@@ -18,7 +18,7 @@ export default function Sidebar() {
   return (
     <aside className="w-56 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700 p-4 flex flex-col gap-2">
       <div className="mb-4">
-        <AppLogo fallbackText="Workspace" />
+        <AppLogo />
       </div>
       {nav.map(item => (
         <Link
