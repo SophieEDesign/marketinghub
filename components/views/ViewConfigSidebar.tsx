@@ -18,7 +18,12 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+
+const toTransformString = (transform: any) => {
+  if (!transform) return "";
+  const { x = 0, y = 0, scaleX = 1, scaleY = 1 } = transform;
+  return `translate3d(${x}px, ${y}px, 0) scaleX(${scaleX}) scaleY(${scaleY})`;
+};
 
 interface ViewConfig {
   visible_fields: string[];
@@ -42,7 +47,7 @@ function SortableFieldItem({ id, label, isVisible, onToggle }: { id: string; lab
   } = useSortable({ id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: toTransformString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
