@@ -41,7 +41,8 @@ export default function CalendarView() {
 
   const handleDateClick = (info: DateSelectArg) => {
     // open new content modal later
-    console.log("Clicked date:", info.dateStr);
+    const dateStr = info.start.toISOString().split("T")[0];
+    console.log("Clicked date:", dateStr);
   };
 
   const handleEventDrop = async (info: EventDropArg) => {
