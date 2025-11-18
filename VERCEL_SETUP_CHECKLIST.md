@@ -9,13 +9,21 @@ Go to your Vercel project dashboard:
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3dHljZ3ZjbGhja2dsbXV3bm13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0Mzg0OTIsImV4cCI6MjA3OTAxNDQ5Mn0.-yOyserJWJgp0WByBxlOBpksNOGdRJTJ-fUiS6lS-H8`
 3. **Redeploy** after adding/updating variables
 
-## ✅ Step 2: Create Supabase Tables
+## ✅ Step 2: Create Missing Supabase Tables & Settings
+
+**IMPORTANT:** Your `content` table already exists, but you need the `settings` table for colors and settings to work!
 
 1. Go to **Supabase Dashboard** → **SQL Editor**
 2. Click **"New query"**
-3. Copy and paste the contents of `supabase-setup.sql` (or see below)
+3. Copy and paste the contents of `supabase-setup-actual.sql` (this matches your existing schema)
 4. Click **"Run"** (or press Ctrl+Enter)
 5. You should see "Success. No rows returned"
+
+This will:
+- ✅ Create the `settings` table (REQUIRED for colors/settings to work)
+- ✅ Add `thumbnail_url` column to your existing `content` table (optional but used by app)
+- ✅ Insert initial settings with all status colors
+- ✅ Set up RLS policies
 
 ### Quick SQL (or use supabase-setup.sql file):
 
