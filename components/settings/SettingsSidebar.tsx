@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSettings } from "@/lib/useSettings";
+import { useSettingsState } from "@/lib/settingsState";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
 import LogoUploader from "./LogoUploader";
 
 export default function SettingsSidebar() {
+  const { open, setOpen } = useSettingsState();
   const { settings, isLoading, updateSettings, updateLogo } = useSettings();
   const [saving, setSaving] = useState(false);
   const [statusColors, setStatusColors] = useState(settings.status_colors || {});
@@ -14,11 +16,11 @@ export default function SettingsSidebar() {
   const [brandingColors, setBrandingColors] = useState(settings.branding_colors || {});
 
   // Sync with settings when they load
-  useState(() => {
+  useEffect(() => {
     if (settings.status_colors) setStatusColors(settings.status_colors);
     if (settings.channel_colors) setChannelColors(settings.channel_colors);
     if (settings.branding_colors) setBrandingColors(settings.branding_colors);
-  });
+  }, [settings]);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -65,21 +67,39 @@ export default function SettingsSidebar() {
     setBrandingColors((prev) => ({ ...prev, [key]: color }));
   };
 
+  if (!open) return null;
+
   if (isLoading) {
     return (
-      <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-300 dark:border-gray-700 p-6">
-        <div className="text-gray-500 dark:text-gray-400">Loading settings...</div>
+      <div className="fixed inset-0 flex justify-end z-50">
+        <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+        <div className="relative w-80 bg-white dark:bg-gray-900 border-r border-gray-300 dark:border-gray-700 p-6">
+          <div className="text-gray-500 dark:text-gray-400">Loading settings...</div>
+        </div>
       </div>
     );
   }
 
   const statusOptions = [
-    "draft",
-    "in-progress",
-    "review",
-    "approved",
-    "published",
-    "archived",
+    "To Do",
+    "Awaiting Information",
+    "In Progress",
+    "Needs Update",
+    "Drafted – Needs Internal Review",
+    "Sent for Approval – Internal (P&M)",
+    "Tech Check Required",
+    "Text Approved – Image Needed",
+    "Approved – Ready to Schedule",
+    "Scheduled",
+    "Completed (Published)",
+    "Event Passed / Out of Date",
+    "Monthly (Recurring)",
+    "Ideas",
+    "Dates for Engagement",
+    "Date Confirmed",
+    "On Hold",
+    "Duplicate",
+    "Cancelled",
   ];
 
   const channelOptions = [
@@ -98,8 +118,24 @@ export default function SettingsSidebar() {
   ];
 
   return (
-    <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-300 dark:border-gray-700 p-6 overflow-y-auto h-full">
-      <h2 className="text-xl font-semibold mb-6">Settings</h2>
+    <div className="fixed inset-0 flex justify-end z-50">
+      {/* Overlay */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={() => setOpen(false)}
+      />
+      
+      {/* Sidebar */}
+      <div className="relative w-80 bg-white dark:bg-gray-900 border-l border-gray-300 dark:border-gray-700 p-6 overflow-y-auto h-full">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold">Settings</h2>
+          <button
+            onClick={() => setOpen(false)}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            ✕
+          </button>
+        </div>
 
       <div className="flex flex-col gap-6">
         {/* Logo Uploader */}

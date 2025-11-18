@@ -1,12 +1,14 @@
 "use client";
 import { useTheme, useDensity } from "@/app/providers";
 import { useModal } from "@/lib/modalState";
+import { useSettingsState } from "@/lib/settingsState";
 import AppLogo from "@/components/branding/AppLogo";
 
 export default function HeaderBar() {
   const themeContext = useTheme();
   const densityContext = useDensity();
   const { setOpen } = useModal();
+  const { setOpen: setSettingsOpen } = useSettingsState();
 
   if (!themeContext || !densityContext) {
     return null;
@@ -26,6 +28,13 @@ export default function HeaderBar() {
           className="px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
         >
           + New
+        </button>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          title="Settings"
+        >
+          ⚙️ Settings
         </button>
         <button
           onClick={() => {

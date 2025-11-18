@@ -5,11 +5,13 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 import { DrawerProvider } from '@/lib/drawerState'
 import { ModalProvider } from '@/lib/modalState'
 import { LinkerProvider } from '@/lib/linkerState'
+import { SettingsProvider } from '@/lib/settingsState'
 import Sidebar from '@/components/Sidebar'
 import HeaderBar from '@/components/HeaderBar'
 import RecordDrawer from '@/components/drawer/RecordDrawer'
 import NewContentModal from '@/components/modal/NewContentModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
+import SettingsSidebar from '@/components/settings/SettingsSidebar'
 
 export const metadata: Metadata = {
   title: 'Marketing Workspace',
@@ -28,7 +30,8 @@ export default function RootLayout({
           <DrawerProvider>
             <ModalProvider>
               <LinkerProvider>
-                <ThemeProvider>
+                <SettingsProvider>
+                  <ThemeProvider>
                   <div className="flex h-screen">
                     <Sidebar />
                     <div className="flex flex-col flex-1">
@@ -39,7 +42,9 @@ export default function RootLayout({
                   <RecordDrawer />
                   <NewContentModal />
                   <LinkedRecordPicker />
+                  <SettingsSidebar />
                 </ThemeProvider>
+                </SettingsProvider>
               </LinkerProvider>
             </ModalProvider>
           </DrawerProvider>
