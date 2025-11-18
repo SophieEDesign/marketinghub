@@ -16,10 +16,11 @@ export default function LinkedRecordPicker() {
 
     async function load() {
       setLoading(true);
-      let query = supabase.from(mode).select("*");
+      const tableName = mode; // TypeScript now knows mode is not null
+      let query = supabase.from(tableName).select("*");
 
       if (search) {
-        const searchField = mode === "campaigns" ? "name" : "name";
+        const searchField = tableName === "campaigns" ? "name" : "name";
         query = query.ilike(searchField, `%${search}%`);
       }
 
