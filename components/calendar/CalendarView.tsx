@@ -8,8 +8,6 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventInput, DateSelectArg, EventDropArg } from "@fullcalendar/core";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
-import "@fullcalendar/core/vdom.css";
-import "@fullcalendar/daygrid/main.css";
 
 export default function CalendarView() {
   const [events, setEvents] = useState<EventInput[]>([]);
