@@ -20,7 +20,7 @@ export default function LinkedRecordPicker() {
       let query = supabase.from(mode!).select("*");
 
       if (search) {
-        const searchField = mode === "campaigns" ? "name" : "name";
+        const searchField = mode! === "campaigns" ? "name" : "name";
         query = query.ilike(searchField, `%${search}%`);
       }
 

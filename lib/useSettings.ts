@@ -38,7 +38,7 @@ const fetcher = async (): Promise<Settings> => {
 };
 
 const getDefaultSettings = (): Settings => ({
-  logo_url: null,
+  logo_url: undefined,
   status_colors: {
     draft: "#9ca3af",
     "in-progress": "#60a5fa",
