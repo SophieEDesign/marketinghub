@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import type { EventInput, DateClickArg, EventDropArg } from "@fullcalendar/core";
+import type { EventInput, EventDropArg } from "@fullcalendar/core";
+import type { DateClickArg } from "@fullcalendar/interaction";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
 
