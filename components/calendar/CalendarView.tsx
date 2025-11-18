@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import type { EventInput, DateSelectArg, EventDropArg } from "@fullcalendar/core";
+import type { EventInput, DateClickArg, EventDropArg } from "@fullcalendar/core";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
 
@@ -39,9 +39,9 @@ export default function CalendarView() {
     load();
   }, []);
 
-  const handleDateClick = (info: DateSelectArg) => {
+  const handleDateClick = (info: DateClickArg) => {
     // open new content modal later
-    const dateStr = info.start.toISOString().split("T")[0];
+    const dateStr = info.dateStr || info.date.toISOString().split("T")[0];
     console.log("Clicked date:", dateStr);
   };
 
