@@ -137,7 +137,7 @@ export default function SettingsSidebar() {
           </button>
         </div>
 
-      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
         {/* Logo Uploader */}
         <div>
           <label className="text-sm font-medium block mb-2">Logo</label>
@@ -267,6 +267,7 @@ export default function SettingsSidebar() {
         >
           {saving ? "Saving..." : "Save Settings"}
         </button>
+        </div>
       </div>
     </div>
   );
