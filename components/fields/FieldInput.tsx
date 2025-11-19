@@ -4,6 +4,7 @@ import { Field, FieldType } from "@/lib/fields";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
 import AttachmentUpload from "./AttachmentUpload";
+import MultiSelectDropdown from "./MultiSelectDropdown";
 
 interface FieldInputProps {
   field: Field;
@@ -90,32 +91,13 @@ export default function FieldInput({ field, value, onChange, error, table, recor
       );
 
     case "multi_select":
-      // For multi-select, we'll use a text input with comma separation for now
-      // In a full implementation, this could be a multi-select dropdown
-      const currentValue = Array.isArray(value) ? value.join(", ") : value || "";
       return (
         <div>
-          <input
-            type="text"
-            className={baseClasses}
-            value={currentValue}
-            onChange={(e) => {
-              const parts = e.target.value
-                .split(",")
-                .map((x) => x.trim())
-                .filter(Boolean);
-              onChange(parts.length > 0 ? parts : null);
-            }}
-            placeholder="Comma-separated values"
-            required={field.required}
+          <MultiSelectDropdown
+            field={field}
+            value={Array.isArray(value) ? value : null}
+            onChange={onChange}
           />
-          {field.field_key === "channels" && Array.isArray(value) && value.length > 0 && (
-            <div className="flex gap-1 mt-2 flex-wrap">
-              {value.map((c: string) => (
-                <ChannelChip key={c} label={c} />
-              ))}
-            </div>
-          )}
           {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
         </div>
       );
