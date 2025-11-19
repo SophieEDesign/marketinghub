@@ -60,19 +60,28 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   // Find thumbnail field
   const thumbnailField = allFields.find((f) => f.type === "attachment");
 
-  // Load view settings on mount
+  // Load view settings on mount (only once)
   useEffect(() => {
-    getViewSettings();
-  }, [getViewSettings]);
+    if (tableId && viewId) {
+      getViewSettings();
+    }
+  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   useEffect(() => {
+    if (!tableId) return;
+    
     async function load() {
       let query = supabase.from(tableId).select("*");
       
       // Apply filters and sort
       query = applyFiltersAndSort(query, filters, sort);
 
-      const { data } = await query;
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Error loading records:", error);
+        return;
+      }
 
       if (data) {
         setRows(data);

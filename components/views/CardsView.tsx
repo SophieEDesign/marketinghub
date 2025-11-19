@@ -35,13 +35,17 @@ export default function CardsView({ tableId }: CardsViewProps) {
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
 
-  // Load view settings on mount
+  // Load view settings on mount (only once)
   useEffect(() => {
-    getViewSettings();
-  }, [getViewSettings]);
+    if (tableId && viewId) {
+      getViewSettings();
+    }
+  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   // Load records with filters and sort
   useEffect(() => {
+    if (!tableId) return;
+    
     async function load() {
       setLoading(true);
       
@@ -59,6 +63,8 @@ export default function CardsView({ tableId }: CardsViewProps) {
       
       if (!error && data) {
         setRows(data);
+      } else if (error) {
+        console.error("Error loading records:", error);
       }
       setLoading(false);
     }

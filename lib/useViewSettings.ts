@@ -21,9 +21,33 @@ export function useViewSettings(tableId: string, viewId: string) {
         .maybeSingle();
 
       if (fetchError) {
+        // If table doesn't exist, just return default settings (don't block UI)
+        if (fetchError.message?.includes("does not exist") || fetchError.code === "42P01") {
+          console.warn("view_settings table does not exist yet. Using default settings. Run the SQL migration to enable persistence.");
+          const defaultSettings: ViewSettings = {
+            id: "",
+            table_id: tableId,
+            view_id: viewId,
+            filters: [],
+            sort: [],
+            updated_at: new Date().toISOString(),
+          };
+          setSettings(defaultSettings);
+          return defaultSettings;
+        }
         console.error("Error fetching view settings:", fetchError);
         setError(fetchError.message);
-        return null;
+        // Still return default settings to not block UI
+        const defaultSettings: ViewSettings = {
+          id: "",
+          table_id: tableId,
+          view_id: viewId,
+          filters: [],
+          sort: [],
+          updated_at: new Date().toISOString(),
+        };
+        setSettings(defaultSettings);
+        return defaultSettings;
       }
 
       if (data) {
@@ -49,8 +73,17 @@ export function useViewSettings(tableId: string, viewId: string) {
       return defaultSettings;
     } catch (err: any) {
       console.error("Error in getViewSettings:", err);
-      setError(err.message);
-      return null;
+      // Return default settings even on error to not block UI
+      const defaultSettings: ViewSettings = {
+        id: "",
+        table_id: tableId,
+        view_id: viewId,
+        filters: [],
+        sort: [],
+        updated_at: new Date().toISOString(),
+      };
+      setSettings(defaultSettings);
+      return defaultSettings;
     } finally {
       setLoading(false);
     }
@@ -102,9 +135,20 @@ export function useViewSettings(tableId: string, viewId: string) {
           }
         }
 
-        // Update local state
-        setSettings((prev) => (prev ? { ...prev, filters, updated_at: new Date().toISOString() } : null));
-        await getViewSettings();
+        // Update local state directly (don't refetch to avoid loops)
+        setSettings((prev) => {
+          if (!prev) {
+            return {
+              id: existing?.id || "",
+              table_id: tableId,
+              view_id: viewId,
+              filters,
+              sort: [],
+              updated_at: new Date().toISOString(),
+            };
+          }
+          return { ...prev, filters, updated_at: new Date().toISOString() };
+        });
         return true;
       } catch (err: any) {
         console.error("Error in saveFilters:", err);
@@ -163,9 +207,20 @@ export function useViewSettings(tableId: string, viewId: string) {
           }
         }
 
-        // Update local state
-        setSettings((prev) => (prev ? { ...prev, sort, updated_at: new Date().toISOString() } : null));
-        await getViewSettings();
+        // Update local state directly (don't refetch to avoid loops)
+        setSettings((prev) => {
+          if (!prev) {
+            return {
+              id: existing?.id || "",
+              table_id: tableId,
+              view_id: viewId,
+              filters: [],
+              sort,
+              updated_at: new Date().toISOString(),
+            };
+          }
+          return { ...prev, sort, updated_at: new Date().toISOString() };
+        });
         return true;
       } catch (err: any) {
         console.error("Error in saveSort:", err);

@@ -55,13 +55,17 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
   ) || allFields.find((f) => f.type === "single_select") || null;
 
-  // Load view settings on mount
+  // Load view settings on mount (only once)
   useEffect(() => {
-    getViewSettings();
-  }, [getViewSettings]);
+    if (tableId && viewId) {
+      getViewSettings();
+    }
+  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   // Load records with filters and sort
   useEffect(() => {
+    if (!tableId) return;
+    
     async function load() {
       setLoading(true);
       
@@ -74,6 +78,8 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
       
       if (!error && data) {
         setRows(data);
+      } else if (error) {
+        console.error("Error loading records:", error);
       }
       setLoading(false);
     }
