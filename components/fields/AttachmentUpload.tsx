@@ -83,14 +83,16 @@ export default function AttachmentUpload({
         console.error("Upload error:", uploadError);
         let errorMessage = "Failed to upload file";
         
-        if (uploadError.message?.includes("Bucket not found")) {
+        const errorMsg = uploadError.message || "";
+        
+        if (errorMsg.includes("Bucket not found")) {
           errorMessage = "Storage bucket 'attachments' not found. Please create it in Supabase Storage.";
-        } else if (uploadError.message?.includes("RLS") || uploadError.message?.includes("row-level security")) {
+        } else if (errorMsg.includes("RLS") || errorMsg.includes("row-level security")) {
           errorMessage = "Permission denied. Please check RLS policies for the 'attachments' bucket.";
-        } else if (uploadError.statusCode === "403") {
+        } else if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
           errorMessage = "Access forbidden. Check bucket permissions.";
         } else {
-          errorMessage = `Upload failed: ${uploadError.message || "Unknown error"}`;
+          errorMessage = `Upload failed: ${errorMsg || "Unknown error"}`;
         }
 
         setError(errorMessage);
