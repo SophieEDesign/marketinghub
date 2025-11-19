@@ -126,7 +126,7 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {lanes.map((lane) => (
+        {lanes.map((lane: { id: string; title: string }) => (
           <KanbanLane
             key={lane.id}
             groupTitle={lane.title}
