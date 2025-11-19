@@ -131,16 +131,17 @@ export function useSettings() {
       });
 
       // Provide more specific error message
-      if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("The resource was not found")) {
+      const errorMsg = uploadError.message || "";
+      if (errorMsg.includes("Bucket not found") || errorMsg.includes("The resource was not found")) {
         throw new Error("Storage bucket 'branding' not found. Please create it in Supabase Storage → Storage → New bucket (name: 'branding', make it Public).");
-      } else if (uploadError.message?.includes("new row violates row-level security") || uploadError.message?.includes("RLS")) {
+      } else if (errorMsg.includes("new row violates row-level security") || errorMsg.includes("RLS")) {
         throw new Error("Permission denied. Please check RLS policies for the 'branding' bucket. Go to Storage → branding → Policies and ensure INSERT is allowed.");
-      } else if (uploadError.statusCode === "403" || uploadError.message?.includes("403")) {
+      } else if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
         throw new Error("Access forbidden. The 'branding' bucket may not be public or RLS policies are blocking uploads.");
-      } else if (uploadError.statusCode === "401" || uploadError.message?.includes("401")) {
+      } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
         throw new Error("Authentication failed. Please check your Supabase credentials.");
       }
-      throw new Error(`Upload failed: ${uploadError.message || uploadError.statusCode || "Unknown error"}`);
+      throw new Error(`Upload failed: ${errorMsg || "Unknown error"}`);
     }
 
     if (!uploadData) {
