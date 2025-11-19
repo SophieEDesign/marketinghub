@@ -3,6 +3,7 @@
 import { Field, FieldType } from "@/lib/fields";
 import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
+import LinkedRecordChip from "../linked/LinkedRecordChip";
 
 interface FieldRendererProps {
   field: Field;
@@ -126,11 +127,27 @@ export default function FieldRenderer({ field, value, record }: FieldRendererPro
       return <span className="text-gray-400">—</span>;
 
     case "linked_record":
-      // For now, just show the ID or related name if available
-      if (record && record[`${field.field_key}_name`]) {
-        return <span>{record[`${field.field_key}_name`]}</span>;
+      // Use LinkedRecordChip for display
+      const linkedRecordId = value;
+      const toTable = field.options?.to_table;
+      const displayField = field.options?.display_field || "name";
+      
+      if (!linkedRecordId || !toTable) {
+        return <span className="text-gray-400">—</span>;
       }
-      return <span className="text-gray-400">—</span>;
+
+      // Try to get display value from record if available (from joined query)
+      if (record && record[`${field.field_key}_${displayField}`]) {
+        return (
+          <LinkedRecordChip
+            displayValue={String(record[`${field.field_key}_${displayField}`])}
+            size="sm"
+          />
+        );
+      }
+
+      // Fallback: show ID (will be replaced by useLinkedRecord hook in views)
+      return <LinkedRecordChip displayValue={String(linkedRecordId)} size="sm" />;
 
     default:
       return <span>{String(value)}</span>;

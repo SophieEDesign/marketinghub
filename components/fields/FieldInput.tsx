@@ -5,6 +5,7 @@ import StatusChip from "../chips/StatusChip";
 import ChannelChip from "../chips/ChannelChip";
 import AttachmentUpload from "./AttachmentUpload";
 import MultiSelectDropdown from "./MultiSelectDropdown";
+import LinkedRecordField from "../linked/LinkedRecordField";
 
 interface FieldInputProps {
   field: Field;
@@ -149,16 +150,14 @@ export default function FieldInput({ field, value, onChange, error, table, recor
       );
 
     case "linked_record":
-      // Linked record picker - use LinkedRecordPicker component
+      // Use LinkedRecordField component
       return (
         <div>
-          <input
-            type="text"
-            className={baseClasses}
-            value={value || ""}
-            onChange={(e) => onChange(e.target.value || null)}
-            placeholder="Record ID (Linked Record Picker coming soon)"
-            required={field.required}
+          <LinkedRecordField
+            field={field}
+            value={value || null}
+            onChange={onChange}
+            editable={true}
           />
           {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
         </div>
