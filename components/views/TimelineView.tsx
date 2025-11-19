@@ -105,8 +105,9 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
         ) : (
           rows.map((row) => {
             const start = row[startField.field_key] ? dayjs(row[startField.field_key]) : dayjs();
-            const end = row[endField?.field_key || startField.field_key]
-              ? dayjs(row[endField.field_key])
+            const endFieldKey = endField?.field_key || startField.field_key;
+            const end = row[endFieldKey]
+              ? dayjs(row[endFieldKey])
               : dayjs().add(1, "day");
 
             // Convert to offset
