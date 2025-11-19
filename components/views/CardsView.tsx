@@ -1,31 +1,61 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
+import { useViewSettings } from "@/lib/useViewSettings";
+import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
+import { Filter, Sort } from "@/lib/types/filters";
 import { useDrawer } from "@/lib/drawerState";
 import FieldRenderer from "../fields/FieldRenderer";
+import ViewHeader from "./ViewHeader";
 
 interface CardsViewProps {
   tableId: string;
 }
 
 export default function CardsView({ tableId }: CardsViewProps) {
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const viewId = pathParts[1] || "cards";
+
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { fields, loading: fieldsLoading } = useFields(tableId);
   const { setOpen, setRecordId, setTableId } = useDrawer();
+  const {
+    settings,
+    getViewSettings,
+    saveFilters,
+    saveSort,
+  } = useViewSettings(tableId, viewId);
 
+  const filters = settings?.filters || [];
+  const sort = settings?.sort || [];
+
+  // Load view settings on mount
+  useEffect(() => {
+    getViewSettings();
+  }, [getViewSettings]);
+
+  // Load records with filters and sort
   useEffect(() => {
     async function load() {
       setLoading(true);
       
-      // Load records
-      const { data, error } = await supabase
-        .from(tableId)
-        .select("*")
-        .order("updated_at", { ascending: false });
+      let query = supabase.from(tableId).select("*");
+      
+      // Apply filters and sort
+      query = applyFiltersAndSort(query, filters, sort);
+      
+      // Default sort if no sort specified
+      if (sort.length === 0) {
+        query = query.order("updated_at", { ascending: false });
+      }
+      
+      const { data, error } = await query;
       
       if (!error && data) {
         setRows(data);
@@ -33,7 +63,20 @@ export default function CardsView({ tableId }: CardsViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId]);
+  }, [tableId, filters, sort]);
+
+  const handleFiltersChange = async (newFilters: Filter[]) => {
+    await saveFilters(newFilters);
+  };
+
+  const handleSortChange = async (newSort: Sort[]) => {
+    await saveSort(newSort);
+  };
+
+  const handleRemoveFilter = async (filterId: string) => {
+    const newFilters = filters.filter((f) => f.id !== filterId);
+    await saveFilters(newFilters);
+  };
 
   if (loading || fieldsLoading) {
     return (
@@ -73,10 +116,20 @@ export default function CardsView({ tableId }: CardsViewProps) {
   ) || fields.find((f) => f.field_key === "publish_date" && f.type === "date");
 
   return (
-    <div
-      className="grid gap-4"
-      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
-    >
+    <div>
+      <ViewHeader
+        fields={fields}
+        filters={filters}
+        sort={sort}
+        onFiltersChange={handleFiltersChange}
+        onSortChange={handleSortChange}
+        onRemoveFilter={handleRemoveFilter}
+      />
+
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}
+      >
       {rows.map((row) => {
         const imageValue = imageField ? row[imageField.field_key] : null;
         const titleValue = titleField ? row[titleField.field_key] : "Untitled";
@@ -138,6 +191,7 @@ export default function CardsView({ tableId }: CardsViewProps) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

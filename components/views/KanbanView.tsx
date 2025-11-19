@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -13,19 +14,36 @@ import {
 } from "@dnd-kit/core";
 import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
+import { useViewSettings } from "@/lib/useViewSettings";
+import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
+import { Filter, Sort } from "@/lib/types/filters";
 import KanbanLane from "../kanban/KanbanLane";
 import KanbanCard from "../kanban/KanbanCard";
+import ViewHeader from "./ViewHeader";
 
 interface KanbanViewProps {
   tableId: string;
 }
 
 export default function KanbanView({ tableId }: KanbanViewProps) {
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const viewId = pathParts[1] || "kanban";
+
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  const {
+    settings,
+    getViewSettings,
+    saveFilters,
+    saveSort,
+  } = useViewSettings(tableId, viewId);
+
+  const filters = settings?.filters || [];
+  const sort = settings?.sort || [];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -37,12 +55,22 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
   ) || allFields.find((f) => f.type === "single_select") || null;
 
+  // Load view settings on mount
+  useEffect(() => {
+    getViewSettings();
+  }, [getViewSettings]);
+
+  // Load records with filters and sort
   useEffect(() => {
     async function load() {
       setLoading(true);
       
-      // Load records
-      const { data, error } = await supabase.from(tableId).select("*");
+      let query = supabase.from(tableId).select("*");
+      
+      // Apply filters and sort
+      query = applyFiltersAndSort(query, filters, sort);
+      
+      const { data, error } = await query;
       
       if (!error && data) {
         setRows(data);
@@ -50,7 +78,20 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId]);
+  }, [tableId, filters, sort]);
+
+  const handleFiltersChange = async (newFilters: Filter[]) => {
+    await saveFilters(newFilters);
+  };
+
+  const handleSortChange = async (newSort: Sort[]) => {
+    await saveSort(newSort);
+  };
+
+  const handleRemoveFilter = async (filterId: string) => {
+    const newFilters = filters.filter((f) => f.id !== filterId);
+    await saveFilters(newFilters);
+  };
 
   function handleDragStart(event: any) {
     setActiveId(event.active.id);
@@ -119,13 +160,23 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   const activeItem = activeId ? rows.find((r) => r.id === activeId) : null;
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCorners}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+    <div>
+      <ViewHeader
+        fields={allFields}
+        filters={filters}
+        sort={sort}
+        onFiltersChange={handleFiltersChange}
+        onSortChange={handleSortChange}
+        onRemoveFilter={handleRemoveFilter}
+      />
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
         {lanes.map((lane: { id: string; title: string }) => (
           <KanbanLane
             key={lane.id}
@@ -145,6 +196,7 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
         ) : null}
       </DragOverlay>
     </DndContext>
+    </div>
   );
 }
 

@@ -1,20 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import dayjs from "dayjs";
 import { useFields } from "@/lib/useFields";
+import { useViewSettings } from "@/lib/useViewSettings";
+import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
+import { Filter, Sort } from "@/lib/types/filters";
 import FieldRenderer from "../fields/FieldRenderer";
+import ViewHeader from "./ViewHeader";
 
 interface TimelineViewProps {
   tableId: string;
 }
 
 export default function TimelineView({ tableId }: TimelineViewProps) {
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const viewId = pathParts[1] || "timeline";
+
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  const {
+    settings,
+    getViewSettings,
+    saveFilters,
+    saveSort,
+  } = useViewSettings(tableId, viewId);
+
+  const filters = settings?.filters || [];
+  const sort = settings?.sort || [];
 
   // Identify timeline start: use created_at field (label = "Created At")
   const startField = allFields.find(
@@ -34,15 +52,26 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
     (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
   );
 
+  // Load view settings on mount
+  useEffect(() => {
+    getViewSettings();
+  }, [getViewSettings]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
       
-      // Load records
-      const { data, error } = await supabase
-        .from(tableId)
-        .select("*")
-        .order(startField?.field_key || "created_at");
+      let query = supabase.from(tableId).select("*");
+      
+      // Apply filters and sort
+      query = applyFiltersAndSort(query, filters, sort);
+      
+      // Default sort if no sort specified
+      if (sort.length === 0 && startField) {
+        query = query.order(startField.field_key, { ascending: true });
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         setRows(data);
@@ -50,7 +79,20 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId, startField]);
+  }, [tableId, startField, filters, sort]);
+
+  const handleFiltersChange = async (newFilters: Filter[]) => {
+    await saveFilters(newFilters);
+  };
+
+  const handleSortChange = async (newSort: Sort[]) => {
+    await saveSort(newSort);
+  };
+
+  const handleRemoveFilter = async (filterId: string) => {
+    const newFilters = filters.filter((f) => f.id !== filterId);
+    await saveFilters(newFilters);
+  };
 
   // Timeline window (60 days forward/backwards)
   const startWindow = dayjs().subtract(30, "day");
@@ -76,7 +118,17 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
   }
 
   return (
-    <div className="w-full p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-x-auto">
+    <div>
+      <ViewHeader
+        fields={allFields}
+        filters={filters}
+        sort={sort}
+        onFiltersChange={handleFiltersChange}
+        onSortChange={handleSortChange}
+        onRemoveFilter={handleRemoveFilter}
+      />
+
+      <div className="w-full p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-x-auto">
       <div className="min-w-[1500px]">
         {/* Timeline header (day scale) */}
         <div className="flex border-b border-gray-300 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900 z-10">
@@ -164,6 +216,7 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

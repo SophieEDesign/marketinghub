@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -8,18 +9,35 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventInput, EventDropArg } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import { useFields } from "@/lib/useFields";
+import { useViewSettings } from "@/lib/useViewSettings";
+import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
+import { Filter, Sort } from "@/lib/types/filters";
 import FieldRenderer from "../fields/FieldRenderer";
+import ViewHeader from "./ViewHeader";
 
 interface CalendarViewProps {
   tableId: string;
 }
 
 export default function CalendarView({ tableId }: CalendarViewProps) {
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const viewId = pathParts[1] || "calendar";
+
   const [events, setEvents] = useState<EventInput[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  const {
+    settings,
+    getViewSettings,
+    saveFilters,
+    saveSort,
+  } = useViewSettings(tableId, viewId);
   const calendarRef = useRef<FullCalendar>(null);
+
+  const filters = settings?.filters || [];
+  const sort = settings?.sort || [];
 
   // Detect date field: prefer "Publish Date", otherwise first date field
   const dateField = allFields.find(
@@ -42,10 +60,19 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   // Find thumbnail field
   const thumbnailField = allFields.find((f) => f.type === "attachment");
 
+  // Load view settings on mount
+  useEffect(() => {
+    getViewSettings();
+  }, [getViewSettings]);
+
   useEffect(() => {
     async function load() {
-      // Load records
-      const { data } = await supabase.from(tableId).select("*");
+      let query = supabase.from(tableId).select("*");
+      
+      // Apply filters and sort
+      query = applyFiltersAndSort(query, filters, sort);
+
+      const { data } = await query;
 
       if (data) {
         setRows(data);
@@ -67,7 +94,20 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
       }
     }
     load();
-  }, [tableId, dateField, titleField]);
+  }, [tableId, dateField, titleField, filters, sort]);
+
+  const handleFiltersChange = async (newFilters: Filter[]) => {
+    await saveFilters(newFilters);
+  };
+
+  const handleSortChange = async (newSort: Sort[]) => {
+    await saveSort(newSort);
+  };
+
+  const handleRemoveFilter = async (filterId: string) => {
+    const newFilters = filters.filter((f) => f.id !== filterId);
+    await saveFilters(newFilters);
+  };
 
   const handleDateClick = (info: DateClickArg) => {
     const dateStr = info.dateStr || info.date.toISOString().split("T")[0];
@@ -151,8 +191,18 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   }
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-      <FullCalendar
+    <div>
+      <ViewHeader
+        fields={allFields}
+        filters={filters}
+        sort={sort}
+        onFiltersChange={handleFiltersChange}
+        onSortChange={handleSortChange}
+        onRemoveFilter={handleRemoveFilter}
+      />
+
+      <div className="p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
+        <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, interactionPlugin]}
         initialView="dayGridMonth"
@@ -168,6 +218,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
           right: "dayGridMonth",
         }}
       />
+      </div>
     </div>
   );
 }
