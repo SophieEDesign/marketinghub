@@ -102,13 +102,13 @@ export default function FieldList({ field, onEdit, onDelete }: FieldListProps) {
       <div className="flex gap-2">
         <button
           onClick={() => onEdit(field)}
-          className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs"
+          className="btn-secondary text-xs"
         >
           Edit
         </button>
         <button
           onClick={() => onDelete(field.id)}
-          className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 transition text-xs"
+          className="px-3 py-1 rounded bg-brand-red text-white hover:bg-brand-redDark transition text-xs"
         >
           Delete
         </button>

@@ -65,7 +65,7 @@ export default function Sidebar() {
     currentTable === tableId && currentView === view;
 
   return (
-    <aside className="w-64 min-h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+    <aside className="w-64 min-h-screen bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col">
       {/* Workspace Header */}
       <WorkspaceHeader />
 
@@ -82,7 +82,7 @@ export default function Sidebar() {
                 {/* Table Header */}
                 <button
                   onClick={() => toggleTable(table.id)}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition ${
+                  className={`w-full flex items-center justify-between px-2 py-2 text-sm font-heading text-brand-blue tracking-wide uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition ${
                     isActive ? "bg-gray-100 dark:bg-gray-800" : ""
                   }`}
                 >
@@ -105,10 +105,10 @@ export default function Sidebar() {
                         <Link
                           key={view}
                           href={href}
-                          className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition ${
+                          className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
                             isActiveView
-                              ? "bg-gray-100 dark:bg-gray-800 font-semibold text-gray-900 dark:text-gray-100 border-l-2 border-blue-600 dark:border-blue-400"
-                              : ""
+                              ? "bg-brand-red text-white font-semibold"
+                              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                           }`}
                         >
                           {getViewIcon(view)}
@@ -131,10 +131,10 @@ export default function Sidebar() {
           <div className="space-y-0.5">
             <Link
               href="/settings/fields"
-              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition ${
+              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
                 pathname === "/settings/fields"
-                  ? "bg-gray-100 dark:bg-gray-800 font-semibold text-gray-900 dark:text-gray-100 border-l-2 border-blue-600 dark:border-blue-400"
-                  : ""
+                  ? "bg-brand-red text-white font-semibold"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <Settings className="w-4 h-4" />
@@ -151,10 +151,10 @@ export default function Sidebar() {
           <div className="space-y-0.5">
             <Link
               href="/import"
-              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100 transition ${
+              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
                 pathname === "/import"
-                  ? "bg-gray-100 dark:bg-gray-800 font-semibold text-gray-900 dark:text-gray-100 border-l-2 border-blue-600 dark:border-blue-400"
-                  : ""
+                  ? "bg-brand-red text-white font-semibold"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />

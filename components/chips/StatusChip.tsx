@@ -63,10 +63,10 @@ export default function StatusChip({ value, size = "md" }: { value: string; size
     const textColor = getContrastColor(statusColorHex);
     return (
       <span
-        className={`inline-flex items-center rounded-full font-medium ${sizeClasses}`}
+        className={`inline-flex items-center rounded-full text-xs font-semibold ${sizeClasses}`}
         style={{
-          backgroundColor: statusColorHex,
-          color: textColor,
+          backgroundColor: statusColorHex + "22",
+          color: statusColorHex,
         }}
       >
         {value || "—"}

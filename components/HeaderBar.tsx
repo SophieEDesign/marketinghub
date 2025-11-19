@@ -3,7 +3,8 @@ import { useTheme, useDensity } from "@/app/providers";
 import { useModal } from "@/lib/modalState";
 import { useSettingsState } from "@/lib/settingsState";
 import { usePathname } from "next/navigation";
-import AppLogo from "@/components/branding/AppLogo";
+import { Moon, Sun } from "lucide-react";
+import { getBrand } from "@/lib/brand";
 
 export default function HeaderBar() {
   const themeContext = useTheme();
@@ -11,6 +12,7 @@ export default function HeaderBar() {
   const { setOpen, setTableId } = useModal();
   const { setOpen: setSettingsOpen } = useSettingsState();
   const pathname = usePathname();
+  const brand = getBrand();
   
   // Extract table ID from path
   const pathParts = pathname.split("/").filter(Boolean);
@@ -22,25 +24,29 @@ export default function HeaderBar() {
 
   const { theme, setTheme } = themeContext;
   const { density, setDensity } = densityContext;
+  const isDark = theme === "dark";
 
   return (
-    <header className="h-14 border-b border-gray-300 dark:border-gray-700 flex items-center justify-between px-6">
-      <div className="flex items-center gap-3">
-        <AppLogo />
+    <header className="h-14 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 bg-brand-blue text-white">
+      <div className="flex items-center gap-2">
+        {brand.logo && (
+          <img src={brand.logo} alt={brand.name} className="h-6 w-auto object-contain" />
+        )}
+        <span className="font-heading tracking-wide text-sm">{brand.name}</span>
       </div>
-      <div className="flex gap-3">
+      <div className="ml-auto flex items-center gap-4">
         <button
           onClick={() => {
             setTableId(currentTable);
             setOpen(true);
           }}
-          className="px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
+          className="btn-primary"
         >
           + New
         </button>
         <button
           onClick={() => setSettingsOpen(true)}
-          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          className="btn-secondary text-white bg-white/10 hover:bg-white/20 border-0"
           title="Settings"
         >
           ⚙️ Settings
@@ -51,16 +57,17 @@ export default function HeaderBar() {
             else if (theme === "dark") setTheme("brand");
             else setTheme("light");
           }}
-          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700"
+          className="p-2 rounded-md hover:bg-white/10 transition"
+          title="Toggle theme"
         >
-          {theme === "light" ? "Dark" : theme === "dark" ? "Brand" : "Light"}
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
-
         <button
           onClick={() =>
             setDensity(density === "comfortable" ? "compact" : "comfortable")
           }
-          className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700"
+          className="p-2 rounded-md hover:bg-white/10 transition text-xs"
+          title="Toggle density"
         >
           {density === "comfortable" ? "Compact" : "Comfortable"}
         </button>

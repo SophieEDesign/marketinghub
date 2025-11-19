@@ -83,13 +83,13 @@ export default function FieldAddModal({ onClose, onAdd }: FieldAddModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+              className="btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
+              className="btn-primary"
             >
               Add Field
             </button>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Inter, League_Spartan } from "next/font/google"
 import './globals.css'
 import { AppProviders } from './providers'
 import { ThemeProvider } from '@/components/ThemeProvider'
@@ -13,6 +14,9 @@ import NewRecordModal from '@/components/modal/NewRecordModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
 import SettingsSidebar from '@/components/settings/SettingsSidebar'
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-body" })
+const spartan = League_Spartan({ subsets: ["latin"], variable: "--font-heading" })
+
 export const metadata: Metadata = {
   title: 'Marketing Workspace',
   description: 'Marketing Hub Application',
@@ -25,7 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-200">
+      <body className={`${inter.variable} ${spartan.variable} font-body bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-200`}>
         <AppProviders>
           <DrawerProvider>
             <ModalProvider>

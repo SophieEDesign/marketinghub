@@ -61,7 +61,7 @@ export default function GridView({ tableId }: GridViewProps) {
         <thead>
           <tr className="text-left border-b border-gray-300 dark:border-gray-700">
             {fields.map((field) => (
-              <th key={field.id} className="p-2 font-medium">
+              <th key={field.id} className="p-2 font-heading uppercase text-xs tracking-wide text-brand-grey">
                 {field.label}
               </th>
             ))}

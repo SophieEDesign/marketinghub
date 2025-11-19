@@ -179,10 +179,10 @@ export default function NewRecordModal() {
       />
 
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
+      <div className="relative bg-white dark:bg-gray-950 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 border border-gray-200 dark:border-gray-700">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold">Create New Record</h2>
+            <h2 className="text-xl font-heading text-brand-blue">Create New Record</h2>
             <button
               onClick={() => setOpen(false)}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -214,14 +214,14 @@ export default function NewRecordModal() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Creating..." : "Create Record"}
               </button>

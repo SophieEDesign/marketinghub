@@ -135,7 +135,7 @@ function FieldManagerContent() {
           <h2 className="text-lg font-semibold">Fields ({fields.length})</h2>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm font-medium"
+            className="btn-primary text-sm"
           >
             + Add Field
           </button>

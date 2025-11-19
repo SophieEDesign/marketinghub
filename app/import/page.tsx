@@ -298,7 +298,7 @@ function ImportPageContent() {
                 <button
                   onClick={() => setStep("preview")}
                   disabled={mappings.filter((m) => m.csvColumn && m.csvColumn !== "IGNORE").length === 0}
-                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue to Preview
                 </button>
@@ -376,7 +376,7 @@ function ImportPageContent() {
                     </h3>
                     <button
                       onClick={handleDownloadErrors}
-                      className="text-sm px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                      className="text-sm btn-primary"
                     >
                       Download Errors CSV
                     </button>
@@ -394,7 +394,7 @@ function ImportPageContent() {
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => router.push(`/${tableId}/grid`)}
-                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition font-medium"
+                  className="btn-primary"
                 >
                   View Data
                 </button>
@@ -407,7 +407,7 @@ function ImportPageContent() {
                     setMappings([]);
                     setImportResult(null);
                   }}
-                  className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  className="btn-secondary"
                 >
                   Import Another File
                 </button>

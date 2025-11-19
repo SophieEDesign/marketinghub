@@ -12,6 +12,17 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        brand: {
+          red: "#e10600",
+          redDark: "#b00000",
+          blue: "#003756",
+          grey: "#4a4f54",
+          light: "#f5f7fa",
+        },
+      },
+      fontFamily: {
+        heading: ["var(--font-heading)", "League Spartan", "sans-serif"],
+        body: ["var(--font-body)", "Inter", "sans-serif"],
       },
     },
   },

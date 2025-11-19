@@ -90,7 +90,7 @@ export default function ImportPreview({
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <th className="px-4 py-3 text-left text-xs font-heading uppercase tracking-wide text-brand-grey">
                   Row
                 </th>
                 {mappings
@@ -100,7 +100,7 @@ export default function ImportPreview({
                     return (
                       <th
                         key={m.fieldId}
-                        className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300"
+                        className="px-4 py-3 text-left text-xs font-heading uppercase tracking-wide text-brand-grey"
                       >
                         {field?.label || m.fieldKey}
                       </th>
@@ -156,13 +156,13 @@ export default function ImportPreview({
       <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
         <button
           onClick={onBack}
-          className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+          className="btn-secondary"
         >
           Back to Mapping
         </button>
         <button
           onClick={onConfirm}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition font-medium"
+          className="btn-primary"
         >
           Confirm & Import
         </button>

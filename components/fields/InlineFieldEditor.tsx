@@ -135,13 +135,13 @@ export default function InlineFieldEditor({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+          className="btn-primary text-xs disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save"}
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          className="btn-secondary text-xs"
         >
           Cancel
         </button>

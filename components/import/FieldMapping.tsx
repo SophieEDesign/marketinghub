@@ -70,13 +70,13 @@ export default function FieldMapping({
         <table className="w-full">
           <thead className="bg-gray-50 dark:bg-gray-800">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <th className="px-4 py-3 text-left text-xs font-heading uppercase tracking-wide text-brand-grey">
                 Supabase Field
               </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <th className="px-4 py-3 text-left text-xs font-heading uppercase tracking-wide text-brand-grey">
                 Type
               </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <th className="px-4 py-3 text-left text-xs font-heading uppercase tracking-wide text-brand-grey">
                 CSV Column
               </th>
             </tr>
@@ -155,7 +155,7 @@ export default function FieldMapping({
                     <span className="text-sm text-gray-700 dark:text-gray-300">{header}</span>
                     <button
                       onClick={() => handleCreateField(header)}
-                      className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                      className="text-xs btn-primary"
                       title={`Create field "${header}" (type: ${finalType})`}
                     >
                       Create Field ({finalType})

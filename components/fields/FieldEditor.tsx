@@ -194,13 +194,13 @@ export default function FieldEditor({
             <div className="flex gap-2 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                className="btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
+                className="btn-primary"
               >
                 Save Changes
               </button>

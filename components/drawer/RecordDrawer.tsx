@@ -72,7 +72,7 @@ export default function RecordDrawer() {
       />
 
       {/* Drawer */}
-      <div className="relative w-[420px] bg-white dark:bg-gray-900 shadow-xl h-full p-6 overflow-y-auto">
+      <div className="relative w-[420px] bg-white dark:bg-gray-950 shadow-xl h-full p-6 overflow-y-auto border-l border-gray-200 dark:border-gray-700">
         {(loading || fieldsLoading) && !row ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-500 dark:text-gray-400">Loading...</div>
@@ -80,11 +80,8 @@ export default function RecordDrawer() {
         ) : row ? (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                {(() => {
-                  const titleField = fields.find((f) => f.label.toLowerCase() === "title");
-                  return titleField ? row[titleField.field_key] || "Record" : "Record";
-                })()}
+              <h2 className="text-lg font-heading text-brand-blue">
+                Edit Record
               </h2>
               <button
                 onClick={() => setOpen(false)}
@@ -115,7 +112,7 @@ export default function RecordDrawer() {
 
               {/* Save */}
               <button
-                className="bg-blue-600 text-white p-2 rounded shadow mt-4 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleSave}
                 disabled={loading}
               >

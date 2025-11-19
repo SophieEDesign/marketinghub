@@ -84,7 +84,7 @@ export default function CardsView({ tableId }: CardsViewProps) {
         return (
           <div
             key={row.id}
-            className="bg-white dark:bg-gray-900 rounded-xl shadow-sm hover:shadow-md overflow-hidden cursor-pointer transition border border-gray-200 dark:border-gray-800"
+            className="bg-white dark:bg-gray-950 shadow-sm border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden cursor-pointer transition hover:shadow-md"
             onClick={() => {
               setTableId(tableId);
               setRecordId(row.id);
