@@ -64,7 +64,7 @@ export default function FieldManager() {
       return;
     }
 
-    await deleteField(fieldId, currentTable, fieldKey);
+    await deleteField(currentTable, fieldId);
     await load();
   }
 
