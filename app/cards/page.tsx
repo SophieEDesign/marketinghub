@@ -1,6 +1,6 @@
-import CardsView from "@/components/cards/CardsView";
+import { redirect } from "next/navigation";
 
 export default function CardsPage() {
-  return <CardsView />;
+  redirect("/content/cards");
 }
 

@@ -2,13 +2,19 @@
 import { useTheme, useDensity } from "@/app/providers";
 import { useModal } from "@/lib/modalState";
 import { useSettingsState } from "@/lib/settingsState";
+import { usePathname } from "next/navigation";
 import AppLogo from "@/components/branding/AppLogo";
 
 export default function HeaderBar() {
   const themeContext = useTheme();
   const densityContext = useDensity();
-  const { setOpen } = useModal();
+  const { setOpen, setTableId } = useModal();
   const { setOpen: setSettingsOpen } = useSettingsState();
+  const pathname = usePathname();
+  
+  // Extract table ID from path
+  const pathParts = pathname.split("/").filter(Boolean);
+  const currentTable = pathParts[0] || "content";
 
   if (!themeContext || !densityContext) {
     return null;
@@ -24,7 +30,10 @@ export default function HeaderBar() {
       </div>
       <div className="flex gap-3">
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setTableId(currentTable);
+            setOpen(true);
+          }}
           className="px-3 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
         >
           + New

@@ -1,244 +1,327 @@
 "use client";
 
-import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useSettings } from "@/lib/useSettings";
-
-type FieldType = "text" | "number" | "select" | "date" | "multi-select" | "checkbox" | "file";
-
-interface FieldDefinition {
-  name: string;
-  type: FieldType;
-  label: string;
-  options?: string[]; // For select/multi-select
-  required?: boolean;
-  default_value?: any;
-}
+import { useState, useEffect } from "react";
+import { loadFields, createField, updateField, deleteField, reorderFields, Field, FieldType } from "@/lib/fields";
+import { usePathname } from "next/navigation";
 
 export default function FieldManager() {
-  const { settings, updateSettings } = useSettings();
-  const [saving, setSaving] = useState(false);
-  const [newField, setNewField] = useState<FieldDefinition>({
-    name: "",
-    type: "text",
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const currentTable = pathParts[0] || "content";
+
+  const [fields, setFields] = useState<Field[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingField, setEditingField] = useState<Field | null>(null);
+  const [showAddField, setShowAddField] = useState(false);
+  const [newField, setNewField] = useState({
     label: "",
+    type: "text" as FieldType,
     required: false,
   });
-  const [selectOptions, setSelectOptions] = useState("");
 
-  const customFields = settings.custom_fields || [];
+  useEffect(() => {
+    load();
+  }, [currentTable]);
 
-  const handleAddField = async () => {
-    if (!newField.name || !newField.label) {
-      alert("Please fill in field name and label");
+  async function load() {
+    setLoading(true);
+    const tableFields = await loadFields(currentTable);
+    setFields(tableFields);
+    setLoading(false);
+  }
+
+  async function handleAddField() {
+    if (!newField.label.trim()) return;
+
+    const fieldKey = newField.label.toLowerCase().replace(/\s+/g, "_");
+    const maxOrder = fields.length > 0 ? Math.max(...fields.map((f) => f.order)) : -1;
+
+    const field = await createField({
+      table_id: currentTable,
+      field_key: fieldKey,
+      label: newField.label,
+      type: newField.type,
+      options: newField.type === "single_select" ? [] : null,
+      order: maxOrder + 1,
+      required: newField.required,
+      visible: true,
+    });
+
+    if (field) {
+      await load();
+      setShowAddField(false);
+      setNewField({ label: "", type: "text", required: false });
+    }
+  }
+
+  async function handleUpdateField(fieldId: string, updates: Partial<Field>) {
+    await updateField(fieldId, updates);
+    await load();
+    setEditingField(null);
+  }
+
+  async function handleDeleteField(fieldId: string, fieldKey: string) {
+    if (!confirm(`Are you sure you want to delete this field? This cannot be undone.`)) {
       return;
     }
 
-    // Validate field name (must be valid SQL identifier)
-    const fieldName = newField.name.toLowerCase().replace(/\s+/g, "_");
-    if (!/^[a-z][a-z0-9_]*$/.test(fieldName)) {
-      alert("Field name must start with a letter and contain only lowercase letters, numbers, and underscores");
-      return;
-    }
+    await deleteField(fieldId, currentTable, fieldKey);
+    await load();
+  }
 
-    setSaving(true);
+  async function handleReorder(newOrder: Field[]) {
+    const fieldIds = newOrder.map((f) => f.id);
+    await reorderFields(fieldIds);
+    await load();
+  }
 
-    try {
-      // Prepare field definition
-      const fieldDef: FieldDefinition = {
-        ...newField,
-        name: fieldName,
-        options: newField.type === "select" || newField.type === "multi-select"
-          ? selectOptions.split(",").map(o => o.trim()).filter(Boolean)
-          : undefined,
-      };
-
-      // Add field to Supabase table using RPC
-      const { error: rpcError } = await supabase.rpc("add_content_field", {
-        field_name: fieldName,
-        field_type: getPostgresType(fieldDef.type),
-      });
-
-      if (rpcError) {
-        // If RPC doesn't exist, try direct SQL (requires admin access)
-        console.warn("RPC not available, field may need to be added manually:", rpcError);
-        alert(`Field definition saved. Note: You may need to manually add the column to the content table in Supabase.\n\nSQL: ALTER TABLE content ADD COLUMN ${fieldName} ${getPostgresType(fieldDef.type)}`);
-      }
-
-      // Save field definition to settings
-      const updatedFields = [...customFields, fieldDef];
-      await updateSettings({ custom_fields: updatedFields });
-
-      // Reset form
-      setNewField({ name: "", type: "text", label: "", required: false });
-      setSelectOptions("");
-      alert("Field added successfully!");
-    } catch (error) {
-      console.error("Error adding field:", error);
-      alert("Failed to add field");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRemoveField = async (fieldName: string) => {
-    if (!confirm(`Remove field "${fieldName}"? This will also remove the column from the database.`)) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      // Remove from settings
-      const updatedFields = customFields.filter((f: FieldDefinition) => f.name !== fieldName);
-      await updateSettings({ custom_fields: updatedFields });
-
-      // Try to remove column (may require admin access)
-      const { error } = await supabase.rpc("remove_content_field", {
-        field_name: fieldName,
-      });
-
-      if (error) {
-        console.warn("Could not remove column automatically:", error);
-        alert(`Field removed from settings. You may need to manually drop the column:\n\nSQL: ALTER TABLE content DROP COLUMN ${fieldName}`);
-      } else {
-        alert("Field removed successfully!");
-      }
-    } catch (error) {
-      console.error("Error removing field:", error);
-      alert("Failed to remove field");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const getPostgresType = (type: FieldType): string => {
-    switch (type) {
-      case "text":
-      case "select":
-        return "TEXT";
-      case "number":
-        return "NUMERIC";
-      case "date":
-        return "DATE";
-      case "multi-select":
-      case "file":
-        return "TEXT[]"; // Array of text
-      case "checkbox":
-        return "BOOLEAN";
-      default:
-        return "TEXT";
-    }
-  };
+  if (loading) {
+    return <div className="text-sm text-gray-500">Loading fields...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <h3 className="text-lg font-semibold">Custom Fields</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Fields</h3>
+        <button
+          onClick={() => setShowAddField(true)}
+          className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm"
+        >
+          + Add Field
+        </button>
+      </div>
 
-      {/* Add new field form */}
-      <div className="p-4 border border-gray-300 dark:border-gray-700 rounded-lg">
-        <h4 className="text-sm font-medium mb-3">Add New Field</h4>
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="text-xs opacity-70 block mb-1">Field Name (lowercase, underscores)</label>
+      {showAddField && (
+        <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          <div className="flex flex-col gap-2">
             <input
               type="text"
-              value={newField.name}
-              onChange={(e) => setNewField({ ...newField, name: e.target.value })}
-              placeholder="field_name"
-              className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs opacity-70 block mb-1">Label</label>
-            <input
-              type="text"
+              placeholder="Field name"
               value={newField.label}
               onChange={(e) => setNewField({ ...newField, label: e.target.value })}
-              placeholder="Field Label"
-              className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm"
+              className="p-2 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700"
             />
-          </div>
-
-          <div>
-            <label className="text-xs opacity-70 block mb-1">Type</label>
             <select
               value={newField.type}
               onChange={(e) => setNewField({ ...newField, type: e.target.value as FieldType })}
-              className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm"
+              className="p-2 rounded bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700"
             >
               <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="select">Select</option>
-              <option value="multi-select">Multi-Select</option>
+              <option value="long_text">Long Text</option>
               <option value="date">Date</option>
-              <option value="checkbox">Checkbox</option>
-              <option value="file">File</option>
+              <option value="single_select">Single Select</option>
+              <option value="multi_select">Multi Select</option>
+              <option value="number">Number</option>
+              <option value="boolean">Boolean</option>
+              <option value="attachment">Attachment</option>
+              <option value="linked_record">Linked Record</option>
             </select>
-          </div>
-
-          {(newField.type === "select" || newField.type === "multi-select") && (
-            <div>
-              <label className="text-xs opacity-70 block mb-1">Options (comma-separated)</label>
+            <label className="flex items-center gap-2">
               <input
-                type="text"
-                value={selectOptions}
-                onChange={(e) => setSelectOptions(e.target.value)}
-                placeholder="Option 1, Option 2, Option 3"
-                className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm"
+                type="checkbox"
+                checked={newField.required}
+                onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
               />
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={newField.required || false}
-              onChange={(e) => setNewField({ ...newField, required: e.target.checked })}
-              className="rounded"
-            />
-            <label className="text-xs">Required</label>
-          </div>
-
-          <button
-            onClick={handleAddField}
-            disabled={saving || !newField.name || !newField.label}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-          >
-            {saving ? "Adding..." : "Add Field"}
-          </button>
-        </div>
-      </div>
-
-      {/* Existing fields */}
-      <div>
-        <h4 className="text-sm font-medium mb-2">Existing Custom Fields</h4>
-        {customFields.length === 0 ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">No custom fields yet</div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {customFields.map((field: FieldDefinition) => (
-              <div
-                key={field.name}
-                className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-800"
+              <span className="text-sm">Required</span>
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddField}
+                className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm"
               >
-                <div>
-                  <span className="text-sm font-medium">{field.label}</span>
-                  <span className="text-xs text-gray-500 ml-2">({field.name})</span>
-                  <span className="text-xs text-gray-400 ml-2">{field.type}</span>
-                </div>
-                <button
-                  onClick={() => handleRemoveField(field.name)}
-                  className="text-red-500 hover:text-red-700 text-sm"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+                Create
+              </button>
+              <button
+                onClick={() => {
+                  setShowAddField(false);
+                  setNewField({ label: "", type: "text", required: false });
+                }}
+                className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {fields.map((field) => (
+          <div
+            key={field.id}
+            className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-between"
+          >
+            <div className="flex-1">
+              <div className="font-medium">{field.label}</div>
+              <div className="text-xs text-gray-500">
+                {field.field_key} • {field.type} {field.required && "• Required"}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditingField(field)}
+                className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition text-xs"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteField(field.id, field.field_key)}
+                className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 transition text-xs"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
+
+      {editingField && (
+        <EditFieldModal
+          field={editingField}
+          onClose={() => setEditingField(null)}
+          onSave={(updates) => handleUpdateField(editingField.id, updates)}
+        />
+      )}
     </div>
   );
 }
 
+function EditFieldModal({
+  field,
+  onClose,
+  onSave,
+}: {
+  field: Field;
+  onClose: () => void;
+  onSave: (updates: Partial<Field>) => void;
+}) {
+  const [label, setLabel] = useState(field.label);
+  const [type, setType] = useState(field.type);
+  const [required, setRequired] = useState(field.required);
+  const [visible, setVisible] = useState(field.visible ?? true);
+  const [options, setOptions] = useState<any[]>(
+    Array.isArray(field.options) ? field.options : []
+  );
+
+  const handleSave = () => {
+    onSave({
+      label,
+      type,
+      required,
+      visible,
+      options: type === "single_select" || type === "multi_select" ? options : undefined,
+    });
+  };
+
+  const addOption = () => {
+    setOptions([...options, { id: `opt_${Date.now()}`, label: "" }]);
+  };
+
+  const updateOption = (index: number, label: string) => {
+    const updated = [...options];
+    updated[index] = { ...updated[index], label };
+    setOptions(updated);
+  };
+
+  const removeOption = (index: number) => {
+    setOptions(options.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md p-6">
+        <h3 className="text-lg font-semibold mb-4">Edit Field</h3>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-sm block mb-1">Label</label>
+            <input
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
+            />
+          </div>
+          <div>
+            <label className="text-sm block mb-1">Type</label>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as FieldType)}
+              className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
+            >
+              <option value="text">Text</option>
+              <option value="long_text">Long Text</option>
+              <option value="date">Date</option>
+              <option value="single_select">Single Select</option>
+              <option value="multi_select">Multi Select</option>
+              <option value="number">Number</option>
+              <option value="boolean">Boolean</option>
+              <option value="attachment">Attachment</option>
+              <option value="linked_record">Linked Record</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={required}
+              onChange={(e) => setRequired(e.target.checked)}
+            />
+            <span className="text-sm">Required</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={visible}
+              onChange={(e) => setVisible(e.target.checked)}
+            />
+            <span className="text-sm">Visible</span>
+          </label>
+          {(type === "single_select" || type === "multi_select") && (
+            <div>
+              <label className="text-sm block mb-1">Options</label>
+              <div className="flex flex-col gap-2">
+                {options.map((opt, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={opt.label}
+                      onChange={(e) => updateOption(idx, e.target.value)}
+                      className="flex-1 p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
+                      placeholder="Option label"
+                    />
+                    <button
+                      onClick={() => removeOption(idx)}
+                      className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700 transition text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={addOption}
+                  className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
+                >
+                  + Add Option
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

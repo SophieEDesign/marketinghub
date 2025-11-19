@@ -1,6 +1,6 @@
-import GridTable from "@/components/grid/GridTable";
+import { redirect } from "next/navigation";
 
 export default function GridPage() {
-  return <GridTable />;
+  redirect("/content/grid");
 }
 

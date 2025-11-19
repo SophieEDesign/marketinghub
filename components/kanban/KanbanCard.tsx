@@ -2,18 +2,19 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { useDrawer } from "@/lib/drawerState";
-import StatusChip from "../chips/StatusChip";
-import ChannelChip from "../chips/ChannelChip";
+import { Field } from "@/lib/fields";
+import FieldRenderer from "../fields/FieldRenderer";
 
 interface KanbanCardProps {
   row: any;
+  fields: Field[];
 }
 
-export default function KanbanCard({ row }: KanbanCardProps) {
+export default function KanbanCard({ row, fields }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: row.id,
   });
-  const { setOpen, setRecordId } = useDrawer();
+  const { setOpen, setRecordId, setTableId } = useDrawer();
 
   const style = transform
     ? {
@@ -25,10 +26,24 @@ export default function KanbanCard({ row }: KanbanCardProps) {
     // Only open drawer if not dragging
     if (!isDragging) {
       e.stopPropagation();
+      // Find tableId from fields
+      const tableId = fields[0]?.table_id || "content";
+      setTableId(tableId);
       setRecordId(row.id);
       setOpen(true);
     }
   };
+
+  // Find fields dynamically
+  const titleField = fields.find((f) => f.label.toLowerCase() === "title") || fields[0];
+  const thumbnailField = fields.find((f) => f.type === "attachment");
+  const statusField = fields.find(
+    (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
+  );
+  const multiSelectFields = fields.filter((f) => f.type === "multi_select");
+
+  const titleValue = titleField ? row[titleField.field_key] : "Untitled";
+  const thumbnailValue = thumbnailField ? row[thumbnailField.field_key] : null;
 
   return (
     <div
@@ -41,34 +56,44 @@ export default function KanbanCard({ row }: KanbanCardProps) {
         isDragging ? "opacity-50" : ""
       }`}
     >
-      {row.thumbnail_url ? (
+      {/* Thumbnail */}
+      {thumbnailValue ? (
         <img
-          src={row.thumbnail_url}
-          alt={row.title || "Content thumbnail"}
+          src={Array.isArray(thumbnailValue) ? thumbnailValue[0] : thumbnailValue}
+          alt={String(titleValue)}
           className="w-full h-24 object-cover rounded-md"
         />
       ) : (
         <div className="w-full h-24 bg-gray-300 dark:bg-gray-700 rounded-md" />
       )}
 
-      <h3 className="font-medium text-sm line-clamp-2">{row.title || "Untitled"}</h3>
+      {/* Title */}
+      <h3 className="font-medium text-sm line-clamp-2">{String(titleValue)}</h3>
 
-      <div className="flex items-center gap-1">
-        <StatusChip value={row.status} />
-      </div>
-
-      {row.channels && row.channels.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {row.channels.slice(0, 3).map((ch: string) => (
-            <ChannelChip key={ch} label={ch} />
-          ))}
-          {row.channels.length > 3 && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              +{row.channels.length - 3}
-            </span>
-          )}
+      {/* Status */}
+      {statusField && (
+        <div className="flex items-center gap-1">
+          <FieldRenderer field={statusField} value={row[statusField.field_key]} record={row} />
         </div>
       )}
+
+      {/* Multi-select fields (channels, etc.) */}
+      {multiSelectFields.map((field) => {
+        const value = row[field.field_key];
+        if (!value || !Array.isArray(value) || value.length === 0) return null;
+        return (
+          <div key={field.id} className="flex flex-wrap gap-1">
+            {value.slice(0, 3).map((item: string, idx: number) => (
+              <FieldRenderer key={idx} field={field} value={[item]} record={row} />
+            ))}
+            {value.length > 3 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                +{value.length - 3}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

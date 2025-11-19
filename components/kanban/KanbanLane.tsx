@@ -1,15 +1,17 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
+import { Field } from "@/lib/fields";
 import KanbanCard from "./KanbanCard";
 
 interface KanbanLaneProps {
   groupTitle: string;
   statuses: string[];
   items: any[];
+  fields: Field[];
 }
 
-export default function KanbanLane({ groupTitle, statuses, items }: KanbanLaneProps) {
+export default function KanbanLane({ groupTitle, statuses, items, fields }: KanbanLaneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: groupTitle,
   });
@@ -28,7 +30,7 @@ export default function KanbanLane({ groupTitle, statuses, items }: KanbanLanePr
             No items
           </div>
         ) : (
-          items.map((item) => <KanbanCard key={item.id} row={item} />)
+          items.map((item) => <KanbanCard key={item.id} row={item} fields={fields} />)
         )}
       </div>
     </div>

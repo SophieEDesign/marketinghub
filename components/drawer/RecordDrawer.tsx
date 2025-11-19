@@ -2,54 +2,62 @@
 
 import { useDrawer } from "@/lib/drawerState";
 import { supabase } from "@/lib/supabaseClient";
-import StatusChip from "../chips/StatusChip";
-import ChannelChip from "../chips/ChannelChip";
-import FileUpload from "../uploader/FileUpload";
 import { useEffect, useState } from "react";
+import { useFields } from "@/lib/useFields";
+import FieldInput from "../fields/FieldInput";
 
 export default function RecordDrawer() {
-  const { open, setOpen, recordId } = useDrawer();
+  const { open, setOpen, recordId, tableId } = useDrawer();
   const [row, setRow] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const { fields: allFields, loading: fieldsLoading } = useFields(tableId || "");
+
+  // Filter visible fields, exclude id
+  const fields = allFields.filter((f) => f.visible !== false && f.field_key !== "id");
 
   useEffect(() => {
-    if (!recordId) {
+    if (!recordId || !tableId) {
       setRow(null);
       return;
     }
 
     async function load() {
       setLoading(true);
+      
+      // Load record
       const { data } = await supabase
-        .from("content")
-        .select("*, campaigns(name)")
+        .from(tableId)
+        .select("*")
         .eq("id", recordId)
         .maybeSingle();
+      
       setRow(data);
       setLoading(false);
     }
     load();
-  }, [recordId]);
+  }, [recordId, tableId]);
 
   if (!open) return null;
 
   const handleSave = async () => {
-    if (!row) return;
+    if (!row || !tableId) return;
     
     setLoading(true);
+    
+    // Prepare update data
+    const updateData: Record<string, any> = {};
+    fields.forEach((field) => {
+      const value = row[field.field_key];
+      updateData[field.field_key] = value;
+    });
+
     const { error } = await supabase
-      .from("content")
-      .update({
-        title: row.title,
-        status: row.status,
-        channels: row.channels,
-        description: row.description,
-      })
+      .from(tableId)
+      .update(updateData)
       .eq("id", row.id);
 
     if (!error) {
       setOpen(false);
-      // Optionally refresh the page or trigger a refetch
       window.location.reload();
     }
     setLoading(false);
@@ -65,14 +73,19 @@ export default function RecordDrawer() {
 
       {/* Drawer */}
       <div className="relative w-[420px] bg-white dark:bg-gray-900 shadow-xl h-full p-6 overflow-y-auto">
-        {loading && !row ? (
+        {(loading || fieldsLoading) && !row ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-gray-500 dark:text-gray-400">Loading...</div>
           </div>
         ) : row ? (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">{row.title || "Untitled"}</h2>
+              <h2 className="text-xl font-semibold">
+                {(() => {
+                  const titleField = fields.find((f) => f.label.toLowerCase() === "title");
+                  return titleField ? row[titleField.field_key] || "Record" : "Record";
+                })()}
+              </h2>
               <button
                 onClick={() => setOpen(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -83,109 +96,22 @@ export default function RecordDrawer() {
 
             {/* Editable fields */}
             <div className="flex flex-col gap-4">
-              {/* Title */}
-              <div>
-                <label className="text-sm opacity-70 block mb-1">Title</label>
-                <input
-                  className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
-                  value={row.title || ""}
-                  onChange={(e) => setRow({ ...row, title: e.target.value })}
-                />
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="text-sm opacity-70 block mb-1">Status</label>
-                <select
-                  value={row.status || ""}
-                  onChange={(e) => setRow({ ...row, status: e.target.value })}
-                  className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
-                >
-                  <option value="">Select status...</option>
-                  <option>To Do</option>
-                  <option>Awaiting Information</option>
-                  <option>In Progress</option>
-                  <option>Needs Update</option>
-                  <option>Drafted – Needs Internal Review</option>
-                  <option>Sent for Approval – Internal (P&M)</option>
-                  <option>Tech Check Required</option>
-                  <option>Text Approved – Image Needed</option>
-                  <option>Approved – Ready to Schedule</option>
-                  <option>Scheduled</option>
-                  <option>Completed (Published)</option>
-                  <option>Event Passed / Out of Date</option>
-                  <option>Monthly (Recurring)</option>
-                  <option>Ideas</option>
-                  <option>Dates for Engagement</option>
-                  <option>Date Confirmed</option>
-                  <option>On Hold</option>
-                  <option>Duplicate</option>
-                  <option>Cancelled</option>
-                </select>
-                {row.status && (
-                  <div className="mt-2">
-                    <StatusChip value={row.status} />
-                  </div>
-                )}
-              </div>
-
-              {/* Channels */}
-              <div>
-                <label className="text-sm opacity-70 block mb-1">Channels</label>
-                <input
-                  className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
-                  value={row.channels?.join(", ") || ""}
-                  onChange={(e) => {
-                    const list = e.target.value
-                      .split(",")
-                      .map((x) => x.trim())
-                      .filter(Boolean);
-                    setRow({ ...row, channels: list });
-                  }}
-                  placeholder="LinkedIn, Instagram, Facebook"
-                />
-                {row.channels && row.channels.length > 0 && (
-                  <div className="flex gap-1 mt-2 flex-wrap">
-                    {row.channels.map((c: string) => (
-                      <ChannelChip key={c} label={c} />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="text-sm opacity-70 block mb-1">Description</label>
-                <textarea
-                  className="w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 h-28 resize-none"
-                  value={row.description || ""}
-                  onChange={(e) => setRow({ ...row, description: e.target.value })}
-                  placeholder="Enter description..."
-                />
-              </div>
-
-              {/* Publish Date */}
-              {row.publish_date && (
-                <div>
-                  <label className="text-sm opacity-70 block mb-1">Publish Date</label>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {new Date(row.publish_date).toLocaleDateString()}
-                  </div>
+              {fields.map((field) => (
+                <div key={field.id}>
+                  <label className="text-sm opacity-70 block mb-1">
+                    {field.label} {field.required && "*"}
+                  </label>
+                  <FieldInput
+                    field={field}
+                    value={row[field.field_key]}
+                    onChange={(value) =>
+                      setRow({ ...row, [field.field_key]: value })
+                    }
+                    table={tableId || undefined}
+                    recordId={recordId || null}
+                  />
                 </div>
-              )}
-
-              {/* Campaign */}
-              {row.campaigns?.name && (
-                <div>
-                  <label className="text-sm opacity-70 block mb-1">Campaign</label>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {row.campaigns.name}
-                  </div>
-                </div>
-              )}
-
-              {/* File Upload */}
-              <FileUpload recordId={row.id} />
+              ))}
 
               {/* Save */}
               <button
@@ -206,4 +132,3 @@ export default function RecordDrawer() {
     </div>
   );
 }
-

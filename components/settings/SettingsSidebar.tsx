@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSettings } from "@/lib/useSettings";
 import { useSettingsState } from "@/lib/settingsState";
 import StatusChip from "../chips/StatusChip";
@@ -9,7 +10,7 @@ import LogoUploader from "./LogoUploader";
 
 export default function SettingsSidebar() {
   const { open, setOpen } = useSettingsState();
-  const { settings, isLoading, updateSettings, updateLogo } = useSettings();
+  const { settings, isLoading, updateSettings } = useSettings();
   const [saving, setSaving] = useState(false);
   const [statusColors, setStatusColors] = useState(settings.status_colors || {});
   const [channelColors, setChannelColors] = useState(settings.channel_colors || {});
@@ -21,22 +22,6 @@ export default function SettingsSidebar() {
     if (settings.channel_colors) setChannelColors(settings.channel_colors);
     if (settings.branding_colors) setBrandingColors(settings.branding_colors);
   }, [settings]);
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setSaving(true);
-    try {
-      await updateLogo(file);
-    } catch (error) {
-      console.error("Error uploading logo:", error);
-      alert("Failed to upload logo");
-    } finally {
-      setSaving(false);
-      e.target.value = "";
-    }
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -138,31 +123,6 @@ export default function SettingsSidebar() {
         </div>
 
         <div className="flex flex-col gap-6">
-        {/* Logo Uploader */}
-        <div>
-          <label className="text-sm font-medium block mb-2">Logo</label>
-          {settings.logo_url ? (
-            <div className="mb-2">
-              <img
-                src={settings.logo_url}
-                alt="Logo"
-                className="h-16 w-auto object-contain"
-              />
-            </div>
-          ) : (
-            <div className="h-16 w-32 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center text-xs text-gray-500 mb-2">
-              No logo
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleLogoUpload}
-            disabled={saving}
-            className="w-full text-sm file:mr-4 file:py-1 file:px-2 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 disabled:opacity-50"
-          />
-        </div>
-
         {/* Status Colors */}
         <div>
           <label className="text-sm font-medium block mb-3">Status Colors</label>
@@ -253,10 +213,37 @@ export default function SettingsSidebar() {
           </div>
         </div>
 
+        {/* Field Manager Link */}
+        <div className="mt-6 border-t pt-4">
+          <h3 className="font-semibold mb-2">Field Management</h3>
+          <Link
+            href="/settings/fields?table=content"
+            className="block px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm text-center"
+          >
+            Open Field Manager →
+          </Link>
+        </div>
+
         {/* Branding Section */}
         <div className="mt-6 border-t pt-4">
           <h3 className="font-semibold mb-2">Branding</h3>
-          <LogoUploader />
+          <div>
+            <label className="text-sm font-medium block mb-2">Logo</label>
+            {settings.logo_url ? (
+              <div className="mb-2">
+                <img
+                  src={settings.logo_url}
+                  alt="Logo"
+                  className="h-16 w-auto object-contain"
+                />
+              </div>
+            ) : (
+              <div className="h-16 w-32 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center text-xs text-gray-500 mb-2">
+                No logo
+              </div>
+            )}
+            <LogoUploader />
+          </div>
         </div>
 
         {/* Save Button */}

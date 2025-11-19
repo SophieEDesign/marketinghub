@@ -101,27 +101,70 @@ export function useSettings() {
   };
 
   const updateLogo = async (file: File) => {
+    // Validate file
+    if (!file) {
+      throw new Error("No file provided");
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("File size must be less than 5MB");
+    }
+
     // Upload logo to Supabase Storage (branding bucket)
-    const fileExt = file.name.split(".").pop();
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "png";
     const fileName = `logo.${fileExt}`;
     const filePath = fileName;
 
+    console.log("Uploading logo:", { fileName, filePath, size: file.size, type: file.type });
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("branding")
-      .upload(filePath, file, { upsert: true });
+      .upload(filePath, file, { 
+        upsert: true,
+        contentType: file.type || `image/${fileExt}`,
+      });
 
     if (uploadError) {
-      console.error("Error uploading logo:", uploadError);
-      throw uploadError;
+      console.error("Upload error details:", {
+        message: uploadError.message,
+        statusCode: uploadError.statusCode,
+        error: uploadError,
+      });
+
+      // Provide more specific error message
+      if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("The resource was not found")) {
+        throw new Error("Storage bucket 'branding' not found. Please create it in Supabase Storage → Storage → New bucket (name: 'branding', make it Public).");
+      } else if (uploadError.message?.includes("new row violates row-level security") || uploadError.message?.includes("RLS")) {
+        throw new Error("Permission denied. Please check RLS policies for the 'branding' bucket. Go to Storage → branding → Policies and ensure INSERT is allowed.");
+      } else if (uploadError.statusCode === "403" || uploadError.message?.includes("403")) {
+        throw new Error("Access forbidden. The 'branding' bucket may not be public or RLS policies are blocking uploads.");
+      } else if (uploadError.statusCode === "401" || uploadError.message?.includes("401")) {
+        throw new Error("Authentication failed. Please check your Supabase credentials.");
+      }
+      throw new Error(`Upload failed: ${uploadError.message || uploadError.statusCode || "Unknown error"}`);
     }
+
+    if (!uploadData) {
+      throw new Error("Upload succeeded but no data returned");
+    }
+
+    console.log("Upload successful:", uploadData);
 
     // Get public URL
     const {
       data: { publicUrl },
     } = supabase.storage.from("branding").getPublicUrl(filePath);
 
+    console.log("Public URL:", publicUrl);
+
+    if (!publicUrl) {
+      throw new Error("Failed to get public URL for uploaded file");
+    }
+
     // Update settings
     await updateSettings({ logo_url: publicUrl });
+    
+    console.log("Settings updated with logo URL");
   };
 
   return {

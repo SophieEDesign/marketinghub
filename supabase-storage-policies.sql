@@ -1,0 +1,81 @@
+-- ============================================
+-- SUPABASE STORAGE SETUP GUIDE
+-- ============================================
+-- NOTE: Storage policies cannot be set via SQL in Supabase
+-- You must use the Dashboard UI or make buckets Public
+-- ============================================
+
+-- ============================================
+-- METHOD 1: MAKE BUCKETS PUBLIC (EASIEST)
+-- ============================================
+-- This is the simplest approach and recommended for development
+--
+-- Steps:
+-- 1. Go to Supabase Dashboard → Storage
+-- 2. Click on "attachments" bucket (or create it if it doesn't exist)
+-- 3. Click "Settings" tab
+-- 4. Enable "Public bucket" toggle
+-- 5. Click "Save"
+-- 6. Repeat for "branding" bucket
+--
+-- That's it! Public buckets allow all operations without RLS policies.
+-- ============================================
+
+-- ============================================
+-- METHOD 2: SET UP RLS POLICIES (VIA DASHBOARD)
+-- ============================================
+-- If you prefer to use RLS policies instead of public buckets:
+--
+-- For "attachments" bucket:
+-- 1. Go to Storage → attachments → "Policies" tab
+-- 2. Click "New Policy"
+-- 3. Select "For full customization"
+-- 4. Create these 4 policies:
+--
+--    Policy 1: SELECT (View/Download)
+--    - Policy name: "Allow public SELECT"
+--    - Allowed operation: SELECT
+--    - Policy definition: true
+--    - Check expression: true
+--
+--    Policy 2: INSERT (Upload)
+--    - Policy name: "Allow public INSERT"
+--    - Allowed operation: INSERT
+--    - Policy definition: true
+--    - Check expression: true
+--
+--    Policy 3: UPDATE (Overwrite)
+--    - Policy name: "Allow public UPDATE"
+--    - Allowed operation: UPDATE
+--    - Policy definition: true
+--    - Check expression: true
+--
+--    Policy 4: DELETE (Remove)
+--    - Policy name: "Allow public DELETE"
+--    - Allowed operation: DELETE
+--    - Policy definition: true
+--    - Check expression: true
+--
+-- Repeat the same 4 policies for "branding" bucket.
+-- ============================================
+
+-- ============================================
+-- VERIFY SETUP
+-- ============================================
+-- After setup, verify:
+-- 1. Storage → Both "attachments" and "branding" buckets exist
+-- 2. Both buckets are either:
+--    - Set to "Public bucket" (easiest), OR
+--    - Have 4 RLS policies each (SELECT, INSERT, UPDATE, DELETE)
+-- 3. Test by uploading a file through the app
+-- ============================================
+
+-- ============================================
+-- TROUBLESHOOTING
+-- ============================================
+-- If uploads still fail:
+-- 1. Check bucket exists: Storage → Should see both buckets
+-- 2. Check bucket is public: Storage → [bucket] → Settings → "Public bucket" enabled
+-- 3. Check policies: Storage → [bucket] → Policies → Should see 4 policies
+-- 4. Check browser console (F12) for specific error messages
+-- ============================================

@@ -1,6 +1,6 @@
-import CalendarView from "@/components/calendar/CalendarView";
+import { redirect } from "next/navigation";
 
 export default function CalendarPage() {
-  return <CalendarView />;
+  redirect("/content/calendar");
 }
 

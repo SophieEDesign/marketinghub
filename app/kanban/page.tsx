@@ -1,6 +1,6 @@
-import KanbanBoard from "@/components/kanban/KanbanBoard";
+import { redirect } from "next/navigation";
 
 export default function KanbanPage() {
-  return <KanbanBoard />;
+  redirect("/content/kanban");
 }
 

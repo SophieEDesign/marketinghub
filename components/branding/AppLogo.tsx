@@ -1,22 +1,19 @@
 "use client";
 
-import useSWR from "swr";
-import { supabase } from "@/lib/supabaseClient";
+import { useSettings } from "@/lib/useSettings";
 
 export default function AppLogo() {
-  // Load settings
-  async function fetchSettings() {
-    const { data } = await supabase
-      .from("settings")
-      .select("*")
-      .eq("key", "branding")
-      .single();
-    return data?.value || {};
+  const { settings, isLoading } = useSettings();
+
+  if (isLoading) {
+    return (
+      <div className="text-lg font-bold opacity-70">
+        Workspace
+      </div>
+    );
   }
 
-  const { data } = useSWR("branding-settings", fetchSettings);
-
-  if (!data?.logo_url) {
+  if (!settings.logo_url) {
     return (
       <div className="text-lg font-bold opacity-70">
         Workspace
@@ -26,9 +23,21 @@ export default function AppLogo() {
 
   return (
     <img
-      src={data.logo_url}
+      src={settings.logo_url}
       alt="Logo"
       className="h-8 w-auto object-contain"
+      onError={(e) => {
+        // If image fails to load, show fallback
+        const target = e.target as HTMLImageElement;
+        target.style.display = 'none';
+        const parent = target.parentElement;
+        if (parent && !parent.querySelector('.logo-fallback')) {
+          const fallback = document.createElement('div');
+          fallback.className = 'text-lg font-bold opacity-70 logo-fallback';
+          fallback.textContent = 'Workspace';
+          parent.appendChild(fallback);
+        }
+      }}
     />
   );
 }

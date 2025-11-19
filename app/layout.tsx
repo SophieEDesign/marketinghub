@@ -9,7 +9,7 @@ import { SettingsProvider } from '@/lib/settingsState'
 import Sidebar from '@/components/Sidebar'
 import HeaderBar from '@/components/HeaderBar'
 import RecordDrawer from '@/components/drawer/RecordDrawer'
-import NewContentModal from '@/components/modal/NewContentModal'
+import NewRecordModal from '@/components/modal/NewRecordModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
 import SettingsSidebar from '@/components/settings/SettingsSidebar'
 
@@ -40,7 +40,7 @@ export default function RootLayout({
                     </div>
                   </div>
                   <RecordDrawer />
-                  <NewContentModal />
+                  <NewRecordModal />
                   <LinkedRecordPicker />
                   <SettingsSidebar />
                 </ThemeProvider>

@@ -24,7 +24,18 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Insert Initial Settings (this is what makes colors and settings work!)
+-- 3. Add attachments column to content table (if it doesn't exist)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'content' AND column_name = 'attachments'
+  ) THEN
+    ALTER TABLE content ADD COLUMN attachments TEXT[];
+  END IF;
+END $$;
+
+-- 4. Insert Initial Settings (this is what makes colors and settings work!)
 INSERT INTO settings (key, value)
 VALUES (
   'app_settings',
@@ -79,11 +90,11 @@ ON CONFLICT (key) DO UPDATE SET
   value = EXCLUDED.value,
   updated_at = NOW();
 
--- 4. Enable Row Level Security (RLS) if not already enabled
+-- 5. Enable Row Level Security (RLS) if not already enabled
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE content ENABLE ROW LEVEL SECURITY;
 
--- 5. Create RLS Policies for settings table
+-- 6. Create RLS Policies for settings table
 DROP POLICY IF EXISTS "Allow public read access to settings" ON settings;
 CREATE POLICY "Allow public read access to settings" ON settings
   FOR SELECT USING (true);
@@ -96,7 +107,7 @@ DROP POLICY IF EXISTS "Allow public update access to settings" ON settings;
 CREATE POLICY "Allow public update access to settings" ON settings
   FOR UPDATE USING (true);
 
--- 6. Create RLS Policies for content table (if they don't exist)
+-- 7. Create RLS Policies for content table (if they don't exist)
 DO $$ 
 BEGIN
   -- Check and create SELECT policy
@@ -141,7 +152,7 @@ END $$;
 -- ============================================
 -- After running, check:
 -- 1. Table Editor → settings table exists with key = 'app_settings'
--- 2. Table Editor → content table has thumbnail_url column
+-- 2. Table Editor → content table has thumbnail_url and attachments columns
 -- 3. Storage → buckets: attachments, branding (both Public)
 -- ============================================
 
