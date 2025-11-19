@@ -112,7 +112,7 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
 
   // Group items by kanban field value
   const groupedItems: Record<string, any[]> = {};
-  lanes.forEach((lane) => {
+  lanes.forEach((lane: { id: string; title: string }) => {
     groupedItems[lane.id] = rows.filter((r) => r[kanbanField.field_key] === lane.id);
   });
 
