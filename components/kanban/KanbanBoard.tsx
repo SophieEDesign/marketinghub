@@ -12,6 +12,7 @@ import {
   DragEndEvent,
 } from "@dnd-kit/core";
 import { supabase } from "@/lib/supabaseClient";
+import { useFields } from "@/lib/useFields";
 import KanbanLane from "./KanbanLane";
 import KanbanCard from "./KanbanCard";
 
@@ -46,6 +47,7 @@ export default function KanbanBoard() {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { fields: allFields } = useFields("content");
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -134,6 +136,7 @@ export default function KanbanBoard() {
               groupTitle={group.title}
               statuses={group.statuses}
               items={groupItems}
+              fields={allFields}
             />
           );
         })}
@@ -142,7 +145,7 @@ export default function KanbanBoard() {
       <DragOverlay>
         {activeItem ? (
           <div className="rotate-3 opacity-90">
-            <KanbanCard row={activeItem} />
+            <KanbanCard row={activeItem} fields={allFields} />
           </div>
         ) : null}
       </DragOverlay>
