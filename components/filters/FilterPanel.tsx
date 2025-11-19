@@ -153,6 +153,74 @@ export default function FilterPanel({
           </select>
         );
 
+      case "multi_select":
+        const multiSelectOptions = field.options?.values || [];
+        if (filter.operator === "includes_any_of") {
+          // Multi-select for "includes any of" - allows multiple values
+          return (
+            <div className="space-y-2">
+              {Array.isArray(filter.value) && filter.value.length > 0 ? (
+                filter.value.map((val: string, idx: number) => (
+                  <div key={idx} className="flex gap-2">
+                    <select
+                      value={val || ""}
+                      onChange={(e) => {
+                        const newValue = [...(filter.value || [])];
+                        newValue[idx] = e.target.value;
+                        updateFilter(filter.id, { value: newValue });
+                      }}
+                      className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    >
+                      <option value="">Select option...</option>
+                      {multiSelectOptions.map((opt: any) => (
+                        <option key={opt.id || opt.label} value={opt.id || opt.label}>
+                          {opt.label || opt.id}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const newValue = [...(filter.value || [])];
+                        newValue.splice(idx, 1);
+                        updateFilter(filter.id, { value: newValue.length > 0 ? newValue : [] });
+                      }}
+                      className="px-2 text-red-600 hover:text-red-700"
+                      title="Remove value"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              ) : null}
+              <button
+                onClick={() => {
+                  const newValue = Array.isArray(filter.value) ? [...filter.value, ""] : [""];
+                  updateFilter(filter.id, { value: newValue });
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" />
+                Add value
+              </button>
+            </div>
+          );
+        }
+        // Single value for "includes" or "contains"
+        return (
+          <select
+            value={filter.value || ""}
+            onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
+            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+          >
+            <option value="">Select option...</option>
+            {multiSelectOptions.map((opt: any) => (
+              <option key={opt.id || opt.label} value={opt.id || opt.label}>
+                {opt.label || opt.id}
+              </option>
+            ))}
+          </select>
+        );
+
       case "boolean":
         return (
           <select
