@@ -83,11 +83,33 @@ export function applyFilters(
         break;
 
       case "in_range":
+      case "range":
         if (Array.isArray(value) && value.length === 2) {
           const [start, end] = value;
           const startStr = typeof start === "string" ? start.split("T")[0] : start;
           const endStr = typeof end === "string" ? end.split("T")[0] : end;
           filteredQuery = filteredQuery.gte(field, `${startStr}T00:00:00`).lte(field, `${endStr}T23:59:59`);
+        }
+        break;
+
+      case "includes":
+        // For multi-select: check if array field contains value
+        if (Array.isArray(value)) {
+          // If value is array, check if field array contains any of them
+          filteredQuery = filteredQuery.contains(field, value);
+        } else {
+          // Single value: check if field array contains this value
+          filteredQuery = filteredQuery.contains(field, [value]);
+        }
+        break;
+
+      case "includes_any_of":
+        // For multi-select: check if array field contains any of the values
+        if (Array.isArray(value)) {
+          // Use OR logic: field contains value[0] OR value[1] OR ...
+          // Supabase doesn't have direct "contains any" so we use OR with multiple contains
+          const orConditions = value.map((v) => `${field}.cs.{${v}}`).join(",");
+          filteredQuery = filteredQuery.or(orConditions);
         }
         break;
 

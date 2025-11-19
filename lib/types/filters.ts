@@ -7,6 +7,8 @@ export type FilterOperator =
   | "not_equals"
   | "contains"
   | "not_contains"
+  | "includes"
+  | "includes_any_of"
   | "is_empty"
   | "is_not_empty"
   | "greater_than"
@@ -17,6 +19,7 @@ export type FilterOperator =
   | "before"
   | "after"
   | "in_range"
+  | "range"
   | "in"
   | "not_in";
 
@@ -70,7 +73,7 @@ export function getOperatorsForFieldType(fieldType: string): FilterOperator[] {
       return ["equals", "not_equals", "in", "not_in", "is_empty", "is_not_empty"];
 
     case "multi_select":
-      return ["contains", "not_contains", "is_empty", "is_not_empty"];
+      return ["contains", "not_contains", "includes", "includes_any_of", "is_empty", "is_not_empty"];
 
     case "boolean":
       return ["equals", "is_empty", "is_not_empty"];
@@ -102,8 +105,11 @@ export function getOperatorLabel(operator: FilterOperator): string {
     before: "is before",
     after: "is after",
     in_range: "is between",
+    range: "is between",
     in: "is one of",
     not_in: "is not one of",
+    includes: "includes",
+    includes_any_of: "includes any of",
   };
   return labels[operator] || operator;
 }
