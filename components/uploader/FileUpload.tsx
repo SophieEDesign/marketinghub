@@ -66,23 +66,23 @@ export default function FileUpload({ recordId, onUploadComplete }: FileUploadPro
         });
 
       if (uploadError) {
+        const errorMsg = uploadError.message || "";
         console.error("Upload error details:", {
-          message: uploadError.message,
-          statusCode: uploadError.statusCode,
+          message: errorMsg,
           error: uploadError,
         });
 
         let errorMessage = "Failed to upload file";
-        if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("The resource was not found")) {
+        if (errorMsg.includes("Bucket not found") || errorMsg.includes("The resource was not found")) {
           errorMessage = "Storage bucket 'attachments' not found. Please create it in Supabase Storage → Storage → New bucket (name: 'attachments', make it Public).";
-        } else if (uploadError.message?.includes("new row violates row-level security") || uploadError.message?.includes("RLS")) {
+        } else if (errorMsg.includes("new row violates row-level security") || errorMsg.includes("RLS")) {
           errorMessage = "Permission denied. Please check RLS policies for the 'attachments' bucket. Go to Storage → attachments → Policies and ensure INSERT is allowed.";
-        } else if (uploadError.statusCode === "403" || uploadError.message?.includes("403")) {
+        } else if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
           errorMessage = "Access forbidden. The 'attachments' bucket may not be public or RLS policies are blocking uploads.";
-        } else if (uploadError.statusCode === "401" || uploadError.message?.includes("401")) {
+        } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
           errorMessage = "Authentication failed. Please check your Supabase credentials.";
         } else {
-          errorMessage = `Upload failed: ${uploadError.message || uploadError.statusCode || "Unknown error"}`;
+          errorMessage = `Upload failed: ${errorMsg || "Unknown error"}`;
         }
 
         setError(errorMessage);
