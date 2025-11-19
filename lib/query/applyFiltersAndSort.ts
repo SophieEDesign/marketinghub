@@ -35,10 +35,12 @@ export function applyFilters(
         break;
 
       case "is_empty":
+        // Check for null or empty string
         filteredQuery = filteredQuery.or(`${field}.is.null,${field}.eq.`);
         break;
 
       case "is_not_empty":
+        // Check for not null and not empty
         filteredQuery = filteredQuery.not("or", `${field}.is.null,${field}.eq.`);
         break;
 
