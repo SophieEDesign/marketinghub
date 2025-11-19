@@ -26,7 +26,7 @@ export default function RecordDrawer() {
       
       // Load record
       const { data } = await supabase
-        .from(tableId)
+        .from(tableId as string)
         .select("*")
         .eq("id", recordId)
         .maybeSingle();
@@ -52,7 +52,7 @@ export default function RecordDrawer() {
     });
 
     const { error } = await supabase
-      .from(tableId)
+      .from(tableId as string)
       .update(updateData)
       .eq("id", row.id);
 

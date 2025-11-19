@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface AttachmentUploadProps {
@@ -26,11 +26,11 @@ export default function AttachmentUpload({
   const [isDragging, setIsDragging] = useState(false);
 
   // Update preview when value changes externally
-  useState(() => {
+  useEffect(() => {
     if (value !== previewUrl) {
       setPreviewUrl(value || null);
     }
-  });
+  }, [value, previewUrl]);
 
   const getStoragePath = (fileName: string, isTemp: boolean = false): string => {
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");

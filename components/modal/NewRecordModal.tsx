@@ -119,7 +119,7 @@ export default function NewRecordModal() {
 
     // Insert record
     const { data: newRecord, error } = await supabase
-      .from(tableId)
+      .from(tableId as string)
       .insert([insertData])
       .select()
       .single();
@@ -145,7 +145,7 @@ export default function NewRecordModal() {
       // Update record with final attachment URLs
       if (Object.keys(updates).length > 0) {
         await supabase
-          .from(tableId)
+          .from(tableId as string)
           .update(updates)
           .eq("id", newRecord.id);
       }
