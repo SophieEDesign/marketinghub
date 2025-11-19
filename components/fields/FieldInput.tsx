@@ -63,7 +63,8 @@ export default function FieldInput({ field, value, onChange, error, table, recor
       );
 
     case "single_select":
-      const selectOptions = Array.isArray(field.options) ? field.options : [];
+      // Options are stored as { values: [...] } in field.options
+      const selectOptions = field.options?.values || (Array.isArray(field.options) ? field.options : []);
       return (
         <div>
           <select
@@ -74,7 +75,7 @@ export default function FieldInput({ field, value, onChange, error, table, recor
           >
             <option value="">Select {field.label}...</option>
             {selectOptions.map((opt: any) => (
-              <option key={opt.id || opt.label} value={opt.label || opt.id}>
+              <option key={opt.id || opt.label} value={opt.id || opt.label}>
                 {opt.label || opt.id}
               </option>
             ))}
