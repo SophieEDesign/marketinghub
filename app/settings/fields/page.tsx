@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
@@ -23,7 +23,7 @@ import FieldList from "@/components/fields/FieldList";
 import FieldEditor from "@/components/fields/FieldEditor";
 import FieldAddModal from "@/components/fields/FieldAddModal";
 
-export default function FieldManagerPage() {
+function FieldManagerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tableId = searchParams.get("table") || "content";
@@ -204,5 +204,17 @@ export default function FieldManagerPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FieldManagerPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-6">
+        <div className="text-sm text-gray-500">Loading fields...</div>
+      </div>
+    }>
+      <FieldManagerContent />
+    </Suspense>
   );
 }
