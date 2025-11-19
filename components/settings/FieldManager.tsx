@@ -70,7 +70,7 @@ export default function FieldManager() {
 
   async function handleReorder(newOrder: Field[]) {
     const fieldIds = newOrder.map((f) => f.id);
-    await reorderFields(fieldIds);
+    await reorderFields(currentTable, fieldIds);
     await load();
   }
 
