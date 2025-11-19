@@ -67,16 +67,17 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     if (!item) return;
 
     const newValue = over.id as string;
+    const fieldKey = kanbanField.field_key; // Store in variable to help TypeScript
 
     async function updateRecord() {
       const { error } = await supabase
-        .from(tableId)
-        .update({ [kanbanField.field_key]: newValue })
+        .from(tableId as string)
+        .update({ [fieldKey]: newValue })
         .eq("id", draggedId);
 
       if (!error) {
         // Reload data
-        const { data } = await supabase.from(tableId).select("*");
+        const { data } = await supabase.from(tableId as string).select("*");
         if (data) setRows(data);
       }
     }
