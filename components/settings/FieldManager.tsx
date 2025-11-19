@@ -36,12 +36,11 @@ export default function FieldManager() {
     const fieldKey = newField.label.toLowerCase().replace(/\s+/g, "_");
     const maxOrder = fields.length > 0 ? Math.max(...fields.map((f) => f.order)) : -1;
 
-    const field = await createField({
-      table_id: currentTable,
+    const field = await createField(currentTable, {
       field_key: fieldKey,
       label: newField.label,
       type: newField.type,
-      options: newField.type === "single_select" ? [] : null,
+      options: newField.type === "single_select" || newField.type === "multi_select" ? { values: [] } : undefined,
       order: maxOrder + 1,
       required: newField.required,
       visible: true,
@@ -55,7 +54,7 @@ export default function FieldManager() {
   }
 
   async function handleUpdateField(fieldId: string, updates: Partial<Field>) {
-    await updateField(fieldId, updates);
+    await updateField(currentTable, fieldId, updates);
     await load();
     setEditingField(null);
   }
