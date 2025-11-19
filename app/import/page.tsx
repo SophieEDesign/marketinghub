@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { loadFields, Field } from "@/lib/fields";
@@ -14,7 +14,7 @@ import { useFieldManager } from "@/lib/useFieldManager";
 
 type Step = "upload" | "mapping" | "preview" | "importing" | "results";
 
-export default function ImportPage() {
+function ImportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tableId = searchParams.get("table") || "content";
@@ -417,6 +417,25 @@ export default function ImportPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ImportPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Loading...
+            </p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ImportPageContent />
+    </Suspense>
   );
 }
 
