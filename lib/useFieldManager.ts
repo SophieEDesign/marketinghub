@@ -144,9 +144,18 @@ export function useFieldManager(tableId: string) {
       setLoading(true);
       setError(null);
       try {
-        const updateData: any = { ...changes };
-        if (updateData.options && typeof updateData.options === "object") {
-          updateData.options = JSON.stringify(updateData.options);
+        // Only include fields that are actually being updated
+        // Exclude undefined values and only update what's in changes
+        const updateData: any = {};
+        if (changes.label !== undefined) updateData.label = changes.label;
+        if (changes.type !== undefined) updateData.type = changes.type;
+        if (changes.required !== undefined) updateData.required = changes.required;
+        if (changes.order !== undefined) updateData.order = changes.order;
+        if (changes.visible !== undefined) updateData.visible = changes.visible;
+        if (changes.options !== undefined) {
+          updateData.options = typeof changes.options === "object" 
+            ? JSON.stringify(changes.options) 
+            : changes.options;
         }
 
         const { data, error: updateError } = await supabase
