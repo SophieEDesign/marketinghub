@@ -30,6 +30,8 @@ interface ViewHeaderProps {
   onRemoveFilter: (filterId: string) => void;
   viewSettings?: ViewSettings;
   onViewSettingsUpdate?: (updates: ViewSettings) => Promise<void>;
+  selectedRowCount?: number;
+  onBulkDelete?: () => void;
 }
 
 export default function ViewHeader({
