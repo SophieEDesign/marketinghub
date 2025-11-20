@@ -10,6 +10,11 @@ import TaskList from "./TaskList";
 import PublishCalendar from "./PublishCalendar";
 import IdeaList from "./IdeaList";
 import CampaignTimeline from "./CampaignTimeline";
+import MediaList from "./MediaList";
+import SponsorshipsList from "./SponsorshipsList";
+import StrategyList from "./StrategyList";
+import BriefingsList from "./BriefingsList";
+import AssetsList from "./AssetsList";
 import UploadDiagnostic from "@/components/debug/UploadDiagnostic";
 import DashboardSortableModule from "./DashboardSortableModule";
 import { useModal } from "@/lib/modalState";
@@ -30,6 +35,11 @@ const dashboardModules: DashboardModule[] = [
   { id: "publish-calendar", component: PublishCalendar },
   { id: "ideas-list", component: IdeaList },
   { id: "campaign-timeline", component: CampaignTimeline },
+  { id: "media-list", component: MediaList },
+  { id: "sponsorships-list", component: SponsorshipsList },
+  { id: "strategy-list", component: StrategyList },
+  { id: "briefings-list", component: BriefingsList },
+  { id: "assets-list", component: AssetsList },
   { id: "upload-diagnostic", component: UploadDiagnostic },
 ];
 
