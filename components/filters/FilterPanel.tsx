@@ -169,7 +169,7 @@ export default function FilterPanel({
                         newValue[idx] = e.target.value;
                         updateFilter(filter.id, { value: newValue });
                       }}
-                      className="flex-1 px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                      className="flex-1 px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
                     >
                       <option value="">Select option...</option>
                       {multiSelectOptions.map((opt: any) => (
@@ -184,10 +184,11 @@ export default function FilterPanel({
                         newValue.splice(idx, 1);
                         updateFilter(filter.id, { value: newValue.length > 0 ? newValue : [] });
                       }}
-                      className="px-2 text-red-600 hover:text-red-700"
+                      className="px-2 text-red-600 hover:text-red-700 touch-manipulation flex-shrink-0"
                       title="Remove value"
+                      aria-label="Remove value"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-4 h-4 md:w-5 md:h-5" />
                     </button>
                   </div>
                 ))
@@ -197,7 +198,7 @@ export default function FilterPanel({
                   const newValue = Array.isArray(filter.value) ? [...filter.value, ""] : [""];
                   updateFilter(filter.id, { value: newValue });
                 }}
-                className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                className="text-sm md:text-base text-blue-600 hover:text-blue-700 flex items-center gap-1 py-2 touch-manipulation"
               >
                 <Plus className="w-3 h-3" />
                 Add value
