@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, CheckSquare, Calendar, AlertCircle, Plus } from "lucide-react";
+import { FileText, CheckSquare, Calendar, AlertCircle, Plus, Edit3, Check } from "lucide-react";
 import { fetchOverview, OverviewData } from "@/lib/dashboard/fetchOverview";
 import OverviewCard from "./OverviewCard";
 import ContentPipeline from "./ContentPipeline";
@@ -11,15 +11,96 @@ import PublishCalendar from "./PublishCalendar";
 import IdeaList from "./IdeaList";
 import CampaignTimeline from "./CampaignTimeline";
 import UploadDiagnostic from "@/components/debug/UploadDiagnostic";
+import DashboardSortableModule from "./DashboardSortableModule";
 import { useModal } from "@/lib/modalState";
 import { useSearch } from "@/components/search/SearchProvider";
+import { supabase } from "@/lib/supabaseClient";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+
+// Define dashboard modules with their IDs and components
+interface DashboardModule {
+  id: string;
+  component: React.ComponentType;
+}
+
+const dashboardModules: DashboardModule[] = [
+  { id: "content-pipeline", component: ContentPipeline },
+  { id: "tasks-overview", component: TaskList },
+  { id: "publish-calendar", component: PublishCalendar },
+  { id: "ideas-list", component: IdeaList },
+  { id: "campaign-timeline", component: CampaignTimeline },
+  { id: "upload-diagnostic", component: UploadDiagnostic },
+];
 
 export default function Dashboard() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [orderedModules, setOrderedModules] = useState(dashboardModules);
+  const [loadingLayout, setLoadingLayout] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
   const { setOpen: setModalOpen, setTableId: setModalTableId } = useModal();
   const { openSearch } = useSearch();
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Load saved dashboard layout from Supabase
+  useEffect(() => {
+    async function loadLayout() {
+      try {
+        const { data, error } = await supabase
+          .from("settings")
+          .select("value")
+          .eq("key", "dashboard_layout")
+          .maybeSingle();
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error loading dashboard layout:", error);
+        }
+
+        const savedOrder = (data?.value as Array<{ id: string }>) || [];
+
+        if (savedOrder.length > 0) {
+          const ordered = savedOrder
+            .map((saved) => dashboardModules.find((m) => m.id === saved.id))
+            .filter((item): item is DashboardModule => item !== undefined);
+
+          // Add any modules that weren't in saved order (new modules)
+          const missingModules = dashboardModules.filter(
+            (module) => !savedOrder.some((saved) => saved.id === module.id)
+          );
+
+          setOrderedModules([...ordered, ...missingModules]);
+        } else {
+          setOrderedModules(dashboardModules);
+        }
+      } catch (err) {
+        console.error("Error loading dashboard layout:", err);
+        setOrderedModules(dashboardModules);
+      } finally {
+        setLoadingLayout(false);
+      }
+    }
+
+    loadLayout();
+  }, []);
+
+  // Disable editing on mobile
+  useEffect(() => {
+    if (isMobile && editing) {
+      setEditing(false);
+    }
+  }, [isMobile, editing]);
 
   useEffect(() => {
     async function load() {
@@ -36,6 +117,43 @@ export default function Dashboard() {
     setModalOpen(true);
   };
 
+  // Handle drag end for module reordering
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedModules.findIndex((m) => m.id === active.id);
+    const newIndex = orderedModules.findIndex((m) => m.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(orderedModules, oldIndex, newIndex);
+
+    // Update local state immediately
+    setOrderedModules(newOrder);
+
+    // Save to Supabase
+    try {
+      const { error } = await supabase
+        .from("settings")
+        .upsert({
+          key: "dashboard_layout",
+          value: newOrder.map((m) => ({ id: m.id })),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) {
+        console.error("Error saving dashboard layout:", error);
+        // Revert on error
+        setOrderedModules(dashboardModules);
+      }
+    } catch (err) {
+      console.error("Error saving dashboard layout:", err);
+      // Revert on error
+      setOrderedModules(dashboardModules);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -48,6 +166,26 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setEditing(!editing)}
+            disabled={isMobile}
+            className={`btn-secondary text-sm flex items-center gap-2 ${
+              isMobile ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            title={isMobile ? "Drag-and-drop not available on mobile" : undefined}
+          >
+            {editing ? (
+              <>
+                <Check className="w-4 h-4" />
+                Done
+              </>
+            ) : (
+              <>
+                <Edit3 className="w-4 h-4" />
+                Edit Layout
+              </>
+            )}
+          </button>
+          <button
             onClick={openSearch}
             className="btn-secondary text-sm flex items-center gap-2"
           >
@@ -55,6 +193,13 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Editing Mode Banner */}
+      {editing && !isMobile && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+          <strong>Editing layout mode:</strong> Drag modules to reorder them. Click "Done" when finished.
+        </div>
+      )}
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -88,25 +233,38 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <ContentPipeline />
-        <TaskList />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <PublishCalendar />
-        <IdeaList />
-      </div>
-
-      <div className="mb-6">
-        <CampaignTimeline />
-      </div>
-
-      {/* Upload Diagnostic (Temporary - Remove after testing) */}
-      <div className="mb-6">
-        <UploadDiagnostic />
-      </div>
+      {/* Draggable Modules */}
+      {loadingLayout ? (
+        <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+          Loading dashboard layout...
+        </div>
+      ) : (
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={orderedModules.map((m) => m.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-6">
+              {orderedModules.map((module) => {
+                const ModuleComponent = module.component;
+                return (
+                  <DashboardSortableModule
+                    key={module.id}
+                    id={module.id}
+                    editing={editing}
+                    isMobile={isMobile}
+                  >
+                    <ModuleComponent />
+                  </DashboardSortableModule>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-40">
