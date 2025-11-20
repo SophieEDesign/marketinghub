@@ -30,22 +30,6 @@ export default function GridView({ tableId }: GridViewProps) {
     fieldId: string;
   } | null>(null);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
-  
-  // Apply visible_fields and field_order
-  let fields = allFields;
-  if (visibleFields.length > 0) {
-    fields = fields.filter((f) => visibleFields.includes(f.id));
-  }
-  if (fieldOrder.length > 0) {
-    fields = [...fields].sort((a, b) => {
-      const aIndex = fieldOrder.indexOf(a.id);
-      const bIndex = fieldOrder.indexOf(b.id);
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      return aIndex - bIndex;
-    });
-  }
   const { setOpen, setRecordId, setTableId } = useDrawer();
   const {
     settings,
@@ -62,6 +46,22 @@ export default function GridView({ tableId }: GridViewProps) {
   const visibleFields = settings?.visible_fields || [];
   const fieldOrder = settings?.field_order || [];
   const rowHeight = settings?.row_height || "medium";
+
+  // Apply visible_fields and field_order
+  let fields = allFields;
+  if (visibleFields.length > 0) {
+    fields = fields.filter((f) => visibleFields.includes(f.id));
+  }
+  if (fieldOrder.length > 0) {
+    fields = [...fields].sort((a, b) => {
+      const aIndex = fieldOrder.indexOf(a.id);
+      const bIndex = fieldOrder.indexOf(b.id);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }
   
   const handleViewSettingsUpdate = async (updates: {
     visible_fields?: string[];
