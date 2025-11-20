@@ -74,16 +74,77 @@ ON storage.objects FOR DELETE
 USING (bucket_id = 'attachments');
 
 -- ============================================
+-- ASSETS BUCKET POLICIES
+-- ============================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow public read access to assets" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert access to assets" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update access to assets" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete access to assets" ON storage.objects;
+
+-- Create policies for assets bucket
+CREATE POLICY "Allow public read access to assets"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'assets');
+
+CREATE POLICY "Allow public insert access to assets"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'assets');
+
+CREATE POLICY "Allow public update access to assets"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'assets')
+WITH CHECK (bucket_id = 'assets');
+
+CREATE POLICY "Allow public delete access to assets"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'assets');
+
+-- ============================================
+-- MEDIA BUCKET POLICIES
+-- ============================================
+
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow public read access to media" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert access to media" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update access to media" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete access to media" ON storage.objects;
+
+-- Create policies for media bucket
+CREATE POLICY "Allow public read access to media"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'media');
+
+CREATE POLICY "Allow public insert access to media"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'media');
+
+CREATE POLICY "Allow public update access to media"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'media')
+WITH CHECK (bucket_id = 'media');
+
+CREATE POLICY "Allow public delete access to media"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'media');
+
+-- ============================================
 -- VERIFY BUCKETS EXIST
 -- ============================================
 -- Note: Buckets must be created via Supabase Dashboard:
 -- 1. Go to Storage → New bucket
--- 2. Name: "branding", Public: Yes
--- 3. Name: "attachments", Public: Yes
+-- 2. Create these buckets (all should be Public: Yes):
+--    - "branding" (for logo uploads)
+--    - "attachments" (for file attachments)
+--    - "assets" (for asset files)
+--    - "media" (for media files)
 -- 
 -- Or run these commands if you have access:
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('branding', 'branding', true) ON CONFLICT DO NOTHING;
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('attachments', 'attachments', true) ON CONFLICT DO NOTHING;
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('assets', 'assets', true) ON CONFLICT DO NOTHING;
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('media', 'media', true) ON CONFLICT DO NOTHING;
 
 -- ============================================
 -- MIGRATION COMPLETE
