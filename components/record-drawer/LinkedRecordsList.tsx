@@ -56,11 +56,12 @@ export default function LinkedRecordsList({
             .eq("id", linkedId)
             .maybeSingle();
 
-          if (data) {
+          if (data && typeof data === 'object' && 'id' in data) {
+            const record = data as Record<string, any>;
             const displayValue =
-              data[displayField] || data.name || data.title || data.id;
+              record[displayField] || record.name || record.title || record.id;
             linked.push({
-              id: data.id,
+              id: String(record.id),
               table: foreignTable,
               displayValue: String(displayValue),
               fieldKey: field.field_key,
