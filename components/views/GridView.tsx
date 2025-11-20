@@ -67,15 +67,13 @@ export default function GridView({ tableId }: GridViewProps) {
     visible_fields?: string[];
     field_order?: string[];
     row_height?: "compact" | "medium" | "tall";
-  }): Promise<boolean> => {
+  }): Promise<void> => {
     try {
       if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
       if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
       if (updates.row_height !== undefined) await setRowHeight(updates.row_height);
-      return true;
     } catch (error) {
       console.error("Error updating view settings:", error);
-      return false;
     }
   };
 

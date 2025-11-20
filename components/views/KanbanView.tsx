@@ -49,13 +49,11 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   
   const handleViewSettingsUpdate = async (updates: {
     kanban_group_field?: string;
-  }): Promise<boolean> => {
+  }): Promise<void> => {
     try {
       if (updates.kanban_group_field !== undefined) await setKanbanGroupField(updates.kanban_group_field);
-      return true;
     } catch (error) {
       console.error("Error updating view settings:", error);
-      return false;
     }
   };
 

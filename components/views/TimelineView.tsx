@@ -38,13 +38,11 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
   
   const handleViewSettingsUpdate = async (updates: {
     timeline_date_field?: string;
-  }): Promise<boolean> => {
+  }): Promise<void> => {
     try {
       if (updates.timeline_date_field !== undefined) await setTimelineDateField(updates.timeline_date_field);
-      return true;
     } catch (error) {
       console.error("Error updating view settings:", error);
-      return false;
     }
   };
 

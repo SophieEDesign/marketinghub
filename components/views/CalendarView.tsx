@@ -43,13 +43,11 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   
   const handleViewSettingsUpdate = async (updates: {
     calendar_date_field?: string;
-  }): Promise<boolean> => {
+  }): Promise<void> => {
     try {
       if (updates.calendar_date_field !== undefined) await setCalendarDateField(updates.calendar_date_field);
-      return true;
     } catch (error) {
       console.error("Error updating view settings:", error);
-      return false;
     }
   };
 
