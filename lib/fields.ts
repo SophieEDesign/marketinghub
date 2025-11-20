@@ -198,6 +198,72 @@ function getDefaultFieldsForTable(tableId: string): Field[] {
       { id: "t10", table_id: "tasks", field_key: "updated_at", label: "Updated At", type: "date", order: 9, required: false, visible: false },
     ];
   }
+
+  if (tableId === "briefings") {
+    return [
+      { id: "b1", table_id: "briefings", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "b2", table_id: "briefings", field_key: "title", label: "Title", type: "text", order: 1, required: true, visible: true },
+      { id: "b3", table_id: "briefings", field_key: "notes", label: "Notes", type: "long_text", order: 2, required: false, visible: true },
+      { id: "b4", table_id: "briefings", field_key: "content_id", label: "Content", type: "linked_record", order: 3, required: false, visible: true },
+      { id: "b5", table_id: "briefings", field_key: "date", label: "Date", type: "date", order: 4, required: false, visible: true },
+      { id: "b6", table_id: "briefings", field_key: "created_at", label: "Created At", type: "date", order: 5, required: false, visible: false },
+      { id: "b7", table_id: "briefings", field_key: "updated_at", label: "Updated At", type: "date", order: 6, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "sponsorships") {
+    return [
+      { id: "s1", table_id: "sponsorships", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "s2", table_id: "sponsorships", field_key: "name", label: "Name", type: "text", order: 1, required: true, visible: true },
+      { id: "s3", table_id: "sponsorships", field_key: "notes", label: "Notes", type: "long_text", order: 2, required: false, visible: true },
+      { id: "s4", table_id: "sponsorships", field_key: "start_date", label: "Start Date", type: "date", order: 3, required: false, visible: true },
+      { id: "s5", table_id: "sponsorships", field_key: "end_date", label: "End Date", type: "date", order: 4, required: false, visible: true },
+      { id: "s6", table_id: "sponsorships", field_key: "status", label: "Status", type: "single_select", order: 5, required: false, visible: true, options: { values: [
+        { id: "pending", label: "Pending" },
+        { id: "active", label: "Active" },
+        { id: "completed", label: "Completed" },
+        { id: "cancelled", label: "Cancelled" },
+      ]}},
+      { id: "s7", table_id: "sponsorships", field_key: "created_at", label: "Created At", type: "date", order: 6, required: false, visible: false },
+      { id: "s8", table_id: "sponsorships", field_key: "updated_at", label: "Updated At", type: "date", order: 7, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "strategy") {
+    return [
+      { id: "st1", table_id: "strategy", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "st2", table_id: "strategy", field_key: "title", label: "Title", type: "text", order: 1, required: true, visible: true },
+      { id: "st3", table_id: "strategy", field_key: "details", label: "Details", type: "long_text", order: 2, required: false, visible: true },
+      { id: "st4", table_id: "strategy", field_key: "category", label: "Category", type: "single_select", order: 3, required: false, visible: true, options: { values: [
+        { id: "brand", label: "Brand" },
+        { id: "content", label: "Content" },
+        { id: "social", label: "Social" },
+        { id: "seo", label: "SEO" },
+        { id: "other", label: "Other" },
+      ]}},
+      { id: "st5", table_id: "strategy", field_key: "owner", label: "Owner", type: "linked_record", order: 4, required: false, visible: true },
+      { id: "st6", table_id: "strategy", field_key: "created_at", label: "Created At", type: "date", order: 5, required: false, visible: false },
+      { id: "st7", table_id: "strategy", field_key: "updated_at", label: "Updated At", type: "date", order: 6, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "assets") {
+    return [
+      { id: "a1", table_id: "assets", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "a2", table_id: "assets", field_key: "filename", label: "Filename", type: "text", order: 1, required: true, visible: true },
+      { id: "a3", table_id: "assets", field_key: "file_url", label: "File URL", type: "attachment", order: 2, required: true, visible: true },
+      { id: "a4", table_id: "assets", field_key: "asset_type", label: "Asset Type", type: "single_select", order: 3, required: false, visible: true, options: { values: [
+        { id: "image", label: "Image" },
+        { id: "video", label: "Video" },
+        { id: "document", label: "Document" },
+        { id: "other", label: "Other" },
+      ]}},
+      { id: "a5", table_id: "assets", field_key: "content_id", label: "Content", type: "linked_record", order: 4, required: false, visible: true },
+      { id: "a6", table_id: "assets", field_key: "uploaded_at", label: "Uploaded At", type: "date", order: 5, required: false, visible: false },
+      { id: "a7", table_id: "assets", field_key: "created_at", label: "Created At", type: "date", order: 6, required: false, visible: false },
+      { id: "a8", table_id: "assets", field_key: "updated_at", label: "Updated At", type: "date", order: 7, required: false, visible: false },
+    ];
+  }
   
   // For other tables, return empty array (they can be configured via Field Manager)
   return [];
