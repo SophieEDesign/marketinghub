@@ -101,9 +101,9 @@ export default function FilterPanel({
         );
 
       case "date":
-        if (filter.operator === "in_range") {
+        if (filter.operator === "in_range" || filter.operator === "range") {
           return (
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="date"
                 value={Array.isArray(filter.value) ? filter.value[0] || "" : ""}
