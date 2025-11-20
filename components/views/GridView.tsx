@@ -18,6 +18,7 @@ import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
 import { logFieldChanges } from "@/lib/activityLogger";
 import { GridSkeleton } from "../ui/Skeleton";
+import EmptyState from "../ui/EmptyState";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 
@@ -224,8 +225,32 @@ function GridViewComponent({ tableId }: GridViewProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 dark:text-gray-400">No records found</div>
+      <div>
+        <ViewHeader
+          tableId={tableId}
+          viewId={viewId}
+          fields={allFields}
+          filters={filters}
+          sort={sort}
+          onFiltersChange={handleFiltersChange}
+          onSortChange={handleSortChange}
+          onRemoveFilter={handleRemoveFilter}
+          viewSettings={{
+            visible_fields: visibleFields,
+            field_order: fieldOrder,
+            row_height: rowHeight,
+          }}
+          onViewSettingsUpdate={handleViewSettingsUpdate}
+        />
+        <EmptyState
+          title="No records found"
+          description={filters.length > 0 ? "Try adjusting your filters to see more results." : "Get started by creating your first record."}
+          actionLabel={filters.length === 0 ? "Create Record" : undefined}
+          onAction={filters.length === 0 ? () => {
+            // Open new record modal - would need to import useModal
+            window.location.href = `/${tableId}/grid`;
+          } : undefined}
+        />
       </div>
     );
   }

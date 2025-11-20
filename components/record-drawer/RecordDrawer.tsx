@@ -353,7 +353,7 @@ export default function RecordDrawer() {
   return (
     <Sheet open={open} onOpenChange={closeRecord} side="right">
       <SheetContent
-        className="w-full md:w-[480px] lg:w-[620px] xl:w-[720px] p-0"
+        className="w-full md:w-[480px] lg:w-[620px] xl:w-[720px] p-0 transition-transform duration-300 ease-out"
         onClose={closeRecord}
       >
         {loading || fieldsLoading ? (
@@ -534,22 +534,34 @@ interface SectionProps {
 
 function Section({ title, children, collapsed, onToggle }: SectionProps) {
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+    <section
+      className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden mb-6"
+      aria-labelledby={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
+    >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus-visible:ring-2 focus-visible:ring-blue-400"
+        aria-expanded={!collapsed}
+        aria-controls={`section-content-${title.toLowerCase().replace(/\s+/g, '-')}`}
       >
-        <h3 className="text-sm font-heading font-semibold text-brand-blue uppercase tracking-wide">
+        <h3
+          id={`section-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          className="text-sm font-heading font-semibold text-brand-blue uppercase tracking-wide"
+        >
           {title}
         </h3>
         {collapsed ? (
-          <ChevronRight className="w-4 h-4 text-gray-400" />
+          <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
+          <ChevronDown className="w-4 h-4 text-gray-400" aria-hidden="true" />
         )}
       </button>
-      {!collapsed && <div className="p-4">{children}</div>}
-    </div>
+      {!collapsed && (
+        <div id={`section-content-${title.toLowerCase().replace(/\s+/g, '-')}`} className="p-4">
+          {children}
+        </div>
+      )}
+    </section>
   );
 }
 

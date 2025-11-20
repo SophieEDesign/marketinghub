@@ -351,6 +351,7 @@ export default function Sidebar() {
         }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        aria-label="Sidebar navigation"
       >
         {/* Header */}
         <div className="p-3 border-b border-gray-200 dark:border-gray-800">
@@ -430,12 +431,13 @@ function NavGroupComponent({
               <Link
                 href={item.href}
                 onClick={onItemClick}
-                className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-all duration-200 ease-in-out ${
+                className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-blue-400 ${
                   active
-                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
+                    ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                 } ${collapsed ? "justify-center" : ""}`}
                 title={collapsed ? item.label : undefined}
+                aria-current={active ? "page" : undefined}
               >
                 <item.icon className="w-4 h-4 flex-shrink-0" />
                 {!collapsed && <span className="flex-1">{item.label}</span>}

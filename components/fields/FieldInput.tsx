@@ -18,7 +18,7 @@ interface FieldInputProps {
 
 export default function FieldInput({ field, value, onChange, error, table, recordId }: FieldInputProps) {
   const baseClasses =
-    "w-full p-2 rounded bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500";
+    "w-full h-10 px-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent transition-all placeholder:text-gray-400 dark:placeholder:text-gray-500";
 
   switch (field.type) {
     case "text":
