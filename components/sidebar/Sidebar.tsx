@@ -124,7 +124,7 @@ export default function Sidebar() {
     },
     {
       title: "Content",
-      items: tableCategories
+      items: (tableCategories
         .find((c) => c.id === "content")
         ?.tableIds.map((tableId) => {
           const table = tables.find((t) => t.id === tableId);
@@ -140,11 +140,11 @@ export default function Sidebar() {
             })),
           };
         })
-        .filter((item): item is NavItem => item !== null) || [],
+        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
     },
     {
       title: "Planning",
-      items: tableCategories
+      items: (tableCategories
         .find((c) => c.id === "planning")
         ?.tableIds.map((tableId) => {
           const table = tables.find((t) => t.id === tableId);
@@ -160,11 +160,11 @@ export default function Sidebar() {
             })),
           };
         })
-        .filter((item): item is NavItem => item !== null) || [],
+        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
     },
     {
       title: "CRM",
-      items: tableCategories
+      items: (tableCategories
         .find((c) => c.id === "crm")
         ?.tableIds.map((tableId) => {
           const table = tables.find((t) => t.id === tableId);
@@ -180,7 +180,7 @@ export default function Sidebar() {
             })),
           };
         })
-        .filter((item): item is NavItem => item !== null) || [],
+        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
     },
     {
       title: "Settings",
