@@ -122,7 +122,6 @@ export function useSettings() {
       .from("branding")
       .upload(filePath, file, { 
         upsert: true,
-        contentType: file.type || `image/${fileExt}`,
       });
 
     if (uploadError) {
