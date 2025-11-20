@@ -10,6 +10,7 @@ import TaskList from "./TaskList";
 import PublishCalendar from "./PublishCalendar";
 import IdeaList from "./IdeaList";
 import CampaignTimeline from "./CampaignTimeline";
+import UploadDiagnostic from "@/components/debug/UploadDiagnostic";
 import { useModal } from "@/lib/modalState";
 import { useSearch } from "@/components/search/SearchProvider";
 
