@@ -8,7 +8,7 @@ import { useViewSettings } from "@/lib/useViewSettings";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import FieldRenderer from "../fields/FieldRenderer";
 import ViewHeader from "./ViewHeader";
 
@@ -24,7 +24,7 @@ export default function CardsView({ tableId }: CardsViewProps) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { fields, loading: fieldsLoading } = useFields(tableId);
-  const { setOpen, setRecordId, setTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
   const {
     settings,
     getViewSettings,
@@ -189,9 +189,7 @@ export default function CardsView({ tableId }: CardsViewProps) {
             key={row.id}
             className="bg-white dark:bg-gray-950 shadow-sm border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden cursor-pointer transition hover:shadow-md"
             onClick={() => {
-              setTableId(tableId);
-              setRecordId(row.id);
-              setOpen(true);
+              openRecord(tableId, row.id);
             }}
           >
             {/* Thumbnail */}
