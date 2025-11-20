@@ -8,17 +8,20 @@ import {
   Palette,
   Layout,
   Building2,
+  Zap,
   ChevronRight,
 } from "lucide-react";
 import FieldManagerTab from "@/components/settings/tabs/FieldManagerTab";
 import AppearanceTab from "@/components/settings/tabs/AppearanceTab";
 import LayoutsTab from "@/components/settings/tabs/LayoutsTab";
 import WorkspaceTab from "@/components/settings/tabs/WorkspaceTab";
+import AutomationsTab from "@/components/settings/tabs/AutomationsTab";
 
 const SETTINGS_TABS = [
   { id: "fields", label: "Fields", icon: Database, component: FieldManagerTab },
   { id: "appearance", label: "Appearance", icon: Palette, component: AppearanceTab },
   { id: "layouts", label: "Layouts", icon: Layout, component: LayoutsTab },
+  { id: "automations", label: "Automations", icon: Zap, component: AutomationsTab },
   { id: "workspace", label: "Workspace", icon: Building2, component: WorkspaceTab },
 ];
 

@@ -49,6 +49,8 @@ export interface ViewSettings {
   timeline_date_field?: string; // field_key
   row_height?: "compact" | "medium" | "tall";
   card_fields?: string[]; // Array of field IDs for card layout
+  column_widths?: Record<string, number>; // Map of field_id to width in pixels
+  groupings?: Array<{ name: string; fields: string[] }>; // Field groups
   updated_at: string;
 }
 

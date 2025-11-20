@@ -56,6 +56,8 @@ export function useViewSettings(tableId: string, viewId: string) {
           timeline_date_field: value.timeline_date_field,
           row_height: value.row_height || "medium",
           card_fields: value.card_fields || [],
+          column_widths: value.column_widths || {},
+          groupings: value.groupings || [],
           updated_at: data.updated_at || new Date().toISOString(),
         };
         setSettings(viewSettings);
@@ -448,5 +450,7 @@ export function useViewSettings(tableId: string, viewId: string) {
     setTimelineDateField,
     setRowHeight,
     setCardFields,
+    setColumnWidths,
+    setGroupings,
   };
 }

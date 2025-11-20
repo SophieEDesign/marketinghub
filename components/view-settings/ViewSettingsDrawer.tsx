@@ -40,6 +40,8 @@ interface ViewSettingsDrawerProps {
     timeline_date_field?: string;
     row_height?: "compact" | "medium" | "tall";
     card_fields?: string[];
+    column_widths?: Record<string, number>;
+    groupings?: Array<{ name: string; fields: string[] }>;
   };
   onUpdate: (updates: {
     visible_fields?: string[];
@@ -49,6 +51,8 @@ interface ViewSettingsDrawerProps {
     timeline_date_field?: string;
     row_height?: "compact" | "medium" | "tall";
     card_fields?: string[];
+    column_widths?: Record<string, number>;
+    groupings?: Array<{ name: string; fields: string[] }>;
   }) => Promise<void>;
 }
 
@@ -154,6 +158,9 @@ export default function ViewSettingsDrawer({
   const [localTimelineDateField, setLocalTimelineDateField] = useState<string>("");
   const [localRowHeight, setLocalRowHeight] = useState<"compact" | "medium" | "tall">("medium");
   const [localCardFields, setLocalCardFields] = useState<string[]>([]);
+  const [localColumnWidths, setLocalColumnWidths] = useState<Record<string, number>>({});
+  const [localGroupings, setLocalGroupings] = useState<Array<{ name: string; fields: string[] }>>([]);
+  const [editingColumnWidth, setEditingColumnWidth] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -172,6 +179,8 @@ export default function ViewSettingsDrawer({
       setLocalTimelineDateField(settings.timeline_date_field || "");
       setLocalRowHeight(settings.row_height || "medium");
       setLocalCardFields(settings.card_fields || fields.map((f) => f.id));
+      setLocalColumnWidths(settings.column_widths || {});
+      setLocalGroupings(settings.groupings || []);
     }
   }, [open, settings, fields]);
 
@@ -311,24 +320,101 @@ export default function ViewSettingsDrawer({
             <div className="space-y-6">
               {/* Grid View Options */}
               {viewId === "grid" && (
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Row Height
-                  </h3>
-                  <select
-                    value={localRowHeight}
-                    onChange={(e) => {
-                      const height = e.target.value as "compact" | "medium" | "tall";
-                      setLocalRowHeight(height);
-                      onUpdate({ row_height: height });
-                    }}
-                    className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                  >
-                    <option value="compact">Compact</option>
-                    <option value="medium">Medium</option>
-                    <option value="tall">Tall</option>
-                  </select>
-                </div>
+                <>
+                  <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Row Height
+                    </h3>
+                    <select
+                      value={localRowHeight}
+                      onChange={(e) => {
+                        const height = e.target.value as "compact" | "medium" | "tall";
+                        setLocalRowHeight(height);
+                        onUpdate({ row_height: height });
+                      }}
+                      className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    >
+                      <option value="compact">Compact</option>
+                      <option value="medium">Medium</option>
+                      <option value="tall">Tall</option>
+                    </select>
+                  </div>
+
+                  <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Column Widths
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Click a field to edit its column width (in pixels)
+                    </p>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {orderedFields.map((field) => (
+                        <div
+                          key={field.id}
+                          className="flex items-center justify-between p-2 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                        >
+                          <span className="text-sm font-medium">{field.label}</span>
+                          {editingColumnWidth === field.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={localColumnWidths[field.id] || 150}
+                                onChange={(e) => {
+                                  const width = parseInt(e.target.value) || 150;
+                                  const newWidths = { ...localColumnWidths, [field.id]: width };
+                                  setLocalColumnWidths(newWidths);
+                                  onUpdate({ column_widths: newWidths });
+                                }}
+                                onBlur={() => setEditingColumnWidth(null)}
+                                className="w-20 px-2 py-1 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                                autoFocus
+                              />
+                              <span className="text-xs text-gray-500">px</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setEditingColumnWidth(field.id)}
+                              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                            >
+                              {localColumnWidths[field.id] ? `${localColumnWidths[field.id]}px` : "Auto"}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Field Groups
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Group fields together in the grid view
+                    </p>
+                    {localGroupings.length === 0 ? (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No groups yet. Groups will appear here when created.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {localGroupings.map((group, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                          >
+                            <div className="font-medium text-sm mb-1">{group.name}</div>
+                            <div className="text-xs text-gray-500">
+                              {group.fields.length} field{group.fields.length !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Field groups can be created by dragging fields in the Fields tab.
+                    </p>
+                  </div>
+                </>
               )}
 
               {/* Kanban View Options */}
