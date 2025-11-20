@@ -1,7 +1,6 @@
 "use client";
 import { useTheme, useDensity } from "@/app/providers";
 import { useModal } from "@/lib/modalState";
-import { useSettingsState } from "@/lib/settingsState";
 import { usePathname } from "next/navigation";
 import { Moon, Sun, Search } from "lucide-react";
 import { getBrand } from "@/lib/brand";
@@ -11,7 +10,6 @@ export default function HeaderBar() {
   const themeContext = useTheme();
   const densityContext = useDensity();
   const { setOpen, setTableId } = useModal();
-  const { setOpen: setSettingsOpen } = useSettingsState();
   const { openSearch } = useSearch();
   const pathname = usePathname();
   const brand = getBrand();
@@ -53,13 +51,6 @@ export default function HeaderBar() {
           className="btn-primary"
         >
           + New
-        </button>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="btn-secondary text-white bg-white/10 hover:bg-white/20 border-0"
-          title="Settings"
-        >
-          ⚙️ Settings
         </button>
         <button
           onClick={() => {
