@@ -4,38 +4,13 @@ export interface Table {
   views: string[];
 }
 
-export const tables: Table[] = [
-  {
-    id: "content",
-    name: "Content",
-    views: ["grid", "kanban", "calendar", "timeline", "cards"],
-  },
-  {
-    id: "campaigns",
-    name: "Campaigns",
-    views: ["grid", "kanban", "calendar"],
-  },
-  {
-    id: "contacts",
-    name: "Contacts",
-    views: ["grid", "cards"],
-  },
-  {
-    id: "ideas",
-    name: "Ideas",
-    views: ["grid", "kanban", "cards"],
-  },
-  {
-    id: "media",
-    name: "Media",
-    views: ["grid", "calendar", "cards"],
-  },
-  {
-    id: "tasks",
-    name: "Tasks",
-    views: ["grid", "kanban", "calendar", "timeline"],
-  },
-];
+import { tableMetadata, getAllTables, getTableViews, getTableLabel } from "./tableMetadata";
+
+export const tables: Table[] = getAllTables().map((id) => ({
+  id,
+  name: getTableLabel(id),
+  views: getTableViews(id),
+}));
 
 // Table categories for sidebar organization
 export interface TableCategory {

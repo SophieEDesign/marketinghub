@@ -6,6 +6,7 @@ import { Field } from "@/lib/fields";
 import { useRecordDrawer } from "./RecordDrawerProvider";
 import { Link, ExternalLink } from "lucide-react";
 import { getTable } from "@/lib/tables";
+import { tableMetadata } from "@/lib/tableMetadata";
 
 interface LinkedRecordsListProps {
   table: string;
@@ -73,83 +74,33 @@ export default function LinkedRecordsList({
         }
       }
 
-      // Find back-links (records that link to this record)
-      // For content: find media.content_id, tasks.content_id
-      // For campaigns: find content.campaign_id
-      // For contacts: find tasks.assigned_to
-      try {
-        if (table === "content") {
-          // Find media linked to this content
-          const { data: media } = await supabase
-            .from("media")
-            .select("id, publication")
-            .eq("content_id", recordId);
-          if (media) {
-            media.forEach((m) => {
-              linked.push({
-                id: m.id,
-                table: "media",
-                displayValue: m.publication || "Media",
-                fieldKey: "content_id",
-                fieldLabel: "Linked Media",
-              });
-            });
-          }
+             // Find back-links (records that link to this record) using metadata
+             const tableMeta = tableMetadata[table];
+             if (tableMeta?.linkedFrom) {
+               try {
+                 for (const relation of tableMeta.linkedFrom) {
+                   const { data: linkedRecords } = await supabase
+                     .from(relation.table)
+                     .select("id, title, name")
+                     .eq(relation.field, recordId);
 
-          // Find tasks linked to this content
-          const { data: tasks } = await supabase
-            .from("tasks")
-            .select("id, title")
-            .eq("content_id", recordId);
-          if (tasks) {
-            tasks.forEach((t) => {
-              linked.push({
-                id: t.id,
-                table: "tasks",
-                displayValue: t.title || "Task",
-                fieldKey: "content_id",
-                fieldLabel: "Linked Tasks",
-              });
-            });
-          }
-        } else if (table === "campaigns") {
-          // Find content linked to this campaign
-          const { data: content } = await supabase
-            .from("content")
-            .select("id, title")
-            .eq("campaign_id", recordId);
-          if (content) {
-            content.forEach((c) => {
-              linked.push({
-                id: c.id,
-                table: "content",
-                displayValue: c.title || "Content",
-                fieldKey: "campaign_id",
-                fieldLabel: "Linked Content",
-              });
-            });
-          }
-        } else if (table === "contacts") {
-          // Find tasks assigned to this contact
-          const { data: tasks } = await supabase
-            .from("tasks")
-            .select("id, title")
-            .eq("assigned_to", recordId);
-          if (tasks) {
-            tasks.forEach((t) => {
-              linked.push({
-                id: t.id,
-                table: "tasks",
-                displayValue: t.title || "Task",
-                fieldKey: "assigned_to",
-                fieldLabel: "Assigned Tasks",
-              });
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Error loading back-links:", err);
-      }
+                   if (linkedRecords) {
+                     linkedRecords.forEach((record: any) => {
+                       const displayValue = record.title || record.name || `${relation.table} #${record.id}`;
+                       linked.push({
+                         id: record.id,
+                         table: relation.table,
+                         displayValue,
+                         fieldKey: relation.field,
+                         fieldLabel: `Linked ${tableMetadata[relation.table]?.label || relation.table}`,
+                       });
+                     });
+                   }
+                 }
+               } catch (err) {
+                 console.error("Error loading back-links:", err);
+               }
+             }
 
       setLinkedRecords(linked);
       setLoading(false);

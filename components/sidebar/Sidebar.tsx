@@ -46,14 +46,12 @@ const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   cards: SquareStack,
 };
 
-// Map table IDs to icons
-const tableIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  content: FileText,
-  ideas: Lightbulb,
-  campaigns: Megaphone,
-  media: Newspaper,
-  contacts: Users,
-  tasks: CheckSquare,
+import { tableMetadata, getTableIcon, getAllTables } from "@/lib/tableMetadata";
+import { BookOpen, Gift, Compass, Image as ImageIcon } from "lucide-react";
+
+// Map table IDs to icons - now uses metadata
+const getTableIconComponent = (tableId: string) => {
+  return tableMetadata[tableId]?.icon || FileText;
 };
 
 // Capitalize view name
@@ -73,17 +71,27 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Default sidebar items order
-const defaultSidebarItems = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { id: "content", label: "Content", icon: FileText, href: "/content/grid" },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone, href: "/campaigns/grid" },
-  { id: "contacts", label: "Contacts", icon: Users, href: "/contacts/grid" },
-  { id: "ideas", label: "Ideas", icon: Lightbulb, href: "/ideas/grid" },
-  { id: "media", label: "Media", icon: Newspaper, href: "/media/grid" },
-  { id: "tasks", label: "Tasks", icon: CheckSquare, href: "/tasks/grid" },
-  { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
-];
+// Generate default sidebar items from table metadata
+const generateDefaultSidebarItems = () => {
+  const tableItems = getAllTables().map((tableId) => {
+    const meta = tableMetadata[tableId];
+    const Icon = meta?.icon || FileText;
+    return {
+      id: tableId,
+      label: meta?.label || tableId,
+      icon: Icon,
+      href: `/${tableId}/${meta?.defaultView || "grid"}`,
+    };
+  });
+
+  return [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+    ...tableItems,
+    { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
+  ];
+};
+
+const defaultSidebarItems = generateDefaultSidebarItems();
 
 export default function Sidebar() {
   const pathname = usePathname();
