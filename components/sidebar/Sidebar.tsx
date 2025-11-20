@@ -25,10 +25,17 @@ import {
   Calendar,
   Timer,
   SquareStack,
+  GripVertical,
+  Edit3,
+  Check,
 } from "lucide-react";
 import { tables, tableCategories } from "@/lib/tables";
 import { useTheme } from "@/app/providers";
 import WorkspaceHeader from "./WorkspaceHeader";
+import { supabase } from "@/lib/supabaseClient";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import SidebarSortableItem from "./SidebarSortableItem";
 
 // Map view types to icons
 const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -66,12 +73,27 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Default sidebar items order
+const defaultSidebarItems = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { id: "content", label: "Content", icon: FileText, href: "/content/grid" },
+  { id: "campaigns", label: "Campaigns", icon: Megaphone, href: "/campaigns/grid" },
+  { id: "contacts", label: "Contacts", icon: Users, href: "/contacts/grid" },
+  { id: "ideas", label: "Ideas", icon: Lightbulb, href: "/ideas/grid" },
+  { id: "media", label: "Media", icon: Newspaper, href: "/media/grid" },
+  { id: "tasks", label: "Tasks", icon: CheckSquare, href: "/tasks/grid" },
+  { id: "settings", label: "Settings", icon: Settings, href: "/settings/fields" },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const themeContext = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [editing, setEditing] = useState(false);
+  const [orderedSidebar, setOrderedSidebar] = useState(defaultSidebarItems);
+  const [loadingOrder, setLoadingOrder] = useState(true);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
