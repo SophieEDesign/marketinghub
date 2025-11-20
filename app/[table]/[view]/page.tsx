@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getTable, isValidView } from "@/lib/tables";
+import { isValidViewForTable, getTableMetadata } from "@/lib/tableMetadata";
 import dynamic from "next/dynamic";
 import GridView from "@/components/views/GridView";
 import KanbanView from "@/components/views/KanbanView";
@@ -26,13 +26,14 @@ interface PageProps {
 export default function TableViewPage({ params }: PageProps) {
   const { table, view } = params;
 
-  // Validate table and view
-  if (!isValidView(table, view)) {
+  // Validate table exists in metadata
+  const tableMeta = getTableMetadata(table);
+  if (!tableMeta) {
     notFound();
   }
 
-  const tableConfig = getTable(table);
-  if (!tableConfig) {
+  // Validate view is supported for this table
+  if (!isValidViewForTable(table, view)) {
     notFound();
   }
 

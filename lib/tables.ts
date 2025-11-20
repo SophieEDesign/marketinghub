@@ -1,10 +1,10 @@
+import { tableMetadata, getAllTables, getTableViews, getTableLabel } from "./tableMetadata";
+
 export interface Table {
   id: string;
   name: string;
   views: string[];
 }
-
-import { tableMetadata, getAllTables, getTableViews, getTableLabel } from "./tableMetadata";
 
 export const tables: Table[] = getAllTables().map((id) => ({
   id,
