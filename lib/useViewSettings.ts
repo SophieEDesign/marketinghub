@@ -319,6 +319,12 @@ export function useViewSettings(tableId: string, viewId: string) {
         if (updates.row_height !== undefined) {
           updatedValue.row_height = updates.row_height;
         }
+        if (updates.column_widths !== undefined) {
+          updatedValue.column_widths = updates.column_widths;
+        }
+        if (updates.groupings !== undefined) {
+          updatedValue.groupings = updates.groupings;
+        }
 
         if (existing) {
           // Update existing
@@ -429,6 +435,20 @@ export function useViewSettings(tableId: string, viewId: string) {
   const setCardFields = useCallback(
     async (fields: string[]) => {
       return updateSetting({ card_fields: fields });
+    },
+    [updateSetting]
+  );
+
+  const setColumnWidths = useCallback(
+    async (columnWidths: Record<string, number>): Promise<boolean> => {
+      return updateSetting({ column_widths: columnWidths });
+    },
+    [updateSetting]
+  );
+
+  const setGroupings = useCallback(
+    async (groupings: Array<{ name: string; fields: string[] }>): Promise<boolean> => {
+      return updateSetting({ groupings: groupings });
     },
     [updateSetting]
   );

@@ -43,7 +43,7 @@ export default function FieldMapping({
     onMappingChange(updated);
   };
 
-  const handleCreateField = (csvColumn: string) => {
+  const handleCreateField = async (csvColumn: string) => {
     // Get sample values for type detection
     const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
     const detectedType = detectFieldType(sampleValues);
@@ -51,7 +51,12 @@ export default function FieldMapping({
     const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
     if (onCreateField) {
-      onCreateField(csvColumn, finalType);
+      try {
+        await onCreateField(csvColumn, finalType);
+      } catch (error) {
+        console.error("Error creating field:", error);
+        alert(`Failed to create field: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
     }
   };
 

@@ -404,7 +404,7 @@ function ImportPageContent() {
                 <button
                   onClick={() => setStep("preview")}
                   disabled={mappings.filter((m) => m.csvColumn && m.csvColumn !== "IGNORE").length === 0}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                 >
                   Continue to Preview
                 </button>
