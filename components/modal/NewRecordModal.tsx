@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useModal } from "@/lib/modalState";
 import { useFields } from "@/lib/useFields";
 import FieldInput from "../fields/FieldInput";
+import { runAutomations } from "@/lib/automations/automationEngine";
+import { toast } from "../ui/Toast";
 
 export default function NewRecordModal() {
   const { open, setOpen, tableId } = useModal();
@@ -144,11 +146,52 @@ export default function NewRecordModal() {
 
       // Update record with final attachment URLs
       if (Object.keys(updates).length > 0) {
-        await supabase
+        const { data: updatedRecord } = await supabase
           .from(tableId as string)
           .update(updates)
-          .eq("id", newRecord.id);
+          .eq("id", newRecord.id)
+          .select()
+          .single();
+
+        if (updatedRecord) {
+          // Reload record for automations
+          Object.assign(newRecord, updatedRecord);
+        }
       }
+    }
+
+    // Run automations on new record
+    try {
+      const automationResult = await runAutomations(tableId, newRecord, undefined);
+
+      // Apply any updates from automations
+      if (automationResult.updated && Object.keys(automationResult.updated).length > 0) {
+        const automationUpdates: Record<string, any> = {};
+        Object.keys(automationResult.updated).forEach((key) => {
+          if (key !== "id" && automationResult.updated[key] !== newRecord[key]) {
+            automationUpdates[key] = automationResult.updated[key];
+          }
+        });
+
+        if (Object.keys(automationUpdates).length > 0) {
+          await supabase
+            .from(tableId as string)
+            .update(automationUpdates)
+            .eq("id", newRecord.id);
+        }
+      }
+
+      // Show notifications
+      automationResult.notifications.forEach((notification) => {
+        toast({
+          title: "Automation Triggered",
+          description: notification,
+          type: "success",
+        });
+      });
+    } catch (automationError) {
+      console.error("Error running automations:", automationError);
+      // Don't fail the create if automations fail
     }
 
     setOpen(false);

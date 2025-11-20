@@ -9,11 +9,10 @@ import { useViewSettings } from "@/lib/useViewSettings";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import FieldRenderer from "../fields/FieldRenderer";
 import InlineFieldEditor from "../fields/InlineFieldEditor";
-import FilterPanel from "../filters/FilterPanel";
-import SortPanel from "../sorting/SortPanel";
-import FilterBadges from "../filters/FilterBadges";
+import ViewHeader from "./ViewHeader";
 import { Filter, Sort } from "@/lib/types/filters";
-import { Filter as FilterIcon, ArrowUpDown } from "lucide-react";
+import { runAutomations } from "@/lib/automations/automationEngine";
+import { toast } from "../ui/Toast";
 
 interface GridViewProps {
   tableId: string;
@@ -26,23 +25,59 @@ export default function GridView({ tableId }: GridViewProps) {
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [showSortPanel, setShowSortPanel] = useState(false);
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
     fieldId: string;
   } | null>(null);
-  const { fields, loading: fieldsLoading } = useFields(tableId);
+  const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  
+  // Apply visible_fields and field_order
+  let fields = allFields;
+  if (visibleFields.length > 0) {
+    fields = fields.filter((f) => visibleFields.includes(f.id));
+  }
+  if (fieldOrder.length > 0) {
+    fields = [...fields].sort((a, b) => {
+      const aIndex = fieldOrder.indexOf(a.id);
+      const bIndex = fieldOrder.indexOf(b.id);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }
   const { setOpen, setRecordId, setTableId } = useDrawer();
   const {
     settings,
     getViewSettings,
     saveFilters,
     saveSort,
+    setVisibleFields,
+    setFieldOrder,
+    setRowHeight,
   } = useViewSettings(tableId, viewId);
 
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
+  const visibleFields = settings?.visible_fields || [];
+  const fieldOrder = settings?.field_order || [];
+  const rowHeight = settings?.row_height || "medium";
+  
+  const handleViewSettingsUpdate = async (updates: {
+    visible_fields?: string[];
+    field_order?: string[];
+    row_height?: "compact" | "medium" | "tall";
+  }): Promise<boolean> => {
+    try {
+      if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
+      if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
+      if (updates.row_height !== undefined) await setRowHeight(updates.row_height);
+      return true;
+    } catch (error) {
+      console.error("Error updating view settings:", error);
+      return false;
+    }
+  };
 
   // Load view settings on mount (only once)
   useEffect(() => {
@@ -82,12 +117,10 @@ export default function GridView({ tableId }: GridViewProps) {
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
     await saveFilters(newFilters);
-    setShowFilterPanel(false);
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
     await saveSort(newSort);
-    setShowSortPanel(false);
   };
 
   const handleRemoveFilter = async (filterId: string) => {
@@ -113,53 +146,22 @@ export default function GridView({ tableId }: GridViewProps) {
 
   return (
     <div>
-      {/* Header with Filter/Sort Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4 mb-4">
-        <div className="flex-1 min-w-0">
-          <FilterBadges
-            filters={filters}
-            fields={fields}
-            onRemoveFilter={handleRemoveFilter}
-          />
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowFilterPanel(true)}
-            className={`btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation ${filters.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
-          >
-            <FilterIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-            <span className="text-sm md:text-base">
-              Filters {filters.length > 0 && `(${filters.length})`}
-            </span>
-          </button>
-          <button
-            onClick={() => setShowSortPanel(true)}
-            className={`btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation ${sort.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
-          >
-            <ArrowUpDown className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-            <span className="text-sm md:text-base">
-              Sort {sort.length > 0 && `(${sort.length})`}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Panel */}
-      <FilterPanel
-        open={showFilterPanel}
-        onClose={() => setShowFilterPanel(false)}
-        fields={fields}
+      {/* Header with Filter/Sort/Settings Buttons */}
+      <ViewHeader
+        tableId={tableId}
+        viewId={viewId}
+        fields={allFields}
         filters={filters}
-        onFiltersChange={handleFiltersChange}
-      />
-
-      {/* Sort Panel */}
-      <SortPanel
-        open={showSortPanel}
-        onClose={() => setShowSortPanel(false)}
-        fields={fields}
         sort={sort}
+        onFiltersChange={handleFiltersChange}
         onSortChange={handleSortChange}
+        onRemoveFilter={handleRemoveFilter}
+        viewSettings={{
+          visible_fields: visibleFields,
+          field_order: fieldOrder,
+          row_height: rowHeight,
+        }}
+        onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
       {/* Table */}
@@ -178,7 +180,9 @@ export default function GridView({ tableId }: GridViewProps) {
           {rows.map((row) => (
             <tr
               key={row.id}
-              className="hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700"
+              className={`hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${
+                rowHeight === "compact" ? "h-8" : rowHeight === "tall" ? "h-20" : "h-12"
+              }`}
             >
             {fields.map((field) => {
               const isEditing =
@@ -220,24 +224,90 @@ export default function GridView({ tableId }: GridViewProps) {
                       recordId={row.id}
                       tableId={tableId}
                       onSave={async (newValue) => {
-                        const { error } = await supabase
+                        // Store previous state for automation comparison
+                        const previousRecord = { ...row };
+
+                        // Update the field
+                        const { error, data: updatedRecord } = await supabase
                           .from(tableId)
                           .update({ [field.field_key]: newValue })
-                          .eq("id", row.id);
+                          .eq("id", row.id)
+                          .select()
+                          .single();
 
-                        if (!error) {
-                          // Update local state
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.id === row.id
-                                ? { ...r, [field.field_key]: newValue }
-                                : r
-                            )
-                          );
-                          setEditingCell(null);
-                        } else {
+                        if (error) {
                           throw error;
                         }
+
+                        // Run automations
+                        try {
+                          const automationResult = await runAutomations(
+                            tableId,
+                            updatedRecord,
+                            previousRecord
+                          );
+
+                          // Apply any updates from automations
+                          if (automationResult.updated && Object.keys(automationResult.updated).length > 0) {
+                            const automationUpdates: Record<string, any> = {};
+                            Object.keys(automationResult.updated).forEach((key) => {
+                              if (key !== "id" && automationResult.updated[key] !== updatedRecord[key]) {
+                                automationUpdates[key] = automationResult.updated[key];
+                              }
+                            });
+
+                            if (Object.keys(automationUpdates).length > 0) {
+                              const { data: finalRecord } = await supabase
+                                .from(tableId)
+                                .update(automationUpdates)
+                                .eq("id", row.id)
+                                .select()
+                                .single();
+
+                              if (finalRecord) {
+                                // Update local state with final record
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.id === row.id ? finalRecord : r
+                                  )
+                                );
+                              }
+                            } else {
+                              // Update local state with updated record
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.id === row.id ? updatedRecord : r
+                                )
+                              );
+                            }
+                          } else {
+                            // Update local state with updated record
+                            setRows((prev) =>
+                              prev.map((r) =>
+                                r.id === row.id ? updatedRecord : r
+                              )
+                            );
+                          }
+
+                          // Show notifications
+                          automationResult.notifications.forEach((notification) => {
+                            toast({
+                              title: "Automation Triggered",
+                              description: notification,
+                              type: "success",
+                            });
+                          });
+                        } catch (automationError) {
+                          console.error("Error running automations:", automationError);
+                          // Still update local state even if automations fail
+                          setRows((prev) =>
+                            prev.map((r) =>
+                              r.id === row.id ? updatedRecord : r
+                            )
+                          );
+                        }
+
+                        setEditingCell(null);
                       }}
                       onCancel={() => setEditingCell(null)}
                     />

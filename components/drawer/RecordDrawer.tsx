@@ -5,10 +5,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
 import { useFields } from "@/lib/useFields";
 import FieldInput from "../fields/FieldInput";
+import { runAutomations } from "@/lib/automations/automationEngine";
+import { toast } from "../ui/Toast";
 
 export default function RecordDrawer() {
   const { open, setOpen, recordId, tableId } = useDrawer();
   const [row, setRow] = useState<any>(null);
+  const [previousRow, setPreviousRow] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId || "");
 
@@ -32,6 +35,7 @@ export default function RecordDrawer() {
         .maybeSingle();
       
       setRow(data);
+      setPreviousRow(data ? { ...data } : null); // Store copy for comparison
       setLoading(false);
     }
     load();
@@ -51,15 +55,65 @@ export default function RecordDrawer() {
       updateData[field.field_key] = value;
     });
 
-    const { error } = await supabase
+    // Update record first
+    const { error, data: updatedRecord } = await supabase
       .from(tableId as string)
       .update(updateData)
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .select()
+      .single();
 
-    if (!error) {
-      setOpen(false);
-      window.location.reload();
+    if (error) {
+      console.error("Error updating record:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save record",
+        type: "error",
+      });
+      setLoading(false);
+      return;
     }
+
+    // Run automations
+    try {
+      const automationResult = await runAutomations(
+        tableId,
+        updatedRecord,
+        previousRow
+      );
+
+      // Apply any updates from automations
+      if (automationResult.updated && Object.keys(automationResult.updated).length > 0) {
+        const automationUpdates: Record<string, any> = {};
+        Object.keys(automationResult.updated).forEach((key) => {
+          if (key !== "id" && automationResult.updated[key] !== updatedRecord[key]) {
+            automationUpdates[key] = automationResult.updated[key];
+          }
+        });
+
+        if (Object.keys(automationUpdates).length > 0) {
+          await supabase
+            .from(tableId as string)
+            .update(automationUpdates)
+            .eq("id", row.id);
+        }
+      }
+
+      // Show notifications
+      automationResult.notifications.forEach((notification) => {
+        toast({
+          title: "Automation Triggered",
+          description: notification,
+          type: "success",
+        });
+      });
+    } catch (automationError) {
+      console.error("Error running automations:", automationError);
+      // Don't fail the save if automations fail
+    }
+
+    setOpen(false);
+    window.location.reload();
     setLoading(false);
   };
 

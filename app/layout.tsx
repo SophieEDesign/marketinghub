@@ -7,12 +7,15 @@ import { DrawerProvider } from '@/lib/drawerState'
 import { ModalProvider } from '@/lib/modalState'
 import { LinkerProvider } from '@/lib/linkerState'
 import { SettingsProvider } from '@/lib/settingsState'
+import { SearchProvider } from '@/components/search/SearchProvider'
 import Sidebar from '@/components/sidebar/Sidebar'
 import HeaderBar from '@/components/HeaderBar'
 import RecordDrawer from '@/components/drawer/RecordDrawer'
 import NewRecordModal from '@/components/modal/NewRecordModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
 import SettingsSidebar from '@/components/settings/SettingsSidebar'
+import GlobalSearch from '@/components/search/GlobalSearch'
+import { ToastContainer } from '@/components/ui/Toast'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" })
 const spartan = League_Spartan({ subsets: ["latin"], variable: "--font-heading" })
@@ -31,27 +34,31 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} ${spartan.variable} font-body bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-200`}>
         <AppProviders>
-          <DrawerProvider>
-            <ModalProvider>
-              <LinkerProvider>
-                <SettingsProvider>
-                  <ThemeProvider>
-                  <div className="flex h-screen">
-                    <Sidebar />
-                    <div className="flex flex-col flex-1">
-                      <HeaderBar />
-                      <main className="flex-1 overflow-auto p-6">{children}</main>
+          <SearchProvider>
+            <DrawerProvider>
+              <ModalProvider>
+                <LinkerProvider>
+                  <SettingsProvider>
+                    <ThemeProvider>
+                    <div className="flex h-screen">
+                      <Sidebar />
+                      <div className="flex flex-col flex-1">
+                        <HeaderBar />
+                        <main className="flex-1 overflow-auto p-6">{children}</main>
+                      </div>
                     </div>
-                  </div>
-                  <RecordDrawer />
-                  <NewRecordModal />
-                  <LinkedRecordPicker />
-                  <SettingsSidebar />
-                </ThemeProvider>
-                </SettingsProvider>
-              </LinkerProvider>
-            </ModalProvider>
-          </DrawerProvider>
+                    <RecordDrawer />
+                    <NewRecordModal />
+                    <LinkedRecordPicker />
+                    <SettingsSidebar />
+                    <GlobalSearch />
+                    <ToastContainer />
+                  </ThemeProvider>
+                  </SettingsProvider>
+                </LinkerProvider>
+              </ModalProvider>
+            </DrawerProvider>
+          </SearchProvider>
         </AppProviders>
       </body>
     </html>

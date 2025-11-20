@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Calendar, Columns3, Timer, SquareStack, ChevronDown, ChevronRight, Settings, FileSpreadsheet } from "lucide-react";
-import { tables } from "@/lib/tables";
+import { LayoutGrid, Calendar, Columns3, Timer, SquareStack, ChevronDown, ChevronRight, Settings, FileSpreadsheet, Home } from "lucide-react";
+import { tables, tableCategories } from "@/lib/tables";
 import WorkspaceHeader from "./WorkspaceHeader";
 
 // Map view types to icons
@@ -71,53 +71,80 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto p-3">
-        {/* Tables */}
-        <div className="space-y-1">
-          {tables.map((table) => {
-            const isActive = isTableActive(table.id);
-            const isCollapsed = isTableCollapsed(table.id);
+        {/* Dashboard Link */}
+        <Link
+          href="/dashboard"
+          className={`flex items-center gap-2 px-2 py-2 rounded text-sm font-medium transition mb-4 ${
+            pathname === "/dashboard"
+              ? "bg-brand-red text-white font-semibold"
+              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+          }`}
+        >
+          <Home className="w-4 h-4" />
+          <span>Dashboard</span>
+        </Link>
 
+        {/* Table Categories */}
+        <div className="space-y-4">
+          {tableCategories.map((category) => {
+            const categoryTables = tables.filter((t) => category.tableIds.includes(t.id));
+            
             return (
-              <div key={table.id} className="mb-2">
-                {/* Table Header */}
-                <button
-                  onClick={() => toggleTable(table.id)}
-                  className={`w-full flex items-center justify-between px-2 py-2 text-sm font-heading text-brand-blue tracking-wide uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition ${
-                    isActive ? "bg-gray-100 dark:bg-gray-800" : ""
-                  }`}
-                >
-                  <span>{table.name}</span>
-                  {isCollapsed ? (
-                    <ChevronRight className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
+              <div key={category.id} className="space-y-1">
+                {/* Category Header */}
+                <div className="px-2 py-1 text-xs font-heading text-gray-500 dark:text-gray-400 tracking-wider uppercase">
+                  {category.name}
+                </div>
+                
+                {/* Tables in Category */}
+                {categoryTables.map((table) => {
+                  const isActive = isTableActive(table.id);
+                  const isCollapsed = isTableCollapsed(table.id);
 
-                {/* Views */}
-                {!isCollapsed && (
-                  <div className="ml-1 mt-0.5 space-y-0.5">
-                    {table.views.map((view) => {
-                      const href = `/${table.id}/${view}`;
-                      const isActiveView = isViewActive(table.id, view);
+                  return (
+                    <div key={table.id} className="mb-2">
+                      {/* Table Header */}
+                      <button
+                        onClick={() => toggleTable(table.id)}
+                        className={`w-full flex items-center justify-between px-2 py-2 text-sm font-heading text-brand-blue tracking-wide uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition ${
+                          isActive ? "bg-gray-100 dark:bg-gray-800" : ""
+                        }`}
+                      >
+                        <span>{table.name}</span>
+                        {isCollapsed ? (
+                          <ChevronRight className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
 
-                      return (
-                        <Link
-                          key={view}
-                          href={href}
-                          className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
-                            isActiveView
-                              ? "bg-brand-red text-white font-semibold"
-                              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          }`}
-                        >
-                          {getViewIcon(view)}
-                          <span>{capitalizeView(view)}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
+                      {/* Views */}
+                      {!isCollapsed && (
+                        <div className="ml-1 mt-0.5 space-y-0.5">
+                          {table.views.map((view) => {
+                            const href = `/${table.id}/${view}`;
+                            const isActiveView = isViewActive(table.id, view);
+
+                            return (
+                              <Link
+                                key={view}
+                                href={href}
+                                className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
+                                  isActiveView
+                                    ? "bg-brand-red text-white font-semibold"
+                                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                }`}
+                              >
+                                {getViewIcon(view)}
+                                <span>{capitalizeView(view)}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

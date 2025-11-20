@@ -26,22 +26,7 @@ export default function TableViewPage({ params }: PageProps) {
     notFound();
   }
 
-  // Only content table has fully implemented views
-  // Other tables show placeholder
-  if (table !== "content") {
-    return (
-      <div className="p-6">
-        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-8 text-center">
-          <h2 className="text-xl font-semibold mb-2">{tableConfig.name} - {view.charAt(0).toUpperCase() + view.slice(1)} View</h2>
-          <p className="text-gray-500 dark:text-gray-400">
-            This view is not implemented yet. Only the Content table has full view support.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Render the appropriate view component for content table
+  // Render the appropriate view component for all tables
   switch (view) {
     case "grid":
       return <GridView tableId={table} />;

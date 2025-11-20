@@ -3,14 +3,16 @@ import { useTheme, useDensity } from "@/app/providers";
 import { useModal } from "@/lib/modalState";
 import { useSettingsState } from "@/lib/settingsState";
 import { usePathname } from "next/navigation";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Search } from "lucide-react";
 import { getBrand } from "@/lib/brand";
+import { useSearch } from "@/components/search/SearchProvider";
 
 export default function HeaderBar() {
   const themeContext = useTheme();
   const densityContext = useDensity();
   const { setOpen, setTableId } = useModal();
   const { setOpen: setSettingsOpen } = useSettingsState();
+  const { openSearch } = useSearch();
   const pathname = usePathname();
   const brand = getBrand();
   
@@ -35,6 +37,14 @@ export default function HeaderBar() {
         <span className="font-heading tracking-wide text-sm">{brand.name}</span>
       </div>
       <div className="ml-auto flex items-center gap-4">
+        <button
+          onClick={openSearch}
+          className="btn-secondary text-white bg-white/10 hover:bg-white/20 border-0 flex items-center gap-2"
+          title="Search (Cmd+K, Ctrl+K, or /)"
+        >
+          <Search className="w-4 h-4" />
+          <span className="hidden sm:inline">Search</span>
+        </button>
         <button
           onClick={() => {
             setTableId(currentTable);

@@ -29,20 +29,36 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
     getViewSettings,
     saveFilters,
     saveSort,
+    setTimelineDateField,
   } = useViewSettings(tableId, viewId);
 
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
+  const timelineDateFieldKey = settings?.timeline_date_field;
+  
+  const handleViewSettingsUpdate = async (updates: {
+    timeline_date_field?: string;
+  }): Promise<boolean> => {
+    try {
+      if (updates.timeline_date_field !== undefined) await setTimelineDateField(updates.timeline_date_field);
+      return true;
+    } catch (error) {
+      console.error("Error updating view settings:", error);
+      return false;
+    }
+  };
 
   // Identify timeline start: use created_at field (label = "Created At")
   const startField = allFields.find(
     (f) => f.label.toLowerCase() === "created at" && f.type === "date"
   ) || allFields.find((f) => f.field_key === "created_at" && f.type === "date") || null;
 
-  // Identify timeline end: use Publish Date field
-  const endField = allFields.find(
-    (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
-  ) || allFields.find((f) => f.field_key === "publish_date" && f.type === "date") || null;
+  // Identify timeline end: use timeline_date_field from settings, or fallback to Publish Date field
+  const endField = timelineDateFieldKey
+    ? allFields.find((f) => f.field_key === timelineDateFieldKey && f.type === "date")
+    : allFields.find(
+        (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
+      ) || allFields.find((f) => f.field_key === "publish_date" && f.type === "date") || null;
 
   // Find title field
   const titleField = allFields.find((f) => f.label.toLowerCase() === "title") || allFields[0];
@@ -126,12 +142,18 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
   return (
     <div>
       <ViewHeader
+        tableId={tableId}
+        viewId={viewId}
         fields={allFields}
         filters={filters}
         sort={sort}
         onFiltersChange={handleFiltersChange}
         onSortChange={handleSortChange}
         onRemoveFilter={handleRemoveFilter}
+        viewSettings={{
+          timeline_date_field: timelineDateFieldKey,
+        }}
+        onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
       <div className="w-full p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm overflow-x-auto">

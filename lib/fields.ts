@@ -111,6 +111,93 @@ function getDefaultFieldsForTable(tableId: string): Field[] {
       { id: "11", table_id: "content", field_key: "updated_at", label: "Updated At", type: "date", order: 10, required: false, visible: false },
     ];
   }
+
+  if (tableId === "campaigns") {
+    return [
+      { id: "c1", table_id: "campaigns", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "c2", table_id: "campaigns", field_key: "name", label: "Name", type: "text", order: 1, required: true, visible: true },
+      { id: "c3", table_id: "campaigns", field_key: "description", label: "Description", type: "long_text", order: 2, required: false, visible: true },
+      { id: "c4", table_id: "campaigns", field_key: "status", label: "Status", type: "single_select", order: 3, required: false, visible: true, options: { values: [
+        { id: "planning", label: "Planning" },
+        { id: "active", label: "Active" },
+        { id: "completed", label: "Completed" },
+        { id: "cancelled", label: "Cancelled" },
+      ]}},
+      { id: "c5", table_id: "campaigns", field_key: "colour", label: "Colour", type: "text", order: 4, required: false, visible: true },
+      { id: "c6", table_id: "campaigns", field_key: "start_date", label: "Start Date", type: "date", order: 5, required: false, visible: true },
+      { id: "c7", table_id: "campaigns", field_key: "end_date", label: "End Date", type: "date", order: 6, required: false, visible: true },
+      { id: "c8", table_id: "campaigns", field_key: "created_at", label: "Created At", type: "date", order: 7, required: false, visible: false },
+      { id: "c9", table_id: "campaigns", field_key: "updated_at", label: "Updated At", type: "date", order: 8, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "contacts") {
+    return [
+      { id: "ct1", table_id: "contacts", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "ct2", table_id: "contacts", field_key: "name", label: "Name", type: "text", order: 1, required: true, visible: true },
+      { id: "ct3", table_id: "contacts", field_key: "email", label: "Email", type: "text", order: 2, required: false, visible: true },
+      { id: "ct4", table_id: "contacts", field_key: "phone", label: "Phone", type: "text", order: 3, required: false, visible: true },
+      { id: "ct5", table_id: "contacts", field_key: "company", label: "Company", type: "text", order: 4, required: false, visible: true },
+      { id: "ct6", table_id: "contacts", field_key: "notes", label: "Notes", type: "long_text", order: 5, required: false, visible: true },
+      { id: "ct7", table_id: "contacts", field_key: "created_at", label: "Created At", type: "date", order: 6, required: false, visible: false },
+      { id: "ct8", table_id: "contacts", field_key: "updated_at", label: "Updated At", type: "date", order: 7, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "ideas") {
+    return [
+      { id: "i1", table_id: "ideas", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "i2", table_id: "ideas", field_key: "title", label: "Title", type: "text", order: 1, required: true, visible: true },
+      { id: "i3", table_id: "ideas", field_key: "description", label: "Description", type: "long_text", order: 2, required: false, visible: true },
+      { id: "i4", table_id: "ideas", field_key: "category", label: "Category", type: "single_select", order: 3, required: false, visible: true, options: { values: [
+        { id: "social", label: "Social Media" },
+        { id: "blog", label: "Blog" },
+        { id: "email", label: "Email" },
+        { id: "event", label: "Event" },
+        { id: "other", label: "Other" },
+      ]}},
+      { id: "i5", table_id: "ideas", field_key: "status", label: "Status", type: "single_select", order: 4, required: false, visible: true, options: { values: [
+        { id: "idea", label: "Idea" },
+        { id: "draft", label: "Draft" },
+        { id: "ready", label: "Ready" },
+        { id: "completed", label: "Completed" },
+      ]}},
+      { id: "i6", table_id: "ideas", field_key: "created_at", label: "Created At", type: "date", order: 5, required: false, visible: false },
+      { id: "i7", table_id: "ideas", field_key: "updated_at", label: "Updated At", type: "date", order: 6, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "media") {
+    return [
+      { id: "m1", table_id: "media", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "m2", table_id: "media", field_key: "publication", label: "Publication", type: "text", order: 1, required: true, visible: true },
+      { id: "m3", table_id: "media", field_key: "url", label: "URL", type: "text", order: 2, required: false, visible: true },
+      { id: "m4", table_id: "media", field_key: "date", label: "Date", type: "date", order: 3, required: false, visible: true },
+      { id: "m5", table_id: "media", field_key: "notes", label: "Notes", type: "long_text", order: 4, required: false, visible: true },
+      { id: "m6", table_id: "media", field_key: "content_id", label: "Content", type: "linked_record", order: 5, required: false, visible: true },
+      { id: "m7", table_id: "media", field_key: "created_at", label: "Created At", type: "date", order: 6, required: false, visible: false },
+      { id: "m8", table_id: "media", field_key: "updated_at", label: "Updated At", type: "date", order: 7, required: false, visible: false },
+    ];
+  }
+
+  if (tableId === "tasks") {
+    return [
+      { id: "t1", table_id: "tasks", field_key: "id", label: "ID", type: "text", order: 0, required: true, visible: false },
+      { id: "t2", table_id: "tasks", field_key: "title", label: "Title", type: "text", order: 1, required: true, visible: true },
+      { id: "t3", table_id: "tasks", field_key: "description", label: "Description", type: "long_text", order: 2, required: false, visible: true },
+      { id: "t4", table_id: "tasks", field_key: "status", label: "Status", type: "single_select", order: 3, required: false, visible: true, options: { values: [
+        { id: "todo", label: "To Do" },
+        { id: "in_progress", label: "In Progress" },
+        { id: "done", label: "Done" },
+      ]}},
+      { id: "t5", table_id: "tasks", field_key: "due_date", label: "Due Date", type: "date", order: 4, required: false, visible: true },
+      { id: "t6", table_id: "tasks", field_key: "assigned_to", label: "Assigned To", type: "linked_record", order: 5, required: false, visible: true },
+      { id: "t7", table_id: "tasks", field_key: "content_id", label: "Content", type: "linked_record", order: 6, required: false, visible: true },
+      { id: "t8", table_id: "tasks", field_key: "campaign_id", label: "Campaign", type: "linked_record", order: 7, required: false, visible: true },
+      { id: "t9", table_id: "tasks", field_key: "created_at", label: "Created At", type: "date", order: 8, required: false, visible: false },
+      { id: "t10", table_id: "tasks", field_key: "updated_at", label: "Updated At", type: "date", order: 9, required: false, visible: false },
+    ];
+  }
   
   // For other tables, return empty array (they can be configured via Field Manager)
   return [];

@@ -21,34 +21,44 @@ export const tables: Table[] = [
     views: ["grid", "cards"],
   },
   {
-    id: "media",
-    name: "Media",
-    views: ["grid"],
-  },
-  {
-    id: "sponsorships",
-    name: "Sponsorships",
-    views: ["grid"],
-  },
-  {
-    id: "strategy",
-    name: "Strategy",
-    views: ["grid"],
-  },
-  {
     id: "ideas",
     name: "Ideas",
-    views: ["grid", "cards"],
+    views: ["grid", "kanban", "cards"],
   },
   {
-    id: "briefings",
-    name: "Briefings",
-    views: ["grid"],
+    id: "media",
+    name: "Media",
+    views: ["grid", "calendar", "cards"],
   },
   {
     id: "tasks",
     name: "Tasks",
-    views: ["grid", "kanban"],
+    views: ["grid", "kanban", "calendar", "timeline"],
+  },
+];
+
+// Table categories for sidebar organization
+export interface TableCategory {
+  id: string;
+  name: string;
+  tableIds: string[];
+}
+
+export const tableCategories: TableCategory[] = [
+  {
+    id: "content",
+    name: "CONTENT",
+    tableIds: ["content", "ideas", "media"],
+  },
+  {
+    id: "planning",
+    name: "PLANNING",
+    tableIds: ["campaigns", "tasks"],
+  },
+  {
+    id: "crm",
+    name: "CRM",
+    tableIds: ["contacts"],
   },
 ];
 

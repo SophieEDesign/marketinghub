@@ -30,10 +30,24 @@ export default function CardsView({ tableId }: CardsViewProps) {
     getViewSettings,
     saveFilters,
     saveSort,
+    setCardFields,
   } = useViewSettings(tableId, viewId);
 
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
+  const cardFields = settings?.card_fields || [];
+  
+  const handleViewSettingsUpdate = async (updates: {
+    card_fields?: string[];
+  }): Promise<boolean> => {
+    try {
+      if (updates.card_fields !== undefined) await setCardFields(updates.card_fields);
+      return true;
+    } catch (error) {
+      console.error("Error updating view settings:", error);
+      return false;
+    }
+  };
 
   // Load view settings on mount (only once)
   useEffect(() => {
@@ -100,36 +114,62 @@ export default function CardsView({ tableId }: CardsViewProps) {
     );
   }
 
+  // Apply card_fields if set, otherwise use defaults
+  let displayFields = fields;
+  if (cardFields.length > 0) {
+    displayFields = fields.filter((f) => cardFields.includes(f.id));
+    // Sort by card_fields order
+    displayFields = [...displayFields].sort((a, b) => {
+      const aIndex = cardFields.indexOf(a.id);
+      const bIndex = cardFields.indexOf(b.id);
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+  }
+
   // Find thumbnail/image field (field.type = attachment)
-  const imageField = fields.find((f) => f.type === "attachment");
+  const imageField = displayFields.find((f) => f.type === "attachment") || fields.find((f) => f.type === "attachment");
 
   // Find title field (label = "Title")
-  const titleField = fields.find((f) => f.label.toLowerCase() === "title") || fields[0];
+  const titleField = displayFields.find((f) => f.label.toLowerCase() === "title") || fields.find((f) => f.label.toLowerCase() === "title") || fields[0];
 
   // Find status field
-  const statusField = fields.find(
+  const statusField = displayFields.find(
+    (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
+  ) || fields.find(
     (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
   );
 
   // Find channels field
-  const channelsField = fields.find(
+  const channelsField = displayFields.find(
+    (f) => f.type === "multi_select" && f.label.toLowerCase().includes("channel")
+  ) || fields.find(
     (f) => f.type === "multi_select" && f.label.toLowerCase().includes("channel")
   );
 
   // Find publish_date field
-  const publishDateField = fields.find(
+  const publishDateField = displayFields.find(
     (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
-  ) || fields.find((f) => f.field_key === "publish_date" && f.type === "date");
+  ) || fields.find((f) => f.label.toLowerCase() === "publish date" && f.type === "date")
+  || fields.find((f) => f.field_key === "publish_date" && f.type === "date");
 
   return (
     <div>
       <ViewHeader
+        tableId={tableId}
+        viewId={viewId}
         fields={fields}
         filters={filters}
         sort={sort}
         onFiltersChange={handleFiltersChange}
         onSortChange={handleSortChange}
         onRemoveFilter={handleRemoveFilter}
+        viewSettings={{
+          card_fields: cardFields,
+        }}
+        onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
       <div

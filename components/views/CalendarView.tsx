@@ -33,16 +33,32 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
     getViewSettings,
     saveFilters,
     saveSort,
+    setCalendarDateField,
   } = useViewSettings(tableId, viewId);
   const calendarRef = useRef<FullCalendar>(null);
 
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
+  const calendarDateFieldKey = settings?.calendar_date_field;
+  
+  const handleViewSettingsUpdate = async (updates: {
+    calendar_date_field?: string;
+  }): Promise<boolean> => {
+    try {
+      if (updates.calendar_date_field !== undefined) await setCalendarDateField(updates.calendar_date_field);
+      return true;
+    } catch (error) {
+      console.error("Error updating view settings:", error);
+      return false;
+    }
+  };
 
-  // Detect date field: prefer "Publish Date", otherwise first date field
-  const dateField = allFields.find(
-    (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
-  ) || allFields.find((f) => f.type === "date") || null;
+  // Detect date field: use calendar_date_field from settings, or fallback to "Publish Date", otherwise first date field
+  const dateField = calendarDateFieldKey
+    ? allFields.find((f) => f.field_key === calendarDateFieldKey && f.type === "date")
+    : allFields.find(
+        (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
+      ) || allFields.find((f) => f.type === "date") || null;
 
   // Find title field
   const titleField = allFields.find((f) => f.label.toLowerCase() === "title") || allFields[0];
@@ -202,12 +218,18 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   return (
     <div>
       <ViewHeader
+        tableId={tableId}
+        viewId={viewId}
         fields={allFields}
         filters={filters}
         sort={sort}
         onFiltersChange={handleFiltersChange}
         onSortChange={handleSortChange}
         onRemoveFilter={handleRemoveFilter}
+        viewSettings={{
+          calendar_date_field: calendarDateFieldKey,
+        }}
+        onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
       <div className="p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm">

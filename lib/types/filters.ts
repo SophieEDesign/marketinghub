@@ -42,6 +42,13 @@ export interface ViewSettings {
   view_id: string;
   filters: Filter[];
   sort: Sort[];
+  visible_fields?: string[]; // Array of field IDs
+  field_order?: string[]; // Array of field IDs in order
+  kanban_group_field?: string; // field_key
+  calendar_date_field?: string; // field_key
+  timeline_date_field?: string; // field_key
+  row_height?: "compact" | "medium" | "tall";
+  card_fields?: string[]; // Array of field IDs for card layout
   updated_at: string;
 }
 

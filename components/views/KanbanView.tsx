@@ -40,20 +40,36 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     getViewSettings,
     saveFilters,
     saveSort,
+    setKanbanGroupField,
   } = useViewSettings(tableId, viewId);
 
   const filters = settings?.filters || [];
   const sort = settings?.sort || [];
+  const kanbanGroupFieldKey = settings?.kanban_group_field;
+  
+  const handleViewSettingsUpdate = async (updates: {
+    kanban_group_field?: string;
+  }): Promise<boolean> => {
+    try {
+      if (updates.kanban_group_field !== undefined) await setKanbanGroupField(updates.kanban_group_field);
+      return true;
+    } catch (error) {
+      console.error("Error updating view settings:", error);
+      return false;
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor)
   );
 
-  // Find status field: type = 'single_select' AND label contains "Status" (case-insensitive)
-  const kanbanField = allFields.find(
-    (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
-  ) || allFields.find((f) => f.type === "single_select") || null;
+  // Find kanban field: use kanban_group_field from settings, or fallback to status field
+  const kanbanField = kanbanGroupFieldKey
+    ? allFields.find((f) => f.field_key === kanbanGroupFieldKey && f.type === "single_select")
+    : allFields.find(
+        (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
+      ) || allFields.find((f) => f.type === "single_select") || null;
 
   // Load view settings on mount (only once)
   useEffect(() => {
@@ -168,12 +184,18 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   return (
     <div>
       <ViewHeader
+        tableId={tableId}
+        viewId={viewId}
         fields={allFields}
         filters={filters}
         sort={sort}
         onFiltersChange={handleFiltersChange}
         onSortChange={handleSortChange}
         onRemoveFilter={handleRemoveFilter}
+        viewSettings={{
+          kanban_group_field: kanbanGroupFieldKey,
+        }}
+        onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
       <DndContext
