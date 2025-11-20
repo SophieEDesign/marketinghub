@@ -49,7 +49,7 @@ interface ViewSettingsDrawerProps {
     timeline_date_field?: string;
     row_height?: "compact" | "medium" | "tall";
     card_fields?: string[];
-  }) => Promise<boolean>;
+  }) => Promise<void>;
 }
 
 function SortableFieldItem({
