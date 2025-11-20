@@ -15,8 +15,6 @@ import SponsorshipsList from "./SponsorshipsList";
 import StrategyList from "./StrategyList";
 import BriefingsList from "./BriefingsList";
 import AssetsList from "./AssetsList";
-import UploadDiagnostic from "@/components/debug/UploadDiagnostic";
-import SupabaseDiagnostic from "@/components/debug/SupabaseDiagnostic";
 import DashboardSortableModule from "./DashboardSortableModule";
 import { useModal } from "@/lib/modalState";
 import { useSearch } from "@/components/search/SearchProvider";
@@ -41,8 +39,6 @@ const dashboardModules: DashboardModule[] = [
   { id: "strategy-list", component: StrategyList },
   { id: "briefings-list", component: BriefingsList },
   { id: "assets-list", component: AssetsList },
-  { id: "upload-diagnostic", component: UploadDiagnostic },
-  { id: "supabase-diagnostic", component: SupabaseDiagnostic },
 ];
 
 export default function Dashboard() {
