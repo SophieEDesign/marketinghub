@@ -77,12 +77,19 @@ export async function runImport(
 
       try {
         // Check if record exists
-        const { data: existing } = await supabase
+        const { data: existing, error: checkError } = await supabase
           .from(options.tableId)
           .select("id")
           .eq(upsertKey, row[upsertKey])
           .limit(1)
-          .single();
+          .maybeSingle();
+
+        if (checkError && checkError.code !== "PGRST116") {
+          // PGRST116 is "not found" which is fine, other errors are real
+          result.errors.push({ row: i + 1, error: `Check failed: ${checkError.message}` });
+          result.skipped++;
+          continue;
+        }
 
         if (existing) {
           // Update existing
@@ -92,7 +99,7 @@ export async function runImport(
             .eq(upsertKey, row[upsertKey]);
 
           if (updateError) {
-            result.errors.push({ row: i + 1, error: updateError.message });
+            result.errors.push({ row: i + 1, error: `Update failed: ${updateError.message}` });
             result.skipped++;
           } else {
             result.updated++;
@@ -104,7 +111,7 @@ export async function runImport(
             .insert([row]);
 
           if (insertError) {
-            result.errors.push({ row: i + 1, error: insertError.message });
+            result.errors.push({ row: i + 1, error: `Insert failed: ${insertError.message}` });
             result.skipped++;
           } else {
             result.inserted++;

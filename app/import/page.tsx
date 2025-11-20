@@ -37,40 +37,70 @@ function ImportPageContent() {
 
   const handleFileSelect = useCallback(
     async (file: File) => {
-      if (!file.name.endsWith(".csv")) {
-        alert("Please select a CSV file");
-        return;
+      try {
+        if (!file) {
+          alert("No file selected");
+          return;
+        }
+
+        if (!file.name.endsWith(".csv")) {
+          alert("Please select a CSV file (.csv extension required)");
+          return;
+        }
+
+        if (file.size === 0) {
+          alert("The selected file is empty");
+          return;
+        }
+
+        setCsvFile(file);
+
+        // Dynamically import Papa
+        const PapaModule = await import("papaparse");
+        const Papa = PapaModule.default;
+
+        // Parse CSV
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            if (results.errors.length > 0) {
+              console.error("CSV parse errors:", results.errors);
+              const errorMessage = results.errors[0]?.message || "Unknown parsing error";
+              alert(`Error parsing CSV: ${errorMessage}\n\nPlease check your CSV file format.`);
+              setCsvFile(null);
+              return;
+            }
+
+            const data = results.data as Record<string, string>[];
+            if (!data || data.length === 0) {
+              alert("CSV file is empty or contains no valid rows");
+              setCsvFile(null);
+              return;
+            }
+
+            const headers = Object.keys(data[0]);
+            if (headers.length === 0) {
+              alert("CSV file has no headers. Please ensure the first row contains column names.");
+              setCsvFile(null);
+              return;
+            }
+
+            setCsvHeaders(headers);
+            setCsvRows(data);
+            setStep("mapping");
+          },
+          error: (error) => {
+            console.error("CSV parse error:", error);
+            alert(`Failed to parse CSV file: ${error.message || "Unknown error"}`);
+            setCsvFile(null);
+          },
+        });
+      } catch (error: any) {
+        console.error("Error handling file:", error);
+        alert(`Error processing file: ${error.message || "Unknown error"}`);
+        setCsvFile(null);
       }
-
-      setCsvFile(file);
-
-      // Dynamically import Papa
-      const PapaModule = await import("papaparse");
-      const Papa = PapaModule.default;
-
-      // Parse CSV
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.errors.length > 0) {
-            console.error("CSV parse errors:", results.errors);
-            alert(`Error parsing CSV: ${results.errors[0].message}`);
-            return;
-          }
-
-          const data = results.data as Record<string, string>[];
-          if (data.length === 0) {
-            alert("CSV file is empty");
-            return;
-          }
-
-          const headers = Object.keys(data[0]);
-          setCsvHeaders(headers);
-          setCsvRows(data);
-          setStep("mapping");
-        },
-      });
     },
     []
   );
@@ -141,6 +171,18 @@ function ImportPageContent() {
     setStep("importing");
 
     try {
+      if (!csvRows || csvRows.length === 0) {
+        alert("No data to import");
+        setStep("preview");
+        return;
+      }
+
+      if (!mappings || mappings.length === 0) {
+        alert("No field mappings configured");
+        setStep("mapping");
+        return;
+      }
+
       const result = await runImport(csvRows, mappings, fields, {
         tableId,
         mode: "upsert",
@@ -150,7 +192,8 @@ function ImportPageContent() {
       setImportResult(result);
       setStep("results");
     } catch (error: any) {
-      alert(`Import failed: ${error.message}`);
+      console.error("Import error:", error);
+      alert(`Import failed: ${error.message || "Unknown error"}\n\nCheck the browser console for details.`);
       setStep("preview");
     }
   }, [csvRows, mappings, fields, tableId]);
