@@ -12,11 +12,14 @@ import { getOrFetch, CacheKeys, invalidateCache } from "@/lib/cache/metadataCach
 import FieldRenderer from "../fields/FieldRenderer";
 import InlineFieldEditor from "../fields/InlineFieldEditor";
 import ViewHeader from "./ViewHeader";
+import SortableColumnHeader from "./SortableColumnHeader";
 import { Filter, Sort } from "@/lib/types/filters";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
 import { logFieldChanges } from "@/lib/activityLogger";
 import { GridSkeleton } from "../ui/Skeleton";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 
 interface GridViewProps {
   tableId: string;
@@ -51,21 +54,57 @@ function GridViewComponent({ tableId }: GridViewProps) {
   const fieldOrder = settings?.field_order || [];
   const rowHeight = settings?.row_height || "medium";
 
-  // Apply visible_fields and field_order
-  let fields = allFields;
-  if (visibleFields.length > 0) {
-    fields = fields.filter((f) => visibleFields.includes(f.id));
-  }
-  if (fieldOrder.length > 0) {
-    fields = [...fields].sort((a, b) => {
-      const aIndex = fieldOrder.indexOf(a.id);
-      const bIndex = fieldOrder.indexOf(b.id);
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      return aIndex - bIndex;
-    });
-  }
+  // Detect mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Apply visible_fields and field_order (memoized)
+  const fields = useMemo(() => {
+    let currentFields = allFields;
+    if (visibleFields.length > 0) {
+      currentFields = currentFields.filter((f) => visibleFields.includes(f.id));
+    }
+    if (fieldOrder.length > 0) {
+      currentFields = [...currentFields].sort((a, b) => {
+        const aIndex = fieldOrder.indexOf(a.id);
+        const bIndex = fieldOrder.indexOf(b.id);
+        if (aIndex === -1 && bIndex === -1) return 0;
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
+    }
+    return currentFields;
+  }, [allFields, visibleFields, fieldOrder]);
+
+  // Get ordered field IDs for drag-and-drop
+  const orderedFieldIds = useMemo(() => {
+    return fields.map((f) => f.id);
+  }, [fields]);
+
+  // Handle drag end for column reordering
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedFieldIds.indexOf(active.id as string);
+    const newIndex = orderedFieldIds.indexOf(over.id as string);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(orderedFieldIds, oldIndex, newIndex);
+    await setFieldOrder(newOrder);
+    
+    // Invalidate cache to refresh view
+    invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+  };
   
   const handleViewSettingsUpdate = async (updates: {
     visible_fields?: string[];
@@ -214,16 +253,22 @@ function GridViewComponent({ tableId }: GridViewProps) {
       {/* Table */}
       <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
         <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
-          <table className="min-w-full border-collapse">
-          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              {fields.map((field) => (
-                <th key={field.id} className="px-4 py-3 font-heading uppercase text-xs tracking-wide text-brand-grey font-semibold text-left">
-                  {field.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <table className="min-w-full border-collapse">
+            <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+              <tr>
+                <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
+                  {fields.map((field) => (
+                    <SortableColumnHeader
+                      key={field.id}
+                      id={field.id}
+                      label={field.label}
+                      isMobile={isMobile}
+                    />
+                  ))}
+                </SortableContext>
+              </tr>
+            </thead>
           <tbody>
             {rows.map((row, index) => (
               <tr
@@ -394,6 +439,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
           ))}
         </tbody>
       </table>
+          </DndContext>
         </div>
       </div>
     </div>
