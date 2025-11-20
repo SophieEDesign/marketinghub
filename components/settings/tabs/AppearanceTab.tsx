@@ -103,7 +103,7 @@ export default function AppearanceTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {statusOptions.map((status) => (
             <div key={status} className="flex items-center gap-3">
-              <StatusChip status={status} />
+              <StatusChip value={status} />
               <input
                 type="color"
                 value={statusColors[status] || "#6b7280"}
@@ -120,7 +120,7 @@ export default function AppearanceTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {channelOptions.map((channel) => (
             <div key={channel} className="flex items-center gap-3">
-              <ChannelChip channel={channel} />
+              <ChannelChip label={channel} />
               <input
                 type="color"
                 value={channelColors[channel] || "#6b7280"}
