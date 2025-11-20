@@ -84,7 +84,7 @@ export default function FilterPanel({
             type="text"
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
             placeholder="Enter value..."
           />
         );
@@ -95,7 +95,7 @@ export default function FilterPanel({
             type="number"
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value ? Number(e.target.value) : "" })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
             placeholder="Enter number..."
           />
         );
@@ -112,7 +112,7 @@ export default function FilterPanel({
                     value: [e.target.value, Array.isArray(filter.value) ? filter.value[1] || "" : ""],
                   })
                 }
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
               />
               <input
                 type="date"
@@ -122,7 +122,7 @@ export default function FilterPanel({
                     value: [Array.isArray(filter.value) ? filter.value[0] || "" : "", e.target.value],
                   })
                 }
-                className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
               />
             </div>
           );
@@ -132,7 +132,7 @@ export default function FilterPanel({
             type="date"
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
           />
         );
 
@@ -142,7 +142,7 @@ export default function FilterPanel({
           <select
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
           >
             <option value="">Select option...</option>
             {selectOptions.map((opt: any) => (
@@ -210,7 +210,7 @@ export default function FilterPanel({
           <select
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
           >
             <option value="">Select option...</option>
             {multiSelectOptions.map((opt: any) => (
@@ -226,7 +226,7 @@ export default function FilterPanel({
           <select
             value={filter.value === true ? "true" : filter.value === false ? "false" : ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value === "true" ? true : e.target.value === "false" ? false : null })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
           >
             <option value="">Select...</option>
             <option value="true">True</option>
@@ -240,7 +240,7 @@ export default function FilterPanel({
             type="text"
             value={filter.value || ""}
             onChange={(e) => updateFilter(filter.id, { value: e.target.value })}
-            className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+            className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
             placeholder="Enter value..."
           />
         );
@@ -250,26 +250,27 @@ export default function FilterPanel({
   return (
     <div className="fixed inset-0 flex justify-end z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-96 bg-white dark:bg-gray-950 shadow-xl h-full overflow-y-auto border-l border-gray-200 dark:border-gray-700">
-        <div className="p-6">
+      <div className="relative w-full max-w-full md:w-96 md:max-w-md bg-white dark:bg-gray-950 shadow-xl h-full overflow-y-auto border-l border-gray-200 dark:border-gray-700">
+        <div className="p-4 md:p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-heading text-brand-blue">Filters</h2>
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <h2 className="text-lg md:text-xl font-heading text-brand-blue">Filters</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 -mr-2 touch-manipulation"
+              aria-label="Close filters"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 md:w-6 md:h-6" />
             </button>
           </div>
 
           {/* Add Filter Button */}
           <button
             onClick={addFilter}
-            className="w-full btn-secondary mb-4 flex items-center justify-center gap-2"
+            className="w-full btn-secondary mb-4 flex items-center justify-center gap-2 py-3 md:py-2 touch-manipulation"
           >
-            <Plus className="w-4 h-4" />
-            Add Filter
+            <Plus className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="text-sm md:text-base">Add Filter</span>
           </button>
 
           {/* Active Filters */}
@@ -286,10 +287,10 @@ export default function FilterPanel({
                 return (
                   <div
                     key={filter.id}
-                    className="border border-gray-300 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-900"
+                    className="border border-gray-300 dark:border-gray-700 rounded-md p-3 md:p-4 bg-gray-50 dark:bg-gray-900"
                   >
-                    <div className="flex items-start gap-2 mb-2">
-                      <div className="flex-1 space-y-2">
+                    <div className="flex items-start gap-2 md:gap-3 mb-2">
+                      <div className="flex-1 space-y-2 md:space-y-3">
                         {/* Field Select */}
                         <select
                           value={filter.field}
@@ -304,7 +305,7 @@ export default function FilterPanel({
                               });
                             }
                           }}
-                          className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                          className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
                         >
                           {fields.map((f) => (
                             <option key={f.id} value={f.field_key}>
@@ -317,7 +318,7 @@ export default function FilterPanel({
                         <select
                           value={filter.operator}
                           onChange={(e) => updateFilter(filter.id, { operator: e.target.value as FilterOperator, value: "" })}
-                          className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                          className="w-full px-3 py-2.5 md:py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm md:text-base touch-manipulation"
                         >
                           {operators.map((op) => (
                             <option key={op} value={op}>
@@ -333,10 +334,11 @@ export default function FilterPanel({
                       {/* Remove Button */}
                       <button
                         onClick={() => removeFilter(filter.id)}
-                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
+                        className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-2 -mt-1 touch-manipulation"
                         title="Remove filter"
+                        aria-label="Remove filter"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -346,12 +348,12 @@ export default function FilterPanel({
           </div>
 
           {/* Actions */}
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-            <button onClick={handleClear} className="btn-secondary flex-1">
-              Clear All
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row gap-2 md:gap-3">
+            <button onClick={handleClear} className="btn-secondary flex-1 py-3 md:py-2 touch-manipulation">
+              <span className="text-sm md:text-base">Clear All</span>
             </button>
-            <button onClick={handleSave} className="btn-primary flex-1">
-              Apply Filters
+            <button onClick={handleSave} className="btn-primary flex-1 py-3 md:py-2 touch-manipulation">
+              <span className="text-sm md:text-base">Apply Filters</span>
             </button>
           </div>
         </div>

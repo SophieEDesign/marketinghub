@@ -40,28 +40,32 @@ export default function ViewHeader({
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4 mb-4">
+        <div className="flex-1 min-w-0">
           <FilterBadges
             filters={filters}
             fields={fields}
             onRemoveFilter={onRemoveFilter}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowFilterPanel(true)}
-            className={`btn-secondary flex items-center gap-2 ${filters.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
+            className={`btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation ${filters.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
           >
-            <FilterIcon className="w-4 h-4" />
-            Filters {filters.length > 0 && `(${filters.length})`}
+            <FilterIcon className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+            <span className="text-sm md:text-base">
+              Filters {filters.length > 0 && `(${filters.length})`}
+            </span>
           </button>
           <button
             onClick={() => setShowSortPanel(true)}
-            className={`btn-secondary flex items-center gap-2 ${sort.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
+            className={`btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation ${sort.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
           >
-            <ArrowUpDown className="w-4 h-4" />
-            Sort {sort.length > 0 && `(${sort.length})`}
+            <ArrowUpDown className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+            <span className="text-sm md:text-base">
+              Sort {sort.length > 0 && `(${sort.length})`}
+            </span>
           </button>
         </div>
       </div>
