@@ -37,6 +37,12 @@ function GridViewComponent({ tableId }: GridViewProps) {
     rowId: string;
     fieldId: string;
   } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    rowId?: string;
+    rowIds?: string[];
+  }>({ isOpen: false });
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {
@@ -273,6 +279,12 @@ function GridViewComponent({ tableId }: GridViewProps) {
           row_height: rowHeight,
         }}
         onViewSettingsUpdate={handleViewSettingsUpdate}
+        selectedRowCount={selectedRows.size}
+        onBulkDelete={
+          selectedRows.size > 0
+            ? () => setDeleteConfirm({ isOpen: true, rowIds: Array.from(selectedRows) })
+            : undefined
+        }
       />
 
       {/* Table */}
@@ -304,8 +316,25 @@ function GridViewComponent({ tableId }: GridViewProps) {
                     : "bg-gray-50/50 dark:bg-gray-800/50"
                 } hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${
                   rowHeight === "compact" ? "h-10" : rowHeight === "tall" ? "h-20" : "h-14"
-                }`}
+                } ${selectedRows.has(row.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
               >
+                <td className="px-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedRows.has(row.id)}
+                    onChange={(e) => {
+                      const newSelected = new Set(selectedRows);
+                      if (e.target.checked) {
+                        newSelected.add(row.id);
+                      } else {
+                        newSelected.delete(row.id);
+                      }
+                      setSelectedRows(newSelected);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </td>
             {fields.map((field) => {
               const isEditing =
                 editingCell?.rowId === row.id &&

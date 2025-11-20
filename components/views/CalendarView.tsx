@@ -240,6 +240,8 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
         editable={true}
         eventDrop={handleEventDrop}
         eventContent={renderEventContent}
+        displayEventTime={false}
+        eventDisplay="block"
         height="auto"
         headerToolbar={{
           left: "prev,next today",

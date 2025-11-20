@@ -303,6 +303,8 @@ export async function createField(tableId: string, field: Omit<Field, "id" | "ta
     optionsValue = { values: [] };
   }
 
+  console.log("[fields] Creating field:", { tableId, fieldKey, field });
+
   const { data, error } = await supabase
     .from("table_fields")
     .insert([
@@ -321,9 +323,19 @@ export async function createField(tableId: string, field: Omit<Field, "id" | "ta
     .single();
 
   if (error) {
-    console.error("Error creating field:", error);
+    console.error("[fields] Error creating field:", {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      tableId,
+      fieldKey,
+    });
     return null;
   }
+
+  console.log("[fields] Field created successfully:", data);
 
   return {
     ...data,
@@ -344,6 +356,8 @@ export async function updateField(
     updateData.options = JSON.stringify(updateData.options);
   }
 
+  console.log("[fields] Updating field:", { tableId, fieldId, updates });
+
   const { data, error } = await supabase
     .from("table_fields")
     .update(updateData)
@@ -352,9 +366,19 @@ export async function updateField(
     .single();
 
   if (error) {
-    console.error("Error updating field:", error);
+    console.error("[fields] Error updating field:", {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      tableId,
+      fieldId,
+    });
     return null;
   }
+
+  console.log("[fields] Field updated successfully:", data);
 
   return {
     ...data,

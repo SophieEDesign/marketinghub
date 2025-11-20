@@ -63,6 +63,13 @@ export async function runImport(
   // Step 2: Handle unknown select options
   await addUnknownSelectOptions(transformedRows, mappings, fields);
 
+  console.log("[runImport] Starting import:", { 
+    tableId: options.tableId, 
+    mode: options.mode, 
+    upsertKey, 
+    rowCount: transformedRows.length 
+  });
+
   // Step 3: Import rows
   if (options.mode === "upsert") {
     // Upsert mode: update existing or insert new
@@ -86,6 +93,7 @@ export async function runImport(
 
         if (checkError && checkError.code !== "PGRST116") {
           // PGRST116 is "not found" which is fine, other errors are real
+          console.error(`[runImport] Check error for row ${i + 1}:`, checkError);
           result.errors.push({ row: i + 1, error: `Check failed: ${checkError.message}` });
           result.skipped++;
           continue;
@@ -99,6 +107,7 @@ export async function runImport(
             .eq(upsertKey, row[upsertKey]);
 
           if (updateError) {
+            console.error(`[runImport] Update error for row ${i + 1}:`, updateError);
             result.errors.push({ row: i + 1, error: `Update failed: ${updateError.message}` });
             result.skipped++;
           } else {
@@ -111,6 +120,15 @@ export async function runImport(
             .insert([row]);
 
           if (insertError) {
+            console.error(`[runImport] Insert error for row ${i + 1}:`, {
+              error: insertError,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code,
+              tableId: options.tableId,
+              row: Object.keys(row),
+            });
             result.errors.push({ row: i + 1, error: `Insert failed: ${insertError.message}` });
             result.skipped++;
           } else {
@@ -118,6 +136,7 @@ export async function runImport(
           }
         }
       } catch (err: any) {
+        console.error(`[runImport] Exception for row ${i + 1}:`, err);
         result.errors.push({ row: i + 1, error: err.message || "Unknown error" });
         result.skipped++;
       }
@@ -135,6 +154,14 @@ export async function runImport(
           .insert(batch);
 
         if (insertError) {
+          console.error(`[runImport] Batch insert error for batch starting at row ${i + 1}:`, {
+            error: insertError,
+            message: insertError.message,
+            details: insertError.details,
+            hint: insertError.hint,
+            code: insertError.code,
+            tableId: options.tableId,
+          });
           // If batch fails, try individual inserts
           for (let j = 0; j < batch.length; j++) {
             try {
@@ -143,12 +170,14 @@ export async function runImport(
                 .insert([batch[j]]);
 
               if (singleError) {
+                console.error(`[runImport] Single insert error for row ${i + j + 1}:`, singleError);
                 result.errors.push({ row: i + j + 1, error: singleError.message });
                 result.skipped++;
               } else {
                 result.inserted++;
               }
             } catch (err: any) {
+              console.error(`[runImport] Exception for row ${i + j + 1}:`, err);
               result.errors.push({ row: i + j + 1, error: err.message || "Unknown error" });
               result.skipped++;
             }

@@ -102,32 +102,32 @@ ON storage.objects FOR DELETE
 USING (bucket_id = 'assets');
 
 -- ============================================
--- MEDIA BUCKET POLICIES
+-- THUMBNAILS BUCKET POLICIES
 -- ============================================
 
 -- Drop existing policies if they exist
-DROP POLICY IF EXISTS "Allow public read access to media" ON storage.objects;
-DROP POLICY IF EXISTS "Allow public insert access to media" ON storage.objects;
-DROP POLICY IF EXISTS "Allow public update access to media" ON storage.objects;
-DROP POLICY IF EXISTS "Allow public delete access to media" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public read access to thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public insert access to thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public update access to thumbnails" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public delete access to thumbnails" ON storage.objects;
 
--- Create policies for media bucket
-CREATE POLICY "Allow public read access to media"
+-- Create policies for thumbnails bucket
+CREATE POLICY "Allow public read access to thumbnails"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'media');
+USING (bucket_id = 'thumbnails');
 
-CREATE POLICY "Allow public insert access to media"
+CREATE POLICY "Allow public insert access to thumbnails"
 ON storage.objects FOR INSERT
-WITH CHECK (bucket_id = 'media');
+WITH CHECK (bucket_id = 'thumbnails');
 
-CREATE POLICY "Allow public update access to media"
+CREATE POLICY "Allow public update access to thumbnails"
 ON storage.objects FOR UPDATE
-USING (bucket_id = 'media')
-WITH CHECK (bucket_id = 'media');
+USING (bucket_id = 'thumbnails')
+WITH CHECK (bucket_id = 'thumbnails');
 
-CREATE POLICY "Allow public delete access to media"
+CREATE POLICY "Allow public delete access to thumbnails"
 ON storage.objects FOR DELETE
-USING (bucket_id = 'media');
+USING (bucket_id = 'thumbnails');
 
 -- ============================================
 -- VERIFY BUCKETS EXIST
@@ -138,13 +138,13 @@ USING (bucket_id = 'media');
 --    - "branding" (for logo uploads)
 --    - "attachments" (for file attachments)
 --    - "assets" (for asset files)
---    - "media" (for media files)
+--    - "thumbnails" (for thumbnail images)
 -- 
 -- Or run these commands if you have access:
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('branding', 'branding', true) ON CONFLICT DO NOTHING;
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('attachments', 'attachments', true) ON CONFLICT DO NOTHING;
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('assets', 'assets', true) ON CONFLICT DO NOTHING;
--- INSERT INTO storage.buckets (id, name, public) VALUES ('media', 'media', true) ON CONFLICT DO NOTHING;
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('thumbnails', 'thumbnails', true) ON CONFLICT DO NOTHING;
 
 -- ============================================
 -- MIGRATION COMPLETE

@@ -83,19 +83,30 @@ export function useSettings() {
     const currentSettings = data || getDefaultSettings();
     const newSettings = { ...currentSettings, ...updates };
 
+    console.log("[useSettings] Updating settings:", { updates, SETTINGS_KEY });
+
     // Upsert settings
-    const { error: updateError } = await supabase
+    const { data: result, error: updateError } = await supabase
       .from(SETTINGS_TABLE)
       .upsert({
         key: SETTINGS_KEY,
         value: newSettings,
         updated_at: new Date().toISOString(),
-      });
+      })
+      .select();
 
     if (updateError) {
-      console.error("Error updating settings:", updateError);
+      console.error("[useSettings] Error updating settings:", {
+        error: updateError,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        code: updateError.code,
+      });
       throw updateError;
     }
+
+    console.log("[useSettings] Settings updated successfully:", result);
 
     // Optimistically update cache
     mutate(newSettings, false);

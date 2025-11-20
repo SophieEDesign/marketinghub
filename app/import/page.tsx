@@ -9,6 +9,7 @@ import { runImport, ImportResult } from "@/lib/import/runImport";
 import FieldMappingComponent from "@/components/import/FieldMapping";
 import ImportPreview from "@/components/import/ImportPreview";
 import { useFieldManager } from "@/lib/useFieldManager";
+import { getAllTables } from "@/lib/tableMetadata";
 
 // Papa will be imported dynamically when needed
 
@@ -17,7 +18,8 @@ type Step = "upload" | "mapping" | "preview" | "importing" | "results";
 function ImportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tableId = searchParams.get("table") || "content";
+  const [tableId, setTableId] = useState(searchParams.get("table") || "content");
+  const allTables = getAllTables();
 
   const [step, setStep] = useState<Step>("upload");
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -34,6 +36,35 @@ function ImportPageContent() {
   useEffect(() => {
     loadFields(tableId).then(setFields);
   }, [tableId]);
+
+  // Helper function to determine upsert key for a table
+  const getUpsertKeyForTable = (table: string, tableFields: Field[]): string => {
+    // Try to find a unique identifier field
+    const idField = tableFields.find(f => f.field_key === "id");
+    if (idField) return "id";
+    
+    // Try common name fields
+    const nameField = tableFields.find(f => 
+      f.field_key === "name" || f.field_key === "title"
+    );
+    if (nameField) return nameField.field_key;
+    
+    // Default based on table
+    const defaults: Record<string, string> = {
+      content: "title",
+      campaigns: "name",
+      contacts: "name",
+      ideas: "title",
+      media: "publication",
+      tasks: "title",
+      briefings: "title",
+      sponsorships: "name",
+      strategy: "title",
+      assets: "filename",
+    };
+    
+    return defaults[table] || "id";
+  };
 
   const handleFileSelect = useCallback(
     async (file: File) => {
@@ -183,11 +214,18 @@ function ImportPageContent() {
         return;
       }
 
+      // Determine upsert key based on table
+      const upsertKey = getUpsertKeyForTable(tableId, fields);
+      
+      console.log("[Import] Starting import:", { tableId, upsertKey, rowCount: csvRows.length });
+
       const result = await runImport(csvRows, mappings, fields, {
         tableId,
         mode: "upsert",
-        upsertKey: "title",
+        upsertKey,
       });
+      
+      console.log("[Import] Import complete:", result);
 
       setImportResult(result);
       setStep("results");
@@ -226,8 +264,33 @@ function ImportPageContent() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Import CSV
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Import data from a CSV file into the {tableId} table
+          <div className="flex items-center gap-4 mt-4">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Target Table:
+            </label>
+            <select
+              value={tableId}
+              onChange={(e) => {
+                setTableId(e.target.value);
+                // Reset import state when table changes
+                setStep("upload");
+                setCsvFile(null);
+                setCsvHeaders([]);
+                setCsvRows([]);
+                setMappings([]);
+                setImportResult(null);
+              }}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {allTables.map((table) => (
+                <option key={table.id} value={table.id}>
+                  {table.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Import data from a CSV file into the {allTables.find(t => t.id === tableId)?.name || tableId} table
           </p>
         </div>
 

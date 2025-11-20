@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Filter as FilterIcon, ArrowUpDown, Settings } from "lucide-react";
+import { Filter as FilterIcon, ArrowUpDown, Settings, Trash2 } from "lucide-react";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
 import FilterPanel from "../filters/FilterPanel";
@@ -43,6 +43,8 @@ export default function ViewHeader({
   onRemoveFilter,
   viewSettings,
   onViewSettingsUpdate,
+  selectedRowCount = 0,
+  onBulkDelete,
 }: ViewHeaderProps) {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
@@ -69,6 +71,17 @@ export default function ViewHeader({
           />
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {selectedRowCount > 0 && onBulkDelete && (
+            <button
+              onClick={onBulkDelete}
+              className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+            >
+              <Trash2 className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+              <span className="text-sm md:text-base">
+                Delete {selectedRowCount} {selectedRowCount === 1 ? "record" : "records"}
+              </span>
+            </button>
+          )}
           <button
             onClick={() => setShowFilterPanel(true)}
             className={`btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation ${filters.length > 0 ? "bg-brand-red/10 text-brand-red border-brand-red" : ""}`}
