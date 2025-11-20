@@ -43,13 +43,14 @@ export function useViewConfigs(tableName: string) {
   const createView = useCallback(async (viewName: string, cloneFrom?: ViewConfig): Promise<ViewConfig | null> => {
     try {
       const baseConfig = cloneFrom || currentView || {
+        view_type: "grid" as const,
         column_order: [],
         column_widths: {},
         hidden_columns: [],
         filters: [],
         sort: [],
         groupings: [],
-        row_height: "medium",
+        row_height: "medium" as const,
       };
 
       const response = await fetch("/api/views", {
