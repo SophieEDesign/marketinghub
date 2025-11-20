@@ -30,6 +30,8 @@ export default function CardsView({ tableId }: CardsViewProps) {
     getViewSettings,
     saveFilters,
     saveSort,
+    setVisibleFields,
+    setFieldOrder,
     setCardFields,
   } = useViewSettings(tableId, viewId);
 
@@ -38,14 +40,16 @@ export default function CardsView({ tableId }: CardsViewProps) {
   const cardFields = settings?.card_fields || [];
   
   const handleViewSettingsUpdate = async (updates: {
+    visible_fields?: string[];
+    field_order?: string[];
     card_fields?: string[];
-  }): Promise<boolean> => {
+  }): Promise<void> => {
     try {
+      if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
+      if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
       if (updates.card_fields !== undefined) await setCardFields(updates.card_fields);
-      return true;
     } catch (error) {
       console.error("Error updating view settings:", error);
-      return false;
     }
   };
 
