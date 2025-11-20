@@ -7,6 +7,7 @@ import { useSearch } from "./SearchProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { useModal } from "@/lib/modalState";
 import { useDrawer } from "@/lib/drawerState";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 // Dynamically import Fuse.js if available
 let Fuse: any = null;
@@ -85,6 +86,7 @@ const SEARCH_CONFIG: Record<string, { fields: string[]; titleField: string; subt
 export default function GlobalSearch() {
   const { showSearch, closeSearch } = useSearch();
   const [query, setQuery] = useState("");
+  const debouncedQuery = useDebounce(query, 150);
   const [results, setResults] = useState<GroupedResults>({});
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -164,66 +166,65 @@ export default function GlobalSearch() {
   useEffect(() => {
     if (!showSearch) return;
 
-    const timeoutId = setTimeout(() => {
-      if (!query.trim()) {
-        setResults({});
-        setSelectedIndex(0);
-        return;
-      }
+    if (!debouncedQuery.trim()) {
+      setResults({});
+      setSelectedIndex(0);
+      return;
+    }
 
-      let filtered: SearchResult[] = [];
+    let filtered: SearchResult[] = [];
 
-      if (Fuse && allResults.length > 0) {
-        // Use Fuse.js for fuzzy matching
-        const fuse = new Fuse.default(allResults, {
-          keys: allResults.map((r) => {
-            const config = SEARCH_CONFIG[r.table];
-            return config.fields.map((field) => `data.${field}`);
-          }).flat(),
-          threshold: 0.4, // 0.0 = exact match, 1.0 = match anything
-          includeScore: true,
-          minMatchCharLength: 2,
-        });
+    if (Fuse && allResults.length > 0) {
+      // Use Fuse.js for fuzzy matching
+      const fuse = new Fuse.default(allResults, {
+        keys: allResults.map((r) => {
+          const config = SEARCH_CONFIG[r.table];
+          return config.fields.map((field) => `data.${field}`);
+        }).flat(),
+        threshold: 0.4, // 0.0 = exact match, 1.0 = match anything
+        includeScore: true,
+        minMatchCharLength: 2,
+      });
 
-        const fuseResults = fuse.search(query);
-        filtered = fuseResults.map((result: any) => result.item).slice(0, 30);
-      } else {
-        // Fallback to simple client-side search
-        const searchLower = query.toLowerCase();
-        
-        allResults.forEach((result) => {
-          const config = SEARCH_CONFIG[result.table];
-          let matches = false;
+      const fuseResults = fuse.search(debouncedQuery);
+      filtered = fuseResults.map((result: any) => result.item).slice(0, 30);
+    } else {
+      // Fallback to simple client-side search
+      const searchLower = debouncedQuery.toLowerCase();
+      
+      allResults.forEach((result) => {
+        const config = SEARCH_CONFIG[result.table];
+        let matches = false;
 
-          // Check if query matches any searchable field
-          for (const field of config.fields) {
-            const value = result.data[field];
-            if (value) {
-              const valueStr = Array.isArray(value) ? value.join(" ") : String(value);
-              if (valueStr.toLowerCase().includes(searchLower)) {
-                matches = true;
-                break;
-              }
+        // Check if query matches any searchable field
+        for (const field of config.fields) {
+          const value = result.data[field];
+          if (value) {
+            const valueStr = Array.isArray(value) ? value.join(" ") : String(value);
+            if (valueStr.toLowerCase().includes(searchLower)) {
+              matches = true;
+              break;
             }
           }
-
-          if (matches) {
-            filtered.push(result);
-          }
-        });
-
-        // Limit to 30 results
-        filtered = filtered.slice(0, 30);
-      }
-
-      // Group by table
-      const grouped: GroupedResults = {};
-      filtered.forEach((result) => {
-        if (!grouped[result.table]) {
-          grouped[result.table] = [];
         }
-        grouped[result.table].push(result);
+
+        if (matches) {
+          filtered.push(result);
+        }
       });
+
+      // Limit to 30 results
+      filtered = filtered.slice(0, 30);
+    }
+
+    // Group by table
+    const grouped: GroupedResults = {};
+    filtered.forEach((result) => {
+      if (!grouped[result.table]) {
+        grouped[result.table] = [];
+      }
+      grouped[result.table].push(result);
+    });
 
     setResults(grouped);
     setSelectedIndex(0);
