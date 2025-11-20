@@ -103,6 +103,11 @@ export default function Dashboard() {
         <CampaignTimeline />
       </div>
 
+      {/* Upload Diagnostic (Temporary - Remove after testing) */}
+      <div className="mb-6">
+        <UploadDiagnostic />
+      </div>
+
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-40">
         <div className="relative group">
