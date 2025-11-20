@@ -7,6 +7,7 @@ import { useFields } from "@/lib/useFields";
 import FieldInput from "../fields/FieldInput";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
+import { logRecordCreation, logFieldChanges } from "@/lib/activityLogger";
 
 export default function NewRecordModal() {
   const { open, setOpen, tableId } = useModal();
@@ -133,6 +134,9 @@ export default function NewRecordModal() {
       return;
     }
 
+    // Log record creation
+    await logRecordCreation(tableId, newRecord.id, newRecord);
+
     // Move temp attachment files to final location
     if (tempAttachments.length > 0) {
       const updates: Record<string, any> = {};
@@ -174,10 +178,17 @@ export default function NewRecordModal() {
         });
 
         if (Object.keys(automationUpdates).length > 0) {
-          await supabase
+          const { data: finalRecord } = await supabase
             .from(tableId as string)
             .update(automationUpdates)
-            .eq("id", newRecord.id);
+            .eq("id", newRecord.id)
+            .select()
+            .single();
+          
+          if (finalRecord) {
+            // Log automation changes
+            await logFieldChanges(newRecord, finalRecord, tableId, "automation");
+          }
         }
       }
 

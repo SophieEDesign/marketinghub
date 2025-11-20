@@ -1,7 +1,7 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { Field } from "@/lib/fields";
 import FieldRenderer from "../fields/FieldRenderer";
 
@@ -14,7 +14,7 @@ export default function KanbanCard({ row, fields }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: row.id,
   });
-  const { setOpen, setRecordId, setTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
 
   const style = transform
     ? {
@@ -28,9 +28,7 @@ export default function KanbanCard({ row, fields }: KanbanCardProps) {
       e.stopPropagation();
       // Find tableId from fields
       const tableId = fields[0]?.table_id || "content";
-      setTableId(tableId);
-      setRecordId(row.id);
-      setOpen(true);
+      openRecord(tableId, row.id);
     }
   };
 

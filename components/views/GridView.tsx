@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useTransition, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { useFields } from "@/lib/useFields";
 import { useViewSettings } from "@/lib/useViewSettings";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
@@ -15,6 +15,7 @@ import ViewHeader from "./ViewHeader";
 import { Filter, Sort } from "@/lib/types/filters";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
+import { logFieldChanges } from "@/lib/activityLogger";
 import { GridSkeleton } from "../ui/Skeleton";
 
 interface GridViewProps {
@@ -33,7 +34,7 @@ export default function GridViewComponent({ tableId }: GridViewProps) {
     fieldId: string;
   } | null>(null);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
-  const { setOpen, setRecordId, setTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
   const {
     settings,
     getViewSettings,
@@ -256,9 +257,7 @@ export default function GridViewComponent({ tableId }: GridViewProps) {
                         setEditingCell({ rowId: row.id, fieldId: field.id });
                       } else {
                         // For other fields, open drawer
-                        setTableId(tableId);
-                        setRecordId(row.id);
-                        setOpen(true);
+                        openRecord(tableId, row.id);
                       }
                     }
                   }}
@@ -275,51 +274,69 @@ export default function GridViewComponent({ tableId }: GridViewProps) {
                       recordId={row.id}
                       tableId={tableId}
                       onSave={async (newValue) => {
-                        // Store previous state for automation comparison
-                        const previousRecord = { ...row };
-
-                        // Update the field
-                        const { error, data: updatedRecord } = await supabase
-                          .from(tableId)
-                          .update({ [field.field_key]: newValue })
-                          .eq("id", row.id)
-                          .select()
-                          .single();
-
-                        if (error) {
-                          throw error;
-                        }
-
-                        // Run automations
                         try {
-                          const automationResult = await runAutomations(
-                            tableId,
-                            updatedRecord,
-                            previousRecord
-                          );
+                          // Store previous state for automation comparison
+                          const previousRecord = { ...row };
 
-                          // Apply any updates from automations
-                          if (automationResult.updated && Object.keys(automationResult.updated).length > 0) {
-                            const automationUpdates: Record<string, any> = {};
-                            Object.keys(automationResult.updated).forEach((key) => {
-                              if (key !== "id" && automationResult.updated[key] !== updatedRecord[key]) {
-                                automationUpdates[key] = automationResult.updated[key];
-                              }
-                            });
+                          // Update the field
+                          const { error, data: updatedRecord } = await supabase
+                            .from(tableId)
+                            .update({ [field.field_key]: newValue })
+                            .eq("id", row.id)
+                            .select()
+                            .single();
 
-                            if (Object.keys(automationUpdates).length > 0) {
-                              const { data: finalRecord } = await supabase
-                                .from(tableId)
-                                .update(automationUpdates)
-                                .eq("id", row.id)
-                                .select()
-                                .single();
+                          if (error) {
+                            throw error;
+                          }
 
-                              if (finalRecord) {
-                                // Update local state with final record
+                          if (!updatedRecord) {
+                            throw new Error("Failed to update record");
+                          }
+
+                          // Log field change
+                          await logFieldChanges(previousRecord, updatedRecord, tableId, "user");
+
+                          // Run automations
+                          try {
+                            const automationResult = await runAutomations(
+                              tableId,
+                              updatedRecord,
+                              previousRecord
+                            );
+
+                            // Apply any updates from automations
+                            if (automationResult.updated && Object.keys(automationResult.updated).length > 0) {
+                              const automationUpdates: Record<string, any> = {};
+                              Object.keys(automationResult.updated).forEach((key) => {
+                                if (key !== "id" && automationResult.updated[key] !== updatedRecord[key]) {
+                                  automationUpdates[key] = automationResult.updated[key];
+                                }
+                              });
+
+                              if (Object.keys(automationUpdates).length > 0) {
+                                const { data: finalRecord } = await supabase
+                                  .from(tableId)
+                                  .update(automationUpdates)
+                                  .eq("id", row.id)
+                                  .select()
+                                  .single();
+
+                                if (finalRecord) {
+                                  // Log automation changes
+                                  await logFieldChanges(updatedRecord, finalRecord, tableId, "automation");
+                                  // Update local state with final record
+                                  setRows((prev) =>
+                                    prev.map((r) =>
+                                      r.id === row.id ? finalRecord : r
+                                    )
+                                  );
+                                }
+                              } else {
+                                // Update local state with updated record
                                 setRows((prev) =>
                                   prev.map((r) =>
-                                    r.id === row.id ? finalRecord : r
+                                    r.id === row.id ? updatedRecord : r
                                   )
                                 );
                               }
@@ -331,8 +348,18 @@ export default function GridViewComponent({ tableId }: GridViewProps) {
                                 )
                               );
                             }
-                          } else {
-                            // Update local state with updated record
+
+                            // Show notifications
+                            automationResult.notifications.forEach((notification) => {
+                              toast({
+                                title: "Automation Triggered",
+                                description: notification,
+                                type: "success",
+                              });
+                            });
+                          } catch (automationError) {
+                            console.error("Error running automations:", automationError);
+                            // Still update local state even if automations fail
                             setRows((prev) =>
                               prev.map((r) =>
                                 r.id === row.id ? updatedRecord : r
@@ -340,25 +367,16 @@ export default function GridViewComponent({ tableId }: GridViewProps) {
                             );
                           }
 
-                          // Show notifications
-                          automationResult.notifications.forEach((notification) => {
-                            toast({
-                              title: "Automation Triggered",
-                              description: notification,
-                              type: "success",
-                            });
+                          setEditingCell(null);
+                        } catch (error: any) {
+                          console.error("Error saving field:", error);
+                          toast({
+                            title: "Error",
+                            description: error.message || "Failed to save changes",
+                            type: "error",
                           });
-                        } catch (automationError) {
-                          console.error("Error running automations:", automationError);
-                          // Still update local state even if automations fail
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.id === row.id ? updatedRecord : r
-                            )
-                          );
+                          setEditingCell(null);
                         }
-
-                        setEditingCell(null);
                       }}
                       onCancel={() => setEditingCell(null)}
                     />
