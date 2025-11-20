@@ -22,7 +22,7 @@ interface GridViewProps {
   tableId: string;
 }
 
-export default function GridViewComponent({ tableId }: GridViewProps) {
+function GridViewComponent({ tableId }: GridViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
   const viewId = pathParts[1] || "grid";
