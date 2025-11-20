@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { Calendar } from "lucide-react";
 import dayjs from "dayjs";
 
@@ -16,7 +16,7 @@ interface Task {
 export default function TaskList() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const { setOpen, setRecordId, setTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
 
   useEffect(() => {
     async function load() {
@@ -39,9 +39,7 @@ export default function TaskList() {
   }, []);
 
   const handleTaskClick = (taskId: string) => {
-    setTableId("tasks");
-    setRecordId(taskId);
-    setOpen(true);
+    openRecord("tasks", taskId);
   };
 
   const getDueDateColor = (dueDate: string | null): string => {

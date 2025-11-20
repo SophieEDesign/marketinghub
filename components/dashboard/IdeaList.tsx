@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { useModal } from "@/lib/modalState";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
@@ -18,7 +18,7 @@ interface Idea {
 export default function IdeaList() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(true);
-  const { setOpen: setDrawerOpen, setRecordId, setTableId: setDrawerTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
   const { setOpen: setModalOpen, setTableId: setModalTableId } = useModal();
 
   useEffect(() => {
@@ -40,9 +40,7 @@ export default function IdeaList() {
   }, []);
 
   const handleIdeaClick = (ideaId: string) => {
-    setDrawerTableId("ideas");
-    setRecordId(ideaId);
-    setDrawerOpen(true);
+    openRecord("ideas", ideaId);
   };
 
   const handleConvertToContent = async (idea: Idea) => {
