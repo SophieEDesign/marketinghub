@@ -54,6 +54,20 @@ const getTableIconComponent = (tableId: string) => {
   return tableMetadata[tableId]?.icon || FileText;
 };
 
+// Map table IDs to icons for backward compatibility
+const tableIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  content: FileText,
+  ideas: Lightbulb,
+  campaigns: Megaphone,
+  media: Newspaper,
+  contacts: Users,
+  tasks: CheckSquare,
+  briefings: BookOpen,
+  sponsorships: Gift,
+  strategy: Compass,
+  assets: ImageIcon,
+};
+
 // Capitalize view name
 function capitalizeView(view: string): string {
   return view.charAt(0).toUpperCase() + view.slice(1);
