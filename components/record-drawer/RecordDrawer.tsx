@@ -44,7 +44,7 @@ const TABLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
 };
 
 export default function RecordDrawer() {
-  const { open, table, recordId, closeRecord } = useRecordDrawer();
+  const { open, table, recordId, closeRecord, openRecord } = useRecordDrawer();
   const router = useRouter();
   const [record, setRecord] = useState<any>(null);
   const [loading, setLoading] = useState(false);
