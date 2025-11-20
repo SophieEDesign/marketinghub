@@ -359,14 +359,16 @@ async function workflowProgressAutomation(
         .eq("id", updated.content_id)
         .maybeSingle();
 
-      const normalizedStatus = String(content.status || "").toLowerCase();
-      if (content && (normalizedStatus === "to schedule" || normalizedStatus.includes("schedule"))) {
-        await supabase
-          .from("content")
-          .update({ status: "scheduled", __automated: true })
-          .eq("id", content.id);
+      if (content) {
+        const normalizedStatus = String(content.status || "").toLowerCase();
+        if (normalizedStatus === "to schedule" || normalizedStatus.includes("schedule")) {
+          await supabase
+            .from("content")
+            .update({ status: "scheduled", __automated: true })
+            .eq("id", content.id);
 
-        notifications.push("Content status updated to Scheduled");
+          notifications.push("Content status updated to Scheduled");
+        }
       }
     }
   }
