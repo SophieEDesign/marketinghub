@@ -174,7 +174,7 @@ export default function Sidebar() {
           const table = tables.find((t) => t.id === tableId);
           if (!table) return null;
           return {
-            icon: tableIcons[table.id] || FileText,
+            icon: getTableIconComponent(table.id),
             label: table.name,
             href: `/${table.id}/grid`,
             children: table.views.map((view) => ({
@@ -194,7 +194,7 @@ export default function Sidebar() {
           const table = tables.find((t) => t.id === tableId);
           if (!table) return null;
           return {
-            icon: tableIcons[table.id] || FileText,
+            icon: getTableIconComponent(table.id),
             label: table.name,
             href: `/${table.id}/grid`,
             children: table.views.map((view) => ({
@@ -214,7 +214,7 @@ export default function Sidebar() {
           const table = tables.find((t) => t.id === tableId);
           if (!table) return null;
           return {
-            icon: tableIcons[table.id] || FileText,
+            icon: getTableIconComponent(table.id),
             label: table.name,
             href: `/${table.id}/grid`,
             children: table.views.map((view) => ({
