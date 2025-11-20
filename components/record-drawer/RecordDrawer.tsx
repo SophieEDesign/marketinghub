@@ -70,9 +70,12 @@ export default function RecordDrawer() {
     }
 
     async function load() {
+      if (!table) return; // Type guard
+      
+      const tableName = table; // Store in const for type narrowing
       setLoading(true);
       const { data, error } = await supabase
-        .from(table)
+        .from(tableName)
         .select("*")
         .eq("id", recordId)
         .maybeSingle();
@@ -207,7 +210,7 @@ export default function RecordDrawer() {
       // Log deletion before deleting
       await logRecordDeletion(table, record.id, record);
 
-      const { error } = await supabase.from(table).delete().eq("id", record.id);
+      const { error } = await supabase.from(table as string).delete().eq("id", record.id);
 
       if (error) throw error;
 
@@ -237,7 +240,7 @@ export default function RecordDrawer() {
     try {
       const { id, created_at, updated_at, ...recordData } = record;
       const { data: newRecord, error } = await supabase
-        .from(table)
+        .from(table as string)
         .insert([recordData])
         .select()
         .single();
