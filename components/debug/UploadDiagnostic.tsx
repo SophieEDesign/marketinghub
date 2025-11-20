@@ -24,7 +24,6 @@ export default function UploadDiagnostic() {
       
       if (bucketsError) {
         addResult(`❌ Error listing buckets: ${bucketsError.message}`);
-        addResult(`   Code: ${bucketsError.statusCode || 'N/A'}`);
         setTesting(false);
         return;
       }
@@ -57,7 +56,6 @@ export default function UploadDiagnostic() {
       
       if (listError) {
         addResult(`❌ SELECT permission DENIED: ${listError.message}`);
-        addResult(`   Code: ${listError.statusCode || 'N/A'}`);
         addResult("   → SOLUTION: Make bucket public OR add SELECT RLS policy");
       } else {
         addResult("✅ SELECT permission OK");
@@ -82,7 +80,6 @@ export default function UploadDiagnostic() {
       
       if (uploadError) {
         addResult(`❌ INSERT permission DENIED: ${uploadError.message}`);
-        addResult(`   Code: ${uploadError.statusCode || 'N/A'}`);
         
         if (uploadError.message.includes("Bucket not found")) {
           addResult("   → SOLUTION: Create 'attachments' bucket");

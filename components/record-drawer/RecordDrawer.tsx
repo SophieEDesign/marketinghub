@@ -30,9 +30,14 @@ import {
   ChevronRight,
   Check,
   ArrowLeft,
+  Edit3,
+  GripVertical,
 } from "lucide-react";
 import { getTable } from "@/lib/tables";
 import { useRouter } from "next/navigation";
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import SortableDrawerSection from "./SortableDrawerSection";
 
 const TABLE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   content: FileText,
@@ -50,8 +55,12 @@ export default function RecordDrawer() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [fieldSaveStates, setFieldSaveStates] = useState<Record<string, "saving" | "saved" | null>>({});
+  const [orderedSections, setOrderedSections] = useState<string[]>([]);
+  const [loadingLayout, setLoadingLayout] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   const { fields: allFields, loading: fieldsLoading } = useFields(table || "");
   const fields = allFields.filter((f) => f.visible !== false && f.field_key !== "id");
