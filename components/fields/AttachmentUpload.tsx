@@ -75,7 +75,6 @@ export default function AttachmentUpload({
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("attachments")
         .upload(filePath, file, {
-          contentType: file.type || "image/jpeg",
           upsert: false,
         });
 
