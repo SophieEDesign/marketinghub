@@ -19,7 +19,7 @@ export interface BrandConfig {
 // Default Peters & May brand configuration
 export const defaultBrand: BrandConfig = {
   name: "Peters & May",
-  logo: "/pm-logo.svg", // temporary until uploaded
+  logo: undefined, // Logo will be uploaded via Settings
   colors: {
     primary: "#e10600",
     primaryDark: "#b00000",
