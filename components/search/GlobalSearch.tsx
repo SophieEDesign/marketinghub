@@ -6,7 +6,7 @@ import { X, Search, ArrowRight, FileText, Calendar, Users, Lightbulb, Image, Che
 import { useSearch } from "./SearchProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { useModal } from "@/lib/modalState";
-import { useDrawer } from "@/lib/drawerState";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 
 // Dynamically import Fuse.js if available
@@ -94,7 +94,7 @@ export default function GlobalSearch() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const { setOpen: setModalOpen, setTableId: setModalTableId } = useModal();
-  const { setOpen: setDrawerOpen, setRecordId, setTableId: setDrawerTableId } = useDrawer();
+  const { openRecord } = useRecordDrawer();
 
   // Load all data on mount (for client-side search) - optimized with caching
   useEffect(() => {
@@ -293,9 +293,7 @@ export default function GlobalSearch() {
     
     // Open drawer with the record
     setTimeout(() => {
-      setDrawerTableId(result.table);
-      setRecordId(result.id);
-      setDrawerOpen(true);
+      openRecord(result.table, result.id);
     }, 100);
   };
 
