@@ -82,7 +82,7 @@ const defaultSidebarItems = [
   { id: "ideas", label: "Ideas", icon: Lightbulb, href: "/ideas/grid" },
   { id: "media", label: "Media", icon: Newspaper, href: "/media/grid" },
   { id: "tasks", label: "Tasks", icon: CheckSquare, href: "/tasks/grid" },
-  { id: "settings", label: "Settings", icon: Settings, href: "/settings/fields" },
+  { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 export default function Sidebar() {
@@ -209,8 +209,8 @@ export default function Sidebar() {
       items: [
         {
           icon: Settings,
-          label: "Fields",
-          href: "/settings/fields",
+          label: "Settings",
+          href: "/settings",
         },
       ],
     },
@@ -532,15 +532,15 @@ function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse }:
         {!collapsed && <span>Theme</span>}
       </button>
 
-      {/* Settings Link */}
-      <Link
-        href="/settings/fields"
-        className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
-        title={collapsed ? "Settings" : undefined}
-      >
-        <Settings className="w-4 h-4" />
-        {!collapsed && <span>Settings</span>}
-      </Link>
+            {/* Settings Link */}
+            <Link
+              href="/settings"
+              className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+              title={collapsed ? "Settings" : undefined}
+            >
+              <Settings className="w-4 h-4" />
+              {!collapsed && <span>Settings</span>}
+            </Link>
 
       {/* Documentation Placeholder */}
       {!collapsed && (

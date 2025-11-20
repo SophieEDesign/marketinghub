@@ -14,7 +14,6 @@ import HeaderBar from '@/components/HeaderBar'
 import RecordDrawer from '@/components/record-drawer/RecordDrawer'
 import NewRecordModal from '@/components/modal/NewRecordModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
-import SettingsSidebar from '@/components/settings/SettingsSidebar'
 import GlobalSearch from '@/components/search/GlobalSearch'
 import { ToastContainer } from '@/components/ui/Toast'
 
@@ -52,7 +51,6 @@ export default function RootLayout({
                       <RecordDrawer />
                       <NewRecordModal />
                       <LinkedRecordPicker />
-                      <SettingsSidebar />
                       <GlobalSearch />
                       <ToastContainer />
                     </ThemeProvider>
