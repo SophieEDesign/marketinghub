@@ -129,17 +129,18 @@ export default function GlobalSearch() {
 
             if (data) {
               return data.map((record) => {
-                const title = record[config.titleField] || "Untitled";
+                const recordData = record as Record<string, any>;
+                const title = recordData[config.titleField] || "Untitled";
                 const subtitle = config.subtitleField
-                  ? formatSubtitle(record[config.subtitleField], config.subtitleField)
+                  ? formatSubtitle(recordData[config.subtitleField], config.subtitleField)
                   : undefined;
 
                 return {
-                  id: record.id,
+                  id: recordData.id,
                   table,
                   title: String(title),
                   subtitle,
-                  data: record,
+                  data: recordData,
                 };
               });
             }
