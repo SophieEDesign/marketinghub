@@ -63,7 +63,6 @@ export default function NewRecordModal() {
       const { error: uploadError } = await supabase.storage
         .from("attachments")
         .upload(newPath, fileData, {
-          contentType: fileData.type || "image/jpeg",
           upsert: false,
         });
 

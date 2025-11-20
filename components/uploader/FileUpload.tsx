@@ -61,9 +61,7 @@ export default function FileUpload({ recordId, onUploadComplete }: FileUploadPro
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("attachments")
-        .upload(filePath, file, {
-          contentType: file.type || "application/octet-stream",
-        });
+        .upload(filePath, file);
 
       if (uploadError) {
         const errorMsg = uploadError.message || "";
