@@ -138,9 +138,9 @@ export default function Sidebar() {
               label: capitalizeView(view),
               href: `/${table.id}/${view}`,
             })),
-          };
+          } as NavItem;
         })
-        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
+        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
     },
     {
       title: "Planning",
@@ -158,9 +158,9 @@ export default function Sidebar() {
               label: capitalizeView(view),
               href: `/${table.id}/${view}`,
             })),
-          };
+          } as NavItem;
         })
-        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
+        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
     },
     {
       title: "CRM",
@@ -178,9 +178,9 @@ export default function Sidebar() {
               label: capitalizeView(view),
               href: `/${table.id}/${view}`,
             })),
-          };
+          } as NavItem;
         })
-        .filter((item): item is NavItem => item !== null) || []) as NavItem[],
+        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
     },
     {
       title: "Settings",
