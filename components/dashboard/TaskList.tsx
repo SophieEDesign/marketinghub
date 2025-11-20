@@ -26,7 +26,7 @@ export default function TaskList() {
         .from("tasks")
         .select("id, title, due_date, status")
         .neq("status", "done")
-        .order("due_date", { ascending: true, nullsLast: true })
+        .order("due_date", { ascending: true, nullsFirst: false })
         .limit(10);
 
       if (data) {
