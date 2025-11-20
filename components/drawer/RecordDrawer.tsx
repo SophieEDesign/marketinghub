@@ -7,12 +7,17 @@ import { useFields } from "@/lib/useFields";
 import FieldInput from "../fields/FieldInput";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
+import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { invalidateCache, CacheKeys } from "@/lib/cache/metadataCache";
 
 export default function RecordDrawer() {
   const { open, setOpen, recordId, tableId } = useDrawer();
   const [row, setRow] = useState<any>(null);
   const [previousRow, setPreviousRow] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId || "");
 
   // Filter visible fields, exclude id
@@ -113,8 +118,62 @@ export default function RecordDrawer() {
     }
 
     setOpen(false);
+    // Invalidate cache
+    invalidateCache(CacheKeys.tableRecords(tableId, "*"));
     window.location.reload();
     setLoading(false);
+  };
+
+  const handleDelete = async () => {
+    if (!row || !tableId) return;
+    
+    // Confirm deletion
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this record? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+    
+    setDeleting(true);
+    
+    try {
+      // Delete the record
+      const { error } = await supabase
+        .from(tableId as string)
+        .delete()
+        .eq("id", row.id);
+      
+      if (error) {
+        console.error("Error deleting record:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete record",
+          type: "error",
+        });
+        setDeleting(false);
+        return;
+      }
+      
+      // Invalidate cache
+      invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+      
+      toast({
+        title: "Success",
+        description: "Record deleted successfully",
+        type: "success",
+      });
+      
+      setOpen(false);
+      window.location.reload();
+    } catch (err: any) {
+      console.error("Error deleting record:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to delete record",
+        type: "error",
+      });
+      setDeleting(false);
+    }
   };
 
   return (
@@ -137,12 +196,22 @@ export default function RecordDrawer() {
               <h2 className="text-lg font-heading text-brand-blue">
                 Edit Record
               </h2>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="btn-secondary text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800 disabled:opacity-50"
+                  title="Delete record"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Editable fields */}

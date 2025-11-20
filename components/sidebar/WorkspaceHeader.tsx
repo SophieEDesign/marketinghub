@@ -3,30 +3,39 @@
 import { useSettings } from "@/lib/useSettings";
 import { getBrand } from "@/lib/brand";
 
-export default function WorkspaceHeader() {
+interface WorkspaceHeaderProps {
+  collapsed?: boolean;
+}
+
+export default function WorkspaceHeader({ collapsed = false }: WorkspaceHeaderProps) {
   const { settings, isLoading } = useSettings();
   const brand = getBrand();
 
+  const logoUrl = settings.logo_url || brand.logo;
+  const workspaceName = settings.workspace_name || brand.name;
+
   return (
-    <div className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 bg-brand-light dark:bg-gray-900">
-      <div className="flex items-center gap-3">
-        {(settings.logo_url || brand.logo) && !isLoading && (
-          <img
-            src={settings.logo_url || brand.logo}
-            alt="Logo"
-            className="h-8 w-auto object-contain"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = "none";
-            }}
-          />
-        )}
-        <div className="flex-1">
-          <h1 className="text-lg font-heading font-semibold text-brand-blue dark:text-gray-100 tracking-wide">
-            {settings.workspace_name || brand.name}
+    <div className="flex items-center gap-3 transition-all duration-200 ease-in-out">
+      {logoUrl && !isLoading && (
+        <img
+          src={logoUrl}
+          alt="Logo"
+          className={`object-contain transition-all duration-200 ease-in-out ${
+            collapsed ? "h-6 w-6" : "h-8 w-auto"
+          }`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.style.display = "none";
+          }}
+        />
+      )}
+      {!collapsed && (
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-heading font-semibold text-brand-blue dark:text-gray-100 tracking-wide truncate">
+            {workspaceName}
           </h1>
         </div>
-      </div>
+      )}
     </div>
   );
 }

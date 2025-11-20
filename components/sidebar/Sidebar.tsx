@@ -1,10 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Calendar, Columns3, Timer, SquareStack, ChevronDown, ChevronRight, Settings, FileSpreadsheet, Home } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileText,
+  Lightbulb,
+  Megaphone,
+  Newspaper,
+  Users,
+  CheckSquare,
+  Settings,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronRight,
+  Menu,
+  X,
+  Moon,
+  Sun,
+  HelpCircle,
+  LayoutGrid,
+  Columns3,
+  Calendar,
+  Timer,
+  SquareStack,
+} from "lucide-react";
 import { tables, tableCategories } from "@/lib/tables";
+import { useTheme } from "@/app/providers";
 import WorkspaceHeader from "./WorkspaceHeader";
 
 // Map view types to icons
@@ -16,181 +39,494 @@ const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   cards: SquareStack,
 };
 
-// Get icon for view type
-function getViewIcon(view: string) {
-  const Icon = viewIcons[view] || LayoutGrid;
-  return <Icon className="w-4 h-4" />;
-}
+// Map table IDs to icons
+const tableIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  content: FileText,
+  ideas: Lightbulb,
+  campaigns: Megaphone,
+  media: Newspaper,
+  contacts: Users,
+  tasks: CheckSquare,
+};
 
 // Capitalize view name
 function capitalizeView(view: string): string {
   return view.charAt(0).toUpperCase() + view.slice(1);
 }
 
+interface NavItem {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  href: string;
+  children?: { icon: React.ComponentType<{ className?: string }>; label: string; href: string }[];
+}
+
+interface NavGroup {
+  title: string;
+  items: NavItem[];
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set());
+  const themeContext = useTheme();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Parse current route to determine active table and view
+  // Load collapsed state from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarCollapsed");
+    if (saved === "true") {
+      setCollapsed(true);
+    }
+  }, []);
+
+  // Load collapsed groups from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarCollapsedGroups");
+    if (saved) {
+      try {
+        setCollapsedGroups(new Set(JSON.parse(saved)));
+      } catch (e) {
+        console.error("Error loading collapsed groups:", e);
+      }
+    }
+  }, []);
+
+  // Save collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", collapsed ? "true" : "false");
+  }, [collapsed]);
+
+  // Save collapsed groups to localStorage
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(Array.from(collapsedGroups)));
+  }, [collapsedGroups]);
+
+  // Parse current route
   const pathParts = pathname.split("/").filter(Boolean);
   const currentTable = pathParts[0] || null;
   const currentView = pathParts[1] || null;
 
-  // Initialize collapsed state: all collapsed except active table
-  useEffect(() => {
-    const initialCollapsed = new Set<string>();
-    tables.forEach((table) => {
-      if (table.id !== currentTable) {
-        initialCollapsed.add(table.id);
-      }
-    });
-    setCollapsedTables(initialCollapsed);
-  }, [currentTable]);
+  // Build navGroups structure
+  const navGroups: NavGroup[] = [
+    {
+      title: "General",
+      items: [
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          href: "/dashboard",
+        },
+      ],
+    },
+    {
+      title: "Content",
+      items: tableCategories
+        .find((c) => c.id === "content")
+        ?.tableIds.map((tableId) => {
+          const table = tables.find((t) => t.id === tableId);
+          if (!table) return null;
+          return {
+            icon: tableIcons[table.id] || FileText,
+            label: table.name,
+            href: `/${table.id}/grid`,
+            children: table.views.map((view) => ({
+              icon: viewIcons[view] || LayoutGrid,
+              label: capitalizeView(view),
+              href: `/${table.id}/${view}`,
+            })),
+          };
+        })
+        .filter((item): item is NavItem => item !== null) || [],
+    },
+    {
+      title: "Planning",
+      items: tableCategories
+        .find((c) => c.id === "planning")
+        ?.tableIds.map((tableId) => {
+          const table = tables.find((t) => t.id === tableId);
+          if (!table) return null;
+          return {
+            icon: tableIcons[table.id] || FileText,
+            label: table.name,
+            href: `/${table.id}/grid`,
+            children: table.views.map((view) => ({
+              icon: viewIcons[view] || LayoutGrid,
+              label: capitalizeView(view),
+              href: `/${table.id}/${view}`,
+            })),
+          };
+        })
+        .filter((item): item is NavItem => item !== null) || [],
+    },
+    {
+      title: "CRM",
+      items: tableCategories
+        .find((c) => c.id === "crm")
+        ?.tableIds.map((tableId) => {
+          const table = tables.find((t) => t.id === tableId);
+          if (!table) return null;
+          return {
+            icon: tableIcons[table.id] || FileText,
+            label: table.name,
+            href: `/${table.id}/grid`,
+            children: table.views.map((view) => ({
+              icon: viewIcons[view] || LayoutGrid,
+              label: capitalizeView(view),
+              href: `/${table.id}/${view}`,
+            })),
+          };
+        })
+        .filter((item): item is NavItem => item !== null) || [],
+    },
+    {
+      title: "Settings",
+      items: [
+        {
+          icon: Settings,
+          label: "Fields",
+          href: "/settings/fields",
+        },
+      ],
+    },
+    {
+      title: "Tools",
+      items: [
+        {
+          icon: FileSpreadsheet,
+          label: "Import CSV",
+          href: "/import",
+        },
+      ],
+    },
+  ];
 
-  const toggleTable = (tableId: string) => {
-    setCollapsedTables((prev) => {
+  const toggleGroup = (title: string) => {
+    setCollapsedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(tableId)) {
-        next.delete(tableId);
+      if (next.has(title)) {
+        next.delete(title);
       } else {
-        next.add(tableId);
+        next.add(title);
       }
       return next;
     });
   };
 
-  const isTableCollapsed = (tableId: string) => collapsedTables.has(tableId);
-  const isTableActive = (tableId: string) => currentTable === tableId;
-  const isViewActive = (tableId: string, view: string) =>
-    currentTable === tableId && currentView === view;
+  const isGroupCollapsed = (title: string) => {
+    // Check if this is a nav group title or an item label
+    return collapsedGroups.has(title);
+  };
 
-  return (
-    <aside className="w-64 min-h-screen bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col">
-      {/* Workspace Header */}
-      <WorkspaceHeader />
+  const isItemActive = (href: string) => {
+    if (href === "/dashboard") {
+      return pathname === "/dashboard";
+    }
+    const hrefParts = href.split("/").filter(Boolean);
+    return hrefParts[0] === currentTable && (hrefParts[1] === currentView || hrefParts.length === 1);
+  };
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {/* Dashboard Link */}
-        <Link
-          href="/dashboard"
-          className={`flex items-center gap-2 px-2 py-2 rounded text-sm font-medium transition mb-4 ${
-            pathname === "/dashboard"
-              ? "bg-brand-red text-white font-semibold"
-              : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-          }`}
-        >
-          <Home className="w-4 h-4" />
-          <span>Dashboard</span>
-        </Link>
+  const isChildActive = (href: string) => {
+    const hrefParts = href.split("/").filter(Boolean);
+    return hrefParts[0] === currentTable && hrefParts[1] === currentView;
+  };
 
-        {/* Table Categories */}
-        <div className="space-y-4">
-          {tableCategories.map((category) => {
-            const categoryTables = tables.filter((t) => category.tableIds.includes(t.id));
-            
-            return (
-              <div key={category.id} className="space-y-1">
-                {/* Category Header */}
-                <div className="px-2 py-1 text-xs font-heading text-gray-500 dark:text-gray-400 tracking-wider uppercase">
-                  {category.name}
-                </div>
-                
-                {/* Tables in Category */}
-                {categoryTables.map((table) => {
-                  const isActive = isTableActive(table.id);
-                  const isCollapsed = isTableCollapsed(table.id);
+  const handleToggleCollapse = () => {
+    setCollapsed(!collapsed);
+  };
 
-                  return (
-                    <div key={table.id} className="mb-2">
-                      {/* Table Header */}
-                      <button
-                        onClick={() => toggleTable(table.id)}
-                        className={`w-full flex items-center justify-between px-2 py-2 text-sm font-heading text-brand-blue tracking-wide uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition ${
-                          isActive ? "bg-gray-100 dark:bg-gray-800" : ""
-                        }`}
-                      >
-                        <span>{table.name}</span>
-                        {isCollapsed ? (
-                          <ChevronRight className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
+  const handleMouseEnter = () => {
+    if (collapsed) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        // Expand on hover (visual only, doesn't change collapsed state)
+      }, 150);
+    }
+  };
 
-                      {/* Views */}
-                      {!isCollapsed && (
-                        <div className="ml-1 mt-0.5 space-y-0.5">
-                          {table.views.map((view) => {
-                            const href = `/${table.id}/${view}`;
-                            const isActiveView = isViewActive(table.id, view);
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+  };
 
-                            return (
-                              <Link
-                                key={view}
-                                href={href}
-                                className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
-                                  isActiveView
-                                    ? "bg-brand-red text-white font-semibold"
-                                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                                }`}
-                              >
-                                {getViewIcon(view)}
-                                <span>{capitalizeView(view)}</span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
+  const { theme, setTheme } = themeContext || { theme: "light", setTheme: () => {} };
+  const isDark = theme === "dark";
 
-        {/* Settings Section */}
-        <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-            Settings
-          </div>
-          <div className="space-y-0.5">
-            <Link
-              href="/settings/fields"
-              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
-                pathname === "/settings/fields"
-                  ? "bg-brand-red text-white font-semibold"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
+  // Mobile sidebar component
+  const MobileSidebar = () => (
+    <>
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transform transition-transform duration-200 ease-in-out lg:hidden ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Mobile Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+            <WorkspaceHeader />
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
             >
-              <Settings className="w-4 h-4" />
-              <span>Fields</span>
-            </Link>
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        </div>
 
-        {/* Tools Section */}
-        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-            Tools
+          {/* Mobile Navigation */}
+          <div className="flex-1 overflow-y-auto p-3">
+            {navGroups.map((group) => (
+              <NavGroupComponent
+                key={group.title}
+                group={group}
+                isGroupCollapsed={isGroupCollapsed}
+                toggleGroup={toggleGroup}
+                isItemActive={isItemActive}
+                isChildActive={isChildActive}
+                onItemClick={() => setMobileOpen(false)}
+              />
+            ))}
           </div>
-          <div className="space-y-0.5">
-            <Link
-              href="/import"
-              className={`flex items-center gap-2 pl-6 pr-2 py-1.5 rounded text-sm transition ${
-                pathname === "/import"
-                  ? "bg-brand-red text-white font-semibold"
-                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Import CSV</span>
-            </Link>
-          </div>
+
+          {/* Mobile Footer */}
+          <SidebarFooter theme={theme} setTheme={setTheme} />
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  // Desktop sidebar
+  return (
+    <>
+      {/* Mobile Hamburger Button */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="fixed top-16 left-4 z-50 p-2 rounded-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-lg lg:hidden"
+        aria-label="Open sidebar"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar />
+
+      {/* Desktop Sidebar */}
+      <aside
+        ref={sidebarRef}
+        className={`hidden lg:flex flex-col bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transition-all duration-200 ease-in-out ${
+          collapsed ? "w-16" : "w-64"
+        }`}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        {/* Header */}
+        <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+          <WorkspaceHeader collapsed={collapsed} />
+        </div>
+
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto p-3">
+          {navGroups.map((group) => (
+            <NavGroupComponent
+              key={group.title}
+              group={group}
+              isGroupCollapsed={isGroupCollapsed}
+              toggleGroup={toggleGroup}
+              isItemActive={isItemActive}
+              isChildActive={isChildActive}
+              collapsed={collapsed}
+            />
+          ))}
+        </div>
+
+        {/* Footer */}
+        <SidebarFooter theme={theme} setTheme={setTheme} collapsed={collapsed} onToggleCollapse={handleToggleCollapse} />
+      </aside>
+    </>
   );
 }
 
+interface NavGroupComponentProps {
+  group: NavGroup;
+  isGroupCollapsed: (title: string) => boolean;
+  toggleGroup: (title: string) => void;
+  isItemActive: (href: string) => boolean;
+  isChildActive: (href: string) => boolean;
+  collapsed?: boolean;
+  onItemClick?: () => void;
+}
+
+function NavGroupComponent({
+  group,
+  isGroupCollapsed,
+  toggleGroup,
+  isItemActive,
+  isChildActive,
+  collapsed = false,
+  onItemClick,
+}: NavGroupComponentProps) {
+  const groupCollapsed = isGroupCollapsed(group.title);
+
+  return (
+    <div className="mb-4">
+      {/* Group Header */}
+      {!collapsed && (
+        <button
+          onClick={() => toggleGroup(group.title)}
+          className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          <span>{group.title}</span>
+          {groupCollapsed ? (
+            <ChevronRight className="w-3 h-3" />
+          ) : (
+            <ChevronDown className="w-3 h-3" />
+          )}
+        </button>
+      )}
+
+      {/* Group Items */}
+      <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
+        {group.items.map((item) => {
+          const active = isItemActive(item.href);
+          const hasChildren = item.children && item.children.length > 0;
+          const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
+
+          return (
+            <div key={item.href}>
+              {/* Parent Item */}
+              <Link
+                href={item.href}
+                onClick={onItemClick}
+                className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-all duration-200 ease-in-out ${
+                  active
+                    ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                } ${collapsed ? "justify-center" : ""}`}
+                title={collapsed ? item.label : undefined}
+              >
+                <item.icon className="w-4 h-4 flex-shrink-0" />
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {!collapsed && hasChildren && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleGroup(item.label);
+                    }}
+                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                  >
+                    {itemCollapsed ? (
+                      <ChevronRight className="w-3 h-3" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </Link>
+
+              {/* Children Items */}
+              {!collapsed && hasChildren && !itemCollapsed && (
+                <div className="ml-6 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2">
+                  {item.children?.map((child) => {
+                    const childActive = isChildActive(child.href);
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onItemClick}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-all duration-200 ease-in-out ${
+                          childActive
+                            ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        }`}
+                      >
+                        <child.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{child.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface SidebarFooterProps {
+  theme: "light" | "dark" | "brand";
+  setTheme: (theme: "light" | "dark" | "brand") => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse }: SidebarFooterProps) {
+  const isDark = theme === "dark";
+
+  return (
+    <div className="sticky bottom-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-3 space-y-2">
+      {/* Collapse Toggle (Desktop only) */}
+      {onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          className="w-full flex items-center justify-center gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <>
+              <ChevronRight className="w-4 h-4 rotate-180" />
+              {!collapsed && <span>Collapse</span>}
+            </>
+          )}
+        </button>
+      )}
+
+      {/* Dark Mode Toggle */}
+      <button
+        onClick={() => {
+          if (theme === "light") setTheme("dark");
+          else if (theme === "dark") setTheme("brand");
+          else setTheme("light");
+        }}
+        className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+        title={collapsed ? "Toggle theme" : undefined}
+      >
+        {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        {!collapsed && <span>Theme</span>}
+      </button>
+
+      {/* Settings Link */}
+      <Link
+        href="/settings/fields"
+        className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+        title={collapsed ? "Settings" : undefined}
+      >
+        <Settings className="w-4 h-4" />
+        {!collapsed && <span>Settings</span>}
+      </Link>
+
+      {/* Documentation Placeholder */}
+      {!collapsed && (
+        <div className="flex items-center gap-2 px-2 py-2 text-sm text-gray-500 dark:text-gray-500">
+          <HelpCircle className="w-4 h-4" />
+          <span>Documentation</span>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -94,46 +94,66 @@ export default function GlobalSearch() {
   const { setOpen: setModalOpen, setTableId: setModalTableId } = useModal();
   const { setOpen: setDrawerOpen, setRecordId, setTableId: setDrawerTableId } = useDrawer();
 
-  // Load all data on mount (for client-side search)
+  // Load all data on mount (for client-side search) - optimized with caching
   useEffect(() => {
     if (!showSearch) return;
 
     async function loadAllData() {
       setLoading(true);
-      const allData: SearchResult[] = [];
+      
+      // Try to get from cache first
+      const cacheKey = "globalSearch:all";
+      const { getOrFetch } = await import("@/lib/cache/metadataCache");
+      
+      const loadData = async () => {
+        const allData: SearchResult[] = [];
 
-      // Load from all tables
-      for (const table of Object.keys(SEARCH_CONFIG)) {
-        try {
-          const { data, error } = await supabase.from(table).select("*").limit(1000);
-          if (error) {
-            console.error(`Error loading ${table}:`, error);
-            continue;
-          }
-
-          if (data) {
+        // Load from all tables in parallel
+        const promises = Object.keys(SEARCH_CONFIG).map(async (table) => {
+          try {
             const config = SEARCH_CONFIG[table];
-            data.forEach((record) => {
-              const title = record[config.titleField] || "Untitled";
-              const subtitle = config.subtitleField
-                ? formatSubtitle(record[config.subtitleField], config.subtitleField)
-                : undefined;
+            // Select only needed columns for search
+            const columns = `id, ${config.titleField}, ${config.subtitleField || ""}, description, status, channels, company, email, phone, category, publication, url, notes`.split(", ").filter(Boolean).join(", ");
+            
+            const { data, error } = await supabase
+              .from(table)
+              .select(columns)
+              .limit(500); // Reduced from 1000
+              
+            if (error) {
+              console.error(`Error loading ${table}:`, error);
+              return [];
+            }
 
-              allData.push({
-                id: record.id,
-                table,
-                title: String(title),
-                subtitle,
-                data: record,
+            if (data) {
+              return data.map((record) => {
+                const title = record[config.titleField] || "Untitled";
+                const subtitle = config.subtitleField
+                  ? formatSubtitle(record[config.subtitleField], config.subtitleField)
+                  : undefined;
+
+                return {
+                  id: record.id,
+                  table,
+                  title: String(title),
+                  subtitle,
+                  data: record,
+                };
               });
-            });
+            }
+            return [];
+          } catch (err) {
+            console.error(`Error fetching ${table}:`, err);
+            return [];
           }
-        } catch (err) {
-          console.error(`Error fetching ${table}:`, err);
-        }
-      }
+        });
 
-      setAllResults(allData);
+        const results = await Promise.all(promises);
+        return results.flat();
+      };
+
+      const data = await getOrFetch(cacheKey, loadData, 5 * 60 * 1000); // 5 min cache
+      setAllResults(data);
       setLoading(false);
     }
 
@@ -205,12 +225,9 @@ export default function GlobalSearch() {
         grouped[result.table].push(result);
       });
 
-      setResults(grouped);
-      setSelectedIndex(0);
-    }, 150);
-
-    return () => clearTimeout(timeoutId);
-  }, [query, allResults, showSearch]);
+    setResults(grouped);
+    setSelectedIndex(0);
+  }, [debouncedQuery, allResults, showSearch]);
 
   // Keyboard navigation
   useEffect(() => {

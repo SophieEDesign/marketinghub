@@ -1,24 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useTransition, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useDrawer } from "@/lib/drawerState";
 import { useFields } from "@/lib/useFields";
 import { useViewSettings } from "@/lib/useViewSettings";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
+import { getRequiredColumns } from "@/lib/query/getRequiredColumns";
+import { getOrFetch, CacheKeys, invalidateCache } from "@/lib/cache/metadataCache";
 import FieldRenderer from "../fields/FieldRenderer";
 import InlineFieldEditor from "../fields/InlineFieldEditor";
 import ViewHeader from "./ViewHeader";
 import { Filter, Sort } from "@/lib/types/filters";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
+import { GridSkeleton } from "../ui/Skeleton";
 
 interface GridViewProps {
   tableId: string;
 }
 
-export default function GridView({ tableId }: GridViewProps) {
+export default function GridViewComponent({ tableId }: GridViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
   const viewId = pathParts[1] || "grid";
@@ -84,41 +87,70 @@ export default function GridView({ tableId }: GridViewProps) {
     }
   }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
-  // Load records with filters and sort
+  // Get required columns based on visible fields
+  const requiredColumns = useMemo(() => {
+    if (fields.length === 0) return "id, created_at, updated_at";
+    return getRequiredColumns(fields);
+  }, [fields]);
+
+  // Load records with filters and sort (optimized with caching and column selection)
   useEffect(() => {
-    if (!tableId) return;
+    if (!tableId || fieldsLoading) return;
     
     async function load() {
       setLoading(true);
 
-      let query = supabase.from(tableId).select("*");
+      // Create cache key from filters and sort
+      const cacheKey = CacheKeys.tableRecords(
+        tableId,
+        JSON.stringify({ filters, sort, columns: requiredColumns })
+      );
 
-      // Apply filters and sort
-      query = applyFiltersAndSort(query, filters, sort);
+      const loadData = async () => {
+        let query = supabase.from(tableId).select(requiredColumns).limit(200);
 
-      // Default sort if no sort specified
-      if (sort.length === 0) {
-        query = query.order("created_at", { ascending: false });
-      }
+        // Apply filters and sort
+        query = applyFiltersAndSort(query, filters, sort);
 
-      const { data, error } = await query;
+        // Default sort if no sort specified
+        if (sort.length === 0) {
+          query = query.order("created_at", { ascending: false });
+        }
 
-      if (!error && data) {
-        setRows(data);
-      } else if (error) {
-        console.error("Error loading records:", error);
-      }
+        const { data, error } = await query;
+
+        if (!error && data) {
+          return data;
+        } else if (error) {
+          console.error("Error loading records:", error);
+          return [];
+        }
+        return [];
+      };
+
+      const data = await getOrFetch(cacheKey, loadData, 2 * 60 * 1000); // 2 min cache
+      setRows(data);
       setLoading(false);
     }
     load();
-  }, [tableId, filters, sort]);
+  }, [tableId, filters, sort, requiredColumns, fieldsLoading]);
+
+  const [isPending, startTransition] = useTransition();
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
-    await saveFilters(newFilters);
+    startTransition(() => {
+      saveFilters(newFilters);
+      // Invalidate cache when filters change
+      invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+    });
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
-    await saveSort(newSort);
+    startTransition(() => {
+      saveSort(newSort);
+      // Invalidate cache when sort changes
+      invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+    });
   };
 
   const handleRemoveFilter = async (filterId: string) => {
@@ -128,8 +160,24 @@ export default function GridView({ tableId }: GridViewProps) {
 
   if (loading || fieldsLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      <div>
+        <ViewHeader
+          tableId={tableId}
+          viewId={viewId}
+          fields={allFields}
+          filters={filters}
+          sort={sort}
+          onFiltersChange={handleFiltersChange}
+          onSortChange={handleSortChange}
+          onRemoveFilter={handleRemoveFilter}
+          viewSettings={{
+            visible_fields: visibleFields,
+            field_order: fieldOrder,
+            row_height: rowHeight,
+          }}
+          onViewSettingsUpdate={handleViewSettingsUpdate}
+        />
+        <GridSkeleton rows={10} cols={fields.length || 5} />
       </div>
     );
   }
@@ -163,25 +211,30 @@ export default function GridView({ tableId }: GridViewProps) {
       />
 
       {/* Table */}
-      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <table className="min-w-full border-collapse">
-        <thead>
-          <tr className="text-left border-b border-gray-300 dark:border-gray-700">
-            {fields.map((field) => (
-              <th key={field.id} className="p-2 font-heading uppercase text-xs tracking-wide text-brand-grey">
-                {field.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className={`hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${
-                rowHeight === "compact" ? "h-8" : rowHeight === "tall" ? "h-20" : "h-12"
-              }`}
-            >
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
+          <table className="min-w-full border-collapse">
+          <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+            <tr>
+              {fields.map((field) => (
+                <th key={field.id} className="px-4 py-3 font-heading uppercase text-xs tracking-wide text-brand-grey font-semibold text-left">
+                  {field.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr
+                key={row.id}
+                className={`transition-colors duration-150 ${
+                  index % 2 === 0 
+                    ? "bg-white dark:bg-gray-900" 
+                    : "bg-gray-50/50 dark:bg-gray-800/50"
+                } hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${
+                  rowHeight === "compact" ? "h-10" : rowHeight === "tall" ? "h-20" : "h-14"
+                }`}
+              >
             {fields.map((field) => {
               const isEditing =
                 editingCell?.rowId === row.id &&
@@ -190,7 +243,7 @@ export default function GridView({ tableId }: GridViewProps) {
               return (
                 <td
                   key={field.id}
-                  className={`p-2 ${field.type === "number" ? "text-right" : ""} ${
+                  className={`px-4 py-3 text-sm ${field.type === "number" ? "text-right" : ""} ${
                     !isEditing ? "cursor-pointer" : ""
                   }`}
                   onClick={() => {
@@ -323,8 +376,13 @@ export default function GridView({ tableId }: GridViewProps) {
           ))}
         </tbody>
       </table>
+        </div>
       </div>
     </div>
   );
 }
+
+// Memoize GridView to prevent unnecessary re-renders
+const GridView = React.memo(GridViewComponent);
+export default GridView;
 
