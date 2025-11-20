@@ -9,7 +9,7 @@ import { runImport, ImportResult } from "@/lib/import/runImport";
 import FieldMappingComponent from "@/components/import/FieldMapping";
 import ImportPreview from "@/components/import/ImportPreview";
 import { useFieldManager } from "@/lib/useFieldManager";
-import { getAllTables } from "@/lib/tableMetadata";
+import { getAllTables, getTableLabel } from "@/lib/tableMetadata";
 
 // Papa will be imported dynamically when needed
 
@@ -282,15 +282,15 @@ function ImportPageContent() {
               }}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {allTables.map((table) => (
-                <option key={table.id} value={table.id}>
-                  {table.name}
+              {allTables.map((tableId) => (
+                <option key={tableId} value={tableId}>
+                  {getTableLabel(tableId)}
                 </option>
               ))}
             </select>
           </div>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Import data from a CSV file into the {allTables.find(t => t.id === tableId)?.name || tableId} table
+            Import data from a CSV file into the {getTableLabel(tableId)} table
           </p>
         </div>
 
