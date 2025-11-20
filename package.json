@@ -24,7 +24,9 @@
     "dayjs": "^1.11.10",
     "swr": "^2.2.5",
     "papaparse": "^5.4.1",
-    "lucide-react": "^0.344.0"
+    "lucide-react": "^0.344.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
