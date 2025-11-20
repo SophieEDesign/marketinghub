@@ -46,8 +46,17 @@ export default function CampaignTimeline() {
     .flatMap((c) => [c.start_date, c.end_date])
     .filter(Boolean) as string[];
 
-  const minDate = allDates.length > 0 ? dayjs.min(allDates.map((d) => dayjs(d))) : dayjs();
-  const maxDate = allDates.length > 0 ? dayjs.max(allDates.map((d) => dayjs(d))) : dayjs().add(6, "month");
+  let minDate = dayjs();
+  let maxDate = dayjs().add(6, "month");
+
+  if (allDates.length > 0) {
+    const dateObjects = allDates.map((d) => dayjs(d));
+    const timestamps = dateObjects.map((d) => d.valueOf());
+    const minTimestamp = Math.min(...timestamps);
+    const maxTimestamp = Math.max(...timestamps);
+    minDate = dayjs(minTimestamp);
+    maxDate = dayjs(maxTimestamp);
+  }
 
   const totalDays = maxDate.diff(minDate, "day");
   const today = dayjs();
