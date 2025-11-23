@@ -28,6 +28,8 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   // Apply brand theme colors as CSS variables
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     if (theme === "brand" && settings.branding_colors) {
       const root = document.documentElement;
       root.style.setProperty("--brand-primary", settings.branding_colors.primary || "#2563eb");

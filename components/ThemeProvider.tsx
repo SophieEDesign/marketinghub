@@ -7,13 +7,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const themeContext = useTheme();
   
   useEffect(() => {
-    if (themeContext) {
-      const root = document.documentElement;
-      if (themeContext.theme === "dark") {
-        root.classList.add("dark");
-      } else {
-        root.classList.remove("dark");
-      }
+    if (typeof window === 'undefined' || !themeContext) return;
+    const root = document.documentElement;
+    if (themeContext.theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
     }
   }, [themeContext?.theme]);
   

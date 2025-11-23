@@ -21,6 +21,8 @@ import CommandPalette from '@/components/command-palette/CommandPalette'
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" })
 const spartan = League_Spartan({ subsets: ["latin"], variable: "--font-heading" })
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Marketing Workspace',
   description: 'Marketing Hub Application',

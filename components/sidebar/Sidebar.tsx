@@ -116,11 +116,13 @@ export default function Sidebar() {
   const [editing, setEditing] = useState(false);
   const [orderedSidebar, setOrderedSidebar] = useState(defaultSidebarItems);
   const [loadingOrder, setLoadingOrder] = useState(true);
+  const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string> }>({ groupTitles: {}, itemLabels: {} });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load collapsed state from localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const saved = localStorage.getItem("sidebarCollapsed");
     if (saved === "true") {
       setCollapsed(true);
@@ -129,6 +131,7 @@ export default function Sidebar() {
 
   // Load collapsed groups from localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const saved = localStorage.getItem("sidebarCollapsedGroups");
     if (saved) {
       try {
@@ -141,22 +144,27 @@ export default function Sidebar() {
 
   // Save collapsed state to localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     localStorage.setItem("sidebarCollapsed", collapsed ? "true" : "false");
   }, [collapsed]);
 
   // Save collapsed groups to localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups]);
 
   // Load sidebar customizations from localStorage
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const saved = localStorage.getItem("sidebarCustomizations");
     if (saved) {
       try {
         const customizations = JSON.parse(saved);
-        // Apply customizations to navGroups if needed
-        // For now, we'll just load them and apply when rendering
+        setSidebarCustomizations({
+          groupTitles: customizations.groupTitles || {},
+          itemLabels: customizations.itemLabels || {},
+        });
       } catch (e) {
         console.error("Error loading sidebar customizations:", e);
       }
@@ -165,11 +173,13 @@ export default function Sidebar() {
 
   // Handler for group title changes
   const handleGroupTitleChange = (oldTitle: string, newTitle: string) => {
-    const saved = localStorage.getItem("sidebarCustomizations");
-    const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
-    customizations.groupTitles = customizations.groupTitles || {};
-    customizations.groupTitles[oldTitle] = newTitle;
-    localStorage.setItem("sidebarCustomizations", JSON.stringify(customizations));
+    if (typeof window === 'undefined') return;
+    const newCustomizations = {
+      groupTitles: { ...sidebarCustomizations.groupTitles, [oldTitle]: newTitle },
+      itemLabels: { ...sidebarCustomizations.itemLabels },
+    };
+    setSidebarCustomizations(newCustomizations);
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
     // Force re-render by updating state
     setEditing(false);
     setTimeout(() => setEditing(true), 0);
@@ -177,11 +187,13 @@ export default function Sidebar() {
 
   // Handler for item label changes
   const handleItemLabelChange = (href: string, newLabel: string) => {
-    const saved = localStorage.getItem("sidebarCustomizations");
-    const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
-    customizations.itemLabels = customizations.itemLabels || {};
-    customizations.itemLabels[href] = newLabel;
-    localStorage.setItem("sidebarCustomizations", JSON.stringify(customizations));
+    if (typeof window === 'undefined') return;
+    const newCustomizations = {
+      groupTitles: { ...sidebarCustomizations.groupTitles },
+      itemLabels: { ...sidebarCustomizations.itemLabels, [href]: newLabel },
+    };
+    setSidebarCustomizations(newCustomizations);
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
     // Force re-render by updating state
     setEditing(false);
     setTimeout(() => setEditing(true), 0);
@@ -426,16 +438,14 @@ export default function Sidebar() {
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
           {navGroups.map((group) => {
-            // Apply customizations from localStorage
-            const saved = localStorage.getItem("sidebarCustomizations");
-            const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
-            const customTitle = customizations.groupTitles?.[group.title] || group.title;
+            // Apply customizations from state
+            const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
             const customizedGroup = {
               ...group,
               title: customTitle,
               items: group.items.map((item) => ({
                 ...item,
-                label: customizations.itemLabels?.[item.href] || item.label,
+                label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
               })),
             };
             return (
