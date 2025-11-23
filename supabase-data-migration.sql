@@ -149,13 +149,33 @@ SELECT name, label, description FROM tables ORDER BY created_at;
 SELECT name, layout FROM pages ORDER BY created_at;
 
 -- ============================================
--- 6. NOTES
+-- 6. IMPORTANT NOTES
 -- ============================================
 
+-- ⚠️ THIS MIGRATION DOES NOT DELETE ANY DATA TABLES ⚠️
+-- 
+-- Your actual data tables are SAFE and UNTOUCHED:
+-- ✅ content (649 rows) - KEPT
+-- ✅ campaigns - KEPT
+-- ✅ contacts - KEPT
+-- ✅ ideas - KEPT
+-- ✅ media - KEPT
+-- ✅ tasks - KEPT
+-- ✅ briefings - KEPT
+-- ✅ sponsorships - KEPT
+-- ✅ strategy - KEPT
+-- ✅ assets - KEPT
+-- ✅ All other data tables - KEPT
+--
+-- This migration ONLY:
+-- 1. Creates new metadata tables (tables, table_fields, pages, page_blocks)
+-- 2. Migrates metadata FROM old config tables TO new metadata tables
+-- 3. Does NOT touch your actual data
+--
 -- After running this migration:
 -- 1. Verify data was migrated correctly
 -- 2. Test the new /tables and /pages routes
--- 3. Legacy tables can be kept for reference but should not be used
--- 4. Consider creating a backup before removing legacy tables
+-- 3. Legacy metadata tables (table_metadata, dashboard_modules, etc.) can be kept for reference
+-- 4. Your actual data tables remain unchanged and accessible
 -- 5. Update any code that still references table_metadata, dashboard_modules, etc.
 
