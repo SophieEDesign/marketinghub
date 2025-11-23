@@ -113,8 +113,80 @@ export default function CardsView({ tableId }: CardsViewProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500 dark:text-gray-400">No records found</div>
+      <div>
+        <ViewHeader
+          tableId={tableId}
+          viewId={viewId}
+          fields={fields}
+          filters={filters}
+          sort={sort}
+          onFiltersChange={handleFiltersChange}
+          onSortChange={handleSortChange}
+          onRemoveFilter={handleRemoveFilter}
+          viewSettings={{
+            card_fields: cardFields,
+          }}
+          onViewSettingsUpdate={handleViewSettingsUpdate}
+          currentView={currentView}
+          views={views}
+          onRenameView={async (newName: string) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_name: newName });
+              await reloadViews();
+            }
+          }}
+          onDuplicateView={async () => {
+            if (currentView) {
+              const newName = `${currentView.view_name} (Copy)`;
+              await createView(newName, currentView);
+              await reloadViews();
+            }
+          }}
+          onDeleteView={async () => {
+            if (currentView?.id && views.length > 1) {
+              if (confirm(`Delete view "${currentView.view_name}"?`)) {
+                await deleteView(currentView.id);
+                await reloadViews();
+              }
+            }
+          }}
+          onSetDefaultView={async () => {
+            if (currentView?.id) {
+              await setDefaultView(currentView.id);
+              await reloadViews();
+            }
+          }}
+          onChangeViewType={async (viewType) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_type: viewType });
+              await reloadViews();
+              window.location.href = `/${tableId}/${viewType}`;
+            }
+          }}
+          onResetLayout={async () => {
+            if (currentView?.id) {
+              await updateView(currentView.id, {
+                card_fields: [],
+              });
+              await reloadViews();
+            }
+          }}
+          onCreateView={async () => {
+            const name = prompt("Enter view name:");
+            if (name) {
+              await createView(name);
+              await reloadViews();
+            }
+          }}
+        />
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500 dark:text-gray-400 text-center">
+            <p className="mb-2">No records found</p>
+            {filters.length > 0 && (
+              <p className="text-sm">Try adjusting your filters to see more results.</p>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
