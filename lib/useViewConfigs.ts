@@ -10,7 +10,7 @@ export function useViewConfigs(tableName: string) {
   const [error, setError] = useState<string | null>(null);
 
   // Load all views for the table
-  const loadViews = useCallback(async () => {
+  const loadViews = useCallback(async (selectViewName?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -21,10 +21,16 @@ export function useViewConfigs(tableName: string) {
       const data = await response.json();
       setViews(data.views || []);
 
-      // Set current view to default or first view
-      const defaultView = data.views?.find((v: ViewConfig) => v.is_default) || data.views?.[0];
-      if (defaultView) {
-        setCurrentView(defaultView);
+      // Select view by name if provided, otherwise default or first view
+      let selectedView: ViewConfig | undefined;
+      if (selectViewName) {
+        selectedView = data.views?.find((v: ViewConfig) => v.view_name === selectViewName || v.id === selectViewName);
+      }
+      if (!selectedView) {
+        selectedView = data.views?.find((v: ViewConfig) => v.is_default) || data.views?.[0];
+      }
+      if (selectedView) {
+        setCurrentView(selectedView);
       }
     } catch (err: any) {
       console.error("[useViewConfigs] Error loading views:", err);
@@ -34,10 +40,13 @@ export function useViewConfigs(tableName: string) {
     }
   }, [tableName]);
 
+  // Store the view name to select
+  const [selectViewName, setSelectViewName] = useState<string | undefined>(undefined);
+
   // Load views on mount and when table changes
   useEffect(() => {
-    loadViews();
-  }, [loadViews]);
+    loadViews(selectViewName);
+  }, [loadViews, selectViewName]);
 
   // Create a new view
   const createView = useCallback(async (viewName: string, cloneFrom?: ViewConfig): Promise<ViewConfig | null> => {
@@ -144,6 +153,17 @@ export function useViewConfigs(tableName: string) {
     setCurrentView(view);
   }, []);
 
+  // Switch to a view by name or ID
+  const switchToViewByName = useCallback((viewNameOrId: string) => {
+    const view = views.find((v) => v.view_name === viewNameOrId || v.id === viewNameOrId);
+    if (view) {
+      setCurrentView(view);
+    } else {
+      // If view not found in current views, reload and try to select it
+      setSelectViewName(viewNameOrId);
+    }
+  }, [views]);
+
   // Auto-save current view settings
   const saveCurrentView = useCallback(async (updates: Partial<ViewConfig>): Promise<boolean> => {
     if (!currentView?.id) return false;
@@ -160,8 +180,9 @@ export function useViewConfigs(tableName: string) {
     deleteView,
     setDefaultView,
     switchToView,
+    switchToViewByName,
     saveCurrentView,
-    reloadViews: loadViews,
+    reloadViews: () => loadViews(selectViewName),
   };
 }
 

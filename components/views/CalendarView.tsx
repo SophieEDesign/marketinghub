@@ -230,25 +230,27 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
         onViewSettingsUpdate={handleViewSettingsUpdate}
       />
 
-      <div className="p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm">
-        <FullCalendar
-        ref={calendarRef}
-        plugins={[dayGridPlugin, interactionPlugin]}
-        initialView="dayGridMonth"
-        events={events}
-        dateClick={handleDateClick}
-        editable={true}
-        eventDrop={handleEventDrop}
-        eventContent={renderEventContent}
-        displayEventTime={false}
-        eventDisplay="block"
-        height="auto"
-        headerToolbar={{
-          left: "prev,next today",
-          center: "title",
-          right: "dayGridMonth",
-        }}
-      />
+      <div className="overflow-auto">
+        <div className="p-4 bg-white dark:bg-gray-900 rounded-lg shadow-sm min-w-0">
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, interactionPlugin]}
+            initialView="dayGridMonth"
+            events={events}
+            dateClick={handleDateClick}
+            editable={true}
+            eventDrop={handleEventDrop}
+            eventContent={renderEventContent}
+            displayEventTime={false}
+            eventDisplay="block"
+            height="auto"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth",
+            }}
+          />
+        </div>
       </div>
     </div>
   );

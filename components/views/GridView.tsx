@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { useFields } from "@/lib/useFields";
-import { useViewSettings } from "@/lib/useViewSettings";
+import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { getRequiredColumns } from "@/lib/query/getRequiredColumns";
 import { getOrFetch, CacheKeys, invalidateCache } from "@/lib/cache/metadataCache";
 import FieldRenderer from "../fields/FieldRenderer";
 import InlineFieldEditor from "../fields/InlineFieldEditor";
 import ViewHeader from "./ViewHeader";
-import SortableColumnHeader from "./SortableColumnHeader";
+import EnhancedColumnHeader from "../grid/EnhancedColumnHeader";
 import { Filter, Sort } from "@/lib/types/filters";
 import { runAutomations } from "@/lib/automations/automationEngine";
 import { toast } from "../ui/Toast";
@@ -47,20 +47,33 @@ function GridViewComponent({ tableId }: GridViewProps) {
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {
-    settings,
-    getViewSettings,
-    saveFilters,
-    saveSort,
-    setVisibleFields,
-    setFieldOrder,
-    setRowHeight,
-  } = useViewSettings(tableId, viewId);
+    currentView,
+    views,
+    loading: viewConfigLoading,
+    saveCurrentView,
+    switchToViewByName,
+    reloadViews,
+    createView,
+    updateView,
+    deleteView,
+    setDefaultView,
+  } = useViewConfigs(tableId);
 
-  const filters = settings?.filters || [];
-  const sort = settings?.sort || [];
-  const visibleFields = settings?.visible_fields || [];
-  const fieldOrder = settings?.field_order || [];
-  const rowHeight = settings?.row_height || "medium";
+  // Switch to view by name when viewId changes
+  useEffect(() => {
+    if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
+      switchToViewByName(viewId);
+    }
+  }, [viewId, currentView, switchToViewByName]);
+
+  // Extract config from currentView
+  const filters = currentView?.filters || [];
+  const sort = currentView?.sort || [];
+  const hiddenColumns = currentView?.hidden_columns || [];
+  const columnOrder = currentView?.column_order || [];
+  const columnWidths = currentView?.column_widths || {};
+  const groupings = currentView?.groupings || [];
+  const rowHeight = currentView?.row_height || "medium";
 
   // Detect mobile
   const [isMobile, setIsMobile] = useState(false);
@@ -73,7 +86,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Apply visible_fields and field_order (memoized) with deduplication
+  // Apply hidden_columns and column_order (memoized) with deduplication
   const fields = useMemo(() => {
     // First, deduplicate by field_key (keep first occurrence)
     const seenKeys = new Set<string>();
@@ -91,13 +104,15 @@ function GridViewComponent({ tableId }: GridViewProps) {
     });
 
     let currentFields = deduplicated;
-    if (visibleFields.length > 0) {
-      currentFields = currentFields.filter((f) => visibleFields.includes(f.id));
+    // Filter out hidden columns
+    if (hiddenColumns.length > 0) {
+      currentFields = currentFields.filter((f) => !hiddenColumns.includes(f.id));
     }
-    if (fieldOrder.length > 0) {
+    // Apply column order
+    if (columnOrder.length > 0) {
       currentFields = [...currentFields].sort((a, b) => {
-        const aIndex = fieldOrder.indexOf(a.id);
-        const bIndex = fieldOrder.indexOf(b.id);
+        const aIndex = columnOrder.indexOf(a.id);
+        const bIndex = columnOrder.indexOf(b.id);
         if (aIndex === -1 && bIndex === -1) return 0;
         if (aIndex === -1) return 1;
         if (bIndex === -1) return -1;
@@ -105,7 +120,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
       });
     }
     return currentFields;
-  }, [allFields, visibleFields, fieldOrder]);
+  }, [allFields, hiddenColumns, columnOrder]);
 
   // Get ordered field IDs for drag-and-drop
   const orderedFieldIds = useMemo(() => {
@@ -123,29 +138,23 @@ function GridViewComponent({ tableId }: GridViewProps) {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const newOrder = arrayMove(orderedFieldIds, oldIndex, newIndex);
-    await setFieldOrder(newOrder);
+    await saveCurrentView({ column_order: newOrder });
     
     // Invalidate cache to refresh view
     invalidateCache(CacheKeys.tableRecords(tableId, "*"));
   };
   
   const handleViewSettingsUpdate = async (updates: {
-    visible_fields?: string[];
-    field_order?: string[];
+    hidden_columns?: string[];
+    column_order?: string[];
     row_height?: "compact" | "medium" | "tall";
-    kanban_group_field?: string;
-    calendar_date_field?: string;
-    timeline_date_field?: string;
-    card_fields?: string[];
     column_widths?: Record<string, number>;
     groupings?: Array<{ name: string; fields: string[] }>;
+    filters?: any[];
+    sort?: any[];
   }): Promise<void> => {
     try {
-      if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
-      if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
-      if (updates.row_height !== undefined) await setRowHeight(updates.row_height);
-      // Note: Other settings (column_widths, groupings, etc.) are stored but not yet used in GridView
-      // They can be added to the view settings state if needed
+      await saveCurrentView(updates);
     } catch (error) {
       console.error("Error updating view settings:", error);
       toast({
@@ -155,13 +164,6 @@ function GridViewComponent({ tableId }: GridViewProps) {
       });
     }
   };
-
-  // Load view settings on mount (only once)
-  useEffect(() => {
-    if (tableId && viewId) {
-      getViewSettings();
-    }
-  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   // Get required columns based on visible fields
   const requiredColumns = useMemo(() => {
@@ -214,16 +216,16 @@ function GridViewComponent({ tableId }: GridViewProps) {
   const [isPending, startTransition] = useTransition();
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
-    startTransition(() => {
-      saveFilters(newFilters);
+    startTransition(async () => {
+      await saveCurrentView({ filters: newFilters });
       // Invalidate cache when filters change
       invalidateCache(CacheKeys.tableRecords(tableId, "*"));
     });
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
-    startTransition(() => {
-      saveSort(newSort);
+    startTransition(async () => {
+      await saveCurrentView({ sort: newSort });
       // Invalidate cache when sort changes
       invalidateCache(CacheKeys.tableRecords(tableId, "*"));
     });
@@ -231,7 +233,8 @@ function GridViewComponent({ tableId }: GridViewProps) {
 
   const handleRemoveFilter = async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
+    invalidateCache(CacheKeys.tableRecords(tableId, "*"));
   };
 
   const handleDelete = async () => {
@@ -274,7 +277,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
     }
   };
 
-  if (loading || fieldsLoading) {
+  if (loading || fieldsLoading || viewConfigLoading) {
     return (
       <div>
         <ViewHeader
@@ -287,11 +290,68 @@ function GridViewComponent({ tableId }: GridViewProps) {
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}
           viewSettings={{
-            visible_fields: visibleFields,
-            field_order: fieldOrder,
+            hidden_columns: hiddenColumns,
+            column_order: columnOrder,
+            column_widths: columnWidths,
+            groupings: groupings,
             row_height: rowHeight,
           }}
           onViewSettingsUpdate={handleViewSettingsUpdate}
+          currentView={currentView}
+          views={views}
+          onRenameView={async (newName: string) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_name: newName });
+              await reloadViews();
+            }
+          }}
+          onDuplicateView={async () => {
+            if (currentView) {
+              const newName = `${currentView.view_name} (Copy)`;
+              await createView(newName, currentView);
+              await reloadViews();
+            }
+          }}
+          onDeleteView={async () => {
+            if (currentView?.id && views.length > 1) {
+              if (confirm(`Delete view "${currentView.view_name}"?`)) {
+                await deleteView(currentView.id);
+                await reloadViews();
+              }
+            }
+          }}
+          onSetDefaultView={async () => {
+            if (currentView?.id) {
+              await setDefaultView(currentView.id);
+              await reloadViews();
+            }
+          }}
+          onChangeViewType={async (viewType) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_type: viewType });
+              await reloadViews();
+              window.location.href = `/${tableId}/${viewType}`;
+            }
+          }}
+          onResetLayout={async () => {
+            if (currentView?.id) {
+              await updateView(currentView.id, {
+                column_order: [],
+                column_widths: {},
+                hidden_columns: [],
+                groupings: [],
+              });
+              await reloadViews();
+              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+            }
+          }}
+          onCreateView={async () => {
+            const name = prompt("Enter view name:");
+            if (name) {
+              await createView(name);
+              await reloadViews();
+            }
+          }}
         />
         <GridSkeleton rows={10} cols={fields.length || 5} />
       </div>
@@ -311,11 +371,68 @@ function GridViewComponent({ tableId }: GridViewProps) {
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}
           viewSettings={{
-            visible_fields: visibleFields,
-            field_order: fieldOrder,
+            hidden_columns: hiddenColumns,
+            column_order: columnOrder,
+            column_widths: columnWidths,
+            groupings: groupings,
             row_height: rowHeight,
           }}
           onViewSettingsUpdate={handleViewSettingsUpdate}
+          currentView={currentView}
+          views={views}
+          onRenameView={async (newName: string) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_name: newName });
+              await reloadViews();
+            }
+          }}
+          onDuplicateView={async () => {
+            if (currentView) {
+              const newName = `${currentView.view_name} (Copy)`;
+              await createView(newName, currentView);
+              await reloadViews();
+            }
+          }}
+          onDeleteView={async () => {
+            if (currentView?.id && views.length > 1) {
+              if (confirm(`Delete view "${currentView.view_name}"?`)) {
+                await deleteView(currentView.id);
+                await reloadViews();
+              }
+            }
+          }}
+          onSetDefaultView={async () => {
+            if (currentView?.id) {
+              await setDefaultView(currentView.id);
+              await reloadViews();
+            }
+          }}
+          onChangeViewType={async (viewType) => {
+            if (currentView?.id) {
+              await updateView(currentView.id, { view_type: viewType });
+              await reloadViews();
+              window.location.href = `/${tableId}/${viewType}`;
+            }
+          }}
+          onResetLayout={async () => {
+            if (currentView?.id) {
+              await updateView(currentView.id, {
+                column_order: [],
+                column_widths: {},
+                hidden_columns: [],
+                groupings: [],
+              });
+              await reloadViews();
+              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+            }
+          }}
+          onCreateView={async () => {
+            const name = prompt("Enter view name:");
+            if (name) {
+              await createView(name);
+              await reloadViews();
+            }
+          }}
         />
         <EmptyState
           title="No records found"
@@ -343,9 +460,66 @@ function GridViewComponent({ tableId }: GridViewProps) {
         onSortChange={handleSortChange}
         onRemoveFilter={handleRemoveFilter}
         viewSettings={{
-          visible_fields: visibleFields,
-          field_order: fieldOrder,
+          hidden_columns: hiddenColumns,
+          column_order: columnOrder,
+          column_widths: columnWidths,
+          groupings: groupings,
           row_height: rowHeight,
+        }}
+        currentView={currentView}
+        views={views}
+        onRenameView={async (newName: string) => {
+          if (currentView?.id) {
+            await updateView(currentView.id, { view_name: newName });
+            await reloadViews();
+          }
+        }}
+        onDuplicateView={async () => {
+          if (currentView) {
+            const newName = `${currentView.view_name} (Copy)`;
+            await createView(newName, currentView);
+            await reloadViews();
+          }
+        }}
+        onDeleteView={async () => {
+          if (currentView?.id && views.length > 1) {
+            if (confirm(`Delete view "${currentView.view_name}"?`)) {
+              await deleteView(currentView.id);
+              await reloadViews();
+            }
+          }
+        }}
+        onSetDefaultView={async () => {
+          if (currentView?.id) {
+            await setDefaultView(currentView.id);
+            await reloadViews();
+          }
+        }}
+        onChangeViewType={async (viewType) => {
+          if (currentView?.id) {
+            await updateView(currentView.id, { view_type: viewType });
+            await reloadViews();
+            window.location.href = `/${tableId}/${viewType}`;
+          }
+        }}
+        onResetLayout={async () => {
+          if (currentView?.id) {
+            await updateView(currentView.id, {
+              column_order: [],
+              column_widths: {},
+              hidden_columns: [],
+              groupings: [],
+            });
+            await reloadViews();
+            invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+          }
+        }}
+        onCreateView={async () => {
+          const name = prompt("Enter view name:");
+          if (name) {
+            await createView(name);
+            await reloadViews();
+          }
         }}
         onViewSettingsUpdate={handleViewSettingsUpdate}
         selectedRowCount={selectedRows.size}
@@ -379,12 +553,54 @@ function GridViewComponent({ tableId }: GridViewProps) {
                       />
                     </th>
                     <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
-                      {fields.map((field) => (
-                        <SortableColumnHeader
+                      {fields.map((field, index) => (
+                        <EnhancedColumnHeader
                           key={field.id}
-                          id={field.id}
-                          label={field.label}
+                          field={field}
+                          width={columnWidths[field.id]}
                           isMobile={isMobile}
+                          onResize={async (fieldId, newWidth) => {
+                            await saveCurrentView({
+                              column_widths: { ...columnWidths, [fieldId]: newWidth },
+                            });
+                          }}
+                          onHide={async (fieldId) => {
+                            await saveCurrentView({
+                              hidden_columns: [...hiddenColumns, fieldId],
+                            });
+                            invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                          }}
+                          onRename={async (fieldId, newName) => {
+                            // TODO: Implement column_labels in ViewConfig
+                            console.log("Rename column:", fieldId, newName);
+                          }}
+                          onMoveLeft={index > 0 ? async (fieldId) => {
+                            const currentIndex = columnOrder.indexOf(fieldId);
+                            if (currentIndex > 0) {
+                              const newOrder = [...columnOrder];
+                              [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+                              await saveCurrentView({ column_order: newOrder });
+                              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                            }
+                          } : undefined}
+                          onMoveRight={index < fields.length - 1 ? async (fieldId) => {
+                            const currentIndex = columnOrder.indexOf(fieldId);
+                            if (currentIndex < columnOrder.length - 1) {
+                              const newOrder = [...columnOrder];
+                              [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+                              await saveCurrentView({ column_order: newOrder });
+                              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                            }
+                          } : undefined}
+                          onResetWidth={async (fieldId) => {
+                            const newWidths = { ...columnWidths };
+                            delete newWidths[fieldId];
+                            await saveCurrentView({ column_widths: newWidths });
+                          }}
+                          canMoveLeft={index > 0}
+                          canMoveRight={index < fields.length - 1}
+                          isFirst={index === 0}
+                          isLast={index === fields.length - 1}
                         />
                       ))}
                     </SortableContext>
@@ -424,9 +640,11 @@ function GridViewComponent({ tableId }: GridViewProps) {
                 editingCell?.rowId === row.id &&
                 editingCell?.fieldId === field.id;
 
+              const cellWidth = columnWidths[field.id];
               return (
                 <td
                   key={field.id}
+                  style={cellWidth ? { width: `${cellWidth}px`, minWidth: `${cellWidth}px` } : undefined}
                   className={`px-4 py-3 text-sm ${field.type === "number" ? "text-right" : ""} ${
                     !isEditing ? "cursor-pointer" : ""
                   }`}

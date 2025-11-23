@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
-import { useViewSettings } from "@/lib/useViewSettings";
+import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";

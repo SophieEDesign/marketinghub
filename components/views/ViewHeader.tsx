@@ -4,14 +4,19 @@ import { useState } from "react";
 import { Filter as FilterIcon, ArrowUpDown, Settings, Trash2 } from "lucide-react";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
-import FilterPanel from "../filters/FilterPanel";
-import SortPanel from "../sorting/SortPanel";
+import ViewFilterPanel from "./ViewFilterPanel";
+import ViewSortPanel from "./ViewSortPanel";
 import FilterBadges from "../filters/FilterBadges";
 import ViewSettingsDrawer from "../view-settings/ViewSettingsDrawer";
+import ViewMenu from "./ViewMenu";
 
 interface ViewSettings {
-  visible_fields?: string[];
-  field_order?: string[];
+  visible_fields?: string[]; // Legacy - use hidden_columns instead
+  field_order?: string[]; // Legacy - use column_order instead
+  hidden_columns?: string[];
+  column_order?: string[];
+  column_widths?: Record<string, number>;
+  groupings?: Array<{ name: string; fields: string[] }>;
   kanban_group_field?: string;
   calendar_date_field?: string;
   timeline_date_field?: string;
@@ -32,6 +37,16 @@ interface ViewHeaderProps {
   onViewSettingsUpdate?: (updates: ViewSettings) => Promise<void>;
   selectedRowCount?: number;
   onBulkDelete?: () => void;
+  // ViewMenu props
+  currentView?: any; // ViewConfig
+  views?: any[]; // ViewConfig[]
+  onRenameView?: (newName: string) => Promise<void>;
+  onDuplicateView?: () => Promise<void>;
+  onDeleteView?: () => Promise<void>;
+  onSetDefaultView?: () => Promise<void>;
+  onChangeViewType?: (viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => Promise<void>;
+  onResetLayout?: () => Promise<void>;
+  onCreateView?: () => Promise<void>;
 }
 
 export default function ViewHeader({
@@ -47,6 +62,15 @@ export default function ViewHeader({
   onViewSettingsUpdate,
   selectedRowCount = 0,
   onBulkDelete,
+  currentView,
+  views = [],
+  onRenameView,
+  onDuplicateView,
+  onDeleteView,
+  onSetDefaultView,
+  onChangeViewType,
+  onResetLayout,
+  onCreateView,
 }: ViewHeaderProps) {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
@@ -65,7 +89,20 @@ export default function ViewHeader({
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4 mb-4">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          {currentView && (
+            <ViewMenu
+              view={currentView}
+              views={views}
+              onRename={onRenameView || (async () => {})}
+              onDuplicate={onDuplicateView || (async () => {})}
+              onDelete={onDeleteView || (async () => {})}
+              onSetDefault={onSetDefaultView || (async () => {})}
+              onChangeViewType={onChangeViewType || (async () => {})}
+              onResetLayout={onResetLayout || (async () => {})}
+              onCreateView={onCreateView || (async () => {})}
+            />
+          )}
           <FilterBadges
             filters={filters}
             fields={fields}
@@ -125,7 +162,7 @@ export default function ViewHeader({
         />
       )}
 
-      <FilterPanel
+      <ViewFilterPanel
         open={showFilterPanel}
         onClose={() => setShowFilterPanel(false)}
         fields={fields}
@@ -133,7 +170,7 @@ export default function ViewHeader({
         onFiltersChange={handleFiltersChange}
       />
 
-      <SortPanel
+      <ViewSortPanel
         open={showSortPanel}
         onClose={() => setShowSortPanel(false)}
         fields={fields}
