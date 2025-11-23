@@ -43,20 +43,25 @@ export default function FieldMapping({
     onMappingChange(updated);
   };
 
-  const handleCreateField = async (csvColumn: string) => {
-    // Get sample values for type detection
-    const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
-    const detectedType = detectFieldType(sampleValues);
-    const suggestedType = suggestTypeFromColumnName(csvColumn);
-    const finalType = detectedType !== "text" ? detectedType : suggestedType;
+  const [creatingField, setCreatingField] = useState<string | null>(null);
 
-    if (onCreateField) {
-      try {
-        await onCreateField(csvColumn, finalType);
-      } catch (error) {
-        console.error("Error creating field:", error);
-        alert(`Failed to create field: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
+  const handleCreateField = async (csvColumn: string) => {
+    if (!onCreateField || creatingField === csvColumn) return;
+    
+    setCreatingField(csvColumn);
+    try {
+      // Get sample values for type detection
+      const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
+      const detectedType = detectFieldType(sampleValues);
+      const suggestedType = suggestTypeFromColumnName(csvColumn);
+      const finalType = detectedType !== "text" ? detectedType : suggestedType;
+
+      await onCreateField(csvColumn, finalType);
+    } catch (error) {
+      console.error("Error creating field:", error);
+      alert(`Failed to create field: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setCreatingField(null);
     }
   };
 
@@ -159,11 +164,16 @@ export default function FieldMapping({
                   >
                     <span className="text-sm text-gray-700 dark:text-gray-300">{header}</span>
                     <button
-                      onClick={() => handleCreateField(header)}
-                      className="text-xs btn-primary"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleCreateField(header);
+                      }}
+                      disabled={creatingField === header || !onCreateField}
+                      className="text-xs px-3 py-1.5 bg-brand-red text-white rounded-md hover:bg-brand-redDark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       title={`Create field "${header}" (type: ${finalType})`}
                     >
-                      Create Field ({finalType})
+                      {creatingField === header ? "Creating..." : `Create Field (${finalType})`}
                     </button>
                   </div>
                 );
