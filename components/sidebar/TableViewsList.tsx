@@ -86,7 +86,18 @@ export default function TableViewsList({ tableId, tableName, isExpanded = false 
   };
 
   const handleCreateView = async (viewName: string, viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => {
-    await createView(viewName, undefined, viewType);
+    // Create view with the specified type by passing a config object
+    const baseConfig: any = {
+      view_type: viewType,
+      column_order: [],
+      column_widths: {},
+      hidden_columns: [],
+      filters: [],
+      sort: [],
+      groupings: [],
+      row_height: "medium",
+    };
+    await createView(viewName, baseConfig);
     await reloadViews();
     setShowCreateModal(false);
   };
