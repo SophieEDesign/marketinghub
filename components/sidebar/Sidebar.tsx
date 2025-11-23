@@ -276,17 +276,24 @@ export default function Sidebar() {
   const currentTable = pathParts[0] || null;
   const currentView = pathParts[1] || null;
 
-  // Build navGroups structure - Simplified to just Tables and Pages
+  // Build navGroups structure - Tables and Pages in separate sections
   const navGroups: NavGroup[] = [
     {
       title: "Tables",
       items: dynamicTablesList.length > 0
         ? [
-            ...dynamicTablesList.map((table) => ({
-              icon: FileText, // Can be enhanced to use table.icon
-              label: table.label || table.name,
-              href: `/tables/${table.id}`,
-            })),
+            ...dynamicTablesList.map((table) => {
+              // For new system tables, use /tables/{id}
+              // For old system (where id === name), use /{name}/grid
+              const href = table.id === table.name 
+                ? `/${table.name}/grid` 
+                : `/tables/${table.id}`;
+              return {
+                icon: FileText, // Can be enhanced to use table.icon
+                label: table.label || table.name,
+                href: href,
+              };
+            }),
             {
               icon: Plus,
               label: "New Table",
