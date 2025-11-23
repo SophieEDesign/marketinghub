@@ -21,6 +21,16 @@ interface Settings {
     visible_fields: string[];
     field_order: string[];
   }>;
+  theme?: "light" | "dark" | "system";
+  notifications?: {
+    weekly_summary?: boolean;
+    activity_updates?: boolean;
+    automation_failures?: boolean;
+  };
+  security?: {
+    session_timeout?: number;
+    two_factor_enabled?: boolean;
+  };
 }
 
 const fetcher = async (): Promise<Settings> => {

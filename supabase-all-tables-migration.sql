@@ -490,6 +490,54 @@ BEGIN
 END $$;
 
 -- ============================================
+-- AUTOMATIONS TABLE
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS automations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  enabled BOOLEAN DEFAULT true,
+  trigger_type TEXT NOT NULL, -- 'record_created', 'record_updated', 'record_matches_conditions', 'schedule', 'fixed_date'
+  trigger_config JSONB DEFAULT '{}'::jsonb, -- Table name, conditions, schedule details, etc.
+  status TEXT DEFAULT 'ok', -- 'ok', 'error', 'disabled'
+  last_run_at TIMESTAMPTZ,
+  next_run_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_automations_enabled ON automations(enabled) WHERE enabled = true;
+CREATE INDEX IF NOT EXISTS idx_automations_next_run ON automations(next_run_at) WHERE enabled = true AND next_run_at IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS automation_steps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  automation_id UUID NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  step_order INTEGER NOT NULL,
+  action_type TEXT NOT NULL, -- 'send_email', 'insert_record', 'update_record', 'webhook', 'slack_message', 'post_to_table', 'generate_summary'
+  action_config JSONB DEFAULT '{}'::jsonb, -- Action-specific configuration
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(automation_id, step_order)
+);
+
+CREATE INDEX IF NOT EXISTS idx_automation_steps_automation_id ON automation_steps(automation_id);
+
+ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automation_steps ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view all automations" ON automations FOR SELECT USING (true);
+CREATE POLICY "Users can create automations" ON automations FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update automations" ON automations FOR UPDATE USING (true);
+CREATE POLICY "Users can delete automations" ON automations FOR DELETE USING (true);
+
+CREATE POLICY "Users can view all automation_steps" ON automation_steps FOR SELECT USING (true);
+CREATE POLICY "Users can create automation_steps" ON automation_steps FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update automation_steps" ON automation_steps FOR UPDATE USING (true);
+CREATE POLICY "Users can delete automation_steps" ON automation_steps FOR DELETE USING (true);
+
+-- ============================================
 -- AUTO-UPDATE TRIGGERS FOR updated_at
 -- ============================================
 
@@ -510,7 +558,8 @@ DECLARE
     'content', 'campaigns', 'contacts', 'ideas', 'media', 
     'tasks', 'briefings', 'sponsorships', 'strategy', 'assets',
     'table_metadata', 'table_view_configs', 'dashboards', 
-    'dashboard_modules', 'dashboard_blocks', 'comments', 'user_roles'
+    'dashboard_modules', 'dashboard_blocks', 'comments', 'user_roles',
+    'automations', 'automation_steps'
   ];
 BEGIN
   FOREACH table_name IN ARRAY tables

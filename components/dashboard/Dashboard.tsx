@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import Button from "@/components/ui/Button";
 import { useDashboardBlocks } from "@/lib/hooks/useDashboardBlocks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import DashboardBlock from "./DashboardBlock";
