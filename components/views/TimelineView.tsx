@@ -9,6 +9,7 @@ import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import FieldRenderer from "../fields/FieldRenderer";
 import ViewHeader from "./ViewHeader";
 
@@ -24,6 +25,7 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  const { openRecord } = useRecordDrawer();
   const {
     currentView,
     loading: viewConfigLoading,
@@ -207,7 +209,10 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
                 className="flex items-center border-b border-gray-200 dark:border-gray-800 h-12 relative hover:bg-gray-50 dark:hover:bg-gray-800/50"
               >
                 {/* Title */}
-                <div className="w-48 px-2 text-sm font-medium truncate flex-shrink-0">
+                <div 
+                  className="w-48 px-2 text-sm font-medium truncate flex-shrink-0 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                  onClick={() => openRecord(tableId, row.id)}
+                >
                   {titleField ? row[titleField.field_key] || "Untitled" : "Untitled"}
                 </div>
 
@@ -228,6 +233,10 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
                           minWidth: "48px",
                         }}
                         title={`${titleField ? row[titleField.field_key] || "Untitled" : "Untitled"}\n${statusField ? `${statusField.label}: ${row[statusField.field_key] || "N/A"}\n` : ""}Start: ${start.format("DD MMM YYYY")}\nEnd: ${end.format("DD MMM YYYY")}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openRecord(tableId, row.id);
+                        }}
                       >
                         {durationDays * 48 > 60 && (
                           <span className="truncate">

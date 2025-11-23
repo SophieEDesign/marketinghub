@@ -83,8 +83,8 @@ export default function ResizableHeader({
   }, [handleMouseMove, handleMouseUp]);
 
   return (
-    <th
-      ref={headerRef}
+    <div
+      ref={headerRef as any}
       style={{ width: `${currentWidth}px`, minWidth: `${minWidth}px`, position: "relative" }}
       className={`px-4 py-3 font-heading uppercase text-xs tracking-wide text-brand-grey font-semibold text-left bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 select-none ${
         isDragging ? "opacity-50" : ""
@@ -123,10 +123,18 @@ export default function ResizableHeader({
       </div>
       {/* Resize handle */}
       <div
-        className="resize-handle absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 hover:opacity-100 transition-opacity"
-        style={{ zIndex: 10 }}
+        className="resize-handle absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 opacity-0 hover:opacity-100 transition-opacity z-10"
         title="Drag to resize"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsResizing(true);
+          startXRef.current = e.clientX;
+          startWidthRef.current = currentWidth;
+          document.addEventListener("mousemove", handleMouseMove);
+          document.addEventListener("mouseup", handleMouseUp);
+        }}
       />
-    </th>
+    </div>
   );
 }

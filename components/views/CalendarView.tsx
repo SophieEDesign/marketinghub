@@ -13,6 +13,7 @@ import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
+import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import FieldRenderer from "../fields/FieldRenderer";
 import ViewHeader from "./ViewHeader";
 
@@ -28,6 +29,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   const [events, setEvents] = useState<EventInput[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
+  const { openRecord } = useRecordDrawer();
   const {
     currentView,
     loading: viewConfigLoading,
@@ -138,6 +140,13 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
     // TODO: Open new record modal with date pre-filled
   };
 
+  const handleEventClick = (info: any) => {
+    const recordId = info.event.id;
+    if (recordId) {
+      openRecord(tableId, recordId);
+    }
+  };
+
   const handleEventDrop = async (info: EventDropArg) => {
     if (!dateField) return;
     
@@ -238,6 +247,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
             initialView="dayGridMonth"
             events={events}
             dateClick={handleDateClick}
+            eventClick={handleEventClick}
             editable={true}
             eventDrop={handleEventDrop}
             eventContent={renderEventContent}
