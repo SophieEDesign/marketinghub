@@ -234,6 +234,11 @@ export default function Sidebar() {
           label: "Settings",
           href: "/settings",
         },
+        {
+          icon: FileSpreadsheet,
+          label: "Tables",
+          href: "/settings/tables",
+        },
       ],
     },
     {

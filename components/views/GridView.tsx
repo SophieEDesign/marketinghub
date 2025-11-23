@@ -44,6 +44,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
     rowId?: string;
     rowIds?: string[];
   }>({ isOpen: false });
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {
@@ -531,7 +532,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
       />
 
       {/* Table - Fixed horizontal scroll */}
-      <div className="flex-1 w-full min-w-0 overflow-hidden">
+      <div className="flex-1 w-full min-w-0 overflow-hidden -mx-6 px-6">
         <div className="overflow-auto w-full min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
           <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
