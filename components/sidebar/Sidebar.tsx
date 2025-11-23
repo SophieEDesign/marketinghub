@@ -181,20 +181,34 @@ export default function Sidebar() {
     localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups]);
 
-  // Load dynamic tables from database
+  // Load dynamic tables from new tables system
+  const [dynamicTablesList, setDynamicTablesList] = useState<Array<{ id: string; name: string; label: string; icon: string }>>([]);
+  
   useEffect(() => {
     async function loadDynamicTables() {
       try {
-        const { data, error } = await supabase
-          .from("table_metadata")
-          .select("table_name, display_name")
-          .order("display_name", { ascending: true });
+        // Try loading from new tables system first
+        const { data: newTables, error: newError } = await supabase
+          .from("tables")
+          .select("id, name, label, icon")
+          .order("created_at", { ascending: true });
         
-        if (!error && data) {
-          setDynamicTables(data.map((row) => row.table_name));
-          // Update sidebar items with dynamic tables (pass full data for display names)
-          const updatedItems = generateDefaultSidebarItems(data);
-          setOrderedSidebar(updatedItems);
+        if (!newError && newTables && newTables.length > 0) {
+          // Use new dynamic tables system
+          setDynamicTablesList(newTables);
+          setDynamicTables(newTables.map((t) => t.name));
+        } else {
+          // Fallback to old table_metadata system for backward compatibility
+          const { data: oldTables, error: oldError } = await supabase
+            .from("table_metadata")
+            .select("table_name, display_name")
+            .order("display_name", { ascending: true });
+          
+          if (!oldError && oldTables) {
+            setDynamicTables(oldTables.map((row) => row.table_name));
+            const updatedItems = generateDefaultSidebarItems(oldTables);
+            setOrderedSidebar(updatedItems);
+          }
         }
       } catch (error) {
         console.warn("Error loading dynamic tables:", error);
@@ -274,25 +288,46 @@ export default function Sidebar() {
       ],
     },
     {
-      title: "Interfaces",
-      items: [
-        {
-          icon: Layout,
-          label: "Pages",
-          href: "#",
-          children: [
-            ...pages.map((page) => ({
-              icon: FileText,
-              label: page.name,
-              href: `/pages/${page.id}`,
+      title: "Tables",
+      items: dynamicTablesList.length > 0
+        ? [
+            ...dynamicTablesList.map((table) => ({
+              icon: FileText, // Can be enhanced to use table.icon
+              label: table.label,
+              href: `/tables/${table.id}`,
             })),
             {
               icon: Plus,
-              label: "New Page",
-              href: "#",
-              onClick: () => setShowNewPageModal(true),
+              label: "New Table",
+              href: "/tables",
+            },
+          ]
+        : [
+            {
+              icon: FileText,
+              label: "Manage Tables",
+              href: "/tables",
             },
           ],
+    },
+    {
+      title: "Pages",
+      items: [
+        {
+          icon: Layout,
+          label: "All Pages",
+          href: "/pages",
+        },
+        ...pages.map((page) => ({
+          icon: FileText,
+          label: page.name,
+          href: `/pages/${page.id}/view`,
+        })),
+        {
+          icon: Plus,
+          label: "New Page",
+          href: "#",
+          onClick: () => setShowNewPageModal(true),
         },
       ],
     },

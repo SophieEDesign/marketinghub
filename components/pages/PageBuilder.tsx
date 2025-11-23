@@ -1,24 +1,25 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
+import { useState, useCallback, useEffect } from "react";
+import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
+
+// Import CSS for react-grid-layout (client-side only)
+if (typeof window !== "undefined") {
+  try {
+    require("react-grid-layout/css/styles.css");
+    require("react-resizable/css/styles.css");
+  } catch (e) {
+    // CSS files may not be available during build
+  }
+}
+
 import { GripVertical, Plus, Settings, X, Copy, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
 import { renderPageBlock } from "./blocks/BlockRenderer";
 import BlockSettingsPanel from "./BlockSettingsPanel";
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface PageBuilderProps {
   pageId: string;
@@ -39,97 +40,120 @@ export default function PageBuilder({
   onDeleteBlock,
   onReorderBlocks,
 }: PageBuilderProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [layouts, setLayouts] = useState<Layouts>({});
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    if (isEditing) {
-      setActiveId(event.active.id as string);
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over || active.id === over.id || !isEditing) return;
-
-    const oldIndex = blocks.findIndex((b) => b.id === active.id);
-    const newIndex = blocks.findIndex((b) => b.id === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newBlocks = [...blocks];
-    const [moved] = newBlocks.splice(oldIndex, 1);
-    newBlocks.splice(newIndex, 0, moved);
-
-    // Update positions
-    const updatedBlocks = newBlocks.map((block, index) => ({
-      ...block,
-      position_y: index,
+  // Convert blocks to react-grid-layout format
+  useEffect(() => {
+    const lgLayout: Layout[] = blocks.map((block) => ({
+      i: block.id,
+      x: block.position_x || 0,
+      y: block.position_y || 0,
+      w: block.width || 12,
+      h: block.height || 6,
+      minW: 2,
+      minH: 2,
     }));
 
-    onReorderBlocks(updatedBlocks.map((b) => b.id));
-  };
+    setLayouts({
+      lg: lgLayout,
+      md: lgLayout,
+      sm: lgLayout,
+      xs: lgLayout,
+      xxs: lgLayout,
+    });
+  }, [blocks]);
+
+  const handleLayoutChange = useCallback(
+    async (currentLayout: Layout[], allLayouts: Layouts) => {
+      if (!isEditing) return;
+
+      // Update each block that changed
+      for (const item of currentLayout) {
+        const block = blocks.find((b) => b.id === item.i);
+        if (!block) continue;
+
+        const hasChanged =
+          block.position_x !== item.x ||
+          block.position_y !== item.y ||
+          block.width !== item.w ||
+          block.height !== item.h;
+
+        if (hasChanged) {
+          await onUpdateBlock(item.i, {
+            position_x: item.x,
+            position_y: item.y,
+            width: item.w,
+            height: item.h,
+          });
+        }
+      }
+    },
+    [isEditing, blocks, onUpdateBlock]
+  );
 
   const handleDuplicate = async (block: InterfacePageBlock) => {
+    // Create a duplicate block
     const newBlock = {
       ...block,
       id: `temp-${Date.now()}`,
-      position_y: block.position_y + 1,
+      position_x: (block.position_x || 0) + 1,
+      position_y: (block.position_y || 0) + 1,
     };
-    // TODO: Create via API
+    // The parent component will handle creating it via API
+    onAddBlock(block.type);
   };
 
-  // Sort blocks by position
-  const sortedBlocks = [...blocks].sort((a, b) => {
-    if (a.position_y !== b.position_y) {
-      return a.position_y - b.position_y;
-    }
-    return a.position_x - b.position_x;
-  });
-
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <SortableContext
-        items={sortedBlocks.map((b) => b.id)}
-        strategy={rectSortingStrategy}
-        disabled={!isEditing}
-      >
+    <>
+      {isEditing ? (
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          onLayoutChange={handleLayoutChange}
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+          cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
+          rowHeight={50}
+          isDraggable={isEditing}
+          isResizable={isEditing}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+        >
+          {blocks.map((block) => (
+            <div key={block.id} className="relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+              <BlockWrapper
+                block={block}
+                isEditing={isEditing}
+                isDragging={false}
+                onEdit={() => setEditingBlockId(block.id)}
+                onDuplicate={() => handleDuplicate(block)}
+                onDelete={() => onDeleteBlock(block.id)}
+              />
+            </div>
+          ))}
+        </ResponsiveGridLayout>
+      ) : (
         <div className="space-y-4">
-          {sortedBlocks.map((block) => (
+          {blocks.map((block) => (
             <BlockWrapper
               key={block.id}
               block={block}
               isEditing={isEditing}
-              isDragging={activeId === block.id}
+              isDragging={false}
               onEdit={() => setEditingBlockId(block.id)}
               onDuplicate={() => handleDuplicate(block)}
               onDelete={() => onDeleteBlock(block.id)}
             />
           ))}
         </div>
-      </SortableContext>
+      )}
       <BlockSettingsPanel
         block={editingBlockId ? blocks.find((b) => b.id === editingBlockId) || null : null}
         isOpen={editingBlockId !== null}
         onClose={() => setEditingBlockId(null)}
         onUpdate={onUpdateBlock}
       />
-    </DndContext>
+    </>
   );
 }
 

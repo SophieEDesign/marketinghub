@@ -13,14 +13,15 @@ import { PageContextProvider } from "./PageContext";
 
 interface PageViewProps {
   pageId: string;
+  defaultEditing?: boolean;
 }
 
-export default function PageView({ pageId }: PageViewProps) {
+export default function PageView({ pageId, defaultEditing = false }: PageViewProps) {
   const router = useRouter();
   const [page, setPage] = useState<InterfacePage | null>(null);
   const [blocks, setBlocks] = useState<InterfacePageBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(defaultEditing);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
 
   useEffect(() => {
