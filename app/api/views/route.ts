@@ -47,9 +47,30 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: true });
 
     if (error) {
-      console.error("[API] Error fetching views:", error);
+      console.error("[API] Error fetching views:", JSON.stringify(error, null, 2));
+      
+      // Check if table doesn't exist
+      const errorMessage = error.message || '';
+      const errorCode = error.code || '';
+      const isTableMissing = 
+        errorCode === 'PGRST116' || 
+        errorCode === '42P01' ||
+        errorMessage.toLowerCase().includes('relation') || 
+        errorMessage.toLowerCase().includes('does not exist') ||
+        errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found');
+      
+      if (isTableMissing) {
+        console.warn("[API] table_view_configs table missing - returning empty array");
+        // Return empty array instead of error to allow app to continue
+        return NextResponse.json({ views: [] });
+      }
+      
       return NextResponse.json(
-        { error: error.message },
+        { 
+          error: error.message || "Failed to fetch views",
+          code: errorCode,
+          details: JSON.stringify(error)
+        },
         { status: 500 }
       );
     }
@@ -110,9 +131,32 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[API] Error creating view:", error);
+      console.error("[API] Error creating view:", JSON.stringify(error, null, 2));
+      
+      // Check if table doesn't exist
+      const errorMessage = error.message || '';
+      const errorCode = error.code || '';
+      const isTableMissing = 
+        errorCode === 'PGRST116' || 
+        errorCode === '42P01' ||
+        errorMessage.toLowerCase().includes('relation') || 
+        errorMessage.toLowerCase().includes('does not exist') ||
+        errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found');
+      
+      if (isTableMissing) {
+        return NextResponse.json({ 
+          error: "table_view_configs table not found. Please run the migration: supabase-all-tables-migration.sql",
+          details: errorMessage,
+          code: errorCode
+        }, { status: 500 });
+      }
+      
       return NextResponse.json(
-        { error: error.message },
+        { 
+          error: error.message || "Failed to create view",
+          code: errorCode,
+          details: JSON.stringify(error)
+        },
         { status: 500 }
       );
     }
