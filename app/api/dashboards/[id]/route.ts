@@ -19,11 +19,58 @@ export async function GET(
       .from("dashboards")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
     if (dashboardError) {
-      console.error("[API] Error fetching dashboard:", dashboardError);
-      return NextResponse.json({ error: dashboardError.message }, { status: 500 });
+      console.error("[API] Error fetching dashboard:", JSON.stringify(dashboardError, null, 2));
+      
+      // Check if table doesn't exist (various error formats)
+      const errorMessage = dashboardError.message || '';
+      const errorCode = dashboardError.code || '';
+      const isTableMissing = 
+        errorCode === 'PGRST116' || 
+        errorCode === '42P01' ||
+        errorMessage.toLowerCase().includes('relation') || 
+        errorMessage.toLowerCase().includes('does not exist') ||
+        errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found');
+      
+      if (isTableMissing) {
+        console.error("[API] Dashboard table missing - migration required");
+        return NextResponse.json({ 
+          error: "Dashboard tables not found. Please run the migration: supabase-dashboard-complete-migration.sql",
+          details: errorMessage,
+          code: errorCode
+        }, { status: 500 });
+      }
+      
+      return NextResponse.json({ 
+        error: dashboardError.message || "Failed to fetch dashboard",
+        code: errorCode,
+        details: JSON.stringify(dashboardError)
+      }, { status: 500 });
+    }
+
+    // If dashboard doesn't exist, create default one
+    if (!dashboard && id === "00000000-0000-0000-0000-000000000001") {
+      const { data: newDashboard, error: createError } = await supabaseAdmin
+        .from("dashboards")
+        .insert([{ id: id, name: "Main Dashboard" }])
+        .select()
+        .single();
+      
+      if (createError) {
+        console.error("[API] Error creating default dashboard:", createError);
+        return NextResponse.json({ error: createError.message }, { status: 500 });
+      }
+      
+      return NextResponse.json({
+        dashboard: newDashboard,
+        modules: [],
+      });
+    }
+
+    if (!dashboard) {
+      return NextResponse.json({ error: "Dashboard not found" }, { status: 404 });
     }
 
     // Get modules
@@ -35,8 +82,31 @@ export async function GET(
       .order("position_x", { ascending: true });
 
     if (modulesError) {
-      console.error("[API] Error fetching modules:", modulesError);
-      return NextResponse.json({ error: modulesError.message }, { status: 500 });
+      console.error("[API] Error fetching modules:", JSON.stringify(modulesError, null, 2));
+      
+      // Check if table doesn't exist
+      const errorMessage = modulesError.message || '';
+      const errorCode = modulesError.code || '';
+      const isTableMissing = 
+        errorCode === 'PGRST116' || 
+        errorCode === '42P01' ||
+        errorMessage.toLowerCase().includes('relation') || 
+        errorMessage.toLowerCase().includes('does not exist') ||
+        errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found');
+      
+      // If table doesn't exist, return empty array instead of error
+      if (isTableMissing) {
+        console.warn("[API] Dashboard modules table missing - returning empty array");
+        return NextResponse.json({
+          dashboard,
+          modules: [],
+        });
+      }
+      
+      return NextResponse.json({ 
+        error: modulesError.message || "Failed to fetch modules",
+        code: errorCode
+      }, { status: 500 });
     }
 
     return NextResponse.json({

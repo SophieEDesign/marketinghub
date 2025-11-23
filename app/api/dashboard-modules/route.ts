@@ -36,8 +36,32 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("[API] Error creating module:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[API] Error creating module:", JSON.stringify(error, null, 2));
+      
+      // Check if table doesn't exist
+      const errorMessage = error.message || '';
+      const errorCode = error.code || '';
+      const isTableMissing = 
+        errorCode === 'PGRST116' || 
+        errorCode === '42P01' ||
+        errorMessage.toLowerCase().includes('relation') || 
+        errorMessage.toLowerCase().includes('does not exist') ||
+        errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found');
+      
+      if (isTableMissing) {
+        console.error("[API] Dashboard modules table missing - migration required");
+        return NextResponse.json({ 
+          error: "Dashboard tables not found. Please run the migration: supabase-dashboard-complete-migration.sql",
+          details: errorMessage,
+          code: errorCode
+        }, { status: 500 });
+      }
+      
+      return NextResponse.json({ 
+        error: error.message || "Failed to create module",
+        code: errorCode,
+        details: JSON.stringify(error)
+      }, { status: 500 });
     }
 
     return NextResponse.json({ module: data });

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardEditor from "./DashboardEditor";
+import DashboardBlocks from "./DashboardBlocks";
 import { supabase } from "@/lib/supabaseClient";
 
 interface Dashboard {
@@ -158,7 +159,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-8">
+      {/* Dashboard Modules Grid */}
       <DashboardEditor
         dashboardId={dashboardId}
         modules={modules}
@@ -167,6 +169,14 @@ export default function Dashboard() {
         onModuleCreate={handleModuleCreate}
         data={data}
       />
+
+      {/* Dashboard Blocks (Notion-style) */}
+      <div className="mt-12">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Blocks
+        </h2>
+        <DashboardBlocks dashboardId={dashboardId} />
+      </div>
     </div>
   );
 }
