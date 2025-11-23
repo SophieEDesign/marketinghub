@@ -80,6 +80,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   href: string;
+  onClick?: () => void;
   children?: Array<{ icon: React.ComponentType<{ className?: string }>; label: string; href: string; onClick?: () => void }>;
 }
 
