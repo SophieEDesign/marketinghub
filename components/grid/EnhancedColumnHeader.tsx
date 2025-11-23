@@ -69,6 +69,7 @@ export default function EnhancedColumnHeader({
     <>
       <th
         ref={setNodeRef}
+        data-field-id={field.id}
         style={style}
         className={`group relative ${
           isDragging
@@ -85,7 +86,18 @@ export default function EnhancedColumnHeader({
           onDragStart={() => {}}
           isDragging={isDragging}
           showMenu={true}
-          onMenuClick={handleMenuClick}
+          onMenuClick={() => {
+            // Get position from the th element
+            const thElement = document.querySelector(`th[data-field-id="${field.id}"]`) as HTMLElement;
+            if (thElement) {
+              const rect = thElement.getBoundingClientRect();
+              setMenuPosition({
+                x: rect.right - 200,
+                y: rect.bottom + 4,
+              });
+              setMenuOpen(true);
+            }
+          }}
         >
           <div
             {...attributes}
