@@ -248,7 +248,8 @@ function GridViewComponent({ tableId }: GridViewProps) {
         // If fields are still loading or we have no fields, use select all to avoid column errors
         if (fieldsLoading || fields.length === 0) {
           console.log(`Fields not ready for ${tableId}, using select('*')`);
-          let query = supabase.from(tableId).select("*").limit(200);
+          const offset = (currentPage - 1) * recordsPerPage;
+          let query = supabase.from(tableId).select("*").range(offset, offset + recordsPerPage - 1);
           query = applyFiltersAndSort(query, filters, sort);
           if (sort.length === 0) {
             query = query.order("created_at", { ascending: false });
@@ -267,8 +268,19 @@ function GridViewComponent({ tableId }: GridViewProps) {
           return data || [];
         }
 
+        // Get total count first (for pagination)
+        const { count } = await supabase
+          .from(tableId)
+          .select("*", { count: "exact", head: true });
+        
+        if (count !== null) {
+          setTotalRecords(count);
+          setHasMore(count > recordsPerPage);
+        }
+
         // Try with specific columns first
-        let query = supabase.from(tableId).select(requiredColumns).limit(200);
+        const offset = (currentPage - 1) * recordsPerPage;
+        let query = supabase.from(tableId).select(requiredColumns).range(offset, offset + recordsPerPage - 1);
 
         // Apply filters and sort
         query = applyFiltersAndSort(query, filters, sort);
@@ -284,7 +296,8 @@ function GridViewComponent({ tableId }: GridViewProps) {
         if (error && (error.code === '42703' || error.message?.includes('does not exist') || error.message?.includes('column') || error.code === '42P01')) {
           console.warn(`Some columns don't exist (${error.message}), falling back to select('*'):`, error);
           // Retry with select all
-          let fallbackQuery = supabase.from(tableId).select("*").limit(200);
+          const offset = (currentPage - 1) * recordsPerPage;
+          let fallbackQuery = supabase.from(tableId).select("*").range(offset, offset + recordsPerPage - 1);
           fallbackQuery = applyFiltersAndSort(fallbackQuery, filters, sort);
           if (sort.length === 0) {
             fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
@@ -326,7 +339,12 @@ function GridViewComponent({ tableId }: GridViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId, filters, sort, requiredColumns, fieldsLoading, fields]);
+  }, [tableId, filters, sort, requiredColumns, fieldsLoading, fields, currentPage]);
+  
+  // Reset to page 1 when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sort]);
 
   const [isPending, startTransition] = useTransition();
 
