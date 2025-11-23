@@ -36,6 +36,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import SidebarSortableItem from "./SidebarSortableItem";
+import TableViewsList from "./TableViewsList";
 
 // Map view types to icons
 const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -713,28 +714,41 @@ function NavGroupComponent({
                 )}
               </div>
 
-              {/* Children Items */}
-              {!collapsed && hasChildren && !itemCollapsed && (
-                <div className="ml-6 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2">
-                  {item.children?.map((child) => {
-                    const childActive = isChildActive(child.href);
-                    return (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        onClick={onItemClick}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-all duration-200 ease-in-out ${
-                          childActive
-                            ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
-                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        }`}
-                      >
-                        <child.icon className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>{child.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+              {/* Children Items - Show static children OR dynamic views */}
+              {!collapsed && !itemCollapsed && (
+                <>
+                  {/* Static children (from hardcoded table metadata) */}
+                  {hasChildren && (
+                    <div className="ml-6 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2">
+                      {item.children?.map((child) => {
+                        const childActive = isChildActive(child.href);
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={onItemClick}
+                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-all duration-200 ease-in-out ${
+                              childActive
+                                ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
+                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                            }`}
+                          >
+                            <child.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>{child.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Dynamic views from database - extract tableId from href */}
+                  {item.href.startsWith("/") && item.href.split("/").length > 1 && (
+                    <TableViewsList
+                      tableId={item.href.split("/")[1]}
+                      tableName={item.label}
+                      isExpanded={!itemCollapsed}
+                    />
+                  )}
+                </>
               )}
             </div>
           );
