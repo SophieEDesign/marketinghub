@@ -55,12 +55,25 @@ export async function loadFields(tableId: string): Promise<Field[]> {
 
   // Parse and deduplicate fields by field_key (keep the first occurrence)
   const seenKeys = new Set<string>();
+  const seenIds = new Set<string>();
   const uniqueFields = (data || [])
     .map((f) => ({
       ...f,
       options: typeof f.options === "string" ? JSON.parse(f.options) : f.options,
     }))
     .filter((f) => {
+      // Skip if no field_key
+      if (!f.field_key) {
+        console.warn(`Field ${f.id} has no field_key, skipping`);
+        return false;
+      }
+      // Skip if duplicate ID
+      if (seenIds.has(f.id)) {
+        console.warn(`Duplicate field ID "${f.id}" found in table_fields for table "${tableId}". Skipping duplicate.`);
+        return false;
+      }
+      seenIds.add(f.id);
+      // Skip if duplicate field_key
       if (seenKeys.has(f.field_key)) {
         console.warn(`Duplicate field_key "${f.field_key}" found in table_fields for table "${tableId}". Keeping first occurrence.`);
         return false;

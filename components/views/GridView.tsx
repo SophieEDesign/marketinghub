@@ -72,9 +72,24 @@ function GridViewComponent({ tableId }: GridViewProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Apply visible_fields and field_order (memoized)
+  // Apply visible_fields and field_order (memoized) with deduplication
   const fields = useMemo(() => {
-    let currentFields = allFields;
+    // First, deduplicate by field_key (keep first occurrence)
+    const seenKeys = new Set<string>();
+    const deduplicated = allFields.filter((f) => {
+      if (!f.field_key) {
+        console.warn(`Field ${f.id} has no field_key, skipping`);
+        return false;
+      }
+      if (seenKeys.has(f.field_key)) {
+        console.warn(`Duplicate field_key "${f.field_key}" found, skipping duplicate`);
+        return false;
+      }
+      seenKeys.add(f.field_key);
+      return true;
+    });
+
+    let currentFields = deduplicated;
     if (visibleFields.length > 0) {
       currentFields = currentFields.filter((f) => visibleFields.includes(f.id));
     }
