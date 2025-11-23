@@ -49,7 +49,6 @@ export default function EnhancedColumnHeader({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
-  const headerRef = useRef<HTMLTableCellElement>(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -57,16 +56,6 @@ export default function EnhancedColumnHeader({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleMenuClick = () => {
-    if (headerRef.current) {
-      const rect = headerRef.current.getBoundingClientRect();
-      setMenuPosition({
-        x: rect.right - 200,
-        y: rect.bottom + 4,
-      });
-      setMenuOpen(true);
-    }
-  };
 
   if (isMobile) {
     return (
@@ -79,12 +68,7 @@ export default function EnhancedColumnHeader({
   return (
     <>
       <th
-        ref={(node) => {
-          setNodeRef(node);
-          if (node) {
-            headerRef.current = node;
-          }
-        }}
+        ref={setNodeRef}
         style={style}
         className={`group relative ${
           isDragging
