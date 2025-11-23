@@ -117,7 +117,7 @@ export default function AutomationsTab() {
     // Try to save to database
     const { error } = await supabase
       .from("automation_rules")
-      .upsert({ id: ruleId, ...updated }, { onConflict: "id" });
+      .upsert(updated, { onConflict: "id" });
 
     if (error) {
       console.error("Error updating automation:", error);
