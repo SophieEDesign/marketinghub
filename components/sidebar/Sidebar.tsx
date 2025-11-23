@@ -741,7 +741,12 @@ function NavGroupComponent({
                     </div>
                   )}
                   {/* Dynamic views from database - extract tableId from href */}
-                  {item.href.startsWith("/") && item.href.split("/").length > 1 && (
+                  {/* Only show TableViewsList for actual table routes, not settings/tools */}
+                  {item.href.startsWith("/") && 
+                   item.href.split("/").length > 1 && 
+                   !item.href.startsWith("/settings") && 
+                   !item.href.startsWith("/import") && 
+                   !item.href.startsWith("/dashboard") && (
                     <TableViewsList
                       tableId={item.href.split("/")[1]}
                       tableName={item.label}
