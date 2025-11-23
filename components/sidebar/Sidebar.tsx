@@ -86,18 +86,23 @@ interface NavGroup {
 }
 
 // Generate default sidebar items from table metadata
-const generateDefaultSidebarItems = (dynamicTableIds: string[] = []) => {
+const generateDefaultSidebarItems = (dynamicTableData: Array<{ table_name: string; display_name: string }> = []) => {
+  // Create a map of dynamic table data for quick lookup
+  const dynamicTableMap = new Map(dynamicTableData.map(t => [t.table_name, t.display_name]));
+  
   // Merge hardcoded tables with dynamic tables from database
-  const allTableIds = [...new Set([...getAllTables(), ...dynamicTableIds])];
+  const hardcodedTableIds = getAllTables();
+  const dynamicTableIds = dynamicTableData.map(t => t.table_name);
+  const allTableIds = [...new Set([...hardcodedTableIds, ...dynamicTableIds])];
   
   const tableItems = allTableIds.map((tableId) => {
     const meta = tableMetadata[tableId];
-    // Try to get metadata from database if not in hardcoded list
-    let displayName = meta?.label || tableId;
+    // Get display name from database if available, otherwise use hardcoded metadata or format tableId
+    let displayName = dynamicTableMap.get(tableId) || meta?.label || tableId;
     let defaultView = meta?.defaultView || "grid";
     
-    // If not in hardcoded metadata, use tableId as label
-    if (!meta) {
+    // If not in hardcoded metadata and not in database, format tableId
+    if (!meta && !dynamicTableMap.has(tableId)) {
       // Format tableId: "my_table" -> "My Table"
       displayName = tableId
         .split("_")
@@ -177,13 +182,13 @@ export default function Sidebar() {
       try {
         const { data, error } = await supabase
           .from("table_metadata")
-          .select("table_name, display_name");
+          .select("table_name, display_name")
+          .order("display_name", { ascending: true });
         
         if (!error && data) {
-          const tableIds = data.map((row) => row.table_name);
-          setDynamicTables(tableIds);
-          // Update sidebar items with dynamic tables
-          const updatedItems = generateDefaultSidebarItems(tableIds);
+          setDynamicTables(data.map((row) => row.table_name));
+          // Update sidebar items with dynamic tables (pass full data for display names)
+          const updatedItems = generateDefaultSidebarItems(data);
           setOrderedSidebar(updatedItems);
         }
       } catch (error) {
@@ -192,6 +197,13 @@ export default function Sidebar() {
     }
     
     loadDynamicTables();
+    
+    // Reload when window gains focus (in case table was updated in another tab)
+    const handleFocus = () => {
+      loadDynamicTables();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   // Load sidebar customizations from localStorage
