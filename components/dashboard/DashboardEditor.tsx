@@ -1,0 +1,245 @@
+"use client";
+
+import { useState, useCallback, useEffect } from "react";
+import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
+
+// Import CSS for react-grid-layout
+if (typeof window !== "undefined") {
+  require("react-grid-layout/css/styles.css");
+  require("react-resizable/css/styles.css");
+}
+import { X, Plus, Save, Edit2, Trash2 } from "lucide-react";
+import KPIModule from "./modules/KPI";
+import PipelineModule from "./modules/Pipeline";
+import TasksDueModule from "./modules/TasksDue";
+import UpcomingEventsModule from "./modules/UpcomingEvents";
+import CalendarMiniModule from "./modules/CalendarMini";
+import TablePreviewModule from "./modules/TablePreview";
+import CustomEmbedModule from "./modules/CustomEmbed";
+import AddModulePanel from "./AddModulePanel";
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+interface DashboardModule {
+  id: string;
+  type: string;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  config: any;
+}
+
+interface DashboardEditorProps {
+  dashboardId: string;
+  modules: DashboardModule[];
+  onModuleUpdate: (moduleId: string, updates: Partial<DashboardModule>) => Promise<void>;
+  onModuleDelete: (moduleId: string) => Promise<void>;
+  onModuleCreate: (module: Omit<DashboardModule, "id">) => Promise<string>;
+  data?: Record<string, any[]>;
+}
+
+export default function DashboardEditor({
+  dashboardId,
+  modules,
+  onModuleUpdate,
+  onModuleDelete,
+  onModuleCreate,
+  data = {},
+}: DashboardEditorProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [layouts, setLayouts] = useState<Layouts>({});
+
+  // Convert modules to react-grid-layout format
+  useEffect(() => {
+    const lgLayout: Layout[] = modules.map((module) => ({
+      i: module.id,
+      x: module.position_x,
+      y: module.position_y,
+      w: module.width,
+      h: module.height,
+      minW: 2,
+      minH: 2,
+    }));
+
+    setLayouts({
+      lg: lgLayout,
+      md: lgLayout,
+      sm: lgLayout,
+      xs: lgLayout,
+      xxs: lgLayout,
+    });
+  }, [modules]);
+
+  const handleLayoutChange = useCallback(
+    async (currentLayout: Layout[], allLayouts: Layouts) => {
+      if (!isEditing) return;
+
+      // Update each module that changed
+      const updates = currentLayout.map((item) => {
+        const module = modules.find((m) => m.id === item.i);
+        if (!module) return null;
+
+        const hasChanged =
+          module.position_x !== item.x ||
+          module.position_y !== item.y ||
+          module.width !== item.w ||
+          module.height !== item.h;
+
+        if (hasChanged) {
+          return {
+            id: item.i,
+            updates: {
+              position_x: item.x,
+              position_y: item.y,
+              width: item.w,
+              height: item.h,
+            },
+          };
+        }
+        return null;
+      });
+
+      // Save all updates
+      for (const update of updates) {
+        if (update) {
+          await onModuleUpdate(update.id, update.updates);
+        }
+      }
+    },
+    [isEditing, modules, onModuleUpdate]
+  );
+
+  const handleAddModule = useCallback(
+    async (type: string, config: any) => {
+      // Find the highest y position to place new module below existing ones
+      const maxY = modules.length > 0
+        ? Math.max(...modules.map((m) => m.position_y + m.height))
+        : 0;
+
+      const newModule: Omit<DashboardModule, "id"> = {
+        type,
+        position_x: 0,
+        position_y: maxY,
+        width: type === "kpi" ? 3 : 4,
+        height: type === "kpi" ? 3 : 4,
+        config,
+      };
+
+      await onModuleCreate(newModule);
+      setShowAddPanel(false);
+    },
+    [modules, onModuleCreate]
+  );
+
+  const renderModule = (module: DashboardModule) => {
+    const commonProps = {
+      config: module.config,
+      width: module.width,
+      height: module.height,
+      isEditing,
+      onUpdate: (updates: any) => onModuleUpdate(module.id, { config: { ...module.config, ...updates } }),
+    };
+
+    switch (module.type) {
+      case "kpi":
+        return <KPIModule {...commonProps} />;
+      case "pipeline":
+        return <PipelineModule {...commonProps} data={data[module.config.table] || []} />;
+      case "tasks_due":
+        return <TasksDueModule {...commonProps} data={data[module.config.table] || []} />;
+      case "upcoming_events":
+        return <UpcomingEventsModule {...commonProps} data={data[module.config.table] || []} />;
+      case "calendar_mini":
+        return <CalendarMiniModule {...commonProps} data={data[module.config.table] || []} />;
+      case "table_preview":
+        return <TablePreviewModule {...commonProps} data={data[module.config.table] || []} />;
+      case "custom_embed":
+        return <CustomEmbedModule {...commonProps} />;
+      default:
+        return (
+          <div className="h-full bg-gray-100 dark:bg-gray-800 rounded-lg p-4 flex items-center justify-center">
+            <p className="text-sm text-gray-500">Unknown module type: {module.type}</p>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-heading text-brand-blue">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
+              <button
+                onClick={() => setShowAddPanel(true)}
+                className="btn-secondary flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Module
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Edit2 className="w-4 h-4" />
+              Edit Layout
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grid Layout */}
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={layouts}
+        onLayoutChange={handleLayoutChange}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+        cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
+        rowHeight={50}
+        isDraggable={isEditing}
+        isResizable={isEditing}
+        draggableHandle={isEditing ? undefined : ".no-drag"}
+        margin={[16, 16]}
+        containerPadding={[0, 0]}
+      >
+        {modules.map((module) => (
+          <div key={module.id} className="relative">
+            {isEditing && (
+              <button
+                onClick={() => onModuleDelete(module.id)}
+                className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
+                title="Delete module"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            {renderModule(module)}
+          </div>
+        ))}
+      </ResponsiveGridLayout>
+
+      {/* Add Module Panel */}
+      {showAddPanel && (
+        <AddModulePanel
+          open={showAddPanel}
+          onClose={() => setShowAddPanel(false)}
+          onAdd={handleAddModule}
+        />
+      )}
+    </div>
+  );
+}
+
