@@ -18,6 +18,7 @@ import { GripVertical, Plus, Settings, X, Copy, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
 import { renderPageBlock } from "./blocks/BlockRenderer";
+import BlockSettingsPanel from "./BlockSettingsPanel";
 
 interface PageBuilderProps {
   pageId: string;
@@ -122,6 +123,12 @@ export default function PageBuilder({
           ))}
         </div>
       </SortableContext>
+      <BlockSettingsPanel
+        block={editingBlockId ? blocks.find((b) => b.id === editingBlockId) || null : null}
+        isOpen={editingBlockId !== null}
+        onClose={() => setEditingBlockId(null)}
+        onUpdate={onUpdateBlock}
+      />
     </DndContext>
   );
 }

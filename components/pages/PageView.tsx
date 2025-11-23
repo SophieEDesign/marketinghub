@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import PageBuilder from "./PageBuilder";
 import BlockMenu from "./BlockMenu";
+import { PageContextProvider } from "./PageContext";
 
 interface PageViewProps {
   pageId: string;
@@ -115,7 +116,7 @@ export default function PageView({ pageId }: PageViewProps) {
             </Button>
           </div>
         ) : (
-          <>
+          <PageContextProvider>
             {isEditing && (
               <div className="mb-4 flex justify-end">
                 <Button onClick={() => setShowBlockMenu(true)}>
@@ -206,7 +207,7 @@ export default function PageView({ pageId }: PageViewProps) {
                 await loadPage();
               }}
             />
-          </>
+          </PageContextProvider>
         )}
       </div>
 
