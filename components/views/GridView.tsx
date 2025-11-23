@@ -504,8 +504,8 @@ function GridViewComponent({ tableId }: GridViewProps) {
                   )}
                 </td>
               );
-                })}
-                </tr>
+            })}
+              </tr>
               ))}
               </tbody>
             </table>

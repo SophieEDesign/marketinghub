@@ -202,35 +202,59 @@ export default function DashboardEditor({
         </div>
       </div>
 
-      {/* Grid Layout */}
-      <ResponsiveGridLayout
-        className="layout"
-        layouts={layouts}
-        onLayoutChange={handleLayoutChange}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-        cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
-        rowHeight={50}
-        isDraggable={isEditing}
-        isResizable={isEditing}
-        draggableHandle={isEditing ? undefined : ".no-drag"}
-        margin={[16, 16]}
-        containerPadding={[0, 0]}
-      >
-        {modules.map((module) => (
-          <div key={module.id} className="relative">
-            {isEditing && (
-              <button
-                onClick={() => onModuleDelete(module.id)}
-                className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
-                title="Delete module"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-            {renderModule(module)}
+      {/* Empty State */}
+      {modules.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+          <div className="text-center max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+              No modules yet
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Get started by adding your first dashboard module. Click "Edit Layout" and then "Add Module" to begin.
+            </p>
+            <button
+              onClick={() => {
+                setIsEditing(true);
+                setShowAddPanel(true);
+              }}
+              className="btn-primary flex items-center gap-2 mx-auto"
+            >
+              <Plus className="w-4 h-4" />
+              Add Your First Module
+            </button>
           </div>
-        ))}
-      </ResponsiveGridLayout>
+        </div>
+      ) : (
+        /* Grid Layout */
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          onLayoutChange={handleLayoutChange}
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+          cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
+          rowHeight={50}
+          isDraggable={isEditing}
+          isResizable={isEditing}
+          draggableHandle={isEditing ? undefined : ".no-drag"}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+        >
+          {modules.map((module) => (
+            <div key={module.id} className="relative">
+              {isEditing && (
+                <button
+                  onClick={() => onModuleDelete(module.id)}
+                  className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
+                  title="Delete module"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              {renderModule(module)}
+            </div>
+          ))}
+        </ResponsiveGridLayout>
+      )}
 
       {/* Add Module Panel */}
       {showAddPanel && (
