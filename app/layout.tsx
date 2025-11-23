@@ -44,11 +44,11 @@ export default function RootLayout({
                   <LinkerProvider>
                     <SettingsProvider>
                       <ThemeProvider>
-                      <div className="flex h-screen">
+                      <div className="flex h-screen overflow-hidden">
                         <Sidebar />
-                        <div className="flex flex-col flex-1">
+                        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                           <HeaderBar />
-                          <main className="flex-1 overflow-auto p-6" aria-label="Content">{children}</main>
+                          <main className="flex-1 overflow-auto p-6 min-h-0" aria-label="Content">{children}</main>
                         </div>
                       </div>
                       <RecordDrawer />

@@ -423,7 +423,7 @@ export default function Sidebar() {
       {/* Desktop Sidebar */}
       <aside
         ref={sidebarRef}
-        className={`hidden lg:flex flex-col bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transition-all duration-200 ease-in-out sticky top-0 left-0 h-screen overflow-y-auto ${
+        className={`flex flex-col bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 transition-all duration-200 ease-in-out h-full overflow-y-auto ${
           collapsed ? "w-16" : "w-64"
         }`}
         onMouseEnter={handleMouseEnter}
