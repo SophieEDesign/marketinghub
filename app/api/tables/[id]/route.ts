@@ -4,41 +4,91 @@ import { supabase } from "@/lib/supabaseClient";
 export const dynamic = 'force-dynamic';
 
 // GET /api/tables/[id] - Get a single table with its fields
+// Supports both UUID (new system) and table name (old system)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { data: table, error: tableError } = await supabase
-      .from("tables")
-      .select("*")
-      .eq("id", params.id)
-      .single();
+    // Check if id is a UUID (new system) or table name (old system)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.id);
+    
+    let table: any = null;
+    let tableError: any = null;
 
-    if (tableError) {
+    if (isUUID) {
+      // New system: Look up by UUID
+      const result = await supabase
+        .from("tables")
+        .select("*")
+        .eq("id", params.id)
+        .single();
+      table = result.data;
+      tableError = result.error;
+    } else {
+      // Old system or table name: Look up by name
+      const result = await supabase
+        .from("tables")
+        .select("*")
+        .eq("name", params.id)
+        .single();
+      table = result.data;
+      tableError = result.error;
+
+      // If not found in new system, try old table_metadata
+      if (tableError || !table) {
+        const { data: oldTable, error: oldError } = await supabase
+          .from("table_metadata")
+          .select("table_name, display_name, description")
+          .eq("table_name", params.id)
+          .single();
+
+        if (!oldError && oldTable) {
+          // Convert old format to new format
+          table = {
+            id: oldTable.table_name, // Use table_name as id
+            name: oldTable.table_name,
+            label: oldTable.display_name,
+            description: oldTable.description || '',
+            icon: 'table',
+            color: '#6366f1',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          tableError = null;
+        }
+      }
+    }
+
+    if (tableError && !table) {
       console.error("Error fetching table:", tableError);
-      return NextResponse.json({ error: tableError.message }, { status: 500 });
+      return NextResponse.json({ error: tableError.message || "Table not found" }, { status: 404 });
     }
 
     if (!table) {
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    // Fetch fields for this table
-    const { data: fields, error: fieldsError } = await supabase
-      .from("table_fields")
-      .select("*")
-      .eq("table_id", params.id)
-      .order("order", { ascending: true });
+    // Fetch fields for this table (only if using new system with UUID)
+    let fields: any[] = [];
+    if (isUUID && table.id) {
+      const { data: fieldsData, error: fieldsError } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", table.id)
+        .order("order", { ascending: true });
 
-    if (fieldsError) {
-      console.error("Error fetching fields:", fieldsError);
-      // Don't fail if fields don't exist yet
+      if (fieldsError) {
+        console.error("Error fetching fields:", fieldsError);
+        // Don't fail if fields don't exist yet
+      } else {
+        fields = fieldsData || [];
+      }
     }
 
     return NextResponse.json({
       ...table,
-      fields: fields || [],
+      fields: fields,
     });
   } catch (error: any) {
     console.error("Error in GET /api/tables/[id]:", error);
