@@ -276,25 +276,15 @@ export default function Sidebar() {
   const currentTable = pathParts[0] || null;
   const currentView = pathParts[1] || null;
 
-  // Build navGroups structure
+  // Build navGroups structure - Simplified to just Tables and Pages
   const navGroups: NavGroup[] = [
-    {
-      title: "General",
-      items: [
-        {
-          icon: LayoutDashboard,
-          label: "Dashboard",
-          href: "/dashboard",
-        },
-      ],
-    },
     {
       title: "Tables",
       items: dynamicTablesList.length > 0
         ? [
             ...dynamicTablesList.map((table) => ({
               icon: FileText, // Can be enhanced to use table.icon
-              label: table.label,
+              label: table.label || table.name,
               href: `/tables/${table.id}`,
             })),
             {
@@ -314,11 +304,6 @@ export default function Sidebar() {
     {
       title: "Pages",
       items: [
-        {
-          icon: Layout,
-          label: "All Pages",
-          href: "/pages",
-        },
         ...pages.map((page) => ({
           icon: FileText,
           label: page.name,
@@ -329,81 +314,6 @@ export default function Sidebar() {
           label: "New Page",
           href: "#",
           onClick: () => setShowNewPageModal(true),
-        },
-      ],
-    },
-    {
-      title: "Content",
-      items: (tableCategories
-        .find((c) => c.id === "content")
-        ?.tableIds.map((tableId) => {
-          const table = tables.find((t) => t.id === tableId);
-          if (!table) return null;
-          return {
-            icon: getTableIconComponent(table.id),
-            label: table.name,
-            href: `/${table.id}/grid`,
-            children: table.views.map((view) => ({
-              icon: viewIcons[view] || LayoutGrid,
-              label: capitalizeView(view),
-              href: `/${table.id}/${view}`,
-            })),
-          } as NavItem;
-        })
-        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
-    },
-    {
-      title: "Planning",
-      items: (tableCategories
-        .find((c) => c.id === "planning")
-        ?.tableIds.map((tableId) => {
-          const table = tables.find((t) => t.id === tableId);
-          if (!table) return null;
-          return {
-            icon: getTableIconComponent(table.id),
-            label: table.name,
-            href: `/${table.id}/grid`,
-            children: table.views.map((view) => ({
-              icon: viewIcons[view] || LayoutGrid,
-              label: capitalizeView(view),
-              href: `/${table.id}/${view}`,
-            })),
-          } as NavItem;
-        })
-        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
-    },
-    {
-      title: "CRM",
-      items: (tableCategories
-        .find((c) => c.id === "crm")
-        ?.tableIds.map((tableId) => {
-          const table = tables.find((t) => t.id === tableId);
-          if (!table) return null;
-          return {
-            icon: getTableIconComponent(table.id),
-            label: table.name,
-            href: `/${table.id}/grid`,
-            children: table.views.map((view) => ({
-              icon: viewIcons[view] || LayoutGrid,
-              label: capitalizeView(view),
-              href: `/${table.id}/${view}`,
-            })),
-          } as NavItem;
-        })
-        .filter((item) => item !== null) as NavItem[] || []) as NavItem[],
-    },
-    {
-      title: "Settings",
-      items: [
-        {
-          icon: Settings,
-          label: "Settings",
-          href: "/settings",
-        },
-        {
-          icon: FileSpreadsheet,
-          label: "Tables",
-          href: "/settings/tables",
         },
       ],
     },
