@@ -7,8 +7,8 @@ import { supabase } from "@/lib/supabaseClient";
 interface ImageBlockProps {
   id: string;
   content: any;
-  onUpdate: (id: string, content: any) => void;
-  onDelete: (id: string) => void;
+  onUpdate?: (id: string, content: any) => void;
+  onDelete?: (id: string) => void;
   isDragging?: boolean;
 }
 
@@ -40,7 +40,7 @@ export default function ImageBlock({
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
         setImageUrl(dataUrl);
-        onUpdate(id, { url: dataUrl, caption });
+        onUpdate?.(id, { url: dataUrl, caption });
       };
       reader.readAsDataURL(file);
     } catch (error) {
@@ -52,12 +52,12 @@ export default function ImageBlock({
 
   const handleUrlChange = (url: string) => {
     setImageUrl(url);
-    onUpdate(id, { url, caption });
+    onUpdate?.(id, { url, caption });
   };
 
   const handleCaptionChange = (newCaption: string) => {
     setCaption(newCaption);
-    onUpdate(id, { url: imageUrl, caption: newCaption });
+    onUpdate?.(id, { url: imageUrl, caption: newCaption });
   };
 
   return (
@@ -72,13 +72,15 @@ export default function ImageBlock({
       </div>
 
       {/* Delete Button */}
-      <button
-        onClick={() => onDelete(id)}
-        className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-        title="Delete block"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      {onDelete && (
+        <button
+          onClick={() => onDelete(id)}
+          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
+          title="Delete block"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Image Content */}
       <div className="p-4">
@@ -132,7 +134,7 @@ export default function ImageBlock({
               onClick={() => {
                 setImageUrl("");
                 setCaption("");
-                onUpdate(id, { url: "", caption: "" });
+                onUpdate?.(id, { url: "", caption: "" });
               }}
               className="mt-2 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
             >

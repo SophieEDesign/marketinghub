@@ -6,8 +6,8 @@ import { X, GripVertical, ExternalLink } from "lucide-react";
 interface EmbedBlockProps {
   id: string;
   content: any;
-  onUpdate: (id: string, content: any) => void;
-  onDelete: (id: string) => void;
+  onUpdate?: (id: string, content: any) => void;
+  onDelete?: (id: string) => void;
   isDragging?: boolean;
 }
 
@@ -25,7 +25,7 @@ export default function EmbedBlock({
     if (newUrl.trim()) {
       setUrl(newUrl.trim());
       setIsEditing(false);
-      onUpdate(id, { url: newUrl.trim() });
+      onUpdate?.(id, { url: newUrl.trim() });
     }
   };
 
@@ -62,13 +62,15 @@ export default function EmbedBlock({
       </div>
 
       {/* Delete Button */}
-      <button
-        onClick={() => onDelete(id)}
-        className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-        title="Delete block"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      {onDelete && (
+        <button
+          onClick={() => onDelete(id)}
+          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
+          title="Delete block"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Embed Content */}
       <div className="p-4">
