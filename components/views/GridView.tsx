@@ -287,11 +287,12 @@ function GridViewComponent({ tableId }: GridViewProps) {
         }
       />
 
-      {/* Table */}
-      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
-        <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <table className="min-w-full border-collapse">
+      {/* Table - Fixed horizontal scroll */}
+      <div className="flex-1 w-full min-w-0 overflow-hidden">
+        <div className="overflow-auto w-full min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+          <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <table className="min-w-full border-collapse">
             <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
               <tr>
                 <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
@@ -493,7 +494,9 @@ function GridViewComponent({ tableId }: GridViewProps) {
           ))}
         </tbody>
       </table>
-          </DndContext>
+              </DndContext>
+            </div>
+          </div>
         </div>
       </div>
     </div>
