@@ -73,18 +73,45 @@ export async function GET(
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    // Fetch fields for this table (only if using new system with UUID)
+    // Fetch fields for this table
     let fields: any[] = [];
-    if (isUUID && table.id) {
+    const tableIdForFields = isUUID ? table.id : table.id || table.name;
+    
+    if (tableIdForFields) {
+      // Try to fetch fields using table_id (UUID) first
       const { data: fieldsData, error: fieldsError } = await supabase
         .from("table_fields")
         .select("*")
-        .eq("table_id", table.id)
+        .eq("table_id", tableIdForFields)
         .order("order", { ascending: true });
 
       if (fieldsError) {
-        console.error("Error fetching fields:", fieldsError);
-        // Don't fail if fields don't exist yet
+        // If that fails and we're using a table name, try to find the table by name first
+        if (!isUUID && table.name) {
+          const { data: tableByName } = await supabase
+            .from("tables")
+            .select("id")
+            .eq("name", table.name)
+            .single();
+          
+          if (tableByName?.id) {
+            // Try again with the UUID
+            const { data: fieldsData2, error: fieldsError2 } = await supabase
+              .from("table_fields")
+              .select("*")
+              .eq("table_id", tableByName.id)
+              .order("order", { ascending: true });
+            
+            if (!fieldsError2 && fieldsData2) {
+              fields = fieldsData2;
+            }
+          }
+        }
+        
+        if (fields.length === 0) {
+          console.error("Error fetching fields:", fieldsError);
+          // Don't fail if fields don't exist yet - return empty array
+        }
       } else {
         fields = fieldsData || [];
       }
@@ -92,7 +119,7 @@ export async function GET(
 
     return NextResponse.json({
       ...table,
-      fields: fields,
+      fields: fields || [],
     });
   } catch (error: any) {
     console.error("Error in GET /api/tables/[id]:", error);
