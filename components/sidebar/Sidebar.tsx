@@ -554,16 +554,6 @@ interface NavGroupComponentProps {
   isChildActive: (href: string) => boolean;
   collapsed?: boolean;
   onItemClick?: () => void;
-}
-
-interface NavGroupComponentProps {
-  group: NavGroup;
-  isGroupCollapsed: (title: string) => boolean;
-  toggleGroup: (title: string) => void;
-  isItemActive: (href: string) => boolean;
-  isChildActive: (href: string) => boolean;
-  collapsed?: boolean;
-  onItemClick?: () => void;
   editing?: boolean;
   onGroupTitleChange?: (oldTitle: string, newTitle: string) => void;
   onItemLabelChange?: (href: string, newLabel: string) => void;
@@ -664,26 +654,28 @@ function NavGroupComponent({
         <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
           <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
             {group.items.map((item) => {
-          const active = isItemActive(item.href);
-          const hasChildren = item.children && item.children.length > 0;
-          const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
+              const active = isItemActive(item.href);
+              const hasChildren = item.children && item.children.length > 0;
+              const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
 
-          return (
-            <SidebarSortableItem
-              key={item.href}
-              id={item.href}
-              label={item.label}
-              href={item.href}
-              icon={item.icon}
-              editing={editing}
-              active={isItemActive(item.href)}
-              collapsed={collapsed}
-              onClick={item.onClick}
-            />
-          );
-        })}
-      </SortableContext>
-    </DndContext>
+              return (
+                <SidebarSortableItem
+                  key={item.href}
+                  id={item.href}
+                  label={item.label}
+                  href={item.href}
+                  icon={item.icon}
+                  editing={editing}
+                  active={isItemActive(item.href)}
+                  collapsed={collapsed}
+                  onClick={item.onClick}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
   );
 }
 
