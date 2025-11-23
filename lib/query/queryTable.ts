@@ -112,49 +112,78 @@ function applyFilters(query: any, filters: Filter[]): any {
     const { field, operator, value } = filter;
 
     switch (operator) {
-      case "=":
-      case "eq":
+      case "equals":
         result = result.eq(field, value);
         break;
-      case "!=":
-      case "neq":
+      case "not_equals":
         result = result.neq(field, value);
         break;
-      case ">":
-      case "gt":
+      case "greater_than":
         result = result.gt(field, value);
         break;
-      case ">=":
-      case "gte":
+      case "greater_than_or_equal":
         result = result.gte(field, value);
         break;
-      case "<":
-      case "lt":
+      case "less_than":
         result = result.lt(field, value);
         break;
-      case "<=":
-      case "lte":
+      case "less_than_or_equal":
         result = result.lte(field, value);
         break;
       case "contains":
-      case "like":
         result = result.ilike(field, `%${value}%`);
         break;
       case "not_contains":
-      case "not_like":
         result = result.not("ilike", field, `%${value}%`);
-        break;
-      case "starts_with":
-        result = result.ilike(field, `${value}%`);
-        break;
-      case "ends_with":
-        result = result.ilike(field, `%${value}`);
         break;
       case "is_empty":
         result = result.or(`${field}.is.null,${field}.eq.`);
         break;
       case "is_not_empty":
         result = result.not("or", `${field}.is.null,${field}.eq.`);
+        break;
+      case "on":
+        // For date fields, filter by date (ignore time)
+        if (value) {
+          const dateStr = typeof value === "string" ? value.split("T")[0] : value;
+          result = result.gte(field, `${dateStr}T00:00:00`).lte(field, `${dateStr}T23:59:59`);
+        }
+        break;
+      case "before":
+        if (value) {
+          const dateStr = typeof value === "string" ? value.split("T")[0] : value;
+          result = result.lt(field, `${dateStr}T00:00:00`);
+        }
+        break;
+      case "after":
+        if (value) {
+          const dateStr = typeof value === "string" ? value.split("T")[0] : value;
+          result = result.gt(field, `${dateStr}T23:59:59`);
+        }
+        break;
+      case "in_range":
+      case "range":
+        if (Array.isArray(value) && value.length === 2) {
+          const [start, end] = value;
+          const startStr = typeof start === "string" ? start.split("T")[0] : start;
+          const endStr = typeof end === "string" ? end.split("T")[0] : end;
+          result = result.gte(field, `${startStr}T00:00:00`).lte(field, `${endStr}T23:59:59`);
+        }
+        break;
+      case "includes":
+        // For multi-select: check if array field contains value
+        if (Array.isArray(value)) {
+          result = result.contains(field, value);
+        } else {
+          result = result.contains(field, [value]);
+        }
+        break;
+      case "includes_any_of":
+        // For multi-select: check if array field contains any of the values
+        if (Array.isArray(value)) {
+          const orConditions = value.map((v) => `${field}.cs.{${v}}`).join(",");
+          result = result.or(orConditions);
+        }
         break;
       case "in":
         if (Array.isArray(value)) {
