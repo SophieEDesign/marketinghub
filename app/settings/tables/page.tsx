@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Plus, Trash2, Edit2, Settings, ArrowLeft } from "lucide-react";
-import { getAllTables } from "@/lib/tableMetadata";
+import { getAllTables, getTableLabel, getTableMetadata } from "@/lib/tableMetadata";
+import { tableCategories } from "@/lib/tables";
 import { toast } from "@/components/ui/Toast";
 
 export default function TablesManagementPage() {
@@ -22,21 +23,24 @@ export default function TablesManagementPage() {
   const loadTables = async () => {
     try {
       setLoading(true);
-      const allTables = getAllTables();
+      const allTableIds = getAllTables();
       
       // Get metadata for each table
       const tablesWithMetadata = await Promise.all(
-        allTables.map(async (table) => {
+        allTableIds.map(async (tableId) => {
           const { data: metadata } = await supabase
             .from("table_metadata")
             .select("*")
-            .eq("table_name", table.id)
+            .eq("table_name", tableId)
             .maybeSingle();
           
+          // Find category for this table
+          const category = tableCategories.find((cat) => cat.tableIds.includes(tableId));
+          
           return {
-            id: table.id,
-            name: table.name,
-            category: table.category,
+            id: tableId,
+            name: getTableLabel(tableId),
+            category: category?.name || "Uncategorized",
             metadata: metadata || null,
           };
         })
