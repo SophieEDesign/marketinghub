@@ -35,8 +35,36 @@ export default function TablesPage() {
       setLoading(true);
       const response = await fetch("/api/tables");
       if (!response.ok) throw new Error("Failed to load tables");
-      const data = await response.json();
-      setTables(data);
+      let data = await response.json();
+      
+      // If no tables in new system, try loading from old table_metadata as fallback
+      if (!data || data.length === 0) {
+        try {
+          const { supabase } = await import("@/lib/supabaseClient");
+          const { data: oldTables, error } = await supabase
+            .from("table_metadata")
+            .select("table_name, display_name, description")
+            .order("display_name", { ascending: true });
+          
+          if (!error && oldTables && oldTables.length > 0) {
+            // Convert old format to new format for display
+            data = oldTables.map((row) => ({
+              id: row.table_name, // Use table_name as id temporarily
+              name: row.table_name,
+              label: row.display_name,
+              description: row.description || '',
+              icon: 'table',
+              color: '#6366f1',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }));
+          }
+        } catch (fallbackError) {
+          console.warn("Could not load from table_metadata:", fallbackError);
+        }
+      }
+      
+      setTables(data || []);
     } catch (error: any) {
       console.error("Error loading tables:", error);
       toast({
