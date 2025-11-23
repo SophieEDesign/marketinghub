@@ -43,7 +43,7 @@ export default function FieldManager() {
       options: newField.type === "single_select" || newField.type === "multi_select" ? { values: [] } : undefined,
       order: maxOrder + 1,
       required: newField.required,
-      visible: true,
+      // Note: visible column doesn't exist in table_fields - removed
     });
 
     if (field) {

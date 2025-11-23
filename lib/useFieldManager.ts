@@ -102,7 +102,6 @@ export function useFieldManager(tableId: string) {
               options: optionsValue ? JSON.stringify(optionsValue) : null,
               order: newOrder,
               required,
-              visible: true,
             },
           ])
           .select()
@@ -173,7 +172,7 @@ export function useFieldManager(tableId: string) {
         if (changes.type !== undefined) updateData.type = changes.type;
         if (changes.required !== undefined) updateData.required = changes.required;
         if (changes.order !== undefined) updateData.order = changes.order;
-        if (changes.visible !== undefined) updateData.visible = changes.visible;
+        // Note: visible column doesn't exist in table_fields - removed
         if (changes.options !== undefined) {
           updateData.options = typeof changes.options === "object" 
             ? JSON.stringify(changes.options) 

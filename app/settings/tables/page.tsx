@@ -15,6 +15,9 @@ export default function TablesManagementPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editingTable, setEditingTable] = useState<string | null>(null);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   useEffect(() => {
     loadTables();
@@ -206,6 +209,77 @@ export default function TablesManagementPage() {
     router.push(`/settings/fields?table=${tableId}`);
   };
 
+  const handleEditTable = (table: any) => {
+    setEditingTable(table.id);
+    setEditDisplayName(table.metadata?.display_name || table.name);
+    setEditDescription(table.metadata?.description || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTable || !editDisplayName.trim()) {
+      return;
+    }
+
+    try {
+      // Check if metadata exists
+      const table = tables.find((t) => t.id === editingTable);
+      if (table?.metadata) {
+        // Update existing metadata
+        const { error } = await supabase
+          .from("table_metadata")
+          .update({
+            display_name: editDisplayName.trim(),
+            description: editDescription.trim(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("table_name", editingTable);
+
+        if (error) {
+          throw error;
+        }
+      } else {
+        // Create new metadata
+        const { error } = await supabase
+          .from("table_metadata")
+          .insert([
+            {
+              table_name: editingTable,
+              display_name: editDisplayName.trim(),
+              description: editDescription.trim(),
+            },
+          ]);
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Table name updated successfully",
+        type: "success",
+      });
+
+      setEditingTable(null);
+      setEditDisplayName("");
+      setEditDescription("");
+      await loadTables();
+    } catch (error: any) {
+      console.error("Error updating table:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update table",
+        type: "error",
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTable(null);
+    setEditDisplayName("");
+    setEditDescription("");
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -264,12 +338,53 @@ export default function TablesManagementPage() {
               {tables.map((table) => (
                 <tr key={table.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {table.name}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {table.id}
-                    </div>
+                    {editingTable === table.id ? (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={editDisplayName}
+                          onChange={(e) => setEditDisplayName(e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="Display name"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="Description (optional)"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveEdit}
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {table.metadata?.display_name || table.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {table.id}
+                        </div>
+                        {table.metadata?.description && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            {table.metadata.description}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -277,22 +392,31 @@ export default function TablesManagementPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleManageFields(table.id)}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Manage Fields
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTable(table.id, table.name)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Delete
-                      </button>
-                    </div>
+                    {editingTable === table.id ? null : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditTable(table)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleManageFields(table.id)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Fields
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTable(table.id, table.name)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

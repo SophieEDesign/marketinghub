@@ -329,7 +329,7 @@ export async function createField(tableId: string, field: Omit<Field, "id" | "ta
         options: optionsValue ? JSON.stringify(optionsValue) : null,
         order: maxOrder + 1,
         required: field.required || false,
-        visible: field.visible ?? true,
+        // Note: visible column doesn't exist in table_fields - removed
       },
     ])
     .select()
