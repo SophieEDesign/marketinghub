@@ -143,7 +143,7 @@ function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config:
                     >
                       <option value="">Select field</option>
                       {fields
-                        .filter((f) => f.type === "number" || f.type === "currency")
+                        .filter((f) => f.type === "number")
                         .map((field) => (
                           <option key={field.id} value={field.field_key}>
                             {field.label}
