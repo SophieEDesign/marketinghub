@@ -15,26 +15,43 @@ export function useViewConfigs(tableName: string) {
     setError(null);
     try {
       const response = await fetch(`/api/views?table=${tableName}`);
-      if (!response.ok) {
-        throw new Error(`Failed to load views: ${response.statusText}`);
-      }
       const data = await response.json();
-      setViews(data.views || []);
+      
+      if (!response.ok) {
+        // Check if it's a missing table error
+        if (data.code === 'PGRST116' || data.code === '42P01' || 
+            data.error?.includes('does not exist') || 
+            data.error?.includes('migration')) {
+          console.warn("[useViewConfigs] Views table missing - returning empty array");
+          setViews([]);
+          setCurrentView(null);
+          setError(null); // Don't show error for missing table, just use empty views
+        } else {
+          throw new Error(data.error || `Failed to load views: ${response.statusText}`);
+        }
+      } else {
+        setViews(data.views || []);
 
-      // Select view by name if provided, otherwise default or first view
-      let selectedView: ViewConfig | undefined;
-      if (selectViewName) {
-        selectedView = data.views?.find((v: ViewConfig) => v.view_name === selectViewName || v.id === selectViewName);
-      }
-      if (!selectedView) {
-        selectedView = data.views?.find((v: ViewConfig) => v.is_default) || data.views?.[0];
-      }
-      if (selectedView) {
-        setCurrentView(selectedView);
+        // Select view by name if provided, otherwise default or first view
+        let selectedView: ViewConfig | undefined;
+        if (selectViewName) {
+          selectedView = data.views?.find((v: ViewConfig) => v.view_name === selectViewName || v.id === selectViewName);
+        }
+        if (!selectedView) {
+          selectedView = data.views?.find((v: ViewConfig) => v.is_default) || data.views?.[0];
+        }
+        if (selectedView) {
+          setCurrentView(selectedView);
+        } else if (data.views && data.views.length === 0) {
+          // No views exist - create a default one
+          setCurrentView(null);
+        }
       }
     } catch (err: any) {
       console.error("[useViewConfigs] Error loading views:", err);
       setError(err.message);
+      setViews([]);
+      setCurrentView(null);
     } finally {
       setLoading(false);
     }

@@ -59,6 +59,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
     currentView,
     views,
     loading: viewConfigLoading,
+    error: viewConfigError,
     saveCurrentView,
     switchToViewByName,
     reloadViews,
