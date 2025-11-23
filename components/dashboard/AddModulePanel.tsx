@@ -12,16 +12,16 @@ interface AddModulePanelProps {
 }
 
 // KPI Configuration Form Component
-function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config: any) => void }) {
+function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config: any | ((prev: any) => any)) => void }) {
   const [dataSource, setDataSource] = useState<"manual" | "table">(config.table ? "table" : "manual");
   const availableTables = getAllTables();
   const { fields, loading: fieldsLoading } = useFields(config.table || "");
 
   useEffect(() => {
     if (dataSource === "manual" && config.table) {
-      setConfig((prev) => ({ ...prev, table: undefined, field: undefined, calculation: undefined }));
+      setConfig((prev: any) => ({ ...prev, table: undefined, field: undefined, calculation: undefined }));
     } else if (dataSource === "table" && !config.table) {
-      setConfig((prev) => ({ ...prev, value: undefined }));
+      setConfig((prev: any) => ({ ...prev, value: undefined }));
     }
   }, [dataSource]);
 
