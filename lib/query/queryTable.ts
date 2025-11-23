@@ -34,7 +34,7 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
 
   try {
     // Build the select query
-    let query = supabase.from(table);
+    let query: any = supabase.from(table);
 
     // Select specific fields or all
     if (fields.length > 0) {
