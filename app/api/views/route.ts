@@ -20,6 +20,11 @@ export interface ViewConfig {
   groupings?: Array<{ name: string; fields: string[] }>;
   row_height?: string;
   is_default?: boolean;
+  // View-specific fields
+  card_fields?: string[];
+  kanban_group_field?: string;
+  calendar_date_field?: string;
+  timeline_date_field?: string;
 }
 
 // GET /api/views?table=content
