@@ -123,7 +123,7 @@ export default function Dashboard() {
   }, []);
 
   const handleModuleCreate = useCallback(
-    async (module: Omit<DashboardModule, "id">): Promise<string> => {
+    async (module: Omit<DashboardModule, "id" | "dashboard_id">): Promise<string> => {
       try {
         const response = await fetch("/api/dashboard-modules", {
           method: "POST",

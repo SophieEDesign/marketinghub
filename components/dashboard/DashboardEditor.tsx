@@ -22,6 +22,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface DashboardModule {
   id: string;
+  dashboard_id?: string;
   type: string;
   position_x: number;
   position_y: number;
@@ -35,7 +36,7 @@ interface DashboardEditorProps {
   modules: DashboardModule[];
   onModuleUpdate: (moduleId: string, updates: Partial<DashboardModule>) => Promise<void>;
   onModuleDelete: (moduleId: string) => Promise<void>;
-  onModuleCreate: (module: Omit<DashboardModule, "id">) => Promise<string>;
+  onModuleCreate: (module: Omit<DashboardModule, "id" | "dashboard_id">) => Promise<string>;
   data?: Record<string, any[]>;
 }
 
@@ -118,7 +119,7 @@ export default function DashboardEditor({
         ? Math.max(...modules.map((m) => m.position_y + m.height))
         : 0;
 
-      const newModule: Omit<DashboardModule, "id"> = {
+      const newModule: Omit<DashboardModule, "id" | "dashboard_id"> = {
         type,
         position_x: 0,
         position_y: maxY,
