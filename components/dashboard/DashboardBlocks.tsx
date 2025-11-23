@@ -15,23 +15,42 @@ import {
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
-import TextBlock from "./blocks/TextBlock";
-import ImageBlock from "./blocks/ImageBlock";
-import EmbedBlock from "./blocks/EmbedBlock";
-import BlockMenu from "./blocks/BlockMenu";
+import DashboardBlock from "./DashboardBlock";
+import BlockMenu, { BlockType } from "./blocks/BlockMenu";
 import { supabase } from "@/lib/supabaseClient";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface DashboardBlock {
   id: string;
   dashboard_id: string;
-  type: "text" | "image" | "embed";
+  type: "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html";
   content: any;
   position: number;
 }
 
 interface DashboardBlocksProps {
   dashboardId: string;
+}
+
+function getDefaultContentForType(type: BlockType): any {
+  switch (type) {
+    case "text":
+      return { html: "" };
+    case "image":
+      return { url: "", caption: "" };
+    case "embed":
+      return { url: "" };
+    case "kpi":
+      return { table: "content", label: "Total Records", filter: "", aggregate: "count" };
+    case "table":
+      return { table: "content", fields: ["title", "status", "created_at"], limit: 5 };
+    case "calendar":
+      return { table: "content", dateField: "publish_date", limit: 5 };
+    case "html":
+      return { html: "" };
+    default:
+      return {};
+  }
 }
 
 function SortableBlockWrapper({
@@ -62,33 +81,13 @@ function SortableBlockWrapper({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      {block.type === "text" && (
-        <TextBlock
-          id={block.id}
-          content={block.content}
-          onUpdate={canEdit ? onUpdate : undefined}
-          onDelete={canEdit ? onDelete : undefined}
-          isDragging={isDragging}
-        />
-      )}
-      {block.type === "image" && (
-        <ImageBlock
-          id={block.id}
-          content={block.content}
-          onUpdate={canEdit ? onUpdate : undefined}
-          onDelete={canEdit ? onDelete : undefined}
-          isDragging={isDragging}
-        />
-      )}
-      {block.type === "embed" && (
-        <EmbedBlock
-          id={block.id}
-          content={block.content}
-          onUpdate={canEdit ? onUpdate : undefined}
-          onDelete={canEdit ? onDelete : undefined}
-          isDragging={isDragging}
-        />
-      )}
+      <DashboardBlock
+        block={block}
+        isEditing={canEdit}
+        onUpdate={canEdit ? onUpdate : undefined}
+        onDelete={canEdit ? onDelete : undefined}
+        isDragging={isDragging}
+      />
     </div>
   );
 }
@@ -122,7 +121,7 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
     }
   };
 
-  const handleAddBlock = async (type: "text" | "image" | "embed") => {
+  const handleAddBlock = async (type: "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html") => {
     try {
       const maxPosition =
         blocks.length > 0
@@ -135,7 +134,7 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
           {
             dashboard_id: dashboardId,
             type,
-            content: type === "text" ? { text: "" } : {},
+            content: getDefaultContentForType(type),
             position: maxPosition + 1,
           },
         ])

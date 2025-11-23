@@ -1,177 +1,122 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import DashboardEditor from "./DashboardEditor";
-import DashboardBlocks from "./DashboardBlocks";
-import { supabase } from "@/lib/supabaseClient";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { useDashboardBlocks } from "@/lib/hooks/useDashboardBlocks";
+import { usePermissions } from "@/lib/hooks/usePermissions";
+import DashboardBlock from "./DashboardBlock";
+import BlockMenu, { BlockType } from "./blocks/BlockMenu";
+import {
+  DndContext,
+  closestCenter,
+  DragEndEvent,
+  DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Plus } from "lucide-react";
 
-interface Dashboard {
-  id: string;
-  name: string;
-  created_at: string;
-  updated_at: string;
-}
+function SortableBlockItem({
+  block,
+  isEditing,
+  onUpdate,
+  onDelete,
+  isDragging,
+}: {
+  block: any;
+  isEditing: boolean;
+  onUpdate: (id: string, content: any) => void;
+  onDelete: (id: string) => void;
+  isDragging: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: block.id, disabled: !isEditing });
 
-interface DashboardModule {
-  id: string;
-  dashboard_id: string;
-  type: string;
-  position_x: number;
-  position_y: number;
-  width: number;
-  height: number;
-  config: any;
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <DashboardBlock
+        block={block}
+        isEditing={isEditing}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+        isDragging={isDragging}
+      />
+    </div>
+  );
 }
 
 export default function Dashboard() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const dashboardId = searchParams.get("id") || "00000000-0000-0000-0000-000000000001";
+  const permissions = usePermissions();
+  const { blocks, loading, error, addBlock, updateBlock, deleteBlock, reorderBlocks } = useDashboardBlocks(dashboardId);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [modules, setModules] = useState<DashboardModule[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<Record<string, any[]>>({});
+  const canEdit = permissions.canModifyDashboards;
 
-  // Load dashboard and modules
-  useEffect(() => {
-    async function loadDashboard() {
-      try {
-        setError(null);
-        const response = await fetch(`/api/dashboards/${dashboardId}`);
-        const result = await response.json();
-        
-        if (!response.ok) {
-          const errorMsg = result.error || "Failed to load dashboard";
-          const details = result.details || "";
-          const code = result.code || "";
-          
-          // Check if it's a missing table error
-          if (code === 'PGRST116' || code === '42P01' || 
-              errorMsg.includes('does not exist') || 
-              errorMsg.includes('migration')) {
-            setError(
-              `Dashboard tables not found. Please run the database migration:\n\n` +
-              `1. Open Supabase Dashboard\n` +
-              `2. Go to SQL Editor\n` +
-              `3. Run: supabase-all-tables-migration.sql\n\n` +
-              `Error: ${errorMsg}`
-            );
-          } else {
-            setError(`Failed to load dashboard: ${errorMsg}`);
-          }
-          return;
-        }
-        
-        setDashboard(result.dashboard);
-        setModules(result.modules || []);
-      } catch (error: any) {
-        console.error("Error loading dashboard:", error);
-        setError(`Error loading dashboard: ${error.message || "Unknown error"}`);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadDashboard();
-  }, [dashboardId]);
-
-  // Load data for modules that need it
-  useEffect(() => {
-    async function loadData() {
-      const tables = new Set<string>();
-      modules.forEach((module) => {
-        if (module.config?.table) {
-          tables.add(module.config.table);
-        }
-      });
-
-      const dataMap: Record<string, any[]> = {};
-      for (const table of tables) {
-        try {
-          const { data, error } = await supabase
-            .from(table)
-            .select("*")
-            .limit(100);
-
-          if (!error && data) {
-            dataMap[table] = data;
-          }
-        } catch (error) {
-          console.error(`Error loading data for ${table}:`, error);
-        }
-      }
-
-      setData(dataMap);
-    }
-
-    if (modules.length > 0) {
-      loadData();
-    }
-  }, [modules]);
-
-  const handleModuleUpdate = useCallback(
-    async (moduleId: string, updates: Partial<DashboardModule>) => {
-      try {
-        const response = await fetch(`/api/dashboard-modules/${moduleId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(updates),
-        });
-
-        if (!response.ok) throw new Error("Failed to update module");
-
-        const result = await response.json();
-        setModules((prev) =>
-          prev.map((m) => (m.id === moduleId ? { ...m, ...result.module } : m))
-        );
-      } catch (error) {
-        console.error("Error updating module:", error);
-      }
-    },
-    []
-  );
-
-  const handleModuleDelete = useCallback(async (moduleId: string) => {
+  const handleAddBlock = async (type: BlockType) => {
     try {
-      const response = await fetch(`/api/dashboard-modules/${moduleId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) throw new Error("Failed to delete module");
-
-      setModules((prev) => prev.filter((m) => m.id !== moduleId));
+      await addBlock(type);
+      setShowBlockMenu(false);
     } catch (error) {
-      console.error("Error deleting module:", error);
+      console.error("Error adding block:", error);
     }
-  }, []);
+  };
 
-  const handleModuleCreate = useCallback(
-    async (module: Omit<DashboardModule, "id" | "dashboard_id">): Promise<string> => {
-      try {
-        const response = await fetch("/api/dashboard-modules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...module,
-            dashboard_id: dashboardId,
-          }),
-        });
+  const handleUpdateBlock = async (id: string, content: any) => {
+    try {
+      await updateBlock(id, { content });
+    } catch (error) {
+      console.error("Error updating block:", error);
+    }
+  };
 
-        if (!response.ok) throw new Error("Failed to create module");
+  const handleDeleteBlock = async (id: string) => {
+    try {
+      await deleteBlock(id);
+    } catch (error) {
+      console.error("Error deleting block:", error);
+    }
+  };
 
-        const result = await response.json();
-        setModules((prev) => [...prev, result.module]);
-        return result.module.id;
-      } catch (error) {
-        console.error("Error creating module:", error);
-        throw error;
-      }
-    },
-    [dashboardId]
-  );
+  const handleDragStart = (event: DragStartEvent) => {
+    if (isEditing) {
+      setActiveId(event.active.id as string);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id || !isEditing) return;
+
+    const oldIndex = blocks.findIndex((b) => b.id === active.id);
+    const newIndex = blocks.findIndex((b) => b.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(blocks, oldIndex, newIndex).map((b) => b.id);
+    await reorderBlocks(newOrder);
+  };
 
   if (loading) {
     return (
@@ -190,19 +135,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold text-red-900 dark:text-red-100 mb-4">
             Dashboard Error
           </h2>
-          <pre className="whitespace-pre-wrap text-sm text-red-700 dark:text-red-300 font-mono bg-red-100 dark:bg-red-900/40 p-4 rounded">
-            {error}
-          </pre>
-          <button
-            onClick={() => {
-              setError(null);
-              setLoading(true);
-              window.location.reload();
-            }}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       </div>
     );
@@ -212,36 +145,85 @@ export default function Dashboard() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-heading font-semibold text-gray-900 dark:text-white">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
           Dashboard
         </h1>
+        {canEdit && (
+          <Button
+            variant="outline"
+            onClick={() => setIsEditing(!isEditing)}
+          >
+            {isEditing ? "Finish Editing" : "Edit Layout"}
+          </Button>
+        )}
       </div>
 
-      {/* Dashboard Modules Grid */}
-      {modules.length > 0 ? (
-        <DashboardEditor
-          dashboardId={dashboardId}
-          modules={modules}
-          onModuleUpdate={handleModuleUpdate}
-          onModuleDelete={handleModuleDelete}
-          onModuleCreate={handleModuleCreate}
-          data={data}
-        />
-      ) : (
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p className="mb-4">No modules yet. Add a module to get started.</p>
+      {/* Add Block Button (only in edit mode) */}
+      {isEditing && canEdit && (
+        <div className="relative">
+          <Button
+            variant="secondary"
+            onClick={() => setShowBlockMenu(!showBlockMenu)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Block
+          </Button>
+          {showBlockMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowBlockMenu(false)}
+              />
+              <div className="absolute top-full left-0 mt-2 z-50">
+                <BlockMenu
+                  onSelectBlockType={handleAddBlock}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* Dashboard Blocks (Notion-style) */}
-      {modules.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Blocks
-          </h2>
-          <DashboardBlocks dashboardId={dashboardId} />
-        </div>
-      )}
+      {/* Blocks Grid */}
+      <DndContext
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={blocks.map((b) => b.id)}
+          strategy={rectSortingStrategy}
+          disabled={!isEditing}
+        >
+          {blocks.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+              <p className="mb-4">No blocks yet.</p>
+              {canEdit && !isEditing && (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEditing(true)}
+                >
+                  Edit Layout to Add Blocks
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+              {blocks.map((block) => (
+                <SortableBlockItem
+                  key={block.id}
+                  block={block}
+                  isEditing={isEditing}
+                  onUpdate={handleUpdateBlock}
+                  onDelete={handleDeleteBlock}
+                  isDragging={activeId === block.id}
+                />
+              ))}
+            </div>
+          )}
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

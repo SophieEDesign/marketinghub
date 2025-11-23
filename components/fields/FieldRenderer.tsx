@@ -39,19 +39,29 @@ export default function FieldRenderer({ field, value, record }: FieldRendererPro
       const options = field.options?.values || [];
       const option = options.find((opt: any) => opt.id === value || opt.label === value);
       
-      if (field.field_key === "status") {
+      // Use StatusChip for status fields, or if option has a color
+      if (field.field_key === "status" || field.label?.toLowerCase().includes("status")) {
         return <StatusChip value={String(value)} />;
       }
       
       // For other single selects, show as chip with color if available
+      if (option?.color) {
+        return (
+          <span
+            className="px-2 py-1 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: `${option.color}20`,
+              color: option.color,
+            }}
+          >
+            {option?.label || String(value)}
+          </span>
+        );
+      }
+      
+      // Fallback: plain text chip
       return (
-        <span
-          className="px-2 py-1 rounded text-xs"
-          style={{
-            backgroundColor: option?.color ? `${option.color}20` : undefined,
-            color: option?.color || undefined,
-          }}
-        >
+        <span className="px-2 py-1 rounded text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
           {option?.label || String(value)}
         </span>
       );

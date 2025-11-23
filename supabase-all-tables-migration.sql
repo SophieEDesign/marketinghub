@@ -169,7 +169,7 @@ ON CONFLICT (id) DO NOTHING;
 CREATE TABLE IF NOT EXISTS dashboard_blocks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   dashboard_id UUID NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
-  type TEXT NOT NULL CHECK (type IN ('text', 'image', 'embed')),
+  type TEXT NOT NULL CHECK (type IN ('text', 'image', 'embed', 'kpi', 'table', 'calendar', 'html')),
   content JSONB DEFAULT '{}'::jsonb,
   position INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -278,6 +278,8 @@ CREATE TABLE IF NOT EXISTS content (
 CREATE INDEX IF NOT EXISTS idx_content_status ON content(status);
 CREATE INDEX IF NOT EXISTS idx_content_publish_date ON content(publish_date);
 CREATE INDEX IF NOT EXISTS idx_content_campaign_id ON content(campaign_id);
+CREATE INDEX IF NOT EXISTS idx_content_created_at ON content(created_at);
+CREATE INDEX IF NOT EXISTS idx_content_updated_at ON content(updated_at);
 
 ALTER TABLE content ENABLE ROW LEVEL SECURITY;
 
@@ -331,6 +333,12 @@ CREATE POLICY "Users can update campaigns" ON campaigns
 CREATE POLICY "Users can delete campaigns" ON campaigns
   FOR DELETE USING (true);
 
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+CREATE INDEX IF NOT EXISTS idx_campaigns_start_date ON campaigns(start_date);
+CREATE INDEX IF NOT EXISTS idx_campaigns_end_date ON campaigns(end_date);
+CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at);
+CREATE INDEX IF NOT EXISTS idx_campaigns_updated_at ON campaigns(updated_at);
+
 -- 10. OTHER DATA TABLES (basic structure)
 CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -343,6 +351,12 @@ CREATE TABLE IF NOT EXISTS contacts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
+CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
+CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company);
+CREATE INDEX IF NOT EXISTS idx_contacts_created_at ON contacts(created_at);
+CREATE INDEX IF NOT EXISTS idx_contacts_updated_at ON contacts(updated_at);
+
 CREATE TABLE IF NOT EXISTS ideas (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -352,6 +366,11 @@ CREATE TABLE IF NOT EXISTS ideas (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status);
+CREATE INDEX IF NOT EXISTS idx_ideas_category ON ideas(category);
+CREATE INDEX IF NOT EXISTS idx_ideas_created_at ON ideas(created_at);
+CREATE INDEX IF NOT EXISTS idx_ideas_updated_at ON ideas(updated_at);
 
 CREATE TABLE IF NOT EXISTS media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -363,6 +382,11 @@ CREATE TABLE IF NOT EXISTS media (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_media_content_id ON media(content_id);
+CREATE INDEX IF NOT EXISTS idx_media_date ON media(date);
+CREATE INDEX IF NOT EXISTS idx_media_created_at ON media(created_at);
+CREATE INDEX IF NOT EXISTS idx_media_updated_at ON media(updated_at);
 
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -376,6 +400,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_content_id ON tasks(content_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at);
+
 CREATE TABLE IF NOT EXISTS briefings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -385,13 +416,24 @@ CREATE TABLE IF NOT EXISTS briefings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_briefings_content_id ON briefings(content_id);
+CREATE INDEX IF NOT EXISTS idx_briefings_created_at ON briefings(created_at);
+CREATE INDEX IF NOT EXISTS idx_briefings_updated_at ON briefings(updated_at);
+
 CREATE TABLE IF NOT EXISTS sponsorships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
+  event_date DATE,
+  status TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_sponsorships_event_date ON sponsorships(event_date);
+CREATE INDEX IF NOT EXISTS idx_sponsorships_status ON sponsorships(status);
+CREATE INDEX IF NOT EXISTS idx_sponsorships_created_at ON sponsorships(created_at);
+CREATE INDEX IF NOT EXISTS idx_sponsorships_updated_at ON sponsorships(updated_at);
 
 CREATE TABLE IF NOT EXISTS strategy (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -401,6 +443,9 @@ CREATE TABLE IF NOT EXISTS strategy (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE INDEX IF NOT EXISTS idx_strategy_created_at ON strategy(created_at);
+CREATE INDEX IF NOT EXISTS idx_strategy_updated_at ON strategy(updated_at);
+
 CREATE TABLE IF NOT EXISTS assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -409,6 +454,10 @@ CREATE TABLE IF NOT EXISTS assets (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_assets_content_id ON assets(content_id);
+CREATE INDEX IF NOT EXISTS idx_assets_created_at ON assets(created_at);
+CREATE INDEX IF NOT EXISTS idx_assets_updated_at ON assets(updated_at);
 
 -- Enable RLS on all data tables
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
@@ -437,6 +486,45 @@ BEGIN
     EXECUTE format('CREATE POLICY "Users can create %s" ON %I FOR INSERT WITH CHECK (true)', table_name, table_name);
     EXECUTE format('CREATE POLICY "Users can update %s" ON %I FOR UPDATE USING (true)', table_name, table_name);
     EXECUTE format('CREATE POLICY "Users can delete %s" ON %I FOR DELETE USING (true)', table_name, table_name);
+  END LOOP;
+END $$;
+
+-- ============================================
+-- AUTO-UPDATE TRIGGERS FOR updated_at
+-- ============================================
+
+-- Function to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create triggers for all data tables to auto-update updated_at
+DO $$
+DECLARE
+  table_name TEXT;
+  tables TEXT[] := ARRAY[
+    'content', 'campaigns', 'contacts', 'ideas', 'media', 
+    'tasks', 'briefings', 'sponsorships', 'strategy', 'assets',
+    'table_metadata', 'table_view_configs', 'dashboards', 
+    'dashboard_modules', 'dashboard_blocks', 'comments', 'user_roles'
+  ];
+BEGIN
+  FOREACH table_name IN ARRAY tables
+  LOOP
+    -- Drop trigger if exists
+    EXECUTE format('DROP TRIGGER IF EXISTS update_%s_updated_at ON %I', table_name, table_name);
+    
+    -- Create trigger
+    EXECUTE format('
+      CREATE TRIGGER update_%s_updated_at
+      BEFORE UPDATE ON %I
+      FOR EACH ROW
+      EXECUTE FUNCTION update_updated_at_column()
+    ', table_name, table_name);
   END LOOP;
 END $$;
 

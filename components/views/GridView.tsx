@@ -53,6 +53,10 @@ function GridViewComponent({ tableId }: GridViewProps) {
     rowIds?: string[];
   }>({ isOpen: false });
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recordsPerPage] = useState(200);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {

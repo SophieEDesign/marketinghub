@@ -1,9 +1,11 @@
 "use client";
 
-import { FileText, Image, Code, Plus } from "lucide-react";
+import { FileText, Image, Code, BarChart3, Table, Calendar, FileCode, Plus } from "lucide-react";
+
+export type BlockType = "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html";
 
 interface BlockMenuProps {
-  onSelectBlockType: (type: "text" | "image" | "embed") => void;
+  onSelectBlockType: (type: BlockType) => void;
   position?: { x: number; y: number };
 }
 
@@ -29,6 +31,30 @@ export default function BlockMenu({
       icon: Code,
       label: "Embed",
       description: "Embed external content",
+    },
+    {
+      type: "kpi" as const,
+      icon: BarChart3,
+      label: "KPI",
+      description: "Key performance indicator",
+    },
+    {
+      type: "table" as const,
+      icon: Table,
+      label: "Table Summary",
+      description: "Mini table preview",
+    },
+    {
+      type: "calendar" as const,
+      icon: Calendar,
+      label: "Calendar / Upcoming",
+      description: "Upcoming events",
+    },
+    {
+      type: "html" as const,
+      icon: FileCode,
+      label: "Custom HTML",
+      description: "Custom HTML block",
     },
   ];
 
