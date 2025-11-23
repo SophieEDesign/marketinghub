@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Field } from "@/lib/fields";
 import { FieldMapping as FieldMappingType } from "@/lib/import/transformRow";
 import { detectFieldType, suggestTypeFromColumnName } from "@/lib/import/typeDetection";
+import FieldTypeConfirmModal from "./FieldTypeConfirmModal";
 
 interface FieldMappingProps {
   fields: Field[];
@@ -73,8 +74,14 @@ export default function FieldMapping({
   };
 
   const [creatingField, setCreatingField] = useState<string | null>(null);
+  const [showTypeConfirm, setShowTypeConfirm] = useState(false);
+  const [pendingField, setPendingField] = useState<{
+    columnName: string;
+    suggestedType: string;
+    sampleValues: string[];
+  } | null>(null);
 
-  const handleCreateField = async (csvColumn: string) => {
+  const handleCreateField = (csvColumn: string) => {
     if (!onCreateField || creatingField === csvColumn) return;
     
     if (!csvColumn || !csvColumn.trim()) {
@@ -82,24 +89,38 @@ export default function FieldMapping({
       return;
     }
     
-    setCreatingField(csvColumn);
-    try {
-      // Get sample values for type detection
-      const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
-      const detectedType = detectFieldType(sampleValues);
-      const suggestedType = suggestTypeFromColumnName(csvColumn);
-      const finalType = detectedType !== "text" ? detectedType : suggestedType;
+    // Get sample values for type detection
+    const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
+    const detectedType = detectFieldType(sampleValues);
+    const suggestedType = suggestTypeFromColumnName(csvColumn);
+    const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
-      await onCreateField(csvColumn.trim(), finalType);
+    // Show confirmation modal
+    setPendingField({
+      columnName: csvColumn.trim(),
+      suggestedType: finalType,
+      sampleValues,
+    });
+    setShowTypeConfirm(true);
+  };
+
+  const handleConfirmFieldType = async (fieldType: string) => {
+    if (!pendingField || !onCreateField) return;
+    
+    setCreatingField(pendingField.columnName);
+    try {
+      await onCreateField(pendingField.columnName, fieldType);
       
       // The parent component will reload fields and update mappings
       // We don't need to manually update here since useEffect will handle it
     } catch (error) {
       console.error("Error creating field:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`Failed to create field "${csvColumn}": ${errorMessage}\n\nPlease check:\n- The column name is valid\n- The field doesn't already exist\n- Check the browser console for details`);
+      alert(`Failed to create field "${pendingField.columnName}": ${errorMessage}\n\nPlease check:\n- The column name is valid\n- The field doesn't already exist\n- Check the browser console for details`);
     } finally {
       setCreatingField(null);
+      setPendingField(null);
+      setShowTypeConfirm(false);
     }
   };
 
@@ -218,6 +239,21 @@ export default function FieldMapping({
               })}
           </div>
         </div>
+      )}
+
+      {/* Field Type Confirmation Modal */}
+      {pendingField && (
+        <FieldTypeConfirmModal
+          open={showTypeConfirm}
+          onClose={() => {
+            setShowTypeConfirm(false);
+            setPendingField(null);
+          }}
+          columnName={pendingField.columnName}
+          suggestedType={pendingField.suggestedType as any}
+          sampleValues={pendingField.sampleValues}
+          onConfirm={handleConfirmFieldType}
+        />
       )}
     </div>
   );
