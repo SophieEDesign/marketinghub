@@ -8,13 +8,13 @@ import CreateViewModal from "./CreateViewModal";
 interface ViewMenuProps {
   view: ViewConfig | null;
   views: ViewConfig[];
-  onRename: (newName: string) => Promise<void>;
-  onDuplicate: () => Promise<void>;
-  onDelete: () => Promise<void>;
-  onSetDefault: () => Promise<void>;
-  onChangeViewType: (viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => Promise<void>;
-  onResetLayout: () => Promise<void>;
-  onCreateView: () => Promise<void>;
+  onRename?: (newName: string) => Promise<void>;
+  onDuplicate?: () => Promise<void>;
+  onDelete?: () => Promise<void>;
+  onSetDefault?: () => Promise<void>;
+  onChangeViewType?: (viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => Promise<void>;
+  onResetLayout?: () => Promise<void>;
+  onCreateView?: () => Promise<void>;
 }
 
 const viewTypeIcons = {
@@ -72,7 +72,7 @@ export default function ViewMenu({
   const handleRename = async () => {
     if (newName.trim() && newName !== view?.view_name) {
       try {
-        await onRename(newName.trim());
+        await onRename?.(newName.trim());
       } catch (error) {
         console.error("Error renaming view:", error);
         // Reset to original name on error
@@ -86,7 +86,9 @@ export default function ViewMenu({
   };
 
   const handleCreateView = async (viewName: string, viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => {
-    await onCreateView();
+    if (onCreateView) {
+      await onCreateView();
+    }
     // The actual creation will be handled by the parent component
     // We need to pass the view name and type somehow
     // For now, we'll use a prompt fallback if the parent doesn't handle it
@@ -179,20 +181,25 @@ export default function ViewMenu({
         <>
           <div className="flex items-center gap-2 group">
             <button
-              onClick={() => setIsRenaming(true)}
-              onDoubleClick={() => setIsRenaming(true)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition"
-              title="Click or double-click to rename"
+              onClick={() => onRename && setIsRenaming(true)}
+              onDoubleClick={() => onRename && setIsRenaming(true)}
+              disabled={!onRename}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition ${
+                !onRename ? "cursor-default" : ""
+              }`}
+              title={onRename ? "Click or double-click to rename" : ""}
             >
               <span>{view.view_name}</span>
             </button>
-            <button
-              onClick={() => setIsRenaming(true)}
-              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-              title="Rename view"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
-            </button>
+            {onRename && (
+              <button
+                onClick={() => setIsRenaming(true)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                title="Rename view"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           <div className="relative">
             <button
@@ -225,14 +232,15 @@ export default function ViewMenu({
                         <button
                           key={type}
                           onClick={() => {
-                            onChangeViewType(type);
+                            onChangeViewType?.(type);
                             setShowMenu(false);
                           }}
+                          disabled={!onChangeViewType}
                           className={`px-2 py-1 text-xs rounded flex items-center gap-1 transition ${
                             isActive
                               ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
                               : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                          }`}
+                          } ${!onChangeViewType ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
                           <Icon className="w-3 h-3" />
                           <span className="capitalize">{type}</span>
@@ -242,18 +250,20 @@ export default function ViewMenu({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    onDuplicate();
-                    setShowMenu(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <Copy className="w-4 h-4" />
-                  <span>Duplicate view</span>
-                </button>
+                {onDuplicate && (
+                  <button
+                    onClick={() => {
+                      onDuplicate();
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>Duplicate view</span>
+                  </button>
+                )}
 
-                {!view.is_default && (
+                {!view.is_default && onSetDefault && (
                   <button
                     onClick={() => {
                       onSetDefault();
@@ -266,18 +276,20 @@ export default function ViewMenu({
                   </button>
                 )}
 
-                <button
-                  onClick={() => {
-                    onResetLayout();
-                    setShowMenu(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                >
-                  <X className="w-4 h-4" />
-                  <span>Reset layout</span>
-                </button>
+                {onResetLayout && (
+                  <button
+                    onClick={() => {
+                      onResetLayout();
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Reset layout</span>
+                  </button>
+                )}
 
-                {views.length > 1 && (
+                {views.length > 1 && onDelete && (
                   <>
                     <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
                     <button
