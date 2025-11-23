@@ -11,6 +11,7 @@ import FieldMappingComponent from "@/components/import/FieldMapping";
 import ImportPreview from "@/components/import/ImportPreview";
 import { useFieldManager } from "@/lib/useFieldManager";
 import { getAllTables, getTableLabel } from "@/lib/tableMetadata";
+import { supabase } from "@/lib/supabaseClient";
 
 // Papa will be imported dynamically when needed
 
@@ -241,6 +242,26 @@ function ImportPageContent() {
       });
       
       console.log("[Import] Import complete:", result);
+
+      // Ensure table_metadata entry exists for this table
+      try {
+        const { error: metadataError } = await supabase
+          .from("table_metadata")
+          .upsert({
+            table_name: tableId,
+            display_name: getTableLabel(tableId),
+            description: `Imported data table`,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: "table_name",
+          });
+
+        if (metadataError) {
+          console.warn("Could not update table_metadata:", metadataError);
+        }
+      } catch (error) {
+        console.warn("Error ensuring table_metadata:", error);
+      }
 
       setImportResult(result);
       setStep("results");

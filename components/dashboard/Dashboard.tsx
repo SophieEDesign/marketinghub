@@ -209,24 +209,39 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto space-y-8">
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-heading font-semibold text-gray-900 dark:text-white">
+          Dashboard
+        </h1>
+      </div>
+
       {/* Dashboard Modules Grid */}
-      <DashboardEditor
-        dashboardId={dashboardId}
-        modules={modules}
-        onModuleUpdate={handleModuleUpdate}
-        onModuleDelete={handleModuleDelete}
-        onModuleCreate={handleModuleCreate}
-        data={data}
-      />
+      {modules.length > 0 ? (
+        <DashboardEditor
+          dashboardId={dashboardId}
+          modules={modules}
+          onModuleUpdate={handleModuleUpdate}
+          onModuleDelete={handleModuleDelete}
+          onModuleCreate={handleModuleCreate}
+          data={data}
+        />
+      ) : (
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+          <p className="mb-4">No modules yet. Add a module to get started.</p>
+        </div>
+      )}
 
       {/* Dashboard Blocks (Notion-style) */}
-      <div className="mt-12">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Blocks
-        </h2>
-        <DashboardBlocks dashboardId={dashboardId} />
-      </div>
+      {modules.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Blocks
+          </h2>
+          <DashboardBlocks dashboardId={dashboardId} />
+        </div>
+      )}
     </div>
   );
 }

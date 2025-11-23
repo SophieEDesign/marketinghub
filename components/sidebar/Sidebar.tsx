@@ -91,7 +91,7 @@ const generateDefaultSidebarItems = (dynamicTableData: Array<{ table_name: strin
   const dynamicTableMap = new Map(dynamicTableData.map(t => [t.table_name, t.display_name]));
   
   // Merge hardcoded tables with dynamic tables from database
-  const hardcodedTableIds = getAllTables();
+  const hardcodedTableIds = Object.keys(tableMetadata); // Use synchronous version
   const dynamicTableIds = dynamicTableData.map(t => t.table_name);
   const allTableIds = [...new Set([...hardcodedTableIds, ...dynamicTableIds])];
   
