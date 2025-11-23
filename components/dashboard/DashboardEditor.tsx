@@ -3,10 +3,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
 
-// Import CSS for react-grid-layout
+// Import CSS for react-grid-layout (client-side only)
 if (typeof window !== "undefined") {
-  require("react-grid-layout/css/styles.css");
-  require("react-resizable/css/styles.css");
+  try {
+    require("react-grid-layout/css/styles.css");
+    require("react-resizable/css/styles.css");
+  } catch (e) {
+    // CSS files may not be available during build
+  }
 }
 import { X, Plus, Save, Edit2, Trash2, Settings } from "lucide-react";
 import KPIModule from "./modules/KPI";

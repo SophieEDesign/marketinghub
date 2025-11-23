@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { notFound } from "next/navigation";
 import { isValidViewForTable, getTableMetadata } from "@/lib/tableMetadata";
 import dynamic from "next/dynamic";
