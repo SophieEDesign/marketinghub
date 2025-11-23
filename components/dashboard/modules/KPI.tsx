@@ -12,6 +12,7 @@ interface KPIConfig {
   icon?: string;
   table?: string;
   field?: string;
+  calculation?: "count" | "sum" | "average" | "min" | "max";
   filter?: any;
 }
 
