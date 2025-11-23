@@ -37,9 +37,15 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const {
     currentView,
+    views,
     loading: viewConfigLoading,
     saveCurrentView,
     switchToViewByName,
+    reloadViews,
+    updateView,
+    createView,
+    deleteView,
+    setDefaultView,
   } = useViewConfigs(tableId);
 
   // Switch to view by name when viewId changes
@@ -208,6 +214,57 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
           kanban_group_field: kanbanGroupFieldKey,
         }}
         onViewSettingsUpdate={handleViewSettingsUpdate}
+        currentView={currentView}
+        views={views}
+        onRenameView={async (newName: string) => {
+          if (currentView?.id) {
+            await updateView(currentView.id, { view_name: newName });
+            await reloadViews();
+          }
+        }}
+        onDuplicateView={async () => {
+          if (currentView) {
+            const newName = `${currentView.view_name} (Copy)`;
+            await createView(newName, currentView);
+            await reloadViews();
+          }
+        }}
+        onDeleteView={async () => {
+          if (currentView?.id && views.length > 1) {
+            if (confirm(`Delete view "${currentView.view_name}"?`)) {
+              await deleteView(currentView.id);
+              await reloadViews();
+            }
+          }
+        }}
+        onSetDefaultView={async () => {
+          if (currentView?.id) {
+            await setDefaultView(currentView.id);
+            await reloadViews();
+          }
+        }}
+        onChangeViewType={async (viewType) => {
+          if (currentView?.id) {
+            await updateView(currentView.id, { view_type: viewType });
+            await reloadViews();
+            window.location.href = `/${tableId}/${viewType}`;
+          }
+        }}
+        onResetLayout={async () => {
+          if (currentView?.id) {
+            await updateView(currentView.id, {
+              kanban_group_field: undefined,
+            });
+            await reloadViews();
+          }
+        }}
+        onCreateView={async () => {
+          const name = prompt("Enter view name:");
+          if (name) {
+            await createView(name);
+            await reloadViews();
+          }
+        }}
       />
 
       <DndContext
