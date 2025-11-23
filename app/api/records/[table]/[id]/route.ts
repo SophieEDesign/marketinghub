@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteRecord, deleteAsset, parseStorageUrl } from "@/lib/deleteRecord";
 
-// DELETE /api/tables/[table]/[id]
+// DELETE /api/records/[table]/[id] - Delete a record from a table
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { table: string; id: string } }
@@ -55,7 +55,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("[API] Exception in DELETE /api/tables/[table]/[id]:", error);
+    console.error("[API] Exception in DELETE /api/records/[table]/[id]:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }
