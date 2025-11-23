@@ -60,12 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: metaError.message }, { status: 500 });
     }
 
-    // Create the actual Supabase table
-    // Note: This requires admin privileges - we'll need to use a server-side function
-    // For now, we'll create it via a database function or admin API
-    // The table will be created with standard columns: id, created_at, updated_at
-    // Additional fields will be added via table_fields
-
+    // Create the actual Supabase table using the database function
     try {
       const { createClient } = await import("@supabase/supabase-js");
       const supabaseAdmin = createClient(
@@ -73,41 +68,22 @@ export async function POST(request: NextRequest) {
         process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
-      // Create the table using SQL
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS ${name} (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_${name}_created_at ON ${name}(created_at);
-        
-        ALTER TABLE ${name} ENABLE ROW LEVEL SECURITY;
-        
-        CREATE POLICY "Users can view all ${name}" ON ${name} FOR SELECT USING (true);
-        CREATE POLICY "Users can create ${name}" ON ${name} FOR INSERT WITH CHECK (true);
-        CREATE POLICY "Users can update ${name}" ON ${name} FOR UPDATE USING (true);
-        CREATE POLICY "Users can delete ${name}" ON ${name} FOR DELETE USING (true);
-        
-        CREATE TRIGGER update_${name}_updated_at
-          BEFORE UPDATE ON ${name}
-          FOR EACH ROW
-          EXECUTE FUNCTION update_updated_at_column();
-      `;
-
-      const { error: createError } = await supabaseAdmin.rpc('exec_sql', {
-        sql: createTableSQL
+      // Call the database function to create the table
+      const { error: createError } = await supabaseAdmin.rpc('create_dynamic_table', {
+        table_name: name,
+        table_label: label
       });
 
-      // If RPC doesn't exist, we'll need to handle this differently
-      // For now, log the error but don't fail - the table might already exist
       if (createError) {
-        console.warn("Could not create table via RPC (this is expected if RPC doesn't exist):", createError);
-        // Table creation will need to be done manually or via a database function
+        console.error("Error creating table:", createError);
+        // Don't fail the request - metadata is created, table can be created manually
+        console.warn("Table metadata created, but actual table creation failed. You may need to run the create_dynamic_table function in Supabase.");
+      } else {
+        console.log(`Successfully created table: ${name}`);
       }
     } catch (createError: any) {
-      console.warn("Table creation skipped (requires manual setup or admin function):", createError.message);
+      console.warn("Table creation skipped (database function may not exist):", createError.message);
+      console.warn("Please run supabase-create-table-function.sql in Supabase SQL Editor to enable automatic table creation.");
     }
 
     return NextResponse.json(tableMeta, { status: 201 });
