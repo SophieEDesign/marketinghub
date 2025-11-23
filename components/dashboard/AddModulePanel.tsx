@@ -1,12 +1,164 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, BarChart3, Calendar, CheckSquare, Table, ExternalLink, TrendingUp, GitBranch } from "lucide-react";
+import { getAllTables } from "@/lib/tableMetadata";
+import { useFields } from "@/lib/useFields";
 
 interface AddModulePanelProps {
   open: boolean;
   onClose: () => void;
   onAdd: (type: string, config: any) => void;
+}
+
+// KPI Configuration Form Component
+function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config: any) => void }) {
+  const [dataSource, setDataSource] = useState<"manual" | "table">(config.table ? "table" : "manual");
+  const availableTables = getAllTables();
+  const { fields, loading: fieldsLoading } = useFields(config.table || "");
+
+  useEffect(() => {
+    if (dataSource === "manual" && config.table) {
+      setConfig({ ...config, table: undefined, field: undefined, calculation: undefined });
+    } else if (dataSource === "table" && !config.table) {
+      setConfig({ ...config, value: undefined });
+    }
+  }, [dataSource]);
+
+  const calculationTypes = [
+    { value: "count", label: "Count" },
+    { value: "sum", label: "Sum" },
+    { value: "average", label: "Average" },
+    { value: "min", label: "Minimum" },
+    { value: "max", label: "Maximum" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Title
+        </label>
+        <input
+          type="text"
+          value={config.title || ""}
+          onChange={(e) => setConfig({ ...config, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+          placeholder="KPI Title"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Data Source
+        </label>
+        <div className="flex gap-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="manual"
+              checked={dataSource === "manual"}
+              onChange={(e) => setDataSource(e.target.value as "manual" | "table")}
+              className="mr-2"
+            />
+            Manual Value
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="table"
+              checked={dataSource === "table"}
+              onChange={(e) => setDataSource(e.target.value as "manual" | "table")}
+              className="mr-2"
+            />
+            From Table
+          </label>
+        </div>
+      </div>
+
+      {dataSource === "manual" ? (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Value
+          </label>
+          <input
+            type="number"
+            value={config.value || ""}
+            onChange={(e) => setConfig({ ...config, value: parseFloat(e.target.value) || 0 })}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+            placeholder="0"
+          />
+        </div>
+      ) : (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Table
+            </label>
+            <select
+              value={config.table || ""}
+              onChange={(e) => setConfig({ ...config, table: e.target.value, field: undefined, calculation: undefined })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+            >
+              <option value="">Select table</option>
+              {availableTables.map((tableId) => (
+                <option key={tableId} value={tableId}>
+                  {tableId.charAt(0).toUpperCase() + tableId.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {config.table && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Calculation Type
+                </label>
+                <select
+                  value={config.calculation || "count"}
+                  onChange={(e) => setConfig({ ...config, calculation: e.target.value, field: e.target.value === "count" ? undefined : config.field })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+                >
+                  {calculationTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {config.calculation !== "count" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Field
+                  </label>
+                  {fieldsLoading ? (
+                    <div className="text-sm text-gray-500">Loading fields...</div>
+                  ) : (
+                    <select
+                      value={config.field || ""}
+                      onChange={(e) => setConfig({ ...config, field: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
+                    >
+                      <option value="">Select field</option>
+                      {fields
+                        .filter((f) => f.type === "number" || f.type === "currency")
+                        .map((field) => (
+                          <option key={field.id} value={field.field_key}>
+                            {field.label}
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 const moduleTypes = [
@@ -132,32 +284,7 @@ export default function AddModulePanel({ open, onClose, onAdd }: AddModulePanelP
 
               {/* Configuration form based on type */}
               {selectedType === "kpi" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Title
-                    </label>
-                    <input
-                      type="text"
-                      value={config.title || ""}
-                      onChange={(e) => setConfig({ ...config, title: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
-                      placeholder="KPI Title"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Value
-                    </label>
-                    <input
-                      type="number"
-                      value={config.value || ""}
-                      onChange={(e) => setConfig({ ...config, value: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
+                <KPIConfigForm config={config} setConfig={setConfig} />
               )}
 
               {selectedType === "table_preview" && (

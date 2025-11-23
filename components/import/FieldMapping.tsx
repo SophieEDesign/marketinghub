@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Field } from "@/lib/fields";
 import { FieldMapping as FieldMappingType } from "@/lib/import/transformRow";
 import { detectFieldType, suggestTypeFromColumnName } from "@/lib/import/typeDetection";
@@ -22,7 +22,7 @@ export default function FieldMapping({
 }: FieldMappingProps) {
   const [mappings, setMappings] = useState<FieldMappingType[]>(() => {
     // Auto-map based on field_key matching CSV header (case-insensitive)
-    return fields.map((field) => {
+    const initialMappings = fields.map((field) => {
       const matchingHeader = csvHeaders.find(
         (header) => header.toLowerCase() === field.field_key.toLowerCase() ||
                     header.toLowerCase() === field.label.toLowerCase()
@@ -33,7 +33,36 @@ export default function FieldMapping({
         csvColumn: matchingHeader || null,
       };
     });
+    // Notify parent of initial mappings
+    onMappingChange(initialMappings);
+    return initialMappings;
   });
+
+  // Update mappings when fields change (e.g., after creating a new field)
+  useEffect(() => {
+    setMappings((currentMappings) => {
+      const currentFieldIds = new Set(currentMappings.map(m => m.fieldId));
+      const newFields = fields.filter(f => !currentFieldIds.has(f.id));
+      
+      if (newFields.length > 0) {
+        const newMappings = newFields.map((field) => {
+          const matchingHeader = csvHeaders.find(
+            (header) => header.toLowerCase() === field.field_key.toLowerCase() ||
+                        header.toLowerCase() === field.label.toLowerCase()
+          );
+          return {
+            fieldId: field.id,
+            fieldKey: field.field_key,
+            csvColumn: matchingHeader || null,
+          };
+        });
+        const updated = [...currentMappings, ...newMappings];
+        onMappingChange(updated);
+        return updated;
+      }
+      return currentMappings;
+    });
+  }, [fields, csvHeaders, onMappingChange]);
 
   const handleMappingChange = (fieldId: string, csvColumn: string | null) => {
     const updated = mappings.map((m) =>
@@ -57,6 +86,9 @@ export default function FieldMapping({
       const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
       await onCreateField(csvColumn, finalType);
+      
+      // The parent component will reload fields and update mappings
+      // We don't need to manually update here since useEffect will handle it
     } catch (error) {
       console.error("Error creating field:", error);
       alert(`Failed to create field: ${error instanceof Error ? error.message : "Unknown error"}`);

@@ -182,9 +182,10 @@ function ImportPageContent() {
         const updatedFields = await loadFields(tableId);
         setFields(updatedFields);
 
-        // Auto-map the new field
+        // Auto-map the new field - add to existing mappings
+        const existingMappings = mappings || [];
         const updatedMappings = [
-          ...mappings,
+          ...existingMappings,
           {
             fieldId: newField.id,
             fieldKey: newField.field_key,
@@ -193,6 +194,8 @@ function ImportPageContent() {
         ];
         setMappings(updatedMappings);
         handleMappingChange(updatedMappings);
+      } else {
+        alert("Failed to create field. Please try again.");
       }
     },
     [addField, tableId, mappings, handleMappingChange]
@@ -403,7 +406,7 @@ function ImportPageContent() {
               <div className="flex justify-end mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setStep("preview")}
-                  disabled={mappings.filter((m) => m.csvColumn && m.csvColumn !== "IGNORE").length === 0}
+                  disabled={!mappings || mappings.filter((m) => m.csvColumn && m.csvColumn !== "IGNORE" && m.csvColumn !== null).length === 0}
                   className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
                 >
                   Continue to Preview
