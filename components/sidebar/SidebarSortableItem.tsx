@@ -46,6 +46,24 @@ export default function SidebarSortableItem({
   );
 
   if (collapsed && !editing) {
+    if (href === "#" && onClick) {
+      return (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onClick();
+          }}
+          className={`flex items-center justify-center p-2 rounded-md text-sm transition-all duration-200 ease-in-out ${
+            active
+              ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
+              : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+          }`}
+          title={label}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      );
+    }
     return (
       <Link
         href={href}
