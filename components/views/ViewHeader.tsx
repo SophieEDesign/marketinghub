@@ -92,24 +92,24 @@ export default function ViewHeader({
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4 mb-4">
         <div className="flex-1 min-w-0 flex items-center gap-3">
-          {currentView && (
-            <ViewMenu
-              view={currentView}
-              views={views}
-              onRename={permissions.canModifyViews ? (onRenameView || (async () => {})) : undefined}
-              onDuplicate={permissions.canModifyViews ? (onDuplicateView || (async () => {})) : undefined}
-              onDelete={permissions.canModifyViews ? (onDeleteView || (async () => {})) : undefined}
-              onSetDefault={permissions.canModifyViews ? (onSetDefaultView || (async () => {})) : undefined}
-              onChangeViewType={permissions.canModifyViews ? (onChangeViewType || (async () => {})) : undefined}
-              onResetLayout={permissions.canModifyViews ? (onResetLayout || (async () => {})) : undefined}
-              onCreateView={permissions.canModifyViews ? (onCreateView || (async () => {})) : undefined}
+          <ViewMenu
+            view={currentView || null}
+            views={views}
+            onRename={permissions.canModifyViews ? (onRenameView || (async () => {})) : undefined}
+            onDuplicate={permissions.canModifyViews ? (onDuplicateView || (async () => {})) : undefined}
+            onDelete={permissions.canModifyViews ? (onDeleteView || (async () => {})) : undefined}
+            onSetDefault={permissions.canModifyViews ? (onSetDefaultView || (async () => {})) : undefined}
+            onChangeViewType={permissions.canModifyViews ? (onChangeViewType || (async () => {})) : undefined}
+            onResetLayout={permissions.canModifyViews ? (onResetLayout || (async () => {})) : undefined}
+            onCreateView={permissions.canModifyViews ? (onCreateView || (async () => {})) : undefined}
+          />
+          {filters.length > 0 && (
+            <FilterBadges
+              filters={filters}
+              fields={fields}
+              onRemoveFilter={onRemoveFilter}
             />
           )}
-          <FilterBadges
-            filters={filters}
-            fields={fields}
-            onRemoveFilter={onRemoveFilter}
-          />
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           {selectedRowCount > 0 && onBulkDelete && permissions.canDelete && (

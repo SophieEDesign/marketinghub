@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import ResizableHeader from "./ResizableHeader";
 import ColumnMenu from "./ColumnMenu";
 import { Field } from "@/lib/fields";
 

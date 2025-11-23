@@ -13,11 +13,13 @@ const config: Config = {
         background: "var(--background)",
         foreground: "var(--foreground)",
         brand: {
-          red: "#e10600",
-          redDark: "#b00000",
-          blue: "#003756",
-          grey: "#4a4f54",
-          light: "#f5f7fa",
+          primary: "var(--brand-primary)",
+          "primary-dark": "var(--brand-primary-dark)",
+          blue: "var(--brand-blue)",
+          grey: "var(--brand-grey)",
+          light: "var(--brand-light)",
+          red: "#e10600", // Keep for backward compatibility
+          redDark: "#b00000", // Keep for backward compatibility
         },
       },
       fontFamily: {
