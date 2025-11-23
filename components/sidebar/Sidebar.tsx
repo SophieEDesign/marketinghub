@@ -50,7 +50,7 @@ const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 import { tableMetadata, getTableIcon, getAllTables } from "@/lib/tableMetadata";
 import { BookOpen, Gift, Compass, Image as ImageIcon, Layout, Plus } from "lucide-react";
 import { useInterfacePages } from "@/lib/hooks/useInterfacePages";
-import NewPageModal from "@/components/pages/NewPageModal";
+import { useNewPageModal } from "@/components/pages/NewPageModalProvider";
 
 // Map table IDs to icons - now uses metadata
 const getTableIconComponent = (tableId: string) => {
@@ -142,11 +142,11 @@ export default function Sidebar() {
   const [orderedSidebar, setOrderedSidebar] = useState(defaultSidebarItems);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [dynamicTables, setDynamicTables] = useState<string[]>([]);
-  const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string> }>({ groupTitles: {}, itemLabels: {} });
+  const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string>; itemOrder: Record<string, string[]> }>({ groupTitles: {}, itemLabels: {}, itemOrder: {} });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { pages, createPage } = useInterfacePages();
-  const [showNewPageModal, setShowNewPageModal] = useState(false);
+  const { pages } = useInterfacePages();
+  const { openModal } = useNewPageModal();
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -236,6 +236,7 @@ export default function Sidebar() {
         setSidebarCustomizations({
           groupTitles: customizations.groupTitles || {},
           itemLabels: customizations.itemLabels || {},
+          itemOrder: customizations.itemOrder || {},
         });
       } catch (e) {
         console.error("Error loading sidebar customizations:", e);
@@ -263,12 +264,25 @@ export default function Sidebar() {
     const newCustomizations = {
       groupTitles: { ...sidebarCustomizations.groupTitles },
       itemLabels: { ...sidebarCustomizations.itemLabels, [href]: newLabel },
+      itemOrder: { ...sidebarCustomizations.itemOrder },
     };
     setSidebarCustomizations(newCustomizations);
     localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
     // Force re-render by updating state
     setEditing(false);
     setTimeout(() => setEditing(true), 0);
+  };
+
+  // Handler for item reordering within a group
+  const handleItemReorder = (groupTitle: string, newOrder: string[]) => {
+    if (typeof window === 'undefined') return;
+    const newCustomizations = {
+      groupTitles: { ...sidebarCustomizations.groupTitles },
+      itemLabels: { ...sidebarCustomizations.itemLabels },
+      itemOrder: { ...sidebarCustomizations.itemOrder, [groupTitle]: newOrder },
+    };
+    setSidebarCustomizations(newCustomizations);
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
   };
 
   // Parse current route
@@ -320,7 +334,7 @@ export default function Sidebar() {
           icon: Plus,
           label: "New Page",
           href: "#",
-          onClick: () => setShowNewPageModal(true),
+          onClick: openModal,
         },
       ],
     },
@@ -479,10 +493,23 @@ export default function Sidebar() {
           {navGroups.map((group) => {
             // Apply customizations from state
             const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
+            
+            // Apply item order if saved
+            let orderedItems = group.items;
+            const savedOrder = sidebarCustomizations.itemOrder?.[group.title];
+            if (savedOrder && savedOrder.length === group.items.length) {
+              orderedItems = savedOrder
+                .map((href) => group.items.find((item) => item.href === href))
+                .filter((item): item is NavItem => item !== undefined);
+              // Add any new items that aren't in the saved order
+              const newItems = group.items.filter((item) => !savedOrder.includes(item.href));
+              orderedItems = [...orderedItems, ...newItems];
+            }
+            
             const customizedGroup = {
               ...group,
               title: customTitle,
-              items: group.items.map((item) => ({
+              items: orderedItems.map((item) => ({
                 ...item,
                 label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
               })),
@@ -499,6 +526,7 @@ export default function Sidebar() {
                 editing={editing}
                 onGroupTitleChange={handleGroupTitleChange}
                 onItemLabelChange={handleItemLabelChange}
+                onItemReorder={handleItemReorder}
               />
             );
           })}
@@ -514,16 +542,6 @@ export default function Sidebar() {
           onToggleEdit={() => setEditing(!editing)}
         />
       </aside>
-
-      {/* New Page Modal */}
-      <NewPageModal
-        open={showNewPageModal}
-        onClose={() => setShowNewPageModal(false)}
-        onCreate={async (name, layout) => {
-          await createPage(name, layout);
-          setShowNewPageModal(false);
-        }}
-      />
     </>
   );
 }
@@ -549,6 +567,7 @@ interface NavGroupComponentProps {
   editing?: boolean;
   onGroupTitleChange?: (oldTitle: string, newTitle: string) => void;
   onItemLabelChange?: (href: string, newLabel: string) => void;
+  onItemReorder?: (groupTitle: string, newOrder: string[]) => void;
 }
 
 function NavGroupComponent({
@@ -562,7 +581,21 @@ function NavGroupComponent({
   editing = false,
   onGroupTitleChange,
   onItemLabelChange,
+  onItemReorder,
 }: NavGroupComponentProps) {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !onItemReorder) return;
+
+    const items = group.items;
+    const oldIndex = items.findIndex((item) => item.href === active.id);
+    const newIndex = items.findIndex((item) => item.href === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(items, oldIndex, newIndex);
+    onItemReorder(group.title, newOrder.map((item) => item.href));
+  };
   const groupCollapsed = isGroupCollapsed(group.title);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(group.title);
@@ -627,12 +660,46 @@ function NavGroupComponent({
       )}
 
       {/* Group Items */}
-      <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
-        {group.items.map((item) => {
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
+          <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
+            {group.items.map((item) => {
           const active = isItemActive(item.href);
           const hasChildren = item.children && item.children.length > 0;
           const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
 
+          return (
+            <SidebarSortableItem
+              key={item.href}
+              id={item.href}
+              label={item.label}
+              href={item.href}
+              icon={item.icon}
+              editing={editing}
+              active={isItemActive(item.href)}
+              collapsed={collapsed}
+              onClick={item.onClick}
+            />
+          );
+        })}
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+// Keep the old rendering for items with children (temporary until we refactor)
+function NavGroupComponentOld({
+  group,
+  isGroupCollapsed,
+  toggleGroup,
+  isItemActive,
+  isChildActive,
+  collapsed = false,
+  onItemClick,
+  editing = false,
+  onGroupTitleChange,
+  onItemLabelChange,
+}: NavGroupComponentProps) {
           return (
             <div key={item.href}>
               {/* Parent Item */}
