@@ -12,7 +12,9 @@ interface AddModulePanelProps {
 }
 
 // KPI Configuration Form Component
-function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config: any | ((prev: any) => any)) => void }) {
+type ConfigSetter = (config: any | ((prev: any) => any)) => void;
+
+function KPIConfigForm({ config, setConfig }: { config: any; setConfig: ConfigSetter }) {
   const [dataSource, setDataSource] = useState<"manual" | "table">(config.table ? "table" : "manual");
   const availableTables = getAllTables();
   const { fields, loading: fieldsLoading } = useFields(config.table || "");
@@ -23,7 +25,7 @@ function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config:
     } else if (dataSource === "table" && !config.table) {
       setConfig((prev: any) => ({ ...prev, value: undefined }));
     }
-  }, [dataSource]);
+  }, [dataSource, config.table, setConfig]);
 
   const calculationTypes = [
     { value: "count", label: "Count" },
