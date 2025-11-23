@@ -69,7 +69,16 @@ export default function ViewMenu({
 
   const handleRename = async () => {
     if (newName.trim() && newName !== view?.view_name) {
-      await onRename(newName.trim());
+      try {
+        await onRename(newName.trim());
+      } catch (error) {
+        console.error("Error renaming view:", error);
+        // Reset to original name on error
+        setNewName(view?.view_name || "");
+      }
+    } else {
+      // Reset to original name if empty or unchanged
+      setNewName(view?.view_name || "");
     }
     setIsRenaming(false);
   };
@@ -99,17 +108,21 @@ export default function ViewMenu({
             onBlur={handleRename}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
+                e.preventDefault();
                 handleRename();
               } else if (e.key === "Escape") {
+                e.preventDefault();
                 setIsRenaming(false);
                 setNewName(view.view_name);
               }
             }}
-            className="px-2 py-1 text-sm font-semibold border border-blue-500 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-2 py-1 text-sm font-semibold border border-blue-500 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
+            placeholder="View name"
           />
           <button
             onClick={handleRename}
-            className="p-1 text-green-600 hover:text-green-700"
+            className="p-1.5 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+            title="Save"
           >
             <Check className="w-4 h-4" />
           </button>
@@ -118,20 +131,31 @@ export default function ViewMenu({
               setIsRenaming(false);
               setNewName(view.view_name);
             }}
-            className="p-1 text-gray-500 hover:text-gray-700"
+            className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            title="Cancel"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       ) : (
         <>
-          <button
-            onClick={() => setIsRenaming(true)}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition group"
-          >
-            <span>{view.view_name}</span>
-            <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </button>
+          <div className="flex items-center gap-2 group">
+            <button
+              onClick={() => setIsRenaming(true)}
+              onDoubleClick={() => setIsRenaming(true)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition"
+              title="Click or double-click to rename"
+            >
+              <span>{view.view_name}</span>
+            </button>
+            <button
+              onClick={() => setIsRenaming(true)}
+              className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+              title="Rename view"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}

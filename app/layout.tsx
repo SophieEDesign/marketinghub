@@ -16,6 +16,7 @@ import NewRecordModal from '@/components/modal/NewRecordModal'
 import LinkedRecordPicker from '@/components/linker/LinkedRecordPicker'
 import GlobalSearch from '@/components/search/GlobalSearch'
 import { ToastContainer } from '@/components/ui/Toast'
+import CommandPalette from '@/components/command-palette/CommandPalette'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" })
 const spartan = League_Spartan({ subsets: ["latin"], variable: "--font-heading" })
@@ -52,6 +53,7 @@ export default function RootLayout({
                       <NewRecordModal />
                       <LinkedRecordPicker />
                       <GlobalSearch />
+                      <CommandPalette />
                       <ToastContainer />
                     </ThemeProvider>
                     </SettingsProvider>
