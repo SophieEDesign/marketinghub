@@ -293,21 +293,21 @@ function GridViewComponent({ tableId }: GridViewProps) {
           <div className="overflow-y-auto max-h-[calc(100vh-300px)]">
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <table className="min-w-full border-collapse">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
-                  {fields.map((field) => (
-                    <SortableColumnHeader
-                      key={field.id}
-                      id={field.id}
-                      label={field.label}
-                      isMobile={isMobile}
-                    />
-                  ))}
-                </SortableContext>
-              </tr>
-            </thead>
-          <tbody>
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+                  <tr>
+                    <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
+                      {fields.map((field) => (
+                        <SortableColumnHeader
+                          key={field.id}
+                          id={field.id}
+                          label={field.label}
+                          isMobile={isMobile}
+                        />
+                      ))}
+                    </SortableContext>
+                  </tr>
+                </thead>
+                <tbody>
             {rows.map((row, index) => (
               <tr
                 key={row.id}
@@ -489,13 +489,12 @@ function GridViewComponent({ tableId }: GridViewProps) {
                   )}
                 </td>
               );
-            })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-              </DndContext>
-            </div>
+                })}
+                </tr>
+              ))}
+              </tbody>
+            </table>
+            </DndContext>
           </div>
         </div>
       </div>
