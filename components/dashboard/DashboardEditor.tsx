@@ -8,7 +8,7 @@ if (typeof window !== "undefined") {
   require("react-grid-layout/css/styles.css");
   require("react-resizable/css/styles.css");
 }
-import { X, Plus, Save, Edit2, Trash2 } from "lucide-react";
+import { X, Plus, Save, Edit2, Trash2, Settings } from "lucide-react";
 import KPIModule from "./modules/KPI";
 import PipelineModule from "./modules/Pipeline";
 import TasksDueModule from "./modules/TasksDue";
@@ -17,6 +17,7 @@ import CalendarMiniModule from "./modules/CalendarMini";
 import TablePreviewModule from "./modules/TablePreview";
 import CustomEmbedModule from "./modules/CustomEmbed";
 import AddModulePanel from "./AddModulePanel";
+import ModuleSettingsPanel from "./ModuleSettingsPanel";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -50,6 +51,7 @@ export default function DashboardEditor({
 }: DashboardEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [editingModule, setEditingModule] = useState<DashboardModule | null>(null);
   const [layouts, setLayouts] = useState<Layouts>({});
 
   // Convert modules to react-grid-layout format
@@ -247,13 +249,22 @@ export default function DashboardEditor({
           {modules.map((module) => (
             <div key={module.id} className="relative">
               {isEditing && (
-                <button
-                  onClick={() => onModuleDelete(module.id)}
-                  className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
-                  title="Delete module"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <>
+                  <button
+                    onClick={() => setEditingModule(module)}
+                    className="absolute -top-2 -left-2 z-50 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors shadow-lg"
+                    title="Module settings"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onModuleDelete(module.id)}
+                    className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
+                    title="Delete module"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </>
               )}
               {renderModule(module)}
             </div>
@@ -267,6 +278,19 @@ export default function DashboardEditor({
           open={showAddPanel}
           onClose={() => setShowAddPanel(false)}
           onAdd={handleAddModule}
+        />
+      )}
+
+      {/* Module Settings Panel */}
+      {editingModule && (
+        <ModuleSettingsPanel
+          open={!!editingModule}
+          onClose={() => setEditingModule(null)}
+          module={editingModule}
+          onUpdate={async (updates) => {
+            await onModuleUpdate(editingModule.id, updates);
+            setEditingModule(null);
+          }}
         />
       )}
     </div>

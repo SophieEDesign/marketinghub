@@ -35,9 +35,9 @@ export function Sheet({ open, onOpenChange, children, side = "right", className 
       
       {/* Sheet */}
       <div
-        className={`fixed inset-y-0 z-50 bg-white dark:bg-gray-950 shadow-xl border-l border-gray-200 dark:border-gray-700 transition-transform duration-200 ease-out overflow-y-auto ${
+        className={`fixed inset-y-0 z-50 bg-white dark:bg-gray-950 shadow-xl border-l border-gray-200 dark:border-gray-700 transition-transform duration-300 ease-out overflow-y-auto ${
           side === "right" ? "right-0" : "left-0"
-        } ${className}`}
+        } w-full md:w-[600px] lg:w-[700px] ${className}`}
       >
         {children}
       </div>

@@ -269,9 +269,10 @@ export default function AddModulePanel({ open, onClose, onAdd }: AddModulePanelP
       }
       
       await onAdd(selectedType, finalConfig);
+      // Reset form but keep panel open to allow adding more modules
       setSelectedType(null);
       setConfig({});
-      onClose();
+      // Don't close - allow adding multiple modules
     } catch (error) {
       console.error("Error adding module:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -410,16 +411,16 @@ export default function AddModulePanel({ open, onClose, onAdd }: AddModulePanelP
         </div>
 
         {/* Footer */}
-        {selectedType && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
-            <button onClick={onClose} className="btn-secondary">
-              Cancel
-            </button>
+        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700">
+          <button onClick={onClose} className="btn-secondary">
+            {selectedType ? "Cancel" : "Close"}
+          </button>
+          {selectedType && (
             <button onClick={handleAdd} className="btn-primary">
               Add Module
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

@@ -259,3 +259,184 @@ CREATE POLICY "Admins can manage roles" ON user_roles
     )
   );
 
+-- 8. CONTENT TABLE (Main data table)
+CREATE TABLE IF NOT EXISTS content (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT,
+  channels TEXT[] DEFAULT '{}',
+  publish_date DATE,
+  content_type TEXT,
+  thumbnail_url TEXT,
+  campaign_id UUID,
+  assigned_to TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_content_status ON content(status);
+CREATE INDEX IF NOT EXISTS idx_content_publish_date ON content(publish_date);
+CREATE INDEX IF NOT EXISTS idx_content_campaign_id ON content(campaign_id);
+
+ALTER TABLE content ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view all content" ON content;
+DROP POLICY IF EXISTS "Users can create content" ON content;
+DROP POLICY IF EXISTS "Users can update content" ON content;
+DROP POLICY IF EXISTS "Users can delete content" ON content;
+
+CREATE POLICY "Users can view all content" ON content
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can create content" ON content
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update content" ON content
+  FOR UPDATE USING (true);
+
+CREATE POLICY "Users can delete content" ON content
+  FOR DELETE USING (true);
+
+-- 9. CAMPAIGNS TABLE
+CREATE TABLE IF NOT EXISTS campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  status TEXT,
+  colour TEXT,
+  start_date DATE,
+  end_date DATE,
+  assignee TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view all campaigns" ON campaigns;
+DROP POLICY IF EXISTS "Users can create campaigns" ON campaigns;
+DROP POLICY IF EXISTS "Users can update campaigns" ON campaigns;
+DROP POLICY IF EXISTS "Users can delete campaigns" ON campaigns;
+
+CREATE POLICY "Users can view all campaigns" ON campaigns
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can create campaigns" ON campaigns
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update campaigns" ON campaigns
+  FOR UPDATE USING (true);
+
+CREATE POLICY "Users can delete campaigns" ON campaigns
+  FOR DELETE USING (true);
+
+-- 10. OTHER DATA TABLES (basic structure)
+CREATE TABLE IF NOT EXISTS contacts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  company TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ideas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  status TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS media (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  publication TEXT,
+  url TEXT,
+  date DATE,
+  notes TEXT,
+  content_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT,
+  due_date DATE,
+  assigned_to TEXT,
+  content_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS briefings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  content_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sponsorships (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS strategy (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  description TEXT,
+  content_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS on all data tables
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ideas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE briefings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sponsorships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE strategy ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for all data tables (allow all operations)
+DO $$
+DECLARE
+  table_name TEXT;
+  tables TEXT[] := ARRAY['contacts', 'ideas', 'media', 'tasks', 'briefings', 'sponsorships', 'strategy', 'assets'];
+BEGIN
+  FOREACH table_name IN ARRAY tables
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Users can view all %s" ON %I', table_name, table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can create %s" ON %I', table_name, table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can update %s" ON %I', table_name, table_name);
+    EXECUTE format('DROP POLICY IF EXISTS "Users can delete %s" ON %I', table_name, table_name);
+    
+    EXECUTE format('CREATE POLICY "Users can view all %s" ON %I FOR SELECT USING (true)', table_name, table_name);
+    EXECUTE format('CREATE POLICY "Users can create %s" ON %I FOR INSERT WITH CHECK (true)', table_name, table_name);
+    EXECUTE format('CREATE POLICY "Users can update %s" ON %I FOR UPDATE USING (true)', table_name, table_name);
+    EXECUTE format('CREATE POLICY "Users can delete %s" ON %I FOR DELETE USING (true)', table_name, table_name);
+  END LOOP;
+END $$;
+

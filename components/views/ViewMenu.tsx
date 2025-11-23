@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Edit2, Copy, Trash2, Check, X, MoreVertical, Grid, Layout, Calendar, Clock, FileText } from "lucide-react";
+import { Edit2, Copy, Trash2, Check, X, MoreVertical, Grid, Layout, Calendar, Clock, FileText, Plus } from "lucide-react";
 import { ViewConfig } from "@/lib/types/viewConfig";
+import CreateViewModal from "./CreateViewModal";
 
 interface ViewMenuProps {
   view: ViewConfig | null;
@@ -38,6 +39,7 @@ export default function ViewMenu({
   const [isRenaming, setIsRenaming] = useState(false);
   const [newName, setNewName] = useState(view?.view_name || "");
   const [showMenu, setShowMenu] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -83,16 +85,52 @@ export default function ViewMenu({
     setIsRenaming(false);
   };
 
+  const handleCreateView = async (viewName: string, viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => {
+    await onCreateView();
+    // The actual creation will be handled by the parent component
+    // We need to pass the view name and type somehow
+    // For now, we'll use a prompt fallback if the parent doesn't handle it
+    const response = await fetch("/api/views", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        table_name: (view as any)?.table_name || "",
+        view_name: viewName,
+        view_type: viewType,
+        column_order: [],
+        column_widths: {},
+        hidden_columns: [],
+        filters: [],
+        sort: [],
+        groupings: [],
+        row_height: "medium",
+        is_default: false,
+      }),
+    });
+    if (response.ok) {
+      // Reload the page to show the new view
+      window.location.reload();
+    }
+  };
+
   if (!view) {
     return (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onCreateView}
-          className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition"
-        >
-          + New View
-        </button>
-      </div>
+      <>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New View
+          </button>
+        </div>
+        <CreateViewModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCreate={handleCreateView}
+        />
+      </>
     );
   }
 
@@ -166,6 +204,17 @@ export default function ViewMenu({
 
             {showMenu && (
               <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[200px] z-50">
+                <button
+                  onClick={() => {
+                    setShowCreateModal(true);
+                    setShowMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 border-b border-gray-200 dark:border-gray-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create new view</span>
+                </button>
+
                 <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">View Type</div>
                   <div className="flex flex-wrap gap-1">
@@ -250,6 +299,12 @@ export default function ViewMenu({
           </div>
         </>
       )}
+      <CreateViewModal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateView}
+        currentViewType={view?.view_type}
+      />
     </div>
   );
 }

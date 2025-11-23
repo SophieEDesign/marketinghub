@@ -23,6 +23,9 @@ import EmptyState from "../ui/EmptyState";
 import DeleteConfirmModal from "../ui/DeleteConfirmModal";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { usePermissions } from "@/lib/hooks/usePermissions";
+import { useUndo } from "@/lib/undo/useUndo";
+import UndoToast from "../common/UndoToast";
 
 interface GridViewProps {
   tableId: string;
@@ -32,9 +35,13 @@ function GridViewComponent({ tableId }: GridViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
   const viewId = pathParts[1] || "grid";
+  const permissions = usePermissions();
+  const { addAction, undo, lastAction, canUndo } = useUndo();
+  const [dismissedAction, setDismissedAction] = useState<string | null>(null);
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{
     rowId: string;
     fieldId: string;
@@ -225,7 +232,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
 
   // Load records with filters and sort (optimized with caching and column selection)
   useEffect(() => {
-    if (!tableId || fieldsLoading) return;
+    if (!tableId) return;
     
     async function load() {
       setLoading(true);
@@ -237,6 +244,29 @@ function GridViewComponent({ tableId }: GridViewProps) {
       );
 
       const loadData = async () => {
+        // If fields are still loading or we have no fields, use select all to avoid column errors
+        if (fieldsLoading || fields.length === 0) {
+          console.log(`Fields not ready for ${tableId}, using select('*')`);
+          let query = supabase.from(tableId).select("*").limit(200);
+          query = applyFiltersAndSort(query, filters, sort);
+          if (sort.length === 0) {
+            query = query.order("created_at", { ascending: false });
+          }
+          const { data, error } = await query;
+          if (error) {
+            console.error("Error loading records with select(*):", error);
+            if (error.code === '42P01') {
+              setError(`Table "${tableId}" does not exist in the database. Please create it in Supabase.`);
+            } else {
+              setError(`Error loading records: ${error.message}`);
+            }
+            return [];
+          }
+          setError(null);
+          return data || [];
+        }
+
+        // Try with specific columns first
         let query = supabase.from(tableId).select(requiredColumns).limit(200);
 
         // Apply filters and sort
@@ -247,23 +277,55 @@ function GridViewComponent({ tableId }: GridViewProps) {
           query = query.order("created_at", { ascending: false });
         }
 
-        const { data, error } = await query;
+        let { data, error } = await query;
+
+        // If error is due to missing columns, fall back to select all
+        if (error && (error.code === '42703' || error.message?.includes('does not exist') || error.message?.includes('column') || error.code === '42P01')) {
+          console.warn(`Some columns don't exist (${error.message}), falling back to select('*'):`, error);
+          // Retry with select all
+          let fallbackQuery = supabase.from(tableId).select("*").limit(200);
+          fallbackQuery = applyFiltersAndSort(fallbackQuery, filters, sort);
+          if (sort.length === 0) {
+            fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
+          }
+          const fallbackResult = await fallbackQuery;
+          if (!fallbackResult.error && fallbackResult.data) {
+            setError(null);
+            return fallbackResult.data;
+          } else if (fallbackResult.error) {
+            console.error("Fallback query also failed:", fallbackResult.error);
+            // If table doesn't exist, return empty array
+            if (fallbackResult.error.code === '42P01') {
+              setError(`Table "${tableId}" does not exist in the database. Please create it in Supabase.`);
+              return [];
+            }
+            setError(`Error loading records: ${fallbackResult.error.message}`);
+            return [];
+          }
+        }
 
         if (!error && data) {
+          setError(null);
           return data;
         } else if (error) {
           console.error("Error loading records:", error);
+          // If table doesn't exist, return empty array
+          if (error.code === '42P01') {
+            setError(`Table "${tableId}" does not exist in the database. Please create it in Supabase.`);
+            return [];
+          }
+          setError(`Error loading records: ${error.message}`);
           return [];
         }
         return [];
       };
 
       const data = await getOrFetch(cacheKey, loadData, 2 * 60 * 1000); // 2 min cache
-      setRows(data);
+      setRows(data || []);
       setLoading(false);
     }
     load();
-  }, [tableId, filters, sort, requiredColumns, fieldsLoading]);
+  }, [tableId, filters, sort, requiredColumns, fieldsLoading, fields]);
 
   const [isPending, startTransition] = useTransition();
 
@@ -294,6 +356,9 @@ function GridViewComponent({ tableId }: GridViewProps) {
     if (idsToDelete.length === 0) return;
 
     try {
+      // Store deleted rows for undo
+      const deletedRows = rows.filter((row) => idsToDelete.includes(row.id));
+
       const { error } = await supabase
         .from(tableId)
         .delete()
@@ -302,6 +367,29 @@ function GridViewComponent({ tableId }: GridViewProps) {
       if (error) {
         throw error;
       }
+
+      // Add undo action
+      addAction({
+        type: "delete_records",
+        description: `Deleted ${idsToDelete.length} record${idsToDelete.length > 1 ? "s" : ""}`,
+        undo: async () => {
+          // Restore deleted rows
+          for (const row of deletedRows) {
+            const { id, ...rowData } = row;
+            await supabase.from(tableId).insert([rowData]);
+          }
+          invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+          setRows((prevRows) => [...prevRows, ...deletedRows]);
+        },
+        redo: async () => {
+          await supabase
+            .from(tableId)
+            .delete()
+            .in("id", idsToDelete);
+          invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+          setRows((prevRows) => prevRows.filter((row) => !idsToDelete.includes(row.id)));
+        },
+      });
 
       // Remove deleted rows from local state
       setRows((prevRows) => prevRows.filter((row) => !idsToDelete.includes(row.id)));
@@ -328,6 +416,30 @@ function GridViewComponent({ tableId }: GridViewProps) {
       });
     }
   };
+
+  // Show error message if there's an error
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Error Loading Table</h3>
+          <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              // Force reload by clearing cache and reloading
+              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+              window.location.reload();
+            }}
+            className="mt-3 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || fieldsLoading || viewConfigLoading) {
     return (
@@ -588,7 +700,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
         onViewSettingsUpdate={handleViewSettingsUpdate}
         selectedRowCount={selectedRows.size}
         onBulkDelete={
-          selectedRows.size > 0
+          selectedRows.size > 0 && permissions.canDelete
             ? () => setDeleteConfirm({ isOpen: true, rowIds: Array.from(selectedRows) })
             : undefined
         }
@@ -769,13 +881,13 @@ function GridViewComponent({ tableId }: GridViewProps) {
             {rows.map((row, index) => (
               <tr
                 key={row.id}
-                className={`transition-colors duration-150 ${
+                className={`transition-all duration-200 ease-in-out ${
                   index % 2 === 0 
                     ? "bg-white dark:bg-gray-900" 
                     : "bg-gray-50/50 dark:bg-gray-800/50"
-                } hover:bg-gray-100 dark:hover:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${
+                } hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm border-b border-gray-200 dark:border-gray-700 ${
                   rowHeight === "compact" ? "h-10" : rowHeight === "tall" ? "h-20" : "h-14"
-                } ${selectedRows.has(row.id) ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                } ${selectedRows.has(row.id) ? "bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-200 dark:ring-blue-800" : ""}`}
               >
                 <td className="px-2">
                   <input
@@ -804,11 +916,11 @@ function GridViewComponent({ tableId }: GridViewProps) {
                 <td
                   key={field.id}
                   style={cellWidth ? { width: `${cellWidth}px`, minWidth: `${cellWidth}px` } : undefined}
-                  className={`px-4 py-3 text-sm ${field.type === "number" ? "text-right" : ""} ${
-                    !isEditing ? "cursor-pointer" : ""
+                  className={`px-4 py-3 text-sm transition-colors duration-150 ${field.type === "number" ? "text-right" : ""} ${
+                    !isEditing ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50" : ""
                   }`}
                   onClick={() => {
-                    if (!isEditing) {
+                    if (!isEditing && permissions.canEdit) {
                       // For select fields, start inline editing
                       if (
                         field.type === "single_select" ||
@@ -819,10 +931,13 @@ function GridViewComponent({ tableId }: GridViewProps) {
                         // For other fields, open drawer
                         openRecord(tableId, row.id);
                       }
+                    } else if (!isEditing) {
+                      // Viewers can still open the drawer to view
+                      openRecord(tableId, row.id);
                     }
                   }}
                   onDoubleClick={() => {
-                    if (!isEditing) {
+                    if (!isEditing && permissions.canEdit) {
                       setEditingCell({ rowId: row.id, fieldId: field.id });
                     }
                   }}
@@ -837,6 +952,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
                         try {
                           // Store previous state for automation comparison
                           const previousRecord = { ...row };
+                          const previousValue = previousRecord[field.field_key];
 
                           // Update the field
                           const { error, data: updatedRecord } = await supabase
@@ -853,6 +969,36 @@ function GridViewComponent({ tableId }: GridViewProps) {
                           if (!updatedRecord) {
                             throw new Error("Failed to update record");
                           }
+
+                          // Add undo action
+                          addAction({
+                            type: "field_edit",
+                            description: `Updated ${field.label}`,
+                            undo: async () => {
+                              await supabase
+                                .from(tableId)
+                                .update({ [field.field_key]: previousValue })
+                                .eq("id", row.id);
+                              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.id === row.id ? { ...r, [field.field_key]: previousValue } : r
+                                )
+                              );
+                            },
+                            redo: async () => {
+                              await supabase
+                                .from(tableId)
+                                .update({ [field.field_key]: newValue })
+                                .eq("id", row.id);
+                              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.id === row.id ? updatedRecord : r
+                                )
+                              );
+                            },
+                          });
 
                           // Log field change
                           await logFieldChanges(previousRecord, updatedRecord, tableId, "user");
@@ -973,6 +1119,18 @@ function GridViewComponent({ tableId }: GridViewProps) {
         confirmText="Delete"
         cancelText="Cancel"
       />
+
+      {/* Undo Toast */}
+      {lastAction && lastAction.id !== dismissedAction && (
+        <UndoToast
+          action={lastAction}
+          onUndo={async () => {
+            await undo();
+            setDismissedAction(lastAction.id);
+          }}
+          onDismiss={() => setDismissedAction(lastAction.id)}
+        />
+      )}
     </div>
   );
 }

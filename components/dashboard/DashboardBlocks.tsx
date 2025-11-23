@@ -20,6 +20,7 @@ import ImageBlock from "./blocks/ImageBlock";
 import EmbedBlock from "./blocks/EmbedBlock";
 import BlockMenu from "./blocks/BlockMenu";
 import { supabase } from "@/lib/supabaseClient";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface DashboardBlock {
   id: string;
@@ -38,11 +39,13 @@ function SortableBlockWrapper({
   onUpdate,
   onDelete,
   isDragging,
+  canEdit,
 }: {
   block: DashboardBlock;
   onUpdate: (id: string, content: any) => void;
   onDelete: (id: string) => void;
   isDragging: boolean;
+  canEdit: boolean;
 }) {
   const {
     attributes,
@@ -63,8 +66,8 @@ function SortableBlockWrapper({
         <TextBlock
           id={block.id}
           content={block.content}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
+          onUpdate={canEdit ? onUpdate : undefined}
+          onDelete={canEdit ? onDelete : undefined}
           isDragging={isDragging}
         />
       )}
@@ -72,8 +75,8 @@ function SortableBlockWrapper({
         <ImageBlock
           id={block.id}
           content={block.content}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
+          onUpdate={canEdit ? onUpdate : undefined}
+          onDelete={canEdit ? onDelete : undefined}
           isDragging={isDragging}
         />
       )}
@@ -81,8 +84,8 @@ function SortableBlockWrapper({
         <EmbedBlock
           id={block.id}
           content={block.content}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
+          onUpdate={canEdit ? onUpdate : undefined}
+          onDelete={canEdit ? onDelete : undefined}
           isDragging={isDragging}
         />
       )}
@@ -91,6 +94,7 @@ function SortableBlockWrapper({
 }
 
 export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
+  const permissions = usePermissions();
   const [blocks, setBlocks] = useState<DashboardBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -228,14 +232,15 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
   return (
     <div className="space-y-4">
       {/* Add Block Button */}
-      <div className="relative">
-        <button
-          onClick={() => setShowBlockMenu(!showBlockMenu)}
-          className="btn-secondary flex items-center gap-2 w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4" />
-          Add Block
-        </button>
+      {permissions.canModifyDashboards && (
+        <div className="relative">
+          <button
+            onClick={() => setShowBlockMenu(!showBlockMenu)}
+            className="btn-secondary flex items-center gap-2 w-full sm:w-auto"
+          >
+            <Plus className="w-4 h-4" />
+            Add Block
+          </button>
         {showBlockMenu && (
           <>
             <div
@@ -250,7 +255,8 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
             </div>
           </>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Blocks List */}
       <DndContext
@@ -275,6 +281,7 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
                   onUpdate={handleUpdateBlock}
                   onDelete={handleDeleteBlock}
                   isDragging={activeId === block.id}
+                  canEdit={permissions.canModifyDashboards}
                 />
               ))
             )}

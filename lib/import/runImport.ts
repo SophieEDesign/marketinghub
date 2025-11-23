@@ -100,6 +100,199 @@ export async function runImport(
         }
 
         if (existing) {
+          // Remove columns that don't exist in the database
+          // Filter out any columns that might cause errors
+          const safeRow = { ...row };
+          // Remove id from update (it's in the WHERE clause)
+          delete safeRow.id;
+          
+          const { error: updateError } = await supabase
+            .from(options.tableId)
+            .update(safeRow)
+            .eq("id", existing.id);
+
+          if (updateError) {
+            // If update fails due to missing columns, try to identify and remove them
+            if (updateError.code === '42703' || updateError.message?.includes('does not exist')) {
+              console.warn(`[runImport] Column doesn't exist, trying with minimal columns for row ${i + 1}`);
+              // Try with only basic columns that should exist
+              const minimalRow: any = {};
+              if (safeRow[upsertKey] !== undefined) minimalRow[upsertKey] = safeRow[upsertKey];
+              if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
+              if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
+              
+              const { error: minimalError } = await supabase
+                .from(options.tableId)
+                .update(minimalRow)
+                .eq("id", existing.id);
+              
+              if (minimalError) {
+                console.error(`[runImport] Update error for row ${i + 1}:`, minimalError);
+                result.errors.push({ row: i + 1, error: `Update failed: ${minimalError.message}` });
+                result.skipped++;
+                continue;
+              }
+            } else {
+              console.error(`[runImport] Update error for row ${i + 1}:`, updateError);
+              result.errors.push({ row: i + 1, error: `Update failed: ${updateError.message}` });
+              result.skipped++;
+              continue;
+            }
+          } else {
+            result.updated++;
+          }
+        } else {
+          // Insert new record
+          // Remove columns that might not exist
+          const safeRow = { ...row };
+          delete safeRow.id; // Don't insert id, let DB generate it
+          
+          const { error: insertError } = await supabase
+            .from(options.tableId)
+            .insert([safeRow]);
+
+          if (insertError) {
+            // If insert fails due to missing columns, try with minimal columns
+            if (insertError.code === '42703' || insertError.message?.includes('does not exist')) {
+              console.warn(`[runImport] Column doesn't exist, trying with minimal columns for row ${i + 1}`);
+              const minimalRow: any = {};
+              if (safeRow[upsertKey] !== undefined) minimalRow[upsertKey] = safeRow[upsertKey];
+              if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
+              if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
+              
+              const { error: minimalError } = await supabase
+                .from(options.tableId)
+                .insert([minimalRow]);
+              
+              if (minimalError) {
+                console.error(`[runImport] Insert error for row ${i + 1}:`, minimalError);
+                result.errors.push({ row: i + 1, error: `Insert failed: ${minimalError.message}` });
+                result.skipped++;
+                continue;
+              } else {
+                result.inserted++;
+              }
+            } else {
+              console.error(`[runImport] Insert error for row ${i + 1}:`, insertError);
+              result.errors.push({ row: i + 1, error: `Insert failed: ${insertError.message}` });
+              result.skipped++;
+              continue;
+            }
+          } else {
+            result.inserted++;
+          }
+        }
+      } catch (err: any) {
+        console.error(`[runImport] Exception for row ${i + 1}:`, err);
+        result.errors.push({ row: i + 1, error: err.message || "Unknown error" });
+        result.skipped++;
+      }
+    }
+  } else {
+    // Insert mode: only insert new records
+    // Batch insert for better performance
+    const batchSize = 100;
+    for (let i = 0; i < transformedRows.length; i += batchSize) {
+      const batch = transformedRows.slice(i, i + batchSize);
+      
+      try {
+        // Remove id from batch (let DB generate it)
+        const safeBatch = batch.map(row => {
+          const { id, ...rest } = row;
+          return rest;
+        });
+        
+        const { error: insertError } = await supabase
+          .from(options.tableId)
+          .insert(safeBatch);
+
+        if (insertError) {
+          // If batch fails due to missing columns, try individual inserts with error handling
+          if (insertError.code === '42703' || insertError.message?.includes('does not exist')) {
+            console.warn(`[runImport] Some columns don't exist, trying individual inserts for batch starting at row ${i + 1}`);
+            // Try individual inserts
+            for (let j = 0; j < safeBatch.length; j++) {
+              try {
+                const { error: singleError } = await supabase
+                  .from(options.tableId)
+                  .insert([safeBatch[j]]);
+
+                if (singleError) {
+                  // If still fails, try with only the upsert key and timestamps
+                  if (singleError.code === '42703' || singleError.message?.includes('does not exist')) {
+                    const minimalRow: any = {};
+                    if (safeBatch[j][upsertKey] !== undefined) minimalRow[upsertKey] = safeBatch[j][upsertKey];
+                    if (safeBatch[j].created_at !== undefined) minimalRow.created_at = safeBatch[j].created_at;
+                    if (safeBatch[j].updated_at !== undefined) minimalRow.updated_at = safeBatch[j].updated_at;
+                    
+                    const { error: minimalError } = await supabase
+                      .from(options.tableId)
+                      .insert([minimalRow]);
+                    
+                    if (minimalError) {
+                      console.error(`[runImport] Minimal insert error for row ${i + j + 1}:`, minimalError);
+                      result.errors.push({ row: i + j + 1, error: `Insert failed: ${minimalError.message}` });
+                      result.skipped++;
+                    } else {
+                      result.inserted++;
+                      result.warnings.push({ row: i + j + 1, warning: `Only basic fields inserted due to missing columns` });
+                    }
+                  } else {
+                    console.error(`[runImport] Single insert error for row ${i + j + 1}:`, singleError);
+                    result.errors.push({ row: i + j + 1, error: singleError.message });
+                    result.skipped++;
+                  }
+                } else {
+                  result.inserted++;
+                }
+              } catch (err: any) {
+                console.error(`[runImport] Exception for row ${i + j + 1}:`, err);
+                result.errors.push({ row: i + j + 1, error: err.message || "Unknown error" });
+                result.skipped++;
+              }
+            }
+          } else {
+            console.error(`[runImport] Batch insert error for batch starting at row ${i + 1}:`, {
+              error: insertError,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+              code: insertError.code,
+              tableId: options.tableId,
+            });
+            // If batch fails, try individual inserts
+            for (let j = 0; j < safeBatch.length; j++) {
+              try {
+                const { error: singleError } = await supabase
+                  .from(options.tableId)
+                  .insert([safeBatch[j]]);
+
+                if (singleError) {
+                  console.error(`[runImport] Single insert error for row ${i + j + 1}:`, singleError);
+                  result.errors.push({ row: i + j + 1, error: singleError.message });
+                  result.skipped++;
+                } else {
+                  result.inserted++;
+                }
+              } catch (err: any) {
+                console.error(`[runImport] Exception for row ${i + j + 1}:`, err);
+                result.errors.push({ row: i + j + 1, error: err.message || "Unknown error" });
+                result.skipped++;
+              }
+            }
+          }
+        } else {
+          result.inserted += batch.length;
+        }
+      } catch (err: any) {
+        result.errors.push({ row: i + 1, error: err.message || "Unknown error" });
+        result.skipped += batch.length;
+      }
+    }
+  }
+
+  return result;
+}
           // Update existing
           const { error: updateError } = await supabase
             .from(options.tableId)

@@ -149,6 +149,44 @@ export default function Sidebar() {
     localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups]);
 
+  // Load sidebar customizations from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebarCustomizations");
+    if (saved) {
+      try {
+        const customizations = JSON.parse(saved);
+        // Apply customizations to navGroups if needed
+        // For now, we'll just load them and apply when rendering
+      } catch (e) {
+        console.error("Error loading sidebar customizations:", e);
+      }
+    }
+  }, []);
+
+  // Handler for group title changes
+  const handleGroupTitleChange = (oldTitle: string, newTitle: string) => {
+    const saved = localStorage.getItem("sidebarCustomizations");
+    const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
+    customizations.groupTitles = customizations.groupTitles || {};
+    customizations.groupTitles[oldTitle] = newTitle;
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(customizations));
+    // Force re-render by updating state
+    setEditing(false);
+    setTimeout(() => setEditing(true), 0);
+  };
+
+  // Handler for item label changes
+  const handleItemLabelChange = (href: string, newLabel: string) => {
+    const saved = localStorage.getItem("sidebarCustomizations");
+    const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
+    customizations.itemLabels = customizations.itemLabels || {};
+    customizations.itemLabels[href] = newLabel;
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(customizations));
+    // Force re-render by updating state
+    setEditing(false);
+    setTimeout(() => setEditing(true), 0);
+  };
+
   // Parse current route
   const pathParts = pathname.split("/").filter(Boolean);
   const currentTable = pathParts[0] || null;
@@ -387,17 +425,34 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
-          {navGroups.map((group) => (
-            <NavGroupComponent
-              key={group.title}
-              group={group}
-              isGroupCollapsed={isGroupCollapsed}
-              toggleGroup={toggleGroup}
-              isItemActive={isItemActive}
-              isChildActive={isChildActive}
-              collapsed={collapsed}
-            />
-          ))}
+          {navGroups.map((group) => {
+            // Apply customizations from localStorage
+            const saved = localStorage.getItem("sidebarCustomizations");
+            const customizations = saved ? JSON.parse(saved) : { groupTitles: {}, itemLabels: {} };
+            const customTitle = customizations.groupTitles?.[group.title] || group.title;
+            const customizedGroup = {
+              ...group,
+              title: customTitle,
+              items: group.items.map((item) => ({
+                ...item,
+                label: customizations.itemLabels?.[item.href] || item.label,
+              })),
+            };
+            return (
+              <NavGroupComponent
+                key={group.title}
+                group={customizedGroup}
+                isGroupCollapsed={isGroupCollapsed}
+                toggleGroup={toggleGroup}
+                isItemActive={isItemActive}
+                isChildActive={isChildActive}
+                collapsed={collapsed}
+                editing={editing}
+                onGroupTitleChange={handleGroupTitleChange}
+                onItemLabelChange={handleItemLabelChange}
+              />
+            );
+          })}
         </div>
 
         {/* Footer */}

@@ -9,6 +9,7 @@ import ViewSortPanel from "./ViewSortPanel";
 import FilterBadges from "../filters/FilterBadges";
 import ViewSettingsDrawer from "../view-settings/ViewSettingsDrawer";
 import ViewMenu from "./ViewMenu";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface ViewSettings {
   visible_fields?: string[]; // Legacy - use hidden_columns instead
@@ -72,6 +73,7 @@ export default function ViewHeader({
   onResetLayout,
   onCreateView,
 }: ViewHeaderProps) {
+  const permissions = usePermissions();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
@@ -94,13 +96,13 @@ export default function ViewHeader({
             <ViewMenu
               view={currentView}
               views={views}
-              onRename={onRenameView || (async () => {})}
-              onDuplicate={onDuplicateView || (async () => {})}
-              onDelete={onDeleteView || (async () => {})}
-              onSetDefault={onSetDefaultView || (async () => {})}
-              onChangeViewType={onChangeViewType || (async () => {})}
-              onResetLayout={onResetLayout || (async () => {})}
-              onCreateView={onCreateView || (async () => {})}
+              onRename={permissions.canModifyViews ? (onRenameView || (async () => {})) : undefined}
+              onDuplicate={permissions.canModifyViews ? (onDuplicateView || (async () => {})) : undefined}
+              onDelete={permissions.canModifyViews ? (onDeleteView || (async () => {})) : undefined}
+              onSetDefault={permissions.canModifyViews ? (onSetDefaultView || (async () => {})) : undefined}
+              onChangeViewType={permissions.canModifyViews ? (onChangeViewType || (async () => {})) : undefined}
+              onResetLayout={permissions.canModifyViews ? (onResetLayout || (async () => {})) : undefined}
+              onCreateView={permissions.canModifyViews ? (onCreateView || (async () => {})) : undefined}
             />
           )}
           <FilterBadges
@@ -110,7 +112,7 @@ export default function ViewHeader({
           />
         </div>
         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-          {selectedRowCount > 0 && onBulkDelete && (
+          {selectedRowCount > 0 && onBulkDelete && permissions.canDelete && (
             <button
               onClick={onBulkDelete}
               className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation bg-red-50 text-red-600 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
@@ -139,14 +141,16 @@ export default function ViewHeader({
               Sort {sort.length > 0 && `(${sort.length})`}
             </span>
           </button>
-          <button
-            onClick={() => setShowSettingsDrawer(true)}
-            className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation"
-            title="View Settings"
-          >
-            <Settings className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-            <span className="text-sm md:text-base hidden sm:inline">Settings</span>
-          </button>
+          {permissions.canModifyViews && (
+            <button
+              onClick={() => setShowSettingsDrawer(true)}
+              className="btn-secondary flex items-center justify-center gap-2 w-full sm:w-auto py-2.5 md:py-2 touch-manipulation"
+              title="View Settings"
+            >
+              <Settings className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+              <span className="text-sm md:text-base hidden sm:inline">Settings</span>
+            </button>
+          )}
         </div>
       </div>
 
