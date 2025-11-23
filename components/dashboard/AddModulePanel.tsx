@@ -222,30 +222,60 @@ export default function AddModulePanel({ open, onClose, onAdd }: AddModulePanelP
   if (!open) return null;
 
   const handleAdd = async () => {
-    if (selectedType) {
-      try {
-        const moduleType = moduleTypes.find((t) => t.id === selectedType);
-        const finalConfig = { ...moduleType?.defaultConfig, ...config };
-        
+    if (!selectedType) {
+      alert("Please select a module type");
+      return;
+    }
+
+    try {
+      const moduleType = moduleTypes.find((t) => t.id === selectedType);
+      if (!moduleType) {
+        alert("Invalid module type selected");
+        return;
+      }
+
+      const finalConfig = { ...moduleType.defaultConfig, ...config };
+      
         // Validate KPI config if needed
         if (selectedType === "kpi") {
-          if (!finalConfig.title) {
+          if (!finalConfig.title || finalConfig.title.trim() === "") {
             alert("Please enter a title for the KPI");
             return;
           }
+          // If using table data source, ensure calculation is set
           if (finalConfig.table && !finalConfig.calculation) {
             finalConfig.calculation = "count"; // Default to count if table is selected
           }
+          // If using manual value, ensure value is set (allow 0 as valid value)
+          if (!finalConfig.table && (finalConfig.value === undefined || finalConfig.value === null || finalConfig.value === "" || isNaN(Number(finalConfig.value)))) {
+            alert("Please enter a valid numeric value for the KPI");
+            return;
+          }
+          // Ensure value is a number
+          if (!finalConfig.table && finalConfig.value !== undefined && finalConfig.value !== null) {
+            finalConfig.value = Number(finalConfig.value);
+          }
         }
-        
-        await onAdd(selectedType, finalConfig);
-        setSelectedType(null);
-        setConfig({});
-        onClose();
-      } catch (error) {
-        console.error("Error adding module:", error);
-        alert(`Failed to add module: ${error instanceof Error ? error.message : "Unknown error"}`);
+
+      // Validate other module types
+      if (selectedType === "table_preview" && !finalConfig.table) {
+        alert("Please select a table for the preview");
+        return;
       }
+
+      if (selectedType === "custom_embed" && (!finalConfig.url || finalConfig.url.trim() === "")) {
+        alert("Please enter a URL for the embed");
+        return;
+      }
+      
+      await onAdd(selectedType, finalConfig);
+      setSelectedType(null);
+      setConfig({});
+      onClose();
+    } catch (error) {
+      console.error("Error adding module:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to add module: ${errorMessage}\n\nPlease check the browser console for details.`);
     }
   };
 

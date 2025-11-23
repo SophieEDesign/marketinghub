@@ -114,22 +114,27 @@ export default function DashboardEditor({
 
   const handleAddModule = useCallback(
     async (type: string, config: any) => {
-      // Find the highest y position to place new module below existing ones
-      const maxY = modules.length > 0
-        ? Math.max(...modules.map((m) => m.position_y + m.height))
-        : 0;
+      try {
+        // Find the highest y position to place new module below existing ones
+        const maxY = modules.length > 0
+          ? Math.max(...modules.map((m) => m.position_y + m.height))
+          : 0;
 
-      const newModule: Omit<DashboardModule, "id" | "dashboard_id"> = {
-        type,
-        position_x: 0,
-        position_y: maxY,
-        width: type === "kpi" ? 3 : 4,
-        height: type === "kpi" ? 3 : 4,
-        config,
-      };
+        const newModule: Omit<DashboardModule, "id" | "dashboard_id"> = {
+          type,
+          position_x: 0,
+          position_y: maxY,
+          width: type === "kpi" ? 3 : 4,
+          height: type === "kpi" ? 3 : 4,
+          config: config || {},
+        };
 
-      await onModuleCreate(newModule);
-      setShowAddPanel(false);
+        await onModuleCreate(newModule);
+        setShowAddPanel(false);
+      } catch (error) {
+        console.error("Error in handleAddModule:", error);
+        throw error; // Re-throw to be handled by AddModulePanel
+      }
     },
     [modules, onModuleCreate]
   );
