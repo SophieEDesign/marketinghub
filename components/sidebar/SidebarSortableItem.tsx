@@ -79,14 +79,27 @@ export default function SidebarSortableItem({
           <GripVertical className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" />
         </div>
       )}
-      <Link
-        href={href}
-        onClick={onClick}
-        className="flex items-center gap-2 flex-1 min-w-0"
-      >
-        <Icon className="w-4 h-4 flex-shrink-0" />
-        {!collapsed && <span className="truncate">{label}</span>}
-      </Link>
+      {href === "#" && onClick ? (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onClick();
+          }}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          <Icon className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </button>
+      ) : (
+        <Link
+          href={href}
+          onClick={onClick}
+          className="flex items-center gap-2 flex-1 min-w-0"
+        >
+          <Icon className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </Link>
+      )}
     </div>
   );
 }

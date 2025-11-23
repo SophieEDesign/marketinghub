@@ -61,6 +61,10 @@ export async function GET(
     }
 
     if (tableError && !table) {
+      // If it's a "not found" error (PGRST116), return 404
+      if (tableError.code === 'PGRST116' || tableError.message?.includes('No rows')) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
       console.error("Error fetching table:", tableError);
       return NextResponse.json({ error: tableError.message || "Table not found" }, { status: 404 });
     }
