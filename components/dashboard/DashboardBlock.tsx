@@ -12,8 +12,8 @@ import { DashboardBlock as DashboardBlockType } from "@/lib/hooks/useDashboardBl
 interface DashboardBlockProps {
   block: DashboardBlockType;
   isEditing: boolean;
-  onUpdate: (id: string, content: any) => void;
-  onDelete: (id: string) => void;
+  onUpdate?: (id: string, content: any) => void;
+  onDelete?: (id: string) => void;
   isDragging?: boolean;
 }
 
