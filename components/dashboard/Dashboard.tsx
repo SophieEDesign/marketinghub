@@ -32,19 +32,44 @@ export default function Dashboard() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [modules, setModules] = useState<DashboardModule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, any[]>>({});
 
   // Load dashboard and modules
   useEffect(() => {
     async function loadDashboard() {
       try {
+        setError(null);
         const response = await fetch(`/api/dashboards/${dashboardId}`);
-        if (!response.ok) throw new Error("Failed to load dashboard");
         const result = await response.json();
+        
+        if (!response.ok) {
+          const errorMsg = result.error || "Failed to load dashboard";
+          const details = result.details || "";
+          const code = result.code || "";
+          
+          // Check if it's a missing table error
+          if (code === 'PGRST116' || code === '42P01' || 
+              errorMsg.includes('does not exist') || 
+              errorMsg.includes('migration')) {
+            setError(
+              `Dashboard tables not found. Please run the database migration:\n\n` +
+              `1. Open Supabase Dashboard\n` +
+              `2. Go to SQL Editor\n` +
+              `3. Run: supabase-all-tables-migration.sql\n\n` +
+              `Error: ${errorMsg}`
+            );
+          } else {
+            setError(`Failed to load dashboard: ${errorMsg}`);
+          }
+          return;
+        }
+        
         setDashboard(result.dashboard);
         setModules(result.modules || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error loading dashboard:", error);
+        setError(`Error loading dashboard: ${error.message || "Unknown error"}`);
       } finally {
         setLoading(false);
       }
@@ -153,6 +178,31 @@ export default function Dashboard() {
       <div className="p-6">
         <div className="text-center text-gray-500 dark:text-gray-400 py-8">
           Loading dashboard...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-[1600px] mx-auto">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-red-900 dark:text-red-100 mb-4">
+            Dashboard Error
+          </h2>
+          <pre className="whitespace-pre-wrap text-sm text-red-700 dark:text-red-300 font-mono bg-red-100 dark:bg-red-900/40 p-4 rounded">
+            {error}
+          </pre>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              window.location.reload();
+            }}
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
