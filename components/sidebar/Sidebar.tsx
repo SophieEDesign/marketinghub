@@ -48,7 +48,9 @@ const viewIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 import { tableMetadata, getTableIcon, getAllTables } from "@/lib/tableMetadata";
-import { BookOpen, Gift, Compass, Image as ImageIcon } from "lucide-react";
+import { BookOpen, Gift, Compass, Image as ImageIcon, Layout, Plus } from "lucide-react";
+import { useInterfacePages } from "@/lib/hooks/useInterfacePages";
+import NewPageModal from "@/components/pages/NewPageModal";
 
 // Map table IDs to icons - now uses metadata
 const getTableIconComponent = (tableId: string) => {
@@ -78,7 +80,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   href: string;
-  children?: { icon: React.ComponentType<{ className?: string }>; label: string; href: string }[];
+  children?: Array<{ icon: React.ComponentType<{ className?: string }>; label: string; href: string; onClick?: () => void }>;
 }
 
 interface NavGroup {
@@ -142,6 +144,8 @@ export default function Sidebar() {
   const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string> }>({ groupTitles: {}, itemLabels: {} });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { pages, createPage } = useInterfacePages();
+  const [showNewPageModal, setShowNewPageModal] = useState(false);
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -270,6 +274,29 @@ export default function Sidebar() {
       ],
     },
     {
+      title: "Interfaces",
+      items: [
+        {
+          icon: Layout,
+          label: "Pages",
+          href: "#",
+          children: [
+            ...pages.map((page) => ({
+              icon: FileText,
+              label: page.name,
+              href: `/pages/${page.id}`,
+            })),
+            {
+              icon: Plus,
+              label: "New Page",
+              href: "#",
+              onClick: () => setShowNewPageModal(true),
+            },
+          ],
+        },
+      ],
+    },
+    {
       title: "Content",
       items: (tableCategories
         .find((c) => c.id === "content")
@@ -377,11 +404,17 @@ export default function Sidebar() {
     if (href === "/dashboard") {
       return pathname === "/dashboard";
     }
+    if (href.startsWith("/interface/")) {
+      return pathname === href;
+    }
     const hrefParts = href.split("/").filter(Boolean);
     return hrefParts[0] === currentTable && (hrefParts[1] === currentView || hrefParts.length === 1);
   };
 
   const isChildActive = (href: string) => {
+    if (href.startsWith("/pages/")) {
+      return pathname === href;
+    }
     const hrefParts = href.split("/").filter(Boolean);
     return hrefParts[0] === currentTable && hrefParts[1] === currentView;
   };
@@ -528,6 +561,16 @@ export default function Sidebar() {
           onToggleEdit={() => setEditing(!editing)}
         />
       </aside>
+
+      {/* New Page Modal */}
+      <NewPageModal
+        open={showNewPageModal}
+        onClose={() => setShowNewPageModal(false)}
+        onCreate={async (name, layout) => {
+          await createPage(name, layout);
+          setShowNewPageModal(false);
+        }}
+      />
     </>
   );
 }
@@ -722,6 +765,19 @@ function NavGroupComponent({
                     <div className="ml-6 mt-0.5 space-y-0.5 border-l border-gray-200 dark:border-gray-700 pl-2">
                       {item.children?.map((child) => {
                         const childActive = isChildActive(child.href);
+                        const childOnClick = (child as any).onClick;
+                        if (childOnClick) {
+                          return (
+                            <button
+                              key={child.href}
+                              onClick={childOnClick}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-all duration-200 ease-in-out text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 w-full text-left"
+                            >
+                              <child.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span>{child.label}</span>
+                            </button>
+                          );
+                        }
                         return (
                           <Link
                             key={child.href}
@@ -740,19 +796,8 @@ function NavGroupComponent({
                       })}
                     </div>
                   )}
-                  {/* Dynamic views from database - extract tableId from href */}
-                  {/* Only show TableViewsList for actual table routes, not settings/tools */}
-                  {item.href.startsWith("/") && 
-                   item.href.split("/").length > 1 && 
-                   !item.href.startsWith("/settings") && 
-                   !item.href.startsWith("/import") && 
-                   !item.href.startsWith("/dashboard") && (
-                    <TableViewsList
-                      tableId={item.href.split("/")[1]}
-                      tableName={item.label}
-                      isExpanded={!itemCollapsed}
-                    />
-                  )}
+                  {/* Dynamic views from database - REMOVED: Views are now replaced by Interface Pages */}
+                  {/* TableViewsList removed - views are now managed through Interface Pages */}
                 </>
               )}
             </div>

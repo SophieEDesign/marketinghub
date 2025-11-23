@@ -538,6 +538,50 @@ CREATE POLICY "Users can update automation_steps" ON automation_steps FOR UPDATE
 CREATE POLICY "Users can delete automation_steps" ON automation_steps FOR DELETE USING (true);
 
 -- ============================================
+-- PAGES SYSTEM (Airtable-style Interfaces)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS pages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  layout TEXT DEFAULT 'custom', -- 'grid', 'kanban', 'calendar', 'timeline', 'gallery', 'list', 'dashboard', 'form', 'custom'
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pages_created_at ON pages(created_at);
+
+CREATE TABLE IF NOT EXISTS page_blocks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  page_id UUID NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+  type TEXT NOT NULL, -- 'grid', 'kanban', 'calendar', 'timeline', 'gallery', 'list', 'chart', 'kpi', 'text', 'image', 'button', 'record_picker', 'filter', 'divider'
+  position_x INTEGER DEFAULT 0,
+  position_y INTEGER DEFAULT 0,
+  width INTEGER DEFAULT 12, -- grid columns (1-12)
+  height INTEGER DEFAULT 6, -- grid rows
+  config JSONB DEFAULT '{}'::jsonb, -- contains table, filters, sort, fields, dateField, groupField, cardFields, textContent, imageUrl, etc.
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_blocks_page_id ON page_blocks(page_id);
+CREATE INDEX IF NOT EXISTS idx_page_blocks_position ON page_blocks(page_id, position_y, position_x);
+
+ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE page_blocks ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies - full access for all users
+CREATE POLICY "Users can view all pages" ON pages FOR SELECT USING (true);
+CREATE POLICY "Users can create pages" ON pages FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update pages" ON pages FOR UPDATE USING (true);
+CREATE POLICY "Users can delete pages" ON pages FOR DELETE USING (true);
+
+CREATE POLICY "Users can view all page_blocks" ON page_blocks FOR SELECT USING (true);
+CREATE POLICY "Users can create page_blocks" ON page_blocks FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can update page_blocks" ON page_blocks FOR UPDATE USING (true);
+CREATE POLICY "Users can delete page_blocks" ON page_blocks FOR DELETE USING (true);
+
+-- ============================================
 -- AUTO-UPDATE TRIGGERS FOR updated_at
 -- ============================================
 
@@ -559,7 +603,7 @@ DECLARE
     'tasks', 'briefings', 'sponsorships', 'strategy', 'assets',
     'table_metadata', 'table_view_configs', 'dashboards', 
     'dashboard_modules', 'dashboard_blocks', 'comments', 'user_roles',
-    'automations', 'automation_steps'
+    'automations', 'automation_steps', 'pages', 'page_blocks'
   ];
 BEGIN
   FOREACH table_name IN ARRAY tables

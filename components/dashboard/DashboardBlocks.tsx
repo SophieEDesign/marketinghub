@@ -19,14 +19,7 @@ import DashboardBlock from "./DashboardBlock";
 import BlockMenu, { BlockType } from "./blocks/BlockMenu";
 import { supabase } from "@/lib/supabaseClient";
 import { usePermissions } from "@/lib/hooks/usePermissions";
-
-interface DashboardBlock {
-  id: string;
-  dashboard_id: string;
-  type: "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html";
-  content: any;
-  position: number;
-}
+import { DashboardBlock as DashboardBlockType } from "@/lib/hooks/useDashboardBlocks";
 
 interface DashboardBlocksProps {
   dashboardId: string;
@@ -60,7 +53,7 @@ function SortableBlockWrapper({
   isDragging,
   canEdit,
 }: {
-  block: DashboardBlock;
+  block: DashboardBlockType;
   onUpdate: (id: string, content: any) => void;
   onDelete: (id: string) => void;
   isDragging: boolean;
@@ -94,7 +87,7 @@ function SortableBlockWrapper({
 
 export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
   const permissions = usePermissions();
-  const [blocks, setBlocks] = useState<DashboardBlock[]>([]);
+  const [blocks, setBlocks] = useState<DashboardBlockType[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
