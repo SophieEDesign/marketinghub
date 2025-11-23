@@ -128,17 +128,31 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     if (!item) return;
 
     const newValue = over.id as string;
-    const fieldKey = kanbanField.field_key; // Store in variable to help TypeScript
+    const fieldKey = kanbanField.field_key;
 
+    // Optimistically update UI
+    setRows((prevRows) =>
+      prevRows.map((r) => (r.id === draggedId ? { ...r, [fieldKey]: newValue } : r))
+    );
+
+    // Update in database
     async function updateRecord() {
       const { error } = await supabase
         .from(tableId as string)
         .update({ [fieldKey]: newValue })
         .eq("id", draggedId);
 
-      if (!error) {
-        // Reload data
-        const { data } = await supabase.from(tableId as string).select("*");
+      if (error) {
+        console.error("Error updating record:", error);
+        // Revert optimistic update on error
+        setRows((prevRows) =>
+          prevRows.map((r) => (r.id === draggedId ? { ...r, [fieldKey]: item[fieldKey] } : r))
+        );
+      } else {
+        // Reload with filters and sort applied
+        let query = supabase.from(tableId as string).select("*");
+        query = applyFiltersAndSort(query, filters, sort);
+        const { data } = await query;
         if (data) setRows(data);
       }
     }
@@ -202,17 +216,17 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-        {lanes.map((lane: { id: string; title: string }) => (
-          <KanbanLane
-            key={lane.id}
-            groupTitle={lane.title}
-            statuses={[lane.id]}
-            items={groupedItems[lane.id] || []}
-            fields={allFields}
-          />
-        ))}
-      </div>
+        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[400px]">
+          {lanes.map((lane: { id: string; title: string }) => (
+            <KanbanLane
+              key={lane.id}
+              groupTitle={lane.title}
+              statuses={[lane.id]}
+              items={groupedItems[lane.id] || []}
+              fields={allFields}
+            />
+          ))}
+        </div>
 
       <DragOverlay>
         {activeItem ? (

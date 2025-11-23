@@ -12,8 +12,10 @@ interface KanbanLaneProps {
 }
 
 export default function KanbanLane({ groupTitle, statuses, items, fields }: KanbanLaneProps) {
+  // Use the first status as the droppable id to match with lane.id
+  const droppableId = statuses[0] || groupTitle;
   const { setNodeRef, isOver } = useDroppable({
-    id: groupTitle,
+    id: droppableId,
   });
 
   return (

@@ -172,16 +172,41 @@ function GridViewComponent({ tableId }: GridViewProps) {
   };
   
   const handleViewSettingsUpdate = async (updates: {
+    visible_fields?: string[];
+    field_order?: string[];
     hidden_columns?: string[];
     column_order?: string[];
     row_height?: "compact" | "medium" | "tall";
     column_widths?: Record<string, number>;
     groupings?: Array<{ name: string; fields: string[] }>;
+    kanban_group_field?: string;
+    calendar_date_field?: string;
+    timeline_date_field?: string;
+    card_fields?: string[];
     filters?: any[];
     sort?: any[];
   }): Promise<void> => {
     try {
-      await saveCurrentView(updates);
+      // Map legacy properties to new ones
+      const mappedUpdates: any = { ...updates };
+      
+      // Convert visible_fields to hidden_columns
+      if (updates.visible_fields !== undefined) {
+        const allFieldIds = fields.map((f) => f.id);
+        mappedUpdates.hidden_columns = allFieldIds.filter((id) => !updates.visible_fields!.includes(id));
+        delete mappedUpdates.visible_fields;
+      }
+      
+      // Map field_order to column_order
+      if (updates.field_order !== undefined) {
+        mappedUpdates.column_order = updates.field_order;
+        delete mappedUpdates.field_order;
+      }
+      
+      await saveCurrentView(mappedUpdates);
+      
+      // Invalidate cache to refresh view
+      invalidateCache(CacheKeys.tableRecords(tableId, "*"));
     } catch (error) {
       console.error("Error updating view settings:", error);
       toast({
@@ -317,11 +342,17 @@ function GridViewComponent({ tableId }: GridViewProps) {
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}
           viewSettings={{
+            visible_fields: fields.filter((f) => !hiddenColumns.includes(f.id)).map((f) => f.id),
+            field_order: columnOrder.length > 0 ? columnOrder : fields.map((f) => f.id),
             hidden_columns: hiddenColumns,
             column_order: columnOrder,
             column_widths: columnWidths,
             groupings: groupings,
             row_height: rowHeight,
+            kanban_group_field: currentView?.kanban_group_field,
+            calendar_date_field: currentView?.calendar_date_field,
+            timeline_date_field: currentView?.timeline_date_field,
+            card_fields: currentView?.card_fields,
           }}
           onViewSettingsUpdate={handleViewSettingsUpdate}
           currentView={currentView}
@@ -398,11 +429,17 @@ function GridViewComponent({ tableId }: GridViewProps) {
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}
           viewSettings={{
+            visible_fields: fields.filter((f) => !hiddenColumns.includes(f.id)).map((f) => f.id),
+            field_order: columnOrder.length > 0 ? columnOrder : fields.map((f) => f.id),
             hidden_columns: hiddenColumns,
             column_order: columnOrder,
             column_widths: columnWidths,
             groupings: groupings,
             row_height: rowHeight,
+            kanban_group_field: currentView?.kanban_group_field,
+            calendar_date_field: currentView?.calendar_date_field,
+            timeline_date_field: currentView?.timeline_date_field,
+            card_fields: currentView?.card_fields,
           }}
           onViewSettingsUpdate={handleViewSettingsUpdate}
           currentView={currentView}

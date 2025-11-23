@@ -19,8 +19,11 @@ export default function KanbanCard({ row, fields }: KanbanCardProps) {
   const style = transform
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        opacity: isDragging ? 0.5 : 1,
       }
-    : undefined;
+    : {
+        opacity: isDragging ? 0.5 : 1,
+      };
 
   const handleClick = (e: React.MouseEvent) => {
     // Only open drawer if not dragging

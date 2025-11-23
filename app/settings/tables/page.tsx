@@ -28,11 +28,24 @@ export default function TablesManagementPage() {
       // Get metadata for each table
       const tablesWithMetadata = await Promise.all(
         allTableIds.map(async (tableId) => {
-          const { data: metadata } = await supabase
-            .from("table_metadata")
-            .select("*")
-            .eq("table_name", tableId)
-            .maybeSingle();
+          let metadata = null;
+          try {
+            const { data, error } = await supabase
+              .from("table_metadata")
+              .select("*")
+              .eq("table_name", tableId)
+              .maybeSingle();
+            
+            if (!error && data) {
+              metadata = data;
+            } else if (error && error.code !== 'PGRST116') {
+              // PGRST116 = table doesn't exist, which is expected if table_metadata hasn't been created
+              console.warn(`Error loading metadata for ${tableId}:`, error);
+            }
+          } catch (err) {
+            // Table might not exist yet, that's okay
+            console.warn(`table_metadata table may not exist yet:`, err);
+          }
           
           // Find category for this table
           const category = tableCategories.find((cat) => cat.tableIds.includes(tableId));
