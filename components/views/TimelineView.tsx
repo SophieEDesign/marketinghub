@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import dayjs from "dayjs";
@@ -44,10 +44,11 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
     if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
       switchToViewByName(viewId);
     }
-  }, [viewId, currentView, switchToViewByName]);
+  }, [viewId, currentView?.id, currentView?.view_name, switchToViewByName]);
 
-  const filters = currentView?.filters || [];
-  const sort = currentView?.sort || [];
+  // Memoize filters and sort to prevent unnecessary re-renders
+  const filters = useMemo(() => currentView?.filters || [], [currentView?.filters]);
+  const sort = useMemo(() => currentView?.sort || [], [currentView?.sort]);
   const timelineDateFieldKey = (currentView as any)?.timeline_date_field;
   
   const handleViewSettingsUpdate = async (updates: {
@@ -82,7 +83,9 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
 
 
   useEffect(() => {
-    if (!tableId) return;
+    if (!tableId || fieldsLoading || viewConfigLoading || !startField) return;
+    
+    let cancelled = false;
     
     async function load() {
       setLoading(true);
@@ -99,6 +102,8 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
 
       const { data, error } = await query;
 
+      if (cancelled) return;
+
       if (!error && data) {
         setRows(data);
       } else if (error) {
@@ -107,20 +112,24 @@ export default function TimelineView({ tableId }: TimelineViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId, startField, filters, sort]);
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [tableId, startField?.field_key, JSON.stringify(filters), JSON.stringify(sort), fieldsLoading, viewConfigLoading]);
 
-  const handleFiltersChange = async (newFilters: Filter[]) => {
+  const handleFiltersChange = useCallback(async (newFilters: Filter[]) => {
     await saveCurrentView({ filters: newFilters });
-  };
+  }, [saveCurrentView]);
 
-  const handleSortChange = async (newSort: Sort[]) => {
+  const handleSortChange = useCallback(async (newSort: Sort[]) => {
     await saveCurrentView({ sort: newSort });
-  };
+  }, [saveCurrentView]);
 
-  const handleRemoveFilter = async (filterId: string) => {
+  const handleRemoveFilter = useCallback(async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
     await saveCurrentView({ filters: newFilters });
-  };
+  }, [filters, saveCurrentView]);
 
   // Timeline window (60 days forward/backwards)
   const startWindow = dayjs().subtract(30, "day");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
@@ -43,10 +43,11 @@ export default function CardsView({ tableId }: CardsViewProps) {
     if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
       switchToViewByName(viewId);
     }
-  }, [viewId, currentView, switchToViewByName]);
+  }, [viewId, currentView?.id, currentView?.view_name, switchToViewByName]);
 
-  const filters = currentView?.filters || [];
-  const sort = currentView?.sort || [];
+  // Memoize filters and sort to prevent unnecessary re-renders
+  const filters = useMemo(() => currentView?.filters || [], [currentView?.filters]);
+  const sort = useMemo(() => currentView?.sort || [], [currentView?.sort]);
   const cardFields = (currentView as any)?.card_fields || [];
   
   const handleViewSettingsUpdate = async (updates: {
@@ -63,7 +64,9 @@ export default function CardsView({ tableId }: CardsViewProps) {
 
   // Load records with filters and sort
   useEffect(() => {
-    if (!tableId) return;
+    if (!tableId || fieldsLoading || viewConfigLoading) return;
+    
+    let cancelled = false;
     
     async function load() {
       setLoading(true);
@@ -80,6 +83,8 @@ export default function CardsView({ tableId }: CardsViewProps) {
       
       const { data, error } = await query;
       
+      if (cancelled) return;
+      
       if (!error && data) {
         setRows(data);
       } else if (error) {
@@ -88,20 +93,24 @@ export default function CardsView({ tableId }: CardsViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId, filters, sort]);
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [tableId, JSON.stringify(filters), JSON.stringify(sort), fieldsLoading, viewConfigLoading]);
 
-  const handleFiltersChange = async (newFilters: Filter[]) => {
+  const handleFiltersChange = useCallback(async (newFilters: Filter[]) => {
     await saveCurrentView({ filters: newFilters });
-  };
+  }, [saveCurrentView]);
 
-  const handleSortChange = async (newSort: Sort[]) => {
+  const handleSortChange = useCallback(async (newSort: Sort[]) => {
     await saveCurrentView({ sort: newSort });
-  };
+  }, [saveCurrentView]);
 
-  const handleRemoveFilter = async (filterId: string) => {
+  const handleRemoveFilter = useCallback(async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
     await saveCurrentView({ filters: newFilters });
-  };
+  }, [filters, saveCurrentView]);
 
   if (loading || fieldsLoading || viewConfigLoading) {
     return (
