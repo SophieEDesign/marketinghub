@@ -94,6 +94,10 @@ export async function POST(request: NextRequest) {
           sort: body.sort || [],
           groupings: body.groupings || [],
           row_height: body.row_height || "medium",
+          card_fields: body.card_fields || [],
+          kanban_group_field: body.kanban_group_field,
+          calendar_date_field: body.calendar_date_field,
+          timeline_date_field: body.timeline_date_field,
           is_default: body.is_default || false,
         },
       ])

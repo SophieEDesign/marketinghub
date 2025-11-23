@@ -67,6 +67,10 @@ export async function PUT(
     if (body.sort !== undefined) updateData.sort = body.sort;
     if (body.groupings !== undefined) updateData.groupings = body.groupings;
     if (body.row_height !== undefined) updateData.row_height = body.row_height;
+    if (body.card_fields !== undefined) updateData.card_fields = body.card_fields;
+    if (body.kanban_group_field !== undefined) updateData.kanban_group_field = body.kanban_group_field;
+    if (body.calendar_date_field !== undefined) updateData.calendar_date_field = body.calendar_date_field;
+    if (body.timeline_date_field !== undefined) updateData.timeline_date_field = body.timeline_date_field;
     if (body.is_default !== undefined) updateData.is_default = body.is_default;
 
     const { data, error } = await supabaseAdmin

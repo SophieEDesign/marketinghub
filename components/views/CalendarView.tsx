@@ -9,7 +9,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import type { EventInput, EventDropArg } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import { useFields } from "@/lib/useFields";
-import { useViewSettings } from "@/lib/useViewSettings";
+import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
@@ -29,23 +29,29 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   const [rows, setRows] = useState<any[]>([]);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const {
-    settings,
-    getViewSettings,
-    saveFilters,
-    saveSort,
-    setCalendarDateField,
-  } = useViewSettings(tableId, viewId);
+    currentView,
+    loading: viewConfigLoading,
+    saveCurrentView,
+    switchToViewByName,
+  } = useViewConfigs(tableId);
   const calendarRef = useRef<FullCalendar>(null);
 
-  const filters = settings?.filters || [];
-  const sort = settings?.sort || [];
-  const calendarDateFieldKey = settings?.calendar_date_field;
+  // Switch to view by name when viewId changes
+  useEffect(() => {
+    if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
+      switchToViewByName(viewId);
+    }
+  }, [viewId, currentView, switchToViewByName]);
+
+  const filters = currentView?.filters || [];
+  const sort = currentView?.sort || [];
+  const calendarDateFieldKey = (currentView as any)?.calendar_date_field;
   
   const handleViewSettingsUpdate = async (updates: {
     calendar_date_field?: string;
   }): Promise<void> => {
     try {
-      if (updates.calendar_date_field !== undefined) await setCalendarDateField(updates.calendar_date_field);
+      await saveCurrentView(updates as any);
     } catch (error) {
       console.error("Error updating view settings:", error);
     }
@@ -74,12 +80,6 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   // Find thumbnail field
   const thumbnailField = allFields.find((f) => f.type === "attachment");
 
-  // Load view settings on mount (only once)
-  useEffect(() => {
-    if (tableId && viewId) {
-      getViewSettings();
-    }
-  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   useEffect(() => {
     if (!tableId) return;
@@ -120,16 +120,16 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   }, [tableId, dateField, titleField, filters, sort]);
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
-    await saveSort(newSort);
+    await saveCurrentView({ sort: newSort });
   };
 
   const handleRemoveFilter = async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
   const handleDateClick = (info: DateClickArg) => {

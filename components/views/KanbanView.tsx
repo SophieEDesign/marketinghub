@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
-import { useViewSettings } from "@/lib/useViewSettings";
+import { useViewConfigs } from "@/lib/useViewConfigs";
 import { applyFiltersAndSort } from "@/lib/query/applyFiltersAndSort";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
@@ -36,22 +36,28 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const {
-    settings,
-    getViewSettings,
-    saveFilters,
-    saveSort,
-    setKanbanGroupField,
-  } = useViewSettings(tableId, viewId);
+    currentView,
+    loading: viewConfigLoading,
+    saveCurrentView,
+    switchToViewByName,
+  } = useViewConfigs(tableId);
 
-  const filters = settings?.filters || [];
-  const sort = settings?.sort || [];
-  const kanbanGroupFieldKey = settings?.kanban_group_field;
+  // Switch to view by name when viewId changes
+  useEffect(() => {
+    if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
+      switchToViewByName(viewId);
+    }
+  }, [viewId, currentView, switchToViewByName]);
+
+  const filters = currentView?.filters || [];
+  const sort = currentView?.sort || [];
+  const kanbanGroupFieldKey = (currentView as any)?.kanban_group_field;
   
   const handleViewSettingsUpdate = async (updates: {
     kanban_group_field?: string;
   }): Promise<void> => {
     try {
-      if (updates.kanban_group_field !== undefined) await setKanbanGroupField(updates.kanban_group_field);
+      await saveCurrentView(updates as any);
     } catch (error) {
       console.error("Error updating view settings:", error);
     }
@@ -69,12 +75,6 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
         (f) => f.type === "single_select" && f.label.toLowerCase().includes("status")
       ) || allFields.find((f) => f.type === "single_select") || null;
 
-  // Load view settings on mount (only once)
-  useEffect(() => {
-    if (tableId && viewId) {
-      getViewSettings();
-    }
-  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   // Load records with filters and sort
   useEffect(() => {
@@ -101,16 +101,16 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
   }, [tableId, filters, sort]);
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
-    await saveSort(newSort);
+    await saveCurrentView({ sort: newSort });
   };
 
   const handleRemoveFilter = async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
   function handleDragStart(event: any) {
@@ -146,7 +146,7 @@ export default function KanbanView({ tableId }: KanbanViewProps) {
     updateRecord();
   }
 
-  if (loading || fieldsLoading) {
+  if (loading || fieldsLoading || viewConfigLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500 dark:text-gray-400">Loading...</div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useTransition, useMemo } from "react";
+import React, { useEffect, useState, useTransition, useMemo, Fragment } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
@@ -87,8 +88,8 @@ function GridViewComponent({ tableId }: GridViewProps) {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Apply hidden_columns and column_order (memoized) with deduplication
-  const fields = useMemo(() => {
+  // Organize fields by groups
+  const { groupedFields, ungroupedFields } = useMemo(() => {
     // First, deduplicate by field_key (keep first occurrence)
     const seenKeys = new Set<string>();
     const deduplicated = allFields.filter((f) => {
@@ -120,8 +121,33 @@ function GridViewComponent({ tableId }: GridViewProps) {
         return aIndex - bIndex;
       });
     }
-    return currentFields;
-  }, [allFields, hiddenColumns, columnOrder]);
+
+    // Organize by groups
+    const grouped: Array<{ group: { name: string; fields: string[] }; fields: typeof currentFields }> = [];
+    const groupedFieldIds = new Set<string>();
+    
+    if (groupings.length > 0) {
+      groupings.forEach((group) => {
+        const groupFields = currentFields.filter((f) => group.fields.includes(f.id));
+        if (groupFields.length > 0) {
+          grouped.push({ group, fields: groupFields });
+          groupFields.forEach((f) => groupedFieldIds.add(f.id));
+        }
+      });
+    }
+
+    const ungrouped = currentFields.filter((f) => !groupedFieldIds.has(f.id));
+
+    return { groupedFields: grouped, ungroupedFields: ungrouped };
+  }, [allFields, hiddenColumns, columnOrder, groupings]);
+
+  // Flatten for orderedFieldIds
+  const fields = useMemo(() => {
+    const all: typeof allFields = [];
+    groupedFields.forEach((g) => all.push(...g.fields));
+    all.push(...ungroupedFields);
+    return all;
+  }, [groupedFields, ungroupedFields]);
 
   // Get ordered field IDs for drag-and-drop
   const orderedFieldIds = useMemo(() => {
@@ -538,6 +564,43 @@ function GridViewComponent({ tableId }: GridViewProps) {
             <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <table className="min-w-full border-collapse">
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
+                  {/* Group Headers */}
+                  {groupedFields.map((groupData) => {
+                    const isCollapsed = collapsedGroups.has(groupData.group.name);
+                    return (
+                      <tr key={`group-${groupData.group.name}`} className="bg-gray-100 dark:bg-gray-800 border-b-2 border-gray-300 dark:border-gray-600">
+                        <th colSpan={1000} className="px-4 py-2">
+                          <button
+                            onClick={() => {
+                              setCollapsedGroups((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(groupData.group.name)) {
+                                  next.delete(groupData.group.name);
+                                } else {
+                                  next.add(groupData.group.name);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="flex items-center gap-2 w-full text-left hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-2 py-1 transition-colors"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="w-4 h-4 text-gray-500" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-gray-500" />
+                            )}
+                            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">
+                              {groupData.group.name}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                              ({groupData.fields.length} field{groupData.fields.length !== 1 ? "s" : ""})
+                            </span>
+                          </button>
+                        </th>
+                      </tr>
+                    );
+                  })}
+                  {/* Column Headers Row */}
                   <tr>
                     <th className="px-2 w-12">
                       <input
@@ -554,56 +617,114 @@ function GridViewComponent({ tableId }: GridViewProps) {
                       />
                     </th>
                     <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
-                      {fields.map((field, index) => (
-                        <EnhancedColumnHeader
-                          key={field.id}
-                          field={field}
-                          width={columnWidths[field.id]}
-                          isMobile={isMobile}
-                          onResize={async (fieldId, newWidth) => {
-                            await saveCurrentView({
-                              column_widths: { ...columnWidths, [fieldId]: newWidth },
-                            });
-                          }}
-                          onHide={async (fieldId) => {
-                            await saveCurrentView({
-                              hidden_columns: [...hiddenColumns, fieldId],
-                            });
-                            invalidateCache(CacheKeys.tableRecords(tableId, "*"));
-                          }}
-                          onRename={async (fieldId, newName) => {
-                            // TODO: Implement column_labels in ViewConfig
-                            console.log("Rename column:", fieldId, newName);
-                          }}
-                          onMoveLeft={index > 0 ? async (fieldId) => {
-                            const currentIndex = columnOrder.indexOf(fieldId);
-                            if (currentIndex > 0) {
-                              const newOrder = [...columnOrder];
-                              [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
-                              await saveCurrentView({ column_order: newOrder });
+                      {groupedFields.map((groupData) => {
+                        const isCollapsed = collapsedGroups.has(groupData.group.name);
+                        if (isCollapsed) return null;
+                        return groupData.fields.map((field) => {
+                          const globalIndex = fields.indexOf(field);
+                          return (
+                            <EnhancedColumnHeader
+                              key={field.id}
+                              field={field}
+                              width={columnWidths[field.id]}
+                              isMobile={isMobile}
+                              onResize={async (fieldId, newWidth) => {
+                                await saveCurrentView({
+                                  column_widths: { ...columnWidths, [fieldId]: newWidth },
+                                });
+                              }}
+                              onHide={async (fieldId) => {
+                                await saveCurrentView({
+                                  hidden_columns: [...hiddenColumns, fieldId],
+                                });
+                                invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                              }}
+                              onRename={async (fieldId, newName) => {
+                                console.log("Rename column:", fieldId, newName);
+                              }}
+                              onMoveLeft={globalIndex > 0 ? async (fieldId) => {
+                                const currentIndex = columnOrder.indexOf(fieldId);
+                                if (currentIndex > 0) {
+                                  const newOrder = [...columnOrder];
+                                  [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+                                  await saveCurrentView({ column_order: newOrder });
+                                  invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                                }
+                              } : undefined}
+                              onMoveRight={globalIndex < fields.length - 1 ? async (fieldId) => {
+                                const currentIndex = columnOrder.indexOf(fieldId);
+                                if (currentIndex < columnOrder.length - 1) {
+                                  const newOrder = [...columnOrder];
+                                  [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+                                  await saveCurrentView({ column_order: newOrder });
+                                  invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                                }
+                              } : undefined}
+                              onResetWidth={async (fieldId) => {
+                                const newWidths = { ...columnWidths };
+                                delete newWidths[fieldId];
+                                await saveCurrentView({ column_widths: newWidths });
+                              }}
+                              canMoveLeft={globalIndex > 0}
+                              canMoveRight={globalIndex < fields.length - 1}
+                              isFirst={globalIndex === 0}
+                              isLast={globalIndex === fields.length - 1}
+                            />
+                          );
+                        });
+                      })}
+                      {ungroupedFields.map((field) => {
+                        const globalIndex = fields.indexOf(field);
+                        return (
+                          <EnhancedColumnHeader
+                            key={field.id}
+                            field={field}
+                            width={columnWidths[field.id]}
+                            isMobile={isMobile}
+                            onResize={async (fieldId, newWidth) => {
+                              await saveCurrentView({
+                                column_widths: { ...columnWidths, [fieldId]: newWidth },
+                              });
+                            }}
+                            onHide={async (fieldId) => {
+                              await saveCurrentView({
+                                hidden_columns: [...hiddenColumns, fieldId],
+                              });
                               invalidateCache(CacheKeys.tableRecords(tableId, "*"));
-                            }
-                          } : undefined}
-                          onMoveRight={index < fields.length - 1 ? async (fieldId) => {
-                            const currentIndex = columnOrder.indexOf(fieldId);
-                            if (currentIndex < columnOrder.length - 1) {
-                              const newOrder = [...columnOrder];
-                              [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
-                              await saveCurrentView({ column_order: newOrder });
-                              invalidateCache(CacheKeys.tableRecords(tableId, "*"));
-                            }
-                          } : undefined}
-                          onResetWidth={async (fieldId) => {
-                            const newWidths = { ...columnWidths };
-                            delete newWidths[fieldId];
-                            await saveCurrentView({ column_widths: newWidths });
-                          }}
-                          canMoveLeft={index > 0}
-                          canMoveRight={index < fields.length - 1}
-                          isFirst={index === 0}
-                          isLast={index === fields.length - 1}
-                        />
-                      ))}
+                            }}
+                            onRename={async (fieldId, newName) => {
+                              console.log("Rename column:", fieldId, newName);
+                            }}
+                            onMoveLeft={globalIndex > 0 ? async (fieldId) => {
+                              const currentIndex = columnOrder.indexOf(fieldId);
+                              if (currentIndex > 0) {
+                                const newOrder = [...columnOrder];
+                                [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+                                await saveCurrentView({ column_order: newOrder });
+                                invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                              }
+                            } : undefined}
+                            onMoveRight={globalIndex < fields.length - 1 ? async (fieldId) => {
+                              const currentIndex = columnOrder.indexOf(fieldId);
+                              if (currentIndex < columnOrder.length - 1) {
+                                const newOrder = [...columnOrder];
+                                [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+                                await saveCurrentView({ column_order: newOrder });
+                                invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+                              }
+                            } : undefined}
+                            onResetWidth={async (fieldId) => {
+                              const newWidths = { ...columnWidths };
+                              delete newWidths[fieldId];
+                              await saveCurrentView({ column_widths: newWidths });
+                            }}
+                            canMoveLeft={globalIndex > 0}
+                            canMoveRight={globalIndex < fields.length - 1}
+                            isFirst={globalIndex === 0}
+                            isLast={globalIndex === fields.length - 1}
+                          />
+                        );
+                      })}
                     </SortableContext>
                   </tr>
                 </thead>

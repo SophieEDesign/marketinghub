@@ -26,39 +26,35 @@ export default function CardsView({ tableId }: CardsViewProps) {
   const { fields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {
-    settings,
-    getViewSettings,
-    saveFilters,
-    saveSort,
-    setVisibleFields,
-    setFieldOrder,
-    setCardFields,
-  } = useViewSettings(tableId, viewId);
+    currentView,
+    loading: viewConfigLoading,
+    saveCurrentView,
+    switchToViewByName,
+    reloadViews,
+  } = useViewConfigs(tableId);
 
-  const filters = settings?.filters || [];
-  const sort = settings?.sort || [];
-  const cardFields = settings?.card_fields || [];
+  // Switch to view by name when viewId changes
+  useEffect(() => {
+    if (viewId && currentView && currentView.view_name !== viewId && currentView.id !== viewId) {
+      switchToViewByName(viewId);
+    }
+  }, [viewId, currentView, switchToViewByName]);
+
+  const filters = currentView?.filters || [];
+  const sort = currentView?.sort || [];
+  const cardFields = (currentView as any)?.card_fields || [];
   
   const handleViewSettingsUpdate = async (updates: {
-    visible_fields?: string[];
-    field_order?: string[];
+    hidden_columns?: string[];
+    column_order?: string[];
     card_fields?: string[];
   }): Promise<void> => {
     try {
-      if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
-      if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
-      if (updates.card_fields !== undefined) await setCardFields(updates.card_fields);
+      await saveCurrentView(updates as any);
     } catch (error) {
       console.error("Error updating view settings:", error);
     }
   };
-
-  // Load view settings on mount (only once)
-  useEffect(() => {
-    if (tableId && viewId) {
-      getViewSettings();
-    }
-  }, [tableId, viewId]); // Remove getViewSettings from deps to avoid infinite loop
 
   // Load records with filters and sort
   useEffect(() => {
@@ -90,19 +86,19 @@ export default function CardsView({ tableId }: CardsViewProps) {
   }, [tableId, filters, sort]);
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
   const handleSortChange = async (newSort: Sort[]) => {
-    await saveSort(newSort);
+    await saveCurrentView({ sort: newSort });
   };
 
   const handleRemoveFilter = async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
-    await saveFilters(newFilters);
+    await saveCurrentView({ filters: newFilters });
   };
 
-  if (loading || fieldsLoading) {
+  if (loading || fieldsLoading || viewConfigLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500 dark:text-gray-400">Loading...</div>
