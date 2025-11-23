@@ -87,7 +87,8 @@ export default function TableViewsList({ tableId, tableName, isExpanded = false 
 
   const handleCreateView = async (viewName: string, viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => {
     // Create view with the specified type by passing a config object
-    const baseConfig: any = {
+    // The createView function expects (viewName, cloneFrom?) where cloneFrom is a ViewConfig
+    const baseConfig = {
       view_type: viewType,
       column_order: [],
       column_widths: {},
@@ -95,9 +96,10 @@ export default function TableViewsList({ tableId, tableName, isExpanded = false 
       filters: [],
       sort: [],
       groupings: [],
-      row_height: "medium",
+      row_height: "medium" as const,
     };
-    await createView(viewName, baseConfig);
+    // Pass baseConfig as the cloneFrom parameter (it will be used as the base config)
+    await createView(viewName, baseConfig as any);
     await reloadViews();
     setShowCreateModal(false);
   };
