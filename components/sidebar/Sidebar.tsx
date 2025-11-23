@@ -86,15 +86,31 @@ interface NavGroup {
 }
 
 // Generate default sidebar items from table metadata
-const generateDefaultSidebarItems = () => {
-  const tableItems = getAllTables().map((tableId) => {
+const generateDefaultSidebarItems = (dynamicTableIds: string[] = []) => {
+  // Merge hardcoded tables with dynamic tables from database
+  const allTableIds = [...new Set([...getAllTables(), ...dynamicTableIds])];
+  
+  const tableItems = allTableIds.map((tableId) => {
     const meta = tableMetadata[tableId];
+    // Try to get metadata from database if not in hardcoded list
+    let displayName = meta?.label || tableId;
+    let defaultView = meta?.defaultView || "grid";
+    
+    // If not in hardcoded metadata, use tableId as label
+    if (!meta) {
+      // Format tableId: "my_table" -> "My Table"
+      displayName = tableId
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
+    
     const Icon = meta?.icon || FileText;
     return {
       id: tableId,
-      label: meta?.label || tableId,
+      label: displayName,
       icon: Icon,
-      href: `/${tableId}/${meta?.defaultView || "grid"}`,
+      href: `/${tableId}/${defaultView}`,
     };
   });
 
@@ -116,6 +132,7 @@ export default function Sidebar() {
   const [editing, setEditing] = useState(false);
   const [orderedSidebar, setOrderedSidebar] = useState(defaultSidebarItems);
   const [loadingOrder, setLoadingOrder] = useState(true);
+  const [dynamicTables, setDynamicTables] = useState<string[]>([]);
   const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string> }>({ groupTitles: {}, itemLabels: {} });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -153,6 +170,29 @@ export default function Sidebar() {
     if (typeof window === 'undefined') return;
     localStorage.setItem("sidebarCollapsedGroups", JSON.stringify(Array.from(collapsedGroups)));
   }, [collapsedGroups]);
+
+  // Load dynamic tables from database
+  useEffect(() => {
+    async function loadDynamicTables() {
+      try {
+        const { data, error } = await supabase
+          .from("table_metadata")
+          .select("table_name, display_name");
+        
+        if (!error && data) {
+          const tableIds = data.map((row) => row.table_name);
+          setDynamicTables(tableIds);
+          // Update sidebar items with dynamic tables
+          const updatedItems = generateDefaultSidebarItems(tableIds);
+          setOrderedSidebar(updatedItems);
+        }
+      } catch (error) {
+        console.warn("Error loading dynamic tables:", error);
+      }
+    }
+    
+    loadDynamicTables();
+  }, []);
 
   // Load sidebar customizations from localStorage
   useEffect(() => {

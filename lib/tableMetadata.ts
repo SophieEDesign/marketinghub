@@ -182,7 +182,40 @@ export function getTableMetadata(tableId: string): TableMetadata | undefined {
   return tableMetadata[tableId];
 }
 
+export async function getAllTablesFromDB(): Promise<string[]> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return Object.keys(tableMetadata);
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data, error } = await supabase
+      .from("table_metadata")
+      .select("table_name");
+    
+    if (error || !data) {
+      // Fallback to hardcoded list if database query fails
+      return Object.keys(tableMetadata);
+    }
+    
+    // Merge database tables with hardcoded tables (for backward compatibility)
+    const dbTables = data.map((row) => row.table_name);
+    const hardcodedTables = Object.keys(tableMetadata);
+    const allTables = [...new Set([...hardcodedTables, ...dbTables])];
+    return allTables;
+  } catch (error) {
+    console.warn("Error fetching tables from database, using hardcoded list:", error);
+    return Object.keys(tableMetadata);
+  }
+}
+
 export function getAllTables(): string[] {
+  // This is the synchronous version for backward compatibility
+  // For dynamic loading, use getAllTablesFromDB() instead
   return Object.keys(tableMetadata);
 }
 
