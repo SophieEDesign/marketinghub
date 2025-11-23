@@ -21,9 +21,10 @@ interface KPIModuleProps {
   height: number;
   onUpdate?: (config: Partial<KPIConfig>) => void;
   isEditing?: boolean;
+  data?: any[];
 }
 
-export default function KPIModule({ config, width, height, onUpdate, isEditing = false }: KPIModuleProps) {
+export default function KPIModule({ config, width, height, onUpdate, isEditing = false, data }: KPIModuleProps) {
   const trendIcon = useMemo(() => {
     if (config.trend === "up") return <TrendingUp className="w-4 h-4 text-green-600" />;
     if (config.trend === "down") return <TrendingDown className="w-4 h-4 text-red-600" />;
@@ -54,6 +55,42 @@ export default function KPIModule({ config, width, height, onUpdate, isEditing =
     return { diff, percent, trend: diff > 0 ? "up" : diff < 0 ? "down" : "neutral" as const };
   };
 
+  // Calculate value from table data if configured
+  const calculatedValue = useMemo(() => {
+    if (config.table && config.calculation && data) {
+      const tableData = Array.isArray(data) ? data : [];
+      
+      switch (config.calculation) {
+        case "count":
+          return tableData.length;
+        case "sum":
+          if (!config.field) return config.value || 0;
+          return tableData.reduce((sum, row) => {
+            const val = parseFloat(row[config.field!]) || 0;
+            return sum + val;
+          }, 0);
+        case "average":
+          if (!config.field) return config.value || 0;
+          const sum = tableData.reduce((sum, row) => {
+            const val = parseFloat(row[config.field!]) || 0;
+            return sum + val;
+          }, 0);
+          return tableData.length > 0 ? sum / tableData.length : 0;
+        case "min":
+          if (!config.field) return config.value || 0;
+          const values = tableData.map(row => parseFloat(row[config.field!]) || 0).filter(v => !isNaN(v));
+          return values.length > 0 ? Math.min(...values) : 0;
+        case "max":
+          if (!config.field) return config.value || 0;
+          const maxValues = tableData.map(row => parseFloat(row[config.field!]) || 0).filter(v => !isNaN(v));
+          return maxValues.length > 0 ? Math.max(...maxValues) : 0;
+        default:
+          return config.value || 0;
+      }
+    }
+    return config.value || 0;
+  }, [config.table, config.calculation, config.field, config.value, data]);
+
   const trend = calculateTrend();
 
   return (
@@ -70,7 +107,7 @@ export default function KPIModule({ config, width, height, onUpdate, isEditing =
         </div>
         <div className="flex-1 flex items-center">
           <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            {formatValue(config.value)}
+            {formatValue(calculatedValue)}
           </div>
         </div>
         {trend && (

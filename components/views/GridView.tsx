@@ -19,6 +19,7 @@ import { toast } from "../ui/Toast";
 import { logFieldChanges } from "@/lib/activityLogger";
 import { GridSkeleton } from "../ui/Skeleton";
 import EmptyState from "../ui/EmptyState";
+import DeleteConfirmModal from "../ui/DeleteConfirmModal";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 
@@ -132,13 +133,26 @@ function GridViewComponent({ tableId }: GridViewProps) {
     visible_fields?: string[];
     field_order?: string[];
     row_height?: "compact" | "medium" | "tall";
+    kanban_group_field?: string;
+    calendar_date_field?: string;
+    timeline_date_field?: string;
+    card_fields?: string[];
+    column_widths?: Record<string, number>;
+    groupings?: Array<{ name: string; fields: string[] }>;
   }): Promise<void> => {
     try {
       if (updates.visible_fields !== undefined) await setVisibleFields(updates.visible_fields);
       if (updates.field_order !== undefined) await setFieldOrder(updates.field_order);
       if (updates.row_height !== undefined) await setRowHeight(updates.row_height);
+      // Note: Other settings (column_widths, groupings, etc.) are stored but not yet used in GridView
+      // They can be added to the view settings state if needed
     } catch (error) {
       console.error("Error updating view settings:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update view settings",
+        type: "error",
+      });
     }
   };
 
@@ -218,6 +232,46 @@ function GridViewComponent({ tableId }: GridViewProps) {
   const handleRemoveFilter = async (filterId: string) => {
     const newFilters = filters.filter((f) => f.id !== filterId);
     await saveFilters(newFilters);
+  };
+
+  const handleDelete = async () => {
+    const idsToDelete = deleteConfirm.rowIds || (deleteConfirm.rowId ? [deleteConfirm.rowId] : []);
+    if (idsToDelete.length === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from(tableId)
+        .delete()
+        .in("id", idsToDelete);
+
+      if (error) {
+        throw error;
+      }
+
+      // Remove deleted rows from local state
+      setRows((prevRows) => prevRows.filter((row) => !idsToDelete.includes(row.id)));
+      
+      // Clear selection
+      setSelectedRows(new Set());
+      
+      // Invalidate cache
+      invalidateCache(CacheKeys.tableRecords(tableId, "*"));
+
+      toast({
+        title: "Success",
+        description: `${idsToDelete.length} record${idsToDelete.length > 1 ? "s" : ""} deleted successfully`,
+        type: "success",
+      });
+
+      setDeleteConfirm({ isOpen: false });
+    } catch (error: any) {
+      console.error("Error deleting records:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete records",
+        type: "error",
+      });
+    }
   };
 
   if (loading || fieldsLoading) {
@@ -310,6 +364,20 @@ function GridViewComponent({ tableId }: GridViewProps) {
               <table className="min-w-full border-collapse">
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10 border-b border-gray-200 dark:border-gray-700">
                   <tr>
+                    <th className="px-2 w-12">
+                      <input
+                        type="checkbox"
+                        checked={rows.length > 0 && selectedRows.size === rows.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedRows(new Set(rows.map((r) => r.id)));
+                          } else {
+                            setSelectedRows(new Set());
+                          }
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </th>
                     <SortableContext items={orderedFieldIds} strategy={horizontalListSortingStrategy}>
                       {fields.map((field) => (
                         <SortableColumnHeader
@@ -513,6 +581,21 @@ function GridViewComponent({ tableId }: GridViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false })}
+        onConfirm={handleDelete}
+        title={deleteConfirm.rowIds && deleteConfirm.rowIds.length > 1 ? "Delete Records" : "Delete Record"}
+        message={
+          deleteConfirm.rowIds && deleteConfirm.rowIds.length > 1
+            ? `Are you sure you want to delete ${deleteConfirm.rowIds.length} records?`
+            : "Are you sure you want to delete this record?"
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

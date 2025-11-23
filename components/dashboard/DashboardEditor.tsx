@@ -145,7 +145,7 @@ export default function DashboardEditor({
 
     switch (module.type) {
       case "kpi":
-        return <KPIModule {...commonProps} />;
+        return <KPIModule {...commonProps} data={module.config.table ? data[module.config.table] : undefined} />;
       case "pipeline":
         return <PipelineModule {...commonProps} data={data[module.config.table] || []} />;
       case "tasks_due":

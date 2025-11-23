@@ -19,9 +19,9 @@ function KPIConfigForm({ config, setConfig }: { config: any; setConfig: (config:
 
   useEffect(() => {
     if (dataSource === "manual" && config.table) {
-      setConfig({ ...config, table: undefined, field: undefined, calculation: undefined });
+      setConfig((prev) => ({ ...prev, table: undefined, field: undefined, calculation: undefined }));
     } else if (dataSource === "table" && !config.table) {
-      setConfig({ ...config, value: undefined });
+      setConfig((prev) => ({ ...prev, value: undefined }));
     }
   }, [dataSource]);
 
@@ -219,12 +219,31 @@ export default function AddModulePanel({ open, onClose, onAdd }: AddModulePanelP
 
   if (!open) return null;
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (selectedType) {
-      const moduleType = moduleTypes.find((t) => t.id === selectedType);
-      onAdd(selectedType, { ...moduleType?.defaultConfig, ...config });
-      setSelectedType(null);
-      setConfig({});
+      try {
+        const moduleType = moduleTypes.find((t) => t.id === selectedType);
+        const finalConfig = { ...moduleType?.defaultConfig, ...config };
+        
+        // Validate KPI config if needed
+        if (selectedType === "kpi") {
+          if (!finalConfig.title) {
+            alert("Please enter a title for the KPI");
+            return;
+          }
+          if (finalConfig.table && !finalConfig.calculation) {
+            finalConfig.calculation = "count"; // Default to count if table is selected
+          }
+        }
+        
+        await onAdd(selectedType, finalConfig);
+        setSelectedType(null);
+        setConfig({});
+        onClose();
+      } catch (error) {
+        console.error("Error adding module:", error);
+        alert(`Failed to add module: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
     }
   };
 

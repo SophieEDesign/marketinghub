@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, GripVertical, Settings } from "lucide-react";
+import { X, GripVertical, Settings, Plus, Trash2 } from "lucide-react";
 import { Field } from "@/lib/fields";
 import {
   DndContext,
@@ -161,6 +161,9 @@ export default function ViewSettingsDrawer({
   const [localColumnWidths, setLocalColumnWidths] = useState<Record<string, number>>({});
   const [localGroupings, setLocalGroupings] = useState<Array<{ name: string; fields: string[] }>>([]);
   const [editingColumnWidth, setEditingColumnWidth] = useState<string | null>(null);
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroup, setEditingGroup] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -385,15 +388,83 @@ export default function ViewSettingsDrawer({
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                      Field Groups
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Field Groups
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowAddGroup(true);
+                          setNewGroupName("");
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-700 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Group
+                      </button>
+                    </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                       Group fields together in the grid view
                     </p>
-                    {localGroupings.length === 0 ? (
+
+                    {/* Add Group Form */}
+                    {showAddGroup && (
+                      <div className="mb-4 p-3 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                        <input
+                          type="text"
+                          value={newGroupName}
+                          onChange={(e) => setNewGroupName(e.target.value)}
+                          placeholder="Group name"
+                          className="w-full px-3 py-2 mb-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && newGroupName.trim()) {
+                              const newGroup = { name: newGroupName.trim(), fields: [] };
+                              const updated = [...localGroupings, newGroup];
+                              setLocalGroupings(updated);
+                              onUpdate({ groupings: updated });
+                              setNewGroupName("");
+                              setShowAddGroup(false);
+                            } else if (e.key === "Escape") {
+                              setShowAddGroup(false);
+                              setNewGroupName("");
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              if (newGroupName.trim()) {
+                                const newGroup = { name: newGroupName.trim(), fields: [] };
+                                const updated = [...localGroupings, newGroup];
+                                setLocalGroupings(updated);
+                                onUpdate({ groupings: updated });
+                                setNewGroupName("");
+                                setShowAddGroup(false);
+                              }
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+                            disabled={!newGroupName.trim()}
+                          >
+                            Create
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAddGroup(false);
+                              setNewGroupName("");
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Groups List */}
+                    {localGroupings.length === 0 && !showAddGroup ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                        No groups yet. Groups will appear here when created.
+                        No groups yet. Click "Add Group" to create one.
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -402,17 +473,117 @@ export default function ViewSettingsDrawer({
                             key={idx}
                             className="p-3 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                           >
-                            <div className="font-medium text-sm mb-1">{group.name}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="flex items-center justify-between mb-2">
+                              {editingGroup === idx ? (
+                                <input
+                                  type="text"
+                                  value={group.name}
+                                  onChange={(e) => {
+                                    const updated = [...localGroupings];
+                                    updated[idx] = { ...group, name: e.target.value };
+                                    setLocalGroupings(updated);
+                                  }}
+                                  onBlur={() => {
+                                    onUpdate({ groupings: localGroupings });
+                                    setEditingGroup(null);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      onUpdate({ groupings: localGroupings });
+                                      setEditingGroup(null);
+                                    } else if (e.key === "Escape") {
+                                      setEditingGroup(null);
+                                    }
+                                  }}
+                                  className="flex-1 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                                  autoFocus
+                                />
+                              ) : (
+                                <div
+                                  className="font-medium text-sm cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                                  onClick={() => setEditingGroup(idx)}
+                                >
+                                  {group.name}
+                                </div>
+                              )}
+                              <button
+                                onClick={() => {
+                                  const updated = localGroupings.filter((_, i) => i !== idx);
+                                  setLocalGroupings(updated);
+                                  onUpdate({ groupings: updated });
+                                }}
+                                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-1"
+                                title="Delete group"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="text-xs text-gray-500 mb-2">
                               {group.fields.length} field{group.fields.length !== 1 ? "s" : ""}
                             </div>
+                            {/* Field selection for group */}
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  const updated = [...localGroupings];
+                                  if (!updated[idx].fields.includes(e.target.value)) {
+                                    updated[idx] = {
+                                      ...group,
+                                      fields: [...group.fields, e.target.value],
+                                    };
+                                    setLocalGroupings(updated);
+                                    onUpdate({ groupings: updated });
+                                  }
+                                  e.target.value = "";
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
+                            >
+                              <option value="">Add field to group...</option>
+                              {fields
+                                .filter((f) => !group.fields.includes(f.id))
+                                .map((field) => (
+                                  <option key={field.id} value={field.id}>
+                                    {field.label}
+                                  </option>
+                                ))}
+                            </select>
+                            {/* Fields in group */}
+                            {group.fields.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {group.fields.map((fieldId) => {
+                                  const field = fields.find((f) => f.id === fieldId);
+                                  if (!field) return null;
+                                  return (
+                                    <span
+                                      key={fieldId}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                    >
+                                      {field.label}
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...localGroupings];
+                                          updated[idx] = {
+                                            ...group,
+                                            fields: group.fields.filter((id) => id !== fieldId),
+                                          };
+                                          setLocalGroupings(updated);
+                                          onUpdate({ groupings: updated });
+                                        }}
+                                        className="text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
                     )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      Field groups can be created by dragging fields in the Fields tab.
-                    </p>
                   </div>
                 </>
               )}

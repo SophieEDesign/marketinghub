@@ -175,27 +175,38 @@ function ImportPageContent() {
 
   const handleCreateField = useCallback(
     async (columnName: string, suggestedType: string) => {
-      // Create new field
-      const newField = await addField(columnName, suggestedType as any, false);
-      if (newField) {
-        // Reload fields
-        const updatedFields = await loadFields(tableId);
-        setFields(updatedFields);
+      try {
+        if (!columnName || !columnName.trim()) {
+          alert("Column name is required");
+          return;
+        }
 
-        // Auto-map the new field - add to existing mappings
-        const existingMappings = mappings || [];
-        const updatedMappings = [
-          ...existingMappings,
-          {
-            fieldId: newField.id,
-            fieldKey: newField.field_key,
-            csvColumn: columnName,
-          },
-        ];
-        setMappings(updatedMappings);
-        handleMappingChange(updatedMappings);
-      } else {
-        alert("Failed to create field. Please try again.");
+        // Create new field
+        const newField = await addField(columnName.trim(), suggestedType as any, false);
+        if (newField) {
+          // Reload fields
+          const updatedFields = await loadFields(tableId);
+          setFields(updatedFields);
+
+          // Auto-map the new field - add to existing mappings
+          const existingMappings = mappings || [];
+          const updatedMappings = [
+            ...existingMappings,
+            {
+              fieldId: newField.id,
+              fieldKey: newField.field_key,
+              csvColumn: columnName,
+            },
+          ];
+          setMappings(updatedMappings);
+          handleMappingChange(updatedMappings);
+        } else {
+          const errorMsg = "Failed to create field. This might be due to:\n- Duplicate field name\n- Invalid field type\n- Database error\n\nPlease check the console for details.";
+          alert(errorMsg);
+        }
+      } catch (error: any) {
+        console.error("Error in handleCreateField:", error);
+        alert(`Failed to create field: ${error.message || "Unknown error"}`);
       }
     },
     [addField, tableId, mappings, handleMappingChange]

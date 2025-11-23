@@ -88,7 +88,23 @@ export default function NewRecordModal() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tableId) return;
+    if (!tableId) {
+      toast({
+        title: "Error",
+        description: "No table selected",
+        type: "error",
+      });
+      return;
+    }
+
+    if (fields.length === 0) {
+      toast({
+        title: "Error",
+        description: `No fields found for table "${tableId}". Please add fields in settings first.`,
+        type: "error",
+      });
+      return;
+    }
     
     // Validate required fields
     const missingRequired = fields.filter(
@@ -96,7 +112,11 @@ export default function NewRecordModal() {
     );
     
     if (missingRequired.length > 0) {
-      alert(`Please fill in required fields: ${missingRequired.map((f) => f.label).join(", ")}`);
+      toast({
+        title: "Validation Error",
+        description: `Please fill in required fields: ${missingRequired.map((f) => f.label).join(", ")}`,
+        type: "error",
+      });
       return;
     }
     
@@ -128,7 +148,12 @@ export default function NewRecordModal() {
 
     if (error || !newRecord) {
       console.error("Error creating record:", error);
-      alert("Failed to create record. Please try again.");
+      const errorMessage = error?.message || "Failed to create record. Please try again.";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        type: "error",
+      });
       setLoading(false);
       return;
     }
@@ -217,7 +242,39 @@ export default function NewRecordModal() {
       <div className="fixed inset-0 flex items-center justify-center z-50">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl p-6">
-          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading fields...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (fields.length === 0) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+        <div className="relative bg-white dark:bg-gray-950 rounded-xl shadow-xl w-full max-w-2xl m-4 border border-gray-200 dark:border-gray-700">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-heading text-brand-blue">Create New Record</h2>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="text-gray-500 dark:text-gray-400 mb-4">
+              No fields found for table "{tableId}". Please add fields in the settings first.
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setOpen(false)}
+                className="btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );

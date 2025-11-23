@@ -396,7 +396,14 @@ export default function Sidebar() {
         </div>
 
         {/* Footer */}
-        <SidebarFooter theme={theme} setTheme={setTheme} collapsed={collapsed} onToggleCollapse={handleToggleCollapse} />
+        <SidebarFooter 
+          theme={theme} 
+          setTheme={setTheme} 
+          collapsed={collapsed} 
+          onToggleCollapse={handleToggleCollapse}
+          editing={editing}
+          onToggleEdit={() => setEditing(!editing)}
+        />
       </aside>
     </>
   );
@@ -412,6 +419,19 @@ interface NavGroupComponentProps {
   onItemClick?: () => void;
 }
 
+interface NavGroupComponentProps {
+  group: NavGroup;
+  isGroupCollapsed: (title: string) => boolean;
+  toggleGroup: (title: string) => void;
+  isItemActive: (href: string) => boolean;
+  isChildActive: (href: string) => boolean;
+  collapsed?: boolean;
+  onItemClick?: () => void;
+  editing?: boolean;
+  onGroupTitleChange?: (oldTitle: string, newTitle: string) => void;
+  onItemLabelChange?: (href: string, newLabel: string) => void;
+}
+
 function NavGroupComponent({
   group,
   isGroupCollapsed,
@@ -420,24 +440,71 @@ function NavGroupComponent({
   isChildActive,
   collapsed = false,
   onItemClick,
+  editing = false,
+  onGroupTitleChange,
+  onItemLabelChange,
 }: NavGroupComponentProps) {
   const groupCollapsed = isGroupCollapsed(group.title);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(group.title);
+  const [editingItemLabel, setEditingItemLabel] = useState<string | null>(null);
+  const [itemLabelValue, setItemLabelValue] = useState<string>("");
 
   return (
     <div className="mb-4">
       {/* Group Header */}
       {!collapsed && (
-        <button
-          onClick={() => toggleGroup(group.title)}
-          className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-        >
-          <span>{group.title}</span>
-          {groupCollapsed ? (
-            <ChevronRight className="w-3 h-3" />
+        <div className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          {editing && editingTitle ? (
+            <input
+              type="text"
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onBlur={() => {
+                if (titleValue && titleValue !== group.title && onGroupTitleChange) {
+                  onGroupTitleChange(group.title, titleValue);
+                }
+                setEditingTitle(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (titleValue && titleValue !== group.title && onGroupTitleChange) {
+                    onGroupTitleChange(group.title, titleValue);
+                  }
+                  setEditingTitle(false);
+                } else if (e.key === "Escape") {
+                  setTitleValue(group.title);
+                  setEditingTitle(false);
+                }
+              }}
+              className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs"
+              autoFocus
+            />
           ) : (
-            <ChevronDown className="w-3 h-3" />
+            <div className="flex items-center gap-2 flex-1">
+              <button
+                onClick={() => toggleGroup(group.title)}
+                className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              >
+                <span>{group.title}</span>
+                {groupCollapsed ? (
+                  <ChevronRight className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+              {editing && (
+                <button
+                  onClick={() => setEditingTitle(true)}
+                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                  title="Edit group title"
+                >
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           )}
-        </button>
+        </div>
       )}
 
       {/* Group Items */}
@@ -450,36 +517,79 @@ function NavGroupComponent({
           return (
             <div key={item.href}>
               {/* Parent Item */}
-              <Link
-                href={item.href}
-                onClick={onItemClick}
-                className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-blue-400 ${
-                  active
-                    ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-                } ${collapsed ? "justify-center" : ""}`}
-                title={collapsed ? item.label : undefined}
-                aria-current={active ? "page" : undefined}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                {!collapsed && <span className="flex-1">{item.label}</span>}
-                {!collapsed && hasChildren && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      toggleGroup(item.label);
+              <div className="flex items-center gap-1">
+                {!collapsed && editingItemLabel === item.href ? (
+                  <input
+                    type="text"
+                    value={itemLabelValue}
+                    onChange={(e) => setItemLabelValue(e.target.value)}
+                    onBlur={() => {
+                      if (itemLabelValue && itemLabelValue !== item.label && onItemLabelChange) {
+                        onItemLabelChange(item.href, itemLabelValue);
+                      }
+                      setEditingItemLabel(null);
                     }}
-                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                  >
-                    {itemCollapsed ? (
-                      <ChevronRight className="w-3 h-3" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3" />
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (itemLabelValue && itemLabelValue !== item.label && onItemLabelChange) {
+                          onItemLabelChange(item.href, itemLabelValue);
+                        }
+                        setEditingItemLabel(null);
+                      } else if (e.key === "Escape") {
+                        setItemLabelValue(item.label);
+                        setEditingItemLabel(null);
+                      }
+                    }}
+                    className="flex-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    <Link
+                      href={item.href}
+                      onClick={onItemClick}
+                      className={`flex items-center gap-2 px-2 py-2 rounded-md text-sm transition-all duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-blue-400 flex-1 ${
+                        active
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium border-l-4 border-blue-500"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      } ${collapsed ? "justify-center" : ""}`}
+                      title={collapsed ? item.label : undefined}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <item.icon className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && <span className="flex-1">{item.label}</span>}
+                      {!collapsed && hasChildren && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleGroup(item.label);
+                          }}
+                          className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        >
+                          {itemCollapsed ? (
+                            <ChevronRight className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </button>
+                      )}
+                    </Link>
+                    {!collapsed && editing && (
+                      <button
+                        onClick={() => {
+                          setItemLabelValue(item.label);
+                          setEditingItemLabel(item.href);
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        title="Edit item label"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </button>
                     )}
-                  </button>
+                  </>
                 )}
-              </Link>
+              </div>
 
               {/* Children Items */}
               {!collapsed && hasChildren && !itemCollapsed && (
@@ -517,9 +627,11 @@ interface SidebarFooterProps {
   setTheme: (theme: "light" | "dark" | "brand") => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  editing?: boolean;
+  onToggleEdit?: () => void;
 }
 
-function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse }: SidebarFooterProps) {
+function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse, editing = false, onToggleEdit }: SidebarFooterProps) {
   const isDark = theme === "dark";
 
   return (
@@ -565,6 +677,18 @@ function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse }:
               <Settings className="w-4 h-4" />
               {!collapsed && <span>Settings</span>}
             </Link>
+
+      {/* Edit Mode Toggle */}
+      {onToggleEdit && (
+        <button
+          onClick={onToggleEdit}
+          className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+          title={collapsed ? (editing ? "Exit edit mode" : "Edit sidebar") : undefined}
+        >
+          <Edit3 className="w-4 h-4" />
+          {!collapsed && <span>{editing ? "Done Editing" : "Edit Sidebar"}</span>}
+        </button>
+      )}
 
       {/* Documentation Placeholder */}
       {!collapsed && (

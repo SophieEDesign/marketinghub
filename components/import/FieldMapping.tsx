@@ -77,6 +77,11 @@ export default function FieldMapping({
   const handleCreateField = async (csvColumn: string) => {
     if (!onCreateField || creatingField === csvColumn) return;
     
+    if (!csvColumn || !csvColumn.trim()) {
+      alert("Column name cannot be empty");
+      return;
+    }
+    
     setCreatingField(csvColumn);
     try {
       // Get sample values for type detection
@@ -85,13 +90,14 @@ export default function FieldMapping({
       const suggestedType = suggestTypeFromColumnName(csvColumn);
       const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
-      await onCreateField(csvColumn, finalType);
+      await onCreateField(csvColumn.trim(), finalType);
       
       // The parent component will reload fields and update mappings
       // We don't need to manually update here since useEffect will handle it
     } catch (error) {
       console.error("Error creating field:", error);
-      alert(`Failed to create field: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      alert(`Failed to create field "${csvColumn}": ${errorMessage}\n\nPlease check:\n- The column name is valid\n- The field doesn't already exist\n- Check the browser console for details`);
     } finally {
       setCreatingField(null);
     }

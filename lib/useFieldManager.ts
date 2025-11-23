@@ -46,21 +46,43 @@ export function useFieldManager(tableId: string) {
       setLoading(true);
       setError(null);
       try {
+        if (!label || !label.trim()) {
+          setError("Field label is required");
+          return null;
+        }
+
         // Generate field_key from label
-        const fieldKey = label
+        let fieldKey = label
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "_")
           .replace(/^_+|_+$/g, "");
 
-        // Get max order
+        if (!fieldKey) {
+          fieldKey = `field_${Date.now()}`;
+        }
+
+        // Check if field_key already exists
         const { data: existingFields } = await supabase
           .from("table_fields")
-          .select("order")
-          .eq("table_id", tableId)
-          .order("order", { ascending: false })
-          .limit(1);
+          .select("field_key, order")
+          .eq("table_id", tableId);
 
-        const maxOrder = existingFields && existingFields.length > 0 ? existingFields[0].order : -1;
+        // Check for duplicate field_key
+        const duplicate = existingFields?.find((f) => f.field_key === fieldKey);
+        if (duplicate) {
+          // Append number to make it unique
+          let counter = 1;
+          let uniqueKey = `${fieldKey}_${counter}`;
+          while (existingFields?.some((f) => f.field_key === uniqueKey)) {
+            counter++;
+            uniqueKey = `${fieldKey}_${counter}`;
+          }
+          fieldKey = uniqueKey;
+        }
+
+        const maxOrder = existingFields && existingFields.length > 0 
+          ? Math.max(...existingFields.map((f) => f.order || 0))
+          : -1;
         const newOrder = maxOrder + 1;
 
         // Prepare options for select types
@@ -75,7 +97,7 @@ export function useFieldManager(tableId: string) {
             {
               table_id: tableId,
               field_key: fieldKey,
-              label,
+              label: label.trim(),
               type,
               options: optionsValue ? JSON.stringify(optionsValue) : null,
               order: newOrder,
@@ -88,7 +110,7 @@ export function useFieldManager(tableId: string) {
 
         if (insertError) {
           console.error("Error adding field:", insertError);
-          setError(insertError.message);
+          setError(insertError.message || "Failed to create field");
           return null;
         }
 
@@ -101,7 +123,7 @@ export function useFieldManager(tableId: string) {
         return newField;
       } catch (err: any) {
         console.error("Error in addField:", err);
-        setError(err.message);
+        setError(err.message || "Unknown error occurred");
         return null;
       } finally {
         setLoading(false);
