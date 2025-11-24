@@ -199,7 +199,8 @@ export default function PagesPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeletePage(page.id, page.name)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                    title="Delete page"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
