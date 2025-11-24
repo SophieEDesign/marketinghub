@@ -1,5 +1,50 @@
 # Marketing Hub
 
+A comprehensive marketing management system built with Next.js, Supabase, and TypeScript.
+
+## Quick Start
+
+1. **Database Setup**: Run `supabase-all-tables-migration.sql` in Supabase SQL Editor
+2. **Environment Variables**: Configure `.env.local` with Supabase credentials
+3. **Install Dependencies**: `npm install`
+4. **Run Development Server**: `npm run dev`
+
+## Key Features
+
+- **Dynamic Tables**: Create and manage custom data tables
+- **Multiple Views**: Grid, Kanban, Calendar, Timeline, and Card views
+- **Custom Pages**: Build custom interface pages with drag-and-drop blocks
+- **Dashboard**: Customizable dashboard with multiple block types
+- **Import/Export**: CSV import and data export functionality
+
+## Documentation
+
+- **Migrations**: See `MIGRATIONS_README.md` for database setup
+- **Dashboard**: See `DASHBOARD_IMPLEMENTATION_REVIEW.md` for dashboard system
+- **Setup**: See `SETUP.md` for detailed setup instructions
+
+## Project Structure
+
+```
+app/              # Next.js app router pages
+components/       # React components
+lib/             # Utilities, hooks, and helpers
+supabase-*.sql   # Database migration files
+```
+
+## Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **Styling**: Tailwind CSS
+- **UI Components**: Custom components with shadcn/ui patterns
+- **Drag & Drop**: @dnd-kit
+- **Rich Text**: TipTap
+
+---
+
+# Marketing Hub
+
 A comprehensive marketing workspace built with Next.js and Supabase, featuring multiple views for content management.
 
 ## Features
