@@ -692,6 +692,33 @@ function NavGroupComponentOld({
   onGroupTitleChange,
   onItemLabelChange,
 }: NavGroupComponentProps) {
+  const groupCollapsed = isGroupCollapsed(group.title);
+  const [editingItemLabel, setEditingItemLabel] = useState<string | null>(null);
+  const [itemLabelValue, setItemLabelValue] = useState<string>("");
+
+  return (
+    <div className="mb-4">
+      {!collapsed && (
+        <div className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          <button
+            onClick={() => toggleGroup(group.title)}
+            className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          >
+            <span>{group.title}</span>
+            {groupCollapsed ? (
+              <ChevronRight className="w-3 h-3" />
+            ) : (
+              <ChevronDown className="w-3 h-3" />
+            )}
+          </button>
+        </div>
+      )}
+      <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
+        {group.items.map((item) => {
+          const active = isItemActive(item.href);
+          const hasChildren = item.children && item.children.length > 0;
+          const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
+
           return (
             <div key={item.href}>
               {/* Parent Item */}
