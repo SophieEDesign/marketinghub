@@ -103,8 +103,10 @@ function TableRecordsContent() {
             </div>
           </div>
         </div>
-        
-        {/* View Tabs */}
+      </div>
+
+      {/* View Tabs - Below the top bar */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-[73px] z-10">
         <ViewTabs tableId={table.name} tableName={table.label} />
       </div>
 
