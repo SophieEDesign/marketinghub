@@ -50,47 +50,59 @@ export function validateAndFixContent(
     return getDefaultContentForType(type);
   }
 
-  const defaultContent = getDefaultContentForType(type);
-
   switch (type) {
-    case "text":
+    case "text": {
+      const defaultContent = getDefaultContentForType("text");
       return {
         html: content.html !== undefined ? String(content.html) : defaultContent.html,
       };
-    case "image":
+    }
+    case "image": {
+      const defaultContent = getDefaultContentForType("image");
       return {
         url: content.url !== undefined ? String(content.url) : defaultContent.url,
         caption: content.caption !== undefined ? String(content.caption) : defaultContent.caption,
       };
-    case "embed":
+    }
+    case "embed": {
+      const defaultContent = getDefaultContentForType("embed");
       return {
         url: content.url !== undefined ? String(content.url) : defaultContent.url,
       };
-    case "kpi":
+    }
+    case "kpi": {
+      const defaultContent = getDefaultContentForType("kpi");
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         label: content.label !== undefined ? String(content.label) : defaultContent.label,
         filter: content.filter !== undefined ? String(content.filter) : defaultContent.filter,
         aggregate: content.aggregate !== undefined ? String(content.aggregate) : defaultContent.aggregate,
       };
-    case "table":
+    }
+    case "table": {
+      const defaultContent = getDefaultContentForType("table");
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         fields: Array.isArray(content.fields) ? content.fields.map(String) : defaultContent.fields,
         limit: typeof content.limit === "number" ? content.limit : defaultContent.limit,
       };
-    case "calendar":
+    }
+    case "calendar": {
+      const defaultContent = getDefaultContentForType("calendar");
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         dateField: content.dateField !== undefined ? String(content.dateField) : defaultContent.dateField,
         limit: typeof content.limit === "number" ? content.limit : defaultContent.limit,
       };
-    case "html":
+    }
+    case "html": {
+      const defaultContent = getDefaultContentForType("html");
       return {
         html: content.html !== undefined ? String(content.html) : defaultContent.html,
       };
+    }
     default:
-      return defaultContent;
+      return getDefaultContentForType(type);
   }
 }
 
