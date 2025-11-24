@@ -10,11 +10,13 @@ import {
   Database,
   Zap,
   ChevronRight,
+  Layout,
 } from "lucide-react";
 import AccountSettingsTab from "@/components/settings/tabs/AccountSettingsTab";
 import WorkspaceSettingsTab from "@/components/settings/tabs/WorkspaceSettingsTab";
 import DataTablesTab from "@/components/settings/tabs/DataTablesTab";
 import AutomationsTab from "@/components/settings/tabs/AutomationsTab";
+import PagesTab from "@/components/settings/tabs/PagesTab";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const SETTINGS_SECTIONS = [
@@ -39,6 +41,13 @@ const SETTINGS_SECTIONS = [
     icon: Database, 
     component: DataTablesTab,
     description: "Manage tables, fields, views, and imports"
+  },
+  { 
+    id: "pages", 
+    label: "Pages", 
+    icon: Layout, 
+    component: PagesTab,
+    description: "Manage interface pages and blocks"
   },
   { 
     id: "automations", 
