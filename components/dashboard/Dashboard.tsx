@@ -7,6 +7,7 @@ import { useDashboardBlocks } from "@/lib/hooks/useDashboardBlocks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import DashboardBlock from "./DashboardBlock";
 import BlockMenu, { BlockType } from "./blocks/BlockMenu";
+import DashboardBlockSettings from "./DashboardBlockSettings";
 import {
   DndContext,
   closestCenter,
@@ -27,12 +28,14 @@ function SortableBlockItem({
   isEditing,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging,
 }: {
   block: any;
   isEditing: boolean;
   onUpdate: (id: string, content: any) => void;
   onDelete: (id: string) => void;
+  onOpenSettings?: () => void;
   isDragging: boolean;
 }) {
   const {
@@ -87,6 +90,7 @@ function SortableBlockItem({
         isEditing={isEditing}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onOpenSettings={onOpenSettings}
         isDragging={isDragging}
       />
     </div>
@@ -101,6 +105,7 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
 
   const canEdit = permissions.canModifyDashboards;
 
@@ -247,7 +252,7 @@ export default function Dashboard() {
               )}
             </div>
           ) : (
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
               {blocks.map((block) => {
                 if (!block || !block.id) {
                   console.warn("Invalid block found:", block);
@@ -260,6 +265,7 @@ export default function Dashboard() {
                       isEditing={isEditing}
                       onUpdate={handleUpdateBlock}
                       onDelete={handleDeleteBlock}
+                      onOpenSettings={() => setSelectedBlock(block)}
                       isDragging={activeId === block.id}
                     />
                   </div>
@@ -267,6 +273,18 @@ export default function Dashboard() {
               })}
             </div>
           )}
+        </SortableContext>
+      </DndContext>
+
+      {/* Settings Panel */}
+      {isEditing && selectedBlock && (
+        <DashboardBlockSettings
+          block={selectedBlock}
+          isOpen={!!selectedBlock}
+          onClose={() => setSelectedBlock(null)}
+          onUpdate={handleUpdateBlock}
+        />
+      )}
         </SortableContext>
       </DndContext>
     </div>

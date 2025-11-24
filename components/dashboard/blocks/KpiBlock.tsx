@@ -10,6 +10,7 @@ interface KpiBlockProps {
   content: any;
   onUpdate?: (id: string, content: any) => void;
   onDelete?: (id: string) => void;
+  onOpenSettings?: () => void;
   isDragging?: boolean;
 }
 
@@ -18,6 +19,7 @@ export default function KpiBlock({
   content,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging = false,
 }: KpiBlockProps) {
   const { tables } = useTables();
@@ -106,11 +108,15 @@ export default function KpiBlock({
       )}
 
       {/* Settings Button */}
-      {onUpdate && (
+      {onOpenSettings && (
         <button
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings();
+          }}
           className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
           title="Configure KPI"
+          type="button"
         >
           <Settings className="w-4 h-4" />
         </button>

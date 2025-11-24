@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { X, GripVertical, Upload, Image as ImageIcon } from "lucide-react";
+import { X, GripVertical, Upload, Image as ImageIcon, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
 interface ImageBlockProps {
@@ -9,6 +9,7 @@ interface ImageBlockProps {
   content: any;
   onUpdate?: (id: string, content: any) => void;
   onDelete?: (id: string) => void;
+  onOpenSettings?: () => void;
   isDragging?: boolean;
 }
 
@@ -17,6 +18,7 @@ export default function ImageBlock({
   content,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging = false,
 }: ImageBlockProps) {
   const [imageUrl, setImageUrl] = useState(content?.url || content?.src || "");
@@ -71,12 +73,31 @@ export default function ImageBlock({
         <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
       </div>
 
+      {/* Settings Button */}
+      {onOpenSettings && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings();
+          }}
+          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
+          title="Settings"
+          type="button"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Delete Button */}
       {onDelete && (
         <button
-          onClick={() => onDelete(id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(id);
+          }}
           className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
           title="Delete block"
+          type="button"
         >
           <X className="w-4 h-4" />
         </button>

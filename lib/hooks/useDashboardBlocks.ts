@@ -21,14 +21,17 @@ const DEFAULT_DASHBOARD_ID = "00000000-0000-0000-0000-000000000001";
  */
 async function ensureDefaultDashboard(): Promise<void> {
   try {
+    const DEFAULT_ID = "00000000-0000-0000-0000-000000000001";
     const { error } = await supabase
       .from("dashboards")
       .upsert(
-        {
-          id: DEFAULT_DASHBOARD_ID,
-          name: "Main Dashboard",
-          description: "Default dashboard",
-        },
+        [
+          {
+            id: DEFAULT_ID,
+            name: "Main Dashboard",
+            description: "Default dashboard",
+          },
+        ],
         { onConflict: "id" }
       );
 
@@ -118,13 +121,27 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
             ? Math.max(...blocks.map((b) => b.position))
             : -1;
 
-        // Validate and fix content
-        const validatedContent = validateAndFixContent(
-          type,
-          initialContent && Object.keys(initialContent).length > 0
-            ? initialContent
-            : getDefaultContentForType(type)
-        );
+        // Ensure content is never null - use default content structure
+        const defaultContent: Record<string, any> = {
+          text: { html: "" },
+          image: { url: "", caption: "" },
+          embed: { url: "" },
+          kpi: { table: "", label: "", filter: "", aggregate: "count" },
+          table: { table: "", fields: [], limit: 10 },
+          calendar: { table: "", dateField: "", limit: 10 },
+          html: { html: "" },
+        };
+
+        // Use provided content if valid, otherwise use default
+        const contentToUse = 
+          initialContent && 
+          typeof initialContent === "object" && 
+          Object.keys(initialContent).length > 0
+            ? validateAndFixContent(type, initialContent)
+            : defaultContent[type] || getDefaultContentForType(type);
+
+        // Ensure content is never null
+        const validatedContent = contentToUse || defaultContent[type] || getDefaultContentForType(type);
 
         const { data, error: insertError } = await supabase
           .from("dashboard_blocks")
@@ -132,7 +149,7 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
             {
               dashboard_id: dashboardId,
               type,
-              content: validatedContent,
+              content: validatedContent || defaultContent[type],
               position: maxPosition + 1,
             },
           ])

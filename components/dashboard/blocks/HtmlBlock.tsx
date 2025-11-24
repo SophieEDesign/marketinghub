@@ -9,6 +9,7 @@ interface HtmlBlockProps {
   content: any;
   onUpdate?: (id: string, content: any) => void;
   onDelete?: (id: string) => void;
+  onOpenSettings?: () => void;
   isDragging?: boolean;
 }
 
@@ -17,6 +18,7 @@ export default function HtmlBlock({
   content,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging = false,
 }: HtmlBlockProps) {
   const permissions = usePermissions();
@@ -54,11 +56,15 @@ export default function HtmlBlock({
       )}
 
       {/* Settings Button */}
-      {canEdit && (
+      {onOpenSettings && (
         <button
-          onClick={() => setIsEditing(!isEditing)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings();
+          }}
           className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
           title="Edit HTML"
+          type="button"
         >
           <Settings className="w-4 h-4" />
         </button>

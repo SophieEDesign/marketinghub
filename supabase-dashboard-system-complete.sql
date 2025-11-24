@@ -63,6 +63,13 @@ DROP POLICY IF EXISTS "Allow all users to delete dashboard blocks" ON dashboard_
 
 -- 6. CREATE RLS POLICIES FOR DASHBOARDS
 -- ============================================================================
+-- Allow authenticated users to read
+CREATE POLICY "Allow authenticated read" ON dashboards
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Allow all users to view dashboards (for backward compatibility)
 CREATE POLICY "Allow all users to view dashboards" ON dashboards
   FOR SELECT USING (true);
 
@@ -77,6 +84,13 @@ CREATE POLICY "Allow all users to delete dashboards" ON dashboards
 
 -- 7. CREATE RLS POLICIES FOR DASHBOARD_BLOCKS
 -- ============================================================================
+-- Allow authenticated users to read
+CREATE POLICY "Allow authenticated read" ON dashboard_blocks
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Allow all users to view dashboard blocks (for backward compatibility)
 CREATE POLICY "Allow all users to view dashboard blocks" ON dashboard_blocks
   FOR SELECT USING (true);
 

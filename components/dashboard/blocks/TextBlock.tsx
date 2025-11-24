@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { X, GripVertical } from "lucide-react";
+import { X, GripVertical, Settings } from "lucide-react";
 
 interface TextBlockProps {
   id: string;
   content: any;
   onUpdate?: (id: string, content: any) => void;
   onDelete?: (id: string) => void;
+  onOpenSettings?: () => void;
   isDragging?: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function TextBlock({
   content,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging = false,
 }: TextBlockProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -82,12 +84,31 @@ export default function TextBlock({
         <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
       </div>
 
+      {/* Settings Button */}
+      {onOpenSettings && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenSettings();
+          }}
+          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
+          title="Settings"
+          type="button"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Delete Button */}
       {onDelete && (
         <button
-          onClick={() => onDelete(id)}
-          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(id);
+          }}
+          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
           title="Delete block"
+          type="button"
         >
           <X className="w-4 h-4" />
         </button>
