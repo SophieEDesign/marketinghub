@@ -36,7 +36,7 @@ export async function GET(
       tableError = result.error;
 
       // If not found in new system, try old table_metadata
-      if (tableError || !table) {
+      if ((tableError && (tableError.code === 'PGRST116' || tableError.message?.includes('No rows'))) || !table) {
         const { data: oldTable, error: oldError } = await supabase
           .from("table_metadata")
           .select("table_name, display_name, description")
@@ -56,6 +56,9 @@ export async function GET(
             updated_at: new Date().toISOString(),
           };
           tableError = null;
+        } else if (oldError) {
+          // If old system also doesn't have it, preserve the original error
+          tableError = tableError || oldError;
         }
       }
     }
@@ -162,31 +165,108 @@ export async function PUT(
 }
 
 // DELETE /api/tables/[id] - Delete a table
+// Supports both UUID (new system) and table name (old system)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // First get the table to get its name
-    const { data: table, error: tableError } = await supabase
-      .from("tables")
-      .select("name")
-      .eq("id", params.id)
-      .single();
+    // Check if id is a UUID (new system) or table name (old system)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.id);
+    
+    let table: any = null;
+    let tableError: any = null;
+    let tableIdToDelete: string | null = null;
 
-    if (tableError || !table) {
+    if (isUUID) {
+      // New system: Look up by UUID
+      const result = await supabase
+        .from("tables")
+        .select("id, name")
+        .eq("id", params.id)
+        .single();
+      table = result.data;
+      tableError = result.error;
+      tableIdToDelete = params.id;
+    } else {
+      // Old system or table name: Look up by name
+      const result = await supabase
+        .from("tables")
+        .select("id, name")
+        .eq("name", params.id)
+        .single();
+      table = result.data;
+      tableError = result.error;
+      tableIdToDelete = table?.id || null;
+
+      // If not found in new system, try old table_metadata
+      if ((tableError && (tableError.code === 'PGRST116' || tableError.message?.includes('No rows'))) || !table) {
+        const { data: oldTable, error: oldError } = await supabase
+          .from("table_metadata")
+          .select("table_name")
+          .eq("table_name", params.id)
+          .single();
+
+        if (!oldError && oldTable) {
+          // Table exists in old system only
+          // We'll delete from old system directly
+          table = { name: oldTable.table_name };
+          tableError = null;
+        } else if (oldError) {
+          // Not found in either system
+          tableError = tableError || oldError;
+        }
+      }
+    }
+
+    // Check if table exists
+    if ((tableError && (tableError.code === 'PGRST116' || tableError.message?.includes('No rows'))) && !table) {
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
 
-    // Delete the table metadata (cascade will delete fields)
-    const { error: deleteError } = await supabase
-      .from("tables")
-      .delete()
-      .eq("id", params.id);
+    if (!table) {
+      return NextResponse.json({ error: "Table not found" }, { status: 404 });
+    }
 
-    if (deleteError) {
-      console.error("Error deleting table:", deleteError);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    // Delete related data first (fields, views, etc.)
+    if (tableIdToDelete) {
+      // New system: Delete by UUID
+      // Delete fields
+      await supabase
+        .from("table_fields")
+        .delete()
+        .eq("table_id", tableIdToDelete);
+
+      // Delete views
+      await supabase
+        .from("table_view_configs")
+        .delete()
+        .eq("table_name", table.name || params.id);
+
+      // Delete the table metadata
+      const { error: deleteError } = await supabase
+        .from("tables")
+        .delete()
+        .eq("id", tableIdToDelete);
+
+      if (deleteError) {
+        console.error("Error deleting table:", deleteError);
+        return NextResponse.json({ error: deleteError.message }, { status: 500 });
+      }
+    }
+
+    // Also delete from old table_metadata if it exists (for old system tables)
+    if (!isUUID || !tableIdToDelete) {
+      await supabase
+        .from("table_metadata")
+        .delete()
+        .eq("table_name", table.name || params.id);
+      
+      // Delete old system views
+      await supabase
+        .from("table_view_configs")
+        .delete()
+        .eq("table_name", table.name || params.id);
     }
 
     // Note: The actual Supabase table should be dropped separately
