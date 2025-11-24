@@ -32,12 +32,32 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         .eq("dashboard_id", dashboardId)
         .order("position", { ascending: true });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        // Check if table doesn't exist
+        const errorMessage = fetchError.message || '';
+        const errorCode = fetchError.code || '';
+        const isTableMissing = 
+          errorCode === 'PGRST116' || 
+          errorCode === '42P01' ||
+          errorMessage.toLowerCase().includes('relation') || 
+          errorMessage.toLowerCase().includes('does not exist') ||
+          (errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found'));
+        
+        if (isTableMissing) {
+          console.error("Dashboard blocks table missing. Please run supabase-dashboard-complete-fix.sql");
+          setError("Dashboard blocks table not found. Please run the migration: supabase-dashboard-complete-fix.sql");
+          setBlocks([]);
+          return;
+        }
+        
+        throw fetchError;
+      }
 
       setBlocks(data || []);
     } catch (err: any) {
       console.error("Error loading dashboard blocks:", err);
       setError(err.message || "Failed to load blocks");
+      setBlocks([]);
     } finally {
       setLoading(false);
     }
