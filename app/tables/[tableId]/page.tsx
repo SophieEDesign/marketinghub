@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { ArrowLeft, Plus, Settings } from "lucide-react";
 import Button from "@/components/ui/Button";
 import GridView from "@/components/views/GridView";
+import ViewTabs from "@/components/views/ViewTabs";
 
 interface DynamicTable {
   id: string;
@@ -22,9 +23,14 @@ interface DynamicTable {
 function TableRecordsContent() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
   const tableId = params.tableId as string;
   const [table, setTable] = useState<DynamicTable | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Get view name from URL if present
+  const pathParts = pathname.split("/").filter(Boolean);
+  const viewName = pathParts[2]; // /tables/[tableId]/[viewName]
 
   useEffect(() => {
     loadTable();
@@ -97,6 +103,9 @@ function TableRecordsContent() {
             </div>
           </div>
         </div>
+        
+        {/* View Tabs */}
+        <ViewTabs tableId={table.name} tableName={table.label} />
       </div>
 
       {/* Grid View */}
