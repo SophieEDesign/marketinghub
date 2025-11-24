@@ -108,24 +108,30 @@ export default function Dashboard() {
     try {
       await addBlock(type);
       setShowBlockMenu(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding block:", error);
+      alert(`Failed to add block: ${error.message || "Unknown error"}`);
     }
   };
 
   const handleUpdateBlock = async (id: string, content: any) => {
     try {
       await updateBlock(id, { content });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating block:", error);
+      // Don't show alert for updates - they're frequent and auto-saved
     }
   };
 
   const handleDeleteBlock = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this block?")) {
+      return;
+    }
     try {
       await deleteBlock(id);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting block:", error);
+      alert(`Failed to delete block: ${error.message || "Unknown error"}`);
     }
   };
 
@@ -228,7 +234,7 @@ export default function Dashboard() {
           strategy={rectSortingStrategy}
           disabled={!isEditing}
         >
-          {blocks.length === 0 ? (
+          {!blocks || blocks.length === 0 ? (
             <div className="text-center py-12 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
               <p className="mb-4">No blocks yet.</p>
               {canEdit && !isEditing && (
@@ -242,17 +248,23 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-              {blocks.map((block) => (
-                <div key={block.id} className="relative">
-                  <SortableBlockItem
-                    block={block}
-                    isEditing={isEditing}
-                    onUpdate={handleUpdateBlock}
-                    onDelete={handleDeleteBlock}
-                    isDragging={activeId === block.id}
-                  />
-                </div>
-              ))}
+              {blocks.map((block) => {
+                if (!block || !block.id) {
+                  console.warn("Invalid block found:", block);
+                  return null;
+                }
+                return (
+                  <div key={block.id} className="relative">
+                    <SortableBlockItem
+                      block={block}
+                      isEditing={isEditing}
+                      onUpdate={handleUpdateBlock}
+                      onDelete={handleDeleteBlock}
+                      isDragging={activeId === block.id}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </SortableContext>

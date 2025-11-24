@@ -24,9 +24,12 @@ export default function DashboardBlock({
   onDelete,
   isDragging = false,
 }: DashboardBlockProps) {
+  // Ensure content is always defined
+  const safeContent = block.content || {};
+
   const commonProps = {
     id: block.id,
-    content: block.content,
+    content: safeContent,
     onUpdate: isEditing ? onUpdate : undefined,
     onDelete: isEditing ? onDelete : undefined,
     isDragging,

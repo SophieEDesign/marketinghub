@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { validateAndFixContent, getDefaultContentForType, BlockType } from "@/lib/utils/dashboardBlockContent";
 
 export interface DashboardBlock {
   id: string;
@@ -15,6 +16,31 @@ export interface DashboardBlock {
 
 const DEFAULT_DASHBOARD_ID = "00000000-0000-0000-0000-000000000001";
 
+/**
+ * Ensure default dashboard exists
+ */
+async function ensureDefaultDashboard(): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from("dashboards")
+      .upsert(
+        {
+          id: DEFAULT_DASHBOARD_ID,
+          name: "Main Dashboard",
+          description: "Default dashboard",
+        },
+        { onConflict: "id" }
+      );
+
+    if (error && error.code !== "23505") {
+      // Ignore duplicate key errors
+      console.warn("Could not ensure default dashboard:", error);
+    }
+  } catch (err) {
+    console.warn("Error ensuring default dashboard:", err);
+  }
+}
+
 export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
   const [blocks, setBlocks] = useState<DashboardBlock[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,6 +51,11 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
     try {
       setLoading(true);
       setError(null);
+
+      // Ensure default dashboard exists
+      if (dashboardId === DEFAULT_DASHBOARD_ID) {
+        await ensureDefaultDashboard();
+      }
 
       const { data, error: fetchError } = await supabase
         .from("dashboard_blocks")
@@ -44,8 +75,8 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           (errorMessage.toLowerCase().includes('table') && errorMessage.toLowerCase().includes('not found'));
         
         if (isTableMissing) {
-          console.error("Dashboard blocks table missing. Please run supabase-dashboard-complete-fix.sql");
-          setError("Dashboard blocks table not found. Please run the migration: supabase-dashboard-complete-fix.sql");
+          console.error("Dashboard blocks table missing. Please run supabase-dashboard-system-complete.sql");
+          setError("Dashboard blocks table not found. Please run the migration: supabase-dashboard-system-complete.sql");
           setBlocks([]);
           return;
         }
@@ -53,7 +84,13 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         throw fetchError;
       }
 
-      setBlocks(data || []);
+      // Validate and fix content for all blocks
+      const validatedBlocks = (data || []).map((block) => ({
+        ...block,
+        content: validateAndFixContent(block.type, block.content),
+      }));
+
+      setBlocks(validatedBlocks);
     } catch (err: any) {
       console.error("Error loading dashboard blocks:", err);
       setError(err.message || "Failed to load blocks");
@@ -69,22 +106,25 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
 
   // Add a new block
   const addBlock = useCallback(
-    async (type: DashboardBlock["type"], initialContent: any = {}) => {
+    async (type: BlockType, initialContent: any = {}) => {
       try {
+        // Ensure default dashboard exists
+        if (dashboardId === DEFAULT_DASHBOARD_ID) {
+          await ensureDefaultDashboard();
+        }
+
         const maxPosition =
           blocks.length > 0
             ? Math.max(...blocks.map((b) => b.position))
             : -1;
 
-        const defaultContent: Record<string, any> = {
-          text: type === "text" ? { html: "" } : {},
-          image: type === "image" ? { url: "", caption: "" } : {},
-          embed: type === "embed" ? { url: "" } : {},
-          kpi: type === "kpi" ? { table: "", label: "", filter: "", aggregate: "count" } : {},
-          table: type === "table" ? { table: "", fields: [], limit: 5 } : {},
-          calendar: type === "calendar" ? { table: "", dateField: "", limit: 5 } : {},
-          html: type === "html" ? { html: "" } : {},
-        };
+        // Validate and fix content
+        const validatedContent = validateAndFixContent(
+          type,
+          initialContent && Object.keys(initialContent).length > 0
+            ? initialContent
+            : getDefaultContentForType(type)
+        );
 
         const { data, error: insertError } = await supabase
           .from("dashboard_blocks")
@@ -92,17 +132,26 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
             {
               dashboard_id: dashboardId,
               type,
-              content: initialContent || defaultContent[type] || {},
+              content: validatedContent,
               position: maxPosition + 1,
             },
           ])
           .select()
           .single();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("Error inserting block:", insertError);
+          throw insertError;
+        }
 
-        setBlocks((prev) => [...prev, data]);
-        return data;
+        // Validate the returned data
+        const validatedBlock = {
+          ...data,
+          content: validateAndFixContent(data.type, data.content),
+        };
+
+        setBlocks((prev) => [...prev, validatedBlock]);
+        return validatedBlock;
       } catch (err: any) {
         console.error("Error adding block:", err);
         throw err;
@@ -115,25 +164,46 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
   const updateBlock = useCallback(
     async (id: string, updates: Partial<DashboardBlock>) => {
       try {
+        // Find the block to get its type
+        const existingBlock = blocks.find((b) => b.id === id);
+        if (!existingBlock) {
+          throw new Error(`Block with id ${id} not found`);
+        }
+
+        // If updating content, validate it
+        const updateData: Partial<DashboardBlock> = { ...updates };
+        if (updates.content !== undefined) {
+          updateData.content = validateAndFixContent(existingBlock.type, updates.content);
+        }
+
         const { data, error: updateError } = await supabase
           .from("dashboard_blocks")
-          .update(updates)
+          .update(updateData)
           .eq("id", id)
           .select()
           .single();
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Error updating block:", updateError);
+          throw updateError;
+        }
+
+        // Validate the returned data
+        const validatedBlock = {
+          ...data,
+          content: validateAndFixContent(data.type, data.content),
+        };
 
         setBlocks((prev) =>
-          prev.map((b) => (b.id === id ? { ...b, ...data } : b))
+          prev.map((b) => (b.id === id ? validatedBlock : b))
         );
-        return data;
+        return validatedBlock;
       } catch (err: any) {
         console.error("Error updating block:", err);
         throw err;
       }
     },
-    []
+    [blocks]
   );
 
   // Delete a block
@@ -157,30 +227,43 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
   const reorderBlocks = useCallback(
     async (newOrder: string[]) => {
       try {
+        if (newOrder.length === 0) return;
+
+        // Update positions in database
         const updates = newOrder.map((blockId, index) => ({
           id: blockId,
           position: index,
         }));
 
-        await Promise.all(
-          updates.map((update) =>
-            supabase
-              .from("dashboard_blocks")
-              .update({ position: update.position })
-              .eq("id", update.id)
-          )
+        const updatePromises = updates.map((update) =>
+          supabase
+            .from("dashboard_blocks")
+            .update({ position: update.position })
+            .eq("id", update.id)
         );
 
-        // Update local state
+        const results = await Promise.all(updatePromises);
+        
+        // Check for errors
+        const errors = results.filter((r) => r.error);
+        if (errors.length > 0) {
+          console.error("Errors updating positions:", errors);
+          throw new Error("Failed to update some block positions");
+        }
+
+        // Update local state optimistically
         const reorderedBlocks = newOrder
-          .map((id) => blocks.find((b) => b.id === id))
-          .filter(Boolean) as DashboardBlock[];
+          .map((id, index) => {
+            const block = blocks.find((b) => b.id === id);
+            return block ? { ...block, position: index } : null;
+          })
+          .filter((b): b is DashboardBlock => b !== null);
 
         setBlocks(reorderedBlocks);
       } catch (err: any) {
         console.error("Error reordering blocks:", err);
-        // Reload on error
-        loadBlocks();
+        // Reload on error to get correct state
+        await loadBlocks();
         throw err;
       }
     },
