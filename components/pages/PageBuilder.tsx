@@ -179,32 +179,54 @@ function BlockWrapper({
       }`}
     >
       {isEditing && (
-        <div className="absolute top-2 right-2 z-10 flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 shadow-sm">
+        <div 
+          className="absolute top-2 right-2 z-50 flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <button
-            onClick={onEdit}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
             title="Settings"
+            type="button"
           >
             <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
-            onClick={onDuplicate}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
             title="Duplicate"
+            type="button"
           >
             <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
           </button>
           <button
-            onClick={onDelete}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm("Delete this block?")) {
+                onDelete();
+              }
+            }}
             className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
             title="Delete"
+            type="button"
           >
             <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
           </button>
         </div>
       )}
       {isEditing && (
-        <div className="absolute top-2 left-2 z-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 cursor-move">
+        <div 
+          className="absolute top-2 left-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 cursor-move shadow-lg"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
       )}

@@ -181,9 +181,19 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                   const response = await fetch(`/api/page-blocks/${id}`, {
                     method: "DELETE",
                   });
-                  if (!response.ok) throw new Error("Failed to delete block");
-                  setBlocks(blocks.filter((b) => b.id !== id));
+                  if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Failed to delete block");
+                  }
+                  // Reload the page to ensure UI is in sync
+                  await loadPage();
+                  toast({
+                    title: "Success",
+                    description: "Block deleted successfully",
+                    type: "success",
+                  });
                 } catch (error: any) {
+                  console.error("Error deleting block:", error);
                   toast({
                     title: "Error",
                     description: error.message || "Failed to delete block",
