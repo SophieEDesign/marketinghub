@@ -250,6 +250,7 @@ export default function Sidebar() {
     const newCustomizations = {
       groupTitles: { ...sidebarCustomizations.groupTitles, [oldTitle]: newTitle },
       itemLabels: { ...sidebarCustomizations.itemLabels },
+      itemOrder: { ...sidebarCustomizations.itemOrder },
     };
     setSidebarCustomizations(newCustomizations);
     localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
