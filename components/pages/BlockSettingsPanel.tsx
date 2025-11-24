@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, ExternalLink } from "lucide-react";
 import { InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
 import Button from "@/components/ui/Button";
 
@@ -18,6 +19,7 @@ export default function BlockSettingsPanel({
   onClose,
   onUpdate,
 }: BlockSettingsPanelProps) {
+  const router = useRouter();
   const [config, setConfig] = useState<any>({});
 
   useEffect(() => {
@@ -68,16 +70,31 @@ export default function BlockSettingsPanel({
         {["grid", "kanban", "calendar", "timeline", "gallery", "list"].includes(block.type) && (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Table
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Table
+                </label>
+                {config.table && (
+                  <button
+                    onClick={() => router.push(`/tables/${config.table}`)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                    title="View table data"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    View Table
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={config.table || ""}
                 onChange={(e) => updateConfig("table", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                placeholder="Table name"
+                placeholder="Table name (e.g., content, campaigns)"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Enter the table name to display data from
+              </p>
             </div>
 
             <div>

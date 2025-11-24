@@ -45,14 +45,16 @@ export default function PageBuilder({
 
   // Convert blocks to react-grid-layout format
   useEffect(() => {
-    const lgLayout: Layout[] = blocks.map((block) => ({
+    const lgLayout: Layout[] = blocks.map((block, index) => ({
       i: block.id,
-      x: block.position_x || 0,
-      y: block.position_y || 0,
-      w: block.width || 12,
-      h: block.height || 6,
+      x: block.position_x ?? 0,
+      y: block.position_y ?? index,
+      w: block.width ?? 12,
+      h: block.height ?? 6,
       minW: 2,
       minH: 2,
+      // Prevent layout from collapsing blocks
+      static: false,
     }));
 
     setLayouts({
@@ -118,6 +120,8 @@ export default function PageBuilder({
           isResizable={isEditing}
           margin={[16, 16]}
           containerPadding={[0, 0]}
+          preventCollision={true}
+          compactType={null}
         >
           {blocks.map((block) => (
             <div key={block.id} className="relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -174,9 +178,10 @@ function BlockWrapper({
 }) {
   return (
     <div
-      className={`relative border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 ${
+      className={`relative border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 w-full h-full ${
         isDragging ? "opacity-50" : ""
       }`}
+      style={{ minHeight: '200px' }}
     >
       {isEditing && (
         <div 
@@ -230,7 +235,7 @@ function BlockWrapper({
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
       )}
-      <div className="p-4">
+      <div className="p-4 w-full h-full min-h-[200px]">
         {renderPageBlock(block)}
       </div>
     </div>
