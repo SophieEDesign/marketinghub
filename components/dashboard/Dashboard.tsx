@@ -46,10 +46,42 @@ function SortableBlockItem({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    touchAction: 'none', // Prevent scrolling on touch devices
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      {...attributes}
+      className={isEditing ? "cursor-move" : ""}
+    >
+      {isEditing && (
+        <div
+          {...listeners}
+          className="absolute top-2 left-2 z-10 p-2 cursor-grab active:cursor-grabbing bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 opacity-0 hover:opacity-100 transition-opacity"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-gray-400"
+          >
+            <circle cx="2" cy="2" r="1" fill="currentColor" />
+            <circle cx="6" cy="2" r="1" fill="currentColor" />
+            <circle cx="10" cy="2" r="1" fill="currentColor" />
+            <circle cx="2" cy="6" r="1" fill="currentColor" />
+            <circle cx="6" cy="6" r="1" fill="currentColor" />
+            <circle cx="10" cy="6" r="1" fill="currentColor" />
+            <circle cx="2" cy="10" r="1" fill="currentColor" />
+            <circle cx="6" cy="10" r="1" fill="currentColor" />
+            <circle cx="10" cy="10" r="1" fill="currentColor" />
+          </svg>
+        </div>
+      )}
       <DashboardBlock
         block={block}
         isEditing={isEditing}
@@ -211,14 +243,15 @@ export default function Dashboard() {
           ) : (
             <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
               {blocks.map((block) => (
-                <SortableBlockItem
-                  key={block.id}
-                  block={block}
-                  isEditing={isEditing}
-                  onUpdate={handleUpdateBlock}
-                  onDelete={handleDeleteBlock}
-                  isDragging={activeId === block.id}
-                />
+                <div key={block.id} className="relative">
+                  <SortableBlockItem
+                    block={block}
+                    isEditing={isEditing}
+                    onUpdate={handleUpdateBlock}
+                    onDelete={handleDeleteBlock}
+                    isDragging={activeId === block.id}
+                  />
+                </div>
               ))}
             </div>
           )}
