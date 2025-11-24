@@ -285,8 +285,6 @@ export default function Dashboard() {
           onUpdate={handleUpdateBlock}
         />
       )}
-        </SortableContext>
-      </DndContext>
     </div>
   );
 }
