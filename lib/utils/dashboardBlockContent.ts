@@ -52,54 +52,54 @@ export function validateAndFixContent(
 
   switch (type) {
     case "text": {
-      const defaultContent = getDefaultContentForType("text");
+      const defaultContent = getDefaultContentForType("text") as BlockContentSchemas["text"];
       return {
         html: content.html !== undefined ? String(content.html) : defaultContent.html,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "image": {
-      const defaultContent = getDefaultContentForType("image");
+      const defaultContent = getDefaultContentForType("image") as BlockContentSchemas["image"];
       return {
         url: content.url !== undefined ? String(content.url) : defaultContent.url,
         caption: content.caption !== undefined ? String(content.caption) : defaultContent.caption,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "embed": {
-      const defaultContent = getDefaultContentForType("embed");
+      const defaultContent = getDefaultContentForType("embed") as BlockContentSchemas["embed"];
       return {
         url: content.url !== undefined ? String(content.url) : defaultContent.url,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "kpi": {
-      const defaultContent = getDefaultContentForType("kpi");
+      const defaultContent = getDefaultContentForType("kpi") as BlockContentSchemas["kpi"];
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         label: content.label !== undefined ? String(content.label) : defaultContent.label,
         filter: content.filter !== undefined ? String(content.filter) : defaultContent.filter,
         aggregate: content.aggregate !== undefined ? String(content.aggregate) : defaultContent.aggregate,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "table": {
-      const defaultContent = getDefaultContentForType("table");
+      const defaultContent = getDefaultContentForType("table") as BlockContentSchemas["table"];
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         fields: Array.isArray(content.fields) ? content.fields.map(String) : defaultContent.fields,
         limit: typeof content.limit === "number" ? content.limit : defaultContent.limit,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "calendar": {
-      const defaultContent = getDefaultContentForType("calendar");
+      const defaultContent = getDefaultContentForType("calendar") as BlockContentSchemas["calendar"];
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         dateField: content.dateField !== undefined ? String(content.dateField) : defaultContent.dateField,
         limit: typeof content.limit === "number" ? content.limit : defaultContent.limit,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     case "html": {
-      const defaultContent = getDefaultContentForType("html");
+      const defaultContent = getDefaultContentForType("html") as BlockContentSchemas["html"];
       return {
         html: content.html !== undefined ? String(content.html) : defaultContent.html,
-      };
+      } as BlockContentSchemas[BlockType];
     }
     default:
       return getDefaultContentForType(type);
