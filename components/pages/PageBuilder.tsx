@@ -151,12 +151,17 @@ export default function PageBuilder({
           ))}
         </div>
       )}
-      <BlockSettingsPanel
-        block={editingBlockId ? blocks.find((b) => b.id === editingBlockId) || null : null}
-        isOpen={editingBlockId !== null}
-        onClose={() => setEditingBlockId(null)}
-        onUpdate={onUpdateBlock}
-      />
+      {editingBlockId && (
+        <BlockSettingsPanel
+          block={blocks.find((b) => b.id === editingBlockId) || null}
+          isOpen={true}
+          onClose={() => {
+            console.log("Closing settings panel");
+            setEditingBlockId(null);
+          }}
+          onUpdate={onUpdateBlock}
+        />
+      )}
     </>
   );
 }
@@ -185,16 +190,24 @@ function BlockWrapper({
     >
       {isEditing && (
         <div 
-          className="absolute top-2 right-2 z-50 flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 z-[100] flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 shadow-lg"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
         >
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
+              console.log("Settings button clicked for block:", block.id);
               onEdit();
             }}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
             title="Settings"
             type="button"
           >
