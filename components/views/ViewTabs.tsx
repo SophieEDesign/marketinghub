@@ -29,10 +29,11 @@ export default function ViewTabs({ tableId, tableName }: ViewTabsProps) {
 
   // Get current view name from URL or use currentView
   const pathParts = pathname.split("/").filter(Boolean);
-  const currentViewName = pathParts[1] || currentView?.view_name;
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const currentViewName = pathParts[2] || currentView?.view_name;
 
   const handleViewClick = (viewName: string, viewType: string) => {
-    router.push(`/${tableId}/${viewName}`);
+    router.push(`/tables/${tableId}/${viewName}`);
   };
 
   const handleCreateView = async (viewName: string, viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => {
@@ -50,7 +51,7 @@ export default function ViewTabs({ tableId, tableName }: ViewTabsProps) {
     await reloadViews();
     setShowCreateModal(false);
     // Navigate to the new view
-    router.push(`/${tableId}/${viewName}`);
+    router.push(`/tables/${tableId}/${viewName}`);
   };
 
   if (views.length === 0) {

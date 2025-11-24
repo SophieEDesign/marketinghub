@@ -22,7 +22,8 @@ export default function TextBlock({
   isDragging = false,
 }: TextBlockProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [localContent, setLocalContent] = useState(content?.text || "");
+  // Support both content.text and content.html for backward compatibility
+  const [localContent, setLocalContent] = useState(content?.html || content?.text || "");
 
   const editor = useEditor({
     extensions: [
@@ -38,7 +39,7 @@ export default function TextBlock({
       // Debounce auto-save
       clearTimeout((window as any)[`saveTimeout_${id}`]);
       (window as any)[`saveTimeout_${id}`] = setTimeout(() => {
-        onUpdate?.(id, { text: html });
+        onUpdate?.(id, { html: html, text: html }); // Save as both for compatibility
       }, 500);
     },
     editorProps: {
@@ -49,11 +50,12 @@ export default function TextBlock({
   });
 
   useEffect(() => {
-    if (editor && content?.text && content.text !== localContent) {
-      editor.commands.setContent(content.text);
-      setLocalContent(content.text);
+    const newContent = content?.html || content?.text || "";
+    if (editor && newContent && newContent !== localContent) {
+      editor.commands.setContent(newContent);
+      setLocalContent(newContent);
     }
-  }, [content?.text, editor]);
+  }, [content?.html, content?.text, editor, localContent]);
 
   const handleFocus = () => {
     setIsEditing(true);
