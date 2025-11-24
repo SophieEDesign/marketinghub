@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, GripVertical, Settings, Table as TableIcon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
+import { useTables } from "@/lib/hooks/useTables";
 
 interface TableBlockProps {
   id: string;
@@ -21,6 +22,7 @@ export default function TableBlock({
   isDragging = false,
 }: TableBlockProps) {
   const { openRecord } = useRecordDrawer();
+  const { tables } = useTables();
   const [config, setConfig] = useState({
     table: content?.table || "content",
     fields: content?.fields || ["title", "status", "created_at"],
@@ -115,11 +117,11 @@ export default function TableBlock({
                 onChange={(e) => handleConfigChange({ table: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                <option value="content">Content</option>
-                <option value="campaigns">Campaigns</option>
-                <option value="contacts">Contacts</option>
-                <option value="tasks">Tasks</option>
-                <option value="sponsorships">Sponsorships</option>
+                {tables.map((table) => (
+                  <option key={table.id} value={table.name}>
+                    {table.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
