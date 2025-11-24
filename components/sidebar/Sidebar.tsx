@@ -205,14 +205,28 @@ export default function Sidebar() {
             .select("table_name, display_name")
             .order("display_name", { ascending: true });
           
-          if (!oldError && oldTables) {
+          if (!oldError && oldTables && oldTables.length > 0) {
+            // Convert old format to new format for display
+            const convertedTables = oldTables.map((row) => ({
+              id: row.table_name,
+              name: row.table_name,
+              label: row.display_name,
+              icon: 'table',
+            }));
+            setDynamicTablesList(convertedTables);
             setDynamicTables(oldTables.map((row) => row.table_name));
             const updatedItems = generateDefaultSidebarItems(oldTables);
             setOrderedSidebar(updatedItems);
+          } else {
+            // No tables found, set empty list
+            setDynamicTablesList([]);
+            setDynamicTables([]);
           }
         }
       } catch (error) {
         console.warn("Error loading dynamic tables:", error);
+        setDynamicTablesList([]);
+        setDynamicTables([]);
       }
     }
     
@@ -295,33 +309,21 @@ export default function Sidebar() {
   const navGroups: NavGroup[] = [
     {
       title: "Tables",
-      items: dynamicTablesList.length > 0
-        ? [
-            ...dynamicTablesList.map((table) => {
-              // For new system tables, use /tables/{id}
-              // For old system (where id === name), use /{name}/grid
-              const href = table.id === table.name 
-                ? `/${table.name}/grid` 
-                : `/tables/${table.id}`;
-              return {
-                icon: FileText, // Can be enhanced to use table.icon
-                label: table.label || table.name,
-                href: href,
-              };
-            }),
-            {
-              icon: Plus,
-              label: "New Table",
-              href: "/tables",
-            },
-          ]
-        : [
-            {
-              icon: FileText,
-              label: "Manage Tables",
-              href: "/tables",
-            },
-          ],
+      items: [
+        ...dynamicTablesList.map((table) => {
+          // For new system tables, use /tables/{id}
+          // For old system (where id === name), use /{name}/grid
+          const href = table.id === table.name 
+            ? `/${table.name}/grid` 
+            : `/tables/${table.id}`;
+          const Icon = getTableIconComponent(table.name) || FileText;
+          return {
+            icon: Icon,
+            label: table.label || table.name,
+            href: href,
+          };
+        }),
+      ],
     },
     {
       title: "Pages",
