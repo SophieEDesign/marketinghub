@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { X, ExternalLink } from "lucide-react";
 import { InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
 import Button from "@/components/ui/Button";
+import { useTables } from "@/lib/hooks/useTables";
 
 interface BlockSettingsPanelProps {
   block: InterfacePageBlock | null;
@@ -20,6 +21,7 @@ export default function BlockSettingsPanel({
   onUpdate,
 }: BlockSettingsPanelProps) {
   const router = useRouter();
+  const { tables } = useTables();
   const [config, setConfig] = useState<any>({});
 
   useEffect(() => {
@@ -85,15 +87,20 @@ export default function BlockSettingsPanel({
                   </button>
                 )}
               </div>
-              <input
-                type="text"
+              <select
                 value={config.table || ""}
                 onChange={(e) => updateConfig("table", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                placeholder="Table name (e.g., content, campaigns)"
-              />
+              >
+                <option value="">Select a table...</option>
+                {tables.map((table) => (
+                  <option key={table.id} value={table.name}>
+                    {table.label}
+                  </option>
+                ))}
+              </select>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Enter the table name to display data from
+                Select the table to display data from
               </p>
             </div>
 
