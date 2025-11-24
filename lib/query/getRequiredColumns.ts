@@ -3,6 +3,8 @@ import { Field } from "../fields";
 /**
  * Known columns that don't exist in the database but might be in field definitions
  * These will be filtered out to prevent query errors
+ * Note: Linked record fields like 'briefings' and 'documents' are relationships,
+ * not actual columns, so they should be queried via joins or separate queries
  */
 const INVALID_COLUMNS = new Set([
   'track',
@@ -10,6 +12,8 @@ const INVALID_COLUMNS = new Set([
   'date_to',
   'date_due',
   'content_folder_canva',
+  'briefings', // This is a linked table relationship, not a column
+  'documents', // This is a linked table relationship, not a column
 ]);
 
 /**

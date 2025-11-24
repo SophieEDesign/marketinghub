@@ -9,6 +9,7 @@ export interface QueryTableOptions {
   group?: string; // Field name to group by
   limit?: number;
   offset?: number;
+  _retryCount?: number; // Internal flag to prevent infinite recursion
 }
 
 export interface QueryTableResult {
@@ -30,6 +31,7 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
     group,
     limit,
     offset = 0,
+    _retryCount = 0,
   } = options;
 
   try {
@@ -67,17 +69,18 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
     const { data, error, count } = await query;
 
     if (error) {
-      // If error is due to missing columns, try with select all
+      // If error is due to missing columns, try with select all (but only once to prevent infinite loops)
       if (
-        error.code === "42703" ||
+        _retryCount === 0 &&
+        (error.code === "42703" ||
         error.message?.includes("does not exist") ||
-        error.message?.includes("column")
+        error.message?.includes("column"))
       ) {
         console.warn(
           `Some columns don't exist for table ${table}, falling back to select('*'):`,
           error
         );
-        return queryTable({ ...options, fields: [] });
+        return queryTable({ ...options, fields: [], _retryCount: 1 });
       }
 
       return {
