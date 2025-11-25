@@ -31,6 +31,7 @@ interface ViewSettingsDrawerProps {
   onClose: () => void;
   tableId: string;
   viewId: string;
+  viewType?: "grid" | "kanban" | "calendar" | "timeline" | "cards";
   fields: Field[];
   settings: {
     visible_fields?: string[];
@@ -146,6 +147,7 @@ export default function ViewSettingsDrawer({
   onClose,
   tableId,
   viewId,
+  viewType,
   fields,
   settings,
   onUpdate,
@@ -322,7 +324,7 @@ export default function ViewSettingsDrawer({
           {activeTab === "options" && (
             <div className="space-y-6">
               {/* Grid View Options */}
-              {viewId === "grid" && (
+              {(viewType === "grid" || viewId === "grid" || viewId.includes("grid")) && (
                 <>
                   <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">

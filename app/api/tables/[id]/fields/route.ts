@@ -3,17 +3,103 @@ import { supabase } from "@/lib/supabaseClient";
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Resolve table ID from either UUID or table name
+ */
+async function resolveTableId(id: string): Promise<string | null> {
+  // Check if id is a UUID (new system) or table name (old system)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  
+  if (isUUID) {
+    // New system: Verify UUID exists
+    const { data, error } = await supabase
+      .from("tables")
+      .select("id")
+      .eq("id", id)
+      .single();
+    
+    if (error || !data) {
+      return null;
+    }
+    
+    return data.id;
+  } else {
+    // Old system or table name: Look up by name
+    const { data, error } = await supabase
+      .from("tables")
+      .select("id")
+      .eq("name", id)
+      .single();
+    
+    if (error || !data) {
+      // Try old table_metadata as fallback
+      const { data: oldTable } = await supabase
+        .from("table_metadata")
+        .select("table_name")
+        .eq("table_name", id)
+        .single();
+      
+      if (oldTable) {
+        // For old system, use table_name as the ID
+        return oldTable.table_name;
+      }
+      
+      return null;
+    }
+    
+    return data.id;
+  }
+}
+
 // GET /api/tables/[id]/fields - Get all fields for a table
+// Supports both UUID (new system) and table name (old system)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { data, error } = await supabase
+    const tableId = await resolveTableId(params.id);
+    
+    if (!tableId) {
+      return NextResponse.json({ error: "Table not found" }, { status: 404 });
+    }
+    
+    // Query for fields - handle both cases where table_id might be UUID or table name
+    // If tableId is a UUID but params.id was a name, also check for fields with that name
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableId);
+    
+    let data: any[] = [];
+    let error: any = null;
+    
+    // First, try querying with the resolved tableId
+    const { data: fields1, error: error1 } = await supabase
       .from("table_fields")
       .select("*")
-      .eq("table_id", params.id)
+      .eq("table_id", tableId)
       .order("order", { ascending: true });
+    
+    if (error1) {
+      error = error1;
+    } else {
+      data = fields1 || [];
+    }
+    
+    // If we resolved to a UUID but the original param was a name, also check for fields with that name
+    // (for backward compatibility with old system where fields might have table name as table_id)
+    if (isUUID && params.id !== tableId && (!data || data.length === 0)) {
+      const { data: fields2, error: error2 } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", params.id)
+        .order("order", { ascending: true });
+      
+      if (!error2 && fields2) {
+        data = fields2;
+        error = null;
+      } else if (error2 && !error) {
+        error = error2;
+      }
+    }
 
     if (error) {
       console.error("Error fetching fields:", error);
@@ -28,6 +114,7 @@ export async function GET(
 }
 
 // POST /api/tables/[id]/fields - Create a new field
+// Supports both UUID (new system) and table name (old system)
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -51,22 +138,39 @@ export async function POST(
       );
     }
 
-    // Get the table to get its name
-    const { data: table, error: tableError } = await supabase
-      .from("tables")
-      .select("name")
-      .eq("id", params.id)
-      .single();
-
-    if (tableError || !table) {
+    // Resolve table ID and get table info
+    const tableId = await resolveTableId(params.id);
+    
+    if (!tableId) {
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
+    }
+    
+    // Get the table to get its name (for column creation)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableId);
+    let tableName: string;
+    
+    if (isUUID) {
+      const { data: table, error: tableError } = await supabase
+        .from("tables")
+        .select("name")
+        .eq("id", tableId)
+        .single();
+
+      if (tableError || !table) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
+      
+      tableName = table.name;
+    } else {
+      // Old system: tableId is the table name
+      tableName = tableId;
     }
 
     // Create the field metadata
     const { data: field, error: fieldError } = await supabase
       .from("table_fields")
       .insert({
-        table_id: params.id,
+        table_id: tableId,
         name,
         label,
         type,
@@ -120,7 +224,7 @@ export async function POST(
           columnType = 'TEXT';
       }
 
-      const alterTableSQL = `ALTER TABLE ${table.name} ADD COLUMN IF NOT EXISTS ${name} ${columnType};`;
+      const alterTableSQL = `ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${name} ${columnType};`;
 
       const { error: alterError } = await supabaseAdmin.rpc('exec_sql', {
         sql: alterTableSQL

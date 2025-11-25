@@ -156,21 +156,46 @@ function transformMultiSelect(
   field: Field,
   warnings: string[]
 ): string[] | null {
-  const parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+  if (!value || value.trim() === "") return null;
+  
+  // Handle different formats:
+  // 1. Comma-separated: "Option1, Option2, Option3"
+  // 2. Array-like string: "[Option1, Option2]"
+  // 3. Single value: "Option1"
+  
+  let parts: string[] = [];
+  
+  // Try to parse as JSON array first
+  if (value.trim().startsWith('[') && value.trim().endsWith(']')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        parts = parsed.map((p) => String(p).trim()).filter(Boolean);
+      }
+    } catch (e) {
+      // Not valid JSON, fall through to comma-split
+    }
+  }
+  
+  // If not parsed as JSON, split by comma
+  if (parts.length === 0) {
+    parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+  }
+  
   if (parts.length === 0) return null;
 
   const options = field.options?.values || [];
   const result: string[] = [];
 
   for (const part of parts) {
-    // Try to find by label
+    // Try to find by label (case-insensitive)
     let option = options.find(
       (opt: any) => opt.label?.toLowerCase() === part.toLowerCase()
     );
     
     // Try to find by ID
     if (!option) {
-      option = options.find((opt: any) => opt.id === part);
+      option = options.find((opt: any) => opt.id === part || opt.id === part.toLowerCase().replace(/\s+/g, "_"));
     }
     
     if (option) {
@@ -178,7 +203,9 @@ function transformMultiSelect(
     } else {
       // Unknown option - will be added automatically
       warnings.push(`Unknown multi-select option "${part}" for field ${field.label}. Will be added automatically.`);
-      result.push(part); // Use the value as-is
+      // Use a normalized ID format
+      const normalizedId = part.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+      result.push(normalizedId || part); // Fallback to original if normalization fails
     }
   }
 

@@ -57,12 +57,12 @@ function SortableBlockItem({
       ref={setNodeRef} 
       style={style} 
       {...attributes}
-      className={isEditing ? "cursor-move" : ""}
+      className={`relative ${isEditing ? "cursor-move" : ""}`}
     >
       {isEditing && (
         <div
           {...listeners}
-          className="absolute top-2 left-2 z-10 p-2 cursor-grab active:cursor-grabbing bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 opacity-0 hover:opacity-100 transition-opacity"
+          className="absolute top-2 left-2 z-20 p-2 cursor-grab active:cursor-grabbing bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 opacity-0 hover:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
           <svg
@@ -85,14 +85,16 @@ function SortableBlockItem({
           </svg>
         </div>
       )}
-      <DashboardBlock
-        block={block}
-        isEditing={isEditing}
-        onUpdate={onUpdate}
-        onDelete={onDelete}
-        onOpenSettings={onOpenSettings}
-        isDragging={isDragging}
-      />
+      <div className="h-full">
+        <DashboardBlock
+          block={block}
+          isEditing={isEditing}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onOpenSettings={onOpenSettings}
+          isDragging={isDragging}
+        />
+      </div>
     </div>
   );
 }
@@ -259,7 +261,7 @@ export default function Dashboard() {
                   return null;
                 }
                 return (
-                  <div key={block.id} className="relative">
+                  <div key={block.id} className="relative min-h-[200px]">
                     <SortableBlockItem
                       block={block}
                       isEditing={isEditing}

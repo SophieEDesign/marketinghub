@@ -100,9 +100,8 @@ export async function runImport(
         }
 
         if (existing) {
-          // Remove columns that don't exist in the database
-          // Filter out any columns that might cause errors
-          const safeRow = { ...row };
+          // Filter row to only include columns that exist in the table
+          const safeRow = filterRowToExistingColumns(row, fields, upsertKey);
           // Remove id from update (it's in the WHERE clause)
           delete safeRow.id;
           
@@ -112,14 +111,36 @@ export async function runImport(
             .eq("id", existing.id);
 
           if (updateError) {
-            // If update fails due to missing columns, try to identify and remove them
-            if (updateError.code === '42703' || updateError.message?.includes('does not exist')) {
+            // Check for PostgREST schema cache errors or missing column errors
+            const isColumnError = 
+              updateError.code === '42703' || 
+              updateError.message?.includes('does not exist') ||
+              updateError.message?.includes('Could not find') ||
+              updateError.message?.includes('schema cache');
+            
+            if (isColumnError) {
               console.warn(`[runImport] Column doesn't exist, trying with minimal columns for row ${i + 1}`);
+              // Extract column name from error if possible
+              const columnMatch = updateError.message?.match(/['"]([^'"]+)['"]/);
+              const badColumn = columnMatch ? columnMatch[1] : null;
+              
               // Try with only basic columns that should exist
               const minimalRow: any = {};
-              if (safeRow[upsertKey] !== undefined) minimalRow[upsertKey] = safeRow[upsertKey];
+              if (safeRow[upsertKey] !== undefined && safeRow[upsertKey] !== badColumn) {
+                minimalRow[upsertKey] = safeRow[upsertKey];
+              }
               if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
               if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
+              
+              // Only include other columns that are in the fields list
+              for (const field of fields) {
+                if (safeRow[field.field_key] !== undefined && 
+                    field.field_key !== badColumn &&
+                    field.field_key !== upsertKey &&
+                    field.field_key !== 'id') {
+                  minimalRow[field.field_key] = safeRow[field.field_key];
+                }
+              }
               
               const { error: minimalError } = await supabase
                 .from(options.tableId)
@@ -131,6 +152,11 @@ export async function runImport(
                 result.errors.push({ row: i + 1, error: `Update failed: ${minimalError.message}` });
                 result.skipped++;
                 continue;
+              } else {
+                result.updated++;
+                if (badColumn) {
+                  result.warnings.push({ row: i + 1, warning: `Column '${badColumn}' does not exist in table and was skipped` });
+                }
               }
             } else {
               console.error(`[runImport] Update error for row ${i + 1}:`, updateError);
@@ -143,8 +169,8 @@ export async function runImport(
           }
         } else {
           // Insert new record
-          // Remove columns that might not exist
-          const safeRow = { ...row };
+          // Filter row to only include columns that exist in the table
+          const safeRow = filterRowToExistingColumns(row, fields, upsertKey);
           delete safeRow.id; // Don't insert id, let DB generate it
           
           const { error: insertError } = await supabase
@@ -152,13 +178,36 @@ export async function runImport(
             .insert([safeRow]);
 
           if (insertError) {
-            // If insert fails due to missing columns, try with minimal columns
-            if (insertError.code === '42703' || insertError.message?.includes('does not exist')) {
+            // Check for PostgREST schema cache errors or missing column errors
+            const isColumnError = 
+              insertError.code === '42703' || 
+              insertError.message?.includes('does not exist') ||
+              insertError.message?.includes('Could not find') ||
+              insertError.message?.includes('schema cache');
+            
+            if (isColumnError) {
               console.warn(`[runImport] Column doesn't exist, trying with minimal columns for row ${i + 1}`);
+              // Extract column name from error if possible
+              const columnMatch = insertError.message?.match(/['"]([^'"]+)['"]/);
+              const badColumn = columnMatch ? columnMatch[1] : null;
+              
+              // Remove the problematic column and try again
               const minimalRow: any = {};
-              if (safeRow[upsertKey] !== undefined) minimalRow[upsertKey] = safeRow[upsertKey];
+              if (safeRow[upsertKey] !== undefined && safeRow[upsertKey] !== badColumn) {
+                minimalRow[upsertKey] = safeRow[upsertKey];
+              }
               if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
               if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
+              
+              // Only include other columns that are in the fields list
+              for (const field of fields) {
+                if (safeRow[field.field_key] !== undefined && 
+                    field.field_key !== badColumn &&
+                    field.field_key !== upsertKey &&
+                    field.field_key !== 'id') {
+                  minimalRow[field.field_key] = safeRow[field.field_key];
+                }
+              }
               
               const { error: minimalError } = await supabase
                 .from(options.tableId)
@@ -171,6 +220,9 @@ export async function runImport(
                 continue;
               } else {
                 result.inserted++;
+                if (badColumn) {
+                  result.warnings.push({ row: i + 1, warning: `Column '${badColumn}' does not exist in table and was skipped` });
+                }
               }
             } else {
               console.error(`[runImport] Insert error for row ${i + 1}:`, insertError);
@@ -292,6 +344,53 @@ export async function runImport(
   }
 
   return result;
+}
+
+/**
+ * Filter a row to only include columns that exist in the fields definition
+ */
+function filterRowToExistingColumns(
+  row: any,
+  fields: Field[],
+  upsertKey: string
+): any {
+  const fieldKeys = new Set(fields.map(f => f.field_key));
+  const filtered: any = {};
+  
+  // Always include standard columns
+  const standardColumns = ['id', 'created_at', 'updated_at', upsertKey];
+  
+  for (const key of Object.keys(row)) {
+    // Only include if it's a known field or standard column
+    if (fieldKeys.has(key) || standardColumns.includes(key)) {
+      // For multi_select fields, ensure proper array format
+      const field = fields.find(f => f.field_key === key);
+      if (field?.type === 'multi_select') {
+        // Ensure it's a proper array
+        if (Array.isArray(row[key])) {
+          filtered[key] = row[key];
+        } else if (typeof row[key] === 'string') {
+          // Try to parse as array if it's a string
+          try {
+            // Handle comma-separated values
+            if (row[key].includes(',')) {
+              filtered[key] = row[key].split(',').map((v: string) => v.trim()).filter(Boolean);
+            } else {
+              // Single value as array
+              filtered[key] = [row[key].trim()].filter(Boolean);
+            }
+          } catch (e) {
+            // If parsing fails, skip this field
+            console.warn(`[filterRowToExistingColumns] Could not parse multi_select value for ${key}:`, row[key]);
+          }
+        }
+      } else {
+        filtered[key] = row[key];
+      }
+    }
+  }
+  
+  return filtered;
 }
 
 /**
