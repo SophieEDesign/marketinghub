@@ -16,14 +16,16 @@ const viewTypeIcons = {
 };
 
 interface ViewTabsProps {
-  tableId: string;
-  tableName: string;
+  tableId: string; // URL tableId (could be UUID or table name)
+  tableName: string; // Actual table name for view configs (e.g., "contacts")
+  displayName?: string; // Display name for the table (optional)
 }
 
-export default function ViewTabs({ tableId, tableName }: ViewTabsProps) {
+export default function ViewTabs({ tableId, tableName, displayName }: ViewTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { views, currentView, createView, reloadViews } = useViewConfigs(tableId);
+  // Use tableName for view configs (views are stored by table name, not UUID)
+  const { views, currentView, createView, reloadViews } = useViewConfigs(tableName);
   const permissions = usePermissions();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -33,6 +35,7 @@ export default function ViewTabs({ tableId, tableName }: ViewTabsProps) {
   const currentViewName = pathParts[2] || currentView?.view_name;
 
   const handleViewClick = (viewName: string, viewType: string) => {
+    // Use tableId from URL for navigation (could be UUID or table name)
     router.push(`/tables/${tableId}/${viewName}`);
   };
 
@@ -50,7 +53,7 @@ export default function ViewTabs({ tableId, tableName }: ViewTabsProps) {
     await createView(viewName, baseConfig as any);
     await reloadViews();
     setShowCreateModal(false);
-    // Navigate to the new view
+    // Navigate to the new view using tableId from URL
     router.push(`/tables/${tableId}/${viewName}`);
   };
 

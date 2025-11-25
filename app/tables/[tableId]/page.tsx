@@ -107,7 +107,11 @@ function TableRecordsContent() {
 
       {/* View Tabs - Below the top bar */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-[73px] z-10">
-        <ViewTabs tableId={table.name} tableName={table.label} />
+        <ViewTabs 
+          tableId={tableId} 
+          tableName={table.name} 
+          displayName={table.label} 
+        />
       </div>
 
       {/* Grid View */}

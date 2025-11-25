@@ -311,11 +311,9 @@ export default function Sidebar() {
       title: "Tables",
       items: [
         ...dynamicTablesList.map((table) => {
-          // For new system tables, use /tables/{id}
-          // For old system (where id === name), use /{name}/grid
-          const href = table.id === table.name 
-            ? `/${table.name}/grid` 
-            : `/tables/${table.id}`;
+          // Always use the new route format /tables/{id} for consistency
+          // This ensures ViewTabs are always shown
+          const href = `/tables/${table.id}`;
           const Icon = getTableIconComponent(table.name) || FileText;
           return {
             icon: Icon,
