@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { LayoutGrid, Columns3, Calendar, Clock, FileText, Plus } from "lucide-react";
 import { useViewConfigs } from "@/lib/useViewConfigs";
@@ -25,9 +25,15 @@ export default function ViewTabs({ tableId, tableName, displayName }: ViewTabsPr
   const router = useRouter();
   const pathname = usePathname();
   // Use tableName for view configs (views are stored by table name, not UUID)
-  const { views, currentView, createView, reloadViews } = useViewConfigs(tableName);
+  const { views, currentView, createView, reloadViews, loading, error } = useViewConfigs(tableName);
   const permissions = usePermissions();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log("[ViewTabs] Props:", { tableId, tableName, displayName });
+    console.log("[ViewTabs] Views state:", { views, loading, error, viewsCount: views.length });
+  }, [tableId, tableName, displayName, views, loading, error]);
 
   // Get current view name from URL or use currentView
   const pathParts = pathname.split("/").filter(Boolean);
