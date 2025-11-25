@@ -184,11 +184,8 @@ export function useFieldManager(tableId: string) {
             : changes.options;
         }
         
-        // Handle visible field - only include if explicitly set (old system has this column)
-        // Don't include if undefined to avoid schema errors
-        if (changes.visible !== undefined && changes.visible !== null) {
-          updateData.visible = Boolean(changes.visible);
-        }
+        // Note: visible field is not included as it doesn't exist in table_fields schema
+        // The visible checkbox in FieldEditor is for UI purposes only
 
         // Don't try to update if there's nothing to update
         if (Object.keys(updateData).length === 0) {
