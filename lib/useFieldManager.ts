@@ -167,17 +167,37 @@ export function useFieldManager(tableId: string) {
       try {
         // Only include fields that are actually being updated
         // Exclude undefined values and only update what's in changes
+        // Only include columns that exist in the table_fields schema
+        // Valid columns: id, table_id, field_key, label, type, options, required, order, visible (old system), created_at, updated_at
         const updateData: any = {};
-        if (changes.label !== undefined) updateData.label = changes.label;
-        if (changes.type !== undefined) updateData.type = changes.type;
-        if (changes.required !== undefined) updateData.required = changes.required;
-        if (changes.order !== undefined) updateData.order = changes.order;
-        // Note: visible column doesn't exist in table_fields - removed
-        if (changes.options !== undefined) {
+        
+        // Filter to only valid, defined values
+        if (changes.label !== undefined && changes.label !== null) updateData.label = String(changes.label);
+        if (changes.type !== undefined && changes.type !== null) updateData.type = String(changes.type);
+        if (changes.required !== undefined && changes.required !== null) updateData.required = Boolean(changes.required);
+        if (changes.order !== undefined && changes.order !== null) updateData.order = Number(changes.order);
+        
+        // Handle options - convert to JSON string if object
+        if (changes.options !== undefined && changes.options !== null) {
           updateData.options = typeof changes.options === "object" 
             ? JSON.stringify(changes.options) 
             : changes.options;
         }
+        
+        // Handle visible field - only include if explicitly set (old system has this column)
+        // Don't include if undefined to avoid schema errors
+        if (changes.visible !== undefined && changes.visible !== null) {
+          updateData.visible = Boolean(changes.visible);
+        }
+
+        // Don't try to update if there's nothing to update
+        if (Object.keys(updateData).length === 0) {
+          console.warn("No fields to update for field:", fieldId);
+          setLoading(false);
+          return null;
+        }
+        
+        console.log("Updating field with data:", { fieldId, updateData });
 
         const { data, error: updateError } = await supabase
           .from("table_fields")
@@ -187,8 +207,16 @@ export function useFieldManager(tableId: string) {
           .single();
 
         if (updateError) {
-          console.error("Error updating field:", updateError);
-          setError(updateError.message);
+          console.error("Error updating field:", {
+            error: updateError,
+            message: updateError.message,
+            details: updateError.details,
+            hint: updateError.hint,
+            code: updateError.code,
+            fieldId,
+            updateData,
+          });
+          setError(updateError.message || "Failed to update field");
           return null;
         }
 
