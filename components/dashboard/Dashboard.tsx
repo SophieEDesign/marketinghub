@@ -1,115 +1,90 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
+
+// Import CSS for react-grid-layout (client-side only)
+if (typeof window !== "undefined") {
+  try {
+    require("react-grid-layout/css/styles.css");
+    require("react-resizable/css/styles.css");
+  } catch (e) {
+    // CSS files may not be available during build
+  }
+}
+
 import Button from "@/components/ui/Button";
 import { useDashboardBlocks } from "@/lib/hooks/useDashboardBlocks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import DashboardBlock from "./DashboardBlock";
 import BlockMenu, { BlockType } from "./blocks/BlockMenu";
 import DashboardBlockSettings from "./DashboardBlockSettings";
-import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-  DragStartEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { Plus } from "lucide-react";
+import { Plus, Settings, X } from "lucide-react";
 
-function SortableBlockItem({
-  block,
-  isEditing,
-  onUpdate,
-  onDelete,
-  onOpenSettings,
-  isDragging,
-}: {
-  block: any;
-  isEditing: boolean;
-  onUpdate: (id: string, content: any) => void;
-  onDelete: (id: string) => void;
-  onOpenSettings?: () => void;
-  isDragging: boolean;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: block.id, disabled: !isEditing });
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    touchAction: 'none', // Prevent scrolling on touch devices
-  };
-
-  return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      {...attributes}
-      className={`relative ${isEditing ? "cursor-move" : ""}`}
-    >
-      {isEditing && (
-        <div
-          {...listeners}
-          className="absolute top-2 left-2 z-20 p-2 cursor-grab active:cursor-grabbing bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700 opacity-0 hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 12 12"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="text-gray-400"
-          >
-            <circle cx="2" cy="2" r="1" fill="currentColor" />
-            <circle cx="6" cy="2" r="1" fill="currentColor" />
-            <circle cx="10" cy="2" r="1" fill="currentColor" />
-            <circle cx="2" cy="6" r="1" fill="currentColor" />
-            <circle cx="6" cy="6" r="1" fill="currentColor" />
-            <circle cx="10" cy="6" r="1" fill="currentColor" />
-            <circle cx="2" cy="10" r="1" fill="currentColor" />
-            <circle cx="6" cy="10" r="1" fill="currentColor" />
-            <circle cx="10" cy="10" r="1" fill="currentColor" />
-          </svg>
-        </div>
-      )}
-      <div className="h-full">
-        <DashboardBlock
-          block={block}
-          isEditing={isEditing}
-          onUpdate={onUpdate}
-          onDelete={onDelete}
-          onOpenSettings={onOpenSettings}
-          isDragging={isDragging}
-        />
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const searchParams = useSearchParams();
   const dashboardId = searchParams.get("id") || "00000000-0000-0000-0000-000000000001";
   const permissions = usePermissions();
-  const { blocks, loading, error, addBlock, updateBlock, deleteBlock, reorderBlocks } = useDashboardBlocks(dashboardId);
+  const { blocks, loading, error, addBlock, updateBlock, deleteBlock } = useDashboardBlocks(dashboardId);
   const [isEditing, setIsEditing] = useState(false);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
+  const [layouts, setLayouts] = useState<Layouts>({});
 
   const canEdit = permissions.canModifyDashboards;
+
+  // Convert blocks to react-grid-layout format
+  useEffect(() => {
+    const lgLayout: Layout[] = blocks.map((block, index) => ({
+      i: block.id,
+      x: block.position_x ?? (index % 4) * 3, // Default: 3 columns per block
+      y: block.position_y ?? Math.floor(index / 4) * 4, // Default: 4 rows per block
+      w: block.width ?? 3, // Default width: 3 columns
+      h: block.height ?? 4, // Default height: 4 rows
+      minW: 2,
+      minH: 2,
+    }));
+
+    setLayouts({
+      lg: lgLayout,
+      md: lgLayout,
+      sm: lgLayout,
+      xs: lgLayout,
+      xxs: lgLayout,
+    });
+  }, [blocks]);
+
+  const handleLayoutChange = useCallback(
+    async (currentLayout: Layout[], allLayouts: Layouts) => {
+      if (!isEditing) return;
+
+      // Update each block that changed
+      for (const item of currentLayout) {
+        const block = blocks.find((b) => b.id === item.i);
+        if (!block) continue;
+
+        const hasChanged =
+          block.position_x !== item.x ||
+          block.position_y !== item.y ||
+          block.width !== item.w ||
+          block.height !== item.h;
+
+        if (hasChanged) {
+          await updateBlock(item.i, {
+            position_x: item.x,
+            position_y: item.y,
+            width: item.w,
+            height: item.h,
+          });
+        }
+      }
+    },
+    [isEditing, blocks, updateBlock]
+  );
 
   const handleAddBlock = async (type: BlockType) => {
     try {
@@ -121,12 +96,11 @@ export default function Dashboard() {
     }
   };
 
-  const handleUpdateBlock = async (id: string, content: any) => {
+  const handleUpdateBlock = async (id: string, updates: any) => {
     try {
-      await updateBlock(id, { content });
+      await updateBlock(id, updates);
     } catch (error: any) {
       console.error("Error updating block:", error);
-      // Don't show alert for updates - they're frequent and auto-saved
     }
   };
 
@@ -140,27 +114,6 @@ export default function Dashboard() {
       console.error("Error deleting block:", error);
       alert(`Failed to delete block: ${error.message || "Unknown error"}`);
     }
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    if (isEditing) {
-      setActiveId(event.active.id as string);
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over || active.id === over.id || !isEditing) return;
-
-    const oldIndex = blocks.findIndex((b) => b.id === active.id);
-    const newIndex = blocks.findIndex((b) => b.id === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newOrder = arrayMove(blocks, oldIndex, newIndex).map((b) => b.id);
-    await reorderBlocks(newOrder);
   };
 
   if (loading) {
@@ -231,52 +184,71 @@ export default function Dashboard() {
       )}
 
       {/* Blocks Grid */}
-      <DndContext
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={blocks.map((b) => b.id)}
-          strategy={rectSortingStrategy}
-          disabled={!isEditing}
-        >
-          {!blocks || blocks.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-              <p className="mb-4">No blocks yet.</p>
-              {canEdit && !isEditing && (
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEditing(true)}
-                >
-                  Edit Layout to Add Blocks
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-4">
-              {blocks.map((block) => {
-                if (!block || !block.id) {
-                  console.warn("Invalid block found:", block);
-                  return null;
-                }
-                return (
-                  <div key={block.id} className="relative min-h-[200px]">
-                    <SortableBlockItem
-                      block={block}
-                      isEditing={isEditing}
-                      onUpdate={handleUpdateBlock}
-                      onDelete={handleDeleteBlock}
-                      onOpenSettings={() => setSelectedBlock(block)}
-                      isDragging={activeId === block.id}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+      {!blocks || blocks.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+          <p className="mb-4">No blocks yet.</p>
+          {canEdit && !isEditing && (
+            <Button
+              variant="outline"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit Layout to Add Blocks
+            </Button>
           )}
-        </SortableContext>
-      </DndContext>
+        </div>
+      ) : (
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          onLayoutChange={handleLayoutChange}
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+          cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
+          rowHeight={50}
+          isDraggable={isEditing}
+          isResizable={isEditing}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+          preventCollision={true}
+          compactType={null}
+        >
+          {blocks.map((block) => {
+            if (!block || !block.id) {
+              console.warn("Invalid block found:", block);
+              return null;
+            }
+            return (
+              <div key={block.id} className="relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 h-full">
+                {isEditing && (
+                  <>
+                    <button
+                      onClick={() => setSelectedBlock(block)}
+                      className="absolute -top-2 -left-2 z-50 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors shadow-lg"
+                      title="Block settings"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBlock(block.id)}
+                      className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
+                      title="Delete block"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
+                <DashboardBlock
+                  block={block}
+                  isEditing={isEditing}
+                  onUpdate={handleUpdateBlock}
+                  onDelete={handleDeleteBlock}
+                  onOpenSettings={() => setSelectedBlock(block)}
+                  isDragging={false}
+                />
+              </div>
+            );
+          })}
+        </ResponsiveGridLayout>
+      )}
 
       {/* Settings Panel */}
       {isEditing && selectedBlock && (

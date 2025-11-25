@@ -9,7 +9,11 @@ export interface DashboardBlock {
   dashboard_id: string;
   type: "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html";
   content: any;
-  position: number;
+  position: number; // Legacy - kept for backward compatibility
+  position_x?: number; // Grid X position
+  position_y?: number; // Grid Y position
+  width?: number; // Grid width
+  height?: number; // Grid height
   created_at: string;
   updated_at: string;
 }
@@ -133,10 +137,17 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           throw new Error(`Invalid block type: ${type}. Must be one of: ${validTypes.join(", ")}`);
         }
 
-        const maxPosition =
-          blocks.length > 0
-            ? Math.max(...blocks.map((b) => b.position))
-            : -1;
+        // Calculate default grid position (place new block after existing ones)
+        const maxY = blocks.length > 0
+          ? Math.max(...blocks.map((b) => (b.position_y ?? b.position ?? 0)))
+          : -1;
+        const maxX = blocks.length > 0
+          ? Math.max(...blocks.filter((b) => (b.position_y ?? b.position ?? 0) === maxY).map((b) => (b.position_x ?? 0)))
+          : -1;
+        
+        // Default position: next row if current row is full (4 blocks), otherwise next column
+        const defaultX = maxX >= 9 ? 0 : (maxX + 3);
+        const defaultY = maxX >= 9 ? maxY + 4 : maxY;
 
         // Ensure content is never null - use default content structure
         const defaultContent: Record<string, any> = {
@@ -167,7 +178,11 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
               dashboard_id: dashboardId,
               type: type as string, // Ensure it's a string
               content: validatedContent || defaultContent[type],
-              position: maxPosition + 1,
+              position: maxY + 1, // Legacy position
+              position_x: defaultX,
+              position_y: defaultY,
+              width: 3, // Default width: 3 columns
+              height: 4, // Default height: 4 rows
             },
           ])
           .select()
