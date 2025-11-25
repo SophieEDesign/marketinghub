@@ -171,22 +171,55 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         // Ensure content is never null
         const validatedContent = contentToUse || defaultContent[type] || getDefaultContentForType(type);
 
-        const { data, error: insertError } = await supabase
+        // Try inserting with grid layout columns first
+        let insertData: any = {
+          dashboard_id: dashboardId,
+          type: type as string,
+          content: validatedContent || defaultContent[type],
+          position: maxY + 1, // Legacy position
+        };
+
+        // Try to include grid layout columns, but fallback if they don't exist
+        try {
+          insertData.position_x = defaultX;
+          insertData.position_y = defaultY;
+          insertData.width = 3;
+          insertData.height = 4;
+        } catch (e) {
+          // Ignore - columns may not exist
+        }
+
+        let { data, error: insertError } = await supabase
           .from("dashboard_blocks")
-          .insert([
-            {
-              dashboard_id: dashboardId,
-              type: type as string, // Ensure it's a string
-              content: validatedContent || defaultContent[type],
-              position: maxY + 1, // Legacy position
-              position_x: defaultX,
-              position_y: defaultY,
-              width: 3, // Default width: 3 columns
-              height: 4, // Default height: 4 rows
-            },
-          ])
+          .insert([insertData])
           .select()
           .single();
+
+        // If error is about missing columns (height, width, position_x, position_y), retry without them
+        if (insertError && (insertError.code === "PGRST204" || insertError.message?.includes("column"))) {
+          console.warn("Grid layout columns not available, inserting without them:", insertError.message);
+          // Retry with only basic columns
+          const basicInsertData = {
+            dashboard_id: dashboardId,
+            type: type as string,
+            content: validatedContent || defaultContent[type],
+            position: maxY + 1,
+          };
+          
+          const retryResult = await supabase
+            .from("dashboard_blocks")
+            .insert([basicInsertData])
+            .select()
+            .single();
+          
+          if (retryResult.error) {
+            console.error("Error inserting block (retry):", retryResult.error);
+            throw retryResult.error;
+          }
+          
+          data = retryResult.data;
+          insertError = null;
+        }
 
         if (insertError) {
           console.error("Error inserting block:", insertError);
@@ -227,19 +260,53 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           updateData.content = validateAndFixContent(existingBlock.type, updates.content);
         }
         
-        // Handle position updates
-        if (updates.position_x !== undefined) updateData.position_x = updates.position_x;
-        if (updates.position_y !== undefined) updateData.position_y = updates.position_y;
-        if (updates.width !== undefined) updateData.width = updates.width;
-        if (updates.height !== undefined) updateData.height = updates.height;
+        // Handle position updates - only include if they're defined
         if (updates.position !== undefined) updateData.position = updates.position;
+        
+        // Try to include grid layout columns, but handle gracefully if they don't exist
+        const gridColumns: any = {};
+        if (updates.position_x !== undefined) gridColumns.position_x = updates.position_x;
+        if (updates.position_y !== undefined) gridColumns.position_y = updates.position_y;
+        if (updates.width !== undefined) gridColumns.width = updates.width;
+        if (updates.height !== undefined) gridColumns.height = updates.height;
+        
+        // Merge grid columns into updateData
+        Object.assign(updateData, gridColumns);
 
-        const { data, error: updateError } = await supabase
+        let { data, error: updateError } = await supabase
           .from("dashboard_blocks")
           .update(updateData)
           .eq("id", id)
           .select()
           .single();
+
+        // If error is about missing columns, retry without grid layout columns
+        if (updateError && (updateError.code === "PGRST204" || updateError.message?.includes("column"))) {
+          console.warn("Grid layout columns not available, updating without them:", updateError.message);
+          // Retry with only basic columns
+          const basicUpdateData: any = {};
+          if (updates.content !== undefined) {
+            basicUpdateData.content = validateAndFixContent(existingBlock.type, updates.content);
+          }
+          if (updates.position !== undefined) {
+            basicUpdateData.position = updates.position;
+          }
+          
+          const retryResult = await supabase
+            .from("dashboard_blocks")
+            .update(basicUpdateData)
+            .eq("id", id)
+            .select()
+            .single();
+          
+          if (retryResult.error) {
+            console.error("Error updating block (retry):", retryResult.error);
+            throw retryResult.error;
+          }
+          
+          data = retryResult.data;
+          updateError = null;
+        }
 
         if (updateError) {
           console.error("Error updating block:", updateError);

@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 import { DashboardBlock } from "@/lib/hooks/useDashboardBlocks";
 import { useTables } from "@/lib/hooks/useTables";
 import Button from "@/components/ui/Button";
@@ -22,11 +25,54 @@ export default function DashboardBlockSettings({
   const { tables } = useTables();
   const [config, setConfig] = useState<any>({});
 
+  // Rich text editor for text blocks
+  const textEditor = useEditor({
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: "Start typing...",
+      }),
+    ],
+    content: config.html || "",
+    editorProps: {
+      attributes: {
+        class: "prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800",
+      },
+    },
+  });
+
   useEffect(() => {
     if (block) {
       setConfig(block.content || {});
     }
   }, [block]);
+
+  // Update editor content when config changes
+  useEffect(() => {
+    if (textEditor && block?.type === "text" && config.html !== undefined) {
+      const currentContent = textEditor.getHTML();
+      if (currentContent !== config.html) {
+        textEditor.commands.setContent(config.html || "");
+      }
+    }
+  }, [config.html, textEditor, block?.type]);
+
+  // Update config when editor content changes
+  useEffect(() => {
+    if (!textEditor || block?.type !== "text") return;
+
+    const handleUpdate = () => {
+      const html = textEditor.getHTML();
+      if (html !== config.html) {
+        setConfig((prev: any) => ({ ...prev, html }));
+      }
+    };
+
+    textEditor.on("update", handleUpdate);
+    return () => {
+      textEditor.off("update", handleUpdate);
+    };
+  }, [textEditor, block?.type, config.html]);
 
   if (!isOpen || !block) return null;
 
@@ -69,15 +115,20 @@ export default function DashboardBlockSettings({
         {block.type === "text" && (
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              HTML Content
+              Rich Text Content
             </label>
-            <textarea
-              value={config.html || ""}
-              onChange={(e) => updateConfig("html", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 font-mono text-sm"
-              rows={10}
-              placeholder="Enter HTML content..."
-            />
+            {textEditor ? (
+              <div className="border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 min-h-[200px]">
+                <EditorContent editor={textEditor} />
+              </div>
+            ) : (
+              <div className="w-full h-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                Loading editor...
+              </div>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Use the toolbar to format your text. Changes are saved automatically.
+            </p>
           </div>
         )}
 
