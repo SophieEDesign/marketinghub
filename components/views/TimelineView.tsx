@@ -20,7 +20,8 @@ interface TimelineViewProps {
 export default function TimelineView({ tableId }: TimelineViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const viewId = pathParts[1] || "timeline";
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const viewId = pathParts[2] || "timeline";
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

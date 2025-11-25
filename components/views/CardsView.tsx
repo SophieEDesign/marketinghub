@@ -19,7 +19,8 @@ interface CardsViewProps {
 export default function CardsView({ tableId }: CardsViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const viewId = pathParts[1] || "cards";
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const viewId = pathParts[2] || "cards";
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

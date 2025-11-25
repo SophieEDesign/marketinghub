@@ -34,7 +34,8 @@ interface GridViewProps {
 function GridViewComponent({ tableId }: GridViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const viewId = pathParts[1] || "grid";
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const viewId = pathParts[2] || "grid";
   const permissions = usePermissions();
   const { addAction, undo, lastAction, canUndo } = useUndo();
   const [dismissedAction, setDismissedAction] = useState<string | null>(null);

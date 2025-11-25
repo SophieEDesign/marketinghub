@@ -24,7 +24,8 @@ interface CalendarViewProps {
 export default function CalendarView({ tableId }: CalendarViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const viewId = pathParts[1] || "calendar";
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const viewId = pathParts[2] || "calendar";
 
   const [events, setEvents] = useState<EventInput[]>([]);
   const [rows, setRows] = useState<any[]>([]);

@@ -29,7 +29,8 @@ interface KanbanViewProps {
 export default function KanbanView({ tableId }: KanbanViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const viewId = pathParts[1] || "kanban";
+  // Path is /tables/[tableId]/[viewName] so viewName is at index 2
+  const viewId = pathParts[2] || "kanban";
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
