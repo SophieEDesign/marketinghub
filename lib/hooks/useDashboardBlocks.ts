@@ -22,22 +22,33 @@ const DEFAULT_DASHBOARD_ID = "00000000-0000-0000-0000-000000000001";
 async function ensureDefaultDashboard(): Promise<void> {
   try {
     const DEFAULT_ID = "00000000-0000-0000-0000-000000000001";
+    
+    // Try to insert/update without description first (in case column doesn't exist)
+    const dashboardData: any = {
+      id: DEFAULT_ID,
+      name: "Main Dashboard",
+    };
+    
+    // Only include description if the column exists (we'll let the error tell us)
     const { error } = await supabase
       .from("dashboards")
-      .upsert(
-        [
-          {
-            id: DEFAULT_ID,
-            name: "Main Dashboard",
-            description: "Default dashboard",
-          },
-        ],
-        { onConflict: "id" }
-      );
+      .upsert([dashboardData], { onConflict: "id" });
 
-    if (error && error.code !== "23505") {
-      // Ignore duplicate key errors
-      console.warn("Could not ensure default dashboard:", error);
+    if (error) {
+      // If error is about missing description column, try without it
+      if (error.message?.includes("description") || error.code === "PGRST204") {
+        // Retry without description
+        const { error: retryError } = await supabase
+          .from("dashboards")
+          .upsert([{ id: DEFAULT_ID, name: "Main Dashboard" }], { onConflict: "id" });
+        
+        if (retryError && retryError.code !== "23505") {
+          console.warn("Could not ensure default dashboard:", retryError);
+        }
+      } else if (error.code !== "23505") {
+        // Ignore duplicate key errors (23505)
+        console.warn("Could not ensure default dashboard:", error);
+      }
     }
   } catch (err) {
     console.warn("Error ensuring default dashboard:", err);
@@ -116,6 +127,12 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           await ensureDefaultDashboard();
         }
 
+        // Validate block type - must match database constraint
+        const validTypes: BlockType[] = ["text", "image", "embed", "kpi", "table", "calendar", "html"];
+        if (!type || !validTypes.includes(type)) {
+          throw new Error(`Invalid block type: ${type}. Must be one of: ${validTypes.join(", ")}`);
+        }
+
         const maxPosition =
           blocks.length > 0
             ? Math.max(...blocks.map((b) => b.position))
@@ -148,7 +165,7 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           .insert([
             {
               dashboard_id: dashboardId,
-              type,
+              type: type as string, // Ensure it's a string
               content: validatedContent || defaultContent[type],
               position: maxPosition + 1,
             },

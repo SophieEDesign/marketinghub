@@ -30,19 +30,49 @@ export function useViewConfigs(tableName: string) {
           throw new Error(data.error || `Failed to load views: ${response.statusText}`);
         }
       } else {
-        setViews(data.views || []);
+        const allViews = data.views || [];
+        setViews(allViews);
+
+        // Find the default view (or first view) to use as the source for shared settings
+        const defaultView = allViews.find((v: ViewConfig) => v.is_default) || allViews[0];
+        
+        // Inherit shared settings (filters, sort, column_order) from default view to all views
+        const viewsWithInheritedSettings = allViews.map((view: ViewConfig) => {
+          // Skip if this is the default view itself
+          if (view.id === defaultView?.id) {
+            return view;
+          }
+          
+          // Inherit filters, sort, and column_order from default view if current view doesn't have them
+          const hasFilters = view.filters && Array.isArray(view.filters) && view.filters.length > 0;
+          const hasSort = view.sort && Array.isArray(view.sort) && view.sort.length > 0;
+          const hasColumnOrder = view.column_order && Array.isArray(view.column_order) && view.column_order.length > 0;
+          
+          if (!hasFilters || !hasSort || !hasColumnOrder) {
+            return {
+              ...view,
+              filters: hasFilters ? view.filters : (defaultView?.filters || []),
+              sort: hasSort ? view.sort : (defaultView?.sort || []),
+              column_order: hasColumnOrder ? view.column_order : (defaultView?.column_order || []),
+            };
+          }
+          
+          return view;
+        });
+        
+        setViews(viewsWithInheritedSettings);
 
         // Select view by name if provided, otherwise default or first view
         let selectedView: ViewConfig | undefined;
         if (selectViewName) {
-          selectedView = data.views?.find((v: ViewConfig) => v.view_name === selectViewName || v.id === selectViewName);
+          selectedView = viewsWithInheritedSettings.find((v: ViewConfig) => v.view_name === selectViewName || v.id === selectViewName);
         }
         if (!selectedView) {
-          selectedView = data.views?.find((v: ViewConfig) => v.is_default) || data.views?.[0];
+          selectedView = viewsWithInheritedSettings.find((v: ViewConfig) => v.is_default) || viewsWithInheritedSettings[0];
         }
         if (selectedView) {
           setCurrentView(selectedView);
-        } else if (data.views && data.views.length === 0) {
+        } else if (allViews.length === 0) {
           // No views exist - create a default one
           setCurrentView(null);
         }
@@ -172,9 +202,26 @@ export function useViewConfigs(tableName: string) {
 
   // Switch to a view by name or ID
   const switchToViewByName = useCallback((viewNameOrId: string) => {
-    const view = views.find((v) => v.view_name === viewNameOrId || v.id === viewNameOrId);
-    if (view) {
-      setCurrentView(view);
+    const defaultView = views.find((v) => v.is_default) || views[0];
+    const targetView = views.find((v) => v.view_name === viewNameOrId || v.id === viewNameOrId);
+    
+    if (targetView) {
+      // Inherit shared settings from default view if target view doesn't have them
+      const hasFilters = targetView.filters && Array.isArray(targetView.filters) && targetView.filters.length > 0;
+      const hasSort = targetView.sort && Array.isArray(targetView.sort) && targetView.sort.length > 0;
+      const hasColumnOrder = targetView.column_order && Array.isArray(targetView.column_order) && targetView.column_order.length > 0;
+      
+      if (defaultView && (targetView.id !== defaultView.id) && (!hasFilters || !hasSort || !hasColumnOrder)) {
+        const viewWithInheritedSettings = {
+          ...targetView,
+          filters: hasFilters ? targetView.filters : (defaultView.filters || []),
+          sort: hasSort ? targetView.sort : (defaultView.sort || []),
+          column_order: hasColumnOrder ? targetView.column_order : (defaultView.column_order || []),
+        };
+        setCurrentView(viewWithInheritedSettings);
+      } else {
+        setCurrentView(targetView);
+      }
     } else {
       // If view not found in current views, reload and try to select it
       setSelectViewName(viewNameOrId);
