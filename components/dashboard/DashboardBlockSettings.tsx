@@ -197,16 +197,20 @@ export default function DashboardBlockSettings({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Limit
+                Row Limit (default: 3)
               </label>
               <input
                 type="number"
-                value={config.limit || 10}
-                onChange={(e) => updateConfig("limit", parseInt(e.target.value) || 10)}
+                value={config.limit || 3}
+                onChange={(e) => updateConfig("limit", parseInt(e.target.value) || 3)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
                 min="1"
                 max="50"
+                placeholder="3"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Number of rows to display. Default is 3, extend as needed.
+              </p>
             </div>
           </>
         )}

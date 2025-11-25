@@ -210,6 +210,7 @@ export default function Dashboard() {
           containerPadding={[0, 0]}
           preventCollision={true}
           compactType={null}
+          allowOverlap={false}
         >
           {blocks.map((block) => {
             if (!block || !block.id) {

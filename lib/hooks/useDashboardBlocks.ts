@@ -219,11 +219,20 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           throw new Error(`Block with id ${id} not found`);
         }
 
-        // If updating content, validate it
-        const updateData: Partial<DashboardBlock> = { ...updates };
+        // Build update data - explicitly include all fields that might be updated
+        const updateData: any = {};
+        
+        // Handle content updates
         if (updates.content !== undefined) {
           updateData.content = validateAndFixContent(existingBlock.type, updates.content);
         }
+        
+        // Handle position updates
+        if (updates.position_x !== undefined) updateData.position_x = updates.position_x;
+        if (updates.position_y !== undefined) updateData.position_y = updates.position_y;
+        if (updates.width !== undefined) updateData.width = updates.width;
+        if (updates.height !== undefined) updateData.height = updates.height;
+        if (updates.position !== undefined) updateData.position = updates.position;
 
         const { data, error: updateError } = await supabase
           .from("dashboard_blocks")

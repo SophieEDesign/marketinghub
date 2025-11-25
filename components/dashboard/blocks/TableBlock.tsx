@@ -28,7 +28,7 @@ export default function TableBlock({
   const [config, setConfig] = useState({
     table: content?.table || "content",
     fields: content?.fields || ["title", "status", "created_at"],
-    limit: content?.limit || 5,
+    limit: content?.limit || 3, // Default to 3 rows
   });
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -178,7 +178,7 @@ export default function TableBlock({
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((row, idx) => (
+                    {rows.slice(0, config.limit).map((row, idx) => (
                       <tr
                         key={row.id || idx}
                         onClick={() => handleRowClick(row)}

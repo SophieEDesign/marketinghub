@@ -29,7 +29,7 @@ export function getDefaultContentForType(type: BlockType): BlockContentSchemas[B
     case "kpi":
       return { table: "", label: "Total Records", filter: "", aggregate: "count" };
     case "table":
-      return { table: "", fields: [], limit: 5 };
+      return { table: "", fields: [], limit: 3 };
     case "calendar":
       return { table: "", dateField: "publish_date", limit: 5 };
     case "html":
