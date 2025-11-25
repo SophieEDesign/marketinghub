@@ -308,6 +308,16 @@ export default function Sidebar() {
   // Build navGroups structure - Tables and Pages in separate sections
   const navGroups: NavGroup[] = [
     {
+      title: "Main",
+      items: [
+        {
+          icon: LayoutDashboard,
+          label: "Dashboard",
+          href: "/dashboard",
+        },
+      ],
+    },
+    {
       title: "Tables",
       items: [
         ...dynamicTablesList.map((table) => {
