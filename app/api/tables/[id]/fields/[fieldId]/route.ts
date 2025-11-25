@@ -65,10 +65,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Table not found" }, { status: 404 });
     }
     
-    // Get the field to get its name
+    // Get the field - try to select both field_key (old) and name (new)
+    // Use a wildcard select to get all columns, then we'll check what exists
     const { data: field, error: fieldError } = await supabase
       .from("table_fields")
-      .select("name, table_id")
+      .select("*")
       .eq("id", params.fieldId)
       .single();
 

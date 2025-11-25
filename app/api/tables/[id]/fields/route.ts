@@ -167,18 +167,21 @@ export async function POST(
     }
 
     // Create the field metadata
+    // The database uses 'field_key' (this is what lib/fields.ts expects)
+    const insertData: any = {
+      table_id: tableId,
+      field_key: name, // Use name as field_key
+      label,
+      type,
+      options: options || {},
+      required: required || false,
+      visible: true, // Old system has visible field
+      order: order || 0,
+    };
+    
     const { data: field, error: fieldError } = await supabase
       .from("table_fields")
-      .insert({
-        table_id: tableId,
-        name,
-        label,
-        type,
-        options: options || {},
-        required: required || false,
-        unique_field: unique_field || false,
-        order: order || 0,
-      })
+      .insert(insertData)
       .select()
       .single();
 
