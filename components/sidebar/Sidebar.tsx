@@ -305,7 +305,7 @@ export default function Sidebar() {
   const currentTable = pathParts[0] || null;
   const currentView = pathParts[1] || null;
 
-  // Build navGroups structure - Tables and Pages in separate sections
+  // Build navGroups structure - Pages above Tables
   const navGroups: NavGroup[] = [
     {
       title: "Main",
@@ -314,6 +314,22 @@ export default function Sidebar() {
           icon: LayoutDashboard,
           label: "Dashboard",
           href: "/dashboard",
+        },
+      ],
+    },
+    {
+      title: "Pages",
+      items: [
+        ...pages.map((page) => ({
+          icon: FileText,
+          label: page.name,
+          href: `/pages/${page.id}/view`,
+        })),
+        {
+          icon: Plus,
+          label: "New Page",
+          href: "#",
+          onClick: openModal,
         },
       ],
     },
@@ -331,22 +347,6 @@ export default function Sidebar() {
             href: href,
           };
         }),
-      ],
-    },
-    {
-      title: "Pages",
-      items: [
-        ...pages.map((page) => ({
-          icon: FileText,
-          label: page.name,
-          href: `/pages/${page.id}/view`,
-        })),
-        {
-          icon: Plus,
-          label: "New Page",
-          href: "#",
-          onClick: openModal,
-        },
       ],
     },
     {
