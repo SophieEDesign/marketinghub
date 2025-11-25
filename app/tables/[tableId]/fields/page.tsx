@@ -2,42 +2,34 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, Edit2 } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import Button from "@/components/ui/Button";
-import { toast } from "@/components/ui/Toast";
-
-interface TableField {
-  id: string;
-  name: string;
-  label: string;
-  type: string;
-  options: any;
-  required: boolean;
-  unique_field: boolean;
-  order: number;
-}
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { useFieldManager } from "@/lib/useFieldManager";
+import { Field, FieldType } from "@/lib/fields";
+import FieldList from "@/components/fields/FieldList";
+import FieldEditor from "@/components/fields/FieldEditor";
+import FieldAddModal from "@/components/fields/FieldAddModal";
 
 interface DynamicTable {
   id: string;
   name: string;
   label: string;
-  fields: TableField[];
+  description: string;
 }
-
-const FIELD_TYPES = [
-  { value: "text", label: "Text" },
-  { value: "number", label: "Number" },
-  { value: "date", label: "Date" },
-  { value: "datetime", label: "Date & Time" },
-  { value: "checkbox", label: "Checkbox" },
-  { value: "single_select", label: "Single Select" },
-  { value: "multi_select", label: "Multi Select" },
-  { value: "url", label: "URL" },
-  { value: "email", label: "Email" },
-  { value: "phone", label: "Phone" },
-  { value: "attachment", label: "Attachment" },
-  { value: "linked_record", label: "Linked Record" },
-];
 
 function FieldsContent() {
   const params = useParams();
@@ -45,17 +37,43 @@ function FieldsContent() {
   const tableId = params.tableId as string;
   const [table, setTable] = useState<DynamicTable | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingField, setEditingField] = useState<TableField | null>(null);
-  const [fieldName, setFieldName] = useState("");
-  const [fieldLabel, setFieldLabel] = useState("");
-  const [fieldType, setFieldType] = useState("text");
-  const [fieldRequired, setFieldRequired] = useState(false);
-  const [fieldUnique, setFieldUnique] = useState(false);
+  
+  // Resolve table name from tableId (could be UUID or table name)
+  const [tableName, setTableName] = useState<string>("");
+
+  const {
+    fields,
+    loading: fieldsLoading,
+    error,
+    getFields,
+    addField,
+    deleteField,
+    updateField,
+    reorderFields,
+    addSelectOption,
+    removeSelectOption,
+    updateSelectOption,
+  } = useFieldManager(tableName);
+
+  const [editingField, setEditingField] = useState<Field | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadTable();
   }, [tableId]);
+
+  useEffect(() => {
+    if (tableName) {
+      getFields();
+    }
+  }, [tableName, getFields]);
 
   const loadTable = async () => {
     try {
@@ -64,107 +82,51 @@ function FieldsContent() {
       if (!response.ok) throw new Error("Failed to load table");
       const data = await response.json();
       setTable(data);
+      setTableName(data.name); // Use the actual table name for field manager
     } catch (error: any) {
       console.error("Error loading table:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to load table",
-        type: "error",
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateField = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fieldName.trim() || !fieldLabel.trim()) {
-      toast({
-        title: "Error",
-        description: "Field name and label are required",
-        type: "error",
-      });
-      return;
-    }
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    try {
-      const response = await fetch(`/api/tables/${tableId}/fields`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
-          label: fieldLabel.trim(),
-          type: fieldType,
-          required: fieldRequired,
-          unique_field: fieldUnique,
-          order: table?.fields.length || 0,
-        }),
-      });
+    if (!over || active.id === over.id) return;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create field");
-      }
+    const oldIndex = fields.findIndex((f) => f.id === active.id);
+    const newIndex = fields.findIndex((f) => f.id === over.id);
 
-      await loadTable();
-      setShowCreateModal(false);
-      resetForm();
-      toast({
-        title: "Success",
-        description: "Field created successfully",
-        type: "success",
-      });
-    } catch (error: any) {
-      console.error("Error creating field:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create field",
-        type: "error",
-      });
-    }
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newFields = [...fields];
+    const [moved] = newFields.splice(oldIndex, 1);
+    newFields.splice(newIndex, 0, moved);
+
+    const fieldIds = newFields.map((f) => f.id);
+    reorderFields(fieldIds);
   };
 
-  const handleDeleteField = async (fieldId: string, fieldName: string) => {
-    if (!confirm(`Delete field "${fieldName}"? This cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/tables/${tableId}/fields/${fieldId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete field");
-      }
-
-      await loadTable();
-      toast({
-        title: "Success",
-        description: "Field deleted successfully",
-        type: "success",
-      });
-    } catch (error: any) {
-      console.error("Error deleting field:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete field",
-        type: "error",
-      });
-    }
+  const handleAdd = async (label: string, type: FieldType, required: boolean) => {
+    await addField(label, type, required);
+    setShowAddModal(false);
   };
 
-  const resetForm = () => {
-    setFieldName("");
-    setFieldLabel("");
-    setFieldType("text");
-    setFieldRequired(false);
-    setFieldUnique(false);
+  const handleDelete = async (fieldId: string) => {
+    if (!confirm("Are you sure you want to delete this field? This cannot be undone.")) {
+      return;
+    }
+    await deleteField(fieldId);
+  };
+
+  const handleUpdate = async (updates: Partial<Field>) => {
+    if (!editingField) return;
+    await updateField(editingField.id, updates);
     setEditingField(null);
   };
 
-  if (loading) {
+  if (loading || fieldsLoading) {
     return (
       <div className="p-6">
         <div className="text-sm text-gray-500">Loading fields...</div>
@@ -204,7 +166,7 @@ function FieldsContent() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateModal(true)}>
+            <Button onClick={() => setShowAddModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               New Field
             </Button>
@@ -214,173 +176,79 @@ function FieldsContent() {
 
       {/* Fields List */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {table.fields.length === 0 ? (
-          <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              No fields yet. Add your first field to get started.
-            </p>
-            <Button onClick={() => setShowCreateModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Field
-            </Button>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-800">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Field
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Options
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {table.fields.map((field) => (
-                  <tr key={field.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {field.label}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {field.name}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 dark:text-white">
-                        {FIELD_TYPES.find((t) => t.value === field.type)?.label || field.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {field.required && (
-                        <span className="inline-block px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 rounded mr-1">
-                          Required
-                        </span>
-                      )}
-                      {field.unique_field && (
-                        <span className="inline-block px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 rounded">
-                          Unique
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleDeleteField(field.id, field.label)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-600 dark:text-red-400">
+            {error}
           </div>
         )}
+
+        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Fields ({fields.length})</h2>
+          </div>
+
+          {fields.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              <p className="mb-2">No fields configured yet.</p>
+              <p className="text-sm">Click "New Field" to get started.</p>
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={fields.map((f) => f.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-2">
+                  {fields.map((field) => (
+                    <FieldList
+                      key={field.id}
+                      field={field}
+                      onEdit={setEditingField}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
       </div>
 
-      {/* Create Field Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Create New Field
-              </h2>
-              <form onSubmit={handleCreateField} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Field Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={fieldName}
-                    onChange={(e) => setFieldName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    placeholder="e.g., title"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Lowercase, alphanumeric, underscores only
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Display Label *
-                  </label>
-                  <input
-                    type="text"
-                    value={fieldLabel}
-                    onChange={(e) => setFieldLabel(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    placeholder="e.g., Title"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Field Type *
-                  </label>
-                  <select
-                    value={fieldType}
-                    onChange={(e) => setFieldType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    required
-                  >
-                    {FIELD_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={fieldRequired}
-                      onChange={(e) => setFieldRequired(e.target.checked)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Required</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={fieldUnique}
-                      onChange={(e) => setFieldUnique(e.target.checked)}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Unique</span>
-                  </label>
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit">Create Field</Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+      {showAddModal && (
+        <FieldAddModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={handleAdd}
+        />
+      )}
+
+      {editingField && (
+        <FieldEditor
+          field={editingField}
+          onClose={() => setEditingField(null)}
+          onSave={handleUpdate}
+          onAddOption={async (option) => {
+            if (editingField) {
+              await addSelectOption(editingField.id, option);
+              await getFields();
+            }
+          }}
+          onUpdateOption={async (optionId, changes) => {
+            if (editingField) {
+              await updateSelectOption(editingField.id, optionId, changes);
+              await getFields();
+            }
+          }}
+          onRemoveOption={async (optionId) => {
+            if (editingField) {
+              await removeSelectOption(editingField.id, optionId);
+              await getFields();
+            }
+          }}
+        />
       )}
     </div>
   );
