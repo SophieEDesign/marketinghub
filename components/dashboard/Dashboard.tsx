@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
 import { supabase } from "@/lib/supabaseClient";
@@ -37,6 +37,8 @@ export default function Dashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [layouts, setLayouts] = useState<Layouts>({});
   const [dashboardName, setDashboardName] = useState<string>("Dashboard");
+  const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
 
   const canEdit = permissions.canModifyDashboards;
 
@@ -69,6 +71,15 @@ export default function Dashboard() {
     fetchDashboardName();
   }, [dashboardId]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Get default block height from settings (default: 3)
   const getDefaultBlockHeight = () => {
     if (typeof window === 'undefined') return 3;
@@ -99,10 +110,10 @@ export default function Dashboard() {
   }, [blocks]);
 
   const handleLayoutChange = useCallback(
-    async (currentLayout: Layout[], allLayouts: Layouts) => {
+    (currentLayout: Layout[], allLayouts: Layouts) => {
       if (!isEditing) return;
 
-      // Update each block that changed
+      // Store pending updates instead of immediately calling API
       for (const item of currentLayout) {
         const block = blocks.find((b) => b.id === item.i);
         if (!block) continue;
@@ -114,14 +125,39 @@ export default function Dashboard() {
           block.height !== item.h;
 
         if (hasChanged) {
-          await updateBlock(item.i, {
-            position_x: item.x,
-            position_y: item.y,
-            width: item.w,
-            height: item.h,
+          pendingUpdatesRef.current.set(item.i, {
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
           });
         }
       }
+
+      // Clear existing timeout
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+
+      // Debounce: Only save to database after user stops dragging/resizing (500ms delay)
+      layoutChangeTimeoutRef.current = setTimeout(async () => {
+        const updates = Array.from(pendingUpdatesRef.current.entries());
+        pendingUpdatesRef.current.clear();
+
+        // Batch update all changed blocks
+        for (const [blockId, layout] of updates) {
+          try {
+            await updateBlock(blockId, {
+              position_x: layout.x,
+              position_y: layout.y,
+              width: layout.w,
+              height: layout.h,
+            });
+          } catch (error) {
+            console.error(`Error updating block ${blockId}:`, error);
+          }
+        }
+      }, 500);
     },
     [isEditing, blocks, updateBlock]
   );

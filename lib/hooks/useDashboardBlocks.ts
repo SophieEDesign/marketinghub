@@ -356,8 +356,8 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         }
 
         // Validate the returned data
-        if (!data) {
-          // If still no data, update optimistically
+        if (!data || Array.isArray(data)) {
+          // If still no data or data is an array, update optimistically
           setBlocks((prev) =>
             prev.map((b) => {
               if (b.id === id) {
@@ -375,9 +375,11 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           return existingBlock;
         }
 
+        // At this point, data is guaranteed to be a single object, not an array
+        const blockData = data as DashboardBlock;
         const validatedBlock = {
-          ...data,
-          content: validateAndFixContent(data.type, data.content),
+          ...blockData,
+          content: validateAndFixContent(blockData.type, blockData.content),
         };
 
         setBlocks((prev) =>
