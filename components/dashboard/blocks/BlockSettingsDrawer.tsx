@@ -542,7 +542,7 @@ export default function BlockSettingsDrawer({
                   >
                     <option value="">Select a date field...</option>
                     {tableFields
-                      .filter((f) => f.type === "date" || f.type === "datetime")
+                      .filter((f) => f.type === "date")
                       .map((field) => (
                         <option key={field.id} value={field.field_key}>
                           {field.label}
