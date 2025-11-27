@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Building2, Users, Shield, Info, Mail, UserPlus, Trash2, Key } from "lucide-react";
+import { Building2, Users, Shield, Info, Mail, UserPlus, Trash2, Key, LayoutGrid } from "lucide-react";
 import { useSettings } from "@/lib/useSettings";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import LogoUploader from "@/components/settings/LogoUploader";
