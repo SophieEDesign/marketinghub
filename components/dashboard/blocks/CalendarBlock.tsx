@@ -57,7 +57,7 @@ export default function CalendarBlock({
     setLoading(true);
     try {
       const today = new Date().toISOString().split("T")[0];
-      let query = supabase
+      let query: any = supabase
         .from(normalizedContent.table)
         .select(`id, ${normalizedContent.dateField}, ${(normalizedContent.fields || []).join(", ")}`)
         .gte(normalizedContent.dateField, today)

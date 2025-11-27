@@ -44,7 +44,7 @@ export default function KpiBlock({
 
     setLoading(true);
     try {
-      let query = supabase.from(normalizedContent.table);
+      let query: any = supabase.from(normalizedContent.table);
 
       // Apply filters if provided
       if (normalizedContent.filters && Array.isArray(normalizedContent.filters)) {

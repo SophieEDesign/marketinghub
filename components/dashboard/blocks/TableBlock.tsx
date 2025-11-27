@@ -56,7 +56,7 @@ export default function TableBlock({
 
     setLoading(true);
     try {
-      let query = supabase
+      let query: any = supabase
         .from(normalizedContent.table)
         .select(normalizedContent.fields.join(", "));
 
