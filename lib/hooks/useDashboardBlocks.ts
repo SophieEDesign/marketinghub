@@ -285,12 +285,12 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         // Merge grid columns into updateData
         Object.assign(updateData, gridColumns);
 
+        // First, try to update with all columns
         let { data, error: updateError } = await supabase
           .from("dashboard_blocks")
           .update(updateData)
           .eq("id", id)
-          .select()
-          .single();
+          .select();
 
         // If error is about missing columns, retry without grid layout columns
         if (updateError && (updateError.code === "PGRST204" || updateError.message?.includes("column"))) {
@@ -308,24 +308,73 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
             .from("dashboard_blocks")
             .update(basicUpdateData)
             .eq("id", id)
-            .select()
-            .single();
+            .select();
           
           if (retryResult.error) {
             console.error("Error updating block (retry):", retryResult.error);
             throw retryResult.error;
           }
           
-          data = retryResult.data;
+          data = retryResult.data?.[0] || null;
           updateError = null;
+        } else if (updateError) {
+          throw updateError;
+        } else {
+          // Get the first result if multiple, or the single result
+          data = Array.isArray(data) ? (data[0] || null) : data;
         }
 
-        if (updateError) {
-          console.error("Error updating block:", updateError);
-          throw updateError;
+        // If no data returned, fetch the updated block
+        if (!data) {
+          const { data: fetchedData, error: fetchError } = await supabase
+            .from("dashboard_blocks")
+            .select("*")
+            .eq("id", id)
+            .maybeSingle();
+          
+          if (fetchError) {
+            console.error("Error fetching updated block:", fetchError);
+            // Still update local state optimistically
+            setBlocks((prev) =>
+              prev.map((b) => {
+                if (b.id === id) {
+                  return {
+                    ...b,
+                    ...updates,
+                    content: updates.content !== undefined 
+                      ? validateAndFixContent(b.type, updates.content)
+                      : b.content,
+                  };
+                }
+                return b;
+              })
+            );
+            return existingBlock;
+          }
+          
+          data = fetchedData;
         }
 
         // Validate the returned data
+        if (!data) {
+          // If still no data, update optimistically
+          setBlocks((prev) =>
+            prev.map((b) => {
+              if (b.id === id) {
+                return {
+                  ...b,
+                  ...updates,
+                  content: updates.content !== undefined 
+                    ? validateAndFixContent(b.type, updates.content)
+                    : b.content,
+                };
+              }
+              return b;
+            })
+          );
+          return existingBlock;
+        }
+
         const validatedBlock = {
           ...data,
           content: validateAndFixContent(data.type, data.content),

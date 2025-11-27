@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
+import { supabase } from "@/lib/supabaseClient";
 
 // Import CSS for react-grid-layout (client-side only)
 if (typeof window !== "undefined") {
@@ -35,8 +36,38 @@ export default function Dashboard() {
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [layouts, setLayouts] = useState<Layouts>({});
+  const [dashboardName, setDashboardName] = useState<string>("Dashboard");
 
   const canEdit = permissions.canModifyDashboards;
+
+  // Fetch dashboard name
+  useEffect(() => {
+    const fetchDashboardName = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("dashboards")
+          .select("name")
+          .eq("id", dashboardId)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching dashboard name:", error);
+          return;
+        }
+
+        if (data) {
+          setDashboardName(data.name || "Dashboard");
+        } else {
+          // If dashboard doesn't exist, use default name
+          setDashboardName("Dashboard");
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard:", err);
+      }
+    };
+
+    fetchDashboardName();
+  }, [dashboardId]);
 
   // Get default block height from settings (default: 3)
   const getDefaultBlockHeight = () => {
@@ -158,7 +189,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          Dashboard
+          {dashboardName}
         </h1>
         {canEdit && (
           <Button

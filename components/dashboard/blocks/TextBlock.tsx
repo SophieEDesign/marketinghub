@@ -95,11 +95,14 @@ export default function TextBlock({
         isDragging={isDragging}
       />
       <div
-        style={{ maxHeight: `${maxHeight}px`, overflowY: "auto" }}
+        className="flex-1 overflow-y-auto"
+        style={{ maxHeight: `${maxHeight}px` }}
         onFocus={handleFocus}
         onBlur={handleBlur}
       >
-        <EditorContent editor={editor} />
+        <div className="p-4">
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   );
