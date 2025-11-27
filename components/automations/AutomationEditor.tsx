@@ -701,7 +701,7 @@ function DateApproachingTriggerConfig({
 }) {
   const { fields } = useFields(tableId);
   const dateFields = fields.filter(
-    (f) => f.type === "date" || f.type === "datetime"
+    (f) => f.type === "date"
   );
 
   return (
