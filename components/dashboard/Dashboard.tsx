@@ -37,14 +37,22 @@ export default function Dashboard() {
 
   const canEdit = permissions.canModifyDashboards;
 
+  // Get default block height from settings (default: 3)
+  const getDefaultBlockHeight = () => {
+    if (typeof window === 'undefined') return 3;
+    const saved = localStorage.getItem('dashboardDefaultBlockHeight');
+    return saved ? parseInt(saved, 10) : 3;
+  };
+
   // Convert blocks to react-grid-layout format
   useEffect(() => {
+    const defaultHeight = getDefaultBlockHeight();
     const lgLayout: Layout[] = blocks.map((block, index) => ({
       i: block.id,
       x: block.position_x ?? (index % 4) * 3, // Default: 3 columns per block
-      y: block.position_y ?? Math.floor(index / 4) * 4, // Default: 4 rows per block
+      y: block.position_y ?? Math.floor(index / 4) * defaultHeight, // Default rows per block
       w: block.width ?? 3, // Default width: 3 columns
-      h: block.height ?? 4, // Default height: 4 rows
+      h: block.height ?? defaultHeight, // Default height from settings
       minW: 2,
       minH: 2,
     }));

@@ -179,12 +179,19 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           position: maxY + 1, // Legacy position
         };
 
+        // Get default block height from settings (default: 3)
+        const getDefaultBlockHeight = () => {
+          if (typeof window === 'undefined') return 3;
+          const saved = localStorage.getItem('dashboardDefaultBlockHeight');
+          return saved ? parseInt(saved, 10) : 3;
+        };
+        
         // Try to include grid layout columns, but fallback if they don't exist
         try {
           insertData.position_x = defaultX;
           insertData.position_y = defaultY;
           insertData.width = 3;
-          insertData.height = 4;
+          insertData.height = getDefaultBlockHeight();
         } catch (e) {
           // Ignore - columns may not exist
         }

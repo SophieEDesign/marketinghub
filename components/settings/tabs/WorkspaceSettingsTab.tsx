@@ -19,7 +19,7 @@ export default function WorkspaceSettingsTab() {
   const permissions = usePermissions();
   const { settings, updateSettings } = useSettings();
   const [saving, setSaving] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<"info" | "users" | "security">("info");
+  const [activeSubTab, setActiveSubTab] = useState<"info" | "users" | "security" | "dashboard">("info");
 
   // Workspace Info state
   const [workspaceName, setWorkspaceName] = useState(settings.workspace_name || "");
@@ -35,6 +35,13 @@ export default function WorkspaceSettingsTab() {
   // Security state
   const [sessionTimeout, setSessionTimeout] = useState(30); // minutes
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  // Dashboard settings
+  const [defaultBlockHeight, setDefaultBlockHeight] = useState(() => {
+    if (typeof window === 'undefined') return 3;
+    const saved = localStorage.getItem('dashboardDefaultBlockHeight');
+    return saved ? parseInt(saved, 10) : 3;
+  });
 
   useEffect(() => {
     if (settings.workspace_name) {
@@ -225,6 +232,7 @@ export default function WorkspaceSettingsTab() {
     { id: "info" as const, label: "Workspace Info", icon: Info },
     { id: "users" as const, label: "Users & Roles", icon: Users },
     { id: "security" as const, label: "Security", icon: Shield },
+    { id: "dashboard" as const, label: "Dashboard", icon: LayoutGrid },
   ];
 
   return (
@@ -451,6 +459,47 @@ export default function WorkspaceSettingsTab() {
               <Button onClick={handleSaveSecurity} disabled={saving}>
                 {saving ? "Saving..." : "Save Security Settings"}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dashboard Tab */}
+      {activeSubTab === "dashboard" && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Dashboard Settings</h2>
+            <div className="space-y-4 max-w-md">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Default Block Height (rows)
+                </label>
+                <input
+                  type="number"
+                  value={defaultBlockHeight}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 3;
+                    setDefaultBlockHeight(value);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('dashboardDefaultBlockHeight', value.toString());
+                    }
+                  }}
+                  min="2"
+                  max="10"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Default height for new dashboard blocks. Current value: {defaultBlockHeight} rows.
+                </p>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <LayoutGrid className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <div className="text-xs text-blue-700 dark:text-blue-300">
+                    <strong>Note:</strong> This setting applies to new blocks only. Existing blocks keep their current height.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
