@@ -132,19 +132,27 @@ export default function BlockSettingsDrawer({
   };
 
   return (
-    <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl z-[9999] flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {block.type.charAt(0).toUpperCase() + block.type.slice(1)} Block Settings
-        </h2>
-        <button
-          onClick={onClose}
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 z-[9998]"
+        onClick={onClose}
+      />
+      
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl z-[9999] flex flex-col transform transition-transform duration-300 ease-in-out">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {block.type.charAt(0).toUpperCase() + block.type.slice(1)} Block Settings
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -688,7 +696,8 @@ export default function BlockSettingsDrawer({
           Save Changes
         </Button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

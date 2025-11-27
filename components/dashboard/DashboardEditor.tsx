@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
 
 // Import CSS for react-grid-layout (client-side only)
@@ -57,15 +57,25 @@ export default function DashboardEditor({
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [editingModule, setEditingModule] = useState<DashboardModule | null>(null);
   const [layouts, setLayouts] = useState<Layouts>({});
+  const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+
+  // Get default block height from settings (default: 3)
+  const getDefaultBlockHeight = () => {
+    if (typeof window === 'undefined') return 3;
+    const saved = localStorage.getItem('dashboardDefaultBlockHeight');
+    return saved ? parseInt(saved, 10) : 3;
+  };
 
   // Convert modules to react-grid-layout format
   useEffect(() => {
+    const defaultHeight = getDefaultBlockHeight();
     const lgLayout: Layout[] = modules.map((module) => ({
       i: module.id,
       x: module.position_x,
       y: module.position_y,
       w: module.width,
-      h: module.height,
+      h: module.height ?? defaultHeight,
       minW: 2,
       minH: 2,
     }));
@@ -79,14 +89,23 @@ export default function DashboardEditor({
     });
   }, [modules]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLayoutChange = useCallback(
-    async (currentLayout: Layout[], allLayouts: Layouts) => {
+    (currentLayout: Layout[], allLayouts: Layouts) => {
       if (!isEditing) return;
 
-      // Update each module that changed
-      const updates = currentLayout.map((item) => {
+      // Store pending updates instead of immediately calling API
+      for (const item of currentLayout) {
         const module = modules.find((m) => m.id === item.i);
-        if (!module) return null;
+        if (!module) continue;
 
         const hasChanged =
           module.position_x !== item.x ||
@@ -95,25 +114,39 @@ export default function DashboardEditor({
           module.height !== item.h;
 
         if (hasChanged) {
-          return {
-            id: item.i,
-            updates: {
-              position_x: item.x,
-              position_y: item.y,
-              width: item.w,
-              height: item.h,
-            },
-          };
-        }
-        return null;
-      });
-
-      // Save all updates
-      for (const update of updates) {
-        if (update) {
-          await onModuleUpdate(update.id, update.updates);
+          pendingUpdatesRef.current.set(item.i, {
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+          });
         }
       }
+
+      // Clear existing timeout
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+
+      // Debounce: Only save to database after user stops dragging/resizing (500ms delay)
+      layoutChangeTimeoutRef.current = setTimeout(async () => {
+        const updates = Array.from(pendingUpdatesRef.current.entries());
+        pendingUpdatesRef.current.clear();
+
+        // Batch update all changed modules
+        for (const [moduleId, layout] of updates) {
+          try {
+            await onModuleUpdate(moduleId, {
+              position_x: layout.x,
+              position_y: layout.y,
+              width: layout.w,
+              height: layout.h,
+            });
+          } catch (error) {
+            console.error(`Error updating module ${moduleId}:`, error);
+          }
+        }
+      }, 500);
     },
     [isEditing, modules, onModuleUpdate]
   );
@@ -126,12 +159,13 @@ export default function DashboardEditor({
           ? Math.max(...modules.map((m) => m.position_y + m.height))
           : 0;
 
+        const defaultHeight = getDefaultBlockHeight();
         const newModule: Omit<DashboardModule, "id" | "dashboard_id"> = {
           type,
           position_x: 0,
           position_y: maxY,
           width: type === "kpi" ? 3 : 4,
-          height: type === "kpi" ? 3 : 4,
+          height: defaultHeight,
           config: config || {},
         };
 
@@ -249,6 +283,9 @@ export default function DashboardEditor({
           draggableHandle={isEditing ? undefined : ".no-drag"}
           margin={[16, 16]}
           containerPadding={[0, 0]}
+          preventCollision={true}
+          compactType={null}
+          allowOverlap={false}
         >
           {modules.map((module) => (
             <div key={module.id} className="relative">

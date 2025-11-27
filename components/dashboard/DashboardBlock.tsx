@@ -72,6 +72,11 @@ export default function DashboardBlock({
     editing: isEditing, // Pass editing state to blocks
   };
 
-  return <Component {...commonProps} />;
+  // Wrap every block in a unified card container
+  return (
+    <div className="h-full bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
+      <Component {...commonProps} />
+    </div>
+  );
 }
 

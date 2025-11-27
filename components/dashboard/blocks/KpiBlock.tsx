@@ -118,11 +118,7 @@ export default function KpiBlock({
   const label = normalizedContent.label || "Total Records";
 
   return (
-    <div
-      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
-        isDragging ? "opacity-50" : ""
-      }`}
-    >
+    <>
       <BlockHeader
         title={title}
         editing={editing}
@@ -130,8 +126,7 @@ export default function KpiBlock({
         onDelete={onDelete ? () => onDelete(id) : undefined}
         isDragging={isDragging}
       />
-
-      <div className="p-6 text-center flex-1 flex flex-col items-center justify-center">
+      <div className="flex-1 overflow-y-auto p-4 text-center flex flex-col items-center justify-center">
         {!normalizedContent.table ? (
           <>
             <BarChart3 className="w-8 h-8 mx-auto text-gray-400 mb-2" />
@@ -154,6 +149,6 @@ export default function KpiBlock({
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }

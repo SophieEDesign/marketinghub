@@ -75,18 +75,23 @@ export default function TextBlock({
 
   if (!editor) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-        <div className="text-sm text-gray-500">Loading editor...</div>
-      </div>
+      <>
+        <BlockHeader
+          title={title}
+          editing={editing}
+          onOpenSettings={onOpenSettings || (() => {})}
+          onDelete={onDelete ? () => onDelete(id) : undefined}
+          isDragging={isDragging}
+        />
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="text-sm text-gray-500">Loading editor...</div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div
-      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
-        isFocused ? "ring-2 ring-blue-500" : ""
-      } ${isDragging ? "opacity-50" : ""}`}
-    >
+    <>
       <BlockHeader
         title={title}
         editing={editing}
@@ -104,7 +109,7 @@ export default function TextBlock({
           <EditorContent editor={editor} />
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

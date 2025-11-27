@@ -28,6 +28,7 @@ import {
   GripVertical,
   Edit3,
   Check,
+  Zap,
 } from "lucide-react";
 import { tables, tableCategories } from "@/lib/tables";
 import { useTheme } from "@/app/providers";
@@ -125,6 +126,7 @@ const generateDefaultSidebarItems = (dynamicTableData: Array<{ table_name: strin
 
   return [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+    { id: "automations", label: "Automations", icon: Zap, href: "/automations" },
     ...tableItems,
     { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
   ];
