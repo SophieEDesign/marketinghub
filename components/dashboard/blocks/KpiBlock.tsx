@@ -90,7 +90,7 @@ export default function KpiBlock({
         const { data, error } = await query.select(normalizedContent.field);
         if (error) throw error;
         const values = (data || []).map((row: any) => parseFloat(row[normalizedContent.field]) || 0);
-        const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        const avg = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0;
         setValue(avg);
       } else if (normalizedContent.aggregate === "min" && normalizedContent.field) {
         const { data, error } = await query.select(normalizedContent.field).order(normalizedContent.field, { ascending: true }).limit(1);
