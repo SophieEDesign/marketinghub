@@ -123,8 +123,9 @@ export function validateAndFixContent(
       return {
         table: content.table !== undefined ? String(content.table) : defaultContent.table,
         label: content.label !== undefined ? String(content.label) : defaultContent.label,
-        filter: content.filter !== undefined ? String(content.filter) : defaultContent.filter,
         aggregate: content.aggregate !== undefined ? String(content.aggregate) : defaultContent.aggregate,
+        field: content.field !== undefined ? String(content.field) : (defaultContent as any).field || "",
+        filters: Array.isArray(content.filters) ? content.filters : (defaultContent as any).filters || [],
       } as BlockContentSchemas[BlockType];
     }
     case "table": {
