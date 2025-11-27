@@ -5,38 +5,86 @@
 
 export type BlockType = "text" | "image" | "embed" | "kpi" | "table" | "calendar" | "html";
 
+// Universal content structure - all blocks support these fields
+export interface UniversalBlockContent {
+  title?: string;
+  limit?: number;
+  filters?: Array<{ field: string; operator: string; value: string }>;
+  table?: string;
+  fields?: string[];
+  aggregate?: string;
+  dateField?: string;
+  html?: string;
+  url?: string;
+  caption?: string;
+  maxHeight?: number;
+  style?: string;
+  height?: number;
+  field?: string; // For KPI blocks when aggregate != count
+}
+
 export interface BlockContentSchemas {
-  text: { html: string };
-  image: { url: string; caption: string };
-  embed: { url: string };
-  kpi: { table: string; label: string; filter: string; aggregate: string };
-  table: { table: string; fields: string[]; limit: number };
-  calendar: { table: string; dateField: string; limit: number };
-  html: { html: string };
+  text: UniversalBlockContent & { html: string; maxHeight?: number };
+  image: UniversalBlockContent & { url: string; caption: string; style?: string };
+  embed: UniversalBlockContent & { url: string; height?: number };
+  kpi: UniversalBlockContent & { table: string; label?: string; aggregate: string; field?: string };
+  table: UniversalBlockContent & { table: string; fields: string[]; limit: number };
+  calendar: UniversalBlockContent & { table: string; dateField: string; limit: number };
+  html: UniversalBlockContent & { html: string; height?: number };
 }
 
 /**
  * Get default content for a block type
+ * All blocks now support: title, limit, filters, table, fields
  */
 export function getDefaultContentForType(type: BlockType): BlockContentSchemas[BlockType] {
+  const baseDefaults: UniversalBlockContent = {
+    title: "",
+    limit: 3,
+    filters: [],
+    table: "",
+    fields: [],
+  };
+
   switch (type) {
     case "text":
-      return { html: "" };
+      return { ...baseDefaults, html: "", maxHeight: 200 } as BlockContentSchemas["text"];
     case "image":
-      return { url: "", caption: "" };
+      return { ...baseDefaults, url: "", caption: "", style: "contain" } as BlockContentSchemas["image"];
     case "embed":
-      return { url: "" };
+      return { ...baseDefaults, url: "", height: 400 } as BlockContentSchemas["embed"];
     case "kpi":
-      return { table: "", label: "Total Records", filter: "", aggregate: "count" };
+      return { ...baseDefaults, table: "", label: "Total Records", aggregate: "count" } as BlockContentSchemas["kpi"];
     case "table":
-      return { table: "", fields: [], limit: 3 };
+      return { ...baseDefaults, table: "", fields: [], limit: 3 } as BlockContentSchemas["table"];
     case "calendar":
-      return { table: "", dateField: "publish_date", limit: 5 };
+      return { ...baseDefaults, table: "", dateField: "publish_date", limit: 10 } as BlockContentSchemas["calendar"];
     case "html":
-      return { html: "" };
+      return { ...baseDefaults, html: "", height: 400 } as BlockContentSchemas["html"];
     default:
-      return {} as any;
+      return baseDefaults as any;
   }
+}
+
+/**
+ * Get default content structure (for useDashboardBlocks)
+ */
+export function getDefaultContent(type: string): UniversalBlockContent {
+  return {
+    title: "",
+    limit: 3,
+    filters: [],
+    table: "",
+    fields: [],
+    aggregate: "",
+    dateField: "",
+    html: "",
+    url: "",
+    caption: "",
+    maxHeight: 200,
+    style: "contain",
+    height: 400,
+  };
 }
 
 /**

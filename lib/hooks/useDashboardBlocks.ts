@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { validateAndFixContent, getDefaultContentForType, BlockType } from "@/lib/utils/dashboardBlockContent";
+import { validateAndFixContent, getDefaultContentForType, getDefaultContent, BlockType } from "@/lib/utils/dashboardBlockContent";
 
 export interface DashboardBlock {
   id: string;
@@ -102,11 +102,19 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         throw fetchError;
       }
 
-      // Validate and fix content for all blocks
-      const validatedBlocks = (data || []).map((block) => ({
-        ...block,
-        content: validateAndFixContent(block.type, block.content),
-      }));
+      // Validate and fix content for all blocks - normalize with defaults for backwards compatibility
+      const validatedBlocks = (data || []).map((block) => {
+        const baseDefaults = getDefaultContent(block.type);
+        const typeDefaults = getDefaultContentForType(block.type);
+        const defaultContent = { ...baseDefaults, ...typeDefaults };
+        const existingContent = block.content || {};
+        // Merge defaults with existing content to ensure all fields exist
+        const normalizedContent = { ...defaultContent, ...validateAndFixContent(block.type, existingContent) };
+        return {
+          ...block,
+          content: normalizedContent,
+        };
+      });
 
       setBlocks(validatedBlocks);
     } catch (err: any) {
@@ -149,27 +157,24 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
         const defaultX = maxX >= 9 ? 0 : (maxX + 3);
         const defaultY = maxX >= 9 ? maxY + 4 : maxY;
 
-        // Ensure content is never null - use default content structure
-        const defaultContent: Record<string, any> = {
-          text: { html: "" },
-          image: { url: "", caption: "" },
-          embed: { url: "" },
-          kpi: { table: "", label: "", filter: "", aggregate: "count" },
-          table: { table: "", fields: [], limit: 10 },
-          calendar: { table: "", dateField: "", limit: 10 },
-          html: { html: "" },
-        };
+        // Get default content structure (includes title, limit, filters, etc.)
+        const baseDefaults = getDefaultContent(type);
+        const typeDefaults = getDefaultContentForType(type);
+        
+        // Merge base defaults with type-specific defaults
+        const defaultContent = { ...baseDefaults, ...typeDefaults };
 
         // Use provided content if valid, otherwise use default
+        // Normalize content: merge with defaults to ensure all fields exist
         const contentToUse = 
           initialContent && 
           typeof initialContent === "object" && 
           Object.keys(initialContent).length > 0
-            ? validateAndFixContent(type, initialContent)
-            : defaultContent[type] || getDefaultContentForType(type);
+            ? { ...defaultContent, ...validateAndFixContent(type, initialContent) }
+            : defaultContent;
 
-        // Ensure content is never null
-        const validatedContent = contentToUse || defaultContent[type] || getDefaultContentForType(type);
+        // Ensure content is never null and has all required fields
+        const validatedContent = contentToUse || defaultContent;
 
         // Try inserting with grid layout columns first
         let insertData: any = {

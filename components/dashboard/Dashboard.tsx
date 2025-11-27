@@ -19,8 +19,8 @@ import { useDashboardBlocks } from "@/lib/hooks/useDashboardBlocks";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import DashboardBlock from "./DashboardBlock";
 import BlockMenu, { BlockType } from "./blocks/BlockMenu";
-import DashboardBlockSettings from "./DashboardBlockSettings";
-import { Plus, Settings, X } from "lucide-react";
+import BlockSettingsDrawer from "./blocks/BlockSettingsDrawer";
+import { Plus } from "lucide-react";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -33,6 +33,7 @@ export default function Dashboard() {
   const [isEditing, setIsEditing] = useState(false);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<any | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [layouts, setLayouts] = useState<Layouts>({});
 
   const canEdit = permissions.canModifyDashboards;
@@ -106,7 +107,12 @@ export default function Dashboard() {
 
   const handleUpdateBlock = async (id: string, updates: any) => {
     try {
-      await updateBlock(id, updates);
+      // If updates contain content, merge it properly
+      if (updates.content) {
+        await updateBlock(id, { content: updates.content });
+      } else {
+        await updateBlock(id, updates);
+      }
     } catch (error: any) {
       console.error("Error updating block:", error);
     }
@@ -226,31 +232,16 @@ export default function Dashboard() {
               return null;
             }
             return (
-              <div key={block.id} className="relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 h-full">
-                {isEditing && (
-                  <>
-                    <button
-                      onClick={() => setSelectedBlock(block)}
-                      className="absolute -top-2 -left-2 z-50 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors shadow-lg"
-                      title="Block settings"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBlock(block.id)}
-                      className="absolute -top-2 -right-2 z-50 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg"
-                      title="Delete block"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+              <div key={block.id} className="h-full">
                 <DashboardBlock
                   block={block}
                   isEditing={isEditing}
                   onUpdate={handleUpdateBlock}
                   onDelete={handleDeleteBlock}
-                  onOpenSettings={() => setSelectedBlock(block)}
+                  onOpenSettings={() => {
+                    setSelectedBlock(block);
+                    setIsSettingsOpen(true);
+                  }}
                   isDragging={false}
                 />
               </div>
@@ -259,15 +250,16 @@ export default function Dashboard() {
         </ResponsiveGridLayout>
       )}
 
-      {/* Settings Panel */}
-      {isEditing && selectedBlock && (
-        <DashboardBlockSettings
-          block={selectedBlock}
-          isOpen={!!selectedBlock}
-          onClose={() => setSelectedBlock(null)}
-          onUpdate={handleUpdateBlock}
-        />
-      )}
+      {/* Settings Drawer */}
+      <BlockSettingsDrawer
+        block={selectedBlock}
+        open={isSettingsOpen}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setSelectedBlock(null);
+        }}
+        onUpdate={handleUpdateBlock}
+      />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, GripVertical, Settings, Table as TableIcon } from "lucide-react";
+import { Table as TableIcon, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
-import { useTables } from "@/lib/hooks/useTables";
+import BlockHeader from "./BlockHeader";
+import { getDefaultContent } from "@/lib/utils/dashboardBlockContent";
 
 interface TableBlockProps {
   id: string;
@@ -13,6 +14,7 @@ interface TableBlockProps {
   onDelete?: (id: string) => void;
   onOpenSettings?: () => void;
   isDragging?: boolean;
+  editing?: boolean;
 }
 
 export default function TableBlock({
@@ -22,34 +24,73 @@ export default function TableBlock({
   onDelete,
   onOpenSettings,
   isDragging = false,
+  editing = false,
 }: TableBlockProps) {
   const { openRecord } = useRecordDrawer();
-  const { tables } = useTables();
-  const [config, setConfig] = useState({
-    table: content?.table || "content",
-    fields: content?.fields || ["title", "status", "created_at"],
-    limit: content?.limit || 3, // Default to 3 rows
-  });
+  
+  // Normalize content with defaults for backwards compatibility
+  const defaults = getDefaultContent("table");
+  const normalizedContent = { ...defaults, ...content };
+  
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  // Get display limit - default to 3 rows
+  const displayLimit = normalizedContent.limit || 3;
+  const limit = expanded ? Infinity : displayLimit;
+  const visibleRows = rows.slice(0, limit);
+  const hasMore = rows.length > displayLimit;
 
   // Load table data
   useEffect(() => {
-    if (config.table) {
+    if (normalizedContent.table && normalizedContent.fields && normalizedContent.fields.length > 0) {
       loadTableData();
     }
-  }, [config.table, config.fields, config.limit]);
+  }, [normalizedContent.table, normalizedContent.fields, normalizedContent.filters]);
 
   const loadTableData = async () => {
+    if (!normalizedContent.table || !normalizedContent.fields || normalizedContent.fields.length === 0) {
+      return;
+    }
+
     setLoading(true);
     try {
-      const columns = config.fields.join(", ");
-      const { data, error } = await supabase
-        .from(config.table)
-        .select(columns)
-        .limit(config.limit)
-        .order("created_at", { ascending: false });
+      let query = supabase
+        .from(normalizedContent.table)
+        .select(normalizedContent.fields.join(", "));
+
+      // Apply filters if provided
+      if (normalizedContent.filters && Array.isArray(normalizedContent.filters)) {
+        normalizedContent.filters.forEach((filter: any) => {
+          if (filter.field && filter.operator && filter.value !== undefined) {
+            switch (filter.operator) {
+              case "eq":
+                query = query.eq(filter.field, filter.value);
+                break;
+              case "neq":
+                query = query.neq(filter.field, filter.value);
+                break;
+              case "gt":
+                query = query.gt(filter.field, filter.value);
+                break;
+              case "lt":
+                query = query.lt(filter.field, filter.value);
+                break;
+              case "gte":
+                query = query.gte(filter.field, filter.value);
+                break;
+              case "lte":
+                query = query.lte(filter.field, filter.value);
+                break;
+            }
+          }
+        });
+      }
+
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .limit(100); // Load more than display limit
 
       if (error) throw error;
       setRows(data || []);
@@ -61,144 +102,92 @@ export default function TableBlock({
     }
   };
 
-  const handleConfigChange = (updates: Partial<typeof config>) => {
-    const newConfig = { ...config, ...updates };
-    setConfig(newConfig);
-    onUpdate?.(id, newConfig);
-  };
-
   const handleRowClick = (row: any) => {
-    if (row.id) {
-      openRecord(config.table, row.id);
+    if (row.id && normalizedContent.table) {
+      openRecord(normalizedContent.table, row.id);
     }
   };
 
+  const title = normalizedContent.title || normalizedContent.table || "Table Block";
+
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${
+      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
         isDragging ? "opacity-50" : ""
       }`}
     >
-      {/* Drag Handle */}
-      <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
-      </div>
+      <BlockHeader
+        title={title}
+        editing={editing}
+        onOpenSettings={onOpenSettings || (() => {})}
+        onDelete={onDelete ? () => onDelete(id) : undefined}
+        isDragging={isDragging}
+      />
 
-      {/* Delete Button */}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(id)}
-          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-          title="Delete block"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Settings Button */}
-      {onOpenSettings && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings();
-          }}
-          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
-          title="Configure Table"
-          type="button"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Content */}
-      <div className="p-4">
-        {isEditing ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Table
-              </label>
-              <select
-                value={config.table}
-                onChange={(e) => handleConfigChange({ table: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-              >
-                {tables.map((table) => (
-                  <option key={table.id} value={table.name}>
-                    {table.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Limit
-              </label>
-              <input
-                type="number"
-                value={config.limit}
-                onChange={(e) => handleConfigChange({ limit: parseInt(e.target.value) || 5 })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-                min="1"
-                max="20"
-              />
-            </div>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-            >
-              Done
-            </button>
+      <div className="p-4 flex-1 overflow-auto">
+        {!normalizedContent.table ? (
+          <div className="text-center py-8 text-gray-500 text-sm">
+            <TableIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+            <p>No table selected</p>
+            <p className="text-xs mt-1">Configure in settings</p>
           </div>
+        ) : loading ? (
+          <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
+        ) : rows.length === 0 ? (
+          <div className="text-center py-4 text-gray-500 text-sm">No data</div>
         ) : (
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <TableIcon className="w-4 h-4 text-gray-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                {config.table}
-              </h3>
-            </div>
-            {loading ? (
-              <div className="text-center py-4 text-gray-500">Loading...</div>
-            ) : rows.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">No data</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                      {config.fields.slice(0, 3).map((field: string) => (
-                        <th
-                          key={field}
-                          className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
-                        >
-                          {field.replace(/_/g, " ")}
-                        </th>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    {normalizedContent.fields.slice(0, 3).map((field: string) => (
+                      <th
+                        key={field}
+                        className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        {field.replace(/_/g, " ")}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((row, idx) => (
+                    <tr
+                      key={row.id || idx}
+                      onClick={() => handleRowClick(row)}
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                    >
+                      {normalizedContent.fields.slice(0, 3).map((field: string) => (
+                        <td key={field} className="px-2 py-2 text-gray-900 dark:text-gray-100">
+                          {row[field] ? String(row[field]).slice(0, 30) : "—"}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, config.limit).map((row, idx) => (
-                      <tr
-                        key={row.id || idx}
-                        onClick={() => handleRowClick(row)}
-                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                      >
-                        {config.fields.slice(0, 3).map((field: string) => (
-                          <td key={field} className="px-2 py-2 text-gray-900 dark:text-gray-100">
-                            {row[field] ? String(row[field]).slice(0, 30) : "—"}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {hasMore && !expanded && (
+              <button
+                onClick={() => setExpanded(true)}
+                className="w-full mt-3 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md flex items-center justify-center gap-1"
+              >
+                Show more ({rows.length - displayLimit} more)
+                <ChevronDown className="w-4 h-4" />
+              </button>
             )}
-          </div>
+            {expanded && hasMore && (
+              <button
+                onClick={() => setExpanded(false)}
+                className="w-full mt-3 px-3 py-2 text-sm text-gray-600 hover:text-gray-700 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md"
+              >
+                Show less
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
-

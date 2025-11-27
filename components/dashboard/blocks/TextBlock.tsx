@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import { X, GripVertical, Settings } from "lucide-react";
+import BlockHeader from "./BlockHeader";
 
 interface TextBlockProps {
   id: string;
@@ -13,6 +13,7 @@ interface TextBlockProps {
   onDelete?: (id: string) => void;
   onOpenSettings?: () => void;
   isDragging?: boolean;
+  editing?: boolean;
 }
 
 export default function TextBlock({
@@ -22,10 +23,15 @@ export default function TextBlock({
   onDelete,
   onOpenSettings,
   isDragging = false,
+  editing = false,
 }: TextBlockProps) {
-  const [isEditing, setIsEditing] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   // Support both content.text and content.html for backward compatibility
   const [localContent, setLocalContent] = useState(content?.html || content?.text || "");
+  
+  // Get title from content or use default
+  const title = content?.title || "Text Block";
+  const maxHeight = content?.maxHeight || 200;
 
   const editor = useEditor({
     extensions: [
@@ -60,62 +66,41 @@ export default function TextBlock({
   }, [content?.html, content?.text, editor, localContent]);
 
   const handleFocus = () => {
-    setIsEditing(true);
+    setIsFocused(true);
   };
 
   const handleBlur = () => {
-    setIsEditing(false);
+    setIsFocused(false);
   };
 
   if (!editor) {
-    return null;
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+        <div className="text-sm text-gray-500">Loading editor...</div>
+      </div>
+    );
   }
 
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${
-        isEditing ? "ring-2 ring-blue-500" : ""
+      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
+        isFocused ? "ring-2 ring-blue-500" : ""
       } ${isDragging ? "opacity-50" : ""}`}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
     >
-      {/* Drag Handle */}
-      <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
+      <BlockHeader
+        title={title}
+        editing={editing}
+        onOpenSettings={onOpenSettings || (() => {})}
+        onDelete={onDelete ? () => onDelete(id) : undefined}
+        isDragging={isDragging}
+      />
+      <div
+        style={{ maxHeight: `${maxHeight}px`, overflowY: "auto" }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+      >
+        <EditorContent editor={editor} />
       </div>
-
-      {/* Settings Button */}
-      {onOpenSettings && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings();
-          }}
-          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
-          title="Settings"
-          type="button"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Delete Button */}
-      {onDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(id);
-          }}
-          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-          title="Delete block"
-          type="button"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Editor */}
-      <EditorContent editor={editor} />
     </div>
   );
 }

@@ -67,8 +67,9 @@ export default function DashboardBlock({
     content: safeContent,
     onUpdate: isEditing ? onUpdate : undefined,
     onDelete: isEditing ? onDelete : undefined,
-    onOpenSettings: isEditing ? onOpenSettings : undefined,
+    onOpenSettings: onOpenSettings, // Always available for settings button
     isDragging,
+    editing: isEditing, // Pass editing state to blocks
   };
 
   return <Component {...commonProps} />;

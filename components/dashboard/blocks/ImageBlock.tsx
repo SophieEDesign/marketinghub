@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, GripVertical, Upload, Image as ImageIcon, Settings } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { Image as ImageIcon } from "lucide-react";
+import BlockHeader from "./BlockHeader";
+import { getDefaultContent } from "@/lib/utils/dashboardBlockContent";
 
 interface ImageBlockProps {
   id: string;
@@ -11,6 +11,7 @@ interface ImageBlockProps {
   onDelete?: (id: string) => void;
   onOpenSettings?: () => void;
   isDragging?: boolean;
+  editing?: boolean;
 }
 
 export default function ImageBlock({
@@ -20,151 +21,60 @@ export default function ImageBlock({
   onDelete,
   onOpenSettings,
   isDragging = false,
+  editing = false,
 }: ImageBlockProps) {
-  const [imageUrl, setImageUrl] = useState(content?.url || content?.src || "");
-  const [isUploading, setIsUploading] = useState(false);
-  const [caption, setCaption] = useState(content?.caption || "");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleImageUpload = async (file: File) => {
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      // Upload to Supabase Storage (optional - you may need to create a bucket)
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${id}_${Date.now()}.${fileExt}`;
-      const filePath = `dashboard-images/${fileName}`;
-
-      // For now, use a data URL or external URL
-      // In production, upload to Supabase Storage
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        setImageUrl(dataUrl);
-        onUpdate?.(id, { url: dataUrl, caption });
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error("Error uploading image:", error);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleUrlChange = (url: string) => {
-    setImageUrl(url);
-    onUpdate?.(id, { url, caption });
-  };
-
-  const handleCaptionChange = (newCaption: string) => {
-    setCaption(newCaption);
-    onUpdate?.(id, { url: imageUrl, caption: newCaption });
-  };
+  // Normalize content with defaults for backwards compatibility
+  const defaults = getDefaultContent("image");
+  const normalizedContent = { ...defaults, ...content };
+  
+  const imageUrl = normalizedContent.url || "";
+  const caption = normalizedContent.caption || "";
+  const style = normalizedContent.style || "contain";
+  
+  const title = normalizedContent.title || "Image Block";
+  
+  const imageStyle = style === "cover" 
+    ? "object-cover w-full h-full" 
+    : style === "full-width"
+    ? "w-full"
+    : "object-contain w-full";
 
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${
+      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
         isDragging ? "opacity-50" : ""
       }`}
     >
-      {/* Drag Handle */}
-      <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
-      </div>
+      <BlockHeader
+        title={title}
+        editing={editing}
+        onOpenSettings={onOpenSettings || (() => {})}
+        onDelete={onDelete ? () => onDelete(id) : undefined}
+        isDragging={isDragging}
+      />
 
-      {/* Settings Button */}
-      {onOpenSettings && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings();
-          }}
-          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
-          title="Settings"
-          type="button"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Delete Button */}
-      {onDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(id);
-          }}
-          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-          title="Delete block"
-          type="button"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Image Content */}
-      <div className="p-4">
+      <div className="p-4 flex-1 flex items-center justify-center">
         {!imageUrl ? (
-          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center">
-            <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImageUpload(file);
-              }}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="btn-secondary flex items-center gap-2 mx-auto"
-            >
-              <Upload className="w-4 h-4" />
-              {isUploading ? "Uploading..." : "Upload Image"}
-            </button>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              or paste an image URL
-            </p>
-            <input
-              type="url"
-              placeholder="https://example.com/image.jpg"
-              value={imageUrl}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              className="mt-4 w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-            />
+          <div className="text-center py-8 text-gray-500 text-sm">
+            <ImageIcon className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+            <p>No image</p>
+            <p className="text-xs mt-1">Configure in settings</p>
           </div>
         ) : (
-          <div>
+          <div className="w-full">
             <img
               src={imageUrl}
               alt={caption || "Dashboard image"}
-              className="w-full rounded-lg"
+              className={`${imageStyle} rounded-lg`}
             />
-            <input
-              type="text"
-              placeholder="Add a caption..."
-              value={caption}
-              onChange={(e) => handleCaptionChange(e.target.value)}
-              className="mt-2 w-full px-2 py-1 text-sm text-gray-500 dark:text-gray-400 border-none bg-transparent focus:outline-none focus:ring-0"
-            />
-            <button
-              onClick={() => {
-                setImageUrl("");
-                setCaption("");
-                onUpdate?.(id, { url: "", caption: "" });
-              }}
-              className="mt-2 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
-            >
-              Change image
-            </button>
+            {caption && (
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">
+                {caption}
+              </p>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 }
-

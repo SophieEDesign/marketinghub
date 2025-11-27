@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, GripVertical, Settings, BarChart3 } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
-import { useTables } from "@/lib/hooks/useTables";
+import BlockHeader from "./BlockHeader";
+import { getDefaultContent } from "@/lib/utils/dashboardBlockContent";
 
 interface KpiBlockProps {
   id: string;
@@ -12,6 +13,7 @@ interface KpiBlockProps {
   onDelete?: (id: string) => void;
   onOpenSettings?: () => void;
   isDragging?: boolean;
+  editing?: boolean;
 }
 
 export default function KpiBlock({
@@ -21,53 +23,86 @@ export default function KpiBlock({
   onDelete,
   onOpenSettings,
   isDragging = false,
+  editing = false,
 }: KpiBlockProps) {
-  const { tables } = useTables();
-  const [config, setConfig] = useState({
-    table: content?.table || "content",
-    label: content?.label || "Total Records",
-    filter: content?.filter || "",
-    aggregate: content?.aggregate || "count",
-  });
+  // Normalize content with defaults for backwards compatibility
+  const defaults = getDefaultContent("kpi");
+  const normalizedContent = { ...defaults, ...content };
+  
   const [value, setValue] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
 
   // Load KPI value
   useEffect(() => {
-    if (config.table) {
+    if (normalizedContent.table) {
       loadKpiValue();
     }
-  }, [config.table, config.filter, config.aggregate]);
+  }, [normalizedContent.table, normalizedContent.aggregate, normalizedContent.filters, normalizedContent.field]);
 
   const loadKpiValue = async () => {
+    if (!normalizedContent.table) return;
+
     setLoading(true);
     try {
-      let query = supabase.from(config.table).select("*", { count: "exact", head: true });
+      let query = supabase.from(normalizedContent.table);
 
-      // Apply filter if provided
-      if (config.filter) {
-        try {
-          const filterObj = JSON.parse(config.filter);
-          Object.entries(filterObj).forEach(([key, val]) => {
-            query = query.eq(key, val);
-          });
-        } catch {
-          // Invalid filter JSON, ignore
-        }
+      // Apply filters if provided
+      if (normalizedContent.filters && Array.isArray(normalizedContent.filters)) {
+        normalizedContent.filters.forEach((filter: any) => {
+          if (filter.field && filter.operator && filter.value !== undefined) {
+            switch (filter.operator) {
+              case "eq":
+                query = query.eq(filter.field, filter.value);
+                break;
+              case "neq":
+                query = query.neq(filter.field, filter.value);
+                break;
+              case "gt":
+                query = query.gt(filter.field, filter.value);
+                break;
+              case "lt":
+                query = query.lt(filter.field, filter.value);
+                break;
+              case "gte":
+                query = query.gte(filter.field, filter.value);
+                break;
+              case "lte":
+                query = query.lte(filter.field, filter.value);
+                break;
+            }
+          }
+        });
       }
 
-      if (config.aggregate === "count") {
-        const { count, error } = await query;
+      if (normalizedContent.aggregate === "count") {
+        const { count, error } = await query.select("*", { count: "exact", head: true });
         if (error) throw error;
         setValue(count || 0);
-      } else if (config.aggregate === "sum") {
-        // For sum, we need a field to sum - default to counting for now
-        const { count, error } = await query;
+      } else if (normalizedContent.aggregate === "sum" && normalizedContent.field) {
+        const { data, error } = await query.select(normalizedContent.field);
         if (error) throw error;
-        setValue(count || 0);
+        const sum = (data || []).reduce((acc: number, row: any) => {
+          const val = parseFloat(row[normalizedContent.field]) || 0;
+          return acc + val;
+        }, 0);
+        setValue(sum);
+      } else if (normalizedContent.aggregate === "avg" && normalizedContent.field) {
+        const { data, error } = await query.select(normalizedContent.field);
+        if (error) throw error;
+        const values = (data || []).map((row: any) => parseFloat(row[normalizedContent.field]) || 0);
+        const avg = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        setValue(avg);
+      } else if (normalizedContent.aggregate === "min" && normalizedContent.field) {
+        const { data, error } = await query.select(normalizedContent.field).order(normalizedContent.field, { ascending: true }).limit(1);
+        if (error) throw error;
+        setValue(data && data[0] ? parseFloat(data[0][normalizedContent.field]) || 0 : 0);
+      } else if (normalizedContent.aggregate === "max" && normalizedContent.field) {
+        const { data, error } = await query.select(normalizedContent.field).order(normalizedContent.field, { ascending: false }).limit(1);
+        if (error) throw error;
+        setValue(data && data[0] ? parseFloat(data[0][normalizedContent.field]) || 0 : 0);
       } else {
-        const { count, error } = await query;
+        // Default to count
+        const { count, error } = await query.select("*", { count: "exact", head: true });
         if (error) throw error;
         setValue(count || 0);
       }
@@ -79,106 +114,35 @@ export default function KpiBlock({
     }
   };
 
-  const handleConfigChange = (updates: Partial<typeof config>) => {
-    const newConfig = { ...config, ...updates };
-    setConfig(newConfig);
-    onUpdate?.(id, newConfig);
-  };
+  const title = normalizedContent.title || normalizedContent.label || "KPI";
+  const label = normalizedContent.label || "Total Records";
 
   return (
     <div
-      className={`group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow ${
+      className={`bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
         isDragging ? "opacity-50" : ""
       }`}
     >
-      {/* Drag Handle */}
-      <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <GripVertical className="w-4 h-4 text-gray-400 cursor-grab active:cursor-grabbing" />
-      </div>
+      <BlockHeader
+        title={title}
+        editing={editing}
+        onOpenSettings={onOpenSettings || (() => {})}
+        onDelete={onDelete ? () => onDelete(id) : undefined}
+        isDragging={isDragging}
+      />
 
-      {/* Delete Button */}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(id)}
-          className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-600 z-10"
-          title="Delete block"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Settings Button */}
-      {onOpenSettings && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings();
-          }}
-          className="absolute right-10 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 z-10"
-          title="Configure KPI"
-          type="button"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Content */}
-      <div className="p-6">
-        {isEditing ? (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Table
-              </label>
-              <select
-                value={config.table}
-                onChange={(e) => handleConfigChange({ table: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-              >
-                {tables.map((table) => (
-                  <option key={table.id} value={table.name}>
-                    {table.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Label
-              </label>
-              <input
-                type="text"
-                value={config.label}
-                onChange={(e) => handleConfigChange({ label: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-                placeholder="KPI Label"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Aggregate
-              </label>
-              <select
-                value={config.aggregate}
-                onChange={(e) => handleConfigChange({ aggregate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
-              >
-                <option value="count">Count</option>
-                <option value="sum">Sum</option>
-              </select>
-            </div>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-            >
-              Done
-            </button>
-          </div>
+      <div className="p-6 text-center flex-1 flex flex-col items-center justify-center">
+        {!normalizedContent.table ? (
+          <>
+            <BarChart3 className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+            <p className="text-sm text-gray-500">No table selected</p>
+            <p className="text-xs mt-1 text-gray-400">Configure in settings</p>
+          </>
         ) : (
-          <div className="text-center">
+          <>
             <BarChart3 className="w-8 h-8 mx-auto text-gray-400 mb-2" />
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-              {config.label}
+              {label}
             </div>
             {loading ? (
               <div className="text-2xl font-bold text-gray-400">...</div>
@@ -187,10 +151,9 @@ export default function KpiBlock({
                 {value !== null ? value.toLocaleString() : "—"}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
-
