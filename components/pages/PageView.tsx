@@ -163,10 +163,21 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates),
                   });
-                  if (!response.ok) throw new Error("Failed to update block");
+                  if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Failed to update block");
+                  }
                   const updated = await response.json();
                   setBlocks(blocks.map((b) => (b.id === id ? updated : b)));
+                  // Reload page to ensure UI is in sync
+                  await loadPage();
+                  toast({
+                    title: "Success",
+                    description: "Block settings saved",
+                    type: "success",
+                  });
                 } catch (error: any) {
+                  console.error("Error updating block:", error);
                   toast({
                     title: "Error",
                     description: error.message || "Failed to update block",

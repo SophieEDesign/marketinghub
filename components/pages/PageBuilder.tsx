@@ -96,18 +96,28 @@ export default function PageBuilder({
 
   const handleUpdateBlock = async (id: string, content: any) => {
     const block = blocks.find((b) => b.id === id);
-    if (!block) return;
+    if (!block) {
+      console.error("Block not found:", id);
+      return;
+    }
 
+    // Merge with existing config to preserve any fields not in content
+    const existingConfig = block.config || {};
+    
     // Convert dashboard content format back to page config format
-    const config = convertDashboardContentToPageConfig(content || {}, block.type);
+    const newConfig = convertDashboardContentToPageConfig(content || {}, block.type);
+    
+    // Merge new config with existing config
+    const mergedConfig = { ...existingConfig, ...newConfig };
     
     // Also update position/size if provided in content
-    const blockUpdates: Partial<InterfacePageBlock> = { config };
+    const blockUpdates: Partial<InterfacePageBlock> = { config: mergedConfig };
     if (content?.position_x !== undefined) blockUpdates.position_x = content.position_x;
     if (content?.position_y !== undefined) blockUpdates.position_y = content.position_y;
     if (content?.width !== undefined) blockUpdates.width = content.width;
     if (content?.height !== undefined) blockUpdates.height = content.height;
 
+    console.log("Updating block:", id, "with config:", mergedConfig);
     await onUpdateBlock(id, blockUpdates);
   };
 

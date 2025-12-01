@@ -34,32 +34,34 @@ export default function BlockHeader({
         </h3>
       </div>
       
-      <div className="flex items-center gap-1">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings();
-          }}
-          className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-          title="Settings"
-          type="button"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-        {editing && onDelete && (
+      {editing && (
+        <div className="flex items-center gap-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onDelete();
+              onOpenSettings();
             }}
-            className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
-            title="Delete block"
+            className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+            title="Settings"
             type="button"
           >
-            <X className="w-4 h-4" />
+            <Settings className="w-4 h-4" />
           </button>
-        )}
-      </div>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+              title="Delete block"
+              type="button"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
