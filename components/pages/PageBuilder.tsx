@@ -45,12 +45,20 @@ export default function PageBuilder({
 
   // Convert blocks to react-grid-layout format
   useEffect(() => {
+    // Get default block height (default: 3 rows)
+    const getDefaultBlockHeight = () => {
+      if (typeof window === 'undefined') return 3;
+      const saved = localStorage.getItem('dashboardDefaultBlockHeight');
+      return saved ? parseInt(saved, 10) : 3;
+    };
+
+    const defaultHeight = getDefaultBlockHeight();
     const lgLayout: Layout[] = blocks.map((block, index) => ({
       i: block.id,
-      x: block.position_x ?? 0,
-      y: block.position_y ?? index,
-      w: block.width ?? 12,
-      h: block.height ?? 6,
+      x: block.position_x ?? (index % 4) * 3, // Default: 3 columns per block, spread horizontally
+      y: block.position_y ?? Math.floor(index / 4) * defaultHeight, // Default: stack vertically
+      w: block.width ?? 3, // Default width: 3 columns
+      h: block.height ?? defaultHeight, // Default height from settings
       minW: 2,
       minH: 2,
       // Prevent layout from collapsing blocks
