@@ -94,19 +94,19 @@ export default function PageBuilder({
     [isEditing, blocks, onUpdateBlock]
   );
 
-  const handleUpdateBlock = async (id: string, updates: { content?: any }) => {
+  const handleUpdateBlock = async (id: string, content: any) => {
     const block = blocks.find((b) => b.id === id);
     if (!block) return;
 
     // Convert dashboard content format back to page config format
-    const config = convertDashboardContentToPageConfig(updates.content || {}, block.type);
+    const config = convertDashboardContentToPageConfig(content || {}, block.type);
     
-    // Also update position/size if provided
+    // Also update position/size if provided in content
     const blockUpdates: Partial<InterfacePageBlock> = { config };
-    if (updates.content?.position_x !== undefined) blockUpdates.position_x = updates.content.position_x;
-    if (updates.content?.position_y !== undefined) blockUpdates.position_y = updates.content.position_y;
-    if (updates.content?.width !== undefined) blockUpdates.width = updates.content.width;
-    if (updates.content?.height !== undefined) blockUpdates.height = updates.content.height;
+    if (content?.position_x !== undefined) blockUpdates.position_x = content.position_x;
+    if (content?.position_y !== undefined) blockUpdates.position_y = content.position_y;
+    if (content?.width !== undefined) blockUpdates.width = content.width;
+    if (content?.height !== undefined) blockUpdates.height = content.height;
 
     await onUpdateBlock(id, blockUpdates);
   };
@@ -177,7 +177,7 @@ export default function PageBuilder({
             setIsSettingsOpen(false);
             setSelectedBlock(null);
           }}
-          updateBlock={async (id, updates) => {
+          onUpdate={async (id, updates) => {
             await handleUpdateBlock(id, updates);
             setIsSettingsOpen(false);
             setSelectedBlock(null);
