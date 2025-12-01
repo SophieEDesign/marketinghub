@@ -18,6 +18,7 @@ import GlobalSearch from '@/components/search/GlobalSearch'
 import { ToastContainer } from '@/components/ui/Toast'
 import CommandPalette from '@/components/command-palette/CommandPalette'
 import NewPageModalProvider from '@/components/pages/NewPageModalProvider'
+import FaviconUpdater from '@/components/FaviconUpdater'
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" })
 const spartan = League_Spartan({ subsets: ["latin"], variable: "--font-heading" })
@@ -62,6 +63,7 @@ export default function RootLayout({
                         <GlobalSearch />
                         <CommandPalette />
                         <ToastContainer />
+                        <FaviconUpdater />
                       </NewPageModalProvider>
                     </ThemeProvider>
                     </SettingsProvider>

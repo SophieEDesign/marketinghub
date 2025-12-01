@@ -287,22 +287,170 @@ export default function WorkspaceSettingsTab() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Accent Color
+                  Favicon
                 </label>
-                <div className="flex items-center gap-3">
+                <div className="space-y-2">
                   <input
-                    type="color"
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    className="w-16 h-10 rounded border border-gray-300 dark:border-gray-700 cursor-pointer"
+                    type="file"
+                    accept="image/x-icon,image/png,image/svg+xml"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      try {
+                        // Upload to Supabase storage
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `favicon.${fileExt}`;
+                        const filePath = `branding/${fileName}`;
+                        
+                        const { error: uploadError } = await supabase.storage
+                          .from('branding')
+                          .upload(filePath, file, { upsert: true });
+                        
+                        if (uploadError) throw uploadError;
+                        
+                        // Get public URL
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('branding')
+                          .getPublicUrl(filePath);
+                        
+                        // Save to settings
+                        await updateSettings({
+                          favicon_url: publicUrl,
+                        });
+                        
+                        // Update favicon in document
+                        const link = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+                        if (link) {
+                          link.href = publicUrl;
+                        } else {
+                          const newLink = document.createElement('link');
+                          newLink.rel = 'icon';
+                          newLink.href = publicUrl;
+                          document.head.appendChild(newLink);
+                        }
+                        
+                        toast({
+                          title: "Success",
+                          description: "Favicon updated!",
+                          type: "success",
+                        });
+                      } catch (error: any) {
+                        toast({
+                          title: "Error",
+                          description: error.message || "Failed to upload favicon",
+                          type: "error",
+                        });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
                   />
-                  <input
-                    type="text"
-                    value={accentColor}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm font-mono"
-                    placeholder="#2563eb"
-                  />
+                  {settings.favicon_url && (
+                    <div className="flex items-center gap-2">
+                      <img src={settings.favicon_url} alt="Favicon" className="w-6 h-6" />
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Current favicon
+                      </span>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Upload a .ico, .png, or .svg file (recommended: 32x32px or 16x16px)
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Brand Colors
+                </label>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Primary Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="w-16 h-10 rounded border border-gray-300 dark:border-gray-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm font-mono"
+                        placeholder="#2563eb"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Secondary Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={settings.branding_colors?.secondary || "#64748b"}
+                        onChange={async (e) => {
+                          await updateSettings({
+                            branding_colors: {
+                              ...settings.branding_colors,
+                              secondary: e.target.value,
+                            },
+                          });
+                        }}
+                        className="w-16 h-10 rounded border border-gray-300 dark:border-gray-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.branding_colors?.secondary || "#64748b"}
+                        onChange={async (e) => {
+                          await updateSettings({
+                            branding_colors: {
+                              ...settings.branding_colors,
+                              secondary: e.target.value,
+                            },
+                          });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm font-mono"
+                        placeholder="#64748b"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Accent Color
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={settings.branding_colors?.accent || "#f59e0b"}
+                        onChange={async (e) => {
+                          await updateSettings({
+                            branding_colors: {
+                              ...settings.branding_colors,
+                              accent: e.target.value,
+                            },
+                          });
+                        }}
+                        className="w-16 h-10 rounded border border-gray-300 dark:border-gray-700 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.branding_colors?.accent || "#f59e0b"}
+                        onChange={async (e) => {
+                          await updateSettings({
+                            branding_colors: {
+                              ...settings.branding_colors,
+                              accent: e.target.value,
+                            },
+                          });
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm font-mono"
+                        placeholder="#f59e0b"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               <div>

@@ -8,6 +8,7 @@ const SETTINGS_KEY = "app_settings";
 
 interface Settings {
   logo_url?: string;
+  favicon_url?: string;
   workspace_name?: string;
   status_colors?: Record<string, string>;
   channel_colors?: Record<string, string>;
