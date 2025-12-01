@@ -8,7 +8,7 @@ import { Edit2, Copy, Trash2, Plus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import PageBuilder from "./PageBuilder";
-import BlockMenu from "./BlockMenu";
+import BlockMenu from "@/components/dashboard/blocks/BlockMenu";
 import { PageContextProvider } from "./PageContext";
 
 interface PageViewProps {
@@ -146,10 +146,8 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                     }),
                   });
                   if (!response.ok) throw new Error("Failed to create block");
-                  const newBlock = await response.json();
-                  setBlocks([...blocks, newBlock]);
-                  setShowBlockMenu(false);
                   await loadPage(); // Reload to get fresh data
+                  setShowBlockMenu(false);
                 } catch (error: any) {
                   toast({
                     title: "Error",
@@ -224,35 +222,41 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
 
       {/* Block Menu */}
       {showBlockMenu && (
-        <BlockMenu
-          onClose={() => setShowBlockMenu(false)}
-          onSelect={async (type) => {
-            try {
-              const response = await fetch("/api/page-blocks", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  page_id: pageId,
-                  type,
-                  position_x: 0,
-                  position_y: blocks.length,
-                  width: 12,
-                  height: 6,
-                  config: {},
-                }),
-              });
-              if (!response.ok) throw new Error("Failed to create block");
-              await loadPage();
-              setShowBlockMenu(false);
-            } catch (error: any) {
-              toast({
-                title: "Error",
-                description: error.message || "Failed to add block",
-                type: "error",
-              });
-            }
-          }}
-        />
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowBlockMenu(false)}>
+          <div
+            className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 min-w-[200px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <BlockMenu
+              onSelectBlockType={async (type) => {
+                try {
+                  const response = await fetch("/api/page-blocks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      page_id: pageId,
+                      type,
+                      position_x: 0,
+                      position_y: blocks.length,
+                      width: 12,
+                      height: 6,
+                      config: {},
+                    }),
+                  });
+                  if (!response.ok) throw new Error("Failed to create block");
+                  await loadPage();
+                  setShowBlockMenu(false);
+                } catch (error: any) {
+                  toast({
+                    title: "Error",
+                    description: error.message || "Failed to add block",
+                    type: "error",
+                  });
+                }
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

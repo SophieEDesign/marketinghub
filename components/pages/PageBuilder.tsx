@@ -13,11 +13,10 @@ if (typeof window !== "undefined") {
   }
 }
 
-import { GripVertical, Plus, Settings, X, Copy, Trash2 } from "lucide-react";
-import Button from "@/components/ui/Button";
 import { InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
-import { renderPageBlock } from "./blocks/BlockRenderer";
-import BlockSettingsPanel from "./BlockSettingsPanel";
+import DashboardBlock from "@/components/dashboard/DashboardBlock";
+import BlockSettingsDrawer from "@/components/dashboard/blocks/BlockSettingsDrawer";
+import { convertPageBlockToDashboardBlock, convertDashboardContentToPageConfig } from "@/lib/utils/pageBlockAdapter";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -40,7 +39,8 @@ export default function PageBuilder({
   onDeleteBlock,
   onReorderBlocks,
 }: PageBuilderProps) {
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<InterfacePageBlock | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [layouts, setLayouts] = useState<Layouts>({});
 
   // Convert blocks to react-grid-layout format
@@ -94,16 +94,21 @@ export default function PageBuilder({
     [isEditing, blocks, onUpdateBlock]
   );
 
-  const handleDuplicate = async (block: InterfacePageBlock) => {
-    // Create a duplicate block
-    const newBlock = {
-      ...block,
-      id: `temp-${Date.now()}`,
-      position_x: (block.position_x || 0) + 1,
-      position_y: (block.position_y || 0) + 1,
-    };
-    // The parent component will handle creating it via API
-    onAddBlock(block.type);
+  const handleUpdateBlock = async (id: string, updates: { content?: any }) => {
+    const block = blocks.find((b) => b.id === id);
+    if (!block) return;
+
+    // Convert dashboard content format back to page config format
+    const config = convertDashboardContentToPageConfig(updates.content || {}, block.type);
+    
+    // Also update position/size if provided
+    const blockUpdates: Partial<InterfacePageBlock> = { config };
+    if (updates.content?.position_x !== undefined) blockUpdates.position_x = updates.content.position_x;
+    if (updates.content?.position_y !== undefined) blockUpdates.position_y = updates.content.position_y;
+    if (updates.content?.width !== undefined) blockUpdates.width = updates.content.width;
+    if (updates.content?.height !== undefined) blockUpdates.height = updates.content.height;
+
+    await onUpdateBlock(id, blockUpdates);
   };
 
   return (
@@ -123,135 +128,64 @@ export default function PageBuilder({
           preventCollision={true}
           compactType={null}
         >
-          {blocks.map((block) => (
-            <div key={block.id} className="relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
-              <BlockWrapper
-                block={block}
-                isEditing={isEditing}
-                isDragging={false}
-                onEdit={() => setEditingBlockId(block.id)}
-                onDuplicate={() => handleDuplicate(block)}
-                onDelete={() => onDeleteBlock(block.id)}
-              />
-            </div>
-          ))}
+          {blocks.map((block) => {
+            const dashboardBlock = convertPageBlockToDashboardBlock(block);
+            return (
+              <div key={block.id} className="h-full">
+                <DashboardBlock
+                  block={dashboardBlock}
+                  isEditing={isEditing}
+                  onUpdate={handleUpdateBlock}
+                  onDelete={onDeleteBlock}
+                  onOpenSettings={() => {
+                    setSelectedBlock(block);
+                    setIsSettingsOpen(true);
+                  }}
+                  isDragging={false}
+                />
+              </div>
+            );
+          })}
         </ResponsiveGridLayout>
       ) : (
         <div className="space-y-4">
-          {blocks.map((block) => (
-            <BlockWrapper
-              key={block.id}
-              block={block}
-              isEditing={isEditing}
-              isDragging={false}
-              onEdit={() => setEditingBlockId(block.id)}
-              onDuplicate={() => handleDuplicate(block)}
-              onDelete={() => onDeleteBlock(block.id)}
-            />
-          ))}
+          {blocks.map((block) => {
+            const dashboardBlock = convertPageBlockToDashboardBlock(block);
+            return (
+              <div key={block.id} className="h-full">
+                <DashboardBlock
+                  block={dashboardBlock}
+                  isEditing={isEditing}
+                  onUpdate={handleUpdateBlock}
+                  onDelete={onDeleteBlock}
+                  onOpenSettings={() => {
+                    setSelectedBlock(block);
+                    setIsSettingsOpen(true);
+                  }}
+                  isDragging={false}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
-      {editingBlockId && (
-        <BlockSettingsPanel
-          block={blocks.find((b) => b.id === editingBlockId) || null}
-          isOpen={true}
+      {selectedBlock && (
+        <BlockSettingsDrawer
+          block={convertPageBlockToDashboardBlock(selectedBlock)}
+          open={isSettingsOpen}
           onClose={() => {
-            console.log("Closing settings panel");
-            setEditingBlockId(null);
+            setIsSettingsOpen(false);
+            setSelectedBlock(null);
           }}
-          onUpdate={onUpdateBlock}
+          updateBlock={async (id, updates) => {
+            await handleUpdateBlock(id, updates);
+            setIsSettingsOpen(false);
+            setSelectedBlock(null);
+          }}
         />
       )}
     </>
   );
 }
 
-function BlockWrapper({
-  block,
-  isEditing,
-  isDragging,
-  onEdit,
-  onDuplicate,
-  onDelete,
-}: {
-  block: InterfacePageBlock;
-  isEditing: boolean;
-  isDragging: boolean;
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div
-      className={`relative border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 w-full h-full ${
-        isDragging ? "opacity-50" : ""
-      }`}
-      style={{ minHeight: '200px' }}
-    >
-      {isEditing && (
-        <div 
-          className="absolute top-2 right-2 z-[100] flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 shadow-lg"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-          }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              console.log("Settings button clicked for block:", block.id);
-              onEdit();
-            }}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-            title="Settings"
-            type="button"
-          >
-            <Settings className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDuplicate();
-            }}
-            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-            title="Duplicate"
-            type="button"
-          >
-            <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (confirm("Delete this block?")) {
-                onDelete();
-              }
-            }}
-            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-            title="Delete"
-            type="button"
-          >
-            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-          </button>
-        </div>
-      )}
-      {isEditing && (
-        <div 
-          className="absolute top-2 left-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md p-1 cursor-move shadow-lg"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="w-4 h-4 text-gray-400" />
-        </div>
-      )}
-      <div className="p-4 w-full h-full min-h-[200px]">
-        {renderPageBlock(block)}
-      </div>
-    </div>
-  );
-}
 
