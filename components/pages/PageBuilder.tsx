@@ -158,7 +158,20 @@ export default function PageBuilder({
           })}
         </ResponsiveGridLayout>
       ) : (
-        <div className="space-y-4">
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          onLayoutChange={() => {}} // No-op in view mode
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+          cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
+          rowHeight={50}
+          isDraggable={false}
+          isResizable={false}
+          margin={[16, 16]}
+          containerPadding={[0, 0]}
+          preventCollision={true}
+          compactType={null}
+        >
           {blocks.map((block) => {
             const dashboardBlock = convertPageBlockToDashboardBlock(block);
             return (
@@ -177,7 +190,7 @@ export default function PageBuilder({
               </div>
             );
           })}
-        </div>
+        </ResponsiveGridLayout>
       )}
       {selectedBlock && (
         <BlockSettingsDrawer

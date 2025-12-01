@@ -18,11 +18,15 @@ export function convertPageBlockToDashboardBlock(
     // Map unsupported types to closest match
     grid: "table", // Grid view becomes table block
     list: "table", // List view becomes table block
+    gallery: "table", // Gallery view becomes table block
+    kanban: "table", // Kanban view becomes table block
+    timeline: "table", // Timeline view becomes table block
+    chart: "kpi", // Chart becomes KPI block
     html: "html",
     embed: "embed",
   };
 
-  const dashboardType = typeMap[pageBlock.type] || pageBlock.type;
+  const dashboardType = typeMap[pageBlock.type] || "table"; // Default to table if unknown
 
   // Convert config to content format
   const config = pageBlock.config || {};
