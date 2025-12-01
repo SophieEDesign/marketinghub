@@ -415,9 +415,35 @@ export default function BlockSettingsDrawer({
             </div>
             {content.table && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Fields
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Fields
+                  </label>
+                  <button
+                    onClick={() => {
+                      const currentFields = content.fields || [];
+                      const allFieldKeys = tableFields.map((f) => f.field_key);
+                      const allSelected = allFieldKeys.every((key) => currentFields.includes(key));
+                      
+                      if (allSelected) {
+                        // Deselect all
+                        updateContent("fields", []);
+                      } else {
+                        // Select all
+                        updateContent("fields", allFieldKeys);
+                      }
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    type="button"
+                  >
+                    {(() => {
+                      const currentFields = content.fields || [];
+                      const allFieldKeys = tableFields.map((f) => f.field_key);
+                      const allSelected = allFieldKeys.length > 0 && allFieldKeys.every((key) => currentFields.includes(key));
+                      return allSelected ? "Deselect All" : "Select All";
+                    })()}
+                  </button>
+                </div>
                 <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-md p-2">
                   {tableFields.map((field) => (
                     <label key={field.id} className="flex items-center gap-2 py-1">
@@ -559,9 +585,35 @@ export default function BlockSettingsDrawer({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Fields to Display
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Fields to Display
+                    </label>
+                    <button
+                      onClick={() => {
+                        const currentFields = content.fields || [];
+                        const allFieldKeys = tableFields.map((f) => f.field_key);
+                        const allSelected = allFieldKeys.every((key) => currentFields.includes(key));
+                        
+                        if (allSelected) {
+                          // Deselect all
+                          updateContent("fields", []);
+                        } else {
+                          // Select all
+                          updateContent("fields", allFieldKeys);
+                        }
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                      type="button"
+                    >
+                      {(() => {
+                        const currentFields = content.fields || [];
+                        const allFieldKeys = tableFields.map((f) => f.field_key);
+                        const allSelected = allFieldKeys.length > 0 && allFieldKeys.every((key) => currentFields.includes(key));
+                        return allSelected ? "Deselect All" : "Select All";
+                      })()}
+                    </button>
+                  </div>
                   <div className="max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-md p-2">
                     {tableFields.map((field) => (
                       <label key={field.id} className="flex items-center gap-2 py-1">
