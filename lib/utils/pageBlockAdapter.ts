@@ -75,6 +75,7 @@ export function convertPageBlockToDashboardBlock(
     dashboard_id: pageBlock.page_id, // Use page_id as dashboard_id
     type: dashboardType as any,
     content,
+    position: pageBlock.position_y || 0, // Legacy position field for backward compatibility
     position_x: pageBlock.position_x || 0,
     position_y: pageBlock.position_y || 0,
     width: pageBlock.width || 3,
