@@ -126,7 +126,7 @@ export default function KpiBlock({
         onDelete={onDelete ? () => onDelete(id) : undefined}
         isDragging={isDragging}
       />
-      <div className="flex-1 overflow-y-auto p-4 text-center flex flex-col items-center justify-center">
+      <div className="flex-1 overflow-y-auto p-4 text-center flex flex-col items-center justify-center" style={{ maxHeight: '300px' }}>
         {!normalizedContent.table ? (
           <>
             <BarChart3 className="w-8 h-8 mx-auto text-gray-400 mb-2" />

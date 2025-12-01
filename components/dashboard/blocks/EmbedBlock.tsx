@@ -60,7 +60,7 @@ export default function EmbedBlock({
         onDelete={onDelete ? () => onDelete(id) : undefined}
         isDragging={isDragging}
       />
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4" style={{ maxHeight: `${height}px` }}>
         {!url ? (
           <div className="text-center py-8 text-gray-500 text-sm">
             <p>No embed URL</p>

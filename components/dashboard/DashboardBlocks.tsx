@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
 import DashboardBlock from "./DashboardBlock";
 import BlockMenu, { BlockType } from "./blocks/BlockMenu";
+import BlockSettingsDrawer from "./blocks/BlockSettingsDrawer";
 import { supabase } from "@/lib/supabaseClient";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { DashboardBlock as DashboardBlockType } from "@/lib/hooks/useDashboardBlocks";
@@ -50,12 +51,14 @@ function SortableBlockWrapper({
   block,
   onUpdate,
   onDelete,
+  onOpenSettings,
   isDragging,
   canEdit,
 }: {
   block: DashboardBlockType;
   onUpdate: (id: string, content: any) => void;
   onDelete: (id: string) => void;
+  onOpenSettings: () => void;
   isDragging: boolean;
   canEdit: boolean;
 }) {
@@ -73,12 +76,13 @@ function SortableBlockWrapper({
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style} {...attributes} className="h-full">
       <DashboardBlock
         block={block}
         isEditing={canEdit}
         onUpdate={canEdit ? onUpdate : undefined}
         onDelete={canEdit ? onDelete : undefined}
+        onOpenSettings={onOpenSettings}
         isDragging={isDragging}
       />
     </div>
@@ -91,6 +95,8 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [selectedBlock, setSelectedBlock] = useState<DashboardBlockType | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Load blocks
   useEffect(() => {
@@ -272,6 +278,10 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
                   block={block}
                   onUpdate={handleUpdateBlock}
                   onDelete={handleDeleteBlock}
+                  onOpenSettings={() => {
+                    setSelectedBlock(block);
+                    setIsSettingsOpen(true);
+                  }}
                   isDragging={activeId === block.id}
                   canEdit={permissions.canModifyDashboards}
                 />
@@ -280,6 +290,17 @@ export default function DashboardBlocks({ dashboardId }: DashboardBlocksProps) {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Settings Drawer */}
+      <BlockSettingsDrawer
+        block={selectedBlock}
+        open={isSettingsOpen}
+        onClose={() => {
+          setIsSettingsOpen(false);
+          setSelectedBlock(null);
+        }}
+        onUpdate={handleUpdateBlock}
+      />
     </div>
   );
 }

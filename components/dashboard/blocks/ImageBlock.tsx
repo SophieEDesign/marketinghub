@@ -48,7 +48,7 @@ export default function ImageBlock({
         onDelete={onDelete ? () => onDelete(id) : undefined}
         isDragging={isDragging}
       />
-      <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
+      <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center" style={{ maxHeight: '400px' }}>
         {!imageUrl ? (
           <div className="text-center py-8 text-gray-500 text-sm">
             <ImageIcon className="w-12 h-12 mx-auto mb-2 text-gray-400" />
