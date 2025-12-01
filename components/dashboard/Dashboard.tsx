@@ -174,10 +174,29 @@ export default function Dashboard() {
 
   const handleUpdateBlock = async (id: string, updates: any) => {
     try {
-      // If updates contain content, merge it properly
-      if (updates.content) {
+      // BlockSettingsDrawer passes content directly, not wrapped in { content: ... }
+      // Check if updates looks like content (has title, limit, etc.) vs block metadata
+      const isContentUpdate = updates && (
+        updates.title !== undefined ||
+        updates.limit !== undefined ||
+        updates.filters !== undefined ||
+        updates.table !== undefined ||
+        updates.fields !== undefined ||
+        updates.html !== undefined ||
+        updates.url !== undefined ||
+        updates.caption !== undefined ||
+        updates.aggregate !== undefined ||
+        updates.dateField !== undefined
+      ) && !updates.id && !updates.dashboard_id && !updates.type;
+      
+      if (isContentUpdate) {
+        // This is a content update from BlockSettingsDrawer
+        await updateBlock(id, { content: updates });
+      } else if (updates.content) {
+        // This is already wrapped in { content: ... }
         await updateBlock(id, { content: updates.content });
       } else {
+        // This is a metadata update (position, width, height, etc.)
         await updateBlock(id, updates);
       }
     } catch (error: any) {
