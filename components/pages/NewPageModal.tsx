@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, LayoutList, Images, Columns3, Calendar, Timer, FileText, LayoutDashboard, GripVertical, LayoutGrid } from "lucide-react";
+import { X, LayoutList, Images, Columns3, Calendar, Timer, FileText, LayoutDashboard, GripVertical, LayoutGrid, Users, Layout, Square } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 
@@ -14,6 +14,9 @@ export type PageLayout =
   | "list" 
   | "dashboard" 
   | "form" 
+  | "team"
+  | "overview"
+  | "record_review"
   | "custom";
 
 interface LayoutOption {
@@ -71,6 +74,24 @@ const LAYOUT_OPTIONS: LayoutOption[] = [
     label: "Form",
     description: "Data entry form",
     icon: FileText,
+  },
+  {
+    value: "team",
+    label: "Team",
+    description: "People/collaborators",
+    icon: Users,
+  },
+  {
+    value: "overview",
+    label: "Overview",
+    description: "Mixed layout with text, summaries, links",
+    icon: Layout,
+  },
+  {
+    value: "record_review",
+    label: "Record Review",
+    description: "Cycle through many records",
+    icon: Square,
   },
   {
     value: "custom",

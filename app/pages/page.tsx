@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Layout, Edit2, Trash2, Eye } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
-import NewPageModal from "@/components/interfaces/NewPageModal";
+import NewPageModal from "@/components/pages/NewPageModal";
 
 interface Page {
   id: string;

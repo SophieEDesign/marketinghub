@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { PageLayout } from "@/components/interfaces/NewPageModal";
+import { PageLayout } from "@/components/pages/NewPageModal";
 
 export interface InterfacePage {
   id: string;
