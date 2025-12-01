@@ -29,7 +29,7 @@ export default function BlockHeader({
       }`}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+        <div className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 react-grid-drag-handle">
           <GripVertical className="w-4 h-4" />
         </div>
         <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -41,7 +41,11 @@ export default function BlockHeader({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             onOpenSettings();
+          }}
+          onMouseDown={(e) => {
+            e.stopPropagation();
           }}
           className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           title="Settings"
@@ -53,7 +57,11 @@ export default function BlockHeader({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               onDelete();
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation();
             }}
             className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
             title="Delete block"

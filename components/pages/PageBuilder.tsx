@@ -141,6 +141,7 @@ export default function PageBuilder({
           rowHeight={50}
           isDraggable={isEditing}
           isResizable={isEditing}
+          draggableHandle=".react-grid-drag-handle"
           margin={[16, 16]}
           containerPadding={[0, 0]}
           preventCollision={true}
