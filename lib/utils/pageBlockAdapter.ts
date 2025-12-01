@@ -96,53 +96,35 @@ export function convertDashboardContentToPageConfig(
   dashboardContent: any,
   originalType: string
 ): any {
-  const config: any = {};
+  // Start with all dashboard content fields to preserve everything
+  const config: any = { ...dashboardContent };
 
-  // Common mappings - preserve all fields
-  if (dashboardContent.table !== undefined) config.table = dashboardContent.table;
-  if (dashboardContent.fields !== undefined) config.fields = dashboardContent.fields;
-  if (dashboardContent.filters !== undefined) config.filters = dashboardContent.filters;
-  if (dashboardContent.limit !== undefined) config.limit = dashboardContent.limit;
-  if (dashboardContent.title !== undefined) config.title = dashboardContent.title;
-  if (dashboardContent.maxHeight !== undefined) config.maxHeight = dashboardContent.maxHeight;
-  if (dashboardContent.style !== undefined) config.style = dashboardContent.style;
-  if (dashboardContent.height !== undefined) config.height = dashboardContent.height;
-
-  // Type-specific conversions
+  // Type-specific field name mappings (for backwards compatibility)
   switch (originalType) {
     case "text":
+      // Map html to both textContent and content for compatibility
       if (dashboardContent.html !== undefined) {
         config.textContent = dashboardContent.html;
         config.content = dashboardContent.html;
       }
       break;
     case "image":
+      // Map url to both imageUrl and url for compatibility
       if (dashboardContent.url !== undefined) {
         config.imageUrl = dashboardContent.url;
-        config.url = dashboardContent.url;
       }
-      if (dashboardContent.caption !== undefined) config.caption = dashboardContent.caption;
-      break;
-    case "kpi":
-      if (dashboardContent.label !== undefined) config.label = dashboardContent.label;
-      if (dashboardContent.aggregate !== undefined) config.aggregate = dashboardContent.aggregate;
-      if (dashboardContent.field !== undefined) config.field = dashboardContent.field;
       break;
     case "calendar":
+      // Map dateField to both calendar_date_field and dateField for compatibility
       if (dashboardContent.dateField !== undefined) {
         config.calendar_date_field = dashboardContent.dateField;
-        config.dateField = dashboardContent.dateField;
       }
-      break;
-    case "html":
-      if (dashboardContent.html !== undefined) config.html = dashboardContent.html;
       break;
     case "embed":
+      // Map url to both embedUrl and url for compatibility
       if (dashboardContent.url !== undefined) {
-        config.url = dashboardContent.url;
         config.embedUrl = dashboardContent.url;
       }
-      if (dashboardContent.height !== undefined) config.height = dashboardContent.height;
       break;
   }
 
