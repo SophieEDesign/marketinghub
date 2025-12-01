@@ -241,7 +241,7 @@ export default function BlockSettingsDrawer({
               >
                 <option value="contain">Contain</option>
                 <option value="cover">Cover</option>
-                <option value="full-width">Full Width</option>
+                <option value="fit">Fit</option>
               </select>
             </div>
           </>

@@ -35,8 +35,8 @@ export default function ImageBlock({
   
   const imageStyle = style === "cover" 
     ? "object-cover w-full h-full" 
-    : style === "full-width"
-    ? "w-full"
+    : style === "fit"
+    ? "w-full h-full"
     : "object-contain w-full";
 
   return (
