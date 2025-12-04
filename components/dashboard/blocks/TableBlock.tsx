@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Table as TableIcon, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
@@ -28,9 +28,16 @@ export default function TableBlock({
 }: TableBlockProps) {
   const { openRecord } = useRecordDrawer();
   
-  // Normalize content with defaults for backwards compatibility
+  // Normalize content with defaults for backwards compatibility - memoize to prevent re-renders
   const defaults = getDefaultContent("table");
-  const normalizedContent = { ...defaults, ...content };
+  const normalizedContent = useMemo(() => ({ ...defaults, ...content }), [content]);
+  
+  // Extract stable values for dependencies
+  const tableName = normalizedContent.table;
+  const fields = normalizedContent.fields;
+  const filters = normalizedContent.filters;
+  const displayLimit = normalizedContent.limit || 3;
+  const title = normalizedContent.title || normalizedContent.table || "Table Block";
   
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,8 +57,8 @@ export default function TableBlock({
 
   // Compute valid fields whenever fields change
   useEffect(() => {
-    if (normalizedContent.fields && normalizedContent.fields.length > 0) {
-      const filtered = normalizedContent.fields.filter(
+    if (fields && fields.length > 0) {
+      const filtered = fields.filter(
         (field: string) => !INVALID_COLUMNS.has(field)
       );
       
@@ -64,82 +71,83 @@ export default function TableBlock({
     } else {
       setValidFields([]);
     }
-  }, [normalizedContent.fields]);
+  }, [fields]);
 
   // Get display limit - default to 3 rows
-  const displayLimit = normalizedContent.limit || 3;
   const limit = expanded ? Infinity : displayLimit;
   const visibleRows = rows.slice(0, limit);
   const hasMore = rows.length > displayLimit;
 
-  // Load table data
-  useEffect(() => {
-    if (normalizedContent.table && validFields.length > 0) {
-      loadTableData();
-    }
-  }, [normalizedContent.table, validFields, normalizedContent.filters]);
+  // Serialize filters for stable dependency comparison
+  const filtersKey = useMemo(() => {
+    if (!filters || !Array.isArray(filters)) return '';
+    return JSON.stringify(filters);
+  }, [filters]);
 
-  const loadTableData = async () => {
-    if (!normalizedContent.table || validFields.length === 0) {
+  // Load table data - defined inside useEffect to avoid dependency issues
+  useEffect(() => {
+    if (!tableName || validFields.length === 0) {
       return;
     }
 
-    setLoading(true);
-    try {
-      
-      let query: any = supabase
-        .from(normalizedContent.table)
-        .select(validFields.join(", "));
+    const loadTableData = async () => {
+      setLoading(true);
+      try {
+        let query: any = supabase
+          .from(tableName)
+          .select(validFields.join(", "));
 
-      // Apply filters if provided
-      if (normalizedContent.filters && Array.isArray(normalizedContent.filters)) {
-        normalizedContent.filters.forEach((filter: any) => {
-          if (filter.field && filter.operator && filter.value !== undefined) {
-            switch (filter.operator) {
-              case "eq":
-                query = query.eq(filter.field, filter.value);
-                break;
-              case "neq":
-                query = query.neq(filter.field, filter.value);
-                break;
-              case "gt":
-                query = query.gt(filter.field, filter.value);
-                break;
-              case "lt":
-                query = query.lt(filter.field, filter.value);
-                break;
-              case "gte":
-                query = query.gte(filter.field, filter.value);
-                break;
-              case "lte":
-                query = query.lte(filter.field, filter.value);
-                break;
+        // Apply filters if provided
+        if (filters && Array.isArray(filters)) {
+          filters.forEach((filter: any) => {
+            if (filter.field && filter.operator && filter.value !== undefined) {
+              switch (filter.operator) {
+                case "eq":
+                  query = query.eq(filter.field, filter.value);
+                  break;
+                case "neq":
+                  query = query.neq(filter.field, filter.value);
+                  break;
+                case "gt":
+                  query = query.gt(filter.field, filter.value);
+                  break;
+                case "lt":
+                  query = query.lt(filter.field, filter.value);
+                  break;
+                case "gte":
+                  query = query.gte(filter.field, filter.value);
+                  break;
+                case "lte":
+                  query = query.lte(filter.field, filter.value);
+                  break;
+              }
             }
-          }
-        });
+          });
+        }
+
+        const { data, error } = await query
+          .order("created_at", { ascending: false })
+          .limit(100); // Load more than display limit
+
+        if (error) throw error;
+        setRows(data || []);
+      } catch (error) {
+        console.error("Error loading table data:", error);
+        setRows([]);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const { data, error } = await query
-        .order("created_at", { ascending: false })
-        .limit(100); // Load more than display limit
-
-      if (error) throw error;
-      setRows(data || []);
-    } catch (error) {
-      console.error("Error loading table data:", error);
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    loadTableData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableName, validFields, filtersKey]);
 
   const handleRowClick = (row: any) => {
-    if (row.id && normalizedContent.table) {
-      openRecord(normalizedContent.table, row.id);
+    if (row.id && tableName) {
+      openRecord(tableName, row.id);
     }
   };
-
-  const title = normalizedContent.title || normalizedContent.table || "Table Block";
 
   return (
     <>
@@ -151,7 +159,7 @@ export default function TableBlock({
         isDragging={isDragging}
       />
       <div className="flex-1 overflow-y-auto p-4" style={{ maxHeight: '400px' }}>
-        {!normalizedContent.table ? (
+        {!tableName ? (
           <div className="text-center py-8 text-gray-500 text-sm">
             <TableIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
             <p>No table selected</p>

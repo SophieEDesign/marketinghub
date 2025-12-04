@@ -114,9 +114,9 @@ function TableRecordsContent() {
         />
       </div>
 
-      {/* Grid View */}
+      {/* Grid View - without ViewHeader toolbar */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <GridView tableId={table.name} />
+        <GridView tableId={table.name} hideHeader={true} />
       </div>
     </div>
   );

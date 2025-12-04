@@ -181,7 +181,7 @@ export default function BlockSettingsDrawer({
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
             Block Size
           </h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${block?.type === "table" ? "grid-cols-1" : "grid-cols-2"}`}>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Width (columns)
@@ -203,27 +203,29 @@ export default function BlockSettingsDrawer({
                 Grid columns (2-12)
               </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Height (rows)
-              </label>
-              <input
-                type="number"
-                value={blockSize.height}
-                onChange={async (e) => {
-                  const height = parseInt(e.target.value) || 3;
-                  const clampedHeight = Math.max(2, Math.min(20, height));
-                  setBlockSize(prev => ({ ...prev, height: clampedHeight }));
-                  await onUpdate(block.id, { height: clampedHeight });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                min="2"
-                max="20"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Grid rows (2-20)
-              </p>
-            </div>
+            {block?.type !== "table" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Height (rows)
+                </label>
+                <input
+                  type="number"
+                  value={blockSize.height}
+                  onChange={async (e) => {
+                    const height = parseInt(e.target.value) || 3;
+                    const clampedHeight = Math.max(2, Math.min(20, height));
+                    setBlockSize(prev => ({ ...prev, height: clampedHeight }));
+                    await onUpdate(block.id, { height: clampedHeight });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
+                  min="2"
+                  max="20"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Grid rows (2-20)
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

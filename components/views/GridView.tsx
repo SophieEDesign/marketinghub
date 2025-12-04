@@ -29,9 +29,10 @@ import UndoToast from "../common/UndoToast";
 
 interface GridViewProps {
   tableId: string;
+  hideHeader?: boolean; // If true, don't show ViewHeader toolbar
 }
 
-function GridViewComponent({ tableId }: GridViewProps) {
+function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
   // Path is /tables/[tableId]/[viewName] so viewName is at index 2
@@ -468,6 +469,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
   if (loading || fieldsLoading || viewConfigLoading) {
     return (
       <div>
+        {!hideHeader && (
         <ViewHeader
           tableId={tableId}
           viewId={viewId}
@@ -547,6 +549,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
             }
           }}
         />
+        )}
         <GridSkeleton rows={10} cols={fields.length || 5} />
       </div>
     );
@@ -555,6 +558,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
   if (rows.length === 0) {
     return (
       <div>
+        {!hideHeader && (
         <ViewHeader
           tableId={tableId}
           viewId={viewId}
@@ -634,6 +638,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
             }
           }}
         />
+        )}
         <EmptyState
           title="No records found"
           description={filters.length > 0 ? "Try adjusting your filters to see more results." : "Get started by creating your first record."}
@@ -650,6 +655,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
   return (
     <div>
       {/* Header with Filter/Sort/Settings Buttons */}
+      {!hideHeader && (
       <ViewHeader
         tableId={tableId}
         viewId={viewId}
@@ -729,6 +735,7 @@ function GridViewComponent({ tableId }: GridViewProps) {
             : undefined
         }
       />
+      )}
 
       {/* Table - Fixed horizontal scroll */}
       <div className="flex-1 w-full min-w-0 overflow-hidden -mx-6 px-6">

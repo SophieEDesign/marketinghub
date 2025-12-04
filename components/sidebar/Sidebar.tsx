@@ -34,7 +34,7 @@ import { tables, tableCategories } from "@/lib/tables";
 import { useTheme } from "@/app/providers";
 import WorkspaceHeader from "./WorkspaceHeader";
 import { supabase } from "@/lib/supabaseClient";
-import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, DragEndEvent, DragOverEvent, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import SidebarSortableItem from "./SidebarSortableItem";
 import TableViewsList from "./TableViewsList";
@@ -144,7 +144,7 @@ export default function Sidebar() {
   const [orderedSidebar, setOrderedSidebar] = useState(defaultSidebarItems);
   const [loadingOrder, setLoadingOrder] = useState(true);
   const [dynamicTables, setDynamicTables] = useState<string[]>([]);
-  const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string>; itemOrder: Record<string, string[]> }>({ groupTitles: {}, itemLabels: {}, itemOrder: {} });
+  const [sidebarCustomizations, setSidebarCustomizations] = useState<{ groupTitles: Record<string, string>; itemLabels: Record<string, string>; itemOrder: Record<string, string[]>; itemGroups: Record<string, string> }>({ groupTitles: {}, itemLabels: {}, itemOrder: {}, itemGroups: {} });
   const sidebarRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { pages } = useInterfacePages();
@@ -253,6 +253,7 @@ export default function Sidebar() {
           groupTitles: customizations.groupTitles || {},
           itemLabels: customizations.itemLabels || {},
           itemOrder: customizations.itemOrder || {},
+          itemGroups: customizations.itemGroups || {},
         });
       } catch (e) {
         console.error("Error loading sidebar customizations:", e);
@@ -297,9 +298,59 @@ export default function Sidebar() {
       groupTitles: { ...sidebarCustomizations.groupTitles },
       itemLabels: { ...sidebarCustomizations.itemLabels },
       itemOrder: { ...sidebarCustomizations.itemOrder, [groupTitle]: newOrder },
+      itemGroups: { ...sidebarCustomizations.itemGroups },
     };
     setSidebarCustomizations(newCustomizations);
     localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
+  };
+
+  // Handler for moving items between groups
+  const handleItemMoveToGroup = (itemHref: string, sourceGroup: string, targetGroup: string, targetIndex?: number) => {
+    if (typeof window === 'undefined' || sourceGroup === targetGroup) return;
+    
+    // Find the item in the source group
+    const sourceGroupData = navGroups.find(g => g.title === sourceGroup);
+    if (!sourceGroupData) return;
+    
+    const item = sourceGroupData.items.find(i => i.href === itemHref);
+    if (!item) return;
+    
+    // Get current orders
+    const sourceOrder = sidebarCustomizations.itemOrder[sourceGroup] || sourceGroupData.items.map(i => i.href);
+    const targetOrder = sidebarCustomizations.itemOrder[targetGroup] || (navGroups.find(g => g.title === targetGroup)?.items.map(i => i.href) || []);
+    
+    // Remove from source
+    const newSourceOrder = sourceOrder.filter(href => href !== itemHref);
+    
+    // Add to target
+    let newTargetOrder = [...targetOrder];
+    if (targetIndex !== undefined && targetIndex >= 0) {
+      newTargetOrder.splice(targetIndex, 0, itemHref);
+    } else {
+      newTargetOrder.push(itemHref);
+    }
+    
+    // Update customizations
+    const newCustomizations = {
+      groupTitles: { ...sidebarCustomizations.groupTitles },
+      itemLabels: { ...sidebarCustomizations.itemLabels },
+      itemOrder: {
+        ...sidebarCustomizations.itemOrder,
+        [sourceGroup]: newSourceOrder,
+        [targetGroup]: newTargetOrder,
+      },
+      itemGroups: {
+        ...sidebarCustomizations.itemGroups,
+        [itemHref]: targetGroup,
+      },
+    };
+    
+    setSidebarCustomizations(newCustomizations);
+    localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
+    
+    // Force re-render
+    setEditing(false);
+    setTimeout(() => setEditing(true), 0);
   };
 
   // Parse current route
@@ -506,53 +557,130 @@ export default function Sidebar() {
           {editing && (
             <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                <strong>Edit Mode:</strong> Click group titles to rename, drag items to reorder within groups.
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400">
-                To add new categories, go to Settings → Sidebar
+                <strong>Edit Mode:</strong> Click group titles to rename, drag items to reorder within groups or move between categories.
               </p>
             </div>
           )}
-          {navGroups.map((group) => {
-            // Apply customizations from state
-            const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
-            
-            // Apply item order if saved
-            let orderedItems = group.items;
-            const savedOrder = sidebarCustomizations.itemOrder?.[group.title];
-            if (savedOrder && savedOrder.length === group.items.length) {
-              orderedItems = savedOrder
-                .map((href) => group.items.find((item) => item.href === href))
-                .filter((item): item is NavItem => item !== undefined);
-              // Add any new items that aren't in the saved order
-              const newItems = group.items.filter((item) => !savedOrder.includes(item.href));
-              orderedItems = [...orderedItems, ...newItems];
-            }
-            
-            const customizedGroup = {
-              ...group,
-              title: customTitle,
-              items: orderedItems.map((item) => ({
-                ...item,
-                label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
-              })),
-            };
-            return (
-              <NavGroupComponent
-                key={group.title}
-                group={customizedGroup}
-                isGroupCollapsed={isGroupCollapsed}
-                toggleGroup={toggleGroup}
-                isItemActive={isItemActive}
-                isChildActive={isChildActive}
-                collapsed={collapsed}
-                editing={editing}
-                onGroupTitleChange={handleGroupTitleChange}
-                onItemLabelChange={handleItemLabelChange}
-                onItemReorder={handleItemReorder}
-              />
-            );
-          })}
+          <DndContext
+            collisionDetection={closestCenter}
+            onDragEnd={(event) => {
+              const { active, over } = event;
+              if (!over || !editing) return;
+              
+              const activeId = active.id as string;
+              const overId = over.id as string;
+              
+              // Check if dragging over a group header (droppable area for cross-category moves)
+              const targetGroup = navGroups.find(g => g.title === overId);
+              if (targetGroup) {
+                // Find which group the item currently belongs to (considering itemGroups mapping)
+                const itemGroups = sidebarCustomizations.itemGroups || {};
+                const assignedGroup = itemGroups[activeId];
+                let sourceGroup = navGroups.find(g => {
+                  if (assignedGroup) {
+                    return g.title === assignedGroup;
+                  }
+                  return g.items.some(item => item.href === activeId);
+                });
+                
+                // If not found in assigned group, check all groups
+                if (!sourceGroup) {
+                  sourceGroup = navGroups.find(g => 
+                    g.items.some(item => item.href === activeId)
+                  );
+                }
+                
+                if (sourceGroup && sourceGroup.title !== targetGroup.title) {
+                  handleItemMoveToGroup(activeId, sourceGroup.title, targetGroup.title);
+                  return;
+                }
+              }
+              
+              // Check if dragging over another item (within-group reordering)
+              const targetItemGroup = navGroups.find(g => 
+                g.items.some(item => item.href === overId)
+              );
+              const sourceItemGroup = navGroups.find(g => {
+                const itemGroups = sidebarCustomizations.itemGroups || {};
+                const assignedGroup = itemGroups[activeId];
+                if (assignedGroup) {
+                  return g.title === assignedGroup;
+                }
+                return g.items.some(item => item.href === activeId);
+              });
+              
+              if (targetItemGroup && sourceItemGroup && targetItemGroup.title === sourceItemGroup.title) {
+                // Same group - handle reordering
+                const items = targetItemGroup.items;
+                const oldIndex = items.findIndex((item) => item.href === activeId);
+                const newIndex = items.findIndex((item) => item.href === overId);
+                
+                if (oldIndex !== -1 && newIndex !== -1) {
+                  const newOrder = arrayMove(items, oldIndex, newIndex);
+                  handleItemReorder(targetItemGroup.title, newOrder.map((item) => item.href));
+                }
+              }
+            }}
+          >
+            {navGroups.map((group) => {
+              // Apply customizations from state
+              const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
+              
+              // Apply itemGroups mapping - move items to their assigned groups
+              const itemGroups = sidebarCustomizations.itemGroups || {};
+              const itemsInThisGroup = group.items.filter(item => 
+                !itemGroups[item.href] || itemGroups[item.href] === group.title
+              );
+              
+              // Get items from other groups that should be in this group
+              const itemsFromOtherGroups = navGroups
+                .filter(g => g.title !== group.title)
+                .flatMap(g => g.items.filter(item => itemGroups[item.href] === group.title));
+              
+              // Combine items
+              let allItems = [...itemsInThisGroup, ...itemsFromOtherGroups];
+              
+              // Apply item order if saved
+              const savedOrder = sidebarCustomizations.itemOrder?.[group.title];
+              if (savedOrder && savedOrder.length > 0) {
+                // Filter saved order to only include items that exist
+                const validOrder = savedOrder.filter(href => 
+                  allItems.some(item => item.href === href)
+                );
+                const orderedItems = validOrder
+                  .map((href) => allItems.find((item) => item.href === href))
+                  .filter((item): item is NavItem => item !== undefined);
+                // Add any new items that aren't in the saved order
+                const newItems = allItems.filter((item) => !validOrder.includes(item.href));
+                allItems = [...orderedItems, ...newItems];
+              }
+              
+              const customizedGroup = {
+                ...group,
+                title: customTitle,
+                items: allItems.map((item) => ({
+                  ...item,
+                  label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
+                })),
+              };
+              return (
+                <NavGroupComponent
+                  key={group.title}
+                  group={customizedGroup}
+                  isGroupCollapsed={isGroupCollapsed}
+                  toggleGroup={toggleGroup}
+                  isItemActive={isItemActive}
+                  isChildActive={isChildActive}
+                  collapsed={collapsed}
+                  editing={editing}
+                  onGroupTitleChange={handleGroupTitleChange}
+                  onItemLabelChange={handleItemLabelChange}
+                  onItemReorder={handleItemReorder}
+                  allGroups={navGroups.map(g => g.title)}
+                />
+              );
+            })}
+          </DndContext>
         </div>
 
         {/* Footer */}
@@ -581,6 +709,7 @@ interface NavGroupComponentProps {
   onGroupTitleChange?: (oldTitle: string, newTitle: string) => void;
   onItemLabelChange?: (href: string, newLabel: string) => void;
   onItemReorder?: (groupTitle: string, newOrder: string[]) => void;
+  allGroups?: string[];
 }
 
 function NavGroupComponent({
@@ -595,20 +724,13 @@ function NavGroupComponent({
   onGroupTitleChange,
   onItemLabelChange,
   onItemReorder,
+  allGroups = [],
 }: NavGroupComponentProps) {
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id || !onItemReorder) return;
-
-    const items = group.items;
-    const oldIndex = items.findIndex((item) => item.href === active.id);
-    const newIndex = items.findIndex((item) => item.href === over.id);
-
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newOrder = arrayMove(items, oldIndex, newIndex);
-    onItemReorder(group.title, newOrder.map((item) => item.href));
-  };
+  // Make group header droppable for cross-category moves
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: group.title,
+    disabled: !editing,
+  });
   const groupCollapsed = isGroupCollapsed(group.title);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(group.title);
@@ -617,9 +739,14 @@ function NavGroupComponent({
 
   return (
     <div className="mb-4">
-      {/* Group Header */}
+      {/* Group Header - Droppable for cross-category moves */}
       {!collapsed && (
-        <div className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <div 
+          ref={setDroppableRef}
+          className={`w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 transition-colors ${
+            isOver && editing ? "bg-blue-100 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-600 rounded" : ""
+          }`}
+        >
           {editing && editingTitle ? (
             <input
               type="text"
@@ -672,32 +799,30 @@ function NavGroupComponent({
         </div>
       )}
 
-      {/* Group Items */}
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
-          <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
-            {group.items.map((item) => {
-              const active = isItemActive(item.href);
-              const hasChildren = item.children && item.children.length > 0;
-              const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
+      {/* Group Items - No DndContext here, using parent one */}
+      <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
+        <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
+          {group.items.map((item) => {
+            const active = isItemActive(item.href);
+            const hasChildren = item.children && item.children.length > 0;
+            const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
 
-              return (
-                <SidebarSortableItem
-                  key={item.href}
-                  id={item.href}
-                  label={item.label}
-                  href={item.href}
-                  icon={item.icon}
-                  editing={editing}
-                  active={isItemActive(item.href)}
-                  collapsed={collapsed}
-                  onClick={item.onClick}
-                />
-              );
-            })}
-          </div>
-        </SortableContext>
-      </DndContext>
+            return (
+              <SidebarSortableItem
+                key={item.href}
+                id={item.href}
+                label={item.label}
+                href={item.href}
+                icon={item.icon}
+                editing={editing}
+                active={isItemActive(item.href)}
+                collapsed={collapsed}
+                onClick={item.onClick}
+              />
+            );
+          })}
+        </div>
+      </SortableContext>
     </div>
   );
 }
