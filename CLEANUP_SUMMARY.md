@@ -1,5 +1,14 @@
 # Codebase Cleanup Summary
 
+**Last Updated:** Commit `50414c3` - "Update cleanup summary with all removed files" (December 1, 2025)
+
+## Related Commits (December 1, 2025)
+1. **"Convert dashboard to use pages system and fix block settings save issue"** - Major refactor to unify dashboard and pages systems
+2. **"Fix block settings to preserve all content fields when saving"** - Fixed content preservation bug in block settings
+3. **"Tidy up: consolidate duplicate NewPageModal files and remove unused interfaces directory"** - Consolidated duplicate files
+4. **"Update cleanup summary with all removed files"** - Documented all removed files
+5. **"Add health check report"** - Added system health documentation
+
 ## Files Removed (26 files total)
 ### Dashboard Legacy Files (24 files)
 1. ✅ `components/dashboard/AddModulePanel.tsx`
@@ -41,10 +50,16 @@
 1. ✅ `lib/hooks/useInterfacePages.ts` - Updated to import from `components/pages/NewPageModal`
 2. ✅ `app/pages/page.tsx` - Updated to import from `components/pages/NewPageModal`
 
+## Related Fixes
+- ✅ **Block Settings Content Preservation** - Fixed issue where block settings weren't preserving all content fields when saving
+- ✅ **Dashboard System Conversion** - Converted dashboard to use unified pages system
+- ✅ **Content Normalization** - Implemented `getDefaultContent()` to ensure all required fields are preserved
+
 ## Notes
 - `components/dashboard/Dashboard.tsx` - Kept for potential legacy support (not currently used by dashboard route)
 - All linter checks passed ✅
 - No breaking changes introduced
+- Health check report added to verify system status
 
 ## Result
 - Reduced code duplication
@@ -52,3 +67,8 @@
 - Cleaner file structure
 - All imports working correctly
 
+## Verification
+- ✅ `components/dashboard/modules/` directory - Confirmed removed
+- ✅ `components/interfaces/` directory - Confirmed removed
+- ✅ All listed files verified as removed from codebase
+- ✅ No broken imports or references found

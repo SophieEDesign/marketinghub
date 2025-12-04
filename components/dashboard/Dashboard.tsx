@@ -39,6 +39,9 @@ export default function Dashboard() {
   const [dashboardName, setDashboardName] = useState<string>("Dashboard");
   const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  const isDraggingRef = useRef<boolean>(false);
+  const savedLayoutRef = useRef<Layouts | null>(null);
+  const isSavingRef = useRef<boolean>(false);
 
   const canEdit = permissions.canModifyDashboards;
 
@@ -88,7 +91,53 @@ export default function Dashboard() {
   };
 
   // Convert blocks to react-grid-layout format
+  // Only update if we're not in the middle of a drag operation
   useEffect(() => {
+    // Skip if user is actively dragging, there are pending updates, or we're saving
+    if (isDraggingRef.current || pendingUpdatesRef.current.size > 0 || isSavingRef.current) {
+      return;
+    }
+
+    // If we have a saved layout from dragging, ALWAYS use it while it exists
+    // This prevents reverting during the save process
+    if (savedLayoutRef.current && Object.keys(savedLayoutRef.current).length > 0) {
+      const savedLayout = savedLayoutRef.current.lg || [];
+      // Only check if we have the same number of blocks
+      if (savedLayout.length === blocks.length) {
+        // Check if blocks now match the saved layout (save completed)
+        // Only clear if blocks match AND we're not saving
+        if (!isSavingRef.current) {
+          const allBlocksMatch = blocks.every((block) => {
+            const layoutItem = savedLayout.find((l) => l.i === block.id);
+            if (!layoutItem) return false;
+            const xMatch = Math.abs(layoutItem.x - (block.position_x ?? 0)) <= 1;
+            const yMatch = Math.abs(layoutItem.y - (block.position_y ?? 0)) <= 1;
+            const wMatch = layoutItem.w === (block.width ?? 3);
+            const hMatch = layoutItem.h === (block.height ?? 3);
+            return xMatch && yMatch && wMatch && hMatch;
+          });
+
+          if (allBlocksMatch) {
+            // Blocks match saved layout - save is complete!
+            // Clear saved layout and recalculate from blocks
+            savedLayoutRef.current = null;
+            // Continue to recalculate from blocks below
+          } else {
+            // Blocks don't match yet - keep using saved layout to prevent revert
+            setLayouts(savedLayoutRef.current);
+            return;
+          }
+        } else {
+          // Still saving - use saved layout
+          setLayouts(savedLayoutRef.current);
+          return;
+        }
+      } else {
+        // Block count changed, clear saved layout and recalculate
+        savedLayoutRef.current = null;
+      }
+    }
+
     const defaultHeight = getDefaultBlockHeight();
     const lgLayout: Layout[] = blocks.map((block, index) => ({
       i: block.id,
@@ -113,6 +162,9 @@ export default function Dashboard() {
     (currentLayout: Layout[], allLayouts: Layouts) => {
       if (!isEditing) return;
 
+      // Mark as dragging
+      isDraggingRef.current = true;
+
       // Store pending updates instead of immediately calling API
       for (const item of currentLayout) {
         const block = blocks.find((b) => b.id === item.i);
@@ -134,6 +186,11 @@ export default function Dashboard() {
         }
       }
 
+      // Update layouts immediately to reflect drag position
+      setLayouts(allLayouts);
+      // Save current layout to prevent reverting
+      savedLayoutRef.current = allLayouts;
+
       // Clear existing timeout
       if (layoutChangeTimeoutRef.current) {
         clearTimeout(layoutChangeTimeoutRef.current);
@@ -142,10 +199,21 @@ export default function Dashboard() {
       // Debounce: Only save to database after user stops dragging/resizing (500ms delay)
       layoutChangeTimeoutRef.current = setTimeout(async () => {
         const updates = Array.from(pendingUpdatesRef.current.entries());
-        pendingUpdatesRef.current.clear();
+        
+        if (updates.length === 0) {
+          isDraggingRef.current = false;
+          isSavingRef.current = false;
+          return;
+        }
 
+        // Mark as saving to prevent layout recalculation
+        isSavingRef.current = true;
+        
+        // Store the updates we're about to make
+        const updatesToApply = new Map(updates);
+        
         // Batch update all changed blocks
-        for (const [blockId, layout] of updates) {
+        const updatePromises = Array.from(updatesToApply.entries()).map(async ([blockId, layout]) => {
           try {
             await updateBlock(blockId, {
               position_x: layout.x,
@@ -153,10 +221,31 @@ export default function Dashboard() {
               width: layout.w,
               height: layout.h,
             });
+            return { blockId, success: true };
           } catch (error) {
             console.error(`Error updating block ${blockId}:`, error);
+            return { blockId, success: false, error };
           }
-        }
+        });
+
+        await Promise.all(updatePromises);
+
+        // Clear pending updates AFTER all updates complete
+        pendingUpdatesRef.current.clear();
+        
+        // Wait for blocks state to update from the database
+        // Keep saved layout active during this time
+        setTimeout(() => {
+          isDraggingRef.current = false;
+          // Wait longer for blocks state to fully update
+          setTimeout(() => {
+            // Clear saving flag - saved layout will persist until blocks match
+            isSavingRef.current = false;
+            
+            // Don't clear savedLayoutRef here - let the useEffect handle it
+            // when it detects blocks match the saved layout
+          }, 800);
+        }, 300);
       }, 500);
     },
     [isEditing, blocks, updateBlock]
@@ -270,13 +359,15 @@ export default function Dashboard() {
           {showBlockMenu && (
             <>
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 bg-black/40 z-[9998]"
                 onClick={() => setShowBlockMenu(false)}
               />
-              <div className="absolute top-full left-0 mt-2 z-50">
-                <BlockMenu
-                  onSelectBlockType={handleAddBlock}
-                />
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
+                <div className="pointer-events-auto max-h-[80vh] overflow-y-auto">
+                  <BlockMenu
+                    onSelectBlockType={handleAddBlock}
+                  />
+                </div>
               </div>
             </>
           )}
@@ -306,7 +397,7 @@ export default function Dashboard() {
           rowHeight={50}
           isDraggable={isEditing}
           isResizable={isEditing}
-          draggableHandle=".react-grid-drag-handle"
+          draggableHandle={isEditing ? ".react-grid-drag-handle" : undefined}
           margin={[16, 16]}
           containerPadding={[0, 0]}
           preventCollision={true}
@@ -319,7 +410,7 @@ export default function Dashboard() {
               return null;
             }
             return (
-              <div key={block.id} className="h-full">
+              <div key={block.id} className="h-full w-full">
                 <DashboardBlock
                   block={block}
                   isEditing={isEditing}

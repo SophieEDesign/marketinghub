@@ -135,7 +135,25 @@ export default function AutomationEditor({
 
   const handleUpdateAction = (index: number, updates: any) => {
     const newActions = [...actions];
-    newActions[index] = { ...newActions[index], ...updates };
+    const currentAction = newActions[index];
+    
+    // If action type is changing, reset to default structure for that type
+    if (updates.type && updates.type !== currentAction.type) {
+      const defaultActions: Record<string, any> = {
+        send_email: { type: "send_email", to: "", subject: "", body: "" },
+        slack_message: { type: "slack_message", webhook_url: "", message: "" },
+        webhook: { type: "webhook", url: "", method: "POST", body: {} },
+        update_record: { type: "update_record", table: "", recordId: "", updates: {} },
+        create_record: { type: "create_record", table: "", data: {} },
+        duplicate_record: { type: "duplicate_record", table: "", recordId: "", excludeFields: [] },
+        run_script: { type: "run_script", script: "" },
+      };
+      newActions[index] = { ...defaultActions[updates.type] || { type: updates.type } };
+    } else {
+      // Otherwise, merge updates
+      newActions[index] = { ...currentAction, ...updates };
+    }
+    
     setActions(newActions);
   };
 
@@ -852,58 +870,92 @@ function ActionEditor({
           {/* Action-specific fields */}
           {action.type === "send_email" && (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  To Email (use {"{{record.field}}"} for variables)
+                </label>
               <input
                 type="email"
                 value={action.to || ""}
                 onChange={(e) => onChange({ to: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="To email"
+                  placeholder="email@example.com or {{record.email}}"
               />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Subject (use {"{{record.field}}"} for variables)
+                </label>
               <input
                 type="text"
                 value={action.subject || ""}
                 onChange={(e) => onChange({ subject: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="Subject"
+                  placeholder="Email subject"
               />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Body (use {"{{record.field}}"} for variables)
+                </label>
               <textarea
                 value={action.body || ""}
                 onChange={(e) => onChange({ body: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="Email body (use {{field}} for variables)"
+                  placeholder="Email body (use {{record.field}} for variables)"
                 rows={4}
               />
+              </div>
             </>
           )}
 
           {action.type === "slack_message" && (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Slack Webhook URL
+                </label>
               <input
                 type="url"
                 value={action.webhook_url || ""}
                 onChange={(e) => onChange({ webhook_url: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="Slack Webhook URL"
+                  placeholder="https://hooks.slack.com/services/..."
               />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Message (use {"{{record.field}}"} for variables)
+                </label>
               <textarea
                 value={action.message || ""}
                 onChange={(e) => onChange({ message: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="Message"
+                  placeholder="Message (use {{record.field}} for variables)"
                 rows={3}
               />
+              </div>
             </>
           )}
 
           {action.type === "webhook" && (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Webhook URL
+                </label>
               <input
                 type="url"
                 value={action.url || ""}
                 onChange={(e) => onChange({ url: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                placeholder="Webhook URL"
+                  placeholder="https://example.com/webhook"
               />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  HTTP Method
+                </label>
               <select
                 value={action.method || "POST"}
                 onChange={(e) => onChange({ method: e.target.value })}
@@ -915,6 +967,11 @@ function ActionEditor({
                 <option value="PATCH">PATCH</option>
                 <option value="DELETE">DELETE</option>
               </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Request Body (JSON, use {"{{record.field}}"} for variables)
+                </label>
               <textarea
                 value={JSON.stringify(action.body || {}, null, 2)}
                 onChange={(e) => {
@@ -928,6 +985,7 @@ function ActionEditor({
                 placeholder='{"key": "value"}'
                 rows={4}
               />
+              </div>
             </>
           )}
 
@@ -935,6 +993,10 @@ function ActionEditor({
             action.type === "create_record" ||
             action.type === "duplicate_record") && (
             <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Table
+                </label>
               <select
                 value={action.table || ""}
                 onChange={(e) => onChange({ table: e.target.value })}
@@ -942,29 +1004,56 @@ function ActionEditor({
               >
                 <option value="">Select table...</option>
                 {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    {table.name}
+                    <option key={table.id} value={table.name}>
+                      {table.label || table.name}
                   </option>
                 ))}
               </select>
+              </div>
               {action.type === "update_record" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Record ID (use {"{{record.id}}"} for triggered record)
+                  </label>
                 <input
                   type="text"
                   value={action.recordId || ""}
                   onChange={(e) => onChange({ recordId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                  placeholder="Record ID"
+                    placeholder="Record ID or {{record.id}}"
                 />
+                </div>
               )}
               {action.type === "duplicate_record" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Record ID to Duplicate (use {"{{record.id}}"} for triggered record)
+                  </label>
                 <input
                   type="text"
                   value={action.recordId || ""}
                   onChange={(e) => onChange({ recordId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
-                  placeholder="Record ID to duplicate"
-                />
+                    placeholder="Record ID or {{record.id}}"
+                  />
+                </div>
               )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {action.type === "update_record" ? "Updates (JSON)" : action.type === "create_record" ? "Data (JSON)" : "Exclude Fields (comma-separated)"}
+                </label>
+                {action.type === "duplicate_record" ? (
+                  <input
+                    type="text"
+                    value={Array.isArray(action.excludeFields) ? action.excludeFields.join(", ") : action.excludeFields || ""}
+                    onChange={(e) => {
+                      const fields = e.target.value.split(",").map(f => f.trim()).filter(Boolean);
+                      onChange({ excludeFields: fields });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
+                    placeholder="id, created_at, updated_at"
+                  />
+                ) : (
               <textarea
                 value={JSON.stringify(action.updates || action.data || {}, null, 2)}
                 onChange={(e) => {
@@ -983,17 +1072,27 @@ function ActionEditor({
                 placeholder='{"field": "value"}'
                 rows={4}
               />
+                )}
+              </div>
             </>
           )}
 
           {action.type === "run_script" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                JavaScript Code (use `context.record` to access triggered record)
+              </label>
             <textarea
               value={action.script || ""}
               onChange={(e) => onChange({ script: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm font-mono"
-              placeholder="JavaScript code"
+                placeholder="// Access triggered record via context.record&#10;const record = context.record;&#10;return { success: true };"
               rows={8}
             />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                The script should return an object with `success` (boolean) and optionally `output` or `error`.
+              </p>
+            </div>
           )}
         </div>
         <button

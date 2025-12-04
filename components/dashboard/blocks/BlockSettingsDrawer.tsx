@@ -42,6 +42,7 @@ export default function BlockSettingsDrawer({
 }: BlockSettingsDrawerProps) {
   const { tables } = useTables();
   const [content, setContent] = useState<any>({});
+  const [blockSize, setBlockSize] = useState({ width: 3, height: 3 });
 
   // Load fields when table is selected
   const { fields: tableFields } = useFields(content.table || "");
@@ -68,6 +69,11 @@ export default function BlockSettingsDrawer({
       const defaultContent = getDefaultContent(block.type);
       const normalizedContent = { ...defaultContent, ...block.content };
       setContent(normalizedContent);
+      // Update block size state
+      setBlockSize({
+        width: block.width ?? 3,
+        height: block.height ?? 3,
+      });
     }
   }, [block]);
 
@@ -168,6 +174,57 @@ export default function BlockSettingsDrawer({
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
             placeholder="Block title"
           />
+        </div>
+
+        {/* Grid Size Settings */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+            Block Size
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Width (columns)
+              </label>
+              <input
+                type="number"
+                value={blockSize.width}
+                onChange={async (e) => {
+                  const width = parseInt(e.target.value) || 3;
+                  const clampedWidth = Math.max(2, Math.min(12, width));
+                  setBlockSize(prev => ({ ...prev, width: clampedWidth }));
+                  await onUpdate(block.id, { width: clampedWidth });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
+                min="2"
+                max="12"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Grid columns (2-12)
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Height (rows)
+              </label>
+              <input
+                type="number"
+                value={blockSize.height}
+                onChange={async (e) => {
+                  const height = parseInt(e.target.value) || 3;
+                  const clampedHeight = Math.max(2, Math.min(20, height));
+                  setBlockSize(prev => ({ ...prev, height: clampedHeight }));
+                  await onUpdate(block.id, { height: clampedHeight });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
+                min="2"
+                max="20"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Grid rows (2-20)
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Text Block Settings */}

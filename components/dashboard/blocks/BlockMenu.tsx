@@ -60,7 +60,9 @@ export default function BlockMenu({
 
   return (
     <div
-      className="absolute z-50 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 min-w-[200px]"
+      className={`bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2 min-w-[280px] ${
+        position ? "absolute z-50" : ""
+      }`}
       style={
         position
           ? {

@@ -616,6 +616,26 @@ export default function WorkspaceSettingsTab() {
       {activeSubTab === "dashboard" && (
         <div className="space-y-6">
           <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Sidebar Management</h2>
+            <div className="space-y-4 max-w-md mb-8">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                  How to Edit Sidebar
+                </h3>
+                <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-decimal list-inside">
+                  <li>Click <strong>"Edit Sidebar"</strong> button at the bottom of the sidebar</li>
+                  <li>Click the <strong>edit icon</strong> next to any category title to rename it</li>
+                  <li><strong>Drag items</strong> within a category to reorder them</li>
+                  <li>Click <strong>"Done Editing"</strong> when finished</li>
+                </ol>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-3">
+                  <strong>Note:</strong> Category names and item order are saved to your browser. To add new categories or move items between categories, edit the code in <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">lib/tables.ts</code>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Dashboard Settings</h2>
             <div className="space-y-4 max-w-md">
               <div>

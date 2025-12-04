@@ -145,17 +145,19 @@ export function useDashboardBlocks(dashboardId: string = DEFAULT_DASHBOARD_ID) {
           throw new Error(`Invalid block type: ${type}. Must be one of: ${validTypes.join(", ")}`);
         }
 
-        // Calculate default grid position (place new block after existing ones)
+        // Calculate default grid position (place new block at top, after existing blocks)
+        // Find the bottom-most row with blocks
         const maxY = blocks.length > 0
-          ? Math.max(...blocks.map((b) => (b.position_y ?? b.position ?? 0)))
-          : -1;
-        const maxX = blocks.length > 0
-          ? Math.max(...blocks.filter((b) => (b.position_y ?? b.position ?? 0) === maxY).map((b) => (b.position_x ?? 0)))
-          : -1;
+          ? Math.max(...blocks.map((b) => {
+              const y = b.position_y ?? b.position ?? 0;
+              const h = b.height ?? 3;
+              return y + h; // Bottom of the block
+            }))
+          : 0;
         
-        // Default position: next row if current row is full (4 blocks), otherwise next column
-        const defaultX = maxX >= 9 ? 0 : (maxX + 3);
-        const defaultY = maxX >= 9 ? maxY + 4 : maxY;
+        // Start new blocks at the top (y=0) if no blocks exist, otherwise after the last block
+        const defaultY = blocks.length === 0 ? 0 : maxY;
+        const defaultX = 0; // Always start at left edge
 
         // Get default content structure (includes title, limit, filters, etc.)
         const baseDefaults = getDefaultContent(type);

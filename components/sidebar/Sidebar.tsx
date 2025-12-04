@@ -310,7 +310,7 @@ export default function Sidebar() {
   // Build navGroups structure - Pages above Tables
   const navGroups: NavGroup[] = [
     {
-      title: "Main",
+      title: "Dashboard",
       items: [
         {
           icon: LayoutDashboard,
@@ -503,6 +503,16 @@ export default function Sidebar() {
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto p-3">
+          {editing && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                <strong>Edit Mode:</strong> Click group titles to rename, drag items to reorder within groups.
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                To add new categories, go to Settings → Sidebar
+              </p>
+            </div>
+          )}
           {navGroups.map((group) => {
             // Apply customizations from state
             const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
@@ -920,7 +930,11 @@ function SidebarFooter({ theme, setTheme, collapsed = false, onToggleCollapse, e
       {onToggleEdit && (
         <button
           onClick={onToggleEdit}
-          className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
+          className={`w-full flex items-center ${collapsed ? "justify-center" : "justify-start"} gap-2 px-2 py-2 rounded-md text-sm font-medium ${
+            editing 
+              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700" 
+              : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+          } transition-colors`}
           title={collapsed ? (editing ? "Exit edit mode" : "Edit sidebar") : undefined}
         >
           <Edit3 className="w-4 h-4" />
