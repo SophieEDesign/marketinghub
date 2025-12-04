@@ -35,6 +35,36 @@ export default function TableBlock({
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [validFields, setValidFields] = useState<string[]>([]);
+
+  // Filter out invalid/non-existent columns
+  const INVALID_COLUMNS = new Set([
+    'track',
+    'content_name',
+    'date_to',
+    'date_due',
+    'content_folder_canva',
+    'briefings', // Linked table relationship, not a column
+    'documents', // Linked table relationship, not a column
+  ]);
+
+  // Compute valid fields whenever fields change
+  useEffect(() => {
+    if (normalizedContent.fields && normalizedContent.fields.length > 0) {
+      const filtered = normalizedContent.fields.filter(
+        (field: string) => !INVALID_COLUMNS.has(field)
+      );
+      
+      if (filtered.length === 0) {
+        // If all fields are invalid, use a safe default
+        setValidFields(['id', 'created_at']);
+      } else {
+        setValidFields(filtered);
+      }
+    } else {
+      setValidFields([]);
+    }
+  }, [normalizedContent.fields]);
 
   // Get display limit - default to 3 rows
   const displayLimit = normalizedContent.limit || 3;
@@ -44,21 +74,22 @@ export default function TableBlock({
 
   // Load table data
   useEffect(() => {
-    if (normalizedContent.table && normalizedContent.fields && normalizedContent.fields.length > 0) {
+    if (normalizedContent.table && validFields.length > 0) {
       loadTableData();
     }
-  }, [normalizedContent.table, normalizedContent.fields, normalizedContent.filters]);
+  }, [normalizedContent.table, validFields, normalizedContent.filters]);
 
   const loadTableData = async () => {
-    if (!normalizedContent.table || !normalizedContent.fields || normalizedContent.fields.length === 0) {
+    if (!normalizedContent.table || validFields.length === 0) {
       return;
     }
 
     setLoading(true);
     try {
+      
       let query: any = supabase
         .from(normalizedContent.table)
-        .select(normalizedContent.fields.join(", "));
+        .select(validFields.join(", "));
 
       // Apply filters if provided
       if (normalizedContent.filters && Array.isArray(normalizedContent.filters)) {
@@ -136,7 +167,7 @@ export default function TableBlock({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    {normalizedContent.fields.slice(0, 3).map((field: string) => (
+                    {validFields.slice(0, 3).map((field: string) => (
                       <th
                         key={field}
                         className="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
@@ -153,7 +184,7 @@ export default function TableBlock({
                       onClick={() => handleRowClick(row)}
                       className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                     >
-                      {normalizedContent.fields.slice(0, 3).map((field: string) => (
+                      {validFields.slice(0, 3).map((field: string) => (
                         <td key={field} className="px-2 py-2 text-gray-900 dark:text-gray-100">
                           {row[field] ? String(row[field]).slice(0, 30) : "—"}
                         </td>

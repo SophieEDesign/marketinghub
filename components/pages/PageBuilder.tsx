@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Layout, Layouts, Responsive, WidthProvider } from "react-grid-layout";
 
 // Import CSS for react-grid-layout (client-side only)
@@ -42,9 +42,105 @@ export default function PageBuilder({
   const [selectedBlock, setSelectedBlock] = useState<InterfacePageBlock | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [layouts, setLayouts] = useState<Layouts>({});
+  const layoutChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  const isDraggingRef = useRef<boolean>(false);
+  const savedLayoutRef = useRef<Layouts | null>(null);
+  const isSavingRef = useRef<boolean>(false);
+  const previousLayoutRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map());
+  const previousLayoutsRef = useRef<Layouts>({});
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Convert blocks to react-grid-layout format
+  // Only update if we're not in the middle of a drag operation
   useEffect(() => {
+    // Skip if user is actively dragging, there are pending updates, or we're saving
+    if (isDraggingRef.current || pendingUpdatesRef.current.size > 0 || isSavingRef.current) {
+      return;
+    }
+
+    // Check if layout properties (position/size) have actually changed
+    // If only config/content changed, don't recalculate layout
+    const layoutChanged = blocks.some((block) => {
+      const prev = previousLayoutRef.current.get(block.id);
+      if (!prev) return true; // New block, needs layout
+      return (
+        prev.x !== (block.position_x ?? 0) ||
+        prev.y !== (block.position_y ?? 0) ||
+        prev.w !== (block.width ?? 3) ||
+        prev.h !== (block.height ?? 3)
+      );
+    });
+
+    // Update previous layout ref
+    blocks.forEach((block) => {
+      previousLayoutRef.current.set(block.id, {
+        x: block.position_x ?? 0,
+        y: block.position_y ?? 0,
+        w: block.width ?? 3,
+        h: block.height ?? 3,
+      });
+    });
+
+    // If layout hasn't changed and we have a saved layout, keep using it
+    if (!layoutChanged && savedLayoutRef.current && Object.keys(savedLayoutRef.current).length > 0) {
+      return;
+    }
+
+    // If layout hasn't changed and we have existing layouts, don't recalculate
+    if (!layoutChanged && Object.keys(layouts).length > 0) {
+      return;
+    }
+
+    // If we have a saved layout from dragging, ALWAYS use it while it exists
+    // This prevents reverting during the save process
+    if (savedLayoutRef.current && Object.keys(savedLayoutRef.current).length > 0) {
+      const savedLayout = savedLayoutRef.current.lg || [];
+      // Only check if we have the same number of blocks
+      if (savedLayout.length === blocks.length) {
+        // Check if blocks now match the saved layout (save completed)
+        // Only clear if blocks match AND we're not saving
+        if (!isSavingRef.current) {
+          const allBlocksMatch = blocks.every((block) => {
+            const layoutItem = savedLayout.find((l) => l.i === block.id);
+            if (!layoutItem) return false;
+            // More forgiving comparison - allow small differences due to rounding
+            const xMatch = Math.abs(layoutItem.x - (block.position_x ?? 0)) <= 1;
+            const yMatch = Math.abs(layoutItem.y - (block.position_y ?? 0)) <= 1;
+            const wMatch = Math.abs(layoutItem.w - (block.width ?? 3)) <= 1;
+            const hMatch = Math.abs(layoutItem.h - (block.height ?? 3)) <= 1;
+            return xMatch && yMatch && wMatch && hMatch;
+          });
+
+          if (allBlocksMatch) {
+            // Blocks match saved layout - save is complete!
+            // Clear saved layout and recalculate from blocks
+            savedLayoutRef.current = null;
+            // Continue to recalculate from blocks below
+          } else {
+            // Blocks don't match yet - keep using saved layout to prevent revert
+            setLayouts(savedLayoutRef.current);
+            return;
+          }
+        } else {
+          // Still saving - use saved layout
+          setLayouts(savedLayoutRef.current);
+          return;
+        }
+      } else {
+        // Block count changed, clear saved layout and recalculate
+        savedLayoutRef.current = null;
+      }
+    }
+
     // Get default block height (default: 3 rows)
     const getDefaultBlockHeight = () => {
       if (typeof window === 'undefined') return 3;
@@ -65,20 +161,43 @@ export default function PageBuilder({
       static: false,
     }));
 
-    setLayouts({
-      lg: lgLayout,
-      md: lgLayout,
-      sm: lgLayout,
-      xs: lgLayout,
-      xxs: lgLayout,
-    });
+    // Only update layouts if they've actually changed (compare with previous layout)
+    const prevLayout = previousLayoutsRef.current.lg || [];
+    const layoutsChanged = 
+      prevLayout.length !== lgLayout.length ||
+      lgLayout.some((newItem) => {
+        const prevItem = prevLayout.find((item) => item.i === newItem.i);
+        if (!prevItem) return true; // New item
+        return (
+          prevItem.x !== newItem.x ||
+          prevItem.y !== newItem.y ||
+          prevItem.w !== newItem.w ||
+          prevItem.h !== newItem.h
+        );
+      });
+
+    if (layoutsChanged) {
+      const newLayouts = {
+        lg: lgLayout,
+        md: lgLayout,
+        sm: lgLayout,
+        xs: lgLayout,
+        xxs: lgLayout,
+      };
+      setLayouts(newLayouts);
+      // Update ref for next comparison
+      previousLayoutsRef.current = newLayouts;
+    }
   }, [blocks]);
 
   const handleLayoutChange = useCallback(
-    async (currentLayout: Layout[], allLayouts: Layouts) => {
+    (currentLayout: Layout[], allLayouts: Layouts) => {
       if (!isEditing) return;
 
-      // Update each block that changed
+      // Mark as dragging
+      isDraggingRef.current = true;
+
+      // Store pending updates instead of immediately calling API
       for (const item of currentLayout) {
         const block = blocks.find((b) => b.id === item.i);
         if (!block) continue;
@@ -90,14 +209,78 @@ export default function PageBuilder({
           block.height !== item.h;
 
         if (hasChanged) {
-          await onUpdateBlock(item.i, {
-            position_x: item.x,
-            position_y: item.y,
-            width: item.w,
-            height: item.h,
+          pendingUpdatesRef.current.set(item.i, {
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
           });
         }
       }
+
+      // Update layouts immediately to reflect drag position
+      setLayouts(allLayouts);
+      // Save current layout to prevent reverting
+      savedLayoutRef.current = allLayouts;
+      // Also update previous layout ref to keep it in sync
+      previousLayoutsRef.current = allLayouts;
+
+      // Clear existing timeout
+      if (layoutChangeTimeoutRef.current) {
+        clearTimeout(layoutChangeTimeoutRef.current);
+      }
+
+      // Debounce: Only save to database after user stops dragging/resizing (500ms delay)
+      layoutChangeTimeoutRef.current = setTimeout(async () => {
+        const updates = Array.from(pendingUpdatesRef.current.entries());
+        
+        if (updates.length === 0) {
+          isDraggingRef.current = false;
+          isSavingRef.current = false;
+          return;
+        }
+
+        // Mark as saving to prevent layout recalculation
+        isSavingRef.current = true;
+        
+        // Store the updates we're about to make
+        const updatesToApply = new Map(updates);
+        
+        // Batch update all changed blocks
+        const updatePromises = Array.from(updatesToApply.entries()).map(async ([blockId, layout]) => {
+          try {
+            await onUpdateBlock(blockId, {
+              position_x: layout.x,
+              position_y: layout.y,
+              width: layout.w,
+              height: layout.h,
+            });
+            return { blockId, success: true };
+          } catch (error) {
+            console.error(`Error updating block ${blockId}:`, error);
+            return { blockId, success: false, error };
+          }
+        });
+
+        await Promise.all(updatePromises);
+
+        // Clear pending updates AFTER all updates complete
+        pendingUpdatesRef.current.clear();
+        
+        // Wait for blocks state to update from the database
+        // Keep saved layout active during this time
+        setTimeout(() => {
+          isDraggingRef.current = false;
+          // Wait longer for blocks state to fully update
+          setTimeout(() => {
+            // Clear saving flag - saved layout will persist until blocks match
+            isSavingRef.current = false;
+            
+            // Don't clear savedLayoutRef here - let the useEffect handle it
+            // when it detects blocks match the saved layout
+          }, 800);
+        }, 300);
+      }, 500);
     },
     [isEditing, blocks, onUpdateBlock]
   );

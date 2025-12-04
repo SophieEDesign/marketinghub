@@ -158,6 +158,23 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
               }}
               onUpdateBlock={async (id, updates) => {
                 try {
+                  // Update local state optimistically first (like Dashboard does)
+                  setBlocks((prev) =>
+                    prev.map((b) =>
+                      b.id === id
+                        ? {
+                            ...b,
+                            ...updates,
+                            // Merge config if it's being updated
+                            config:
+                              updates.config !== undefined
+                                ? { ...b.config, ...updates.config }
+                                : b.config,
+                          }
+                        : b
+                    )
+                  );
+
                   const response = await fetch(`/api/page-blocks/${id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -168,16 +185,24 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                     throw new Error(errorData.error || "Failed to update block");
                   }
                   const updated = await response.json();
-                  setBlocks(blocks.map((b) => (b.id === id ? updated : b)));
-                  // Reload page to ensure UI is in sync
-                  await loadPage();
-                  toast({
-                    title: "Success",
-                    description: "Block settings saved",
-                    type: "success",
-                  });
+                  
+                  // Update with server response to ensure consistency
+                  setBlocks((prev) =>
+                    prev.map((b) => (b.id === id ? updated : b))
+                  );
+                  
+                  // Only show toast for non-layout updates (content changes)
+                  if (updates.config !== undefined) {
+                    toast({
+                      title: "Success",
+                      description: "Block settings saved",
+                      type: "success",
+                    });
+                  }
                 } catch (error: any) {
                   console.error("Error updating block:", error);
+                  // Revert optimistic update on error
+                  loadPage();
                   toast({
                     title: "Error",
                     description: error.message || "Failed to update block",

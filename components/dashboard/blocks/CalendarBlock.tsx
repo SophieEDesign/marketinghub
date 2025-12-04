@@ -56,10 +56,29 @@ export default function CalendarBlock({
 
     setLoading(true);
     try {
+      // Filter out invalid/non-existent columns
+      const INVALID_COLUMNS = new Set([
+        'track',
+        'content_name',
+        'date_to',
+        'date_due',
+        'content_folder_canva',
+        'briefings',
+        'documents',
+      ]);
+      
+      const validFields = (normalizedContent.fields || []).filter(
+        (field: string) => !INVALID_COLUMNS.has(field)
+      );
+      
+      const fieldsToSelect = validFields.length > 0 
+        ? `id, ${normalizedContent.dateField}, ${validFields.join(", ")}`
+        : `id, ${normalizedContent.dateField}`;
+      
       const today = new Date().toISOString().split("T")[0];
       let query: any = supabase
         .from(normalizedContent.table)
-        .select(`id, ${normalizedContent.dateField}, ${(normalizedContent.fields || []).join(", ")}`)
+        .select(fieldsToSelect)
         .gte(normalizedContent.dateField, today)
         .order(normalizedContent.dateField, { ascending: true });
 
