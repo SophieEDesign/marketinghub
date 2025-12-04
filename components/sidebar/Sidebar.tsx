@@ -268,6 +268,7 @@ export default function Sidebar() {
       groupTitles: { ...sidebarCustomizations.groupTitles, [oldTitle]: newTitle },
       itemLabels: { ...sidebarCustomizations.itemLabels },
       itemOrder: { ...sidebarCustomizations.itemOrder },
+      itemGroups: { ...sidebarCustomizations.itemGroups },
     };
     setSidebarCustomizations(newCustomizations);
     localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
@@ -283,6 +284,7 @@ export default function Sidebar() {
       groupTitles: { ...sidebarCustomizations.groupTitles },
       itemLabels: { ...sidebarCustomizations.itemLabels, [href]: newLabel },
       itemOrder: { ...sidebarCustomizations.itemOrder },
+      itemGroups: { ...sidebarCustomizations.itemGroups },
     };
     setSidebarCustomizations(newCustomizations);
     localStorage.setItem("sidebarCustomizations", JSON.stringify(newCustomizations));
