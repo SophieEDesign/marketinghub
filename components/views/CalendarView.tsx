@@ -182,7 +182,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
       };
       
       // If there's an end date field, maintain the duration when dragging
-      if (dateToField && info.event.end) {
+      if (dateToField && info.event.end && info.event.start) {
         const originalStart = info.event.start;
         const originalEnd = info.event.end;
         const duration = originalEnd.getTime() - originalStart.getTime();
