@@ -211,7 +211,7 @@ export default function Dashboard() {
         
         // Store the updates we're about to make
         const updatesToApply = new Map(updates);
-        
+
         // Batch update all changed blocks
         const updatePromises = Array.from(updatesToApply.entries()).map(async ([blockId, layout]) => {
           try {
@@ -225,7 +225,7 @@ export default function Dashboard() {
           } catch (error) {
             console.error(`Error updating block ${blockId}:`, error);
             return { blockId, success: false, error };
-          }
+        }
         });
 
         await Promise.all(updatePromises);
@@ -364,9 +364,9 @@ export default function Dashboard() {
               />
               <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none">
                 <div className="pointer-events-auto max-h-[80vh] overflow-y-auto">
-                  <BlockMenu
-                    onSelectBlockType={handleAddBlock}
-                  />
+                <BlockMenu
+                  onSelectBlockType={handleAddBlock}
+                />
                 </div>
               </div>
             </>

@@ -193,11 +193,11 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                   
                   // Only show toast for non-layout updates (content changes)
                   if (updates.config !== undefined) {
-                    toast({
-                      title: "Success",
-                      description: "Block settings saved",
-                      type: "success",
-                    });
+                  toast({
+                    title: "Success",
+                    description: "Block settings saved",
+                    type: "success",
+                  });
                   }
                 } catch (error: any) {
                   console.error("Error updating block:", error);

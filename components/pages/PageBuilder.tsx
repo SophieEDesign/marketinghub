@@ -178,11 +178,11 @@ export default function PageBuilder({
 
     if (layoutsChanged) {
       const newLayouts = {
-        lg: lgLayout,
-        md: lgLayout,
-        sm: lgLayout,
-        xs: lgLayout,
-        xxs: lgLayout,
+      lg: lgLayout,
+      md: lgLayout,
+      sm: lgLayout,
+      xs: lgLayout,
+      xxs: lgLayout,
       };
       setLayouts(newLayouts);
       // Update ref for next comparison

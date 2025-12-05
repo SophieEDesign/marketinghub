@@ -624,9 +624,9 @@ export default function Sidebar() {
               }
             }}
           >
-            {navGroups.map((group) => {
-              // Apply customizations from state
-              const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
+          {navGroups.map((group) => {
+            // Apply customizations from state
+            const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
               
               // Apply itemGroups mapping - move items to their assigned groups
               const itemGroups = sidebarCustomizations.itemGroups || {};
@@ -641,9 +641,9 @@ export default function Sidebar() {
               
               // Combine items
               let allItems = [...itemsInThisGroup, ...itemsFromOtherGroups];
-              
-              // Apply item order if saved
-              const savedOrder = sidebarCustomizations.itemOrder?.[group.title];
+            
+            // Apply item order if saved
+            const savedOrder = sidebarCustomizations.itemOrder?.[group.title];
               if (savedOrder && savedOrder.length > 0) {
                 // Filter saved order to only include items that exist
                 const validOrder = savedOrder.filter(href => 
@@ -651,37 +651,37 @@ export default function Sidebar() {
                 );
                 const orderedItems = validOrder
                   .map((href) => allItems.find((item) => item.href === href))
-                  .filter((item): item is NavItem => item !== undefined);
-                // Add any new items that aren't in the saved order
+                .filter((item): item is NavItem => item !== undefined);
+              // Add any new items that aren't in the saved order
                 const newItems = allItems.filter((item) => !validOrder.includes(item.href));
                 allItems = [...orderedItems, ...newItems];
-              }
-              
-              const customizedGroup = {
-                ...group,
-                title: customTitle,
+            }
+            
+            const customizedGroup = {
+              ...group,
+              title: customTitle,
                 items: allItems.map((item) => ({
-                  ...item,
-                  label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
-                })),
-              };
-              return (
-                <NavGroupComponent
-                  key={group.title}
-                  group={customizedGroup}
-                  isGroupCollapsed={isGroupCollapsed}
-                  toggleGroup={toggleGroup}
-                  isItemActive={isItemActive}
-                  isChildActive={isChildActive}
-                  collapsed={collapsed}
-                  editing={editing}
-                  onGroupTitleChange={handleGroupTitleChange}
-                  onItemLabelChange={handleItemLabelChange}
-                  onItemReorder={handleItemReorder}
+                ...item,
+                label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
+              })),
+            };
+            return (
+              <NavGroupComponent
+                key={group.title}
+                group={customizedGroup}
+                isGroupCollapsed={isGroupCollapsed}
+                toggleGroup={toggleGroup}
+                isItemActive={isItemActive}
+                isChildActive={isChildActive}
+                collapsed={collapsed}
+                editing={editing}
+                onGroupTitleChange={handleGroupTitleChange}
+                onItemLabelChange={handleItemLabelChange}
+                onItemReorder={handleItemReorder}
                   allGroups={navGroups.map(g => g.title)}
-                />
-              );
-            })}
+              />
+            );
+          })}
           </DndContext>
         </div>
 
@@ -802,29 +802,29 @@ function NavGroupComponent({
       )}
 
       {/* Group Items - No DndContext here, using parent one */}
-      <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
-        <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
-          {group.items.map((item) => {
-            const active = isItemActive(item.href);
-            const hasChildren = item.children && item.children.length > 0;
-            const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
+        <SortableContext items={group.items.map((item) => item.href)} disabled={!editing}>
+          <div className={`space-y-0.5 ${collapsed ? "mt-2" : ""}`}>
+            {group.items.map((item) => {
+              const active = isItemActive(item.href);
+              const hasChildren = item.children && item.children.length > 0;
+              const itemCollapsed = hasChildren && isGroupCollapsed(item.label);
 
-            return (
-              <SidebarSortableItem
-                key={item.href}
-                id={item.href}
-                label={item.label}
-                href={item.href}
-                icon={item.icon}
-                editing={editing}
-                active={isItemActive(item.href)}
-                collapsed={collapsed}
-                onClick={item.onClick}
-              />
-            );
-          })}
-        </div>
-      </SortableContext>
+              return (
+                <SidebarSortableItem
+                  key={item.href}
+                  id={item.href}
+                  label={item.label}
+                  href={item.href}
+                  icon={item.icon}
+                  editing={editing}
+                  active={isItemActive(item.href)}
+                  collapsed={collapsed}
+                  onClick={item.onClick}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
     </div>
   );
 }

@@ -91,53 +91,53 @@ export default function TableBlock({
     }
 
     const loadTableData = async () => {
-      setLoading(true);
-      try {
-        let query: any = supabase
+    setLoading(true);
+    try {
+      let query: any = supabase
           .from(tableName)
           .select(validFields.join(", "));
 
-        // Apply filters if provided
+      // Apply filters if provided
         if (filters && Array.isArray(filters)) {
           filters.forEach((filter: any) => {
-            if (filter.field && filter.operator && filter.value !== undefined) {
-              switch (filter.operator) {
-                case "eq":
-                  query = query.eq(filter.field, filter.value);
-                  break;
-                case "neq":
-                  query = query.neq(filter.field, filter.value);
-                  break;
-                case "gt":
-                  query = query.gt(filter.field, filter.value);
-                  break;
-                case "lt":
-                  query = query.lt(filter.field, filter.value);
-                  break;
-                case "gte":
-                  query = query.gte(filter.field, filter.value);
-                  break;
-                case "lte":
-                  query = query.lte(filter.field, filter.value);
-                  break;
-              }
+          if (filter.field && filter.operator && filter.value !== undefined) {
+            switch (filter.operator) {
+              case "eq":
+                query = query.eq(filter.field, filter.value);
+                break;
+              case "neq":
+                query = query.neq(filter.field, filter.value);
+                break;
+              case "gt":
+                query = query.gt(filter.field, filter.value);
+                break;
+              case "lt":
+                query = query.lt(filter.field, filter.value);
+                break;
+              case "gte":
+                query = query.gte(filter.field, filter.value);
+                break;
+              case "lte":
+                query = query.lte(filter.field, filter.value);
+                break;
             }
-          });
-        }
-
-        const { data, error } = await query
-          .order("created_at", { ascending: false })
-          .limit(100); // Load more than display limit
-
-        if (error) throw error;
-        setRows(data || []);
-      } catch (error) {
-        console.error("Error loading table data:", error);
-        setRows([]);
-      } finally {
-        setLoading(false);
+          }
+        });
       }
-    };
+
+      const { data, error } = await query
+        .order("created_at", { ascending: false })
+        .limit(100); // Load more than display limit
+
+      if (error) throw error;
+      setRows(data || []);
+    } catch (error) {
+      console.error("Error loading table data:", error);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
     loadTableData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
