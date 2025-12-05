@@ -38,6 +38,7 @@ interface ViewSettingsDrawerProps {
     field_order?: string[];
     kanban_group_field?: string;
     calendar_date_field?: string;
+    calendar_date_to_field?: string;
     timeline_date_field?: string;
     row_height?: "compact" | "medium" | "tall";
     card_fields?: string[];
@@ -49,6 +50,7 @@ interface ViewSettingsDrawerProps {
     field_order?: string[];
     kanban_group_field?: string;
     calendar_date_field?: string;
+    calendar_date_to_field?: string;
     timeline_date_field?: string;
     row_height?: "compact" | "medium" | "tall";
     card_fields?: string[];
@@ -157,6 +159,7 @@ export default function ViewSettingsDrawer({
   const [localFieldOrder, setLocalFieldOrder] = useState<string[]>([]);
   const [localKanbanGroupField, setLocalKanbanGroupField] = useState<string>("");
   const [localCalendarDateField, setLocalCalendarDateField] = useState<string>("");
+  const [localCalendarDateToField, setLocalCalendarDateToField] = useState<string>("");
   const [localTimelineDateField, setLocalTimelineDateField] = useState<string>("");
   const [localRowHeight, setLocalRowHeight] = useState<"compact" | "medium" | "tall">("medium");
   const [localCardFields, setLocalCardFields] = useState<string[]>([]);
@@ -181,6 +184,7 @@ export default function ViewSettingsDrawer({
       setLocalFieldOrder(settings.field_order || fields.map((f) => f.id));
       setLocalKanbanGroupField(settings.kanban_group_field || "");
       setLocalCalendarDateField(settings.calendar_date_field || "");
+      setLocalCalendarDateToField(settings.calendar_date_to_field || "");
       setLocalTimelineDateField(settings.timeline_date_field || "");
       setLocalRowHeight(settings.row_height || "medium");
       setLocalCardFields(settings.card_fields || fields.map((f) => f.id));
@@ -616,25 +620,53 @@ export default function ViewSettingsDrawer({
 
               {/* Calendar View Options */}
               {viewId === "calendar" && (
-                <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Date Field
-                  </h3>
-                  <select
-                    value={localCalendarDateField}
-                    onChange={(e) => {
-                      setLocalCalendarDateField(e.target.value);
-                      onUpdate({ calendar_date_field: e.target.value || undefined });
-                    }}
-                    className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                  >
-                    <option value="">Select field...</option>
-                    {dateFields.map((field) => (
-                      <option key={field.id} value={field.field_key}>
-                        {field.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="pb-4 border-b border-gray-200 dark:border-gray-700 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      From Date Field
+                    </h3>
+                    <select
+                      value={localCalendarDateField}
+                      onChange={(e) => {
+                        setLocalCalendarDateField(e.target.value);
+                        onUpdate({ calendar_date_field: e.target.value || undefined });
+                      }}
+                      className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    >
+                      <option value="">Select field...</option>
+                      {dateFields.map((field) => (
+                        <option key={field.id} value={field.field_key}>
+                          {field.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Required: The start date for calendar events
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      To Date Field (Optional)
+                    </h3>
+                    <select
+                      value={localCalendarDateToField}
+                      onChange={(e) => {
+                        setLocalCalendarDateToField(e.target.value);
+                        onUpdate({ calendar_date_to_field: e.target.value || undefined });
+                      }}
+                      className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                    >
+                      <option value="">None (single date)</option>
+                      {dateFields.map((field) => (
+                        <option key={field.id} value={field.field_key}>
+                          {field.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Optional: Select a field to create date range events (periods of time)
+                    </p>
+                  </div>
                 </div>
               )}
 

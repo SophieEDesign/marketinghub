@@ -45,12 +45,14 @@ export async function loadFields(tableId: string): Promise<Field[]> {
 
   if (error) {
     console.error("Error loading fields:", error);
-    // Fallback to defaults if table_fields doesn't exist yet
-    return getDefaultFieldsForTable(tableId);
+    // Return empty array - new tables should have no default fields
+    return [];
   }
 
   if (!data || data.length === 0) {
-    return getDefaultFieldsForTable(tableId);
+    // Return empty array - new tables should have no default fields
+    // User will add fields as needed
+    return [];
   }
 
   // Parse and deduplicate fields by field_key (keep the first occurrence)

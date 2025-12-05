@@ -49,9 +49,11 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
   const filters = currentView?.filters || [];
   const sort = currentView?.sort || [];
   const calendarDateFieldKey = (currentView as any)?.calendar_date_field;
+  const calendarDateToFieldKey = (currentView as any)?.calendar_date_to_field;
   
   const handleViewSettingsUpdate = async (updates: {
     calendar_date_field?: string;
+    calendar_date_to_field?: string;
   }): Promise<void> => {
     try {
       await saveCurrentView(updates as any);
@@ -66,6 +68,11 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
     : allFields.find(
         (f) => f.label.toLowerCase() === "publish date" && f.type === "date"
       ) || allFields.find((f) => f.type === "date") || null;
+
+  // Detect "to date" field for date ranges (optional)
+  const dateToField = calendarDateToFieldKey
+    ? allFields.find((f) => f.field_key === calendarDateToFieldKey && f.type === "date")
+    : null;
 
   // Find title field
   const titleField = allFields.find((f) => f.label.toLowerCase() === "title") || allFields[0];
@@ -106,14 +113,31 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
         if (dateField) {
           const mapped = data
             .filter((row) => row[dateField.field_key])
-            .map((row) => ({
-              id: row.id.toString(),
-              title: titleField ? row[titleField.field_key] || "Untitled" : "Untitled",
-              start: row[dateField.field_key],
-              extendedProps: {
-                ...row,
-              },
-            }));
+            .map((row) => {
+              const startDate = row[dateField.field_key];
+              const endDate = dateToField && row[dateToField.field_key] 
+                ? row[dateToField.field_key] 
+                : null;
+              
+              // If end date exists and is before start date, swap them
+              let finalStart = startDate;
+              let finalEnd = endDate;
+              if (endDate && new Date(endDate) < new Date(startDate)) {
+                finalStart = endDate;
+                finalEnd = startDate;
+              }
+
+              return {
+                id: row.id.toString(),
+                title: titleField ? row[titleField.field_key] || "Untitled" : "Untitled",
+                start: finalStart,
+                end: finalEnd ? new Date(finalEnd).toISOString().split("T")[0] : undefined,
+                allDay: true,
+                extendedProps: {
+                  ...row,
+                },
+              };
+            });
 
           setEvents(mapped);
         }
@@ -153,9 +177,22 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
     
     const newDate = info.event.start;
     if (newDate) {
+      const updates: any = {
+        [dateField.field_key]: newDate.toISOString().split("T")[0]
+      };
+      
+      // If there's an end date field, maintain the duration when dragging
+      if (dateToField && info.event.end) {
+        const originalStart = info.event.start;
+        const originalEnd = info.event.end;
+        const duration = originalEnd.getTime() - originalStart.getTime();
+        const newEnd = new Date(newDate.getTime() + duration);
+        updates[dateToField.field_key] = newEnd.toISOString().split("T")[0];
+      }
+      
       await supabase
         .from(tableId)
-        .update({ [dateField.field_key]: newDate.toISOString().split("T")[0] })
+        .update(updates)
         .eq("id", info.event.id);
     }
   };
@@ -223,6 +260,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
     );
   }
 
+
   return (
     <div>
       <ViewHeader
@@ -236,6 +274,7 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
         onRemoveFilter={handleRemoveFilter}
         viewSettings={{
           calendar_date_field: calendarDateFieldKey,
+          calendar_date_to_field: calendarDateToFieldKey,
         }}
         onViewSettingsUpdate={handleViewSettingsUpdate}
       />

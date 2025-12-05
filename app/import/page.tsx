@@ -10,18 +10,18 @@ import { runImport, ImportResult } from "@/lib/import/runImport";
 import FieldMappingComponent from "@/components/import/FieldMapping";
 import ImportPreview from "@/components/import/ImportPreview";
 import { useFieldManager } from "@/lib/useFieldManager";
-import { getAllTables, getTableLabel } from "@/lib/tableMetadata";
+import { useTables } from "@/lib/hooks/useTables";
 import { supabase } from "@/lib/supabaseClient";
 
 // Papa will be imported dynamically when needed
 
-type Step = "upload" | "mapping" | "preview" | "importing" | "results";
+type Step = "upload" | "select-table" | "mapping" | "preview" | "importing" | "results";
 
 function ImportPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tableId, setTableId] = useState(searchParams.get("table") || "content");
-  const allTables = getAllTables();
+  const [tableId, setTableId] = useState<string>("");
+  const { tables: dynamicTables, loading: tablesLoading } = useTables();
 
   const [step, setStep] = useState<Step>("upload");
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -34,10 +34,12 @@ function ImportPageContent() {
 
   const { addField } = useFieldManager(tableId);
 
-  // Load fields on mount
+  // Load fields only when table is selected
   useEffect(() => {
-    loadFields(tableId).then(setFields);
-  }, [tableId]);
+    if (tableId && step !== "upload" && step !== "select-table") {
+      loadFields(tableId).then(setFields);
+    }
+  }, [tableId, step]);
 
   // Helper function to determine upsert key for a table
   const getUpsertKeyForTable = (table: string, tableFields: Field[]): string => {
@@ -51,21 +53,21 @@ function ImportPageContent() {
     );
     if (nameField) return nameField.field_key;
     
-    // Default based on table
-    const defaults: Record<string, string> = {
-      content: "title",
-      campaigns: "name",
-      contacts: "name",
-      ideas: "title",
-      media: "publication",
-      tasks: "title",
-      briefings: "title",
-      sponsorships: "name",
-      strategy: "title",
-      assets: "filename",
-    };
+    // Try to find any text field that might work as an identifier
+    const textField = tableFields.find(f => 
+      f.type === "text" && 
+      (f.field_key.includes("name") || 
+       f.field_key.includes("title") || 
+       f.field_key.includes("label"))
+    );
+    if (textField) return textField.field_key;
     
-    return defaults[table] || "id";
+    // Try any text field
+    const anyTextField = tableFields.find(f => f.type === "text");
+    if (anyTextField) return anyTextField.field_key;
+    
+    // Default to id if nothing found
+    return "id";
   };
 
   const handleFileSelect = useCallback(
@@ -121,7 +123,7 @@ function ImportPageContent() {
 
             setCsvHeaders(headers);
             setCsvRows(data);
-            setStep("mapping");
+            setStep("select-table");
           },
           error: (error) => {
             console.error("CSV parse error:", error);
@@ -243,24 +245,25 @@ function ImportPageContent() {
       
       console.log("[Import] Import complete:", result);
 
-      // Ensure table_metadata entry exists for this table
+      // Ensure table entry exists for this table (if using new tables system)
       try {
-        const { error: metadataError } = await supabase
-          .from("table_metadata")
+        const tableLabel = dynamicTables.find(t => t.name === tableId)?.label || tableId;
+        const { error: tableError } = await supabase
+          .from("tables")
           .upsert({
-            table_name: tableId,
-            display_name: getTableLabel(tableId),
+            name: tableId,
+            label: tableLabel,
             description: `Imported data table`,
             updated_at: new Date().toISOString(),
           }, {
-            onConflict: "table_name",
+            onConflict: "name",
           });
 
-        if (metadataError) {
-          console.warn("Could not update table_metadata:", metadataError);
+        if (tableError) {
+          console.warn("Could not update tables:", tableError);
         }
       } catch (error) {
-        console.warn("Error ensuring table_metadata:", error);
+        console.warn("Error ensuring table entry:", error);
       }
 
       setImportResult(result);
@@ -300,33 +303,10 @@ function ImportPageContent() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             Import CSV
           </h1>
-          <div className="flex items-center gap-4 mt-4">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Target Table:
-            </label>
-            <select
-              value={tableId}
-              onChange={(e) => {
-                setTableId(e.target.value);
-                // Reset import state when table changes
-                setStep("upload");
-                setCsvFile(null);
-                setCsvHeaders([]);
-                setCsvRows([]);
-                setMappings([]);
-                setImportResult(null);
-              }}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {allTables.map((tableId) => (
-                <option key={tableId} value={tableId}>
-                  {getTableLabel(tableId)}
-                </option>
-              ))}
-            </select>
-          </div>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Import data from a CSV file into the {getTableLabel(tableId)} table
+            {step === "upload" && "Upload your CSV file to get started"}
+            {step === "select-table" && "Choose which table to import your data into"}
+            {step !== "upload" && step !== "select-table" && tableId && `Importing into ${dynamicTables.find(t => t.name === tableId)?.label || tableId} table`}
           </p>
         </div>
 
@@ -334,11 +314,12 @@ function ImportPageContent() {
         <div className="mb-8 flex items-center gap-4">
           {[
             { id: "upload", label: "1. Upload CSV" },
-            { id: "mapping", label: "2. Map Columns" },
-            { id: "preview", label: "3. Preview" },
-            { id: "importing", label: "4. Import" },
+            { id: "select-table", label: "2. Select Table" },
+            { id: "mapping", label: "3. Map Columns" },
+            { id: "preview", label: "4. Preview" },
+            { id: "importing", label: "5. Import" },
           ].map((s, index) => {
-            const stepIndex = ["upload", "mapping", "preview", "importing", "results"].indexOf(step);
+            const stepIndex = ["upload", "select-table", "mapping", "preview", "importing", "results"].indexOf(step);
             const isActive = index === stepIndex;
             const isCompleted = index < stepIndex;
 
@@ -366,7 +347,7 @@ function ImportPageContent() {
                 >
                   {s.label}
                 </span>
-                {index < 3 && (
+                {index < 4 && (
                   <div className="w-8 h-0.5 bg-gray-200 dark:bg-gray-700 mx-2" />
                 )}
               </div>
@@ -423,6 +404,86 @@ function ImportPageContent() {
                     </p>
                   </div>
                 </label>
+              </div>
+              {csvFile && (
+                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    ✓ File uploaded: {csvFile.name} ({csvRows.length} rows)
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === "select-table" && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  ✓ CSV file uploaded: <strong>{csvFile?.name}</strong> ({csvRows.length} rows, {csvHeaders.length} columns)
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Select Target Table:
+                </label>
+                {tablesLoading ? (
+                  <div className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                    Loading tables...
+                  </div>
+                ) : dynamicTables.length === 0 ? (
+                  <div className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300">
+                    No tables found. Please create a table first in Settings → Data & Tables.
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      value={tableId}
+                      onChange={(e) => {
+                        setTableId(e.target.value);
+                        setMappings([]);
+                        setImportResult(null);
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                    >
+                      <option value="">-- Select a table --</option>
+                      {dynamicTables.map((table) => (
+                        <option key={table.id} value={table.name}>
+                          {table.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Choose which table you want to import your CSV data into. If no tables exist, create one in Settings → Data & Tables.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setStep("upload");
+                    setCsvFile(null);
+                    setCsvHeaders([]);
+                    setCsvRows([]);
+                    setTableId("");
+                  }}
+                  className="btn-secondary mr-3"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => {
+                    if (tableId) {
+                      setStep("mapping");
+                    }
+                  }}
+                  disabled={!tableId}
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400"
+                >
+                  Continue to Mapping
+                </button>
               </div>
             </div>
           )}
@@ -535,7 +596,7 @@ function ImportPageContent() {
 
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
-                  onClick={() => router.push(`/${tableId}/grid`)}
+                  onClick={() => router.push(`/tables/${tableId}`)}
                   className="btn-primary"
                 >
                   View Data
@@ -548,6 +609,7 @@ function ImportPageContent() {
                     setCsvRows([]);
                     setMappings([]);
                     setImportResult(null);
+                    setTableId("");
                   }}
                   className="btn-secondary"
                 >

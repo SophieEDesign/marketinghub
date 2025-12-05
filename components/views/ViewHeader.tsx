@@ -20,6 +20,7 @@ interface ViewSettings {
   groupings?: Array<{ name: string; fields: string[] }>;
   kanban_group_field?: string;
   calendar_date_field?: string;
+  calendar_date_to_field?: string;
   timeline_date_field?: string;
   row_height?: "compact" | "medium" | "tall";
   card_fields?: string[];

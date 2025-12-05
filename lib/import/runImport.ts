@@ -63,11 +63,38 @@ export async function runImport(
   // Step 2: Handle unknown select options
   await addUnknownSelectOptions(transformedRows, mappings, fields);
 
+  // Get all valid field keys for validation
+  const validFieldKeys = new Set(fields.map(f => f.field_key));
+  const invalidColumns: Set<string> = new Set();
+  
+  // Pre-validate all rows and collect invalid columns
+  for (const row of transformedRows) {
+    for (const key of Object.keys(row)) {
+      if (!validFieldKeys.has(key) && 
+          key !== 'id' && 
+          key !== 'created_at' && 
+          key !== 'updated_at' && 
+          key !== upsertKey) {
+        invalidColumns.add(key);
+      }
+    }
+  }
+  
+  if (invalidColumns.size > 0) {
+    console.warn(`[runImport] Found ${invalidColumns.size} columns that don't exist in table:`, Array.from(invalidColumns));
+    // Add warnings for invalid columns
+    for (const col of invalidColumns) {
+      result.warnings.push({ row: 0, warning: `Column '${col}' does not exist in table and will be skipped` });
+    }
+  }
+  
   console.log("[runImport] Starting import:", { 
     tableId: options.tableId, 
     mode: options.mode, 
     upsertKey, 
-    rowCount: transformedRows.length 
+    rowCount: transformedRows.length,
+    validColumns: validFieldKeys.size,
+    invalidColumns: invalidColumns.size
   });
 
   // Step 3: Import rows
@@ -132,14 +159,26 @@ export async function runImport(
               if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
               if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
               
-              // Only include other columns that are in the fields list
+              // Only include other columns that are in the fields list and exist in safeRow
               for (const field of fields) {
                 if (safeRow[field.field_key] !== undefined && 
                     field.field_key !== badColumn &&
                     field.field_key !== upsertKey &&
-                    field.field_key !== 'id') {
+                    field.field_key !== 'id' &&
+                    field.field_key !== 'created_at' &&
+                    field.field_key !== 'updated_at') {
                   minimalRow[field.field_key] = safeRow[field.field_key];
                 }
+              }
+              
+              // If minimal row is empty or only has timestamps, skip
+              const hasData = Object.keys(minimalRow).some(key => 
+                key !== 'created_at' && key !== 'updated_at'
+              );
+              if (!hasData) {
+                result.errors.push({ row: i + 1, error: `No valid columns to update after filtering out non-existent columns` });
+                result.skipped++;
+                continue;
               }
               
               const { error: minimalError } = await supabase
@@ -173,6 +212,13 @@ export async function runImport(
           const safeRow = filterRowToExistingColumns(row, fields, upsertKey);
           delete safeRow.id; // Don't insert id, let DB generate it
           
+          // If no valid columns after filtering, skip this row
+          if (Object.keys(safeRow).length === 0) {
+            result.errors.push({ row: i + 1, error: `No valid columns to insert - all mapped columns do not exist in table` });
+            result.skipped++;
+            continue;
+          }
+          
           const { error: insertError } = await supabase
             .from(options.tableId)
             .insert([safeRow]);
@@ -199,14 +245,26 @@ export async function runImport(
               if (safeRow.created_at !== undefined) minimalRow.created_at = safeRow.created_at;
               if (safeRow.updated_at !== undefined) minimalRow.updated_at = safeRow.updated_at;
               
-              // Only include other columns that are in the fields list
+              // Only include other columns that are in the fields list and exist in safeRow
               for (const field of fields) {
                 if (safeRow[field.field_key] !== undefined && 
                     field.field_key !== badColumn &&
                     field.field_key !== upsertKey &&
-                    field.field_key !== 'id') {
+                    field.field_key !== 'id' &&
+                    field.field_key !== 'created_at' &&
+                    field.field_key !== 'updated_at') {
                   minimalRow[field.field_key] = safeRow[field.field_key];
                 }
+              }
+              
+              // If minimal row is empty or only has timestamps, skip
+              const hasData = Object.keys(minimalRow).some(key => 
+                key !== 'created_at' && key !== 'updated_at'
+              );
+              if (!hasData) {
+                result.errors.push({ row: i + 1, error: `No valid columns to insert after filtering out non-existent columns` });
+                result.skipped++;
+                continue;
               }
               
               const { error: minimalError } = await supabase
@@ -248,11 +306,12 @@ export async function runImport(
       const batch = transformedRows.slice(i, i + batchSize);
       
       try {
-        // Remove id from batch (let DB generate it)
+        // Filter each row to only include columns that exist in the table
         const safeBatch = batch.map(row => {
-          const { id, ...rest } = row;
-          return rest;
-        });
+          const filtered = filterRowToExistingColumns(row, fields, upsertKey);
+          delete filtered.id; // Don't insert id, let DB generate it
+          return filtered;
+        }).filter(row => Object.keys(row).length > 0); // Remove empty rows
         
         const { error: insertError } = await supabase
           .from(options.tableId)
@@ -348,21 +407,38 @@ export async function runImport(
 
 /**
  * Filter a row to only include columns that exist in the fields definition
+ * This is critical to prevent inserting columns that don't exist in the table
  */
 function filterRowToExistingColumns(
   row: any,
   fields: Field[],
   upsertKey: string
 ): any {
+  // Create a set of valid field keys for fast lookup
   const fieldKeys = new Set(fields.map(f => f.field_key));
+  
+  // Standard columns that might exist in any table
+  const standardColumns = new Set(['id', 'created_at', 'updated_at']);
+  if (upsertKey) {
+    standardColumns.add(upsertKey);
+  }
+  
   const filtered: any = {};
   
-  // Always include standard columns
-  const standardColumns = ['id', 'created_at', 'updated_at', upsertKey];
-  
+  // Only include keys that are either:
+  // 1. In the fields list (valid table columns)
+  // 2. Standard columns (id, created_at, updated_at, upsertKey)
   for (const key of Object.keys(row)) {
+    // Skip if value is null or undefined (but allow empty strings)
+    if (row[key] === null || row[key] === undefined) {
+      continue;
+    }
+    
     // Only include if it's a known field or standard column
-    if (fieldKeys.has(key) || standardColumns.includes(key)) {
+    const isValidField = fieldKeys.has(key);
+    const isStandardColumn = standardColumns.has(key);
+    
+    if (isValidField || isStandardColumn) {
       // For multi_select fields, ensure proper array format
       const field = fields.find(f => f.field_key === key);
       if (field?.type === 'multi_select') {
@@ -387,6 +463,9 @@ function filterRowToExistingColumns(
       } else {
         filtered[key] = row[key];
       }
+    } else {
+      // Log skipped columns for debugging
+      console.debug(`[filterRowToExistingColumns] Skipping column '${key}' - not found in table fields`);
     }
   }
   
