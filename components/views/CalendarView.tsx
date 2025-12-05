@@ -183,9 +183,10 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
       
       // If there's an end date field, maintain the duration when dragging
       if (dateToField && info.event.end && info.event.start) {
+        // Use values directly to avoid TypeScript narrowing issues
         const originalStart = info.event.start;
         const originalEnd = info.event.end;
-        const duration = originalEnd.getTime() - originalStart.getTime();
+        const duration = originalEnd!.getTime() - originalStart!.getTime();
         const newEnd = new Date(newDate.getTime() + duration);
         updates[dateToField.field_key] = newEnd.toISOString().split("T")[0];
       }
