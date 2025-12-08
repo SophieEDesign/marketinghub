@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Database, Table, Columns, Eye, Download, Upload, ChevronRight, Plus, Trash2, Edit2, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getAllTables } from "@/lib/tableMetadata";
+import { useTables } from "@/lib/hooks/useTables";
 import { useViewConfigs } from "@/lib/useViewConfigs";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "@/components/ui/Toast";
@@ -12,7 +12,8 @@ import Button from "@/components/ui/Button";
 export default function DataTablesTab() {
   const router = useRouter();
   const [activeSubTab, setActiveSubTab] = useState<"tables" | "fields" | "views" | "import">("tables");
-  const [selectedTable, setSelectedTable] = useState<string>("content");
+  const [selectedTable, setSelectedTable] = useState<string>("");
+  const { tables: dynamicTables } = useTables();
 
   const subTabs = [
     { id: "tables" as const, label: "Tables", icon: Table },
@@ -112,12 +113,14 @@ export default function DataTablesTab() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Fields</h2>
-            <Button
-              variant="secondary"
-              onClick={() => router.push(`/settings/fields?table=${selectedTable}`)}
-            >
-              Manage Fields
-            </Button>
+            {selectedTable && (
+              <Button
+                variant="secondary"
+                onClick={() => router.push(`/settings/fields?table=${selectedTable}`)}
+              >
+                Manage Fields
+              </Button>
+            )}
           </div>
           <div className="space-y-3">
             <div>
@@ -129,9 +132,10 @@ export default function DataTablesTab() {
                 onChange={(e) => setSelectedTable(e.target.value)}
                 className="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                {getAllTables().map((tableId) => (
-                  <option key={tableId} value={tableId}>
-                    {tableId}
+                <option value="">-- Select a table --</option>
+                {dynamicTables.map((table) => (
+                  <option key={table.id} value={table.name}>
+                    {table.label}
                   </option>
                 ))}
               </select>
@@ -139,9 +143,11 @@ export default function DataTablesTab() {
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Manage fields for the selected table. Add new fields, change field types, reorder fields, or delete unused fields.
             </p>
-            <Button onClick={() => router.push(`/settings/fields?table=${selectedTable}`)}>
-              Manage Fields for {selectedTable}
-            </Button>
+            {selectedTable && (
+              <Button onClick={() => router.push(`/settings/fields?table=${selectedTable}`)}>
+                Manage Fields for {dynamicTables.find(t => t.name === selectedTable)?.label || selectedTable}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -189,15 +195,18 @@ export default function DataTablesTab() {
                     onChange={(e) => setSelectedTable(e.target.value)}
                     className="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm mb-3"
                   >
-                    {getAllTables().map((tableId) => (
-                      <option key={tableId} value={tableId}>
-                        {tableId}
+                    <option value="">-- Select a table --</option>
+                    {dynamicTables.map((table) => (
+                      <option key={table.id} value={table.name}>
+                        {table.label}
                       </option>
                     ))}
                   </select>
-                  <Button onClick={() => handleExportCSV(selectedTable)}>
-                    Export {selectedTable} as CSV
-                  </Button>
+                  {selectedTable && (
+                    <Button onClick={() => handleExportCSV(selectedTable)}>
+                      Export {dynamicTables.find(t => t.name === selectedTable)?.label || selectedTable} as CSV
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -610,9 +619,10 @@ function ViewsManagement({ selectedTable }: { selectedTable: string }) {
             onChange={(e) => router.push(`/settings?section=data&table=${e.target.value}`)}
             className="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
           >
-            {getAllTables().map((tableId) => (
-              <option key={tableId} value={tableId}>
-                {tableId}
+            <option value="">-- Select a table --</option>
+            {dynamicTables.map((table) => (
+              <option key={table.id} value={table.name}>
+                {table.label}
               </option>
             ))}
           </select>

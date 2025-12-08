@@ -50,25 +50,13 @@ export function useTables() {
         }));
         setTables(convertedTables);
       } else {
-        // Final fallback to hardcoded common tables
-        setTables([
-          { id: "content", name: "content", label: "Content" },
-          { id: "campaigns", name: "campaigns", label: "Campaigns" },
-          { id: "contacts", name: "contacts", label: "Contacts" },
-          { id: "tasks", name: "tasks", label: "Tasks" },
-          { id: "sponsorships", name: "sponsorships", label: "Sponsorships" },
-        ]);
+        // No tables found - return empty array
+        setTables([]);
       }
     } catch (error) {
       console.error("Error loading tables:", error);
-      // Fallback to hardcoded tables
-      setTables([
-        { id: "content", name: "content", label: "Content" },
-        { id: "campaigns", name: "campaigns", label: "Campaigns" },
-        { id: "contacts", name: "contacts", label: "Contacts" },
-        { id: "tasks", name: "tasks", label: "Tasks" },
-        { id: "sponsorships", name: "sponsorships", label: "Sponsorships" },
-      ]);
+      // Return empty array on error - no hardcoded fallback
+      setTables([]);
     } finally {
       setLoading(false);
     }

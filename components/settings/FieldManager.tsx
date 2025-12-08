@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 export default function FieldManager() {
   const pathname = usePathname();
   const pathParts = pathname.split("/").filter(Boolean);
-  const currentTable = pathParts[0] || "content";
+  const currentTable = pathParts[0] || "";
 
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +20,16 @@ export default function FieldManager() {
   });
 
   useEffect(() => {
-    load();
+    if (currentTable) {
+      load();
+    } else {
+      setFields([]);
+      setLoading(false);
+    }
   }, [currentTable]);
 
   async function load() {
+    if (!currentTable) return;
     setLoading(true);
     const tableFields = await loadFields(currentTable);
     setFields(tableFields);

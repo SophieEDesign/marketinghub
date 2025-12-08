@@ -16,7 +16,7 @@ export default function HeaderBar() {
   
   // Extract table ID from path
   const pathParts = pathname.split("/").filter(Boolean);
-  const currentTable = pathParts[0] || "content";
+  const currentTable = pathParts[0] || "";
 
   if (!themeContext || !densityContext) {
     return null;

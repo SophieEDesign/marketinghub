@@ -57,42 +57,7 @@ export default function CommandPalette() {
   const commandItems = useMemo<CommandItem[]>(() => {
     const items: CommandItem[] = [];
 
-    // Add action items
-    items.push({
-      id: "new-content",
-      type: "action",
-      label: "Create new Content",
-      description: "Create a new content item",
-      icon: <Plus className="w-4 h-4" />,
-      action: () => {
-        router.push("/content/grid");
-        setIsOpen(false);
-      },
-    });
-
-    items.push({
-      id: "new-campaign",
-      type: "action",
-      label: "Create new Campaign",
-      description: "Create a new campaign",
-      icon: <Plus className="w-4 h-4" />,
-      action: () => {
-        router.push("/campaigns/grid");
-        setIsOpen(false);
-      },
-    });
-
-    items.push({
-      id: "new-task",
-      type: "action",
-      label: "Create new Task",
-      description: "Create a new task",
-      icon: <Plus className="w-4 h-4" />,
-      action: () => {
-        router.push("/tasks/grid");
-        setIsOpen(false);
-      },
-    });
+    // Action items are now handled dynamically via table navigation
 
     // Add table items
     tables.forEach((tableId) => {

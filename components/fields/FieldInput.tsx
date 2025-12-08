@@ -139,7 +139,7 @@ export default function FieldInput({ field, value, onChange, error, table, recor
       return (
         <div>
           <AttachmentUpload
-            table={table || field.table_id || "content"}
+            table={table || field.table_id || ""}
             recordId={recordId || null}
             fieldKey={field.field_key}
             value={Array.isArray(value) ? value[0] || null : value || null}

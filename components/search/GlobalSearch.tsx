@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useModal } from "@/lib/modalState";
 import { useRecordDrawer } from "@/components/record-drawer/RecordDrawerProvider";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { useTables } from "@/lib/hooks/useTables";
 
 // Dynamically import Fuse.js if available
 let Fuse: any = null;
@@ -95,6 +96,7 @@ export default function GlobalSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { setOpen: setModalOpen, setTableId: setModalTableId } = useModal();
   const { openRecord } = useRecordDrawer();
+  const { tables: dynamicTables } = useTables();
 
   // Load all data on mount (for client-side search) - optimized with caching
   useEffect(() => {
@@ -421,18 +423,18 @@ export default function GlobalSearch() {
               <div className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 font-semibold mb-3">
                 Create New
               </div>
-              {["content", "ideas", "contacts"].map((table) => {
-                const Icon = TABLE_ICONS[table] || FileText;
+              {dynamicTables.slice(0, 6).map((table) => {
+                const Icon = TABLE_ICONS[table.name] || FileText;
                 return (
                   <div
-                    key={table}
-                    onClick={() => handleCreateNew(table, query)}
+                    key={table.id}
+                    onClick={() => handleCreateNew(table.name, query)}
                     className="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                   >
                     <Icon className="w-4 h-4 text-gray-400" />
                     <div className="flex-1">
                       <div className="font-medium">
-                        + Create new {TABLE_LABELS[table]} "{query}"
+                        + Create new {table.label} "{query}"
                       </div>
                     </div>
                   </div>

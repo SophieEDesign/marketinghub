@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useFieldManager } from "@/lib/useFieldManager";
-import { tables } from "@/lib/tables";
+import { useTables } from "@/lib/hooks/useTables";
 import { Field } from "@/lib/fields";
 import FieldList from "@/components/fields/FieldList";
 import FieldEditor from "@/components/fields/FieldEditor";
@@ -25,7 +25,8 @@ import FieldAddModal from "@/components/fields/FieldAddModal";
 
 export default function FieldManagerTab() {
   const router = useRouter();
-  const [tableId, setTableId] = useState("content");
+  const [tableId, setTableId] = useState("");
+  const { tables: dynamicTables, loading: tablesLoading } = useTables();
 
   const {
     fields,
@@ -52,7 +53,9 @@ export default function FieldManagerTab() {
   );
 
   useEffect(() => {
-    getFields();
+    if (tableId) {
+      getFields();
+    }
   }, [tableId, getFields]);
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -91,7 +94,7 @@ export default function FieldManagerTab() {
     setEditingField(null);
   };
 
-  const currentTable = tables.find((t) => t.id === tableId);
+  const currentTable = dynamicTables.find((t) => t.name === tableId || t.id === tableId);
 
   if (loading && fields.length === 0) {
     return <div className="text-sm text-gray-500">Loading fields...</div>;
@@ -102,7 +105,7 @@ export default function FieldManagerTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-heading font-semibold text-brand-blue mb-2">
-            Field Manager – {currentTable?.name || tableId} Table
+            Field Manager – {currentTable?.label || tableId || "Select Table"} Table
           </h2>
           <div className="flex items-center gap-4">
             <select
@@ -110,14 +113,15 @@ export default function FieldManagerTab() {
               onChange={(e) => setTableId(e.target.value)}
               className="px-3 py-2 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700"
             >
-              {tables.map((table) => (
-                <option key={table.id} value={table.id}>
-                  {table.name}
+              <option value="">-- Select a table --</option>
+              {dynamicTables.map((table) => (
+                <option key={table.id} value={table.name}>
+                  {table.label}
                 </option>
               ))}
             </select>
             <span className="text-sm text-gray-500">
-              Managing fields for: <strong>{currentTable?.name || tableId}</strong>
+              Managing fields for: <strong>{currentTable?.label || tableId || "No table selected"}</strong>
             </span>
           </div>
         </div>
@@ -138,7 +142,11 @@ export default function FieldManagerTab() {
       <div>
         <h3 className="text-lg font-semibold mb-4">Fields ({fields.length})</h3>
 
-        {fields.length === 0 ? (
+        {!tableId ? (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            <p className="mb-2">Please select a table to manage its fields.</p>
+          </div>
+        ) : fields.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-400">
             <p className="mb-2">No fields configured yet.</p>
             <p className="text-sm">Click "Add Field" to get started.</p>

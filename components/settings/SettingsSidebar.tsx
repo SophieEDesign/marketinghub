@@ -217,7 +217,7 @@ export default function SettingsSidebar() {
         <div className="mt-6 border-t pt-4">
           <h3 className="font-semibold mb-2">Field Management</h3>
           <Link
-            href="/settings/fields?table=content"
+            href="/settings/fields"
             className="block px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition text-sm text-center"
           >
             Open Field Manager →

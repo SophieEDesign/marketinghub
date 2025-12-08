@@ -30,8 +30,10 @@ export default function KanbanCard({ row, fields }: KanbanCardProps) {
     if (!isDragging) {
       e.stopPropagation();
       // Find tableId from fields
-      const tableId = fields[0]?.table_id || "content";
-      openRecord(tableId, row.id);
+      const tableId = fields[0]?.table_id;
+      if (tableId) {
+        openRecord(tableId, row.id);
+      }
     }
   };
 

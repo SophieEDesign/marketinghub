@@ -61,7 +61,15 @@ function TableRecordsContent() {
   if (!table) {
     return (
       <div className="p-6">
-        <div className="text-sm text-red-500">Table not found</div>
+        <div className="text-sm text-red-500 mb-4">
+          Table "{tableId}" not found. This table may have been deleted or renamed.
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/tables")}
+        >
+          View All Tables
+        </Button>
       </div>
     );
   }
