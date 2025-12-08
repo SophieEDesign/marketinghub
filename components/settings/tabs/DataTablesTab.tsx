@@ -583,6 +583,7 @@ function TablesManagement() {
 
 function ViewsManagement({ selectedTable }: { selectedTable: string }) {
   const { views, loading, deleteView, setDefaultView, switchToViewByName } = useViewConfigs(selectedTable);
+  const { tables: dynamicTables } = useTables();
   const router = useRouter();
 
   const handleDeleteView = async (viewId: string, viewName: string) => {
