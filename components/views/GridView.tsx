@@ -59,6 +59,7 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
   const [recordsPerPage] = useState(200);
   const [totalRecords, setTotalRecords] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { fields: allFields, loading: fieldsLoading } = useFields(tableId);
   const { openRecord } = useRecordDrawer();
   const {
@@ -237,6 +238,17 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
     return getRequiredColumns(fields);
   }, [fields]);
 
+  // Get searchable fields (text, long_text, single_select, and id)
+  const searchableFields = useMemo(() => {
+    return fields.filter(
+      (f) =>
+        f.type === "text" ||
+        f.type === "long_text" ||
+        f.type === "single_select" ||
+        f.field_key === "id"
+    );
+  }, [fields]);
+
   // Load records with filters and sort (optimized with caching and column selection)
   useEffect(() => {
     if (!tableId) return;
@@ -244,10 +256,10 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
     async function load() {
       setLoading(true);
 
-      // Create cache key from filters and sort
+      // Create cache key from filters, sort, and search
       const cacheKey = CacheKeys.tableRecords(
         tableId,
-        JSON.stringify({ filters, sort, columns: requiredColumns })
+        JSON.stringify({ filters, sort, searchQuery, columns: requiredColumns })
       );
 
       const loadData = async () => {
@@ -256,7 +268,7 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
           console.log(`Fields not ready for ${tableId}, using select('*')`);
           const offset = (currentPage - 1) * recordsPerPage;
           let query = supabase.from(tableId).select("*").range(offset, offset + recordsPerPage - 1);
-          query = applyFiltersAndSort(query, filters, sort);
+          query = applyFiltersAndSort(query, filters, sort, searchQuery, searchableFields);
           if (sort.length === 0) {
             query = query.order("created_at", { ascending: false });
           }
@@ -288,8 +300,8 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
         const offset = (currentPage - 1) * recordsPerPage;
         let query = supabase.from(tableId).select(requiredColumns).range(offset, offset + recordsPerPage - 1);
 
-        // Apply filters and sort
-        query = applyFiltersAndSort(query, filters, sort);
+        // Apply search, filters and sort
+        query = applyFiltersAndSort(query, filters, sort, searchQuery, searchableFields);
 
         // Default sort if no sort specified
         if (sort.length === 0) {
@@ -304,7 +316,7 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
           // Retry with select all
           const offset = (currentPage - 1) * recordsPerPage;
           let fallbackQuery = supabase.from(tableId).select("*").range(offset, offset + recordsPerPage - 1);
-          fallbackQuery = applyFiltersAndSort(fallbackQuery, filters, sort);
+          fallbackQuery = applyFiltersAndSort(fallbackQuery, filters, sort, searchQuery, searchableFields);
           if (sort.length === 0) {
             fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
           }
@@ -345,12 +357,12 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
       setLoading(false);
     }
     load();
-  }, [tableId, filters, sort, requiredColumns, fieldsLoading, fields, currentPage]);
+  }, [tableId, filters, sort, searchQuery, requiredColumns, fieldsLoading, fields, currentPage, searchableFields]);
   
-  // Reset to page 1 when filters or sort change
+  // Reset to page 1 when filters, sort, or search change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, sort]);
+  }, [filters, sort, searchQuery]);
 
   const [isPending, startTransition] = useTransition();
 
@@ -476,6 +488,8 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
           fields={allFields}
           filters={filters}
           sort={sort}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           onFiltersChange={handleFiltersChange}
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}
@@ -565,6 +579,8 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
           fields={allFields}
           filters={filters}
           sort={sort}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
           onFiltersChange={handleFiltersChange}
           onSortChange={handleSortChange}
           onRemoveFilter={handleRemoveFilter}

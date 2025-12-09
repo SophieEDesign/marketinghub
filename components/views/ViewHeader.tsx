@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Filter as FilterIcon, ArrowUpDown, Settings, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Filter as FilterIcon, ArrowUpDown, Settings, Trash2, Search, X } from "lucide-react";
 import { Field } from "@/lib/fields";
 import { Filter, Sort } from "@/lib/types/filters";
 import ViewFilterPanel from "./ViewFilterPanel";
@@ -49,6 +49,8 @@ interface ViewHeaderProps {
   onChangeViewType?: (viewType: "grid" | "kanban" | "calendar" | "timeline" | "cards") => Promise<void>;
   onResetLayout?: () => Promise<void>;
   onCreateView?: () => Promise<void>;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
 }
 
 export default function ViewHeader({
@@ -73,11 +75,19 @@ export default function ViewHeader({
   onChangeViewType,
   onResetLayout,
   onCreateView,
+  searchQuery = "",
+  onSearchChange,
 }: ViewHeaderProps) {
   const permissions = usePermissions();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showSettingsDrawer, setShowSettingsDrawer] = useState(false);
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+
+  // Sync local state with prop
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
 
   const handleFiltersChange = async (newFilters: Filter[]) => {
     await onFiltersChange(newFilters);
@@ -89,8 +99,53 @@ export default function ViewHeader({
     setShowSortPanel(false);
   };
 
+  // Get text fields for search
+  const searchableFields = fields.filter(
+    (f) => 
+      f.type === "text" || 
+      f.type === "long_text" || 
+      f.type === "single_select" ||
+      f.field_key === "id"
+  );
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearchQuery(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
+
+  const handleClearSearch = () => {
+    handleSearchChange("");
+  };
+
   return (
     <>
+      {/* Search Bar */}
+      {onSearchChange && searchableFields.length > 0 && (
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={localSearchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder={`Search ${searchableFields.length} field${searchableFields.length !== 1 ? 's' : ''}...`}
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            {localSearchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 md:gap-4 mb-4">
         <div className="flex-1 min-w-0 flex items-center gap-3">
           <ViewMenu

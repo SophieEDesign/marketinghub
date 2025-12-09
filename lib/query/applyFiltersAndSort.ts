@@ -1,6 +1,8 @@
 import { PostgrestQueryBuilder } from "@supabase/postgrest-js";
 import { Filter, Sort } from "../types/filters";
 
+export { applySearch };
+
 /**
  * Apply filters to a Supabase query
  */
@@ -158,14 +160,59 @@ export function applySort(query: any, sort: Sort[]): any {
 }
 
 /**
+ * Apply search query across multiple text fields
+ */
+export function applySearch(
+  query: any,
+  searchQuery: string,
+  searchableFields: Array<{ field_key: string }>
+): any {
+  if (!searchQuery || !searchQuery.trim() || searchableFields.length === 0) {
+    return query;
+  }
+
+  const trimmedQuery = searchQuery.trim();
+  if (!trimmedQuery) {
+    return query;
+  }
+
+  // Escape special characters for ilike (%, _, \)
+  const escapedQuery = trimmedQuery.replace(/[%_\\]/g, '\\$&');
+  const searchPattern = `%${escapedQuery}%`;
+
+  // Build OR conditions for all searchable fields
+  // Supabase OR format: field1.ilike.%pattern%,field2.ilike.%pattern%,...
+  const searchConditions = searchableFields
+    .map((field) => `${field.field_key}.ilike.${searchPattern}`)
+    .join(",");
+
+  // Apply OR search across all fields
+  // If only one field, use direct ilike (more efficient)
+  if (searchableFields.length === 1) {
+    return query.ilike(searchableFields[0].field_key, searchPattern);
+  }
+
+  // Multiple fields: use OR
+  return query.or(searchConditions);
+}
+
+/**
  * Apply both filters and sort to a query
  */
 export function applyFiltersAndSort(
   query: any,
   filters: Filter[],
-  sort: Sort[]
+  sort: Sort[],
+  searchQuery?: string,
+  searchableFields?: Array<{ field_key: string }>
 ): any {
   let result = query;
+  
+  // Apply search first (before filters)
+  if (searchQuery && searchableFields && searchableFields.length > 0) {
+    result = applySearch(result, searchQuery, searchableFields);
+  }
+  
   result = applyFilters(result, filters);
   result = applySort(result, sort);
   return result;

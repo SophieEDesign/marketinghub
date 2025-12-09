@@ -34,13 +34,60 @@ export interface FieldMetadata {
 }
 
 /**
+ * Resolve table ID from either UUID or table name
+ */
+async function resolveTableIdForFields(tableId: string): Promise<string | null> {
+  // Check if id is a UUID (new system) or table name (old system)
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tableId);
+  
+  if (isUUID) {
+    // New system: Verify UUID exists
+    const { data, error } = await supabase
+      .from("tables")
+      .select("id")
+      .eq("id", tableId)
+      .single();
+    
+    if (error || !data) {
+      return null;
+    }
+    
+    return data.id;
+  } else {
+    // Old system or table name: Look up by name
+    const { data, error } = await supabase
+      .from("tables")
+      .select("id")
+      .eq("name", tableId)
+      .single();
+    
+    if (error || !data) {
+      return null;
+    }
+    
+    return data.id;
+  }
+}
+
+/**
  * Load all fields for a table from Supabase table_fields table
+ * Resolves table name to UUID to avoid matching old orphaned fields
  */
 export async function loadFields(tableId: string): Promise<Field[]> {
+  // First, resolve table name to UUID (if needed)
+  const resolvedTableId = await resolveTableIdForFields(tableId);
+  
+  if (!resolvedTableId) {
+    // Table doesn't exist or couldn't be resolved - return empty array
+    console.warn(`Table "${tableId}" not found or couldn't be resolved. Returning empty fields.`);
+    return [];
+  }
+
+  // Query fields using the resolved UUID (not the table name)
   const { data, error } = await supabase
     .from("table_fields")
     .select("*")
-    .eq("table_id", tableId)
+    .eq("table_id", resolvedTableId)
     .order("order", { ascending: true });
 
   if (error) {
