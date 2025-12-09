@@ -36,6 +36,8 @@ AND tf.table_id::text NOT SIMILAR TO '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 -- - Check the result of the query above to see which one you have
 
 -- Version A: If your table has 'name' column (old schema)
+-- Uncomment this and comment Version B if you have 'name':
+/*
 SELECT 
   tf.id,
   tf.table_id,
@@ -51,10 +53,9 @@ WHERE NOT EXISTS (
   SELECT 1 FROM tables t 
   WHERE t.id::text = tf.table_id::text
 );
+*/
 
 -- Version B: If your table has 'field_key' column (new schema)
--- Uncomment this and comment Version A if you have 'field_key':
-/*
 SELECT 
   tf.id,
   tf.table_id,
@@ -70,7 +71,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM tables t 
   WHERE t.id::text = tf.table_id::text
 );
-*/
 
 -- ============================================
 -- ALTERNATIVE: Nuclear option - Delete ALL fields and start fresh
