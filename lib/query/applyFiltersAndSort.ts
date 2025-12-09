@@ -1,8 +1,6 @@
 import { PostgrestQueryBuilder } from "@supabase/postgrest-js";
 import { Filter, Sort } from "../types/filters";
 
-export { applySearch };
-
 /**
  * Apply filters to a Supabase query
  */
