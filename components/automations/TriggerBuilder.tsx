@@ -246,7 +246,7 @@ function FieldMatchTriggerConfig({
   config: any;
   onChange: (updates: any) => void;
 }) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const { fields } = useFields(tableId || "");
   const [selectedField, setSelectedField] = useState<string>(config.field_key || "");
 
@@ -358,7 +358,7 @@ function DateApproachingTriggerConfig({
   config: any;
   onChange: (updates: any) => void;
 }) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const { fields } = useFields(tableId || "");
   const dateFields = fields.filter((f) => f.type === "date");
 
