@@ -4,6 +4,7 @@ import { evaluateTrigger } from "@/lib/automations/triggerEngine";
 import { evaluateConditions } from "@/lib/automations/conditionEngine";
 import { executeActions } from "@/lib/automations/actionEngine";
 import { AutomationTrigger, Condition, AutomationAction } from "@/lib/automations/schema";
+import { Automation } from "@/lib/types/automations";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,14 +80,24 @@ export async function POST(
     const actions = automation.actions as AutomationAction[];
     const startTime = Date.now();
 
+    // Convert automation to Automation type
+    const automationData: Automation = {
+      id: automation.id,
+      name: automation.name,
+      status: automation.status as 'active' | 'paused',
+      trigger: automation.trigger,
+      conditions: automation.conditions || [],
+      actions: automation.actions || [],
+      created_at: automation.created_at,
+      updated_at: automation.updated_at,
+    };
+
     const actionResults = await executeActions(actions, {
       record: recordToCheck,
       oldRecord,
       newRecord,
-      automation: {
-        id: automation.id,
-        name: automation.name,
-      },
+      automation: automationData,
+      supabase: supabaseAdmin,
     });
 
     const duration = Date.now() - startTime;

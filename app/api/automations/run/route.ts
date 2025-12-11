@@ -186,9 +186,20 @@ export async function POST(request: NextRequest) {
         }
 
         // Execute actions
+        const automationData: Automation = {
+          id: automation.id,
+          name: automation.name,
+          status: automation.status as 'active' | 'paused',
+          trigger: automation.trigger,
+          conditions: automation.conditions || [],
+          actions: automation.actions || [],
+          created_at: automation.created_at,
+          updated_at: automation.updated_at,
+        };
+
         const actionContext: ActionContext = {
           record: record || {},
-          automation,
+          automation: automationData,
           supabase,
           logger: (message, data) => {
             console.log(`[Automation ${automation.name}]`, message, data);
