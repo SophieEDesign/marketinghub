@@ -160,7 +160,8 @@ export default function AutomationEditor({
 
   const handleAddCondition = () => {
     const newCondition: Condition = {
-      field: "",
+      type: "field",
+      field_key: "",
       operator: "equals",
       value: "",
     };
