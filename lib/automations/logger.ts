@@ -24,7 +24,7 @@ export async function writeAutomationLog(
       status,
       input: input || null,
       output: output || null,
-      error: error || null,
+      error: error || undefined,
       duration_ms: durationMs || null,
     };
 
