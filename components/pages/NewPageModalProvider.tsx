@@ -32,8 +32,8 @@ export default function NewPageModalProvider({ children }: { children?: ReactNod
     setIsOpen(false);
   };
 
-  const handleCreate = async (name: string, layout: PageLayout) => {
-    await createPage(name, layout);
+  const handleCreate = async (name: string, layout: PageLayout, pageType?: string) => {
+    await createPage(name, layout, pageType);
     closeModal();
   };
 

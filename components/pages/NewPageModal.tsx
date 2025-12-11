@@ -47,9 +47,16 @@ export default function NewPageModal({ open, onClose, onCreate }: NewPageModalPr
 
     setCreating(true);
     try {
-      await onCreate(name.trim(), selectedLayout);
+      // Map page type to layout for backward compatibility
+      // For new page types, use "custom" as the layout
+      const layout: PageLayout = selectedPageType === "custom" ? "custom" : 
+                                  ["grid", "kanban", "calendar", "gallery", "form"].includes(selectedPageType) 
+                                    ? selectedPageType as PageLayout 
+                                    : "custom";
+      
+      await onCreate(name.trim(), layout, selectedPageType);
       setName("");
-      setSelectedLayout("custom");
+      setSelectedPageType("custom");
       onClose();
     } catch (error: any) {
       toast({
