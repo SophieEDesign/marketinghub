@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, ChevronRight, ChevronLeft, Plus, Trash2, Play, Code, AlertTriangle } from "lucide-react";
 import { useAutomations } from "@/lib/hooks/useAutomations";
 import { useTables } from "@/lib/hooks/useTables";
+import { useFields } from "@/lib/useFields";
 import Button from "@/components/ui/Button";
 import TriggerBuilder from "./TriggerBuilder";
 import ConditionBuilder from "./ConditionBuilder";
