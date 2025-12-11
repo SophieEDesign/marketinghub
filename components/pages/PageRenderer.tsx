@@ -9,6 +9,15 @@
 import { useEffect, useState } from "react";
 import { InterfacePage } from "@/lib/hooks/useInterfacePages";
 import { usePageConfig } from "@/lib/hooks/usePageConfig";
+import {
+  GridPageConfig,
+  RecordPageConfig,
+  KanbanPageConfig,
+  GalleryPageConfig,
+  CalendarPageConfig,
+  FormPageConfig,
+  ChartPageConfig,
+} from "@/lib/pages/pageConfig";
 import GridPage from "./renderers/GridPage";
 import RecordPage from "./renderers/RecordPage";
 import KanbanPage from "./renderers/KanbanPage";
@@ -48,10 +57,9 @@ export default function PageRenderer({ page, data, isEditing, ...props }: PageRe
     );
   }
 
-  // Pass config to renderers
-  const rendererProps = {
+  // Base props for all renderers
+  const baseProps = {
     page,
-    config,
     data,
     isEditing,
     ...props,
@@ -59,25 +67,25 @@ export default function PageRenderer({ page, data, isEditing, ...props }: PageRe
 
   switch (pageType) {
     case 'grid':
-      return <GridPage {...rendererProps} />;
+      return <GridPage {...baseProps} config={config as GridPageConfig | null} />;
     
     case 'record':
-      return <RecordPage {...rendererProps} />;
+      return <RecordPage {...baseProps} config={config as RecordPageConfig | null} />;
     
     case 'kanban':
-      return <KanbanPage {...rendererProps} />;
+      return <KanbanPage {...baseProps} config={config as KanbanPageConfig | null} />;
     
     case 'gallery':
-      return <GalleryPage {...rendererProps} />;
+      return <GalleryPage {...baseProps} config={config as GalleryPageConfig | null} />;
     
     case 'calendar':
-      return <CalendarPage {...rendererProps} />;
+      return <CalendarPage {...baseProps} config={config as CalendarPageConfig | null} />;
     
     case 'form':
-      return <FormPage {...rendererProps} />;
+      return <FormPage {...baseProps} config={config as FormPageConfig | null} />;
     
     case 'chart':
-      return <ChartPage {...rendererProps} />;
+      return <ChartPage {...baseProps} config={config as ChartPageConfig | null} />;
     
     case 'custom':
     default:
