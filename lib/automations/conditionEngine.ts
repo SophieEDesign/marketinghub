@@ -5,7 +5,7 @@
  * Matches schema definitions from lib/automations/schema.ts
  */
 
-import { Condition } from "./schema";
+import { Condition, FieldCondition } from "./schema";
 
 /**
  * Evaluate a single condition against a record
@@ -45,7 +45,7 @@ export function evaluateCondition(
         return fieldValue !== null && fieldValue !== undefined && fieldValue !== "";
 
       default:
-        console.warn(`Unknown condition operator: ${condition.operator}`);
+        console.warn(`Unknown condition operator: ${(condition as FieldCondition).operator}`);
         return false;
     }
   }
