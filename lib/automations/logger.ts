@@ -25,7 +25,7 @@ export async function writeAutomationLog(
       input: input || null,
       output: output || null,
       error: error || undefined,
-      duration_ms: durationMs || null,
+      duration_ms: durationMs || undefined,
     };
 
     const { error: insertError } = await supabase
