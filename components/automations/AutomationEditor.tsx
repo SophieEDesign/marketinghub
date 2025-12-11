@@ -646,15 +646,20 @@ function ConditionEditor({
   onRemove: () => void;
 }) {
   const { fields } = useFields(tableId || "");
-  const field = fields.find((f) => f.field_key === condition.field);
+  // Type guard to check if it's a FieldCondition
+  const isFieldCondition = (c: Condition): c is import("@/lib/automations/schema").FieldCondition => {
+    return c.type === "field";
+  };
+  const fieldCondition = isFieldCondition(condition) ? condition : null;
+  const field = fieldCondition ? fields.find((f) => f.field_key === fieldCondition.field_key) : null;
 
   return (
     <div className="border border-gray-300 dark:border-gray-700 rounded-md p-3 bg-gray-50 dark:bg-gray-800">
       <div className="flex items-start gap-2">
         <div className="flex-1 space-y-2">
           <select
-            value={condition.field}
-            onChange={(e) => onChange({ field: e.target.value })}
+            value={fieldCondition?.field_key || ""}
+            onChange={(e) => onChange({ field_key: e.target.value } as any)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
           >
             <option value="">Select field...</option>
@@ -666,28 +671,25 @@ function ConditionEditor({
                 </option>
               ))}
           </select>
-          {condition.field && (
+          {fieldCondition?.field_key && (
             <>
               <select
-                value={condition.operator}
+                value={fieldCondition.operator || "equals"}
                 onChange={(e) => onChange({ operator: e.target.value as any })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
               >
                 <option value="equals">Equals</option>
                 <option value="not_equals">Not Equals</option>
                 <option value="contains">Contains</option>
-                <option value=">">Greater Than</option>
-                <option value="<">Less Than</option>
-                <option value=">=">Greater Than or Equal</option>
-                <option value="<=">Less Than or Equal</option>
-                <option value="between">Between</option>
-                <option value="changed_from">Changed From</option>
-                <option value="changed_to">Changed To</option>
+                <option value="greater_than">Greater Than</option>
+                <option value="less_than">Less Than</option>
+                <option value="is_empty">Is Empty</option>
+                <option value="is_not_empty">Is Not Empty</option>
               </select>
-              {!["is_empty", "is_not_empty"].includes(condition.operator) && (
+              {!["is_empty", "is_not_empty"].includes(fieldCondition.operator || "") && (
                 <input
                   type="text"
-                  value={condition.value || ""}
+                  value={fieldCondition.value || ""}
                   onChange={(e) => onChange({ value: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                   placeholder="Value"
