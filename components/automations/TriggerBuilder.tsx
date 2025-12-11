@@ -346,7 +346,7 @@ function DateApproachingTriggerConfig({
 }) {
   const { tables } = useTables();
   const { fields } = useFields(tableId || "");
-  const dateFields = fields.filter((f) => f.type === "date" || f.type === "datetime");
+  const dateFields = fields.filter((f) => f.type === "date");
 
   return (
     <div className="space-y-3">
