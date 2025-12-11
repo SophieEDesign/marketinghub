@@ -112,7 +112,12 @@ export const automationTemplates: AutomationTemplate[] = [
       type: "record_updated",
       table_id: "",
       table_name: "",
-      fields: ["status"],
+      field_filters: [
+        {
+          field_key: "status",
+          operator: "changed" as const,
+        },
+      ],
     },
     conditions: [
       {
