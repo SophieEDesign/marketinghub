@@ -212,7 +212,6 @@ export default function TestAutomationModal({
                       <XCircle className="w-5 h-5 text-red-600" />
                     )}
                     <span className="text-sm">
-                      ">
                       Conditions: {testResults.conditionsPassed ? "Passed" : "Failed"}
                     </span>
                   </div>
