@@ -713,11 +713,13 @@ function ConditionEditor({
 function ActionEditor({
   action,
   tables,
+  tablesLoading,
   onChange,
   onRemove,
 }: {
   action: any;
   tables: any[];
+  tablesLoading: boolean;
   onChange: (updates: any) => void;
   onRemove: () => void;
 }) {
