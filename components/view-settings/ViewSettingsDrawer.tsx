@@ -622,24 +622,24 @@ export default function ViewSettingsDrawer({
               {viewId === "calendar" && (
                 <div className="pb-4 border-b border-gray-200 dark:border-gray-700 space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                       From Date Field
-                    </h3>
-                    <select
-                      value={localCalendarDateField}
-                      onChange={(e) => {
-                        setLocalCalendarDateField(e.target.value);
-                        onUpdate({ calendar_date_field: e.target.value || undefined });
-                      }}
-                      className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
-                    >
-                      <option value="">Select field...</option>
-                      {dateFields.map((field) => (
-                        <option key={field.id} value={field.field_key}>
-                          {field.label}
-                        </option>
-                      ))}
-                    </select>
+                  </h3>
+                  <select
+                    value={localCalendarDateField}
+                    onChange={(e) => {
+                      setLocalCalendarDateField(e.target.value);
+                      onUpdate({ calendar_date_field: e.target.value || undefined });
+                    }}
+                    className="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                  >
+                    <option value="">Select field...</option>
+                    {dateFields.map((field) => (
+                      <option key={field.id} value={field.field_key}>
+                        {field.label}
+                      </option>
+                    ))}
+                  </select>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                       Required: The start date for calendar events
                     </p>

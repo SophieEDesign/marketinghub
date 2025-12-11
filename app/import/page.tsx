@@ -37,7 +37,7 @@ function ImportPageContent() {
   // Load fields only when table is selected
   useEffect(() => {
     if (tableId && step !== "upload" && step !== "select-table") {
-      loadFields(tableId).then(setFields);
+    loadFields(tableId).then(setFields);
     }
   }, [tableId, step]);
 

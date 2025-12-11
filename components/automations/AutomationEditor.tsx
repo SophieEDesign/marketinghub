@@ -110,13 +110,13 @@ export default function AutomationEditor({
 
   const handleSave = async () => {
     // Validate before saving
-    const automationData = {
-      name,
-      status,
+      const automationData = {
+        name,
+        status,
       trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
-      conditions,
-      actions,
-    };
+        conditions,
+        actions,
+      };
 
     const validation = validateAutomation(automationData);
     if (!validation.valid) {
@@ -310,9 +310,9 @@ export default function AutomationEditor({
           {/* Step 3: Conditions */}
           {step === 3 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Conditions
-              </h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Conditions
+                </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 All conditions must be met (AND logic) for the automation to run.
               </p>
@@ -320,20 +320,20 @@ export default function AutomationEditor({
                 conditions={conditions}
                 tableId={triggerConfig.table_id || triggerConfig.table}
                 onChange={setConditions}
-              />
+                    />
             </div>
           )}
 
           {/* Step 4: Actions */}
           {step === 4 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                Actions
-              </h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                  Actions
+                </h3>
               <ActionBuilder
                 actions={actions}
                 onChange={setActions}
-              />
+                    />
             </div>
           )}
 
@@ -404,8 +404,8 @@ export default function AutomationEditor({
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    JSON Preview
-                  </label>
+                  JSON Preview
+                </label>
                   <button
                     onClick={() => setShowJsonPreview(!showJsonPreview)}
                     className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -416,18 +416,18 @@ export default function AutomationEditor({
                 </div>
                 {showJsonPreview && (
                   <pre className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-xs overflow-auto max-h-64 border border-gray-200 dark:border-gray-700">
-                    {JSON.stringify(
-                      {
-                        name,
-                        status,
+                  {JSON.stringify(
+                    {
+                      name,
+                      status,
                         trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
-                        conditions,
-                        actions,
-                      },
-                      null,
-                      2
-                    )}
-                  </pre>
+                      conditions,
+                      actions,
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
                 )}
               </div>
             </div>

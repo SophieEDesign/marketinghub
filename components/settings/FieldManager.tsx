@@ -21,7 +21,7 @@ export default function FieldManager() {
 
   useEffect(() => {
     if (currentTable) {
-      load();
+    load();
     } else {
       setFields([]);
       setLoading(false);

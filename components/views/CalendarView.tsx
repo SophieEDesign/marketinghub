@@ -128,14 +128,14 @@ export default function CalendarView({ tableId }: CalendarViewProps) {
               }
 
               return {
-                id: row.id.toString(),
-                title: titleField ? row[titleField.field_key] || "Untitled" : "Untitled",
+              id: row.id.toString(),
+              title: titleField ? row[titleField.field_key] || "Untitled" : "Untitled",
                 start: finalStart,
                 end: finalEnd ? new Date(finalEnd).toISOString().split("T")[0] : undefined,
                 allDay: true,
-                extendedProps: {
-                  ...row,
-                },
+              extendedProps: {
+                ...row,
+              },
               };
             });
 

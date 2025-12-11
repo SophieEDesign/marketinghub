@@ -54,7 +54,7 @@ export default function FieldManagerTab() {
 
   useEffect(() => {
     if (tableId) {
-      getFields();
+    getFields();
     }
   }, [tableId, getFields]);
 

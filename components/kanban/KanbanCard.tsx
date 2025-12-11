@@ -32,7 +32,7 @@ export default function KanbanCard({ row, fields }: KanbanCardProps) {
       // Find tableId from fields
       const tableId = fields[0]?.table_id;
       if (tableId) {
-        openRecord(tableId, row.id);
+      openRecord(tableId, row.id);
       }
     }
   };
