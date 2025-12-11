@@ -17,6 +17,7 @@ interface AutomationEditorProps {
   automation: any | null;
   open: boolean;
   onClose: () => void;
+  onSave?: (updatedAutomation: any) => Promise<void>;
   onTemplateSelect?: (template: AutomationTemplate) => void;
 }
 
@@ -41,6 +42,7 @@ export default function AutomationEditor({
   automation,
   open,
   onClose,
+  onSave,
 }: AutomationEditorProps) {
   const { createAutomation, updateAutomation } = useAutomations();
   const { tables } = useTables();
@@ -137,8 +139,14 @@ export default function AutomationEditor({
 
       if (automation) {
         await updateAutomation(automation.id, automationData);
+        if (onSave) {
+          await onSave(automationData);
+        }
       } else {
-        await createAutomation(automationData);
+        const newAutomation = await createAutomation(automationData);
+        if (onSave && newAutomation) {
+          await onSave(newAutomation);
+        }
       }
 
       onClose();
