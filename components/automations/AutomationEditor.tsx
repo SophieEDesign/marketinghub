@@ -46,7 +46,7 @@ export default function AutomationEditor({
   onSave,
 }: AutomationEditorProps) {
   const { createAutomation, updateAutomation } = useAutomations();
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -874,7 +874,10 @@ function ActionEditor({
                 onChange={(e) => onChange({ table: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
               >
-                <option value="">Select table...</option>
+                <option value="">{tablesLoading ? "Loading tables..." : "Select table..."}</option>
+                {tables.length === 0 && !tablesLoading && (
+                  <option value="" disabled>No tables available. Create a table first.</option>
+                )}
                 {tables.map((table) => (
                     <option key={table.id} value={table.name}>
                       {table.label || table.name}

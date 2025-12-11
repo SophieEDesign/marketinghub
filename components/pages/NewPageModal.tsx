@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X, LayoutList, Images, Columns3, Calendar, Timer, FileText, LayoutDashboard, GripVertical, LayoutGrid, Users, Layout, Square } from "lucide-react";
+import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
+import { PAGE_TYPES } from "@/lib/pages/pageTypes";
+import type { PageTypeId } from "@/lib/pages/pageTypes";
 
 export type PageLayout = 
   | "grid" 
@@ -19,97 +21,15 @@ export type PageLayout =
   | "record_review"
   | "custom";
 
-interface LayoutOption {
-  value: PageLayout;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const LAYOUT_OPTIONS: LayoutOption[] = [
-  {
-    value: "grid",
-    label: "Grid",
-    description: "Spreadsheet-style view",
-    icon: LayoutGrid,
-  },
-  {
-    value: "kanban",
-    label: "Kanban",
-    description: "Grouped by single-select",
-    icon: Columns3,
-  },
-  {
-    value: "calendar",
-    label: "Calendar",
-    description: "Events by date",
-    icon: Calendar,
-  },
-  {
-    value: "timeline",
-    label: "Timeline",
-    description: "Gantt-like layout",
-    icon: Timer,
-  },
-  {
-    value: "gallery",
-    label: "Gallery",
-    description: "Image-centric records",
-    icon: Images,
-  },
-  {
-    value: "list",
-    label: "List",
-    description: "Record list view",
-    icon: LayoutList,
-  },
-  {
-    value: "dashboard",
-    label: "Dashboard",
-    description: "Summary cards, charts, metrics",
-    icon: LayoutDashboard,
-  },
-  {
-    value: "form",
-    label: "Form",
-    description: "Data entry form",
-    icon: FileText,
-  },
-  {
-    value: "team",
-    label: "Team",
-    description: "People/collaborators",
-    icon: Users,
-  },
-  {
-    value: "overview",
-    label: "Overview",
-    description: "Mixed layout with text, summaries, links",
-    icon: Layout,
-  },
-  {
-    value: "record_review",
-    label: "Record Review",
-    description: "Cycle through many records",
-    icon: Square,
-  },
-  {
-    value: "custom",
-    label: "Custom",
-    description: "Drag-and-drop free layout",
-    icon: GripVertical,
-  },
-];
-
 interface NewPageModalProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (name: string, layout: PageLayout) => Promise<void>;
+  onCreate: (name: string, layout: PageLayout, pageType?: string) => Promise<void>;
 }
 
 export default function NewPageModal({ open, onClose, onCreate }: NewPageModalProps) {
   const [name, setName] = useState("");
-  const [selectedLayout, setSelectedLayout] = useState<PageLayout>("custom");
+  const [selectedPageType, setSelectedPageType] = useState<PageTypeId>("custom");
   const [creating, setCreating] = useState(false);
 
   if (!open) return null;
@@ -175,20 +95,20 @@ export default function NewPageModal({ open, onClose, onCreate }: NewPageModalPr
             </div>
           </div>
 
-          {/* Layout Selection */}
+          {/* Page Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Choose Layout *
+              Choose Page Type *
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {LAYOUT_OPTIONS.map((layout) => {
-                const Icon = layout.icon;
-                const isSelected = selectedLayout === layout.value;
+              {PAGE_TYPES.map((pageType) => {
+                const Icon = pageType.icon;
+                const isSelected = selectedPageType === pageType.id;
                 return (
                   <button
-                    key={layout.value}
+                    key={pageType.id}
                     type="button"
-                    onClick={() => setSelectedLayout(layout.value)}
+                    onClick={() => setSelectedPageType(pageType.id as PageTypeId)}
                     className={`p-4 border-2 rounded-lg text-left transition-all ${
                       isSelected
                         ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
@@ -197,11 +117,13 @@ export default function NewPageModal({ open, onClose, onCreate }: NewPageModalPr
                   >
                     <Icon className={`w-6 h-6 mb-2 ${isSelected ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400"}`} />
                     <div className={`text-sm font-medium mb-1 ${isSelected ? "text-blue-900 dark:text-blue-100" : "text-gray-900 dark:text-white"}`}>
-                      {layout.label}
+                      {pageType.label}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {layout.description}
-                    </div>
+                    {pageType.description && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {pageType.description}
+                      </div>
+                    )}
                   </button>
                 );
               })}

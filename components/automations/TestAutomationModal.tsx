@@ -18,7 +18,7 @@ export default function TestAutomationModal({
   open,
   onClose,
 }: TestAutomationModalProps) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const [selectedTableId, setSelectedTableId] = useState<string>("");
   const [sampleRecords, setSampleRecords] = useState<any[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<string>("");
@@ -142,7 +142,10 @@ export default function TestAutomationModal({
                     }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
                   >
-                    <option value="">Select a table...</option>
+                    <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+                    {tables.length === 0 && !tablesLoading && (
+                      <option value="" disabled>No tables available.</option>
+                    )}
                     {tables.map((table) => (
                       <option key={table.id} value={table.id}>
                         {table.label} ({table.name})

@@ -8,6 +8,7 @@ export interface InterfacePage {
   id: string;
   name: string;
   layout: PageLayout;
+  page_type?: string; // New: page type (grid, record, kanban, etc.)
   created_at: string;
   updated_at: string;
 }
@@ -55,21 +56,29 @@ export function useInterfacePages() {
 
   const createPage = useCallback(async (
     name: string,
-    layout: PageLayout
+    layout: PageLayout,
+    pageType?: string
   ): Promise<InterfacePage> => {
+    // Use pageType if provided, otherwise derive from layout
+    const finalPageType = pageType || (layout === 'custom' ? 'custom' : layout) || 'custom';
+    
     const { data, error: createError } = await supabase
       .from("pages")
       .insert({
         name,
         layout,
+        page_type: finalPageType,
       })
       .select()
       .single();
 
     if (createError) throw createError;
     
-    // Create default blocks based on layout
-    await createDefaultBlocks(data.id, layout);
+    // Create default blocks based on layout (only for custom pages or if no page_type specific logic)
+    if (finalPageType === 'custom') {
+      await createDefaultBlocks(data.id, layout);
+    }
+    // For other page types, default templates will be used by the renderer
     
     await loadPages();
     return data;

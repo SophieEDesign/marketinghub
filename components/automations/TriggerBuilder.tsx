@@ -11,9 +11,16 @@ interface TriggerBuilderProps {
 }
 
 export default function TriggerBuilder({ trigger, onChange }: TriggerBuilderProps) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const [triggerType, setTriggerType] = useState<string>(trigger?.type || "schedule");
   const [config, setConfig] = useState<any>(trigger || {});
+  
+  // Debug: Log tables to verify they're loading
+  useEffect(() => {
+    if (!tablesLoading && tables.length > 0) {
+      console.log("[TriggerBuilder] Loaded tables:", tables.map(t => ({ id: t.id, name: t.name, label: t.label })));
+    }
+  }, [tables, tablesLoading]);
 
   useEffect(() => {
     if (trigger) {
@@ -169,8 +176,12 @@ export default function TriggerBuilder({ trigger, onChange }: TriggerBuilderProp
               });
             }}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
+            disabled={tablesLoading}
           >
-            <option value="">Select a table...</option>
+            <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+            {tables.length === 0 && !tablesLoading && (
+              <option value="" disabled>No tables available. Create a table first.</option>
+            )}
             {tables.map((table) => (
               <option key={table.id} value={table.id}>
                 {table.label} ({table.name})
@@ -262,7 +273,10 @@ function FieldMatchTriggerConfig({
           }}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         >
-          <option value="">Select a table...</option>
+          <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+          {tables.length === 0 && !tablesLoading && (
+            <option value="" disabled>No tables available. Create a table first.</option>
+          )}
           {tables.map((table) => (
             <option key={table.id} value={table.id}>
               {table.label} ({table.name})
@@ -365,7 +379,10 @@ function DateApproachingTriggerConfig({
           }}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         >
-          <option value="">Select a table...</option>
+          <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+          {tables.length === 0 && !tablesLoading && (
+            <option value="" disabled>No tables available. Create a table first.</option>
+          )}
           {tables.map((table) => (
             <option key={table.id} value={table.id}>
               {table.label} ({table.name})

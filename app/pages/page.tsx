@@ -45,7 +45,7 @@ export default function PagesPage() {
     }
   };
 
-  const handleCreatePage = async (name: string, layout: string) => {
+  const handleCreatePage = async (name: string, layout: string, pageType?: string) => {
     try {
       const response = await fetch("/api/pages", {
         method: "POST",
@@ -53,6 +53,7 @@ export default function PagesPage() {
         body: JSON.stringify({
           name,
           layout,
+          page_type: pageType,
         }),
       });
 

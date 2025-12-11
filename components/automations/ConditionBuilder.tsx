@@ -18,7 +18,7 @@ export default function ConditionBuilder({
   tableId,
   onChange,
 }: ConditionBuilderProps) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const [selectedTableId, setSelectedTableId] = useState<string>(tableId || "");
   const { fields } = useFields(selectedTableId || "");
 
@@ -57,7 +57,10 @@ export default function ConditionBuilder({
             onChange={(e) => setSelectedTableId(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           >
-            <option value="">Select a table...</option>
+            <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+            {tables.length === 0 && !tablesLoading && (
+              <option value="" disabled>No tables available. Create a table first.</option>
+            )}
             {tables.map((table) => (
               <option key={table.id} value={table.id}>
                 {table.label} ({table.name})

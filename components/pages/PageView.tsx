@@ -8,6 +8,7 @@ import { Edit2, Copy, Trash2, Plus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import PageBuilder from "./PageBuilder";
+import PageRenderer from "./PageRenderer";
 import BlockMenu from "@/components/dashboard/blocks/BlockMenu";
 import { PageContextProvider } from "./PageContext";
 
@@ -106,7 +107,86 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
 
       {/* Page Content */}
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {blocks.length === 0 && !isEditing ? (
+        {/* Use PageRenderer for non-custom pages, PageBuilder for custom pages */}
+        {page.page_type && page.page_type !== 'custom' ? (
+          <PageRenderer 
+            page={page} 
+            data={blocks}
+            blocks={blocks}
+            isEditing={isEditing}
+            onAddBlock={async (type) => {
+              try {
+                const response = await fetch("/api/page-blocks", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    page_id: pageId,
+                    type,
+                    position_x: 0,
+                    position_y: blocks.length,
+                    width: 12,
+                    height: 6,
+                    config: {},
+                  }),
+                });
+                if (!response.ok) throw new Error("Failed to create block");
+                await loadPage();
+              } catch (error: any) {
+                toast({
+                  title: "Error",
+                  description: error.message || "Failed to add block",
+                  type: "error",
+                });
+              }
+            }}
+            onUpdateBlock={async (id, updates) => {
+              try {
+                const response = await fetch(`/api/page-blocks/${id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(updates),
+                });
+                if (!response.ok) throw new Error("Failed to update block");
+                await loadPage();
+              } catch (error: any) {
+                toast({
+                  title: "Error",
+                  description: error.message || "Failed to update block",
+                  type: "error",
+                });
+              }
+            }}
+            onDeleteBlock={async (id) => {
+              try {
+                const response = await fetch(`/api/page-blocks/${id}`, {
+                  method: "DELETE",
+                });
+                if (!response.ok) throw new Error("Failed to delete block");
+                await loadPage();
+              } catch (error: any) {
+                toast({
+                  title: "Error",
+                  description: error.message || "Failed to delete block",
+                  type: "error",
+                });
+              }
+            }}
+            onReorderBlocks={async (blockIds) => {
+              const updates = blockIds.map((id, index) => ({
+                id,
+                position_y: index,
+              }));
+              for (const update of updates) {
+                await fetch(`/api/page-blocks/${update.id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ position_y: update.position_y }),
+                });
+              }
+              await loadPage();
+            }}
+          />
+        ) : blocks.length === 0 && !isEditing ? (
           <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               This page has no blocks yet.

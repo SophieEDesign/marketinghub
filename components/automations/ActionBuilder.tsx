@@ -325,7 +325,10 @@ function ActionEditor({
                 }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                <option value="">Select a table...</option>
+                <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+                {tables.length === 0 && !tablesLoading && (
+                  <option value="" disabled>No tables available. Create a table first.</option>
+                )}
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>
                     {table.label} ({table.name})
@@ -375,7 +378,10 @@ function ActionEditor({
                 }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                <option value="">Select a table...</option>
+                <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+                {tables.length === 0 && !tablesLoading && (
+                  <option value="" disabled>No tables available. Create a table first.</option>
+                )}
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>
                     {table.label} ({table.name})
@@ -413,7 +419,10 @@ function ActionEditor({
                 }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
               >
-                <option value="">Select a table...</option>
+                <option value="">{tablesLoading ? "Loading tables..." : "Select a table..."}</option>
+                {tables.length === 0 && !tablesLoading && (
+                  <option value="" disabled>No tables available. Create a table first.</option>
+                )}
                 {tables.map((table) => (
                   <option key={table.id} value={table.id}>
                     {table.label} ({table.name})

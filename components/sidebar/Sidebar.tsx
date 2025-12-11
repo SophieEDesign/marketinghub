@@ -52,6 +52,7 @@ import { tableMetadata, getTableIcon, getAllTables } from "@/lib/tableMetadata";
 import { BookOpen, Gift, Compass, Image as ImageIcon, Layout, Plus } from "lucide-react";
 import { useInterfacePages } from "@/lib/hooks/useInterfacePages";
 import { useNewPageModal } from "@/components/pages/NewPageModalProvider";
+import { useSidebarCategories } from "@/lib/hooks/useSidebarCategories";
 
 // Map table IDs to icons - now uses metadata
 const getTableIconComponent = (tableId: string) => {
@@ -149,6 +150,13 @@ export default function Sidebar() {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { pages } = useInterfacePages();
   const { openModal } = useNewPageModal();
+  const { 
+    categories: dbCategories, 
+    loading: categoriesLoading,
+    createCategory,
+    moveItem: moveItemToCategory,
+    addItem: addItemToCategory,
+  } = useSidebarCategories();
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -307,10 +315,65 @@ export default function Sidebar() {
   };
 
   // Handler for moving items between groups
-  const handleItemMoveToGroup = (itemHref: string, sourceGroup: string, targetGroup: string, targetIndex?: number) => {
+  const handleItemMoveToGroup = async (itemHref: string, sourceGroup: string, targetGroup: string, targetIndex?: number) => {
     if (typeof window === 'undefined' || sourceGroup === targetGroup) return;
     
-    // Find the item in the source group
+    // Try to use database categories system if available
+    if (dbCategories && dbCategories.length > 0) {
+      try {
+        // Find target category in database
+        const targetCategory = dbCategories.find(c => c.name === targetGroup);
+        if (targetCategory) {
+          // Check if item exists in database
+          const allItems = dbCategories.flatMap(c => c.items);
+          const existingItem = allItems.find(item => item.href === itemHref);
+          
+          if (existingItem) {
+            // Move existing item
+            const targetItems = targetCategory.items || [];
+            const newPosition = targetIndex !== undefined ? targetIndex : targetItems.length;
+            await moveItemToCategory(existingItem.id, targetCategory.id, newPosition);
+            return;
+          } else {
+            // Add new item to database
+            // Determine item type and ID from href
+            let itemType: "page" | "table" | "link" = "link";
+            let itemId: string | null = null;
+            let label = "";
+            let icon: string | null = null;
+            
+            if (itemHref.startsWith("/pages/")) {
+              itemType = "page";
+              const pageId = itemHref.split("/")[2];
+              itemId = pageId;
+              const page = pages.find(p => p.id === pageId);
+              label = page?.name || "Page";
+              icon = "file-text";
+            } else if (itemHref.startsWith("/tables/")) {
+              itemType = "table";
+              const tableId = itemHref.split("/")[2];
+              itemId = tableId;
+              const table = dynamicTablesList.find(t => t.id === tableId);
+              label = table?.label || table?.name || "Table";
+              icon = "table";
+            } else {
+              // Link or other
+              const sourceGroupData = navGroups.find(g => g.title === sourceGroup);
+              const item = sourceGroupData?.items.find(i => i.href === itemHref);
+              label = item?.label || "Item";
+            }
+            
+            await addItemToCategory(targetCategory.id, itemType, itemId, label, itemHref, icon);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error moving item to category:", error);
+        // Fall through to localStorage fallback
+      }
+    }
+    
+    // Fallback to localStorage system
     const sourceGroupData = navGroups.find(g => g.title === sourceGroup);
     if (!sourceGroupData) return;
     
@@ -353,6 +416,19 @@ export default function Sidebar() {
     // Force re-render
     setEditing(false);
     setTimeout(() => setEditing(true), 0);
+  };
+  
+  // Handler for creating new category
+  const handleCreateCategory = async () => {
+    const name = prompt("Enter category name:");
+    if (!name || !name.trim()) return;
+    
+    try {
+      await createCategory(name.trim(), "folder");
+      // Reload will happen automatically via useSidebarCategories
+    } catch (error: any) {
+      alert(`Failed to create category: ${error.message}`);
+    }
   };
 
   // Parse current route
@@ -624,7 +700,7 @@ export default function Sidebar() {
               }
             }}
           >
-          {navGroups.map((group) => {
+          {navGroups.map((group, groupIndex) => {
             // Apply customizations from state
             const customTitle = sidebarCustomizations.groupTitles?.[group.title] || group.title;
               
@@ -665,6 +741,7 @@ export default function Sidebar() {
                 label: sidebarCustomizations.itemLabels?.[item.href] || item.label,
               })),
             };
+            const isLastGroup = groupIndex === navGroups.length - 1;
             return (
               <NavGroupComponent
                 key={group.title}
@@ -678,7 +755,9 @@ export default function Sidebar() {
                 onGroupTitleChange={handleGroupTitleChange}
                 onItemLabelChange={handleItemLabelChange}
                 onItemReorder={handleItemReorder}
-                  allGroups={navGroups.map(g => g.title)}
+                allGroups={navGroups.map(g => g.title)}
+                isLastGroup={isLastGroup}
+                onCreateCategory={handleCreateCategory}
               />
             );
           })}
@@ -712,6 +791,8 @@ interface NavGroupComponentProps {
   onItemLabelChange?: (href: string, newLabel: string) => void;
   onItemReorder?: (groupTitle: string, newOrder: string[]) => void;
   allGroups?: string[];
+  isLastGroup?: boolean;
+  onCreateCategory?: () => void;
 }
 
 function NavGroupComponent({
@@ -727,6 +808,8 @@ function NavGroupComponent({
   onItemLabelChange,
   onItemReorder,
   allGroups = [],
+  isLastGroup = false,
+  onCreateCategory,
 }: NavGroupComponentProps) {
   // Make group header droppable for cross-category moves
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -788,16 +871,31 @@ function NavGroupComponent({
                 )}
               </button>
               {editing && (
-                <button
-                  onClick={() => setEditingTitle(true)}
-                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                  title="Edit group title"
-                >
-                  <Edit3 className="w-3 h-3" />
-                </button>
+                <>
+                  <button
+                    onClick={() => setEditingTitle(true)}
+                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                    title="Edit group title"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                </>
               )}
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Add Category Button (in edit mode, at end of last group) */}
+      {editing && !collapsed && isLastGroup && onCreateCategory && (
+        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <button
+            onClick={onCreateCategory}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            <span>New Category</span>
+          </button>
         </div>
       )}
 
