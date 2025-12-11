@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAutomations } from "@/lib/hooks/useAutomations";
 import Button from "@/components/ui/Button";
-import { Plus, Play, Pause, Edit, Trash2, Settings, Clock } from "lucide-react";
+import { Plus, Play, Pause, Edit, Trash2, Settings, Clock, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import AutomationEditor from "@/components/automations/AutomationEditor";
+import TemplatePicker from "@/components/automations/TemplatePicker";
+import { validateAutomation } from "@/lib/automations/validateAutomation";
+import { AutomationTemplate } from "@/components/automations/templates";
 
 export default function AutomationsPage() {
   const router = useRouter();
@@ -19,6 +22,7 @@ export default function AutomationsPage() {
   } = useAutomations();
   const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [validationStatuses, setValidationStatuses] = useState<Record<string, "valid" | "warning" | "invalid">>({});
 
   const handleToggleStatus = async (automation: any) => {
     try {
@@ -74,9 +78,72 @@ export default function AutomationsPage() {
     }
   };
 
-  const getLastRun = (automation: any) => {
-    // This would need to fetch from logs
-    return "Never";
+  const [lastRuns, setLastRuns] = useState<Record<string, string>>({});
+  const [nextRuns, setNextRuns] = useState<Record<string, string>>({});
+
+  // Validate automations and compute status badges
+  useEffect(() => {
+    const statuses: Record<string, "valid" | "warning" | "invalid"> = {};
+    automations.forEach((automation) => {
+      const validation = validateAutomation(automation);
+      if (!validation.valid) {
+        statuses[automation.id] = "invalid";
+      } else if (validation.warnings.length > 0) {
+        statuses[automation.id] = "warning";
+      } else {
+        statuses[automation.id] = "valid";
+      }
+    });
+    setValidationStatuses(statuses);
+  }, [automations]);
+
+  // Fetch last run times for all automations
+  useEffect(() => {
+    const fetchLastRuns = async () => {
+      const runs: Record<string, string> = {};
+      const next: Record<string, string> = {};
+      
+      for (const automation of automations) {
+        try {
+          const response = await fetch(`/api/automations/${automation.id}/logs?limit=1`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.logs && data.logs.length > 0) {
+              const lastLog = data.logs[0];
+              runs[automation.id] = new Date(lastLog.timestamp).toLocaleString();
+            } else {
+              runs[automation.id] = "Never";
+            }
+          }
+          
+          // Calculate next run for schedule triggers
+          if (automation.trigger?.type === "schedule") {
+            // This is a placeholder - would need proper scheduling logic
+            next[automation.id] = "Scheduled";
+          } else {
+            next[automation.id] = "-";
+          }
+        } catch (err) {
+          runs[automation.id] = "Never";
+          next[automation.id] = "-";
+        }
+      }
+      
+      setLastRuns(runs);
+      setNextRuns(next);
+    };
+
+    if (automations.length > 0) {
+      fetchLastRuns();
+    }
+  }, [automations]);
+
+  const getLastRun = (automationId: string) => {
+    return lastRuns[automationId] || "Never";
+  };
+
+  const getNextRun = (automationId: string) => {
+    return nextRuns[automationId] || "-";
   };
 
   if (loading) {
@@ -114,16 +181,32 @@ export default function AutomationsPage() {
             Automate your workflows with triggers and actions
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditingAutomation(null);
-            setIsEditorOpen(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Automation
-        </Button>
+        <div className="flex items-center gap-2">
+          <TemplatePicker
+            onSelectTemplate={(template) => {
+              // Convert template to automation format
+              const templateAutomation = {
+                name: template.name,
+                status: template.status || "active",
+                trigger: template.trigger,
+                conditions: template.conditions || [],
+                actions: template.actions,
+              };
+              setEditingAutomation(templateAutomation);
+              setIsEditorOpen(true);
+            }}
+          />
+          <Button
+            onClick={() => {
+              setEditingAutomation(null);
+              setIsEditorOpen(true);
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Automation
+          </Button>
+        </div>
       </div>
 
       {/* Automations Table */}
@@ -159,6 +242,12 @@ export default function AutomationsPage() {
                     Last Run
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Next Run
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Logs
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -170,8 +259,29 @@ export default function AutomationsPage() {
                     className="hover:bg-gray-50 dark:hover:bg-gray-800"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {automation.name}
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {automation.name}
+                        </div>
+                        {validationStatuses[automation.id] && (
+                          <span title={
+                            validationStatuses[automation.id] === "valid"
+                              ? "Valid"
+                              : validationStatuses[automation.id] === "warning"
+                              ? "Needs attention"
+                              : "Invalid"
+                          }>
+                            {validationStatuses[automation.id] === "valid" && (
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            )}
+                            {validationStatuses[automation.id] === "warning" && (
+                              <AlertCircle className="w-4 h-4 text-yellow-600" />
+                            )}
+                            {validationStatuses[automation.id] === "invalid" && (
+                              <XCircle className="w-4 h-4 text-red-600" />
+                            )}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
@@ -189,7 +299,18 @@ export default function AutomationsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      {getLastRun(automation)}
+                      {getLastRun(automation.id)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                      {getNextRun(automation.id)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => router.push(`/automations/${automation.id}/logs`)}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        View Logs
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -222,11 +343,11 @@ export default function AutomationsPage() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => router.push(`/automations/${automation.id}/logs`)}
+                          onClick={() => router.push(`/automations/${automation.id}`)}
                           className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                          title="View logs"
+                          title="Edit automation"
                         >
-                          <Clock className="w-4 h-4" />
+                          <Settings className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(automation)}
@@ -252,6 +373,16 @@ export default function AutomationsPage() {
         onClose={() => {
           setIsEditorOpen(false);
           setEditingAutomation(null);
+        }}
+        onTemplateSelect={(template) => {
+          setEditingAutomation({
+            name: template.name,
+            status: template.status || "active",
+            trigger: template.trigger,
+            conditions: template.conditions || [],
+            actions: template.actions,
+          });
+          setIsEditorOpen(true);
         }}
       />
     </div>

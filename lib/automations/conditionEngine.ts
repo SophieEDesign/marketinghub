@@ -1,23 +1,11 @@
 /**
  * Condition Engine for Automations
  * Evaluates whether conditions are met for an automation to proceed
+ * 
+ * Matches schema definitions from lib/automations/schema.ts
  */
 
-export interface Condition {
-  field: string;
-  operator:
-    | "equals"
-    | "not_equals"
-    | "contains"
-    | ">"
-    | "<"
-    | ">="
-    | "<="
-    | "between"
-    | "changed_from"
-    | "changed_to";
-  value: any;
-}
+import { Condition } from "./schema";
 
 /**
  * Evaluate a single condition against a record
@@ -27,59 +15,98 @@ export function evaluateCondition(
   record: any,
   oldRecord?: any
 ): boolean {
-  const fieldValue = record[condition.field];
-  const oldFieldValue = oldRecord?.[condition.field];
+  // Handle different condition types
+  if (condition.type === "field") {
+    const fieldValue = record[condition.field_key];
+    const oldFieldValue = oldRecord?.[condition.field_key];
 
-  switch (condition.operator) {
-    case "equals":
-      return fieldValue === condition.value;
+    switch (condition.operator) {
+      case "equals":
+        return fieldValue === condition.value;
 
-    case "not_equals":
-      return fieldValue !== condition.value;
+      case "not_equals":
+        return fieldValue !== condition.value;
 
-    case "contains":
-      return String(fieldValue || "").toLowerCase().includes(
-        String(condition.value || "").toLowerCase()
-      );
+      case "contains":
+        return String(fieldValue || "").toLowerCase().includes(
+          String(condition.value || "").toLowerCase()
+        );
 
-    case ">":
-      return Number(fieldValue) > Number(condition.value);
+      case "greater_than":
+        return Number(fieldValue) > Number(condition.value);
 
-    case "<":
-      return Number(fieldValue) < Number(condition.value);
+      case "less_than":
+        return Number(fieldValue) < Number(condition.value);
 
-    case ">=":
-      return Number(fieldValue) >= Number(condition.value);
+      case "is_empty":
+        return fieldValue === null || fieldValue === undefined || fieldValue === "";
 
-    case "<=":
-      return Number(fieldValue) <= Number(condition.value);
+      case "is_not_empty":
+        return fieldValue !== null && fieldValue !== undefined && fieldValue !== "";
 
-    case "between":
-      if (Array.isArray(condition.value) && condition.value.length === 2) {
-        const [min, max] = condition.value;
-        const numValue = Number(fieldValue);
-        return numValue >= Number(min) && numValue <= Number(max);
-      }
-      return false;
-
-    case "changed_from":
-      // Check if field changed from the specified value
-      if (oldRecord === undefined) return false;
-      return oldFieldValue === condition.value && fieldValue !== condition.value;
-
-    case "changed_to":
-      // Check if field changed to the specified value
-      if (oldRecord === undefined) return false;
-      return oldFieldValue !== condition.value && fieldValue === condition.value;
-
-    default:
-      console.warn(`Unknown condition operator: ${condition.operator}`);
-      return false;
+      default:
+        console.warn(`Unknown condition operator: ${condition.operator}`);
+        return false;
+    }
   }
+
+  if (condition.type === "date") {
+    const fieldValue = record[condition.field_key];
+    if (!fieldValue) return false;
+
+    const recordDate = new Date(fieldValue);
+    const compareDate = condition.value
+      ? (typeof condition.value === "string"
+          ? new Date(condition.value)
+          : new Date(condition.value.start))
+      : new Date();
+
+    switch (condition.operator) {
+      case "before":
+        return recordDate < compareDate;
+      case "after":
+        return recordDate > compareDate;
+      case "equals":
+        return recordDate.getTime() === compareDate.getTime();
+      case "between":
+        if (typeof condition.value === "object" && condition.value.start && condition.value.end) {
+          const startDate = new Date(condition.value.start);
+          const endDate = new Date(condition.value.end);
+          return recordDate >= startDate && recordDate <= endDate;
+        }
+        return false;
+      default:
+        return false;
+    }
+  }
+
+  if (condition.type === "related_record") {
+    // For related records, we'd need to fetch the related record first
+    // This is a placeholder - implementation would fetch related record
+    // and evaluate nested conditions
+    console.warn("Related record conditions not yet fully implemented");
+    return true; // Default to true for now
+  }
+
+  if (condition.type === "logic") {
+    // Handle AND/OR logic
+    if (condition.operator === "and") {
+      return condition.conditions.every((c) =>
+        evaluateCondition(c, record, oldRecord)
+      );
+    } else if (condition.operator === "or") {
+      return condition.conditions.some((c) =>
+        evaluateCondition(c, record, oldRecord)
+      );
+    }
+  }
+
+  return false;
 }
 
 /**
- * Evaluate all conditions (AND logic - all must be true)
+ * Evaluate all conditions (defaults to AND logic - all must be true)
+ * Conditions ALWAYS return true if empty array
  */
 export function evaluateConditions(
   conditions: Condition[],
@@ -90,27 +117,10 @@ export function evaluateConditions(
     return true; // No conditions means always true
   }
 
-  // All conditions must be true (AND logic)
+  // Default to AND logic - all conditions must be true
+  // If there's a logic condition at the top level, it will handle the logic
+  // Otherwise, treat as implicit AND
   return conditions.every((condition) =>
     evaluateCondition(condition, record, oldRecord)
   );
 }
-
-/**
- * Evaluate conditions with OR logic (at least one must be true)
- */
-export function evaluateConditionsOR(
-  conditions: Condition[],
-  record: any,
-  oldRecord?: any
-): boolean {
-  if (!conditions || conditions.length === 0) {
-    return true;
-  }
-
-  // At least one condition must be true (OR logic)
-  return conditions.some((condition) =>
-    evaluateCondition(condition, record, oldRecord)
-  );
-}
-

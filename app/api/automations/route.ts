@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { validateAutomation } from "@/lib/automations/validateAutomation";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,13 +57,6 @@ export async function POST(request: NextRequest) {
   try {
     const body: Automation = await request.json();
 
-    if (!body.name || !body.trigger || !body.actions) {
-      return NextResponse.json(
-        { error: "Name, trigger, and actions are required" },
-        { status: 400 }
-      );
-    }
-
     const automationData = {
       name: body.name,
       status: body.status || "active",
@@ -70,6 +64,19 @@ export async function POST(request: NextRequest) {
       conditions: body.conditions || [],
       actions: body.actions,
     };
+
+    // Validate automation
+    const validation = validateAutomation(automationData);
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          errors: validation.errors,
+          warnings: validation.warnings,
+        },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabaseAdmin
       .from("automations")

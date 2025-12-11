@@ -1,38 +1,71 @@
+/**
+ * API Route: /api/automations/run
+ * 
+ * Backend automation runner endpoint
+ * Loads active automations, evaluates triggers, conditions, and executes actions
+ * 
+ * This endpoint is designed to be called by:
+ * - Vercel Cron Jobs (for scheduled automations)
+ * - Manual triggers (via UI or API)
+ * - Webhook triggers (when records are created/updated)
+ */
+
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabaseClient";
+import { Automation } from "@/lib/types/automations";
 import { evaluateTrigger } from "@/lib/automations/triggerEngine";
 import { evaluateConditions } from "@/lib/automations/conditionEngine";
-import { executeActions } from "@/lib/automations/actionEngine";
-import { AutomationTrigger } from "@/lib/automations/triggerEngine";
-import { Condition } from "@/lib/automations/conditionEngine";
-import { AutomationAction } from "@/lib/automations/actionEngine";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-// Rate limiting: track last run time per automation
-const lastRunTimes = new Map<string, number>();
-const MIN_RUN_INTERVAL_MS = 60 * 1000; // 1 minute minimum between runs
+import { executeActions, ActionContext } from "@/lib/automations/actionEngine";
+import { writeAutomationLog } from "@/lib/automations/logger";
+import { AutomationTrigger } from "@/lib/automations/schema";
 
 export const dynamic = 'force-dynamic';
 
+interface RunResult {
+  automationId: string;
+  automationName: string;
+  success: boolean;
+  error?: string;
+  durationMs: number;
+}
+
+interface RunSummary {
+  runCount: number;
+  successCount: number;
+  errorCount: number;
+  logs: RunResult[];
+}
+
 /**
  * POST /api/automations/run
- * Runs all active automations or a specific automation
+ * 
+ * Runs all active automations (or specific automation if automationId provided)
+ * 
+ * Query params:
+ * - automationId (optional): Run only this specific automation
+ * - triggerType (optional): Only run automations with this trigger type
+ * - recordId (optional): For record-based triggers, the record ID
+ * - tableId (optional): For record-based triggers, the table ID
  */
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  const results: RunResult[] = [];
+  let runCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+
   try {
+    // Parse request body for optional parameters
     const body = await request.json().catch(() => ({}));
-    const { automationId, record, oldRecord, newRecord } = body;
+    const { automationId, triggerType, recordId, tableId, oldRecord, newRecord } = body;
 
     // Load active automations
-    let query = supabaseAdmin
+    let query = supabase
       .from("automations")
       .select("*")
       .eq("status", "active");
 
+    // Filter by automation ID if provided
     if (automationId) {
       query = query.eq("id", automationId);
     }
@@ -40,7 +73,7 @@ export async function POST(request: NextRequest) {
     const { data: automations, error: fetchError } = await query;
 
     if (fetchError) {
-      console.error("[Automations] Error fetching automations:", fetchError);
+      console.error("Error fetching automations:", fetchError);
       return NextResponse.json(
         { error: "Failed to fetch automations", details: fetchError.message },
         { status: 500 }
@@ -49,171 +82,209 @@ export async function POST(request: NextRequest) {
 
     if (!automations || automations.length === 0) {
       return NextResponse.json({
-        success: true,
-        message: "No active automations to run",
-        results: [],
+        runCount: 0,
+        successCount: 0,
+        errorCount: 0,
+        logs: [],
+        message: "No active automations found",
       });
     }
 
-    const results: Array<{
-      automationId: string;
-      automationName: string;
-      triggered: boolean;
-      executed: boolean;
-      error?: string;
-      actionsExecuted: number;
-    }> = [];
-
     // Process each automation
     for (const automation of automations) {
-      const automationId = automation.id;
-      const automationName = automation.name;
-
-      // Rate limiting check
-      const lastRun = lastRunTimes.get(automationId);
-      const now = Date.now();
-      if (lastRun && now - lastRun < MIN_RUN_INTERVAL_MS) {
-        results.push({
-          automationId,
-          automationName,
-          triggered: false,
-          executed: false,
-          error: "Rate limited (min 1 minute between runs)",
-          actionsExecuted: 0,
-        });
-        continue;
-      }
+      const automationStartTime = Date.now();
+      runCount++;
 
       try {
-        // Evaluate trigger
         const trigger = automation.trigger as AutomationTrigger;
-        const triggerContext = {
-          now: new Date(),
-          record,
-          oldRecord,
-          newRecord,
-        };
 
-        const shouldTrigger = evaluateTrigger(trigger, triggerContext);
+        // Skip manual triggers unless explicitly requested
+        if (trigger.type === "manual" && !automationId) {
+          continue;
+        }
 
-        if (!shouldTrigger) {
-          results.push({
-            automationId,
-            automationName,
-            triggered: false,
-            executed: false,
-            actionsExecuted: 0,
-          });
+        // Filter by trigger type if provided
+        if (triggerType && trigger.type !== triggerType) {
+          continue;
+        }
+
+        // Evaluate trigger
+        let shouldRun = false;
+        let record: any = null;
+
+        if (trigger.type === "schedule") {
+          // For schedule triggers, evaluate based on current time
+          shouldRun = evaluateTrigger(trigger, { now: new Date() });
+        } else if (trigger.type === "record_created" || trigger.type === "record_updated" || trigger.type === "field_match" || trigger.type === "date_approaching") {
+          // For record-based triggers, we need to fetch records
+          if (recordId && tableId) {
+            // Resolve table name from table_id
+            const { data: table } = await supabase
+              .from("tables")
+              .select("name")
+              .eq("id", tableId)
+              .single();
+
+            if (table) {
+              // Fetch the record
+              const { data: fetchedRecord, error: recordError } = await supabase
+                .from(table.name)
+                .select("*")
+                .eq("id", recordId)
+                .single();
+
+              if (!recordError && fetchedRecord) {
+                record = fetchedRecord;
+                
+                // Evaluate trigger with record context
+                if (trigger.type === "record_created") {
+                  shouldRun = evaluateTrigger(trigger, { record });
+                } else if (trigger.type === "record_updated") {
+                  shouldRun = evaluateTrigger(trigger, {
+                    oldRecord: oldRecord || {},
+                    newRecord: newRecord || record,
+                  });
+                } else if (trigger.type === "field_match" || trigger.type === "date_approaching") {
+                  shouldRun = evaluateTrigger(trigger, { record });
+                }
+              }
+            }
+          } else {
+            // For scheduled runs, we might need to query for matching records
+            // This is more complex and would require table-specific queries
+            // For now, skip record-based triggers if no record context provided
+            continue;
+          }
+        } else {
+          // Other trigger types
+          shouldRun = evaluateTrigger(trigger, { now: new Date() });
+        }
+
+        // If trigger criteria NOT met, skip safely
+        if (!shouldRun) {
           continue;
         }
 
         // Evaluate conditions
-        const conditions = (automation.conditions || []) as Condition[];
-        const recordToCheck = newRecord || record;
+        const conditionsPass = evaluateConditions(
+          automation.conditions || [],
+          record || {}
+        );
 
-        if (recordToCheck && !evaluateConditions(conditions, recordToCheck, oldRecord)) {
-          results.push({
-            automationId,
-            automationName,
-            triggered: true,
-            executed: false,
-            error: "Conditions not met",
-            actionsExecuted: 0,
-          });
+        if (!conditionsPass) {
+          // Conditions not met - log but don't count as error
+          await writeAutomationLog(
+            supabase,
+            automation.id,
+            "success",
+            { trigger, record, conditions: automation.conditions },
+            { message: "Conditions not met, automation skipped" },
+            undefined,
+            Date.now() - automationStartTime
+          );
           continue;
         }
 
         // Execute actions
-        const actions = automation.actions as AutomationAction[];
-        const startTime = Date.now();
-
-        const actionResults = await executeActions(actions, {
-          record: recordToCheck,
-          oldRecord,
-          newRecord,
-          automation: {
-            id: automation.id,
-            name: automation.name,
+        const actionContext: ActionContext = {
+          record: record || {},
+          automation,
+          supabase,
+          logger: (message, data) => {
+            console.log(`[Automation ${automation.name}]`, message, data);
           },
-        });
+        };
 
-        const duration = Date.now() - startTime;
-        const successCount = actionResults.filter((r) => r.success).length;
+        const actionResults = await executeActions(
+          automation.actions || [],
+          actionContext
+        );
+
+        // Check if all actions succeeded
+        const allActionsSucceeded = actionResults.every((r) => r.success);
         const hasErrors = actionResults.some((r) => !r.success);
+        const errors = actionResults
+          .filter((r) => !r.success)
+          .map((r) => r.error)
+          .join("; ");
 
-        // Log the execution
-        const logStatus = hasErrors ? "error" : "success";
-        const logError = hasErrors
-          ? actionResults
-              .filter((r) => !r.success)
-              .map((r) => r.error)
-              .join("; ")
-          : null;
+        const durationMs = Date.now() - automationStartTime;
 
-        await supabaseAdmin.from("automation_logs").insert({
-          automation_id: automationId,
-          status: logStatus,
-          input: {
-            trigger,
-            conditions,
-            record: recordToCheck,
-          },
-          output: {
-            actionsExecuted: actionResults.length,
-            successCount,
-            results: actionResults,
-          },
-          error: logError,
-          duration_ms: duration,
-        });
+        // Write log entry
+        await writeAutomationLog(
+          supabase,
+          automation.id,
+          allActionsSucceeded ? "success" : "error",
+          { trigger, record, conditions: automation.conditions },
+          { actionResults },
+          hasErrors ? errors : undefined,
+          durationMs
+        );
 
-        // Update last run time
-        lastRunTimes.set(automationId, now);
-
-        results.push({
-          automationId,
-          automationName,
-          triggered: true,
-          executed: true,
-          actionsExecuted: successCount,
-          error: logError || undefined,
-        });
+        // Record result
+        if (allActionsSucceeded) {
+          successCount++;
+          results.push({
+            automationId: automation.id,
+            automationName: automation.name,
+            success: true,
+            durationMs,
+          });
+        } else {
+          errorCount++;
+          results.push({
+            automationId: automation.id,
+            automationName: automation.name,
+            success: false,
+            error: errors,
+            durationMs,
+          });
+        }
       } catch (error: any) {
-        console.error(`[Automations] Error running automation ${automationId}:`, error);
+        // Handle errors gracefully - log but don't throw globally
+        errorCount++;
+        const durationMs = Date.now() - automationStartTime;
 
-        // Log the error
-        await supabaseAdmin.from("automation_logs").insert({
-          automation_id: automationId,
-          status: "error",
-          input: {
-            trigger: automation.trigger,
-            conditions: automation.conditions,
-            record,
-          },
-          error: error.message || "Unknown error",
-          duration_ms: 0,
-        });
+        await writeAutomationLog(
+          supabase,
+          automation.id,
+          "error",
+          { trigger: automation.trigger },
+          undefined,
+          error.message || "Unknown error",
+          durationMs
+        );
 
         results.push({
-          automationId,
-          automationName,
-          triggered: true,
-          executed: false,
-          error: error.message || "Execution failed",
-          actionsExecuted: 0,
+          automationId: automation.id,
+          automationName: automation.name,
+          success: false,
+          error: error.message || "Unknown error",
+          durationMs,
         });
+
+        console.error(`Error running automation ${automation.name}:`, error);
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: `Processed ${automations.length} automation(s)`,
-      results,
-    });
+    const summary: RunSummary = {
+      runCount,
+      successCount,
+      errorCount,
+      logs: results,
+    };
+
+    return NextResponse.json(summary);
   } catch (error: any) {
-    console.error("[Automations] Exception in POST /api/automations/run:", error);
+    console.error("Fatal error in automation runner:", error);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      {
+        runCount,
+        successCount,
+        errorCount,
+        logs: results,
+        error: error.message || "Fatal error in automation runner",
+      },
       { status: 500 }
     );
   }
@@ -221,27 +292,32 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/automations/run
- * Manual trigger endpoint (for testing)
+ * 
+ * Health check endpoint - returns status without running automations
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const automationId = searchParams.get("id");
+    const { count, error } = await supabase
+      .from("automations")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active");
 
-    // Call POST handler with automation ID
-    const mockRequest = new NextRequest(request.url, {
-      method: "POST",
-      body: JSON.stringify({ automationId }),
-      headers: request.headers,
+    if (error) {
+      return NextResponse.json(
+        { error: "Failed to check automations", details: error.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      status: "ok",
+      activeAutomations: count || 0,
+      message: "Automation runner is ready. Use POST to run automations.",
     });
-
-    return POST(mockRequest);
   } catch (error: any) {
-    console.error("[Automations] Exception in GET /api/automations/run:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
       { status: 500 }
     );
   }
 }
-

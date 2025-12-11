@@ -1,18 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ChevronRight, ChevronLeft, Plus, Trash2 } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, Plus, Trash2, Play, Code, AlertTriangle } from "lucide-react";
 import { useAutomations } from "@/lib/hooks/useAutomations";
 import { useTables } from "@/lib/hooks/useTables";
-import { useFields } from "@/lib/useFields";
 import Button from "@/components/ui/Button";
-import { Filter, getOperatorsForFieldType, getOperatorLabel } from "@/lib/types/filters";
-import { Condition } from "@/lib/automations/conditionEngine";
+import TriggerBuilder from "./TriggerBuilder";
+import ConditionBuilder from "./ConditionBuilder";
+import ActionBuilder from "./ActionBuilder";
+import TestAutomationModal from "./TestAutomationModal";
+import { AutomationTrigger, Condition, AutomationAction } from "@/lib/automations/schema";
+import { validateAutomation } from "@/lib/automations/validateAutomation";
+import { AutomationTemplate } from "./templates";
 
 interface AutomationEditorProps {
   automation: any | null;
   open: boolean;
   onClose: () => void;
+  onTemplateSelect?: (template: AutomationTemplate) => void;
 }
 
 type TriggerType =
@@ -41,6 +46,9 @@ export default function AutomationEditor({
   const { tables } = useTables();
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [showJsonPreview, setShowJsonPreview] = useState(false);
+  const [validationResult, setValidationResult] = useState<any>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -70,24 +78,62 @@ export default function AutomationEditor({
       setActions([]);
       setStep(1);
     }
+    setValidationResult(null);
+    setShowJsonPreview(false);
   }, [automation, open]);
+
+  // Validate automation whenever form changes
+  useEffect(() => {
+    const automationData = {
+      name,
+      status,
+      trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
+      conditions,
+      actions,
+    };
+    const result = validateAutomation(automationData);
+    setValidationResult(result);
+  }, [name, status, triggerType, triggerConfig, conditions, actions]);
+
+  // Handle template selection
+  const handleTemplateSelect = (template: AutomationTemplate) => {
+    setName(template.name);
+    setStatus(template.status || "active");
+    setTriggerType(template.trigger.type as TriggerType);
+    setTriggerConfig(template.trigger);
+    setConditions(template.conditions || []);
+    setActions(template.actions as any[]);
+    setStep(1);
+  };
 
   if (!open) return null;
 
   const handleSave = async () => {
+    // Validate before saving
+    const automationData = {
+      name,
+      status,
+      trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
+      conditions,
+      actions,
+    };
+
+    const validation = validateAutomation(automationData);
+    if (!validation.valid) {
+      alert(`Cannot save: ${validation.errors.join(", ")}`);
+      return;
+    }
+
+    // Show warning if there are warnings
+    if (validation.warnings.length > 0) {
+      const proceed = confirm(
+        `Warnings:\n${validation.warnings.join("\n")}\n\nDo you want to proceed?`
+      );
+      if (!proceed) return;
+    }
+
     try {
       setSaving(true);
-
-      const automationData = {
-        name,
-        status,
-        trigger: {
-          type: triggerType,
-          ...triggerConfig,
-        },
-        conditions,
-        actions,
-      };
 
       if (automation) {
         await updateAutomation(automation.id, automationData);
@@ -251,302 +297,43 @@ export default function AutomationEditor({
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Trigger
               </h3>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Trigger Type
-                </label>
-                <select
-                  value={triggerType}
-                  onChange={(e) => {
-                    setTriggerType(e.target.value as TriggerType);
-                    setTriggerConfig({});
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                >
-                  <option value="schedule">Schedule</option>
-                  <option value="record_created">Record Created</option>
-                  <option value="record_updated">Record Updated</option>
-                  <option value="field_match">Field Match</option>
-                  <option value="date_approaching">Date Approaching</option>
-                  <option value="manual">Manual</option>
-                </select>
-              </div>
-
-              {/* Trigger-specific fields */}
-              {triggerType === "schedule" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Frequency
-                    </label>
-                    <select
-                      value={triggerConfig.frequency || "daily"}
-                      onChange={(e) =>
-                        setTriggerConfig({ ...triggerConfig, frequency: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    >
-                      <option value="minutely">Every Minute</option>
-                      <option value="hourly">Hourly</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  {(triggerConfig.frequency === "daily" ||
-                    triggerConfig.frequency === "weekly" ||
-                    triggerConfig.frequency === "monthly") && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Time (HH:mm)
-                      </label>
-                      <input
-                        type="time"
-                        value={triggerConfig.time || "09:00"}
-                        onChange={(e) =>
-                          setTriggerConfig({ ...triggerConfig, time: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                      />
-                    </div>
-                  )}
-                  {triggerConfig.frequency === "weekly" && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Day of Week
-                      </label>
-                      <select
-                        value={triggerConfig.dayOfWeek || 0}
-                        onChange={(e) =>
-                          setTriggerConfig({
-                            ...triggerConfig,
-                            dayOfWeek: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                      >
-                        <option value="0">Sunday</option>
-                        <option value="1">Monday</option>
-                        <option value="2">Tuesday</option>
-                        <option value="3">Wednesday</option>
-                        <option value="4">Thursday</option>
-                        <option value="5">Friday</option>
-                        <option value="6">Saturday</option>
-                      </select>
-                    </div>
-                  )}
-                  {triggerConfig.frequency === "monthly" && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Day of Month (1-31)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={triggerConfig.dayOfMonth || 1}
-                        onChange={(e) =>
-                          setTriggerConfig({
-                            ...triggerConfig,
-                            dayOfMonth: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                      />
-                    </div>
-                  )}
-                  {triggerConfig.frequency === "hourly" && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Minute (0-59)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={triggerConfig.minute || 0}
-                        onChange={(e) =>
-                          setTriggerConfig({
-                            ...triggerConfig,
-                            minute: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(triggerType === "record_created" ||
-                triggerType === "record_updated") && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Table
-                  </label>
-                  <select
-                    value={triggerConfig.table || ""}
-                    onChange={(e) =>
-                      setTriggerConfig({ ...triggerConfig, table: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                  >
-                    <option value="">Select table...</option>
-                    {tables.map((table) => (
-                      <option key={table.id} value={table.id}>
-                        {table.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {triggerType === "field_match" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Table
-                    </label>
-                    <select
-                      value={triggerConfig.table || ""}
-                      onChange={(e) =>
-                        setTriggerConfig({ ...triggerConfig, table: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    >
-                      <option value="">Select table...</option>
-                      {tables.map((table) => (
-                        <option key={table.id} value={table.id}>
-                          {table.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {triggerConfig.table && (
-                    <FieldMatchTriggerConfig
-                      tableId={triggerConfig.table}
-                      config={triggerConfig}
-                      onChange={setTriggerConfig}
-                    />
-                  )}
-                </div>
-              )}
-
-              {triggerType === "date_approaching" && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Table
-                    </label>
-                    <select
-                      value={triggerConfig.table || ""}
-                      onChange={(e) =>
-                        setTriggerConfig({ ...triggerConfig, table: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
-                    >
-                      <option value="">Select table...</option>
-                      {tables.map((table) => (
-                        <option key={table.id} value={table.id}>
-                          {table.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {triggerConfig.table && (
-                    <DateApproachingTriggerConfig
-                      tableId={triggerConfig.table}
-                      config={triggerConfig}
-                      onChange={setTriggerConfig}
-                    />
-                  )}
-                </div>
-              )}
-
-              {triggerType === "manual" && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  This automation can only be triggered manually from the automations page.
-                </p>
-              )}
+              <TriggerBuilder
+                trigger={triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig }}
+                onChange={(newTrigger) => {
+                  setTriggerConfig(newTrigger);
+                  setTriggerType(newTrigger.type as TriggerType);
+                }}
+              />
             </div>
           )}
 
           {/* Step 3: Conditions */}
           {step === 3 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  Conditions
-                </h3>
-                <Button
-                  variant="outline"
-                  onClick={handleAddCondition}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Condition
-                </Button>
-              </div>
-
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Conditions
+              </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 All conditions must be met (AND logic) for the automation to run.
               </p>
-
-              {conditions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No conditions. Automation will run whenever the trigger fires.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {conditions.map((condition, index) => (
-                    <ConditionEditor
-                      key={index}
-                      condition={condition}
-                      tableId={triggerConfig.table}
-                      onChange={(updates) => handleUpdateCondition(index, updates)}
-                      onRemove={() => handleRemoveCondition(index)}
-                    />
-                  ))}
-                </div>
-              )}
+              <ConditionBuilder
+                conditions={conditions}
+                tableId={triggerConfig.table_id || triggerConfig.table}
+                onChange={setConditions}
+              />
             </div>
           )}
 
           {/* Step 4: Actions */}
           {step === 4 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                  Actions
-                </h3>
-                <Button
-                  variant="outline"
-                  onClick={handleAddAction}
-                  className="flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Action
-                </Button>
-              </div>
-
-              {actions.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No actions. Add at least one action to execute.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {actions.map((action, index) => (
-                    <ActionEditor
-                      key={index}
-                      action={action}
-                      tables={tables}
-                      onChange={(updates) => handleUpdateAction(index, updates)}
-                      onRemove={() => handleRemoveAction(index)}
-                    />
-                  ))}
-                </div>
-              )}
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Actions
+              </h3>
+              <ActionBuilder
+                actions={actions}
+                onChange={setActions}
+              />
             </div>
           )}
 
@@ -556,6 +343,44 @@ export default function AutomationEditor({
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Summary
               </h3>
+
+              {/* Validation Warnings */}
+              {validationResult && validationResult.warnings.length > 0 && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
+                        Warnings
+                      </h4>
+                      <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1">
+                        {validationResult.warnings.map((warning: string, index: number) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Validation Errors */}
+              {validationResult && !validationResult.valid && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <X className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
+                        Validation Errors
+                      </h4>
+                      <ul className="text-sm text-red-700 dark:text-red-300 list-disc list-inside space-y-1">
+                        {validationResult.errors.map((error: string, index: number) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3">
                 <div>
@@ -575,23 +400,35 @@ export default function AutomationEditor({
                 </div>
               </div>
 
+              {/* JSON Preview */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  JSON Preview
-                </label>
-                <pre className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-xs overflow-auto max-h-64">
-                  {JSON.stringify(
-                    {
-                      name,
-                      status,
-                      trigger: { type: triggerType, ...triggerConfig },
-                      conditions,
-                      actions,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    JSON Preview
+                  </label>
+                  <button
+                    onClick={() => setShowJsonPreview(!showJsonPreview)}
+                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <Code className="w-3 h-3" />
+                    {showJsonPreview ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {showJsonPreview && (
+                  <pre className="w-full p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-xs overflow-auto max-h-64 border border-gray-200 dark:border-gray-700">
+                    {JSON.stringify(
+                      {
+                        name,
+                        status,
+                        trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
+                        conditions,
+                        actions,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                )}
               </div>
             </div>
           )}
@@ -610,6 +447,16 @@ export default function AutomationEditor({
                 Previous
               </Button>
             )}
+            {step === 5 && (
+              <Button
+                variant="outline"
+                onClick={() => setShowTestModal(true)}
+                className="flex items-center gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Test
+              </Button>
+            )}
           </div>
           <div className="flex gap-2">
             {step < 5 ? (
@@ -623,7 +470,7 @@ export default function AutomationEditor({
             ) : (
               <Button
                 onClick={handleSave}
-                disabled={saving || !name}
+                disabled={saving || !name || (validationResult && !validationResult.valid)}
                 className="flex items-center gap-2"
               >
                 {saving ? "Saving..." : automation ? "Update" : "Create"}
@@ -631,6 +478,19 @@ export default function AutomationEditor({
             )}
           </div>
         </div>
+
+        {/* Test Modal */}
+        <TestAutomationModal
+          automation={{
+            name,
+            status,
+            trigger: triggerConfig.type ? triggerConfig : { type: triggerType, ...triggerConfig },
+            conditions,
+            actions,
+          }}
+          open={showTestModal}
+          onClose={() => setShowTestModal(false)}
+        />
       </div>
     </>
   );

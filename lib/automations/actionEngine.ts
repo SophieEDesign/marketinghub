@@ -1,68 +1,28 @@
 /**
  * Action Engine for Automations
  * Executes actions defined in automation workflows
+ * 
+ * Matches schema definitions from lib/automations/schema.ts
  */
 
-import { supabase } from "@/lib/supabaseClient";
+import { SupabaseClient } from "@supabase/supabase-js";
+import {
+  UpdateRecordAction,
+  CreateRecordAction,
+  DeleteRecordAction,
+  SendEmailAction,
+  SendWebhookAction,
+  SetFieldValueAction,
+  AutomationAction,
+} from "./schema";
+import { Automation } from "@/lib/types/automations";
 
-export interface SendEmailAction {
-  type: "send_email";
-  to: string;
-  subject: string;
-  template?: string;
-  body?: string;
-  data?: Record<string, any>;
+export interface ActionContext {
+  record?: any;
+  automation?: Automation;
+  supabase: SupabaseClient;
+  logger?: (message: string, data?: any) => void;
 }
-
-export interface SlackMessageAction {
-  type: "slack_message";
-  webhook_url: string;
-  message: string;
-  channel?: string;
-}
-
-export interface WebhookAction {
-  type: "webhook";
-  url: string;
-  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  headers?: Record<string, string>;
-  body?: any;
-}
-
-export interface UpdateRecordAction {
-  type: "update_record";
-  table: string;
-  recordId: string;
-  updates: Record<string, any>;
-}
-
-export interface CreateRecordAction {
-  type: "create_record";
-  table: string;
-  data: Record<string, any>;
-}
-
-export interface DuplicateRecordAction {
-  type: "duplicate_record";
-  table: string;
-  recordId: string;
-  excludeFields?: string[];
-}
-
-export interface RunScriptAction {
-  type: "run_script";
-  script: string;
-  timeout?: number; // milliseconds
-}
-
-export type AutomationAction =
-  | SendEmailAction
-  | SlackMessageAction
-  | WebhookAction
-  | UpdateRecordAction
-  | CreateRecordAction
-  | DuplicateRecordAction
-  | RunScriptAction;
 
 export interface ActionResult {
   success: boolean;
@@ -75,30 +35,32 @@ export interface ActionResult {
  */
 async function executeSendEmail(
   action: SendEmailAction,
-  context?: Record<string, any>
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
-    // Replace template variables with data
-    let body = action.body || action.template || "";
-    if (action.data) {
-      Object.keys(action.data).forEach((key) => {
-        body = body.replace(new RegExp(`{{${key}}}`, "g"), action.data![key]);
+    // Replace template variables in subject and body
+    let subject = action.subject;
+    let body = action.body || "";
+
+    if (context.record) {
+      // Replace {{field_key}} with actual values
+      Object.keys(context.record).forEach((key) => {
+        const value = context.record[key];
+        const regex = new RegExp(`{{${key}}}`, "g");
+        subject = subject.replace(regex, String(value || ""));
+        body = body.replace(regex, String(value || ""));
       });
     }
 
     // TODO: Integrate with your email service (SendGrid, Resend, etc.)
     // For now, this is a placeholder
-    console.log("Sending email:", {
-      to: action.to,
-      subject: action.subject,
-      body,
-    });
+    context.logger?.("Sending email", { to: action.to, subject, body });
 
     // Example: Call your email API endpoint
     // const response = await fetch('/api/send-email', {
     //   method: 'POST',
     //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ to: action.to, subject: action.subject, body })
+    //   body: JSON.stringify({ to: action.to, subject, body, from: action.from })
     // });
 
     return {
@@ -114,46 +76,11 @@ async function executeSendEmail(
 }
 
 /**
- * Execute slack_message action
- */
-async function executeSlackMessage(
-  action: SlackMessageAction,
-  context?: Record<string, any>
-): Promise<ActionResult> {
-  try {
-    const response = await fetch(action.webhook_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text: action.message,
-        channel: action.channel,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Slack API error: ${response.statusText}`);
-    }
-
-    return {
-      success: true,
-      output: { sent: true },
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      error: error.message || "Failed to send Slack message",
-    };
-  }
-}
-
-/**
  * Execute webhook action
  */
 async function executeWebhook(
-  action: WebhookAction,
-  context?: Record<string, any>
+  action: SendWebhookAction,
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
     const method = action.method || "POST";
@@ -162,10 +89,20 @@ async function executeWebhook(
       ...action.headers,
     };
 
+    // Replace template variables in body if it's a string
+    let body = action.body;
+    if (typeof body === "string" && context.record) {
+      Object.keys(context.record).forEach((key) => {
+        const value = context.record[key];
+        const regex = new RegExp(`{{${key}}}`, "g");
+        body = body.replace(regex, String(value || ""));
+      });
+    }
+
     const response = await fetch(action.url, {
       method,
       headers,
-      body: action.body ? JSON.stringify(action.body) : undefined,
+      body: body ? JSON.stringify(body) : undefined,
     });
 
     const responseData = await response.json().catch(() => ({}));
@@ -191,13 +128,56 @@ async function executeWebhook(
  */
 async function executeUpdateRecord(
   action: UpdateRecordAction,
-  context?: Record<string, any>
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
-    const { data, error } = await supabase
-      .from(action.table)
-      .update(action.updates)
-      .eq("id", action.recordId)
+    // Resolve table name from table_id if needed
+    let tableName = action.table_name || action.table_id;
+    
+    // If table_id is a UUID, we need to get the table name
+    if (action.table_id && !action.table_name) {
+      const { data: table } = await context.supabase
+        .from("tables")
+        .select("name")
+        .eq("id", action.table_id)
+        .single();
+      
+      if (table) {
+        tableName = table.name;
+      }
+    }
+
+    if (!tableName) {
+      throw new Error("Table name or table_id is required");
+    }
+
+    // Use record_id from action, or fall back to context.record.id
+    const recordId = action.record_id || context.record?.id;
+    if (!recordId) {
+      throw new Error("Record ID is required");
+    }
+
+    // Replace template variables in field_updates
+    const updates: Record<string, any> = {};
+    Object.keys(action.field_updates).forEach((key) => {
+      let value = action.field_updates[key];
+      
+      // If value is a string with template variables, replace them
+      if (typeof value === "string" && context.record) {
+        Object.keys(context.record).forEach((fieldKey) => {
+          const fieldValue = context.record[fieldKey];
+          const regex = new RegExp(`{{${fieldKey}}}`, "g");
+          value = value.replace(regex, String(fieldValue || ""));
+        });
+      }
+      
+      updates[key] = value;
+    });
+
+    const { data, error } = await context.supabase
+      .from(tableName)
+      .update(updates)
+      .eq("id", recordId)
       .select()
       .single();
 
@@ -220,12 +200,49 @@ async function executeUpdateRecord(
  */
 async function executeCreateRecord(
   action: CreateRecordAction,
-  context?: Record<string, any>
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
-    const { data, error } = await supabase
-      .from(action.table)
-      .insert(action.data)
+    // Resolve table name from table_id if needed
+    let tableName = action.table_name || action.table_id;
+    
+    // If table_id is a UUID, we need to get the table name
+    if (action.table_id && !action.table_name) {
+      const { data: table } = await context.supabase
+        .from("tables")
+        .select("name")
+        .eq("id", action.table_id)
+        .single();
+      
+      if (table) {
+        tableName = table.name;
+      }
+    }
+
+    if (!tableName) {
+      throw new Error("Table name or table_id is required");
+    }
+
+    // Replace template variables in field_values
+    const fieldValues: Record<string, any> = {};
+    Object.keys(action.field_values).forEach((key) => {
+      let value = action.field_values[key];
+      
+      // If value is a string with template variables, replace them
+      if (typeof value === "string" && context.record) {
+        Object.keys(context.record).forEach((fieldKey) => {
+          const fieldValue = context.record[fieldKey];
+          const regex = new RegExp(`{{${fieldKey}}}`, "g");
+          value = value.replace(regex, String(fieldValue || ""));
+        });
+      }
+      
+      fieldValues[key] = value;
+    });
+
+    const { data, error } = await context.supabase
+      .from(tableName)
+      .insert(fieldValues)
       .select()
       .single();
 
@@ -244,111 +261,85 @@ async function executeCreateRecord(
 }
 
 /**
- * Execute duplicate_record action
+ * Execute delete_record action
  */
-async function executeDuplicateRecord(
-  action: DuplicateRecordAction,
-  context?: Record<string, any>
+async function executeDeleteRecord(
+  action: DeleteRecordAction,
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
-    // First, fetch the original record
-    const { data: original, error: fetchError } = await supabase
-      .from(action.table)
-      .select("*")
-      .eq("id", action.recordId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Remove excluded fields and id
-    const excludeFields = new Set(["id", "created_at", "updated_at", ...(action.excludeFields || [])]);
-    const newData: Record<string, any> = {};
-
-    Object.keys(original).forEach((key) => {
-      if (!excludeFields.has(key)) {
-        newData[key] = original[key];
+    // Resolve table name from table_id if needed
+    let tableName = action.table_name || action.table_id;
+    
+    // If table_id is a UUID, we need to get the table name
+    if (action.table_id && !action.table_name) {
+      const { data: table } = await context.supabase
+        .from("tables")
+        .select("name")
+        .eq("id", action.table_id)
+        .single();
+      
+      if (table) {
+        tableName = table.name;
       }
-    });
+    }
 
-    // Create the duplicate
-    const { data, error } = await supabase
-      .from(action.table)
-      .insert(newData)
-      .select()
-      .single();
+    if (!tableName) {
+      throw new Error("Table name or table_id is required");
+    }
+
+    // Use record_id from action, or fall back to context.record.id
+    const recordId = action.record_id || context.record?.id;
+    if (!recordId) {
+      throw new Error("Record ID is required");
+    }
+
+    const { error } = await context.supabase
+      .from(tableName)
+      .delete()
+      .eq("id", recordId);
 
     if (error) throw error;
 
     return {
       success: true,
-      output: data,
+      output: { deleted: true, id: recordId },
     };
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || "Failed to duplicate record",
+      error: error.message || "Failed to delete record",
     };
   }
 }
 
 /**
- * Execute run_script action (sandboxed JavaScript)
+ * Execute set_field_value action
  */
-async function executeRunScript(
-  action: RunScriptAction,
-  context?: Record<string, any>
+async function executeSetFieldValue(
+  action: SetFieldValueAction,
+  context: ActionContext
 ): Promise<ActionResult> {
   try {
-    // WARNING: Running user-provided scripts is a security risk
-    // In production, use a proper sandbox like vm2 or a separate service
-    // This is a basic implementation for demonstration
+    // This action updates the current record (from trigger context)
+    if (!context.record || !context.record.id) {
+      throw new Error("No record in context for set_field_value action");
+    }
 
-    const timeout = action.timeout || 5000; // Default 5 seconds
+    // We need to know which table the record belongs to
+    // This should be provided by the trigger context
+    // For now, we'll need to infer it or require it in the action
+    throw new Error("set_field_value action requires table context - not yet fully implemented");
 
-    // Create a safe execution context
-    const safeContext = {
-      ...context,
-      // Provide safe utilities
-      console: {
-        log: (...args: any[]) => console.log("[Automation Script]", ...args),
-        error: (...args: any[]) => console.error("[Automation Script]", ...args),
-      },
-      // Block dangerous operations
-      require: undefined,
-      process: undefined,
-      global: undefined,
-      eval: undefined,
-      Function: undefined,
-    };
-
-    // Execute with timeout
-    const result = await Promise.race([
-      new Promise((resolve) => {
-        try {
-          // Use Function constructor in a controlled way
-          const func = new Function(
-            ...Object.keys(safeContext),
-            action.script
-          );
-          const output = func(...Object.values(safeContext));
-          resolve(output);
-        } catch (error: any) {
-          resolve({ error: error.message });
-        }
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Script timeout")), timeout)
-      ),
-    ]);
-
+    // TODO: Implement when we have table context
     return {
-      success: true,
-      output: result,
+      success: false,
+      error: "set_field_value action not yet fully implemented",
     };
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || "Failed to execute script",
+      error: error.message || "Failed to set field value",
     };
   }
 }
@@ -358,16 +349,13 @@ async function executeRunScript(
  */
 export async function executeAction(
   action: AutomationAction,
-  context?: Record<string, any>
+  context: ActionContext
 ): Promise<ActionResult> {
   switch (action.type) {
     case "send_email":
       return executeSendEmail(action, context);
 
-    case "slack_message":
-      return executeSlackMessage(action, context);
-
-    case "webhook":
+    case "send_webhook":
       return executeWebhook(action, context);
 
     case "update_record":
@@ -376,11 +364,11 @@ export async function executeAction(
     case "create_record":
       return executeCreateRecord(action, context);
 
-    case "duplicate_record":
-      return executeDuplicateRecord(action, context);
+    case "delete_record":
+      return executeDeleteRecord(action, context);
 
-    case "run_script":
-      return executeRunScript(action, context);
+    case "set_field_value":
+      return executeSetFieldValue(action, context);
 
     default:
       return {
@@ -392,21 +380,29 @@ export async function executeAction(
 
 /**
  * Execute multiple actions in sequence
+ * Must not throw globally - errors must be collected for logging
+ * Return array of action results
  */
 export async function executeActions(
   actions: AutomationAction[],
-  context?: Record<string, any>
+  context: ActionContext
 ): Promise<ActionResult[]> {
   const results: ActionResult[] = [];
 
   for (const action of actions) {
-    const result = await executeAction(action, context);
-    results.push(result);
+    try {
+      const result = await executeAction(action, context);
+      results.push(result);
 
-    // If an action fails, you might want to stop or continue
-    // For now, we continue executing remaining actions
+      // Continue executing remaining actions even if one fails
+    } catch (error: any) {
+      // Collect error but don't throw
+      results.push({
+        success: false,
+        error: error.message || "Unknown error executing action",
+      });
+    }
   }
 
   return results;
 }
-

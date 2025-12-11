@@ -1,54 +1,19 @@
 /**
  * Trigger Engine for Automations
  * Evaluates whether an automation should run based on its trigger configuration
+ * 
+ * Matches schema definitions from lib/automations/schema.ts
  */
 
-export interface ScheduleTrigger {
-  type: "schedule";
-  frequency: "daily" | "weekly" | "monthly" | "hourly" | "minutely";
-  time?: string; // HH:mm format for daily
-  dayOfWeek?: number; // 0-6 for weekly (0 = Sunday)
-  dayOfMonth?: number; // 1-31 for monthly
-  minute?: number; // 0-59 for hourly
-}
-
-export interface RecordCreatedTrigger {
-  type: "record_created";
-  table: string;
-}
-
-export interface RecordUpdatedTrigger {
-  type: "record_updated";
-  table: string;
-  fields?: string[]; // Only trigger if these fields changed
-}
-
-export interface FieldMatchTrigger {
-  type: "field_match";
-  table: string;
-  field: string;
-  operator: "equals" | "not_equals" | "contains" | ">" | "<" | ">=" | "<=";
-  value: any;
-}
-
-export interface DateApproachingTrigger {
-  type: "date_approaching";
-  table: string;
-  dateField: string;
-  daysBefore: number; // Trigger X days before the date
-}
-
-export interface ManualTrigger {
-  type: "manual";
-}
-
-export type AutomationTrigger =
-  | ScheduleTrigger
-  | RecordCreatedTrigger
-  | RecordUpdatedTrigger
-  | FieldMatchTrigger
-  | DateApproachingTrigger
-  | ManualTrigger;
+import {
+  ScheduleTrigger,
+  RecordCreatedTrigger,
+  RecordUpdatedTrigger,
+  FieldMatchTrigger,
+  DateApproachingTrigger,
+  ManualTrigger,
+  AutomationTrigger,
+} from "./schema";
 
 /**
  * Check if a schedule trigger should run at the current time
@@ -62,32 +27,23 @@ export function shouldRunScheduleTrigger(
   const dayOfWeek = now.getDay();
   const dayOfMonth = now.getDate();
 
-  switch (trigger.frequency) {
-    case "minutely":
-      // Run every minute
-      return true;
+  const schedule = trigger.schedule;
 
-    case "hourly":
-      // Run at the specified minute of each hour
-      if (trigger.minute !== undefined) {
-        return minute === trigger.minute;
-      }
-      return minute === 0; // Default to top of the hour
-
+  switch (schedule.frequency) {
     case "daily":
       // Run at the specified time each day
-      if (trigger.time) {
-        const [triggerHour, triggerMinute] = trigger.time.split(":").map(Number);
+      if (schedule.time) {
+        const [triggerHour, triggerMinute] = schedule.time.split(":").map(Number);
         return hour === triggerHour && minute === triggerMinute;
       }
       return false; // No time specified
 
     case "weekly":
       // Run on specified day of week at specified time
-      if (trigger.dayOfWeek !== undefined) {
-        if (dayOfWeek !== trigger.dayOfWeek) return false;
-        if (trigger.time) {
-          const [triggerHour, triggerMinute] = trigger.time.split(":").map(Number);
+      if (schedule.dayOfWeek !== undefined) {
+        if (dayOfWeek !== schedule.dayOfWeek) return false;
+        if (schedule.time) {
+          const [triggerHour, triggerMinute] = schedule.time.split(":").map(Number);
           return hour === triggerHour && minute === triggerMinute;
         }
         return true; // Day matches, no time specified
@@ -96,13 +52,22 @@ export function shouldRunScheduleTrigger(
 
     case "monthly":
       // Run on specified day of month at specified time
-      if (trigger.dayOfMonth !== undefined) {
-        if (dayOfMonth !== trigger.dayOfMonth) return false;
-        if (trigger.time) {
-          const [triggerHour, triggerMinute] = trigger.time.split(":").map(Number);
+      if (schedule.dayOfMonth !== undefined) {
+        if (dayOfMonth !== schedule.dayOfMonth) return false;
+        if (schedule.time) {
+          const [triggerHour, triggerMinute] = schedule.time.split(":").map(Number);
           return hour === triggerHour && minute === triggerMinute;
         }
         return true; // Day matches, no time specified
+      }
+      return false;
+
+    case "custom":
+      // For custom cron expressions, we'd need a cron parser
+      // For now, return false - this should be handled by external scheduler
+      if (schedule.cron) {
+        // TODO: Implement cron parsing if needed
+        return false;
       }
       return false;
 
@@ -113,14 +78,15 @@ export function shouldRunScheduleTrigger(
 
 /**
  * Check if a record created trigger should run
+ * Note: This is typically called when a record is created
  */
 export function shouldRunRecordCreatedTrigger(
   trigger: RecordCreatedTrigger,
   record: any
 ): boolean {
-  // This is typically called when a record is created
-  // The record should match the table
-  return true; // If we're checking this, the record was just created
+  // If we're checking this, the record was just created
+  // The table_id matching should be done by the caller
+  return true;
 }
 
 /**
@@ -131,9 +97,23 @@ export function shouldRunRecordUpdatedTrigger(
   oldRecord: any,
   newRecord: any
 ): boolean {
-  // If specific fields are specified, only trigger if those fields changed
-  if (trigger.fields && trigger.fields.length > 0) {
-    return trigger.fields.some((field) => oldRecord[field] !== newRecord[field]);
+  // If specific field filters are specified, check if those fields changed
+  if (trigger.field_filters && trigger.field_filters.length > 0) {
+    return trigger.field_filters.some((filter) => {
+      const oldValue = oldRecord?.[filter.field_key];
+      const newValue = newRecord?.[filter.field_key];
+
+      switch (filter.operator) {
+        case "changed":
+          return oldValue !== newValue;
+        case "equals":
+          return newValue === filter.value;
+        case "not_equals":
+          return newValue !== filter.value;
+        default:
+          return oldValue !== newValue; // Default to "changed"
+      }
+    });
   }
   // Otherwise, trigger on any update
   return true;
@@ -146,7 +126,7 @@ export function shouldRunFieldMatchTrigger(
   trigger: FieldMatchTrigger,
   record: any
 ): boolean {
-  const fieldValue = record[trigger.field];
+  const fieldValue = record[trigger.field_key];
 
   switch (trigger.operator) {
     case "equals":
@@ -154,15 +134,13 @@ export function shouldRunFieldMatchTrigger(
     case "not_equals":
       return fieldValue !== trigger.value;
     case "contains":
-      return String(fieldValue || "").includes(String(trigger.value || ""));
-    case ">":
+      return String(fieldValue || "").toLowerCase().includes(
+        String(trigger.value || "").toLowerCase()
+      );
+    case "greater_than":
       return Number(fieldValue) > Number(trigger.value);
-    case "<":
+    case "less_than":
       return Number(fieldValue) < Number(trigger.value);
-    case ">=":
-      return Number(fieldValue) >= Number(trigger.value);
-    case "<=":
-      return Number(fieldValue) <= Number(trigger.value);
     default:
       return false;
   }
@@ -175,7 +153,7 @@ export function shouldRunDateApproachingTrigger(
   trigger: DateApproachingTrigger,
   record: any
 ): boolean {
-  const dateValue = record[trigger.dateField];
+  const dateValue = record[trigger.date_field_key];
   if (!dateValue) return false;
 
   const targetDate = new Date(dateValue);
@@ -186,16 +164,16 @@ export function shouldRunDateApproachingTrigger(
   const diffTime = targetDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  // Trigger if the date is exactly X days away
-  return diffDays === trigger.daysBefore;
+  // Trigger if the date is exactly X days away (or within the day range)
+  return diffDays >= 0 && diffDays <= trigger.days_before;
 }
 
 /**
  * Check if a manual trigger should run
+ * Manual triggers must ONLY run when explicitly requested, not via cron
  */
-export function shouldRunManualTrigger(trigger: ManualTrigger): boolean {
-  // Manual triggers are always true when explicitly called
-  return true;
+export function isManualTrigger(trigger: ManualTrigger): boolean {
+  return trigger.type === "manual";
 }
 
 /**
@@ -245,11 +223,12 @@ export function evaluateTrigger(
       return false;
 
     case "manual":
-      return shouldRunManualTrigger(trigger);
+      // Manual triggers should only run when explicitly called
+      // Return false here - they'll be handled separately
+      return false;
 
     default:
       console.warn(`Unknown trigger type: ${(trigger as any).type}`);
       return false;
   }
 }
-

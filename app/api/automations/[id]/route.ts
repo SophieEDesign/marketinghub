@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { validateAutomation } from "@/lib/automations/validateAutomation";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,12 +63,41 @@ export async function PUT(
     const { id } = params;
     const body = await request.json();
 
-    const updateData: any = {};
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.status !== undefined) updateData.status = body.status;
-    if (body.trigger !== undefined) updateData.trigger = body.trigger;
-    if (body.conditions !== undefined) updateData.conditions = body.conditions;
-    if (body.actions !== undefined) updateData.actions = body.actions;
+    // Get existing automation to merge with updates
+    const { data: existing } = await supabaseAdmin
+      .from("automations")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Automation not found" },
+        { status: 404 }
+      );
+    }
+
+    const updateData: any = {
+      ...existing,
+      ...(body.name !== undefined && { name: body.name }),
+      ...(body.status !== undefined && { status: body.status }),
+      ...(body.trigger !== undefined && { trigger: body.trigger }),
+      ...(body.conditions !== undefined && { conditions: body.conditions }),
+      ...(body.actions !== undefined && { actions: body.actions }),
+    };
+
+    // Validate automation
+    const validation = validateAutomation(updateData);
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          error: "Validation failed",
+          errors: validation.errors,
+          warnings: validation.warnings,
+        },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabaseAdmin
       .from("automations")
