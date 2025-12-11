@@ -191,7 +191,7 @@ function ActionEditor({
   isEditing: boolean;
   onToggleEdit: () => void;
 }) {
-  const { tables } = useTables();
+  const { tables, loading: tablesLoading } = useTables();
   const [selectedTableId, setSelectedTableId] = useState<string>(
     (action as any).table_id || ""
   );
