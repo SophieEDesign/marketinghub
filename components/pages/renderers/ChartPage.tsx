@@ -7,9 +7,21 @@ import { ChartPageConfig } from "@/lib/pages/pageConfig";
 import { InterfacePage } from "@/lib/hooks/useInterfacePages";
 import dynamic from "next/dynamic";
 
-// Dynamically import recharts to avoid SSR issues
-// Note: User needs to install recharts: npm install recharts
-const ChartComponent = dynamic(() => import("./ChartComponent"), { ssr: false });
+// Dynamically import ChartComponent to avoid build-time errors if recharts isn't installed
+// Using a function that handles the import error gracefully
+const ChartComponent = dynamic(
+  () => import("./ChartComponent").catch(() => ({
+    default: () => (
+      <div className="p-6 text-center text-gray-500 border border-gray-200 dark:border-gray-700 rounded-lg">
+        <p className="mb-2">Chart library not installed</p>
+        <p className="text-sm">
+          Please install recharts: <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">npm install recharts</code>
+        </p>
+      </div>
+    ),
+  })),
+  { ssr: false }
+);
 
 interface ChartPageProps {
   page: InterfacePage;
