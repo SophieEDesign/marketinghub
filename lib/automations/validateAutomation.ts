@@ -98,7 +98,7 @@ export function validateAutomation(automation: Partial<Automation>): ValidationR
     errors.push("At least one action is required");
   } else {
     automation.actions.forEach((action, index) => {
-      const actionErrors = validateAction(action, index);
+      const actionErrors = validateAction(action, index, warnings);
       errors.push(...actionErrors);
     });
   }
@@ -121,7 +121,7 @@ export function validateAutomation(automation: Partial<Automation>): ValidationR
   };
 }
 
-function validateAction(action: AutomationAction, index: number): string[] {
+function validateAction(action: AutomationAction, index: number, warnings: string[]): string[] {
   const errors: string[] = [];
   const prefix = `Action ${index + 1}`;
 
