@@ -19,6 +19,8 @@ import { Automation } from "@/lib/types/automations";
 
 export interface ActionContext {
   record?: any;
+  oldRecord?: any;
+  newRecord?: any;
   automation?: Automation;
   supabase: SupabaseClient;
   logger?: (message: string, data?: any) => void;

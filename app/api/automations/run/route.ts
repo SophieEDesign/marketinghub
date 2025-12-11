@@ -199,6 +199,8 @@ export async function POST(request: NextRequest) {
 
         const actionContext: ActionContext = {
           record: record || {},
+          oldRecord,
+          newRecord,
           automation: automationData,
           supabase,
           logger: (message, data) => {
