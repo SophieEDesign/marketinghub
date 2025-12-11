@@ -453,7 +453,7 @@ function ActionEditor({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Value (supports {{field_key}} variables)
+                Value (supports {'{{field_key}}'} variables)
               </label>
               <input
                 type="text"
