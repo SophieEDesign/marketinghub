@@ -147,7 +147,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                 });
               }
             }}
-            onUpdateBlock={async (id, updates) => {
+            onUpdateBlock={async (id: string, updates: Partial<InterfacePageBlock>) => {
               try {
                 const response = await fetch(`/api/page-blocks/${id}`, {
                   method: "PUT",
@@ -164,7 +164,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                 });
               }
             }}
-            onDeleteBlock={async (id) => {
+            onDeleteBlock={async (id: string) => {
               try {
                 const response = await fetch(`/api/page-blocks/${id}`, {
                   method: "DELETE",
@@ -179,7 +179,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                 });
               }
             }}
-            onReorderBlocks={async (blockIds) => {
+            onReorderBlocks={async (blockIds: string[]) => {
               const updates = blockIds.map((id, index) => ({
                 id,
                 position_y: index,
@@ -244,7 +244,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                   });
                 }
               }}
-              onUpdateBlock={async (id, updates) => {
+              onUpdateBlock={async (id: string, updates: Partial<InterfacePageBlock>) => {
                 try {
                   // Update local state optimistically first (like Dashboard does)
                   setBlocks((prev) =>
@@ -298,7 +298,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                   });
                 }
               }}
-              onDeleteBlock={async (id) => {
+              onDeleteBlock={async (id: string) => {
                 try {
                   const response = await fetch(`/api/page-blocks/${id}`, {
                     method: "DELETE",
@@ -323,7 +323,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                   });
                 }
               }}
-              onReorderBlocks={async (blockIds) => {
+              onReorderBlocks={async (blockIds: string[]) => {
                 // Update positions based on new order
                 const updates = blockIds.map((id, index) => ({
                   id,
