@@ -122,7 +122,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
             data={blocks}
             blocks={blocks}
             isEditing={isEditing}
-            onAddBlock={async (type) => {
+            onAddBlock={async (type: string) => {
               try {
                 const response = await fetch("/api/page-blocks", {
                   method: "POST",
@@ -218,7 +218,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
               pageId={pageId}
               blocks={blocks}
               isEditing={isEditing}
-              onAddBlock={async (type) => {
+              onAddBlock={async (type: string) => {
                 try {
                   const response = await fetch("/api/page-blocks", {
                     method: "POST",
@@ -352,7 +352,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
             onClick={(e) => e.stopPropagation()}
           >
             <BlockMenu
-              onSelectBlockType={async (type) => {
+              onSelectBlockType={async (type: BlockType) => {
                 try {
                   const response = await fetch("/api/page-blocks", {
                     method: "POST",
