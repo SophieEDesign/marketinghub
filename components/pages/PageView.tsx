@@ -4,13 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { InterfacePage, InterfacePageBlock } from "@/lib/hooks/useInterfacePages";
-import { Edit2, Copy, Trash2, Plus } from "lucide-react";
+import { Edit2, Copy, Trash2, Plus, Settings } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import PageBuilder from "./PageBuilder";
 import PageRenderer from "./PageRenderer";
 import BlockMenu from "@/components/dashboard/blocks/BlockMenu";
 import { PageContextProvider } from "./PageContext";
+import PageSettingsDrawer from "./PageSettingsDrawer";
 
 interface PageViewProps {
   pageId: string;
@@ -24,6 +25,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(defaultEditing);
   const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     loadPage();
@@ -88,6 +90,12 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
               </h1>
             </div>
             <div className="flex items-center gap-2">
+              {page.page_type && page.page_type !== 'custom' && (
+                <Button variant="outline" onClick={() => setShowSettings(true)}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              )}
               {isEditing ? (
                 <>
                   <Button variant="outline" onClick={() => setIsEditing(false)}>
@@ -374,6 +382,13 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
           </div>
         </div>
       )}
+
+      {/* Page Settings Drawer */}
+      <PageSettingsDrawer
+        page={page}
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 }

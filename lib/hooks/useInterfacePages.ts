@@ -9,6 +9,7 @@ export interface InterfacePage {
   name: string;
   layout: PageLayout;
   page_type?: string; // New: page type (grid, record, kanban, etc.)
+  settings?: any; // Page configuration (JSONB)
   created_at: string;
   updated_at: string;
 }
