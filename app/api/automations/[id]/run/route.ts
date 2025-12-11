@@ -3,9 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { evaluateTrigger } from "@/lib/automations/triggerEngine";
 import { evaluateConditions } from "@/lib/automations/conditionEngine";
 import { executeActions } from "@/lib/automations/actionEngine";
-import { AutomationTrigger } from "@/lib/automations/triggerEngine";
-import { Condition } from "@/lib/automations/conditionEngine";
-import { AutomationAction } from "@/lib/automations/actionEngine";
+import { AutomationTrigger, Condition, AutomationAction } from "@/lib/automations/schema";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
