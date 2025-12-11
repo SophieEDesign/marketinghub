@@ -525,8 +525,8 @@ function FieldMatchTriggerConfig({
           Field
         </label>
         <select
-          value={config.field || ""}
-          onChange={(e) => onChange({ ...config, field: e.target.value })}
+          value={config.field_key || ""}
+          onChange={(e) => onChange({ ...config, field_key: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         >
           <option value="">Select field...</option>
@@ -539,7 +539,7 @@ function FieldMatchTriggerConfig({
             ))}
         </select>
       </div>
-      {config.field && (
+      {config.field_key && (
         <>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

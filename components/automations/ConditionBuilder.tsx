@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useTables } from "@/lib/hooks/useTables";
 import { useFields } from "@/lib/useFields";
-import { Condition } from "@/lib/automations/schema";
+import { Condition, FieldCondition } from "@/lib/automations/schema";
 import { getOperatorsForFieldType, getOperatorLabel } from "@/lib/types/filters";
 
 interface ConditionBuilderProps {
@@ -111,9 +111,30 @@ function ConditionEditor({
   onChange: (updates: Partial<Condition>) => void;
   onRemove: () => void;
 }) {
-  const selectedField = fields.find((f) => f.field_key === condition.field_key);
+  // Type guard to check if it's a FieldCondition
+  const isFieldCondition = (c: Condition): c is FieldCondition => {
+    return c.type === "field";
+  };
+  const fieldCondition = isFieldCondition(condition) ? condition : null;
+  
+  const selectedField = fieldCondition ? fields.find((f) => f.field_key === fieldCondition.field_key) : null;
   const fieldType = selectedField?.type || "text";
   const operators = getOperatorsForFieldType(fieldType);
+
+  // Only render if it's a FieldCondition
+  if (!fieldCondition) {
+    return (
+      <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 bg-gray-50 dark:bg-gray-800">
+        <p className="text-sm text-gray-500">Only field conditions are supported in this editor.</p>
+        <button
+          onClick={onRemove}
+          className="mt-2 text-xs text-red-600 hover:text-red-800"
+        >
+          Remove condition
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 bg-gray-50 dark:bg-gray-800">
@@ -124,8 +145,8 @@ function ConditionEditor({
               Field
             </label>
             <select
-              value={condition.field_key || ""}
-              onChange={(e) => onChange({ field_key: e.target.value })}
+              value={fieldCondition.field_key || ""}
+              onChange={(e) => onChange({ field_key: e.target.value } as any)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
             >
               <option value="">Select field...</option>
@@ -137,14 +158,14 @@ function ConditionEditor({
             </select>
           </div>
 
-          {condition.field_key && (
+          {fieldCondition.field_key && (
             <>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Operator
                 </label>
                 <select
-                  value={condition.operator || "equals"}
+                  value={fieldCondition.operator || "equals"}
                   onChange={(e) => onChange({ operator: e.target.value as any })}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                 >
@@ -156,14 +177,14 @@ function ConditionEditor({
                 </select>
               </div>
 
-              {!["is_empty", "is_not_empty"].includes(condition.operator || "equals") && (
+              {!["is_empty", "is_not_empty"].includes(fieldCondition.operator || "equals") && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                     Value
                   </label>
                   {fieldType === "boolean" ? (
                     <select
-                      value={String(condition.value || "")}
+                      value={String(fieldCondition.value || "")}
                       onChange={(e) => onChange({ value: e.target.value === "true" })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                     >
@@ -174,21 +195,21 @@ function ConditionEditor({
                   ) : fieldType === "date" || fieldType === "datetime" ? (
                     <input
                       type={fieldType === "date" ? "date" : "datetime-local"}
-                      value={condition.value || ""}
+                      value={fieldCondition.value || ""}
                       onChange={(e) => onChange({ value: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                     />
                   ) : fieldType === "number" ? (
                     <input
                       type="number"
-                      value={condition.value || ""}
+                      value={fieldCondition.value || ""}
                       onChange={(e) => onChange({ value: parseFloat(e.target.value) || 0 })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                     />
                   ) : (
                     <input
                       type="text"
-                      value={condition.value || ""}
+                      value={fieldCondition.value || ""}
                       onChange={(e) => onChange({ value: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-sm"
                       placeholder="Value"
