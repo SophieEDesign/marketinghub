@@ -170,7 +170,7 @@ export default function AutomationEditor({
 
   const handleUpdateCondition = (index: number, updates: Partial<Condition>) => {
     const newConditions = [...conditions];
-    newConditions[index] = { ...newConditions[index], ...updates };
+    newConditions[index] = { ...newConditions[index], ...updates } as Condition;
     setConditions(newConditions);
   };
 
