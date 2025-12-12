@@ -56,7 +56,7 @@ export default function KanbanPage({ page, config, isEditing }: KanbanPageProps)
 
         // Group records by groupField
         const grouped: Record<string, any[]> = {};
-        (data || []).forEach((record) => {
+        (data || []).forEach((record: any) => {
           const groupValue = record[config.groupField] || "Uncategorized";
           if (!grouped[groupValue]) {
             grouped[groupValue] = [];
@@ -106,7 +106,7 @@ export default function KanbanPage({ page, config, isEditing }: KanbanPageProps)
 
       // Rebuild columns
       const grouped: Record<string, any[]> = {};
-      records.forEach((record) => {
+      records.forEach((record: any) => {
         const groupValue = record.id === recordId ? newGroupValue : record[config.groupField] || "Uncategorized";
         if (!grouped[groupValue]) {
           grouped[groupValue] = [];
