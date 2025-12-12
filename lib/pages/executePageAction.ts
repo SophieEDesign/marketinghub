@@ -5,7 +5,6 @@
 
 import { supabase } from "@/lib/supabaseClient";
 import { PageAction, ActionContext, evaluateActionCondition } from "./pageActions";
-import { useRouter } from "next/navigation";
 
 export interface ExecuteActionResult {
   success: boolean;
@@ -242,9 +241,11 @@ async function executeNavigateToPage(
     context.onNavigate(`/pages/${action.pageId}`);
   } else if (context.router) {
     context.router.push(`/pages/${action.pageId}`);
-  } else {
-    // Fallback to window.location
+  } else if (typeof window !== "undefined") {
+    // Fallback to window.location (browser only)
     window.location.href = `/pages/${action.pageId}`;
+  } else {
+    return { success: false, error: "Navigation not available in this context" };
   }
 
   return { success: true };
@@ -374,8 +375,12 @@ async function executeOpenUrl(
     });
   }
 
-  window.open(url, "_blank");
-  return { success: true };
+  if (typeof window !== "undefined") {
+    window.open(url, "_blank");
+    return { success: true };
+  } else {
+    return { success: false, error: "Cannot open URL in server context" };
+  }
 }
 
 async function executeSetFieldValue(
@@ -404,7 +409,7 @@ async function executeCopyToClipboard(
 
   if (context.onCopyToClipboard) {
     await context.onCopyToClipboard(textToCopy);
-  } else if (navigator.clipboard) {
+  } else if (typeof navigator !== "undefined" && navigator.clipboard) {
     await navigator.clipboard.writeText(textToCopy);
   } else {
     return { success: false, error: "Clipboard API not available" };
