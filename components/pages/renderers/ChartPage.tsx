@@ -61,7 +61,7 @@ export default function ChartPage({ page, config, isEditing }: ChartPageProps) {
 
         // Aggregate data for chart
         const aggregated: Record<string, number> = {};
-        (records || []).forEach((record) => {
+        (records || []).forEach((record: any) => {
           const xValue = String(record[config.xField] || "");
           const yValue = parseFloat(record[config.yField]) || 0;
           
