@@ -424,10 +424,14 @@ export default function Sidebar() {
     if (!name || !name.trim()) return;
     
     try {
-      await createCategory(name.trim(), "folder");
-      // Reload will happen automatically via useSidebarCategories
+      const newCategory = await createCategory(name.trim(), "folder");
+      if (newCategory) {
+        // Category created successfully - categories will reload automatically
+        console.log("Category created:", newCategory);
+      }
     } catch (error: any) {
-      alert(`Failed to create category: ${error.message}`);
+      console.error("Error creating category:", error);
+      alert(`Failed to create category: ${error.message || "Unknown error"}`);
     }
   };
 

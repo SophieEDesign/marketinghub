@@ -47,8 +47,16 @@ export default function BlockSettingsDrawer({
   // Load fields when table is selected
   const { fields: tableFields } = useFields(content.table || "");
 
+  const [isEditorMounted, setIsEditorMounted] = useState(false);
+
+  // Only initialize editor on client side
+  useEffect(() => {
+    setIsEditorMounted(true);
+  }, []);
+
   // Rich text editor for text/html blocks
   const textEditor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit,
       Placeholder.configure({
@@ -236,13 +244,13 @@ export default function BlockSettingsDrawer({
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Rich Text Content
               </label>
-              {textEditor ? (
+              {isEditorMounted && textEditor ? (
                 <div className="border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 min-h-[200px]">
                   <EditorContent editor={textEditor} />
                 </div>
               ) : (
                 <div className="w-full h-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                  Loading editor...
+                  {isEditorMounted ? "Loading editor..." : "Initializing editor..."}
                 </div>
               )}
             </div>

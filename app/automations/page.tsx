@@ -19,6 +19,7 @@ export default function AutomationsPage() {
     updateAutomation,
     deleteAutomation,
     runAutomation,
+    loadAutomations,
   } = useAutomations();
   const [editingAutomation, setEditingAutomation] = useState<any | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -371,6 +372,12 @@ export default function AutomationsPage() {
         automation={editingAutomation}
         open={isEditorOpen}
         onClose={() => {
+          setIsEditorOpen(false);
+          setEditingAutomation(null);
+        }}
+        onSave={async () => {
+          // Reload automations after saving
+          await loadAutomations();
           setIsEditorOpen(false);
           setEditingAutomation(null);
         }}

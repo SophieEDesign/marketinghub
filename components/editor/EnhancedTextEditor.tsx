@@ -54,6 +54,7 @@ export default function EnhancedTextEditor({
   const [showLinkDialog, setShowLinkDialog] = useState(false);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: {
@@ -100,7 +101,7 @@ export default function EnhancedTextEditor({
   }, [content, editor]);
 
   if (!editor) {
-    return <div className="text-sm text-gray-500">Loading editor...</div>;
+    return <div className="text-sm text-gray-500 p-4">Loading editor...</div>;
   }
 
   const setColor = (color: string) => {

@@ -77,13 +77,13 @@ export function useSidebarCategories() {
   const createCategory = useCallback(
     async (name: string, icon: string = "folder") => {
       try {
-        // Get max position
+        // Get max position (use maybeSingle to handle empty table)
         const { data: maxCategory } = await supabase
           .from("sidebar_categories")
           .select("position")
           .order("position", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         const position = maxCategory?.position !== undefined ? maxCategory.position + 1 : 0;
 
@@ -93,7 +93,12 @@ export function useSidebarCategories() {
           .select()
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error creating category:", error);
+          throw error;
+        }
+        
+        // Reload categories to show the new one
         await loadCategories();
         return data;
       } catch (err: any) {
@@ -173,14 +178,14 @@ export function useSidebarCategories() {
       icon: string | null = null
     ) => {
       try {
-        // Get max position in category
+        // Get max position in category (use maybeSingle to handle empty category)
         const { data: maxItem } = await supabase
           .from("sidebar_items")
           .select("position")
           .eq("category_id", categoryId)
           .order("position", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         const position = maxItem?.position !== undefined ? maxItem.position + 1 : 0;
 

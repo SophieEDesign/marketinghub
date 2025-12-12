@@ -38,13 +38,9 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
     // Build the select query
     let query: any = supabase.from(table);
 
-    // Select specific fields or all
-    if (fields.length > 0) {
-      const selectFields = fields.join(", ");
-      query = query.select(selectFields, { count: "exact" });
-    } else {
-      query = query.select("*", { count: "exact" });
-    }
+    // Always use select("*") to avoid column errors - filter in memory if needed
+    // This is safer than trying to select specific columns that might not exist
+    query = query.select("*", { count: "exact" });
 
     // Apply filters
     query = applyFilters(query, filters);
@@ -69,18 +65,16 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
     const { data, error, count } = await query;
 
     if (error) {
-      // If error is due to missing columns, try with select all (but only once to prevent infinite loops)
-      if (
-        _retryCount === 0 &&
-        (error.code === "42703" ||
-        error.message?.includes("does not exist") ||
-        error.message?.includes("column"))
-      ) {
-        console.warn(
-          `Some columns don't exist for table ${table}, falling back to select('*'):`,
-          error
-        );
-        return queryTable({ ...options, fields: [], _retryCount: 1 });
+      // Log error for debugging
+      console.error(`Error querying table ${table}:`, error);
+      
+      // If table doesn't exist, return empty result
+      if (error.code === "42P01" || error.message?.includes("does not exist")) {
+        return {
+          data: [],
+          count: null,
+          error: new Error(`Table "${table}" does not exist`),
+        };
       }
 
       return {
@@ -89,9 +83,28 @@ export async function queryTable(options: QueryTableOptions): Promise<QueryTable
         error: error as any,
       };
     }
+    
+    // Filter data to only requested fields if specified (in memory)
+    // Since we always use select("*"), we can filter in memory if specific fields were requested
+    let resultData = data || [];
+    if (fields.length > 0 && resultData.length > 0) {
+      resultData = resultData.map((row: any) => {
+        const filtered: any = {};
+        fields.forEach((field: string) => {
+          if (row.hasOwnProperty(field)) {
+            filtered[field] = row[field];
+          }
+        });
+        // Always include id and metadata fields
+        if (row.id) filtered.id = row.id;
+        if (row.created_at) filtered.created_at = row.created_at;
+        if (row.updated_at) filtered.updated_at = row.updated_at;
+        return filtered;
+      });
+    }
 
     return {
-      data: data || [],
+      data: resultData,
       count: count || null,
       error: null,
     };

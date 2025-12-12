@@ -190,6 +190,120 @@ export default function PageBuilder({
     }
   }, [blocks]);
 
+  // Airtable-style smart reflow: automatically push blocks down when dragging upward
+  const handleSmartReflow = useCallback(
+    (layout: Layout[], allLayouts: Layouts) => {
+      if (!isEditing) return;
+
+      // Step 1 — clone layout
+      const newLayout = [...layout];
+
+      // Step 2 — sort blocks by y position (top to bottom), then by x (left to right)
+      newLayout.sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y));
+
+      // Step 3 — reflow algorithm (Airtable behaviour)
+      // Push blocks down if they overlap or touch the previous block
+      let hasChanges = false;
+      for (let i = 1; i < newLayout.length; i++) {
+        const prev = newLayout[i - 1];
+        const curr = newLayout[i];
+
+        // If curr overlaps or touches prev vertically, push it down below prev
+        if (curr.y < prev.y + prev.h) {
+          curr.y = prev.y + prev.h;
+          hasChanges = true;
+        }
+      }
+
+      // Step 4 — only update if changes were made
+      if (hasChanges) {
+        // Update layouts with reflowed positions
+        const reflowedLayouts: Layouts = {
+          lg: newLayout,
+          md: newLayout,
+          sm: newLayout,
+          xs: newLayout,
+          xxs: newLayout,
+        };
+        setLayouts(reflowedLayouts);
+        savedLayoutRef.current = reflowedLayouts;
+
+        // Step 5 — save updated layout to DB (store pending updates)
+        for (const item of newLayout) {
+          const block = blocks.find((b) => b.id === item.i);
+          if (!block) continue;
+
+          const hasChanged =
+            block.position_x !== item.x ||
+            block.position_y !== item.y ||
+            block.width !== item.w ||
+            block.height !== item.h;
+
+          if (hasChanged) {
+            pendingUpdatesRef.current.set(item.i, {
+              x: item.x,
+              y: item.y,
+              w: item.w,
+              h: item.h,
+            });
+          }
+        }
+
+        // Clear existing timeout
+        if (layoutChangeTimeoutRef.current) {
+          clearTimeout(layoutChangeTimeoutRef.current);
+        }
+
+        // Debounce: Save to database after a short delay
+        layoutChangeTimeoutRef.current = setTimeout(async () => {
+          const updates = Array.from(pendingUpdatesRef.current.entries());
+          
+          if (updates.length === 0) {
+            isDraggingRef.current = false;
+            isSavingRef.current = false;
+            return;
+          }
+
+          // Mark as saving to prevent layout recalculation
+          isSavingRef.current = true;
+          
+          // Store the updates we're about to make
+          const updatesToApply = new Map(updates);
+          
+          // Batch update all changed blocks
+          const updatePromises = Array.from(updatesToApply.entries()).map(async ([blockId, layout]) => {
+            try {
+              await onUpdateBlock(blockId, {
+                position_x: layout.x,
+                position_y: layout.y,
+                width: layout.w,
+                height: layout.h,
+              });
+              return { blockId, success: true };
+            } catch (error) {
+              console.error(`Error updating block ${blockId}:`, error);
+              return { blockId, success: false, error };
+            }
+          });
+
+          await Promise.all(updatePromises);
+
+          // Clear pending updates AFTER all updates complete
+          pendingUpdatesRef.current.clear();
+          
+          // Wait for blocks state to update from the database
+          setTimeout(() => {
+            isDraggingRef.current = false;
+            setTimeout(() => {
+              isSavingRef.current = false;
+            }, 800);
+          }, 300);
+        }, 300);
+      }
+    },
+    [isEditing, blocks, onUpdateBlock]
+  );
+
   const handleLayoutChange = useCallback(
     (currentLayout: Layout[], allLayouts: Layouts) => {
       if (!isEditing) return;
@@ -319,6 +433,8 @@ export default function PageBuilder({
           className="layout"
           layouts={layouts}
           onLayoutChange={handleLayoutChange}
+          onDragStop={handleSmartReflow}
+          onResizeStop={handleSmartReflow}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           cols={{ lg: 12, md: 8, sm: 6, xs: 4, xxs: 2 }}
           rowHeight={50}
@@ -326,9 +442,11 @@ export default function PageBuilder({
           isResizable={isEditing}
           draggableHandle=".react-grid-drag-handle"
           margin={[16, 16]}
-          containerPadding={[0, 0]}
-          preventCollision={true}
-          compactType={null}
+          containerPadding={[16, 16]}
+          compactType="vertical"
+          preventCollision={false}
+          isBounded={true}
+          allowOverlap={false}
         >
           {blocks.map((block) => {
             const dashboardBlock = convertPageBlockToDashboardBlock(block);

@@ -296,7 +296,7 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
           setHasMore(count > recordsPerPage);
         }
 
-        // Try with specific columns first
+        // Try with specific columns first, but fallback to select("*") on column errors
         const offset = (currentPage - 1) * recordsPerPage;
         let query = supabase.from(tableId).select(requiredColumns).range(offset, offset + recordsPerPage - 1);
 
@@ -309,9 +309,33 @@ function GridViewComponent({ tableId, hideHeader = false }: GridViewProps) {
         }
 
         let { data, error } = await query;
+        
+        // If error is due to missing columns, fallback to select("*")
+        if (error && (error.code === "PGRST116" || error.message?.includes("column") || error.message?.includes("Could not find"))) {
+          console.warn(`Column error for ${tableId}, falling back to select("*"):`, error.message);
+          let fallbackQuery = supabase.from(tableId).select("*").range(offset, offset + recordsPerPage - 1);
+          fallbackQuery = applyFiltersAndSort(fallbackQuery, filters, sort, searchQuery, searchableFields);
+          if (sort.length === 0) {
+            fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
+          }
+          const fallbackResult = await fallbackQuery;
+          data = fallbackResult.data;
+          error = fallbackResult.error;
+        }
+
+        let { data, error } = await query;
 
         // If error is due to missing columns, fall back to select all
-        if (error && (error.code === '42703' || error.message?.includes('does not exist') || error.message?.includes('column') || error.code === '42P01')) {
+        // Check for various error codes: PGRST116 (PostgREST column error), 42703 (PostgreSQL undefined column), 42P01 (table doesn't exist), or 400 (bad request)
+        if (error && (
+          error.code === 'PGRST116' || 
+          error.code === '42703' || 
+          error.code === '42P01' ||
+          error.code === '400' ||
+          error.message?.includes('does not exist') || 
+          error.message?.includes('column') ||
+          error.message?.includes('Could not find')
+        )) {
           console.warn(`Some columns don't exist (${error.message}), falling back to select('*'):`, error);
           // Retry with select all
           const offset = (currentPage - 1) * recordsPerPage;

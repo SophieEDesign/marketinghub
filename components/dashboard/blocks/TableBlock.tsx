@@ -93,33 +93,38 @@ export default function TableBlock({
     const loadTableData = async () => {
     setLoading(true);
     try {
+      // Use "*" to select all columns, then filter in memory
+      // This avoids 400 errors from selecting non-existent columns
       let query: any = supabase
           .from(tableName)
-          .select(validFields.join(", "));
+          .select("*");
 
       // Apply filters if provided
         if (filters && Array.isArray(filters)) {
           filters.forEach((filter: any) => {
           if (filter.field && filter.operator && filter.value !== undefined) {
-            switch (filter.operator) {
-              case "eq":
-                query = query.eq(filter.field, filter.value);
-                break;
-              case "neq":
-                query = query.neq(filter.field, filter.value);
-                break;
-              case "gt":
-                query = query.gt(filter.field, filter.value);
-                break;
-              case "lt":
-                query = query.lt(filter.field, filter.value);
-                break;
-              case "gte":
-                query = query.gte(filter.field, filter.value);
-                break;
-              case "lte":
-                query = query.lte(filter.field, filter.value);
-                break;
+            // Only apply filter if field exists in validFields
+            if (validFields.includes(filter.field)) {
+              switch (filter.operator) {
+                case "eq":
+                  query = query.eq(filter.field, filter.value);
+                  break;
+                case "neq":
+                  query = query.neq(filter.field, filter.value);
+                  break;
+                case "gt":
+                  query = query.gt(filter.field, filter.value);
+                  break;
+                case "lt":
+                  query = query.lt(filter.field, filter.value);
+                  break;
+                case "gte":
+                  query = query.gte(filter.field, filter.value);
+                  break;
+                case "lte":
+                  query = query.lte(filter.field, filter.value);
+                  break;
+              }
             }
           }
         });
@@ -130,10 +135,43 @@ export default function TableBlock({
         .limit(100); // Load more than display limit
 
       if (error) throw error;
-      setRows(data || []);
-    } catch (error) {
+      
+      // Filter to only show valid fields in the response
+      const filteredData = (data || []).map((row: any) => {
+        const filtered: any = {};
+        validFields.forEach((field: string) => {
+          if (row.hasOwnProperty(field)) {
+            filtered[field] = row[field];
+          }
+        });
+        // Always include id if it exists
+        if (row.id) filtered.id = row.id;
+        return filtered;
+      });
+      
+      setRows(filteredData);
+    } catch (error: any) {
       console.error("Error loading table data:", error);
-      setRows([]);
+      // If error is due to column not found, try with just id and created_at
+      if (error?.code === "PGRST116" || error?.message?.includes("column")) {
+        try {
+          const { data, error: fallbackError } = await supabase
+            .from(tableName)
+            .select("id, created_at")
+            .order("created_at", { ascending: false })
+            .limit(100);
+          
+          if (!fallbackError && data) {
+            setRows(data);
+          } else {
+            setRows([]);
+          }
+        } catch {
+          setRows([]);
+        }
+      } else {
+        setRows([]);
+      }
     } finally {
       setLoading(false);
     }
