@@ -9,7 +9,7 @@ import Button from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import PageBuilder from "./PageBuilder";
 import PageRenderer from "./PageRenderer";
-import BlockMenu from "@/components/dashboard/blocks/BlockMenu";
+import BlockMenu, { BlockType } from "@/components/dashboard/blocks/BlockMenu";
 import { PageContextProvider } from "./PageContext";
 import PageSettingsDrawer from "./PageSettingsDrawer";
 
