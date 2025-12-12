@@ -44,7 +44,7 @@ export default function ChartPage({ page, config, isEditing }: ChartPageProps) {
     const loadData = async () => {
       setLoading(true);
       try {
-        let query = supabase.from(config.table).select("*");
+        let query: any = supabase.from(config.table).select("*");
 
         // Apply filters
         if (config.filters && config.filters.length > 0) {

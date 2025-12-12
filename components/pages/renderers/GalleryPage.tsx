@@ -29,7 +29,7 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
     const loadRecords = async () => {
       setLoading(true);
       try {
-        let query = supabase.from(config.table).select("*");
+        let query: any = supabase.from(config.table).select("*");
 
         // Apply filters
         if (config.filters && config.filters.length > 0) {
