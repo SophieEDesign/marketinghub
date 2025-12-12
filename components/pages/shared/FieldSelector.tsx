@@ -58,18 +58,18 @@ export default function FieldSelector({
     <div className="space-y-2 max-h-64 overflow-y-auto">
       {filteredFields.map((field) => (
         <label
-          key={field.key}
+          key={field.field_key}
           className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded"
         >
           <input
             type={multiple ? "checkbox" : "radio"}
-            checked={value.includes(field.key)}
-            onChange={(e) => handleChange(field.key, e.target.checked)}
+            checked={value.includes(field.field_key)}
+            onChange={(e) => handleChange(field.field_key, e.target.checked)}
             disabled={disabled}
             className="rounded border-gray-300 dark:border-gray-600"
           />
           <span className="text-gray-700 dark:text-gray-300">
-            {field.label || field.key}
+            {field.label || field.field_key}
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-500">
             ({field.type})

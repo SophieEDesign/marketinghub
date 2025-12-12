@@ -81,8 +81,8 @@ export default function ChartSettings({ pageId, onClose }: ChartSettingsProps) {
             >
               <option value="">Select a field...</option>
               {fields.map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key} ({field.type})
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key} ({field.type})
                 </option>
               ))}
             </select>
@@ -99,8 +99,8 @@ export default function ChartSettings({ pageId, onClose }: ChartSettingsProps) {
             >
               <option value="">Select a numeric field...</option>
               {fields.filter((f) => f.type === "number").map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key}
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key}
                 </option>
               ))}
             </select>

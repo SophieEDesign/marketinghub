@@ -61,8 +61,8 @@ export default function CalendarSettings({ pageId, onClose }: CalendarSettingsPr
             >
               <option value="">Select a date field...</option>
               {fields.filter((f) => f.type === "date").map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key}
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key}
                 </option>
               ))}
             </select>

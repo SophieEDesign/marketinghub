@@ -22,7 +22,7 @@ export default function SortBuilder({ tableId, sorts, onChange }: SortBuilderPro
   const addSort = () => {
     onChange([
       ...sorts,
-      { field: fields[0]?.key || "", direction: "asc" },
+      { field: fields[0]?.field_key || "", direction: "asc" },
     ]);
   };
 
@@ -78,8 +78,8 @@ export default function SortBuilder({ tableId, sorts, onChange }: SortBuilderPro
                 className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800"
               >
                 {fields.map((field) => (
-                  <option key={field.key} value={field.key}>
-                    {field.label || field.key}
+                  <option key={field.field_key} value={field.field_key}>
+                    {field.label || field.field_key}
                   </option>
                 ))}
               </select>

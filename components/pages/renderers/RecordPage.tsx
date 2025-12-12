@@ -145,7 +145,7 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
       <input
         type="text"
         value={value}
-        onChange={(e) => setEditedRecord({ ...editedRecord, [field.key]: e.target.value })}
+        onChange={(e) => setEditedRecord({ ...editedRecord, [field.field_key]: e.target.value })}
         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
       />
     );

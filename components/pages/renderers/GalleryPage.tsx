@@ -64,7 +64,7 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
 
   const getImageUrl = (record: any) => {
     if (!imageField) return null;
-    const imageValue = record[imageField.key];
+    const imageValue = record[imageField.field_key];
     
     if (Array.isArray(imageValue) && imageValue.length > 0) {
       return imageValue[0].url || imageValue[0];

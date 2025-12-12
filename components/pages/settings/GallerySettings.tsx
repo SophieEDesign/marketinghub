@@ -62,8 +62,8 @@ export default function GallerySettings({ pageId, onClose }: GallerySettingsProp
             >
               <option value="">Select a field...</option>
               {fields.filter((f) => f.type === "attachment" || f.type === "text").map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key} ({field.type})
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key} ({field.type})
                 </option>
               ))}
             </select>
@@ -80,8 +80,8 @@ export default function GallerySettings({ pageId, onClose }: GallerySettingsProp
             >
               <option value="">None</option>
               {fields.map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key}
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key}
                 </option>
               ))}
             </select>
@@ -98,8 +98,8 @@ export default function GallerySettings({ pageId, onClose }: GallerySettingsProp
             >
               <option value="">None</option>
               {fields.map((field) => (
-                <option key={field.key} value={field.key}>
-                  {field.label || field.key}
+                <option key={field.field_key} value={field.field_key}>
+                  {field.label || field.field_key}
                 </option>
               ))}
             </select>
