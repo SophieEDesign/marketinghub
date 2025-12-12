@@ -41,7 +41,7 @@ export default function GridPage({ page, config, isEditing, actions = [] }: Grid
     const loadRecords = async () => {
       setLoading(true);
       try {
-        let query = supabase.from(config.table).select("*");
+        let query: any = supabase.from(config.table).select("*");
 
         // Apply filters
         if (config.filters && config.filters.length > 0) {
@@ -201,7 +201,7 @@ export default function GridPage({ page, config, isEditing, actions = [] }: Grid
                           const loadRecords = async () => {
                             setLoading(true);
                             try {
-                              let query = supabase.from(config!.table).select("*");
+                              let query: any = supabase.from(config!.table).select("*");
                               // Apply same filters/sorts as before
                               const { data, error } = await query;
                               if (!error && data) {
