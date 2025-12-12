@@ -160,7 +160,7 @@ export default function Dashboard() {
 
   // Airtable-style smart reflow: automatically push blocks down when dragging upward
   const handleSmartReflow = useCallback(
-    (layout: Layout[], allLayouts: Layouts) => {
+    (layout: Layout[], oldItem: Layout, newItem: Layout, placeholder: Layout, e: MouseEvent, element: HTMLElement) => {
       if (!isEditing) return;
 
       // Step 1 — clone layout
