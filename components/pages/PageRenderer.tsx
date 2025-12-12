@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { InterfacePage } from "@/lib/hooks/useInterfacePages";
 import { usePageConfig } from "@/lib/hooks/usePageConfig";
+import { usePageActions } from "@/lib/hooks/usePageActions";
 import {
   GridPageConfig,
   RecordPageConfig,
@@ -26,6 +27,7 @@ import CalendarPage from "./renderers/CalendarPage";
 import FormPage from "./renderers/FormPage";
 import ChartPage from "./renderers/ChartPage";
 import CustomPage from "./renderers/CustomPage";
+import PageActionsBar from "./PageActionsBar";
 
 interface PageRendererProps {
   page: InterfacePage;
@@ -40,6 +42,7 @@ export default function PageRenderer({ page, data, isEditing, ...props }: PageRe
     pageId: page?.id || '',
     pageType,
   });
+  const { actions } = usePageActions({ pageId: page?.id || '' });
 
   if (!page) {
     return (
@@ -62,33 +65,43 @@ export default function PageRenderer({ page, data, isEditing, ...props }: PageRe
     page,
     data,
     isEditing,
+    actions, // Pass actions to renderers
     ...props,
   };
 
-  switch (pageType) {
-    case 'grid':
-      return <GridPage {...baseProps} config={config as GridPageConfig | null} />;
-    
-    case 'record':
-      return <RecordPage {...baseProps} config={config as RecordPageConfig | null} />;
-    
-    case 'kanban':
-      return <KanbanPage {...baseProps} config={config as KanbanPageConfig | null} />;
-    
-    case 'gallery':
-      return <GalleryPage {...baseProps} config={config as GalleryPageConfig | null} />;
-    
-    case 'calendar':
-      return <CalendarPage {...baseProps} config={config as CalendarPageConfig | null} />;
-    
-    case 'form':
-      return <FormPage {...baseProps} config={config as FormPageConfig | null} />;
-    
-    case 'chart':
-      return <ChartPage {...baseProps} config={config as ChartPageConfig | null} />;
-    
-    case 'custom':
-    default:
-      return <CustomPage page={page} data={data} {...props} />;
-  }
+  const renderPage = () => {
+    switch (pageType) {
+      case 'grid':
+        return <GridPage {...baseProps} config={config as GridPageConfig | null} />;
+      
+      case 'record':
+        return <RecordPage {...baseProps} config={config as RecordPageConfig | null} />;
+      
+      case 'kanban':
+        return <KanbanPage {...baseProps} config={config as KanbanPageConfig | null} />;
+      
+      case 'gallery':
+        return <GalleryPage {...baseProps} config={config as GalleryPageConfig | null} />;
+      
+      case 'calendar':
+        return <CalendarPage {...baseProps} config={config as CalendarPageConfig | null} />;
+      
+      case 'form':
+        return <FormPage {...baseProps} config={config as FormPageConfig | null} />;
+      
+      case 'chart':
+        return <ChartPage {...baseProps} config={config as ChartPageConfig | null} />;
+      
+      case 'custom':
+      default:
+        return <CustomPage page={page} data={data} {...props} />;
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <PageActionsBar actions={actions} />
+      {renderPage()}
+    </div>
+  );
 }

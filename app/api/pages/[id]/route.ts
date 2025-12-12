@@ -52,7 +52,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, description, icon, layout, page_type, settings } = body;
+    const { name, description, icon, layout, page_type, settings, actions, quick_automations } = body;
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -62,6 +62,8 @@ export async function PUT(
     if (layout !== undefined) updateData.layout = layout;
     if (page_type !== undefined) updateData.page_type = page_type;
     if (settings !== undefined) updateData.settings = settings;
+    if (actions !== undefined) updateData.actions = actions;
+    if (quick_automations !== undefined) updateData.quick_automations = quick_automations;
 
     const { data, error } = await supabase
       .from("pages")

@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
 import { GridPageConfig } from "@/lib/pages/pageConfig";
 import { InterfacePage } from "@/lib/hooks/useInterfacePages";
+import { PageAction } from "@/lib/pages/pageActions";
+import RecordActionsMenu from "../RecordActionsMenu";
 import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Button from "@/components/ui/Button";
 
@@ -12,9 +14,10 @@ interface GridPageProps {
   page: InterfacePage;
   config: GridPageConfig | null;
   isEditing?: boolean;
+  actions?: PageAction[];
 }
 
-export default function GridPage({ page, config, isEditing }: GridPageProps) {
+export default function GridPage({ page, config, isEditing, actions = [] }: GridPageProps) {
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -160,12 +163,17 @@ export default function GridPage({ page, config, isEditing }: GridPageProps) {
                   </div>
                 </th>
               ))}
+              {actions.length > 0 && (
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-12">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
             {records.length === 0 ? (
               <tr>
-                <td colSpan={visibleFields.length} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={visibleFields.length + (actions.length > 0 ? 1 : 0)} className="px-4 py-8 text-center text-gray-500">
                   No records found
                 </td>
               </tr>
@@ -183,6 +191,31 @@ export default function GridPage({ page, config, isEditing }: GridPageProps) {
                       {formatValue(record[field.field_key], field)}
                     </td>
                   ))}
+                  {actions.length > 0 && (
+                    <td className="px-4 py-3">
+                      <RecordActionsMenu
+                        actions={actions}
+                        record={record}
+                        onRecordUpdate={async (recordId, updates) => {
+                          // Reload records after update
+                          const loadRecords = async () => {
+                            setLoading(true);
+                            try {
+                              let query = supabase.from(config!.table).select("*");
+                              // Apply same filters/sorts as before
+                              const { data, error } = await query;
+                              if (!error && data) {
+                                setRecords(data);
+                              }
+                            } finally {
+                              setLoading(false);
+                            }
+                          };
+                          await loadRecords();
+                        }}
+                      />
+                    </td>
+                  )}
                 </tr>
               ))
             )}

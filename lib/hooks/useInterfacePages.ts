@@ -10,6 +10,8 @@ export interface InterfacePage {
   layout: PageLayout;
   page_type?: string; // New: page type (grid, record, kanban, etc.)
   settings?: any; // Page configuration (JSONB)
+  actions?: any[]; // Page actions (JSONB)
+  quick_automations?: any[]; // Quick automations (JSONB)
   created_at: string;
   updated_at: string;
 }

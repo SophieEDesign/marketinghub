@@ -3,10 +3,12 @@
 import { useState, useEffect } from "react";
 import { GridPageConfig } from "@/lib/pages/pageConfig";
 import { usePageConfig } from "@/lib/hooks/usePageConfig";
+import { usePageActions } from "@/lib/hooks/usePageActions";
 import TableSelector from "../shared/TableSelector";
 import FieldSelector from "../shared/FieldSelector";
 import FilterBuilder from "../shared/FilterBuilder";
 import SortBuilder from "../shared/SortBuilder";
+import PageActionsEditor from "./PageActionsEditor";
 import Button from "@/components/ui/Button";
 import { Save } from "lucide-react";
 
@@ -17,6 +19,7 @@ interface GridSettingsProps {
 
 export default function GridSettings({ pageId, onClose }: GridSettingsProps) {
   const { config, saveConfig } = usePageConfig({ pageId, pageType: "grid" });
+  const { actions, saveActions } = usePageActions({ pageId });
   const [localConfig, setLocalConfig] = useState<GridPageConfig | null>(null);
 
   useEffect(() => {
@@ -94,6 +97,14 @@ export default function GridSettings({ pageId, onClose }: GridSettingsProps) {
           />
         </>
       )}
+
+      <div className="border-t pt-6">
+        <PageActionsEditor
+          actions={actions}
+          onChange={saveActions}
+          tableId={localConfig.table}
+        />
+      </div>
 
       <div className="flex justify-end gap-2 pt-4 border-t">
         <Button variant="outline" onClick={onClose}>

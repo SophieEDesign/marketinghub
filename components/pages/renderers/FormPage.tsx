@@ -5,16 +5,21 @@ import { supabase } from "@/lib/supabaseClient";
 import { useFields } from "@/lib/useFields";
 import { FormPageConfig } from "@/lib/pages/pageConfig";
 import { InterfacePage } from "@/lib/hooks/useInterfacePages";
+import { PageAction } from "@/lib/pages/pageActions";
+import { executePageAction, ActionContext } from "@/lib/pages/executePageAction";
 import Button from "@/components/ui/Button";
 import { Save } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface FormPageProps {
   page: InterfacePage;
   config: FormPageConfig | null;
   isEditing?: boolean;
+  actions?: PageAction[];
 }
 
-export default function FormPage({ page, config, isEditing }: FormPageProps) {
+export default function FormPage({ page, config, isEditing, actions = [] }: FormPageProps) {
+  const router = useRouter();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -62,8 +67,53 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
     }
   };
 
+  const handleButtonAction = async (action: PageAction) => {
+    if (action.requiresConfirmation) {
+      const message = action.confirmationMessage || `Are you sure you want to ${action.label}?`;
+      if (!confirm(message)) return;
+    }
+
+    try {
+      const actionContext: ActionContext = {
+        record: formData,
+        router,
+        onNavigate: (path: string) => router.push(path),
+        onCopyToClipboard: async (text: string) => {
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(text);
+          }
+        },
+      };
+
+      const result = await executePageAction(action, actionContext);
+      
+      if (!result.success && result.error) {
+        alert(`Action failed: ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error("Error executing button action:", error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
   const renderField = (field: any) => {
     const value = formData[field.field_key] || "";
+
+    // Button field type - executes a page action
+    if (field.type === "button" && field.actionId) {
+      const action = actions.find(a => a.id === field.actionId);
+      if (!action) return null;
+
+      return (
+        <Button
+          type="button"
+          onClick={() => handleButtonAction(action)}
+          variant="outline"
+        >
+          {action.label}
+        </Button>
+      );
+    }
 
     if (field.type === "long_text" || field.type === "text") {
       return (
