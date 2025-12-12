@@ -125,7 +125,7 @@ export default function CalendarPage({ page, config, isEditing }: CalendarPagePr
             Records for {selectedDate.toLocaleDateString()}
           </h3>
           <div className="space-y-2">
-            {dateRecords.map((record) => (
+            {dateRecords.map((record: any) => (
               <div
                 key={record.id}
                 className="p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700"

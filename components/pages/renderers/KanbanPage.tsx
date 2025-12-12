@@ -180,9 +180,9 @@ function KanbanColumnComponent({
       <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
         {column.title} ({column.items.length})
       </h3>
-      <SortableContext items={column.items.map((item) => item.id)}>
+      <SortableContext items={column.items.map((item: any) => item.id)}>
         <div className="space-y-2">
-          {column.items.map((item) => (
+          {column.items.map((item: any) => (
             <KanbanCard key={item.id} item={item} fields={visibleFields} />
           ))}
         </div>
