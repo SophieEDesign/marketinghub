@@ -47,7 +47,7 @@ export default function CalendarPage({ page, config, isEditing }: CalendarPagePr
         if (error) throw error;
 
         // Convert records to calendar events
-        const calendarEvents = (data || []).map((record) => {
+        const calendarEvents = (data || []).map((record: any) => {
           const dateValue = record[config.dateField];
           const date = dateValue ? new Date(dateValue) : new Date();
 
