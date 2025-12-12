@@ -20,92 +20,90 @@ export async function executePageAction(
   action: PageAction,
   context: ActionContext
 ): Promise<ExecuteActionResult> {
+  // Loop prevention: Check if we're already executing this action
+  if ((context as any).__executingActions?.has(action.id)) {
+    return { success: false, error: "Action already executing (loop prevention)" };
+  }
+
+  // Track execution
+  if (!(context as any).__executingActions) {
+    (context as any).__executingActions = new Set();
+  }
+  (context as any).__executingActions.add(action.id);
+
   try {
-    // Loop prevention: Check if we're already executing this action
-    const executionKey = `action-${action.id}-${Date.now()}`;
-    if ((context as any).__executingActions?.has(action.id)) {
-      return { success: false, error: "Action already executing (loop prevention)" };
-    }
-
-    // Track execution
-    if (!(context as any).__executingActions) {
-      (context as any).__executingActions = new Set();
-    }
-    (context as any).__executingActions.add(action.id);
-
-      // Check condition if present
-      if (action.condition && context.record) {
-        const conditionPasses = evaluateActionCondition(action.condition, context.record);
-        if (!conditionPasses) {
-          return { success: false, error: "Action condition not met" };
-        }
-      }
-
-      let result: ExecuteActionResult;
-
-      switch (action.type) {
-        case "update_record":
-          result = await executeUpdateRecord(action, context);
-          break;
-        
-        case "create_record":
-          result = await executeCreateRecord(action, context);
-          break;
-        
-        case "delete_record":
-          result = await executeDeleteRecord(action, context);
-          break;
-        
-        case "duplicate_record":
-          result = await executeDuplicateRecord(action, context);
-          break;
-        
-        case "navigate_to_page":
-          result = await executeNavigateToPage(action, context);
-          break;
-        
-        case "open_record":
-          result = await executeOpenRecord(action, context);
-          break;
-        
-        case "send_email":
-          result = await executeSendEmail(action, context);
-          break;
-        
-        case "webhook":
-          result = await executeWebhook(action, context);
-          break;
-        
-        case "run_automation":
-          result = await executeRunAutomation(action, context);
-          break;
-        
-        case "open_url":
-          result = await executeOpenUrl(action, context);
-          break;
-        
-        case "set_field_value":
-          result = await executeSetFieldValue(action, context);
-          break;
-        
-        case "copy_to_clipboard":
-          result = await executeCopyToClipboard(action, context);
-          break;
-        
-        default:
-          result = { success: false, error: `Unknown action type: ${action.type}` };
-      }
-
-      return result;
-    } finally {
-      // Remove from executing set
-      if ((context as any).__executingActions) {
-        (context as any).__executingActions.delete(action.id);
+    // Check condition if present
+    if (action.condition && context.record) {
+      const conditionPasses = evaluateActionCondition(action.condition, context.record);
+      if (!conditionPasses) {
+        return { success: false, error: "Action condition not met" };
       }
     }
+
+    let result: ExecuteActionResult;
+
+    switch (action.type) {
+      case "update_record":
+        result = await executeUpdateRecord(action, context);
+        break;
+      
+      case "create_record":
+        result = await executeCreateRecord(action, context);
+        break;
+      
+      case "delete_record":
+        result = await executeDeleteRecord(action, context);
+        break;
+      
+      case "duplicate_record":
+        result = await executeDuplicateRecord(action, context);
+        break;
+      
+      case "navigate_to_page":
+        result = await executeNavigateToPage(action, context);
+        break;
+      
+      case "open_record":
+        result = await executeOpenRecord(action, context);
+        break;
+      
+      case "send_email":
+        result = await executeSendEmail(action, context);
+        break;
+      
+      case "webhook":
+        result = await executeWebhook(action, context);
+        break;
+      
+      case "run_automation":
+        result = await executeRunAutomation(action, context);
+        break;
+      
+      case "open_url":
+        result = await executeOpenUrl(action, context);
+        break;
+      
+      case "set_field_value":
+        result = await executeSetFieldValue(action, context);
+        break;
+      
+      case "copy_to_clipboard":
+        result = await executeCopyToClipboard(action, context);
+        break;
+      
+      default:
+        result = { success: false, error: `Unknown action type: ${action.type}` };
+    }
+
+    return result;
   } catch (error: any) {
     console.error("Error executing page action:", error);
     return { success: false, error: error.message || "Failed to execute action" };
+  } finally {
+    // Remove from executing set
+    if ((context as any).__executingActions) {
+      (context as any).__executingActions.delete(action.id);
+    }
   }
 }
 
