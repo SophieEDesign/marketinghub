@@ -28,7 +28,7 @@ export default function GridPage({ page, config, isEditing }: GridPageProps) {
     if (!config?.fields || config.fields.length === 0) {
       return allFields.slice(0, 10); // Default to first 10 fields
     }
-    return allFields.filter((f) => config.fields.includes(f.key));
+    return allFields.filter((f) => config.fields.includes(f.field_key));
   }, [config?.fields, allFields]);
 
   // Load records
@@ -142,13 +142,13 @@ export default function GridPage({ page, config, isEditing }: GridPageProps) {
             <tr>
               {visibleFields.map((field) => (
                 <th
-                  key={field.key}
+                  key={field.field_key}
                   className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                  onClick={() => handleSort(field.key)}
+                  onClick={() => handleSort(field.field_key)}
                 >
                   <div className="flex items-center gap-2">
-                    <span>{field.label || field.key}</span>
-                    {sortField === field.key ? (
+                    <span>{field.label || field.field_key}</span>
+                    {sortField === field.field_key ? (
                       sortDirection === "asc" ? (
                         <ArrowUp className="w-3 h-3" />
                       ) : (
@@ -177,10 +177,10 @@ export default function GridPage({ page, config, isEditing }: GridPageProps) {
                 >
                   {visibleFields.map((field) => (
                     <td
-                      key={field.key}
+                      key={field.field_key}
                       className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100"
                     >
-                      {formatValue(record[field.key], field)}
+                      {formatValue(record[field.field_key], field)}
                     </td>
                   ))}
                 </tr>

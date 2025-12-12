@@ -18,9 +18,9 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   const { fields: allFields } = useFields(config?.table || "");
 
-  const imageField = allFields.find((f) => f.key === config?.imageField);
-  const titleField = config?.titleField ? allFields.find((f) => f.key === config.titleField) : null;
-  const subtitleField = config?.subtitleField ? allFields.find((f) => f.key === config.subtitleField) : null;
+  const imageField = allFields.find((f) => f.field_key === config?.imageField);
+  const titleField = config?.titleField ? allFields.find((f) => f.field_key === config.titleField) : null;
+  const subtitleField = config?.subtitleField ? allFields.find((f) => f.field_key === config.subtitleField) : null;
 
   // Load records
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
               {imageUrl ? (
                 <img
                   src={imageUrl}
-                  alt={titleField ? String(record[titleField.key] || "") : "Gallery item"}
+                  alt={titleField ? String(record[titleField.field_key] || "") : "Gallery item"}
                   className="w-full h-48 object-cover"
                 />
               ) : (
@@ -122,12 +122,12 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
               <div className="p-3">
                 {titleField && (
                   <h3 className="font-medium text-gray-900 dark:text-white text-sm mb-1">
-                    {String(record[titleField.key] || "")}
+                    {String(record[titleField.field_key] || "")}
                   </h3>
                 )}
                 {subtitleField && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {String(record[subtitleField.key] || "")}
+                    {String(record[subtitleField.field_key] || "")}
                   </p>
                 )}
               </div>
@@ -148,16 +148,16 @@ export default function GalleryPage({ page, config, isEditing }: GalleryPageProp
           >
             <div className="p-6">
               <h2 className="text-xl font-semibold mb-4">
-                {titleField ? String(selectedRecord[titleField.key] || "") : "Record Details"}
+                {titleField ? String(selectedRecord[titleField.field_key] || "") : "Record Details"}
               </h2>
               <div className="space-y-3">
                 {allFields.slice(0, 10).map((field) => (
-                  <div key={field.key}>
+                  <div key={field.field_key}>
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {field.label}:
                     </span>{" "}
                     <span className="text-sm text-gray-900 dark:text-white">
-                      {selectedRecord[field.key] ? String(selectedRecord[field.key]) : "-"}
+                      {selectedRecord[field.field_key] ? String(selectedRecord[field.field_key]) : "-"}
                     </span>
                   </div>
                 ))}

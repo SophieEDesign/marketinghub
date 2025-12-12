@@ -34,8 +34,8 @@ export default function ChartPage({ page, config, isEditing }: ChartPageProps) {
   const [loading, setLoading] = useState(false);
   const { fields: allFields } = useFields(config?.table || "");
 
-  const xField = allFields.find((f) => f.key === config?.xField);
-  const yField = allFields.find((f) => f.key === config?.yField);
+  const xField = allFields.find((f) => f.field_key === config?.xField);
+  const yField = allFields.find((f) => f.field_key === config?.yField);
 
   // Load and aggregate data
   useEffect(() => {

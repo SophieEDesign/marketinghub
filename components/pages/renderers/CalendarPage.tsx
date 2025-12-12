@@ -22,7 +22,7 @@ export default function CalendarPage({ page, config, isEditing }: CalendarPagePr
   const [dateRecords, setDateRecords] = useState<any[]>([]);
   const { fields: allFields } = useFields(config?.table || "");
 
-  const dateField = allFields.find((f) => f.key === config?.dateField);
+  const dateField = allFields.find((f) => f.field_key === config?.dateField);
 
   // Load records and convert to calendar events
   useEffect(() => {
@@ -53,9 +53,9 @@ export default function CalendarPage({ page, config, isEditing }: CalendarPagePr
 
           // Find a title field (prefer name, title, or first text field)
           const titleField = allFields.find(
-            (f) => f.key === "name" || f.key === "title" || f.type === "text"
+            (f) => f.field_key === "name" || f.field_key === "title" || f.type === "text"
           );
-          const title = titleField ? String(record[titleField.key] || "") : `Record ${record.id}`;
+          const title = titleField ? String(record[titleField.field_key] || "") : `Record ${record.id}`;
 
           return {
             id: record.id,
@@ -131,10 +131,10 @@ export default function CalendarPage({ page, config, isEditing }: CalendarPagePr
                 className="p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700"
               >
                 {allFields.slice(0, 3).map((field) => (
-                  <div key={field.key} className="text-sm">
+                  <div key={field.field_key} className="text-sm">
                     <span className="text-gray-500">{field.label}:</span>{" "}
                     <span className="text-gray-900 dark:text-white">
-                      {String(record[field.key] || "-")}
+                      {String(record[field.field_key] || "-")}
                     </span>
                   </div>
                 ))}

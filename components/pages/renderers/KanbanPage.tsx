@@ -29,7 +29,7 @@ export default function KanbanPage({ page, config, isEditing }: KanbanPageProps)
   const [loading, setLoading] = useState(false);
   const { fields: allFields } = useFields(config?.table || "");
 
-  const groupField = allFields.find((f) => f.key === config?.groupField);
+  const groupField = allFields.find((f) => f.field_key === config?.groupField);
 
   // Load records and group them
   useEffect(() => {
@@ -172,7 +172,7 @@ function KanbanColumnComponent({
   allFields: any[];
 }) {
   const visibleFields = cardFields.length > 0
-    ? allFields.filter((f) => cardFields.includes(f.key))
+    ? allFields.filter((f) => cardFields.includes(f.field_key))
     : allFields.slice(0, 3);
 
   return (
@@ -213,10 +213,10 @@ function KanbanCard({ item, fields }: { item: any; fields: any[] }) {
         </div>
         <div className="flex-1 space-y-1">
           {fields.map((field) => (
-            <div key={field.key} className="text-sm">
+            <div key={field.field_key} className="text-sm">
               <span className="text-gray-500 dark:text-gray-400 text-xs">{field.label}:</span>{" "}
               <span className="text-gray-900 dark:text-white">
-                {item[field.key] ? String(item[field.key]).slice(0, 50) : "-"}
+                {item[field.field_key] ? String(item[field.field_key]).slice(0, 50) : "-"}
               </span>
             </div>
           ))}

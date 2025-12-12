@@ -23,7 +23,7 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
 
   // Get visible fields from config
   const visibleFields = config?.fields && config.fields.length > 0
-    ? allFields.filter((f) => config.fields.includes(f.key))
+    ? allFields.filter((f) => config.fields.includes(f.field_key))
     : allFields;
 
   // Load record
@@ -94,13 +94,13 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
   };
 
   const renderField = (field: any) => {
-    const value = editedRecord[field.key] || "";
+    const value = editedRecord[field.field_key] || "";
 
     if (field.type === "long_text" || field.type === "text") {
       return (
         <textarea
           value={value}
-          onChange={(e) => setEditedRecord({ ...editedRecord, [field.key]: e.target.value })}
+          onChange={(e) => setEditedRecord({ ...editedRecord, [field.field_key]: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           rows={4}
         />
@@ -112,7 +112,7 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
         <input
           type="checkbox"
           checked={!!value}
-          onChange={(e) => setEditedRecord({ ...editedRecord, [field.key]: e.target.checked })}
+          onChange={(e) => setEditedRecord({ ...editedRecord, [field.field_key]: e.target.checked })}
           className="rounded border-gray-300 dark:border-gray-600"
         />
       );
@@ -123,7 +123,7 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
         <input
           type="number"
           value={value}
-          onChange={(e) => setEditedRecord({ ...editedRecord, [field.key]: parseFloat(e.target.value) || 0 })}
+          onChange={(e) => setEditedRecord({ ...editedRecord, [field.field_key]: parseFloat(e.target.value) || 0 })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         />
       );
@@ -134,7 +134,7 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
         <input
           type="date"
           value={value ? new Date(value).toISOString().split("T")[0] : ""}
-          onChange={(e) => setEditedRecord({ ...editedRecord, [field.key]: e.target.value })}
+          onChange={(e) => setEditedRecord({ ...editedRecord, [field.field_key]: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         />
       );
@@ -177,15 +177,15 @@ export default function RecordPage({ page, config, isEditing }: RecordPageProps)
     <div className="w-full max-w-4xl mx-auto p-6">
       <div className={layoutClass}>
         {visibleFields.map((field) => (
-          <div key={field.key}>
+          <div key={field.field_key}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {field.label || field.key}
+              {field.label || field.field_key}
             </label>
             {isEditing ? (
               renderField(field)
             ) : (
               <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                {editedRecord[field.key] || "-"}
+                {editedRecord[field.field_key] || "-"}
               </div>
             )}
           </div>

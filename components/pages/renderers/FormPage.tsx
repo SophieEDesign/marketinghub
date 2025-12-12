@@ -22,7 +22,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
 
   // Get visible fields from config
   const visibleFields = config?.fields && config.fields.length > 0
-    ? allFields.filter((f) => config.fields.includes(f.key))
+    ? allFields.filter((f) => config.fields.includes(f.field_key))
     : allFields;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,13 +63,13 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
   };
 
   const renderField = (field: any) => {
-    const value = formData[field.key] || "";
+    const value = formData[field.field_key] || "";
 
     if (field.type === "long_text" || field.type === "text") {
       return (
         <textarea
           value={value}
-          onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, [field.field_key]: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           rows={4}
           required={field.required}
@@ -82,7 +82,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
         <input
           type="checkbox"
           checked={!!value}
-          onChange={(e) => setFormData({ ...formData, [field.key]: e.target.checked })}
+          onChange={(e) => setFormData({ ...formData, [field.field_key]: e.target.checked })}
           className="rounded border-gray-300 dark:border-gray-600"
         />
       );
@@ -93,7 +93,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
         <input
           type="number"
           value={value}
-          onChange={(e) => setFormData({ ...formData, [field.key]: parseFloat(e.target.value) || 0 })}
+          onChange={(e) => setFormData({ ...formData, [field.field_key]: parseFloat(e.target.value) || 0 })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           required={field.required}
         />
@@ -105,7 +105,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
         <input
           type="date"
           value={value ? new Date(value).toISOString().split("T")[0] : ""}
-          onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, [field.field_key]: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           required={field.required}
         />
@@ -116,7 +116,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
       return (
         <select
           value={value}
-          onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, [field.field_key]: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
           required={field.required}
         >
@@ -135,7 +135,7 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
       <input
         type="text"
         value={value}
-        onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
+        onChange={(e) => setFormData({ ...formData, [field.field_key]: e.target.value })}
         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800"
         required={field.required}
       />
@@ -166,9 +166,9 @@ export default function FormPage({ page, config, isEditing }: FormPageProps) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {visibleFields.map((field) => (
-          <div key={field.key}>
+          <div key={field.field_key}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {field.label || field.key}
+              {field.label || field.field_key}
               {field.required && <span className="text-red-500 ml-1">*</span>}
             </label>
             {renderField(field)}
