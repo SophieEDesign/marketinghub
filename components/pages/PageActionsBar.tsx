@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PageAction, shouldShowAction } from "@/lib/pages/pageActions";
-import { executePageAction, ActionContext } from "@/lib/pages/executePageAction";
+import { PageAction, shouldShowAction, ActionContext } from "@/lib/pages/pageActions";
+import { executePageAction } from "@/lib/pages/executePageAction";
 import Button from "@/components/ui/Button";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
