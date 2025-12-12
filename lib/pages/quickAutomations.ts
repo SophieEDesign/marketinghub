@@ -68,8 +68,9 @@ function checkTrigger(
     }
 
     // All conditions must pass
+    const record = context.record; // Store in variable for type narrowing
     return trigger.conditions.every(condition =>
-      evaluateActionCondition(condition, context.record)
+      evaluateActionCondition(condition, record)
     );
   }
 
