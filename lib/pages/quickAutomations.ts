@@ -3,8 +3,8 @@
  * Per-page mini automations that execute immediately
  */
 
-import { QuickAutomation, PageAction } from "./pageActions";
-import { executePageAction, ActionContext } from "./executePageAction";
+import { QuickAutomation, PageAction, ActionContext } from "./pageActions";
+import { executePageAction } from "./executePageAction";
 import { evaluateActionCondition } from "./pageActions";
 
 export interface QuickAutomationContext extends ActionContext {
