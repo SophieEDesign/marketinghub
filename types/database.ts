@@ -1,143 +1,117 @@
-/**
- * Database type definitions for Supabase
- * 
- * This file defines TypeScript types for all database tables.
- * For automations tables, these types match the schema defined in
- * supabase-automations-foundation.sql
- */
+export type AccessLevel = 'public' | 'authenticated' | 'owner'
 
-// Legacy row types (kept for backward compatibility)
-export type ContentRow = any;
-export type CampaignRow = any;
-export type TaskRow = any;
-export type MediaRow = any;
-export type AssetRow = any;
-export type ContactRow = any;
-export type SponsorshipRow = any;
-export type IdeaRow = any;
-export type BriefingRow = any;
-export type StrategyRow = any;
+export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'gallery' | 'page'
 
-// ============================================
-// AUTOMATIONS SUITE TYPES
-// ============================================
+export type FilterOperator =
+  | 'equal'
+  | 'not_equal'
+  | 'contains'
+  | 'not_contains'
+  | 'is_empty'
+  | 'is_not_empty'
+  | 'greater_than'
+  | 'less_than'
+  | 'greater_than_or_equal'
+  | 'less_than_or_equal'
+  | 'date_equal'
+  | 'date_before'
+  | 'date_after'
+  | 'date_on_or_before'
+  | 'date_on_or_after'
 
-/**
- * Automation table row type
- */
-export interface AutomationRow {
-  id: string;
-  name: string;
-  status: 'active' | 'paused';
-  trigger: any; // JSONB - see lib/automations/schema.ts for structure
-  conditions: any[]; // JSONB array - see lib/automations/schema.ts for structure
-  actions: any[]; // JSONB array - see lib/automations/schema.ts for structure
-  created_at: string;
-  updated_at: string;
+export type SortDirection = 'asc' | 'desc'
+
+export type BlockType =
+  | 'text'
+  | 'image'
+  | 'chart'
+  | 'kpi'
+  | 'html'
+  | 'embed'
+  | 'table'
+  | 'automation'
+
+export interface Table {
+  id: string
+  name: string
+  supabase_table: string
 }
 
-/**
- * Automation table insert type (omits auto-generated fields)
- */
-export interface AutomationInsert {
-  name: string;
-  status?: 'active' | 'paused'; // Defaults to 'active'
-  trigger: any;
-  conditions?: any[]; // Defaults to []
-  actions: any[];
-  created_at?: string; // Auto-generated
-  updated_at?: string; // Auto-generated
+export interface View {
+  id: string
+  table_id: string
+  name: string
+  type: ViewType
+  config?: Record<string, any>
+  access_level: AccessLevel
+  allowed_roles?: string[]
+  owner_id?: string
+  public_share_id?: string
 }
 
-/**
- * Automation table update type (all fields optional except id)
- */
-export interface AutomationUpdate {
-  name?: string;
-  status?: 'active' | 'paused';
-  trigger?: any;
-  conditions?: any[];
-  actions?: any[];
-  updated_at?: string; // Auto-updated by trigger
+export interface ViewField {
+  id: string
+  view_id: string
+  field_name: string
+  visible: boolean
+  position: number
 }
 
-/**
- * Automation log table row type
- */
-export interface AutomationLogRow {
-  id: string;
-  automation_id: string;
-  timestamp: string;
-  status: 'success' | 'error';
-  input?: any; // JSONB
-  output?: any; // JSONB
-  error?: string;
-  duration_ms?: number;
+export interface ViewFilter {
+  id: string
+  view_id: string
+  field_name: string
+  operator: FilterOperator
+  value?: string
 }
 
-/**
- * Automation log table insert type (omits auto-generated fields)
- */
-export interface AutomationLogInsert {
-  automation_id: string;
-  timestamp?: string; // Defaults to NOW()
-  status: 'success' | 'error';
-  input?: any;
-  output?: any;
-  error?: string;
-  duration_ms?: number;
+export interface ViewSort {
+  id: string
+  view_id: string
+  field_name: string
+  direction: SortDirection
 }
 
-/**
- * Automation log table update type (all fields optional except id)
- */
-export interface AutomationLogUpdate {
-  automation_id?: string;
-  timestamp?: string;
-  status?: 'success' | 'error';
-  input?: any;
-  output?: any;
-  error?: string;
-  duration_ms?: number;
+export interface ViewBlock {
+  id: string
+  view_id: string
+  type: BlockType
+  position: { x: number; y: number; w: number; h: number }
+  settings?: Record<string, any>
+  visibility?: string | boolean
 }
 
-// ============================================
-// SUPABASE DATABASE INTERFACE
-// ============================================
+export interface ViewTab {
+  id: string
+  view_id: string
+  name: string
+  position: number
+}
 
-/**
- * Main Database interface following Supabase type structure
- * This allows typed access to tables via supabase.from('table_name')
- */
-export interface Database {
-  public: {
-    Tables: {
-      automations: {
-        Row: AutomationRow;
-        Insert: AutomationInsert;
-        Update: AutomationUpdate;
-      };
-      automation_logs: {
-        Row: AutomationLogRow;
-        Insert: AutomationLogInsert;
-        Update: AutomationLogUpdate;
-      };
-      // Add other tables here as needed
-      // tables: { ... };
-      // table_fields: { ... };
-      // etc.
-    };
-    Views: {
-      // Views can be added here if needed
-      [_ in never]: never;
-    };
-    Functions: {
-      // Functions can be added here if needed
-      [_ in never]: never;
-    };
-    Enums: {
-      // Enums can be added here if needed
-      [_ in never]: never;
-    };
-  };
+export interface Automation {
+  id: string
+  name: string
+  description?: string
+  trigger?: Record<string, any>
+  actions?: any[]
+  conditions?: any[]
+  enabled: boolean
+}
+
+export interface AutomationRun {
+  id: string
+  automation_id: string
+  status: 'running' | 'completed' | 'failed'
+  started_at: string
+  completed_at?: string
+  error?: string
+}
+
+export interface AutomationLog {
+  id: string
+  automation_id: string
+  run_id?: string
+  level: 'info' | 'warning' | 'error'
+  message: string
+  created_at: string
 }
