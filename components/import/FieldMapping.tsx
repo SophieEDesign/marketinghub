@@ -16,6 +16,9 @@ interface FieldMappingProps {
     suggestedType: string,
     options?: { to_table?: string; display_field?: string }
   ) => Promise<boolean>;
+  onCreateAllFields?: (
+    columns: Array<{ name: string; type: string }>
+  ) => Promise<{ success: number; failed: number }>;
 }
 
 export default function FieldMapping({
@@ -98,6 +101,7 @@ export default function FieldMapping({
   };
 
   const [creatingField, setCreatingField] = useState<string | null>(null);
+  const [creatingAll, setCreatingAll] = useState(false);
   const [showTypeConfirm, setShowTypeConfirm] = useState(false);
   const [pendingField, setPendingField] = useState<{
     columnName: string;
@@ -256,9 +260,82 @@ export default function FieldMapping({
         (header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header)
       ).length > 0 && (
         <div className="mt-6">
-          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Unmapped CSV Columns
-          </h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Unmapped CSV Columns
+            </h4>
+            {onCreateAllFields && (
+              <button
+                onClick={async () => {
+                  const unmappedHeaders = csvHeaders.filter(
+                    (header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header)
+                  );
+                  
+                  if (unmappedHeaders.length === 0) return;
+                  
+                  setCreatingAll(true);
+                  
+                  // Prepare all columns with their detected types
+                  const columnsToCreate = unmappedHeaders.map((header) => {
+                    const sampleValues = csvRows.slice(0, 10).map((row) => row[header]).filter(Boolean);
+                    const detectedType = detectFieldType(sampleValues);
+                    const suggestedType = suggestTypeFromColumnName(header);
+                    const finalType = detectedType !== "text" ? detectedType : suggestedType;
+                    
+                    return {
+                      name: header,
+                      type: finalType,
+                    };
+                  });
+                  
+                  try {
+                    // Mark all as being created
+                    unmappedHeaders.forEach(header => {
+                      setCreatedFields(prev => new Set(prev).add(header));
+                    });
+                    
+                    const result = await onCreateAllFields(columnsToCreate);
+                    
+                    if (result.failed > 0) {
+                      alert(`Created ${result.success} fields successfully, but ${result.failed} failed. Check the console for details.`);
+                      // Remove failed fields from createdFields so they can be retried
+                      // We'll let the parent component handle this via field reload
+                    } else {
+                      // All succeeded - fields will be reloaded by parent
+                    }
+                  } catch (error) {
+                    console.error("Error creating all fields:", error);
+                    alert(`Failed to create all fields: ${error instanceof Error ? error.message : "Unknown error"}`);
+                    // Remove all from createdFields on error
+                    unmappedHeaders.forEach(header => {
+                      setCreatedFields(prev => {
+                        const next = new Set(prev);
+                        next.delete(header);
+                        return next;
+                      });
+                    });
+                  } finally {
+                    setCreatingAll(false);
+                  }
+                }}
+                disabled={creatingAll || !onCreateAllFields}
+                className="text-xs px-4 py-2 bg-brand-red text-white rounded-md hover:bg-brand-redDark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {creatingAll ? (
+                  <>
+                    <span className="animate-spin">⏳</span>
+                    <span>Creating All...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create All ({csvHeaders.filter(
+                      (header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header)
+                    ).length})</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             {csvHeaders
               .filter((header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header))

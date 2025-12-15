@@ -221,6 +221,36 @@ function ImportPageContent() {
     [addField, tableId, mappings, handleMappingChange]
   );
 
+  const handleCreateAllFields = useCallback(
+    async (columns: Array<{ name: string; type: string }>): Promise<{ success: number; failed: number }> => {
+      let success = 0;
+      let failed = 0;
+      
+      for (const column of columns) {
+        try {
+          const result = await handleCreateField(column.name, column.type);
+          if (result) {
+            success++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          console.error(`Failed to create field "${column.name}":`, error);
+          failed++;
+        }
+      }
+      
+      // Reload fields after all creations
+      if (success > 0) {
+        const updatedFields = await loadFields(tableId);
+        setFields(updatedFields);
+      }
+      
+      return { success, failed };
+    },
+    [handleCreateField, tableId]
+  );
+
   const handlePreviewConfirm = useCallback(async () => {
     setStep("importing");
 
@@ -501,6 +531,7 @@ function ImportPageContent() {
                 csvRows={csvRows}
                 onMappingChange={handleMappingChange}
                 onCreateField={handleCreateField}
+                onCreateAllFields={handleCreateAllFields}
               />
               <div className="flex justify-end mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <button
