@@ -22,7 +22,7 @@ export default function ImportPreview({
 }: ImportPreviewProps) {
   // Transform first 20 rows for preview
   const previewRows = csvRows.slice(0, 20).map((csvRow, index) => {
-    const result = transformRow(csvRow, mappings, fields);
+    const result = await transformRow(csvRow, mappings, fields);
     return {
       rowNumber: index + 1,
       data: result.row,
@@ -33,6 +33,17 @@ export default function ImportPreview({
 
   const totalWarnings = previewRows.reduce((sum, r) => sum + r.warnings.length, 0);
   const totalErrors = previewRows.reduce((sum, r) => sum + r.errors.length, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-red mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Transforming rows for preview...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
