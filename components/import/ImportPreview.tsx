@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Field } from "@/lib/fields";
 import { FieldMapping } from "@/lib/import/transformRow";
 import { transformRow } from "@/lib/import/transformRow";
@@ -13,6 +14,13 @@ interface ImportPreviewProps {
   onConfirm: () => void;
 }
 
+interface PreviewRow {
+  rowNumber: number;
+  data: any;
+  warnings: string[];
+  errors: string[];
+}
+
 export default function ImportPreview({
   csvRows,
   mappings,
@@ -20,16 +28,46 @@ export default function ImportPreview({
   onBack,
   onConfirm,
 }: ImportPreviewProps) {
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
   // Transform first 20 rows for preview
-  const previewRows = csvRows.slice(0, 20).map((csvRow, index) => {
-    const result = await transformRow(csvRow, mappings, fields);
-    return {
-      rowNumber: index + 1,
-      data: result.row,
-      warnings: result.warnings,
-      errors: result.errors,
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPreview() {
+      try {
+        setLoading(true);
+        const rowsToPreview = csvRows.slice(0, 20);
+
+        const transformed = await Promise.all(
+          rowsToPreview.map(async (csvRow, index) => {
+            const result = await transformRow(csvRow, mappings, fields);
+            return {
+              rowNumber: index + 1,
+              data: result.row,
+              warnings: result.warnings,
+              errors: result.errors,
+            } as PreviewRow;
+          })
+        );
+
+        if (isMounted) {
+          setPreviewRows(transformed);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadPreview();
+
+    return () => {
+      isMounted = false;
     };
-  });
+  }, [csvRows, mappings, fields]);
 
   const totalWarnings = previewRows.reduce((sum, r) => sum + r.warnings.length, 0);
   const totalErrors = previewRows.reduce((sum, r) => sum + r.errors.length, 0);
@@ -67,7 +105,7 @@ export default function ImportPreview({
               .filter((r) => r.errors.length > 0)
               .map((r) =>
                 r.errors.map((error, idx) => (
-                  <li key={idx}>
+                  <li key={`${r.rowNumber}-error-${idx}`}>
                     Row {r.rowNumber}: {error}
                   </li>
                 ))
@@ -87,7 +125,7 @@ export default function ImportPreview({
               .slice(0, 10)
               .map((r) =>
                 r.warnings.map((warning, idx) => (
-                  <li key={idx}>
+                  <li key={`${r.rowNumber}-warning-${idx}`}>
                     Row {r.rowNumber}: {warning}
                   </li>
                 ))

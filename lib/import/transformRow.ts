@@ -1,5 +1,6 @@
 import { Field } from "@/lib/fields";
 import dayjs from "dayjs";
+import { supabase } from "@/lib/supabaseClient";
 
 export interface FieldMapping {
   fieldId: string;
@@ -17,11 +18,11 @@ export interface TransformResult {
 /**
  * Transform a CSV row into a Supabase record based on field mappings
  */
-export function transformRow(
+export async function transformRow(
   csvRow: Record<string, string>,
   mappings: FieldMapping[],
   fields: Field[]
-): TransformResult {
+): Promise<TransformResult> {
   const result: any = {};
   const warnings: string[] = [];
   const errors: string[] = [];
