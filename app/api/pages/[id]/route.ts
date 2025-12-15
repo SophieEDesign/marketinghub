@@ -23,22 +23,38 @@ export async function GET(
       return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
-    // Fetch blocks for this page
-    const { data: blocks, error: blocksError } = await supabase
-      .from("page_blocks")
-      .select("*")
-      .eq("page_id", params.id)
-      .order("position_y", { ascending: true })
-      .order("position_x", { ascending: true });
+    // Blocks are now stored in page.blocks JSONB field
+    // For backward compatibility, also check page_blocks table if blocks field is empty
+    let pageBlocks = page.blocks || [];
+    
+    if (!pageBlocks || (Array.isArray(pageBlocks) && pageBlocks.length === 0)) {
+      // Fallback to old page_blocks table for backward compatibility
+      const { data: oldBlocks, error: blocksError } = await supabase
+        .from("page_blocks")
+        .select("*")
+        .eq("page_id", params.id)
+        .order("position_y", { ascending: true })
+        .order("position_x", { ascending: true });
 
-    if (blocksError) {
-      console.error("Error fetching blocks:", blocksError);
-      return NextResponse.json({ error: blocksError.message }, { status: 500 });
+      if (!blocksError && oldBlocks && oldBlocks.length > 0) {
+        // Convert old format to new format
+        pageBlocks = oldBlocks.map((block: any) => ({
+          id: block.id,
+          type: block.type,
+          position: {
+            x: block.position_x || 0,
+            y: block.position_y || 0,
+            w: block.width || 6,
+            h: block.height || 3,
+          },
+          settings: block.config || {},
+        }));
+      }
     }
 
     return NextResponse.json({
       ...page,
-      blocks: blocks || [],
+      blocks: pageBlocks,
     });
   } catch (error: any) {
     console.error("Error in GET /api/pages/[id]:", error);
@@ -52,7 +68,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    const { name, description, icon, layout, page_type, settings, actions, quick_automations } = body;
+    const { name, description, icon, layout, page_type, settings, actions, quick_automations, blocks } = body;
 
     const updateData: any = {
       updated_at: new Date().toISOString(),
@@ -64,6 +80,7 @@ export async function PUT(
     if (settings !== undefined) updateData.settings = settings;
     if (actions !== undefined) updateData.actions = actions;
     if (quick_automations !== undefined) updateData.quick_automations = quick_automations;
+    if (blocks !== undefined) updateData.blocks = blocks; // Store blocks in JSONB field
 
     const { data, error } = await supabase
       .from("pages")

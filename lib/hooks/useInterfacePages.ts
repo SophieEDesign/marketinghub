@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { PageLayout } from "@/components/pages/NewPageModal";
+import { BlockConfig } from "@/lib/pages/blockTypes";
+
+import { BlockConfig } from "@/lib/pages/blockTypes";
 
 export interface InterfacePage {
   id: string;
@@ -12,6 +15,7 @@ export interface InterfacePage {
   settings?: any; // Page configuration (JSONB)
   actions?: any[]; // Page actions (JSONB)
   quick_automations?: any[]; // Quick automations (JSONB)
+  blocks?: BlockConfig[]; // Composable interface blocks (JSONB)
   created_at: string;
   updated_at: string;
 }

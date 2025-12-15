@@ -12,6 +12,8 @@ import PageRenderer from "./PageRenderer";
 import BlockMenu, { BlockType } from "@/components/dashboard/blocks/BlockMenu";
 import { PageContextProvider } from "./PageContext";
 import PageSettingsDrawer from "./PageSettingsDrawer";
+import AddBlockButton from "./AddBlockButton";
+import { BlockConfig, createBlock } from "@/lib/pages/blockTypes";
 
 interface PageViewProps {
   pageId: string;
@@ -49,6 +51,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
       }
       const data = await response.json();
       setPage(data);
+      // Blocks are now in page.blocks (new system) or data.blocks (old system)
       setBlocks(data.blocks || []);
     } catch (error: any) {
       console.error("Error loading page:", error);
@@ -117,83 +120,60 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Use PageRenderer for non-custom pages, PageBuilder for custom pages */}
         {page.page_type && page.page_type !== 'custom' ? (
-          <PageRenderer 
-            page={page} 
-            data={blocks}
-            blocks={blocks}
-            isEditing={isEditing}
-            onAddBlock={async (type: string) => {
-              try {
-                const response = await fetch("/api/page-blocks", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    page_id: pageId,
-                    type,
-                    position_x: 0,
-                    position_y: blocks.length,
-                    width: 12,
-                    height: 6,
-                    config: {},
-                  }),
-                });
-                if (!response.ok) throw new Error("Failed to create block");
-                await loadPage();
-              } catch (error: any) {
-                toast({
-                  title: "Error",
-                  description: error.message || "Failed to add block",
-                  type: "error",
-                });
-              }
-            }}
-            onUpdateBlock={async (id: string, updates: Partial<InterfacePageBlock>) => {
-              try {
-                const response = await fetch(`/api/page-blocks/${id}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(updates),
-                });
-                if (!response.ok) throw new Error("Failed to update block");
-                await loadPage();
-              } catch (error: any) {
-                toast({
-                  title: "Error",
-                  description: error.message || "Failed to update block",
-                  type: "error",
-                });
-              }
-            }}
-            onDeleteBlock={async (id: string) => {
-              try {
-                const response = await fetch(`/api/page-blocks/${id}`, {
-                  method: "DELETE",
-                });
-                if (!response.ok) throw new Error("Failed to delete block");
-                await loadPage();
-              } catch (error: any) {
-                toast({
-                  title: "Error",
-                  description: error.message || "Failed to delete block",
-                  type: "error",
-                });
-              }
-            }}
-            onReorderBlocks={async (blockIds: string[]) => {
-              const updates = blockIds.map((id, index) => ({
-                id,
-                position_y: index,
-              }));
-              for (const update of updates) {
-                await fetch(`/api/page-blocks/${update.id}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ position_y: update.position_y }),
-                });
-              }
-              await loadPage();
-            }}
-          />
+          <>
+            {/* Add Block Button (only in edit mode) */}
+            {isEditing && (
+              <div className="mb-4 flex justify-end">
+                <AddBlockButton
+                  onAddBlock={async (newBlock: BlockConfig) => {
+                    try {
+                      const currentBlocks: BlockConfig[] = page.blocks || [];
+                      const updatedBlocks = [...currentBlocks, newBlock];
+                      
+                      const response = await fetch(`/api/pages/${pageId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ blocks: updatedBlocks }),
+                      });
+                      
+                      if (!response.ok) throw new Error("Failed to add block");
+                      await loadPage();
+                    } catch (error: any) {
+                      toast({
+                        title: "Error",
+                        description: error.message || "Failed to add block",
+                        type: "error",
+                      });
+                    }
+                  }}
+                  existingBlocks={page.blocks || []}
+                />
+              </div>
+            )}
+            
+            <PageRenderer 
+              page={page} 
+              data={blocks}
+              isEditing={isEditing}
+              onPageUpdate={async (updates: Partial<InterfacePage>) => {
+                try {
+                  const response = await fetch(`/api/pages/${pageId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updates),
+                  });
+                  
+                  if (!response.ok) throw new Error("Failed to update page");
+                  await loadPage();
+                } catch (error: any) {
+                  toast({
+                    title: "Error",
+                    description: error.message || "Failed to update page",
+                    type: "error",
+                  });
+                }
+              }}
+            />
         ) : blocks.length === 0 && !isEditing ? (
           <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
