@@ -120,7 +120,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Use PageRenderer for non-custom pages, PageBuilder for custom pages */}
         {page.page_type && page.page_type !== 'custom' ? (
-          <>
+          <div className="space-y-4">
             {/* Add Block Button (only in edit mode) */}
             {isEditing && (
               <div className="mb-4 flex justify-end">
@@ -129,13 +129,13 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                     try {
                       const currentBlocks: BlockConfig[] = page.blocks || [];
                       const updatedBlocks = [...currentBlocks, newBlock];
-                      
+
                       const response = await fetch(`/api/pages/${pageId}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ blocks: updatedBlocks }),
                       });
-                      
+
                       if (!response.ok) throw new Error("Failed to add block");
                       await loadPage();
                     } catch (error: any) {
@@ -150,9 +150,9 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                 />
               </div>
             )}
-            
-            <PageRenderer 
-              page={page} 
+
+            <PageRenderer
+              page={page}
               data={blocks}
               isEditing={isEditing}
               onPageUpdate={async (updates: Partial<InterfacePage>) => {
@@ -162,7 +162,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(updates),
                   });
-                  
+
                   if (!response.ok) throw new Error("Failed to update page");
                   await loadPage();
                 } catch (error: any) {
@@ -174,6 +174,7 @@ export default function PageView({ pageId, defaultEditing = false }: PageViewPro
                 }
               }}
             />
+          </div>
         ) : blocks.length === 0 && !isEditing ? (
           <div className="text-center py-12 border border-gray-200 dark:border-gray-700 rounded-lg">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
