@@ -124,12 +124,12 @@ async function transformValue(
       
       try {
         // Search for a record where the display field matches the CSV value
-        const { data, error } = await supabase
+        let query: any = supabase
           .from(toTable)
           .select("id")
           .eq(displayField, trimmed)
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+        const { data, error } = await query.maybeSingle();
         
         if (error) {
           warnings.push(`Error looking up linked record in ${toTable} for "${trimmed}": ${error.message}. Storing value as-is.`);
@@ -140,12 +140,12 @@ async function transformValue(
           return String(data.id);
         } else {
           // No match found - try case-insensitive search
-          const { data: caseInsensitiveData, error: caseError } = await supabase
+          let caseQuery: any = supabase
             .from(toTable)
             .select("id")
             .ilike(displayField, trimmed)
-            .limit(1)
-            .maybeSingle();
+            .limit(1);
+          const { data: caseInsensitiveData, error: caseError } = await caseQuery.maybeSingle();
           
           if (caseError) {
             warnings.push(`No match found in ${toTable} for "${trimmed}" (case-insensitive search failed). Storing value as-is.`);
