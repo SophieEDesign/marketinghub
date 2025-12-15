@@ -178,17 +178,17 @@ function ImportPageContent() {
   }, []);
 
   const handleCreateField = useCallback(
-    async (columnName: string, suggestedType: string) => {
+    async (columnName: string, suggestedType: string): Promise<boolean> => {
       try {
         if (!columnName || !columnName.trim()) {
           alert("Column name is required");
-          return;
+          return false;
         }
 
-        // Create new field
+        // Create new field with predicted type
         const newField = await addField(columnName.trim(), suggestedType as any, false);
         if (newField) {
-          // Reload fields
+          // Reload fields to get the new field
           const updatedFields = await loadFields(tableId);
           setFields(updatedFields);
 
@@ -204,13 +204,18 @@ function ImportPageContent() {
           ];
           setMappings(updatedMappings);
           handleMappingChange(updatedMappings);
+          
+          // Return success so FieldMapping can update UI
+          return true;
         } else {
           const errorMsg = "Failed to create field. This might be due to:\n- Duplicate field name\n- Invalid field type\n- Database error\n\nPlease check the console for details.";
           alert(errorMsg);
+          return false;
         }
       } catch (error: any) {
         console.error("Error in handleCreateField:", error);
         alert(`Failed to create field: ${error.message || "Unknown error"}`);
+        return false;
       }
     },
     [addField, tableId, mappings, handleMappingChange]

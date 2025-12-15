@@ -39,6 +39,9 @@ export default function FieldMapping({
     return initialMappings;
   });
 
+  // Track created fields to remove them from unmapped list
+  const [createdFields, setCreatedFields] = useState<Set<string>>(new Set());
+
   // Update mappings when fields change (e.g., after creating a new field)
   useEffect(() => {
     setMappings((currentMappings) => {
@@ -47,10 +50,27 @@ export default function FieldMapping({
       
       if (newFields.length > 0) {
         const newMappings = newFields.map((field) => {
-          const matchingHeader = csvHeaders.find(
+          // Try to find matching CSV column for the new field
+          // First check if we created this field from a specific column
+          const createdFromColumn = Array.from(createdFields).find(col => 
+            col.toLowerCase() === field.field_key.toLowerCase() ||
+            col.toLowerCase() === field.label.toLowerCase()
+          );
+          
+          const matchingHeader = createdFromColumn || csvHeaders.find(
             (header) => header.toLowerCase() === field.field_key.toLowerCase() ||
                         header.toLowerCase() === field.label.toLowerCase()
           );
+          
+          if (matchingHeader) {
+            // Mark this column as mapped
+            setCreatedFields(prev => {
+              const next = new Set(prev);
+              next.delete(matchingHeader);
+              return next;
+            });
+          }
+          
           return {
             fieldId: field.id,
             fieldKey: field.field_key,
@@ -63,7 +83,7 @@ export default function FieldMapping({
       }
       return currentMappings;
     });
-  }, [fields, csvHeaders, onMappingChange]);
+  }, [fields, csvHeaders, onMappingChange, createdFields]);
 
   const handleMappingChange = (fieldId: string, csvColumn: string | null) => {
     const updated = mappings.map((m) =>
@@ -89,13 +109,17 @@ export default function FieldMapping({
       return;
     }
     
+    // Mark as being created to prevent duplicate clicks
+    setCreatedFields(prev => new Set(prev).add(csvColumn));
+    
     // Get sample values for type detection
     const sampleValues = csvRows.slice(0, 10).map((row) => row[csvColumn]).filter(Boolean);
     const detectedType = detectFieldType(sampleValues);
     const suggestedType = suggestTypeFromColumnName(csvColumn);
+    // Prioritize detected type over column name suggestion
     const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
-    // Show confirmation modal
+    // Show confirmation modal with predicted type pre-selected
     setPendingField({
       columnName: csvColumn.trim(),
       suggestedType: finalType,
@@ -107,16 +131,34 @@ export default function FieldMapping({
   const handleConfirmFieldType = async (fieldType: string) => {
     if (!pendingField || !onCreateField) return;
     
-    setCreatingField(pendingField.columnName);
+    const columnName = pendingField.columnName;
+    setCreatingField(columnName);
     try {
-      await onCreateField(pendingField.columnName, fieldType);
+      const success = await onCreateField(columnName, fieldType);
       
-      // The parent component will reload fields and update mappings
-      // We don't need to manually update here since useEffect will handle it
+      if (success) {
+        // Field created successfully - it will be removed from unmapped list
+        // The parent component will reload fields and update mappings
+        // The useEffect will handle adding it to the mappings table
+      } else {
+        // Creation failed - remove from createdFields so user can try again
+        setCreatedFields(prev => {
+          const next = new Set(prev);
+          next.delete(columnName);
+          return next;
+        });
+      }
     } catch (error) {
       console.error("Error creating field:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      alert(`Failed to create field "${pendingField.columnName}": ${errorMessage}\n\nPlease check:\n- The column name is valid\n- The field doesn't already exist\n- Check the browser console for details`);
+      alert(`Failed to create field "${columnName}": ${errorMessage}\n\nPlease check:\n- The column name is valid\n- The field doesn't already exist\n- Check the browser console for details`);
+      
+      // Remove from createdFields on error so user can retry
+      setCreatedFields(prev => {
+        const next = new Set(prev);
+        next.delete(columnName);
+        return next;
+      });
     } finally {
       setCreatingField(null);
       setPendingField(null);
@@ -201,7 +243,7 @@ export default function FieldMapping({
 
       {/* Unmapped CSV Columns */}
       {csvHeaders.filter(
-        (header) => !mappings.some((m) => m.csvColumn === header)
+        (header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header)
       ).length > 0 && (
         <div className="mt-6">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -209,19 +251,27 @@ export default function FieldMapping({
           </h4>
           <div className="flex flex-wrap gap-2">
             {csvHeaders
-              .filter((header) => !mappings.some((m) => m.csvColumn === header))
+              .filter((header) => !mappings.some((m) => m.csvColumn === header) && !createdFields.has(header))
               .map((header) => {
                 const sampleValues = csvRows.slice(0, 10).map((row) => row[header]).filter(Boolean);
                 const detectedType = detectFieldType(sampleValues);
                 const suggestedType = suggestTypeFromColumnName(header);
+                // Prioritize detected type - it's more accurate than column name
                 const finalType = detectedType !== "text" ? detectedType : suggestedType;
 
                 return (
                   <div
                     key={header}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-700"
+                    className={`flex items-center gap-2 px-3 py-2 rounded border transition-all ${
+                      creatingField === header
+                        ? "bg-blue-100 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700"
+                        : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                    }`}
                   >
                     <span className="text-sm text-gray-700 dark:text-gray-300">{header}</span>
+                    <span className="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-gray-600 dark:text-gray-400">
+                      {finalType}
+                    </span>
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -230,9 +280,9 @@ export default function FieldMapping({
                       }}
                       disabled={creatingField === header || !onCreateField}
                       className="text-xs px-3 py-1.5 bg-brand-red text-white rounded-md hover:bg-brand-redDark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={`Create field "${header}" (type: ${finalType})`}
+                      title={`Create field "${header}" with predicted type: ${finalType}`}
                     >
-                      {creatingField === header ? "Creating..." : `Create Field (${finalType})`}
+                      {creatingField === header ? "Creating..." : "Create Field"}
                     </button>
                   </div>
                 );

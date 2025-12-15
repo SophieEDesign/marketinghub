@@ -129,7 +129,10 @@ export default function FieldTypeConfirmModal({
 
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
             <p className="text-xs text-blue-800 dark:text-blue-200">
-              <strong>Suggested:</strong> {suggestedType.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())} - {fieldTypeDescriptions[suggestedType]}
+              <strong>Auto-detected:</strong> {suggestedType.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())} - {fieldTypeDescriptions[suggestedType]}
+            </p>
+            <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+              You can change the type above if needed.
             </p>
           </div>
         </div>
