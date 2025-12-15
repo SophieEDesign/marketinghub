@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,15 +6,7 @@ import { getTables } from "@/lib/crud/tables"
 import type { Table } from "@/types/database"
 
 export default async function TablesPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
+  // Authentication disabled for testing
   const tables = await getTables()
 
   return (

@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { checkAccess } from "@/lib/access-control"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,23 +12,10 @@ export default async function TablePage({
 }: {
   params: { tableId: string }
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
+  // Authentication disabled for testing
   const table = await getTable(params.tableId)
   if (!table) {
     return <div>Table not found</div>
-  }
-
-  const hasAccess = await checkAccess(table.access_control, table.created_by)
-  if (!hasAccess) {
-    return <div>Access denied</div>
   }
 
   const views = await getViews(params.tableId)
