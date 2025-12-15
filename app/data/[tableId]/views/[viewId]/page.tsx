@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { checkViewAccess } from '@/lib/permissions'
-import { loadView, loadViewFields } from '@/lib/views'
+import { loadView, loadViewFields, loadViewTabs } from '@/lib/views'
 import { loadViewBlocks } from '@/lib/blocks'
 import { loadRows } from '@/lib/data'
 import GridView from '@/components/views/GridView'
@@ -53,6 +53,7 @@ export default async function ViewPage({
   // Load view configuration
   const viewFields = await loadViewFields(params.viewId)
   const blocks = await loadViewBlocks(params.viewId)
+  const tabs = view.type === 'page' ? await loadViewTabs(params.viewId) : []
 
   // Load data for non-page views
   let rowsData = null
@@ -61,6 +62,19 @@ export default async function ViewPage({
       tableId: params.tableId,
       viewId: params.viewId,
     })
+  }
+
+  // For interface pages, use full-width layout
+  if (view.type === 'page') {
+    return (
+      <div className="w-full h-full">
+        <InterfacePage
+          viewId={params.viewId}
+          blocks={blocks}
+          tabs={tabs}
+        />
+      </div>
+    )
   }
 
   return (
@@ -124,10 +138,11 @@ export default async function ViewPage({
           />
         )}
 
-        {(view.type === 'gallery' || view.type === 'page') && (
+        {view.type === 'gallery' && (
           <InterfacePage
             viewId={params.viewId}
             blocks={blocks}
+            tabs={tabs}
           />
         )}
       </div>

@@ -29,7 +29,8 @@ export type BlockType =
   | 'html'
   | 'embed'
   | 'table'
-  | 'automation'
+  | 'stat'
+  | 'divider'
 
 export interface Table {
   id: string
