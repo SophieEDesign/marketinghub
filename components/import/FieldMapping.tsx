@@ -27,6 +27,7 @@ export default function FieldMapping({
   csvRows,
   onMappingChange,
   onCreateField,
+  onCreateAllFields,
 }: FieldMappingProps) {
   const [mappings, setMappings] = useState<FieldMappingType[]>(() => {
     // Auto-map based on field_key matching CSV header (case-insensitive)
