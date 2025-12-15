@@ -159,7 +159,13 @@ export default function PageRenderer({
 
   return (
     <div className="flex flex-col gap-4">
-      <PageActionsBar actions={actions} page={page} />
+      <PageActionsBar 
+        actions={actions} 
+        context={{
+          pageId: page.id,
+          record: recordContext,
+        }}
+      />
       {renderPage()}
       
       {/* Composable Blocks Layout */}
