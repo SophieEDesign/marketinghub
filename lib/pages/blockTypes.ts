@@ -46,15 +46,10 @@ import {
 // Import placeholder components for blocks not yet fully implemented
 import ChartBlockPlaceholder from "@/components/pages/blocks/ChartBlockPlaceholder";
 import AutomationTriggerBlockPlaceholder from "@/components/pages/blocks/AutomationTriggerBlockPlaceholder";
+import SeparatorBlock from "@/components/pages/blocks/SeparatorBlock";
 
 const ChartBlock = ChartBlockPlaceholder;
 const AutomationTriggerBlock = AutomationTriggerBlockPlaceholder;
-
-const SeparatorBlock = ({ block, isEditing, onUpdate, onDelete, onOpenSettings }: any) => (
-  <div className="py-2">
-    <div className="border-t border-gray-200 dark:border-gray-700" />
-  </div>
-);
 
 /**
  * Block Types Registry
