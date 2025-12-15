@@ -11,7 +11,11 @@ interface FieldMappingProps {
   csvHeaders: string[];
   csvRows: Record<string, string>[];
   onMappingChange: (mappings: FieldMappingType[]) => void;
-  onCreateField?: (columnName: string, suggestedType: string) => void;
+  onCreateField?: (
+    columnName: string,
+    suggestedType: string,
+    options?: { to_table?: string; display_field?: string }
+  ) => Promise<boolean>;
 }
 
 export default function FieldMapping({
