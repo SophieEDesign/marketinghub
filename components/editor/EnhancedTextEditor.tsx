@@ -84,6 +84,7 @@ export default function EnhancedTextEditor({
           class: "text-blue-600 underline cursor-pointer",
         },
       }),
+      FontSize,
     ],
     content,
     editable,
@@ -129,9 +130,10 @@ export default function EnhancedTextEditor({
 
   const setFontSize = (size: string) => {
     if (!editor) return;
-    // Remove 'px' if present and use setFontSize command
+    // Remove 'px' if present and use setMark with fontSize
     const sizeValue = size.replace('px', '');
-    editor.chain().focus().setFontSize(sizeValue).run();
+    // Use setMark directly since TypeScript doesn't recognize custom commands
+    editor.chain().focus().setMark('textStyle', { fontSize: sizeValue }).run();
     setShowFontSizePicker(false);
   };
 
