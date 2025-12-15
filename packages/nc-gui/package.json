@@ -2,10 +2,10 @@
   "name": "nc-gui",
   "private": true,
   "packageManager": "pnpm@9.6.0",
-  "description": "NocoDB Frontend",
+  "description": "P&M Interface Builder Frontend",
   "author": {
-    "name": "NocoDB",
-    "url": "https://nocodb.com/"
+    "name": "Peters & May",
+    "url": "https://petersandmay.com/"
   },
   "license": "AGPL-3.0-or-later",
   "homepage": "https://github.com/nocodb/nocodb",

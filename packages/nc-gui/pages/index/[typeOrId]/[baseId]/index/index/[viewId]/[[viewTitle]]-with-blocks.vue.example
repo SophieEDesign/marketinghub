@@ -1,0 +1,47 @@
+<!--
+  EXAMPLE: How to integrate blocks into a NocoDB view
+  Copy this pattern to actual view files
+-->
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import ViewBlocksWrapper from '~/components/blocks/ViewBlocksWrapper.vue'
+import type { BlockConfig } from '~/blocks/blockRegistry'
+
+const route = useRoute()
+const viewId = computed(() => route.params.viewId as string)
+
+// Get view data (adjust based on NocoDB's composables)
+const { view, updateView } = useView(viewId.value)
+const editMode = ref(false)
+const user = computed(() => useUserStore().user)
+
+// Handle blocks change
+const handleBlocksChange = async (blocks: BlockConfig[]) => {
+  try {
+    await updateView({
+      blocks: blocks,
+    })
+    // Optionally show success message
+  } catch (error) {
+    console.error('Failed to save blocks:', error)
+  }
+}
+</script>
+
+<template>
+  <div class="w-full h-full relative">
+    <!-- Existing NocoDB view component -->
+    <TabsSmartsheet :active-tab="activeTab" />
+    
+    <!-- Block system - appears below the view -->
+    <ViewBlocksWrapper
+      v-if="view"
+      :view-id="viewId"
+      :blocks="(view.blocks as BlockConfig[]) || []"
+      :edit-mode="editMode"
+      :user="user"
+      @blocks-change="handleBlocksChange"
+    />
+  </div>
+</template>

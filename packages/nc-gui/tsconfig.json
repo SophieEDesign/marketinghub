@@ -11,12 +11,8 @@
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "types": [
-      "@intlify/unplugin-vue-i18n/messages",
       "vue-i18n",
-      "unplugin-icons/types/vue",
-      "nuxt-windicss",
-      "vite/client",
-      "@nuxt/image"
+      "vite/client"
     ]
   },
   "exclude": ["node_modules", "dist", ".output"]

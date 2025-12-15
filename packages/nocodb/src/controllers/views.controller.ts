@@ -208,4 +208,52 @@ export class ViewsController {
       req,
     });
   }
+
+  // Block-specific endpoints
+  @Get([
+    '/api/v1/db/meta/views/:viewId/blocks',
+    '/api/v2/meta/views/:viewId/blocks',
+  ])
+  @Acl('viewBlocksGet')
+  async getBlocks(
+    @TenantContext() context: NcContext,
+    @Param('viewId') viewId: string,
+  ) {
+    return await this.viewsService.getBlocks(context, {
+      viewId,
+    });
+  }
+
+  @Patch([
+    '/api/v1/db/meta/views/:viewId/blocks',
+    '/api/v2/meta/views/:viewId/blocks',
+  ])
+  @Acl('viewBlocksUpdate')
+  async updateBlocks(
+    @TenantContext() context: NcContext,
+    @Param('viewId') viewId: string,
+    @Body() body: { blocks: any[] },
+    @Req() req: NcRequest,
+  ) {
+    return await this.viewsService.updateBlocks(context, {
+      viewId,
+      blocks: body.blocks,
+      user: req.user,
+      req,
+    });
+  }
+
+  // Public share view with blocks (read-only)
+  @Get(['/api/v1/db/public/shared-view/:publicShareId'])
+  async getPublicSharedView(
+    @TenantContext() context: NcContext,
+    @Param('publicShareId') publicShareId: string,
+  ) {
+    // This endpoint should return view data including blocks for public sharing
+    // Implementation depends on NocoDB's shared view structure
+    // For now, blocks are included in the view object when fetched
+    return await this.viewsService.getPublicSharedView(context, {
+      publicShareId,
+    });
+  }
 }

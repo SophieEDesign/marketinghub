@@ -84,6 +84,48 @@ async function xcVisibilityMetaGet(
 export class ViewsService {
   constructor(private appHooksService: AppHooksService) {}
 
+  /**
+   * Get blocks for a view
+   */
+  async getBlocks(
+    context: NcContext,
+    param: { viewId: string },
+    ncMeta = Noco.ncMeta,
+  ) {
+    const view = await View.get(context, param.viewId, ncMeta);
+    if (!view) {
+      NcError.viewNotFound(param.viewId);
+    }
+    return (view.blocks as any) || [];
+  }
+
+  /**
+   * Update blocks for a view
+   */
+  async updateBlocks(
+    context: NcContext,
+    param: {
+      viewId: string;
+      blocks: any[];
+      user: UserType;
+      req: NcRequest;
+    },
+    ncMeta = Noco.ncMeta,
+  ) {
+    const view = await View.get(context, param.viewId, ncMeta);
+    if (!view) {
+      NcError.viewNotFound(param.viewId);
+    }
+
+    // Update only the blocks field
+    await View.update(context, param.viewId, {
+      blocks: param.blocks,
+    } as any, ncMeta);
+
+    const updatedView = await View.get(context, param.viewId, ncMeta);
+    return updatedView?.blocks || [];
+  }
+
   async viewList(
     context: NcContext,
     param: {
@@ -584,5 +626,21 @@ export class ViewsService {
 
   async shareViewList(context: NcContext, param: { tableId: string }) {
     return await View.shareViewList(context, param.tableId);
+  }
+
+  /**
+   * Get public shared view by public_share_id
+   */
+  async getPublicSharedView(
+    context: NcContext,
+    param: { publicShareId: string },
+    ncMeta = Noco.ncMeta,
+  ) {
+    // Find view by public_share_id
+    const view = await View.getByPublicShareId(context, param.publicShareId, ncMeta);
+    if (!view) {
+      NcError.viewNotFound(param.publicShareId);
+    }
+    return view;
   }
 }
