@@ -9,6 +9,7 @@ import { Underline } from "@tiptap/extension-underline";
 import { Link } from "@tiptap/extension-link";
 import { Highlight } from "@tiptap/extension-highlight";
 import { TextAlign } from "@tiptap/extension-text-align";
+import { FontSize } from "@/lib/editor/fontSize";
 import {
   Bold,
   Italic,
@@ -30,6 +31,7 @@ import {
   Type,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Code2 } from "lucide-react";
 
 interface EnhancedTextEditorProps {
   content: string;
@@ -52,6 +54,8 @@ export default function EnhancedTextEditor({
   const [showFontSizePicker, setShowFontSizePicker] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [isHtmlMode, setIsHtmlMode] = useState(false);
+  const [htmlContent, setHtmlContent] = useState(content);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -95,28 +99,61 @@ export default function EnhancedTextEditor({
 
   // Update editor content when prop changes
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
+    if (editor && content !== editor.getHTML() && !isHtmlMode) {
       editor.commands.setContent(content);
     }
-  }, [content, editor]);
+  }, [content, editor, isHtmlMode]);
+
+  // Sync HTML content when switching modes
+  useEffect(() => {
+    if (isHtmlMode) {
+      setHtmlContent(editor?.getHTML() || content);
+    }
+  }, [isHtmlMode, editor, content]);
 
   if (!editor) {
     return <div className="text-sm text-gray-500 p-4">Loading editor...</div>;
   }
 
   const setColor = (color: string) => {
+    if (!editor) return;
     editor.chain().focus().setColor(color).run();
     setShowColorPicker(false);
   };
 
   const setHighlight = (color: string) => {
+    if (!editor) return;
     editor.chain().focus().toggleHighlight({ color }).run();
     setShowColorPicker(false);
   };
 
   const setFontSize = (size: string) => {
-    editor.chain().focus().setMark("textStyle", { fontSize: size }).run();
+    if (!editor) return;
+    // Remove 'px' if present and use setFontSize command
+    const sizeValue = size.replace('px', '');
+    editor.chain().focus().setFontSize(sizeValue).run();
     setShowFontSizePicker(false);
+  };
+
+  const toggleHtmlMode = () => {
+    if (isHtmlMode) {
+      // Switching from HTML to visual - update editor with HTML content
+      if (editor) {
+        editor.commands.setContent(htmlContent);
+        onChange(htmlContent);
+      }
+    } else {
+      // Switching to HTML mode - get current HTML
+      if (editor) {
+        setHtmlContent(editor.getHTML());
+      }
+    }
+    setIsHtmlMode(!isHtmlMode);
+  };
+
+  const handleHtmlChange = (newHtml: string) => {
+    setHtmlContent(newHtml);
+    onChange(newHtml);
   };
 
   const addLink = () => {
@@ -286,7 +323,7 @@ export default function EnhancedTextEditor({
         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
         {/* Font Size */}
-        <div className="relative">
+        <div className="relative font-size-picker-container">
           <button
             type="button"
             onClick={() => setShowFontSizePicker(!showFontSizePicker)}
@@ -317,7 +354,7 @@ export default function EnhancedTextEditor({
         </div>
 
         {/* Text Color */}
-        <div className="relative">
+        <div className="relative color-picker-container">
           <button
             type="button"
             onClick={() => setShowColorPicker(!showColorPicker)}
@@ -487,30 +524,51 @@ export default function EnhancedTextEditor({
         <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
         <button
           type="button"
-          onClick={() => {
-            const html = editor.getHTML();
-            const textarea = document.createElement("textarea");
-            textarea.value = html;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textarea);
-            alert("HTML copied to clipboard!");
-          }}
-          className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-xs"
-          title="Copy HTML"
+          onClick={toggleHtmlMode}
+          className={`p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-xs ${
+            isHtmlMode ? "bg-gray-300 dark:bg-gray-600" : ""
+          }`}
+          title={isHtmlMode ? "Switch to Visual Editor" : "Switch to HTML Editor"}
         >
-          HTML
+          <Code2 className="w-4 h-4" />
         </button>
       </div>
     );
   };
 
+  // Close pickers when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.color-picker-container') && !target.closest('button[title="Text Color"]')) {
+        setShowColorPicker(false);
+      }
+      if (!target.closest('.font-size-picker-container') && !target.closest('button[title="Font Size"]')) {
+        setShowFontSizePicker(false);
+      }
+    };
+
+    if (showColorPicker || showFontSizePicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showColorPicker, showFontSizePicker]);
+
   return (
     <div className="flex flex-col">
       <Toolbar />
       <div className="flex-1">
-        <EditorContent editor={editor} />
+        {isHtmlMode ? (
+          <textarea
+            value={htmlContent}
+            onChange={(e) => handleHtmlChange(e.target.value)}
+            className="w-full min-h-[200px] p-4 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 font-mono text-sm"
+            placeholder="Enter HTML content..."
+            style={{ fontFamily: 'monospace' }}
+          />
+        ) : (
+          <EditorContent editor={editor} />
+        )}
       </div>
     </div>
   );

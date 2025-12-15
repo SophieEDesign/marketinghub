@@ -38,16 +38,32 @@ export function useInterfacePages() {
     try {
       setLoading(true);
       setError(null);
-      const { data, error: fetchError } = await supabase
+      
+      // Try to fetch pages - handle potential column errors gracefully
+      let { data, error: fetchError } = await supabase
         .from("pages")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      // If error is due to missing columns, try with minimal selection
+      if (fetchError && (fetchError.code === "PGRST116" || fetchError.message?.includes("column"))) {
+        console.warn("Column error in pages query, trying minimal selection:", fetchError);
+        const { data: minimalData, error: minimalError } = await supabase
+          .from("pages")
+          .select("id, name, layout, page_type, created_at, updated_at")
+          .order("created_at", { ascending: false });
+        
+        if (minimalError) throw minimalError;
+        data = minimalData;
+      } else if (fetchError) {
+        throw fetchError;
+      }
+      
       setPages(data || []);
     } catch (err: any) {
       console.error("Error loading pages:", err);
       setError(err.message || "Failed to load pages");
+      setPages([]);
     } finally {
       setLoading(false);
     }
