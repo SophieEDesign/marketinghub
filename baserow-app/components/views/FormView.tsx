@@ -43,7 +43,7 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
 
   async function handleSave() {
     setSaving(true)
-    const { data: user } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
     if (rowId) {
       const { error } = await supabase
@@ -51,7 +51,7 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
         .update({
           data: formData,
           updated_at: new Date().toISOString(),
-          updated_by: user.data.user?.id,
+          updated_by: user?.id,
         })
         .eq("id", rowId)
 
@@ -63,7 +63,7 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
         {
           table_id: tableId,
           data: formData,
-          created_by: user.data.user?.id,
+          created_by: user?.id,
         },
       ])
 

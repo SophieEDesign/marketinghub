@@ -93,11 +93,11 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   }
 
   async function handleAddRow() {
-    const { data: user } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     const newRow = {
       table_id: tableId,
       data: {},
-      created_by: user.data.user?.id,
+      created_by: user?.id,
     }
 
     const { error } = await supabase.from("table_rows").insert([newRow])

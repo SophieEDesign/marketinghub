@@ -48,13 +48,13 @@ export default function RowDetailView({
   async function handleSave() {
     if (!row) return
 
-    const { data: user } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase
       .from("table_rows")
       .update({
         data: formData,
         updated_at: new Date().toISOString(),
-        updated_by: user.data.user?.id,
+        updated_by: user?.id,
       })
       .eq("id", rowId)
 
