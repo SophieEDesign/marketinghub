@@ -5,8 +5,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { PageLayout } from "@/components/pages/NewPageModal";
 import { BlockConfig } from "@/lib/pages/blockTypes";
 
-import { BlockConfig } from "@/lib/pages/blockTypes";
-
 export interface InterfacePage {
   id: string;
   name: string;
