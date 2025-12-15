@@ -43,7 +43,7 @@ export function transformRow(
     }
 
     try {
-      const transformedValue = transformValue(csvValue, field, warnings, errors);
+      const transformedValue = await transformValue(csvValue, field, warnings, errors);
       if (transformedValue !== null && transformedValue !== undefined) {
         result[mapping.fieldKey] = transformedValue;
       }
@@ -58,12 +58,12 @@ export function transformRow(
 /**
  * Transform a single CSV value to the correct type for a field
  */
-function transformValue(
+async function transformValue(
   csvValue: string,
   field: Field,
   warnings: string[],
   errors: string[]
-): any {
+): Promise<any> {
   const trimmed = csvValue.trim();
   
   if (!trimmed || trimmed === "") {
@@ -112,7 +112,56 @@ function transformValue(
       return null;
 
     case "linked_record":
-      return trimmed; // Store as string ID
+      // Look up the record in the foreign table by matching the display field
+      const toTable = field.options?.to_table || field.options?.foreignTable;
+      const displayField = field.options?.display_field || field.options?.displayField || "name";
+      
+      if (!toTable) {
+        warnings.push(`Linked record field ${field.label} is not configured (missing to_table). Storing value as-is.`);
+        return trimmed;
+      }
+      
+      try {
+        // Search for a record where the display field matches the CSV value
+        const { data, error } = await supabase
+          .from(toTable)
+          .select("id")
+          .eq(displayField, trimmed)
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) {
+          warnings.push(`Error looking up linked record in ${toTable} for "${trimmed}": ${error.message}. Storing value as-is.`);
+          return trimmed;
+        }
+        
+        if (data && data.id) {
+          return String(data.id);
+        } else {
+          // No match found - try case-insensitive search
+          const { data: caseInsensitiveData, error: caseError } = await supabase
+            .from(toTable)
+            .select("id")
+            .ilike(displayField, trimmed)
+            .limit(1)
+            .maybeSingle();
+          
+          if (caseError) {
+            warnings.push(`No match found in ${toTable} for "${trimmed}" (case-insensitive search failed). Storing value as-is.`);
+            return trimmed;
+          }
+          
+          if (caseInsensitiveData && caseInsensitiveData.id) {
+            return String(caseInsensitiveData.id);
+          } else {
+            warnings.push(`No record found in ${toTable} matching "${trimmed}" in field "${displayField}". Storing value as-is. You may need to create the record first.`);
+            return trimmed;
+          }
+        }
+      } catch (err: any) {
+        warnings.push(`Error looking up linked record: ${err.message}. Storing value as-is.`);
+        return trimmed;
+      }
 
     default:
       return trimmed;

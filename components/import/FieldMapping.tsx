@@ -99,6 +99,7 @@ export default function FieldMapping({
     columnName: string;
     suggestedType: string;
     sampleValues: string[];
+    linkedRecordOptions?: { to_table?: string; display_field?: string };
   } | null>(null);
 
   const handleCreateField = (csvColumn: string) => {
@@ -128,13 +129,18 @@ export default function FieldMapping({
     setShowTypeConfirm(true);
   };
 
-  const handleConfirmFieldType = async (fieldType: string) => {
+  const handleConfirmFieldType = async (fieldType: string, options?: { to_table?: string; display_field?: string }) => {
     if (!pendingField || !onCreateField) return;
     
     const columnName = pendingField.columnName;
     setCreatingField(columnName);
     try {
-      const success = await onCreateField(columnName, fieldType);
+      // Store options for linked_record fields
+      if (fieldType === "linked_record" && options) {
+        setPendingField({ ...pendingField, linkedRecordOptions: options });
+      }
+      
+      const success = await onCreateField(columnName, fieldType, options);
       
       if (success) {
         // Field created successfully - it will be removed from unmapped list
@@ -302,7 +308,7 @@ export default function FieldMapping({
           columnName={pendingField.columnName}
           suggestedType={pendingField.suggestedType as any}
           sampleValues={pendingField.sampleValues}
-          onConfirm={handleConfirmFieldType}
+          onConfirm={(fieldType, options) => handleConfirmFieldType(fieldType, options)}
         />
       )}
     </div>

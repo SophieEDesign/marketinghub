@@ -39,7 +39,7 @@ export async function runImport(
   // Step 1: Transform all rows
   for (let i = 0; i < csvRows.length; i++) {
     const csvRow = csvRows[i];
-    const transformResult = transformRow(csvRow, mappings, fields);
+    const transformResult = await transformRow(csvRow, mappings, fields);
 
     // Collect warnings
     for (const warning of transformResult.warnings) {

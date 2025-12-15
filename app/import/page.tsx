@@ -178,15 +178,15 @@ function ImportPageContent() {
   }, []);
 
   const handleCreateField = useCallback(
-    async (columnName: string, suggestedType: string): Promise<boolean> => {
+    async (columnName: string, suggestedType: string, options?: { to_table?: string; display_field?: string }): Promise<boolean> => {
       try {
         if (!columnName || !columnName.trim()) {
           alert("Column name is required");
           return false;
         }
 
-        // Create new field with predicted type
-        const newField = await addField(columnName.trim(), suggestedType as any, false);
+        // Create new field with predicted type and options (for linked_record)
+        const newField = await addField(columnName.trim(), suggestedType as any, false, options);
         if (newField) {
           // Reload fields to get the new field
           const updatedFields = await loadFields(tableId);

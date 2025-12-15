@@ -42,7 +42,7 @@ export function useFieldManager(tableId: string) {
   }, [tableId]);
 
   const addField = useCallback(
-    async (label: string, type: FieldType, required: boolean = false): Promise<Field | null> => {
+    async (label: string, type: FieldType, required: boolean = false, options?: { to_table?: string; display_field?: string }): Promise<Field | null> => {
       setLoading(true);
       setError(null);
       try {
@@ -85,10 +85,16 @@ export function useFieldManager(tableId: string) {
           : -1;
         const newOrder = maxOrder + 1;
 
-        // Prepare options for select types
+        // Prepare options for select types and linked_record
         let optionsValue: any = null;
         if (type === "single_select" || type === "multi_select") {
           optionsValue = { values: [] };
+        } else if (type === "linked_record" && options) {
+          // Store linked_record configuration
+          optionsValue = {
+            to_table: options.to_table,
+            display_field: options.display_field || "name",
+          };
         }
 
         const { data, error: insertError } = await supabase
