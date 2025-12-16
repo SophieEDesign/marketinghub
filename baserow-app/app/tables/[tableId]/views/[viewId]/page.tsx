@@ -48,8 +48,8 @@ export default async function ViewPage({
       )
     }
 
-    // Get view fields, filters, sorts, and config dynamically
-    const [viewFieldsRes, viewFiltersRes, viewSortsRes] = await Promise.all([
+    // Get view fields, filters, sorts, config, and table fields dynamically
+    const [viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes] = await Promise.all([
       supabase
         .from("view_fields")
         .select("field_name, visible, position")
@@ -64,11 +64,17 @@ export default async function ViewPage({
         .select("id, field_name, direction")
         .eq("view_id", params.viewId)
         .order("order_index", { ascending: true }),
+      supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", params.tableId)
+        .order("position", { ascending: true }),
     ])
 
     const viewFields = viewFieldsRes.data || []
     const viewFilters = viewFiltersRes.data || []
     const viewSorts = viewSortsRes.data || []
+    const tableFields = tableFieldsRes.data || []
     
     // Get groupBy from view config
     const groupBy = (view.config as { groupBy?: string })?.groupBy
@@ -100,6 +106,7 @@ export default async function ViewPage({
                   initialFilters={viewFilters}
                   initialSorts={viewSorts}
                   initialGroupBy={groupBy}
+                  initialTableFields={tableFields}
                 />
               )}
               {view.type === "form" && (

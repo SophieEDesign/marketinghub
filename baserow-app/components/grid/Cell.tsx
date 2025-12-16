@@ -6,11 +6,13 @@ interface CellProps {
   value: any
   fieldName: string
   fieldType?: string
+  fieldOptions?: any
+  isVirtual?: boolean
   onSave: (value: any) => Promise<void>
   onCancel?: () => void
 }
 
-export default function Cell({ value, fieldName, fieldType, onSave, onCancel }: CellProps) {
+export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirtual, onSave, onCancel }: CellProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value ?? "")
   const [saving, setSaving] = useState(false)
@@ -89,9 +91,53 @@ export default function Cell({ value, fieldName, fieldType, onSave, onCancel }: 
   }
 
   const inputType = getInputType()
-  const isLongText = fieldType?.toLowerCase().includes("text") && 
-                     (fieldType.toLowerCase().includes("long") || 
-                      fieldType.toLowerCase().includes("textarea"))
+  const isLongText = fieldType === "long_text"
+  
+  // Handle virtual fields - read-only
+  if (isVirtual) {
+    return (
+      <div className="min-h-[32px] flex items-center px-2 py-1 text-gray-500 italic">
+        {value !== null && value !== undefined ? String(value) : "—"}
+      </div>
+    )
+  }
+  
+  // Handle select fields
+  if (fieldType === "single_select" && fieldOptions?.choices) {
+    if (editing) {
+      return (
+        <select
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="w-full h-8 px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          autoFocus
+        >
+          <option value="">Select...</option>
+          {fieldOptions.choices.map((choice: string) => (
+            <option key={choice} value={choice}>
+              {choice}
+            </option>
+          ))}
+        </select>
+      )
+    }
+  }
+  
+  if (fieldType === "multi_select" && fieldOptions?.choices) {
+    // Multi-select is more complex - for now, show as comma-separated
+    const displayValue = Array.isArray(value) ? value.join(", ") : value
+    return (
+      <div
+        onClick={handleStartEdit}
+        className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+        title="Click to edit"
+      >
+        {displayValue || <span className="text-gray-400 italic text-sm">Empty</span>}
+      </div>
+    )
+  }
 
   if (editing) {
     if (inputType === "checkbox") {
@@ -144,17 +190,34 @@ export default function Cell({ value, fieldName, fieldType, onSave, onCancel }: 
     )
   }
 
-  const displayValue = value === null || value === undefined 
-    ? "" 
-    : typeof value === "boolean" 
-      ? value ? "✓" : "" 
-      : String(value)
+  // Format display value based on field type
+  let displayValue: string = ""
+  if (value !== null && value !== undefined) {
+    if (typeof value === "boolean") {
+      displayValue = value ? "✓" : ""
+    } else if (fieldType === "multi_select" && Array.isArray(value)) {
+      displayValue = value.join(", ")
+    } else if (fieldType === "currency" && typeof value === "number") {
+      const symbol = fieldOptions?.currency_symbol || "$"
+      const precision = fieldOptions?.precision ?? 2
+      displayValue = `${symbol}${value.toFixed(precision)}`
+    } else if (fieldType === "percent" && typeof value === "number") {
+      const precision = fieldOptions?.precision ?? 2
+      displayValue = `${(value * 100).toFixed(precision)}%`
+    } else {
+      displayValue = String(value)
+    }
+  }
 
   return (
     <div
-      onClick={handleStartEdit}
-      className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
-      title="Click to edit"
+      onClick={isVirtual ? undefined : handleStartEdit}
+      className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
+        isVirtual 
+          ? "text-gray-500 italic cursor-default" 
+          : "cursor-pointer hover:bg-blue-50"
+      }`}
+      title={isVirtual ? "Virtual field (read-only)" : "Click to edit"}
     >
       {displayValue || (
         <span className="text-gray-400 italic text-sm">Empty</span>

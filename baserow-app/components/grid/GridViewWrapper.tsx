@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
 import Toolbar from "./Toolbar"
+import FieldBuilderDrawer from "./FieldBuilderDrawer"
+import type { TableField } from "@/types/fields"
 
 interface Filter {
   id?: string
@@ -39,6 +41,7 @@ interface GridViewWrapperProps {
     direction: string
   }>
   initialGroupBy?: string
+  initialTableFields?: TableField[]
 }
 
 export default function GridViewWrapper({
@@ -49,11 +52,15 @@ export default function GridViewWrapper({
   initialFilters,
   initialSorts,
   initialGroupBy,
+  initialTableFields = [],
 }: GridViewWrapperProps) {
   const [filters, setFilters] = useState<Filter[]>(initialFilters)
   const [sorts, setSorts] = useState<Sort[]>(initialSorts)
   const [groupBy, setGroupBy] = useState<string | undefined>(initialGroupBy)
   const [searchTerm, setSearchTerm] = useState("")
+  const [fields, setFields] = useState<TableField[]>(initialTableFields)
+  const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
+  const [editingField, setEditingField] = useState<TableField | null>(null)
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
@@ -179,6 +186,40 @@ export default function GridViewWrapper({
     }
   }
 
+  // Load fields
+  useEffect(() => {
+    loadFields()
+  }, [tableId])
+
+  async function loadFields() {
+    try {
+      const response = await fetch(`/api/tables/${tableId}/fields`)
+      const data = await response.json()
+      if (data.fields) {
+        setFields(data.fields)
+      }
+    } catch (error) {
+      console.error("Error loading fields:", error)
+    }
+  }
+
+  function handleAddField() {
+    setEditingField(null)
+    setFieldBuilderOpen(true)
+  }
+
+  function handleEditField(fieldName: string) {
+    const field = fields.find(f => f.name === fieldName)
+    setEditingField(field || null)
+    setFieldBuilderOpen(true)
+  }
+
+  async function handleFieldSave() {
+    await loadFields()
+    // Reload the page to get updated viewFields
+    window.location.reload()
+  }
+
   return (
     <div className="w-full">
       <Toolbar
@@ -203,6 +244,19 @@ export default function GridViewWrapper({
         viewSorts={sorts}
         searchTerm={searchTerm}
         groupBy={groupBy}
+        tableFields={fields}
+        onAddField={handleAddField}
+        onEditField={handleEditField}
+      />
+      <FieldBuilderDrawer
+        isOpen={fieldBuilderOpen}
+        onClose={() => {
+          setFieldBuilderOpen(false)
+          setEditingField(null)
+        }}
+        tableId={tableId}
+        field={editingField}
+        onSave={handleFieldSave}
       />
     </div>
   )

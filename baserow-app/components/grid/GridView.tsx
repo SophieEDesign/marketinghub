@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight } from "lucide-react"
 import Cell from "./Cell"
 import RecordDrawer from "./RecordDrawer"
+import type { TableField } from "@/types/fields"
 
 interface GridViewProps {
   tableId: string
@@ -27,6 +28,9 @@ interface GridViewProps {
   }>
   searchTerm?: string
   groupBy?: string
+  tableFields?: TableField[]
+  onAddField?: () => void
+  onEditField?: (fieldName: string) => void
 }
 
 const ITEMS_PER_PAGE = 100
@@ -40,6 +44,9 @@ export default function GridView({
   viewSorts = [],
   searchTerm = "",
   groupBy,
+  tableFields = [],
+  onAddField,
+  onEditField,
 }: GridViewProps) {
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +62,7 @@ export default function GridView({
 
   useEffect(() => {
     loadRows()
-  }, [supabaseTableName, viewFilters, viewSorts])
+  }, [supabaseTableName, viewFilters, viewSorts, tableFields])
 
   async function loadRows() {
     if (!supabaseTableName) {
@@ -348,13 +355,24 @@ export default function GridView({
     <div className="w-full relative">
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
-        <button
-          onClick={handleAddRow}
-          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Row
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleAddRow}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Row
+          </button>
+          {onAddField && (
+            <button
+              onClick={onAddField}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Field
+            </button>
+          )}
+        </div>
         <div className="text-sm text-gray-500">
           {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
           {searchTerm && filteredRows.length !== rows.length && (
@@ -369,14 +387,31 @@ export default function GridView({
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {visibleFields.map((field) => (
-                  <th
-                    key={field.field_name}
-                    className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] sticky top-0 bg-gray-50 z-10"
-                  >
-                    {field.field_name}
-                  </th>
-                ))}
+                {visibleFields.map((field) => {
+                  const tableField = tableFields.find(f => f.name === field.field_name)
+                  const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                  return (
+                    <th
+                      key={field.field_name}
+                      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          onClick={() => onEditField?.(field.field_name)}
+                          className={`flex-1 ${onEditField ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        >
+                          {field.field_name}
+                          {isVirtual && (
+                            <span className="ml-1 text-xs text-gray-400">(virtual)</span>
+                          )}
+                        </span>
+                        {tableField?.required && (
+                          <span className="text-red-500 text-xs ml-1">*</span>
+                        )}
+                      </div>
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
@@ -456,7 +491,8 @@ export default function GridView({
                     onClick={() => handleRowClick(row.id)}
                   >
                     {visibleFields.map((field) => {
-                      // Don't make the cell clickable - row click opens drawer
+                      const tableField = tableFields.find(f => f.name === field.field_name)
+                      const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
                       return (
                         <td
                           key={field.field_name}
@@ -466,8 +502,13 @@ export default function GridView({
                           <Cell
                             value={row[field.field_name]}
                             fieldName={field.field_name}
+                            fieldType={tableField?.type}
+                            fieldOptions={tableField?.options}
+                            isVirtual={isVirtual}
                             onSave={async (value) => {
-                              await handleCellSave(row.id, field.field_name, value)
+                              if (!isVirtual) {
+                                await handleCellSave(row.id, field.field_name, value)
+                              }
                             }}
                           />
                         </td>

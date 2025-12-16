@@ -121,3 +121,6 @@ export interface TableRow {
   created_by?: string
   updated_by?: string
 }
+
+// Re-export field types for convenience
+export type { FieldType, TableField, FieldOptions } from './fields'
