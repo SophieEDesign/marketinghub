@@ -29,7 +29,6 @@ export default function NewTablePage() {
           {
             name,
             description: description || null,
-            access_control: "public",
           },
         ])
         .select()

@@ -40,7 +40,7 @@ export default async function TablesPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-sm text-muted-foreground">
-                    Access: {table.access_control}
+                    Created: {new Date(table.created_at).toLocaleDateString()}
                   </div>
                 </CardContent>
               </Card>

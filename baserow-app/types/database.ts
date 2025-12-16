@@ -38,7 +38,7 @@ export interface Table {
   created_at: string
   updated_at: string
   created_by?: string
-  access_control: AccessControl
+  access_control?: AccessControl
 }
 
 export interface View {
