@@ -27,6 +27,7 @@ export default async function TablePage({
     kanban: Columns,
     calendar: Calendar,
     gallery: Grid,
+    page: FileText,
   }
 
   return (
