@@ -257,6 +257,7 @@ export default function GridViewWrapper({
         tableId={tableId}
         field={editingField}
         onSave={handleFieldSave}
+        tableFields={fields}
       />
     </div>
   )

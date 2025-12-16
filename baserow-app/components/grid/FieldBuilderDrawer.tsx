@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { X, Save, Trash2, AlertTriangle } from "lucide-react"
 import type { FieldType, TableField, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import FormulaEditor from "@/components/fields/FormulaEditor"
 
 interface FieldBuilderDrawerProps {
   isOpen: boolean
@@ -11,6 +12,7 @@ interface FieldBuilderDrawerProps {
   tableId: string
   field?: TableField | null
   onSave: () => void
+  tableFields?: TableField[]
 }
 
 export default function FieldBuilderDrawer({
@@ -214,21 +216,13 @@ export default function FieldBuilderDrawer({
 
       case "formula":
         return (
-          <div className="space-y-2">
-            <label className="block text-sm font-medium">Formula</label>
-            <textarea
-              value={options.formula || ""}
-              onChange={(e) =>
-                setOptions({ ...options, formula: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-              rows={4}
-              placeholder="e.g., {Field 1} + {Field 2}"
-            />
-            <p className="text-xs text-gray-500">
-              Use {"{Field Name}"} to reference other fields
-            </p>
-          </div>
+          <FormulaEditor
+            value={options.formula || ""}
+            onChange={(formula) =>
+              setOptions({ ...options, formula })
+            }
+            tableFields={tableFields.filter(f => f.id !== field?.id && f.type !== 'formula')}
+          />
         )
 
       case "lookup":

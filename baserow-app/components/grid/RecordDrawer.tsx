@@ -4,12 +4,16 @@ import { useEffect, useState } from "react"
 import { X, Save, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
+import type { TableField } from "@/types/fields"
+import { Calculator } from "lucide-react"
+
 interface RecordDrawerProps {
   isOpen: boolean
   onClose: () => void
   tableName: string
   rowId: string | null
   fieldNames: string[]
+  tableFields?: TableField[]
   onSave?: () => void
   onDelete?: () => void
 }
@@ -20,6 +24,7 @@ export default function RecordDrawer({
   tableName,
   rowId,
   fieldNames,
+  tableFields = [],
   onSave,
   onDelete,
 }: RecordDrawerProps) {
@@ -187,17 +192,35 @@ export default function RecordDrawer({
               {fieldNames.length > 0 ? (
                 fieldNames.map((fieldName) => {
                   const value = formData[fieldName]
+                  const tableField = tableFields.find(f => f.name === fieldName)
+                  const isFormula = tableField?.type === 'formula'
+                  const isVirtual = isFormula || tableField?.type === 'lookup'
                   const inputType = getInputType(fieldName, value)
                   const isLongText = fieldName.toLowerCase().includes("description") ||
                                     fieldName.toLowerCase().includes("notes") ||
                                     fieldName.toLowerCase().includes("comment")
+                  const isError = typeof value === 'string' && value.startsWith('#')
 
                   return (
                     <div key={fieldName} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                         {fieldName}
+                        {isFormula && (
+                          <Calculator className="h-3 w-3 text-gray-400" title={`Formula: ${tableField?.options?.formula || ''}`} />
+                        )}
                       </label>
-                      {inputType === "checkbox" ? (
+                      {isVirtual ? (
+                        <div className={`px-3 py-2 border border-gray-200 rounded-md bg-gray-50 ${
+                          isError ? 'text-red-600' : 'text-gray-700'
+                        } italic`}>
+                          {value !== null && value !== undefined ? String(value) : "—"}
+                          {isFormula && tableField?.options?.formula && (
+                            <div className="text-xs text-gray-500 mt-1 font-mono">
+                              = {tableField.options.formula}
+                            </div>
+                          )}
+                        </div>
+                      ) : inputType === "checkbox" ? (
                         <div className="flex items-center">
                           <input
                             type="checkbox"

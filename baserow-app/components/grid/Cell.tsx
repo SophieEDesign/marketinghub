@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { Calculator } from "lucide-react"
 
 interface CellProps {
   value: any
@@ -93,11 +94,22 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   const inputType = getInputType()
   const isLongText = fieldType === "long_text"
   
-  // Handle virtual fields - read-only
+  // Handle virtual fields (formula/lookup) - read-only
   if (isVirtual) {
+    const displayValue = value !== null && value !== undefined 
+      ? String(value) 
+      : "—"
+    const isError = typeof value === 'string' && value.startsWith('#')
+    
     return (
-      <div className="min-h-[32px] flex items-center px-2 py-1 text-gray-500 italic">
-        {value !== null && value !== undefined ? String(value) : "—"}
+      <div 
+        className={`min-h-[32px] flex items-center gap-2 px-2 py-1 ${
+          isError ? 'text-red-600' : 'text-gray-600'
+        } italic`}
+        title={fieldOptions?.formula ? `Formula: ${fieldOptions.formula}` : 'Formula field'}
+      >
+        <Calculator className="h-3 w-3 opacity-50" />
+        <span>{displayValue}</span>
       </div>
     )
   }

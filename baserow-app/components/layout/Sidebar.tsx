@@ -12,6 +12,7 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Table, View, Automation } from "@/types/database"
@@ -136,6 +137,23 @@ export default function Sidebar({
 
       {/* Sidebar content */}
       <div className="flex-1 overflow-y-auto py-2">
+        {/* Quick Actions */}
+        {!isCollapsed && (
+          <div className="mb-4 px-3">
+            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Quick Actions
+            </div>
+            <div className="space-y-0.5 mt-1">
+              <SidebarItem
+                href="/import"
+                icon={Upload}
+                label="Import CSV"
+                active={isActive("/import")}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Tables Section */}
         <div className="mb-4">
           {!isCollapsed && (

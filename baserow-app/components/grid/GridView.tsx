@@ -7,6 +7,7 @@ import { Plus, ChevronDown, ChevronRight } from "lucide-react"
 import Cell from "./Cell"
 import RecordDrawer from "./RecordDrawer"
 import type { TableField } from "@/types/fields"
+import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 
 interface GridViewProps {
   tableId: string
@@ -140,8 +141,17 @@ export default function GridView({
 
       if (error) {
         console.error("Error loading rows:", error)
-        // Check if table doesn't exist
-        if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("relation")) {
+        // Check if table doesn't exist - check multiple error patterns
+        const errorMessage = error.message || ''
+        const isTableNotFound = 
+          error.code === "42P01" || 
+          error.code === "PGRST116" ||
+          errorMessage.includes("does not exist") || 
+          errorMessage.includes("relation") ||
+          errorMessage.includes("schema cache") ||
+          errorMessage.includes("Could not find the table")
+        
+        if (isTableNotFound) {
           setTableError(`The table "${supabaseTableName}" does not exist. Attempting to create it...`)
           
           // Try to create the table automatically
@@ -155,25 +165,34 @@ export default function GridView({
             const createResult = await createResponse.json()
             
             if (createResult.success) {
-              // Table created, reload rows
-              setTableError(null)
-              loadRows()
+              // Table created, reload rows after a short delay to allow schema cache to update
+              setTimeout(() => {
+                setTableError(null)
+                loadRows()
+              }, 1000)
               return
             } else {
               // Show the SQL needed to create the table
-              setTableError(createResult.message || createResult.error || `Table "${supabaseTableName}" does not exist.`)
+              const errorMsg = createResult.message || createResult.error || `Table "${supabaseTableName}" does not exist.`
+              const sqlMsg = createResult.sql ? `\n\nRun this SQL in Supabase:\n${createResult.sql}` : ''
+              setTableError(errorMsg + sqlMsg)
             }
           } catch (createError) {
             console.error('Failed to create table:', createError)
-            setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically.`)
+            setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically. Please create it manually in Supabase.`)
           }
         } else {
           setTableError(`Error loading data: ${error.message}`)
         }
         setRows([])
       } else {
+        // Compute formula fields for each row
+        const formulaFields = tableFields.filter(f => f.type === 'formula')
+        const computedRows = (data || []).map(row => 
+          computeFormulaFields(row, formulaFields, tableFields)
+        )
         setTableError(null)
-        setRows(data || [])
+        setRows(computedRows)
       }
     } catch (error) {
       console.error("Error loading rows:", error)
@@ -399,10 +418,13 @@ export default function GridView({
                         <span
                           onClick={() => onEditField?.(field.field_name)}
                           className={`flex-1 ${onEditField ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                          title={tableField?.type === 'formula' && tableField?.options?.formula 
+                            ? `Formula: ${tableField.options.formula}` 
+                            : undefined}
                         >
                           {field.field_name}
                           {isVirtual && (
-                            <span className="ml-1 text-xs text-gray-400">(virtual)</span>
+                            <span className="ml-1 text-xs text-gray-400" title="Formula field">(fx)</span>
                           )}
                         </span>
                         {tableField?.required && (
@@ -529,6 +551,7 @@ export default function GridView({
         tableName={supabaseTableName}
         rowId={selectedRowId}
         fieldNames={visibleFields.map((f) => f.field_name)}
+        tableFields={tableFields}
         onSave={handleDrawerSave}
         onDelete={handleDrawerDelete}
       />

@@ -7,14 +7,17 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const { tableName, fieldNames = [] } = await request.json()
+    const { tableName: rawTableName, fieldNames = [] } = await request.json()
     
-    if (!tableName) {
+    if (!rawTableName) {
       return NextResponse.json(
         { error: 'Table name is required' },
         { status: 400 }
       )
     }
+
+    // Strip "public." prefix if present
+    const tableName = rawTableName.replace(/^public\./, '')
 
     const supabase = await createClient()
     
@@ -36,22 +39,35 @@ export async function POST(request: NextRequest) {
     })
     
     if (error) {
-      // If RPC doesn't exist, return SQL for manual creation
+      console.error('RPC create_dynamic_table error:', error)
+      
+      // If RPC doesn't exist or fails, try using execute_sql_safe if available
       const sql = `CREATE TABLE IF NOT EXISTS "${tableName}" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
         created_at timestamptz DEFAULT now(),
         updated_at timestamptz DEFAULT now()
       );`
       
-      return NextResponse.json({
-        success: false,
-        error: 'RPC function not available. Please create the table manually or set up the RPC function.',
-        sql,
-        message: `Table "${tableName}" needs to be created. Run this SQL in Supabase: ${sql}`
-      }, { status: 200 }) // Return 200 with instructions
+      // Try execute_sql_safe as fallback
+      const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
+        sql_text: sql
+      })
+      
+      if (sqlError) {
+        console.error('execute_sql_safe error:', sqlError)
+        return NextResponse.json({
+          success: false,
+          error: 'RPC functions not available. Please create the table manually or set up the RPC functions.',
+          sql,
+          message: `Table "${tableName}" needs to be created. Run this SQL in Supabase SQL Editor:\n\n${sql}`
+        }, { status: 200 }) // Return 200 with instructions
+      }
+      
+      // If execute_sql_safe succeeded, the table was created
+      return NextResponse.json({ success: true, tableName, method: 'execute_sql_safe' })
     }
     
-    return NextResponse.json({ success: true, tableName })
+    return NextResponse.json({ success: true, tableName, method: 'create_dynamic_table' })
   } catch (error: any) {
     console.error('Error in create-table API:', error)
     return NextResponse.json(
