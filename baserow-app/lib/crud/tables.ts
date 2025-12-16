@@ -8,8 +8,14 @@ export async function getTables() {
     .select('*')
     .order('created_at', { ascending: false })
   
-  if (error) throw error
-  return data as Table[]
+  if (error) {
+    // If table doesn't exist, return empty array
+    if (error.code === '42P01') {
+      return []
+    }
+    throw error
+  }
+  return (data || []) as Table[]
 }
 
 export async function getTable(id: string) {

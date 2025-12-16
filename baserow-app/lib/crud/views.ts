@@ -9,8 +9,14 @@ export async function getViews(tableId: string) {
     .eq('table_id', tableId)
     .order('order_index', { ascending: true })
   
-  if (error) throw error
-  return data as View[]
+  if (error) {
+    // If table doesn't exist or no views, return empty array
+    if (error.code === '42P01' || error.code === 'PGRST116') {
+      return []
+    }
+    throw error
+  }
+  return (data || []) as View[]
 }
 
 export async function getView(id: string) {
