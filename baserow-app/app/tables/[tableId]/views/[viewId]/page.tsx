@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import GridView from "@/components/views/GridView"
+import GridView from "@/components/grid/GridView"
 import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
@@ -8,7 +8,6 @@ import InterfacePage from "@/components/views/InterfacePage"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
 import { getView } from "@/lib/crud/views"
-import { getViewBlocks } from "@/lib/crud/view-blocks"
 import type { View } from "@/types/database"
 
 export default async function ViewPage({
@@ -49,19 +48,26 @@ export default async function ViewPage({
       )
     }
 
-    // Get view fields to determine which fields to show
-    const { data: viewFields, error: viewFieldsError } = await supabase
-      .from("view_fields")
-      .select("field_name")
-      .eq("view_id", params.viewId)
-      .order("position", { ascending: true })
+    // Get view fields, filters, and sorts dynamically
+    const [viewFieldsRes, viewFiltersRes, viewSortsRes] = await Promise.all([
+      supabase
+        .from("view_fields")
+        .select("field_name, visible, position")
+        .eq("view_id", params.viewId)
+        .order("position", { ascending: true }),
+      supabase
+        .from("view_filters")
+        .select("field_name, operator, value")
+        .eq("view_id", params.viewId),
+      supabase
+        .from("view_sorts")
+        .select("field_name, direction")
+        .eq("view_id", params.viewId),
+    ])
 
-    if (viewFieldsError) {
-      console.error("Error loading view fields:", viewFieldsError)
-    }
-
-    // Use field_name as field identifier (view_fields table uses field_name, not field_id)
-    const fieldIds = viewFields?.map((vf) => vf.field_name) || []
+    const viewFields = viewFieldsRes.data || []
+    const viewFilters = viewFiltersRes.data || []
+    const viewSorts = viewSortsRes.data || []
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -85,30 +91,33 @@ export default async function ViewPage({
                 <GridView
                   tableId={params.tableId}
                   viewId={params.viewId}
-                  fieldIds={fieldIds}
+                  supabaseTableName={table.supabase_table}
+                  viewFields={viewFields}
+                  viewFilters={viewFilters}
+                  viewSorts={viewSorts}
                 />
               )}
               {view.type === "form" && (
                 <FormView
                   tableId={params.tableId}
                   viewId={params.viewId}
-                  fieldIds={fieldIds}
+                  fieldIds={viewFields.map((f) => f.field_name)}
                 />
               )}
               {view.type === "kanban" && (
                 <KanbanView
                   tableId={params.tableId}
                   viewId={params.viewId}
-                  groupingFieldId={fieldIds[0] || ""}
-                  fieldIds={fieldIds}
+                  groupingFieldId={viewFields[0]?.field_name || ""}
+                  fieldIds={viewFields.map((f) => f.field_name)}
                 />
               )}
               {view.type === "calendar" && (
                 <CalendarView
                   tableId={params.tableId}
                   viewId={params.viewId}
-                  dateFieldId={fieldIds[0] || ""}
-                  fieldIds={fieldIds}
+                  dateFieldId={viewFields[0]?.field_name || ""}
+                  fieldIds={viewFields.map((f) => f.field_name)}
                 />
               )}
             </div>
