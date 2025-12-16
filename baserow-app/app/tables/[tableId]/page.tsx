@@ -14,9 +14,24 @@ export default async function TablePage({
 }) {
   // Authentication disabled for testing
   try {
-    const table = await getTable(params.tableId).catch(() => null)
+    console.log("Fetching table with ID:", params.tableId)
+    const table = await getTable(params.tableId)
+    console.log("Table result:", table ? `Found: ${table.name}` : "Not found")
+    
     if (!table) {
-      return <div>Table not found</div>
+      return (
+        <div className="container mx-auto p-6">
+          <div className="text-center py-12">
+            <p className="text-destructive mb-4">Table not found (ID: {params.tableId})</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              The table may not exist or you may not have permission to view it.
+            </p>
+            <Button asChild>
+              <Link href="/tables">Back to Tables</Link>
+            </Button>
+          </div>
+        </div>
+      )
     }
 
     const views = await getViews(params.tableId).catch(() => [])

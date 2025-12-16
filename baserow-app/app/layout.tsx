@@ -7,6 +7,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Baserow App",
   description: "A Baserow-style interface built with Next.js and Supabase",
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

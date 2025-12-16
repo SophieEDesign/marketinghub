@@ -20,7 +20,25 @@ export async function getTable(id: string) {
     .eq('id', id)
     .single()
   
-  if (error) throw error
+  if (error) {
+    console.error("getTable error:", { id, code: error.code, message: error.message, details: error })
+    // If it's a "not found" error, return null instead of throwing
+    // Supabase PostgREST error codes: PGRST116 = no rows returned
+    if (error.code === 'PGRST116' || 
+        error.code === '42P01' || // relation does not exist
+        error.message?.includes('No rows') ||
+        error.message?.includes('not found') ||
+        error.message?.includes('does not exist')) {
+      return null
+    }
+    throw error
+  }
+  
+  if (!data) {
+    console.warn("getTable: No data returned for id:", id)
+    return null
+  }
+  
   return data as Table
 }
 
