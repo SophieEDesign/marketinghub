@@ -14,15 +14,30 @@ import {
   ChevronUp,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Table, View } from "@/types/database"
-import type { Page } from "@/lib/crud/pages"
-import type { Dashboard } from "@/lib/crud/dashboards"
+import type { Table, View, Automation } from "@/types/database"
+
+interface InterfacePage {
+  id: string
+  name: string
+  description?: string
+  access_level: string
+  allowed_roles?: string[]
+}
+
+interface Dashboard {
+  id: string
+  name: string
+  description?: string
+  access_level: string
+  allowed_roles?: string[]
+}
 
 interface SidebarProps {
   tables: Table[]
   views: Record<string, View[]>
-  interfacePages: Page[]
+  interfacePages: InterfacePage[]
   dashboards: Dashboard[]
+  automations: Automation[]
   userRole: "admin" | "editor" | "viewer" | null
   isCollapsed: boolean
   onToggleCollapse: () => void
@@ -33,6 +48,7 @@ export default function Sidebar({
   views,
   interfacePages,
   dashboards,
+  automations,
   userRole,
   isCollapsed,
   onToggleCollapse,
@@ -251,12 +267,29 @@ export default function Sidebar({
                 Automations
               </div>
             )}
-            <SidebarItem
-              href="/automations"
-              icon={Zap}
-              label="Automations"
-              active={isActive("/automations")}
-            />
+            {automations.length > 0 ? (
+              <div className="space-y-0.5">
+                {automations.map((automation) => {
+                  const isAutomationActive = isActive(`/automations/${automation.id}`)
+                  return (
+                    <SidebarItem
+                      key={automation.id}
+                      href={`/automations/${automation.id}`}
+                      icon={Zap}
+                      label={automation.name}
+                      active={isAutomationActive}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <SidebarItem
+                href="/automations"
+                icon={Zap}
+                label="Automations"
+                active={isActive("/automations")}
+              />
+            )}
           </div>
         )}
       </div>

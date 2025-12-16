@@ -1,18 +1,29 @@
-import EmptyView from "@/components/layout/EmptyView"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
-import { FileText } from "lucide-react"
+import InterfacePage from "@/components/views/InterfacePage"
+import { getView } from "@/lib/crud/views"
 
-export default function InterfacePage({
+export default async function InterfacePageRoute({
   params,
 }: {
   params: { pageId: string }
 }) {
+  const view = await getView(params.pageId).catch(() => null)
+  
+  if (!view || view.type !== "page") {
+    return (
+      <WorkspaceShellWrapper title="Interface Page Not Found">
+        <div className="text-center py-12">
+          <p className="text-destructive">Interface page not found</p>
+        </div>
+      </WorkspaceShellWrapper>
+    )
+  }
+
   return (
-    <WorkspaceShellWrapper title="Interface Page">
-      <EmptyView
-        message={`Interface page ${params.pageId} - Coming soon…`}
-        icon={<FileText className="h-12 w-12" />}
-      />
+    <WorkspaceShellWrapper title={view.name}>
+      <div className="w-full h-full -m-6">
+        <InterfacePage viewId={params.pageId} />
+      </div>
     </WorkspaceShellWrapper>
   )
 }
