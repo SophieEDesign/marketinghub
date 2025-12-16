@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import React from "react"
 import { supabase } from "@/lib/supabase/client"
-import { Plus } from "lucide-react"
+import { Plus, ChevronDown, ChevronRight } from "lucide-react"
 import Cell from "./Cell"
 import RecordDrawer from "./RecordDrawer"
 
@@ -24,6 +25,8 @@ interface GridViewProps {
     field_name: string
     direction: string
   }>
+  searchTerm?: string
+  groupBy?: string
 }
 
 const ITEMS_PER_PAGE = 100
@@ -35,11 +38,15 @@ export default function GridView({
   viewFields,
   viewFilters = [],
   viewSorts = [],
+  searchTerm = "",
+  groupBy,
 }: GridViewProps) {
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [tableError, setTableError] = useState<string | null>(null)
 
   // Get visible fields ordered by position
   const visibleFields = viewFields
@@ -60,7 +67,7 @@ export default function GridView({
     try {
       let query = supabase.from(supabaseTableName).select("*")
 
-      // Apply filters
+      // Apply filters at query level
       for (const filter of viewFilters) {
         const fieldValue = filter.value
         switch (filter.operator) {
@@ -97,12 +104,23 @@ export default function GridView({
         }
       }
 
-      // Apply sorting
+      // Apply sorting at query level
       if (viewSorts.length > 0) {
-        const firstSort = viewSorts[0]
-        query = query.order(firstSort.field_name, {
-          ascending: firstSort.direction === "asc",
-        })
+        // Apply multiple sorts if needed
+        for (let i = 0; i < viewSorts.length; i++) {
+          const sort = viewSorts[i]
+          if (i === 0) {
+            query = query.order(sort.field_name, {
+              ascending: sort.direction === "asc",
+            })
+          } else {
+            // For additional sorts, we'd need to chain them
+            // Supabase supports multiple order() calls
+            query = query.order(sort.field_name, {
+              ascending: sort.direction === "asc",
+            })
+          }
+        }
       } else {
         // Default sort by id descending
         query = query.order("id", { ascending: false })
@@ -138,6 +156,9 @@ export default function GridView({
 
       if (error) {
         console.error("Error saving cell:", error)
+        if (error.code === "42P01" || error.message?.includes("does not exist")) {
+          setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+        }
         throw error
       }
 
@@ -172,6 +193,9 @@ export default function GridView({
 
       if (error) {
         console.error("Error adding row:", error)
+        if (error.code === "42P01" || error.message?.includes("does not exist")) {
+          setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+        }
       } else {
         await loadRows()
         // Optionally select the new row
@@ -180,8 +204,11 @@ export default function GridView({
           setDrawerOpen(true)
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding row:", error)
+      if (error?.code === "42P01" || error?.message?.includes("does not exist")) {
+        setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+      }
     }
   }
 
@@ -204,6 +231,57 @@ export default function GridView({
     handleDrawerClose()
   }
 
+  // Apply client-side search
+  const filteredRows = useMemo(() => {
+    if (!searchTerm.trim()) return rows
+
+    const searchLower = searchTerm.toLowerCase()
+    return rows.filter((row) => {
+      return visibleFields.some((field) => {
+        const value = row[field.field_name]
+        if (value === null || value === undefined) return false
+        return String(value).toLowerCase().includes(searchLower)
+      })
+    })
+  }, [rows, searchTerm, visibleFields])
+
+  // Group rows if groupBy is set
+  const groupedRows = useMemo(() => {
+    if (!groupBy) return null
+
+    const groups: Record<string, Record<string, any>[]> = {}
+
+    filteredRows.forEach((row) => {
+      const groupValue = row[groupBy] ?? "Uncategorized"
+      const groupKey = String(groupValue)
+      if (!groups[groupKey]) {
+        groups[groupKey] = []
+      }
+      groups[groupKey].push(row)
+    })
+
+    // Sort group keys
+    const sortedGroupKeys = Object.keys(groups).sort()
+
+    return sortedGroupKeys.map((key) => ({
+      key,
+      value: groups[key][0][groupBy],
+      rows: groups[key],
+    }))
+  }, [filteredRows, groupBy])
+
+  function toggleGroup(groupKey: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupKey)) {
+        next.delete(groupKey)
+      } else {
+        next.add(groupKey)
+      }
+      return next
+    })
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -220,6 +298,21 @@ export default function GridView({
     )
   }
 
+  if (tableError) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-md p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Table Not Found</h3>
+          <p className="text-sm text-yellow-700 mb-4">{tableError}</p>
+          <p className="text-xs text-yellow-600">
+            The table <code className="bg-yellow-100 px-1 py-0.5 rounded">{supabaseTableName}</code> needs to be created in your Supabase database.
+            You can create it manually in the Supabase dashboard or use a migration.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full relative">
       {/* Toolbar */}
@@ -232,7 +325,10 @@ export default function GridView({
           Add Row
         </button>
         <div className="text-sm text-gray-500">
-          {rows.length} {rows.length === 1 ? "row" : "rows"}
+          {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
+          {searchTerm && filteredRows.length !== rows.length && (
+            <span className="ml-1">(filtered from {rows.length})</span>
+          )}
         </div>
       </div>
 
@@ -253,17 +349,76 @@ export default function GridView({
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {filteredRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={visibleFields.length}
                     className="px-4 py-12 text-center text-gray-500"
                   >
-                    No rows found
+                    {searchTerm ? "No rows match your search" : "No rows found"}
                   </td>
                 </tr>
+              ) : groupBy && groupedRows ? (
+                // Render grouped rows
+                groupedRows.map((group) => {
+                  const isCollapsed = collapsedGroups.has(group.key)
+                  return (
+                    <React.Fragment key={group.key}>
+                      {/* Group header */}
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <td
+                          colSpan={visibleFields.length}
+                          className="px-4 py-2"
+                        >
+                          <button
+                            onClick={() => toggleGroup(group.key)}
+                            className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 w-full text-left"
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span className="font-semibold">
+                              {groupBy}: {String(group.value ?? "Uncategorized")}
+                            </span>
+                            <span className="text-gray-500 ml-2">
+                              ({group.rows.length} {group.rows.length === 1 ? "row" : "rows"})
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                      {/* Group rows */}
+                      {!isCollapsed &&
+                        group.rows.map((row) => (
+                          <tr
+                            key={row.id}
+                            className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
+                            onClick={() => handleRowClick(row.id)}
+                          >
+                            {visibleFields.map((field) => (
+                              <td
+                                key={field.field_name}
+                                className="px-0 py-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Cell
+                                  value={row[field.field_name]}
+                                  fieldName={field.field_name}
+                                  onSave={async (value) => {
+                                    await handleCellSave(row.id, field.field_name, value)
+                                  }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                    </React.Fragment>
+                  )
+                })
               ) : (
-                rows.map((row) => (
+                // Render ungrouped rows
+                filteredRows.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import Link from "next/link"
-import GridView from "@/components/grid/GridView"
+import GridViewWrapper from "@/components/grid/GridViewWrapper"
 import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
@@ -48,7 +48,7 @@ export default async function ViewPage({
       )
     }
 
-    // Get view fields, filters, and sorts dynamically
+    // Get view fields, filters, sorts, and config dynamically
     const [viewFieldsRes, viewFiltersRes, viewSortsRes] = await Promise.all([
       supabase
         .from("view_fields")
@@ -57,17 +57,21 @@ export default async function ViewPage({
         .order("position", { ascending: true }),
       supabase
         .from("view_filters")
-        .select("field_name, operator, value")
+        .select("id, field_name, operator, value")
         .eq("view_id", params.viewId),
       supabase
         .from("view_sorts")
-        .select("field_name, direction")
-        .eq("view_id", params.viewId),
+        .select("id, field_name, direction")
+        .eq("view_id", params.viewId)
+        .order("order_index", { ascending: true }),
     ])
 
     const viewFields = viewFieldsRes.data || []
     const viewFilters = viewFiltersRes.data || []
     const viewSorts = viewSortsRes.data || []
+    
+    // Get groupBy from view config
+    const groupBy = (view.config as { groupBy?: string })?.groupBy
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -88,13 +92,14 @@ export default async function ViewPage({
           <div className="space-y-6">
             <div>
               {view.type === "grid" && (
-                <GridView
+                <GridViewWrapper
                   tableId={params.tableId}
                   viewId={params.viewId}
                   supabaseTableName={table.supabase_table}
                   viewFields={viewFields}
-                  viewFilters={viewFilters}
-                  viewSorts={viewSorts}
+                  initialFilters={viewFilters}
+                  initialSorts={viewSorts}
+                  initialGroupBy={groupBy}
                 />
               )}
               {view.type === "form" && (
