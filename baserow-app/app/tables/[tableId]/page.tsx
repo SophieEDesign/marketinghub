@@ -13,12 +13,13 @@ export default async function TablePage({
   params: { tableId: string }
 }) {
   // Authentication disabled for testing
-  const table = await getTable(params.tableId)
-  if (!table) {
-    return <div>Table not found</div>
-  }
+  try {
+    const table = await getTable(params.tableId).catch(() => null)
+    if (!table) {
+      return <div>Table not found</div>
+    }
 
-  const views = await getViews(params.tableId)
+    const views = await getViews(params.tableId).catch(() => [])
 
   const viewIcons = {
     grid: Grid,
@@ -78,5 +79,15 @@ export default async function TablePage({
         </div>
       </div>
     </div>
-  )
+    )
+  } catch (error) {
+    console.error("Error loading table:", error)
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <p className="text-destructive">An error occurred while loading this table.</p>
+        </div>
+      </div>
+    )
+  }
 }

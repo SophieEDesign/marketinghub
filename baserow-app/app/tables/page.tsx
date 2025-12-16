@@ -7,9 +7,10 @@ import type { Table } from "@/types/database"
 
 export default async function TablesPage() {
   // Authentication disabled for testing
-  const tables = await getTables()
+  try {
+    const tables = await getTables().catch(() => [])
 
-  return (
+    return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -58,5 +59,15 @@ export default async function TablesPage() {
         )}
       </div>
     </div>
-  )
+    )
+  } catch (error) {
+    console.error("Error loading tables:", error)
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <p className="text-destructive">An error occurred while loading tables.</p>
+        </div>
+      </div>
+    )
+  }
 }
