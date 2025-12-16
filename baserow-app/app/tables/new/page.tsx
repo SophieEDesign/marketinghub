@@ -23,11 +23,22 @@ export default function NewTablePage() {
     setError(null)
 
     try {
+      // Generate a unique table name for the Supabase table
+      // Use a sanitized version of the name + timestamp for uniqueness
+      const sanitizedName = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+      const timestamp = Date.now()
+      const supabaseTableName = `table_${sanitizedName}_${timestamp}`
+
       const { data, error: insertError } = await supabase
         .from("tables")
         .insert([
           {
             name,
+            supabase_table: supabaseTableName,
             description: description || null,
           },
         ])

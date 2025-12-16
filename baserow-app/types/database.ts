@@ -34,10 +34,12 @@ export type BlockType =
 export interface Table {
   id: string
   name: string
+  supabase_table: string
   description?: string
   created_at: string
-  updated_at: string
+  updated_at?: string
   created_by?: string
+  category?: string
   access_control?: AccessControl
 }
 
