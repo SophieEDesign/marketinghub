@@ -93,9 +93,9 @@ export function generateChangeColumnTypeSQL(
     usingClause = ' USING CASE WHEN trim("' + sanitizedColumnName + '") = \'\' THEN NULL ELSE CAST(trim("' + sanitizedColumnName + '") AS numeric) END'
   } else if (oldType === 'number' && newType === 'text') {
     usingClause = ' USING CAST("' + sanitizedColumnName + '" AS text)'
-  } else if (oldType === 'text' && newType === 'boolean') {
+  } else if (oldType === 'text' && newType === 'checkbox') {
     usingClause = ' USING CASE WHEN LOWER(trim("' + sanitizedColumnName + '")) IN (\'true\', \'1\', \'yes\', \'t\') THEN true WHEN LOWER(trim("' + sanitizedColumnName + '")) IN (\'false\', \'0\', \'no\', \'f\', \'\') THEN false ELSE NULL END'
-  } else if (oldType === 'boolean' && newType === 'text') {
+  } else if (oldType === 'checkbox' && newType === 'text') {
     usingClause = ' USING CASE WHEN "' + sanitizedColumnName + '" = true THEN \'true\' WHEN "' + sanitizedColumnName + '" = false THEN \'false\' ELSE NULL END'
   } else if (oldType === 'text' && newType === 'date') {
     usingClause = ' USING CASE WHEN trim("' + sanitizedColumnName + '") = \'\' THEN NULL ELSE CAST(trim("' + sanitizedColumnName + '") AS timestamptz) END'
