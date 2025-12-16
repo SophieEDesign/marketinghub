@@ -133,8 +133,39 @@ export default function GridView({
 
       if (error) {
         console.error("Error loading rows:", error)
+        // Check if table doesn't exist
+        if (error.code === "42P01" || error.message?.includes("does not exist") || error.message?.includes("relation")) {
+          setTableError(`The table "${supabaseTableName}" does not exist. Attempting to create it...`)
+          
+          // Try to create the table automatically
+          try {
+            const createResponse = await fetch('/api/tables/create-table', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tableName: supabaseTableName })
+            })
+            
+            const createResult = await createResponse.json()
+            
+            if (createResult.success) {
+              // Table created, reload rows
+              setTableError(null)
+              loadRows()
+              return
+            } else {
+              // Show the SQL needed to create the table
+              setTableError(createResult.message || createResult.error || `Table "${supabaseTableName}" does not exist.`)
+            }
+          } catch (createError) {
+            console.error('Failed to create table:', createError)
+            setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically.`)
+          }
+        } else {
+          setTableError(`Error loading data: ${error.message}`)
+        }
         setRows([])
       } else {
+        setTableError(null)
         setRows(data || [])
       }
     } catch (error) {

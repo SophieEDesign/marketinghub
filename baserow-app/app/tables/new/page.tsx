@@ -51,6 +51,27 @@ export default function NewTablePage() {
         setLoading(false)
       } else if (data && data.id) {
         console.log("Table created successfully:", data.id, data)
+        
+        // Try to create the actual Supabase table
+        try {
+          const createResponse = await fetch('/api/tables/create-table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableName: supabaseTableName })
+          })
+          
+          const createResult = await createResponse.json()
+          
+          if (!createResult.success) {
+            console.warn('Supabase table creation:', createResult.message || createResult.error)
+            // Don't fail the whole operation, just log a warning
+            // The table can be created manually later
+          }
+        } catch (createError) {
+          console.warn('Failed to create Supabase table automatically:', createError)
+          // Continue anyway - table can be created manually
+        }
+        
         // Verify the table exists by fetching it
         const { data: verifyData, error: verifyError } = await supabase
           .from("tables")
