@@ -380,7 +380,7 @@ export default function FieldBuilderDrawer({
             </select>
             {isVirtual && (
               <p className="text-xs text-gray-500 mt-1">
-                Virtual fields are calculated and don't store data in the database
+                Virtual fields are calculated and do not store data in the database
               </p>
             )}
           </div>
