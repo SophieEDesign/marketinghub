@@ -27,18 +27,6 @@ export default function NewViewForm({ tableId }: NewViewFormProps) {
     setError(null)
 
     try {
-      // Get the highest order_index for this table's views
-      const { data: existingViews } = await supabase
-        .from("views")
-        .select("order_index")
-        .eq("table_id", tableId)
-        .order("order_index", { ascending: false })
-        .limit(1)
-
-      const nextOrderIndex = existingViews && existingViews.length > 0 
-        ? (existingViews[0].order_index || 0) + 1 
-        : 0
-
       const { data, error: insertError } = await supabase
         .from("views")
         .insert([
@@ -46,7 +34,6 @@ export default function NewViewForm({ tableId }: NewViewFormProps) {
             table_id: tableId,
             name,
             type,
-            order_index: nextOrderIndex,
           },
         ])
         .select()

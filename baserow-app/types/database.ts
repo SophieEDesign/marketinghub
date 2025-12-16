@@ -48,19 +48,22 @@ export interface View {
   table_id: string
   name: string
   type: ViewType
-  order_index: number
+  config?: Record<string, any>
+  access_level?: string
+  allowed_roles?: string[]
+  owner_id?: string
+  public_share_id?: string
   created_at: string
-  updated_at: string
+  updated_at?: string
 }
 
 export interface ViewField {
   id: string
   view_id: string
-  field_id: string
-  order_index: number
-  width?: number
-  hidden: boolean
-  created_at: string
+  field_name: string
+  visible: boolean
+  position: number
+  created_at?: string
 }
 
 export interface ViewFilter {

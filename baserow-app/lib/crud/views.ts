@@ -7,7 +7,7 @@ export async function getViews(tableId: string) {
     .from('views')
     .select('*')
     .eq('table_id', tableId)
-    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true })
   
   if (error) {
     // If table doesn't exist or no views, return empty array

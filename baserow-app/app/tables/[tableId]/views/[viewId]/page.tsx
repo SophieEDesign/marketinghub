@@ -52,15 +52,16 @@ export default async function ViewPage({
     // Get view fields to determine which fields to show
     const { data: viewFields, error: viewFieldsError } = await supabase
       .from("view_fields")
-      .select("field_id")
+      .select("field_name")
       .eq("view_id", params.viewId)
-      .order("order_index", { ascending: true })
+      .order("position", { ascending: true })
 
     if (viewFieldsError) {
       console.error("Error loading view fields:", viewFieldsError)
     }
 
-    const fieldIds = viewFields?.map((vf) => vf.field_id) || []
+    // Use field_name as field identifier (view_fields table uses field_name, not field_id)
+    const fieldIds = viewFields?.map((vf) => vf.field_name) || []
 
     return (
       <WorkspaceShellWrapper title={view.name}>
