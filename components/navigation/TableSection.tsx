@@ -47,7 +47,7 @@ export default function TableSection({
           )}
         />
         <Link
-          href={`/data/${tableId}`}
+          href={`/tables/${tableId}`}
           className="flex items-center gap-2 flex-1"
           onClick={(e) => e.stopPropagation()}
         >
@@ -61,7 +61,7 @@ export default function TableSection({
             key={view.id}
             id={view.id}
             label={view.name}
-            href={`/data/${tableId}/views/${view.id}`}
+            href={`/tables/${tableId}/views/${view.id}`}
             icon={getViewIcon(view.type)}
             level={1}
           />
@@ -72,7 +72,7 @@ export default function TableSection({
           className="w-full justify-start text-muted-foreground hover:text-foreground"
           asChild
         >
-          <Link href={`/data/${tableId}/views/new`}>
+          <Link href={`/tables/${tableId}/views/new`}>
             <Plus className="mr-2 h-3 w-3" />
             Add View
           </Link>
