@@ -72,7 +72,7 @@ export default function TableSection({
           className="w-full justify-start text-muted-foreground hover:text-foreground"
           asChild
         >
-          <Link href={`/tables/${tableId}/views/new`}>
+          <Link href={`/data/${tableId}/views/new`}>
             <Plus className="mr-2 h-3 w-3" />
             Add View
           </Link>

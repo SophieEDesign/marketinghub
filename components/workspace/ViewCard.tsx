@@ -51,3 +51,4 @@ export default function ViewCard({ view, tableId, href }: ViewCardProps) {
     </Link>
   )
 }
+

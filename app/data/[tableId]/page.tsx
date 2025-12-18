@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Grid, FileText, Columns, Calendar, Layout } from 'lucide-react'
-import ViewCard from '@/components/workspace/ViewCard'
 import type { View } from '@/types/database'
 
 export default async function TableDataPage({
@@ -55,8 +54,8 @@ export default async function TableDataPage({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Views</h2>
           <Button asChild>
+            <Link href={`/data/${params.tableId}/views/new`}>
             <Link href={`/tables/${params.tableId}/views/new`}>
-              <Plus className="mr-2 h-4 w-4" />
               New View
             </Link>
           </Button>
