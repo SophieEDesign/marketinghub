@@ -49,7 +49,7 @@ export function useGridData({
     setError(null)
 
     try {
-      let query = supabase.from(tableName).select('*')
+      let query: any = supabase.from(tableName).select('*')
 
       // Apply filters
       filters.forEach((filter) => {
