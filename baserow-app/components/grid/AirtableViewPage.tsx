@@ -370,19 +370,13 @@ export default function AirtableViewPage({
       <div className="flex-1 overflow-hidden relative">
         {view.type === "grid" ? (
           <AirtableGridView
-            tableId={tableId}
-            viewId={viewId}
-            supabaseTableName={table.supabase_table}
-            viewFields={viewFields}
-            viewFilters={filters}
-            viewSorts={sorts}
-            groupBy={groupBy || undefined}
+            tableName={table.supabase_table}
+            viewName={view.name}
             rowHeight={rowHeight}
-            tableFields={tableFields}
+            editable={true}
+            fields={tableFields}
             onAddField={handleAddField}
             onEditField={handleEditField}
-            onDeleteField={handleDeleteField}
-            onReorderFields={handleReorderFields}
           />
         ) : view.type === "kanban" ? (
           <AirtableKanbanView
