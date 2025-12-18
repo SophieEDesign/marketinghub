@@ -45,13 +45,10 @@ export interface TriggerConfig {
 export interface ActionConfig {
   type: ActionType
   
-  // For update_record, create_record
+  // For update_record, create_record, delete_record
   table_id?: string
   record_id?: string
   field_updates?: Record<string, any>
-  
-  // For delete_record
-  record_id?: string
   
   // For send_email
   to?: string
