@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { Fragment, useState, useEffect, useRef, useMemo } from "react"
 import { 
   GripVertical, 
   MoreVertical, 
@@ -371,7 +371,7 @@ export default function AirtableGridView({
 
   function renderRowContent(row: Record<string, any>, rowIndex: number, isEven: boolean) {
     return (
-      <React.Fragment>
+      <Fragment>
         {/* Row number */}
         <div
           className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
@@ -440,12 +440,12 @@ export default function AirtableGridView({
             <MoreVertical className="h-4 w-4 text-gray-500" />
           </button>
         </div>
-      </React.Fragment>
+      </Fragment>
     )
   }
 
   return (
-    <React.Fragment>
+    <Fragment>
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">Loading...</div>
