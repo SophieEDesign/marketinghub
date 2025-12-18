@@ -1,0 +1,152 @@
+"use client"
+
+import { useState, useRef, useEffect } from 'react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical, MoreVertical, ArrowUpDown } from 'lucide-react'
+import type { TableField } from '@/types/fields'
+import { getFieldIcon } from '@/lib/icons'
+
+interface GridColumnHeaderProps {
+  field: TableField
+  width: number
+  isResizing: boolean
+  onResizeStart: (fieldName: string) => void
+  onResize: (fieldName: string, width: number) => void
+  onResizeEnd: () => void
+  onEdit?: (fieldName: string) => void
+  sortDirection?: 'asc' | 'desc' | null
+  onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
+}
+
+export default function GridColumnHeader({
+  field,
+  width,
+  isResizing,
+  onResizeStart,
+  onResize,
+  onResizeEnd,
+  onEdit,
+  sortDirection,
+  onSort,
+}: GridColumnHeaderProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.name })
+
+  const [isHovered, setIsHovered] = useState(false)
+  const resizeRef = useRef<HTMLDivElement>(null)
+  const [resizeStartX, setResizeStartX] = useState(0)
+  const [resizeStartWidth, setResizeStartWidth] = useState(0)
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setResizeStartX(e.clientX)
+    setResizeStartWidth(width)
+    onResizeStart(field.name)
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const diff = moveEvent.clientX - resizeStartX
+      const newWidth = Math.max(100, resizeStartWidth + diff)
+      onResize(field.name, newWidth)
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      onResizeEnd()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleSortClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (onSort) {
+      if (sortDirection === null || sortDirection === 'desc') {
+        onSort(field.name, 'asc')
+      } else if (sortDirection === 'asc') {
+        onSort(field.name, 'desc')
+      } else {
+        onSort(field.name, null)
+      }
+    }
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ ...style, width, minWidth: width, maxWidth: width }}
+      className="relative flex items-center border-r border-gray-200 bg-white hover:bg-gray-50 transition-colors group"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Drag handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="flex items-center justify-center w-4 h-full cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+      >
+        <GripVertical className="h-3 w-3" />
+      </div>
+
+      {/* Field icon and name */}
+      <div className="flex items-center gap-2 px-2 flex-1 min-w-0">
+        <span className="text-gray-500 flex-shrink-0">
+          {getFieldIcon(field.type)}
+        </span>
+        <span className="text-sm font-semibold text-gray-900 truncate">
+          {field.name}
+        </span>
+      </div>
+
+      {/* Sort button */}
+      {onSort && (
+        <button
+          onClick={handleSortClick}
+          className={`p-1 rounded transition-colors ${
+            sortDirection
+              ? 'text-blue-600 bg-blue-50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+          }`}
+          title={`Sort ${sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none'}`}
+        >
+          <ArrowUpDown className="h-3 w-3" />
+        </button>
+      )}
+
+      {/* Edit menu button */}
+      {onEdit && (
+        <button
+          onClick={() => onEdit(field.name)}
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-opacity mr-1"
+          title="Edit column"
+        >
+          <MoreVertical className="h-4 w-4 text-gray-500" />
+        </button>
+      )}
+
+      {/* Resize handle */}
+      <div
+        ref={resizeRef}
+        onMouseDown={handleMouseDown}
+        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize ${
+          isResizing ? 'bg-blue-500' : 'hover:bg-blue-500'
+        } transition-colors`}
+      />
+    </div>
+  )
+}
