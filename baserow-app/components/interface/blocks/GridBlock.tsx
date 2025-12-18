@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
-import GridView from "@/components/grid/GridView"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
 
 interface GridBlockProps {
@@ -15,6 +14,67 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
   const { config } = block
   const tableId = config?.table_id
   const viewId = config?.view_id
+  const [loading, setLoading] = useState(true)
+  const [table, setTable] = useState<{ supabase_table: string } | null>(null)
+  const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
+  const [viewFilters, setViewFilters] = useState<Array<{ id: string; field_name: string; operator: string; value?: string }>>([])
+  const [viewSorts, setViewSorts] = useState<Array<{ id: string; field_name: string; direction: string }>>([])
+  const [tableFields, setTableFields] = useState<any[]>([])
+  const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
+
+  useEffect(() => {
+    if (tableId && viewId) {
+      loadData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId, viewId])
+
+  async function loadData() {
+    if (!tableId || !viewId) return
+
+    setLoading(true)
+    try {
+      const supabase = createClient()
+
+      const [tableRes, viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes, viewRes] = await Promise.all([
+        supabase.from("tables").select("supabase_table").eq("id", tableId).single(),
+        supabase
+          .from("view_fields")
+          .select("field_name, visible, position")
+          .eq("view_id", viewId)
+          .order("position", { ascending: true }),
+        supabase
+          .from("view_filters")
+          .select("id, field_name, operator, value")
+          .eq("view_id", viewId),
+        supabase
+          .from("view_sorts")
+          .select("id, field_name, direction")
+          .eq("view_id", viewId)
+          .order("order_index", { ascending: true }),
+        supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("position", { ascending: true }),
+        supabase.from("views").select("config").eq("id", viewId).single(),
+      ])
+
+      if (tableRes.data) setTable(tableRes.data)
+      if (viewFieldsRes.data) setViewFields(viewFieldsRes.data)
+      if (viewFiltersRes.data) setViewFilters(viewFiltersRes.data)
+      if (viewSortsRes.data) setViewSorts(viewSortsRes.data)
+      if (tableFieldsRes.data) setTableFields(tableFieldsRes.data)
+      if (viewRes.data?.config) {
+        const config = viewRes.data.config as { groupBy?: string }
+        setGroupBy(config.groupBy)
+      }
+    } catch (error) {
+      console.error("Error loading grid data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (!tableId) {
     return (
@@ -32,12 +92,25 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
     )
   }
 
+  if (loading || !table) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+        Loading...
+      </div>
+    )
+  }
+
   return (
     <div className="h-full w-full overflow-auto">
       <GridViewWrapper
         tableId={tableId}
         viewId={viewId}
-        readOnly={!isEditing}
+        supabaseTableName={table.supabase_table}
+        viewFields={viewFields}
+        initialFilters={viewFilters}
+        initialSorts={viewSorts}
+        initialGroupBy={groupBy}
+        initialTableFields={tableFields}
       />
     </div>
   )
