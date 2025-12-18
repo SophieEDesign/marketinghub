@@ -1,3 +1,6 @@
+"use client"
+
+import React from 'react'
 import {
   Type,
   FileText,
@@ -16,7 +19,7 @@ import {
 } from 'lucide-react'
 import type { FieldType } from '@/types/fields'
 
-export function getFieldIcon(type: FieldType | string) {
+export function getFieldIcon(type: FieldType | string): React.ReactElement {
   const iconClass = "h-3.5 w-3.5 text-gray-500"
   switch (type) {
     case "text":
