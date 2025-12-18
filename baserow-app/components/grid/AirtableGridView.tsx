@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { 
   GripVertical, 
   MoreVertical, 
@@ -440,7 +440,7 @@ export default function AirtableGridView({
             <MoreVertical className="h-4 w-4 text-gray-500" />
           </button>
         </div>
-      </>
+      </React.Fragment>
     )
   }
 
