@@ -134,6 +134,38 @@ export interface AutomationLog {
   created_at: string
 }
 
+export interface Page {
+  id: string
+  name: string
+  description?: string
+  settings?: {
+    access?: 'public' | 'authenticated' | 'roles'
+    allowed_roles?: string[]
+    layout?: {
+      cols?: number
+      rowHeight?: number
+      margin?: [number, number]
+    }
+  }
+  created_at: string
+  updated_at?: string
+  created_by?: string
+}
+
+export interface PageBlock {
+  id: string
+  page_id: string
+  type: string
+  x: number
+  y: number
+  w: number
+  h: number
+  config: Record<string, any>
+  order_index: number
+  created_at: string
+  updated_at?: string
+}
+
 export interface TableRow {
   id: string
   table_id: string
