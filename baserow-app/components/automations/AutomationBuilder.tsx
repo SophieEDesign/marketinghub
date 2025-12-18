@@ -454,8 +454,8 @@ export default function AutomationBuilder({
             <div>
               <label className="block text-sm font-medium mb-1">Body</label>
               <textarea
-                value={action.body || ''}
-                onChange={(e) => updateAction(index, { body: e.target.value })}
+                value={action.email_body || ''}
+                onChange={(e) => updateAction(index, { email_body: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 rows={4}
                 placeholder="Email body (supports {{variables}})"
@@ -493,11 +493,11 @@ export default function AutomationBuilder({
             <div>
               <label className="block text-sm font-medium mb-1">Body (JSON)</label>
               <textarea
-                value={JSON.stringify(action.body || {}, null, 2)}
+                value={JSON.stringify(action.webhook_body || {}, null, 2)}
                 onChange={(e) => {
                   try {
                     const body = JSON.parse(e.target.value)
-                    updateAction(index, { body })
+                    updateAction(index, { webhook_body: body })
                   } catch {}
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"

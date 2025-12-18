@@ -53,13 +53,13 @@ export interface ActionConfig {
   // For send_email
   to?: string
   subject?: string
-  body?: string
+  email_body?: string
   
   // For call_webhook
   url?: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   headers?: Record<string, string>
-  body?: any
+  webhook_body?: any
   
   // For run_script
   script?: string

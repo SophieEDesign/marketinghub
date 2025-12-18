@@ -267,7 +267,7 @@ async function executeSendEmail(
   // For now, just log - email sending would require an email service
   const to = replaceVariablesInObject(action.to || '', context)
   const subject = replaceVariablesInObject(action.subject || '', context)
-  const body = replaceVariablesInObject(action.body || '', context)
+  const body = replaceVariablesInObject(action.email_body || '', context)
 
   return {
     success: true,
@@ -308,7 +308,7 @@ async function executeCallWebhook(
 
   const method = action.method || 'POST'
   const headers = replaceVariablesInObject(action.headers || {}, context)
-  const body = replaceVariablesInObject(action.body, context)
+  const body = replaceVariablesInObject(action.webhook_body, context)
 
   try {
     const response = await fetch(action.url, {
