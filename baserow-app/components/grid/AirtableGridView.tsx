@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { 
   GripVertical, 
   MoreVertical, 
@@ -88,6 +88,7 @@ export default function AirtableGridView({
   const gridRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(600)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
 
   // Get visible fields ordered by position
   const visibleFields = useMemo(() => {
@@ -238,9 +239,8 @@ export default function AirtableGridView({
   }
 
   // Grouping
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const groupedRows = useMemo(() => {
-    if (!groupBy) return { ungrouped: rows }
+    if (!groupBy) return {}
     
     const groups: Record<string, typeof rows> = {}
     rows.forEach((row) => {
@@ -254,7 +254,7 @@ export default function AirtableGridView({
   }, [rows, groupBy])
 
   // Virtualization calculations
-  const allRowsForVirtualization = groupBy 
+  const allRowsForVirtualization = groupBy && Object.keys(groupedRows).length > 0
     ? Object.values(groupedRows).flat()
     : rows
   const visibleRowCount = Math.ceil(containerHeight / ROW_HEIGHT) + 2
@@ -368,14 +368,9 @@ export default function AirtableGridView({
     return String(value)
   }
 
-  function renderRow(row: Record<string, any>, rowIndex: number, isEven: boolean) {
+  function renderRowContent(row: Record<string, any>, rowIndex: number, isEven: boolean) {
     return (
-      <div
-        className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
-          isEven ? "bg-white" : "bg-gray-50/50"
-        }`}
-        style={{ height: ROW_HEIGHT }}
-      >
+      <>
         {/* Row number */}
         <div
           className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
@@ -444,7 +439,7 @@ export default function AirtableGridView({
             <MoreVertical className="h-4 w-4 text-gray-500" />
           </button>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -559,9 +554,15 @@ export default function AirtableGridView({
                     {!isCollapsed && groupRows.map((row, rowIdx) => {
                       const isEven = rowIdx % 2 === 0
                       return (
-                        <React.Fragment key={row.id}>
-                          {renderRow(row, rowIdx, isEven)}
-                        </React.Fragment>
+                        <div
+                          key={row.id}
+                          className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
+                            isEven ? "bg-white" : "bg-gray-50/50"
+                          }`}
+                          style={{ height: ROW_HEIGHT }}
+                        >
+                          {renderRowContent(row, rowIdx, isEven)}
+                        </div>
                       )
                     })}
                   </div>
@@ -574,9 +575,15 @@ export default function AirtableGridView({
                   const actualRowIndex = startIndex + rowIdx
                   const isEven = actualRowIndex % 2 === 0
                   return (
-                    <React.Fragment key={row.id}>
-                      {renderRow(row, actualRowIndex, isEven)}
-                    </React.Fragment>
+                    <div
+                      key={row.id}
+                      className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
+                        isEven ? "bg-white" : "bg-gray-50/50"
+                      }`}
+                      style={{ height: ROW_HEIGHT }}
+                    >
+                      {renderRowContent(row, actualRowIndex, isEven)}
+                    </div>
                   )
                 })}
               </div>
