@@ -13,7 +13,8 @@ import {
   Layout,
   Calendar,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Settings
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,7 @@ interface ViewTopBarProps {
   onNewRecord?: () => void
   onViewChange?: (type: "grid" | "kanban" | "calendar" | "form") => void
   onSearch?: (query: string) => void
+  onDesign?: () => void
 }
 
 export default function ViewTopBar({
@@ -44,6 +46,7 @@ export default function ViewTopBar({
   onNewRecord,
   onViewChange,
   onSearch,
+  onDesign,
 }: ViewTopBarProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
@@ -163,6 +166,17 @@ export default function ViewTopBar({
 
       {/* Right side - Action buttons */}
       <div className="flex items-center gap-2">
+        {onDesign && (
+          <Button
+            onClick={onDesign}
+            size="sm"
+            variant="outline"
+            className="h-8 px-3 text-sm font-medium border-gray-300 hover:bg-gray-50"
+          >
+            <Settings className="h-4 w-4 mr-1.5" />
+            Design
+          </Button>
+        )}
         {onAddField && (
           <Button
             onClick={onAddField}

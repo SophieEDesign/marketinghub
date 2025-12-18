@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import ViewTopBar from "@/components/layout/ViewTopBar"
 import AirtableGridView from "./AirtableGridView"
 import FieldBuilderModal from "./FieldBuilderModal"
+import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 
@@ -57,6 +58,7 @@ export default function AirtableViewPage({
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
 
   async function loadFields() {
     try {
@@ -183,6 +185,7 @@ export default function AirtableViewPage({
       <ViewTopBar
         viewName={view.name}
         viewType={view.type as "grid" | "kanban" | "calendar" | "form"}
+        onDesign={() => setDesignSidebarOpen(true)}
         onAddField={handleAddField}
         onNewRecord={handleNewRecord}
         onSearch={setSearchQuery}
@@ -232,6 +235,18 @@ export default function AirtableViewPage({
         field={editingField}
         onSave={handleFieldSave}
         tableFields={tableFields}
+      />
+      <DesignSidebar
+        isOpen={designSidebarOpen}
+        onClose={() => setDesignSidebarOpen(false)}
+        tableId={tableId}
+        tableName={table.name}
+        supabaseTableName={table.supabase_table}
+        onFieldsUpdated={() => {
+          handleFieldSave()
+          loadFields()
+          loadViewFields()
+        }}
       />
     </div>
   )
