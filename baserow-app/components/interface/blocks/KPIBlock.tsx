@@ -51,7 +51,7 @@ export default function KPIBlock({ block, isEditing = false }: KPIBlockProps) {
           .select("*", { count: "exact", head: true })
 
         setValue(count || 0)
-      } else if (field && aggregate !== "count") {
+      } else if (field) {
         // For other aggregates, we'd need to use RPC or calculate client-side
         const { data: rows } = await supabase
           .from(table.supabase_table)
