@@ -371,7 +371,7 @@ export default function AirtableGridView({
 
   function renderRowContent(row: Record<string, any>, rowIndex: number, isEven: boolean) {
     return (
-      <>
+      <React.Fragment>
         {/* Row number */}
         <div
           className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
