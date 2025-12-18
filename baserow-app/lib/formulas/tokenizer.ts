@@ -55,12 +55,13 @@ export class Tokenizer {
     while (this.currentChar && this.currentChar !== quote) {
       if (this.currentChar === '\\') {
         this.advance()
-        if (this.currentChar === 'n') {
+        const escapedChar = this.currentChar
+        if (escapedChar === 'n') {
           str += '\n'
-        } else if (this.currentChar === 't') {
+        } else if (escapedChar === 't') {
           str += '\t'
-        } else {
-          str += this.currentChar
+        } else if (escapedChar) {
+          str += escapedChar
         }
       } else {
         str += this.currentChar
