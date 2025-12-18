@@ -21,6 +21,7 @@ export default function FieldBuilderDrawer({
   tableId,
   field,
   onSave,
+  tableFields = [],
 }: FieldBuilderDrawerProps) {
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
