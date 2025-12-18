@@ -13,7 +13,7 @@ import SidebarItem from './SidebarItem'
 import TableSection from './TableSection'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 
 export default async function Sidebar() {
   const supabase = await createServerSupabaseClient()
@@ -74,6 +74,19 @@ export default async function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Quick Actions */}
+        <div className="space-y-1">
+          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Quick Actions
+          </div>
+          <SidebarItem
+            id="import-csv"
+            label="Import CSV"
+            href="/import"
+            icon="upload"
+          />
+        </div>
+
         {/* Render categories with their items */}
         {categories
           .filter((category) => category.name !== 'Dashboards') // Dashboards handled separately
