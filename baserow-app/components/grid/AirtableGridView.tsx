@@ -284,7 +284,7 @@ export default function AirtableGridView({
   function formatCellValue(value: any, field: TableField | undefined): string {
     if (value === null || value === undefined) return ""
     if (field?.type === "checkbox") return value ? "✓" : ""
-    if (field?.type === "date" || field?.type === "datetime") {
+    if (field?.type === "date") {
       return new Date(value).toLocaleDateString()
     }
     return String(value)
