@@ -9,9 +9,7 @@ import KanbanView from '@/components/views/KanbanView'
 import CalendarView from '@/components/calendar/CalendarView'
 import FormView from '@/components/views/FormView'
 import InterfacePage from '@/components/views/InterfacePage'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Settings } from 'lucide-react'
+import ViewPageClient from '@/components/views/ViewPageClient'
 
 export default async function ViewPage({
   params,
@@ -67,85 +65,80 @@ export default async function ViewPage({
   // For interface pages, use full-width layout
   if (view.type === 'page') {
     return (
-      <div className="w-full h-full">
+      <ViewPageClient
+        tableId={params.tableId}
+        tableName={table.name}
+        supabaseTableName={table.supabase_table}
+        viewId={params.viewId}
+        viewName={view.name}
+        viewType={view.type}
+      >
         <InterfacePage
           viewId={params.viewId}
           blocks={blocks}
           tabs={tabs}
         />
-      </div>
+      </ViewPageClient>
     )
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <Link
-            href={`/data/${params.tableId}`}
-            className="text-sm text-muted-foreground hover:text-foreground mb-2 inline-block"
-          >
-            ← Back to {table.name}
-          </Link>
-          <h1 className="text-3xl font-bold mt-2">{view.name}</h1>
-          <p className="text-muted-foreground mt-1">
-            {table.name} • {view.type} view
-          </p>
+    <ViewPageClient
+      tableId={params.tableId}
+      tableName={table.name}
+      supabaseTableName={table.supabase_table}
+      viewId={params.viewId}
+      viewName={view.name}
+      viewType={view.type}
+    >
+      <div className="container mx-auto p-6">
+        <div className="space-y-6">
+          {view.type === 'grid' && rowsData && (
+            <GridView
+              tableId={params.tableId}
+              viewId={params.viewId}
+              rows={rowsData.rows}
+              visibleFields={rowsData.visibleFields}
+              filters={rowsData.filters}
+              sorts={rowsData.sorts}
+            />
+          )}
+
+          {view.type === 'kanban' && rowsData && (
+            <KanbanView
+              tableId={params.tableId}
+              viewId={params.viewId}
+              rows={rowsData.rows}
+              visibleFields={rowsData.visibleFields}
+            />
+          )}
+
+          {view.type === 'calendar' && rowsData && (
+            <CalendarView
+              tableId={params.tableId}
+              viewId={params.viewId}
+              rows={rowsData.rows}
+              visibleFields={rowsData.visibleFields}
+            />
+          )}
+
+          {view.type === 'form' && (
+            <FormView
+              tableId={params.tableId}
+              viewId={params.viewId}
+              visibleFields={viewFields}
+            />
+          )}
+
+          {view.type === 'gallery' && (
+            <InterfacePage
+              viewId={params.viewId}
+              blocks={blocks}
+              tabs={tabs}
+            />
+          )}
         </div>
-        <Button variant="outline" asChild>
-          <Link href={`/data/${params.tableId}/views/${params.viewId}/edit`}>
-            <Settings className="mr-2 h-4 w-4" />
-            Edit View
-          </Link>
-        </Button>
       </div>
-
-      <div className="space-y-6">
-        {view.type === 'grid' && rowsData && (
-          <GridView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-            filters={rowsData.filters}
-            sorts={rowsData.sorts}
-          />
-        )}
-
-        {view.type === 'kanban' && rowsData && (
-          <KanbanView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-          />
-        )}
-
-        {view.type === 'calendar' && rowsData && (
-          <CalendarView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-          />
-        )}
-
-        {view.type === 'form' && (
-          <FormView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            visibleFields={viewFields}
-          />
-        )}
-
-        {view.type === 'gallery' && (
-          <InterfacePage
-            viewId={params.viewId}
-            blocks={blocks}
-            tabs={tabs}
-          />
-        )}
-      </div>
-    </div>
+    </ViewPageClient>
   )
 }
