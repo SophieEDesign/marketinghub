@@ -207,7 +207,9 @@ export default function RecordDrawer({
                       <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
                         {fieldName}
                         {isFormula && (
-                          <Calculator className="h-3 w-3 text-gray-400" title={`Formula: ${tableField?.options?.formula || ''}`} />
+                          <span title={`Formula: ${tableField?.options?.formula || ''}`}>
+                            <Calculator className="h-3 w-3 text-gray-400" />
+                          </span>
                         )}
                       </label>
                       {isVirtual ? (
