@@ -21,7 +21,6 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { Table, View, Automation } from "@/types/database"
-import Link from "next/link"
 
 interface InterfacePage {
   id: string
