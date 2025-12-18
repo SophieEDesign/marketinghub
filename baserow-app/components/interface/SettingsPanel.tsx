@@ -28,9 +28,14 @@ export default function SettingsPanel({
   useEffect(() => {
     if (block) {
       setConfig(block.config || {})
-      loadData()
     }
   }, [block])
+
+  useEffect(() => {
+    if (isOpen && block) {
+      loadData()
+    }
+  }, [isOpen, block, config.table_id])
 
   async function loadData() {
     const supabase = createClient()
@@ -61,13 +66,22 @@ export default function SettingsPanel({
         .eq("table_id", config.table_id)
         .order("position")
       setFields((fieldsData || []) as TableField[])
+    } else {
+      setViews([])
+      setFields([])
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (block) {
-      onSave(block.id, config)
-      onClose()
+      try {
+        await onSave(block.id, config)
+        // Don't close automatically - let user see the changes
+        // onClose()
+      } catch (error) {
+        console.error("Failed to save block settings:", error)
+        alert("Failed to save settings. Please try again.")
+      }
     }
   }
 
@@ -105,18 +119,18 @@ export default function SettingsPanel({
       </div>
 
       {/* Footer */}
-      <div className="h-16 border-t border-gray-200 flex items-center justify-end gap-2 px-4">
+      <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">
         <button
           onClick={onClose}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
         >
-          Cancel
+          Close
         </button>
         <button
           onClick={handleSave}
           className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
-          Save
+          Save Changes
         </button>
       </div>
     </div>
@@ -135,11 +149,27 @@ export default function SettingsPanel({
               <label className="block text-sm font-medium mb-1">Table</label>
               <select
                 value={config.table_id || ""}
-                onChange={(e) => {
-                  const newConfig = { ...config, table_id: e.target.value }
+                onChange={async (e) => {
+                  const newTableId = e.target.value
+                  const newConfig = { ...config, table_id: newTableId }
                   setConfig(newConfig)
-                  // Reload views and fields
-                  setTimeout(() => loadData(), 100)
+                  
+                  // Clear dependent fields
+                  if (!newTableId) {
+                    setViews([])
+                    setFields([])
+                    return
+                  }
+
+                  // Reload views and fields for new table
+                  const supabase = createClient()
+                  const [viewsRes, fieldsRes] = await Promise.all([
+                    supabase.from("views").select("*").eq("table_id", newTableId),
+                    supabase.from("table_fields").select("*").eq("table_id", newTableId).order("position"),
+                  ])
+                  
+                  setViews((viewsRes.data || []) as View[])
+                  setFields((fieldsRes.data || []) as TableField[])
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               >

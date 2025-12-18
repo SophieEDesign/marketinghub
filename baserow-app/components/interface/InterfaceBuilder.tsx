@@ -147,6 +147,11 @@ export default function InterfaceBuilder({
           <div className="flex items-center gap-2">
             {isEditing && (
               <>
+                {selectedBlock && (
+                  <div className="px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md">
+                    Selected: {selectedBlock.type} block
+                  </div>
+                )}
                 <button
                   onClick={() => setIsEditing(false)}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
@@ -192,7 +197,7 @@ export default function InterfaceBuilder({
       </div>
 
       {/* Settings Panel */}
-      {isEditing && selectedBlock && (
+      {isEditing && (
         <SettingsPanel
           block={selectedBlock}
           isOpen={!!selectedBlock}

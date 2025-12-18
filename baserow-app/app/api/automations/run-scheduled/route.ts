@@ -7,7 +7,7 @@ import { runScheduledAutomations } from '@/lib/automations/scheduler'
  * {
  *   "crons": [{
  *     "path": "/api/automations/run-scheduled",
- *     "schedule": "*/1 * * * *"
+ *     "schedule": "every minute" or use cron syntax
  *   }]
  * }
  */
