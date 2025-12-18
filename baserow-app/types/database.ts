@@ -106,10 +106,32 @@ export interface Automation {
   trigger_type: string
   trigger_config?: Record<string, any>
   actions?: any[]
+  conditions?: any[]
   enabled: boolean
   created_at: string
   updated_at: string
   created_by?: string
+}
+
+export interface AutomationRun {
+  id: string
+  automation_id: string
+  status: 'running' | 'completed' | 'failed' | 'stopped'
+  started_at: string
+  completed_at?: string
+  error?: string
+  context?: Record<string, any>
+  created_at?: string
+}
+
+export interface AutomationLog {
+  id: string
+  automation_id: string
+  run_id?: string
+  level: 'info' | 'warning' | 'error'
+  message: string
+  data?: Record<string, any>
+  created_at: string
 }
 
 export interface TableRow {
