@@ -22,6 +22,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
     if (tableId) {
       loadFields()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadFields() {

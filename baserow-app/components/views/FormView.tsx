@@ -24,6 +24,7 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
     if (rowId) {
       loadRow()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowId])
 
   async function loadRow() {

@@ -25,6 +25,7 @@ export default function RecordBlock({ block, isEditing = false }: RecordBlockPro
     if (tableId) {
       loadFields()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, recordId])
 
   async function loadRecord() {

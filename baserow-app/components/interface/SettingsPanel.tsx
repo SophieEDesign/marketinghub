@@ -35,6 +35,7 @@ export default function SettingsPanel({
     if (isOpen && block) {
       loadData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, block, config.table_id])
 
   async function loadData() {

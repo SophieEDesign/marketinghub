@@ -23,6 +23,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
     if (tableId) {
       loadData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, xAxis, yAxis])
 
   async function loadData() {

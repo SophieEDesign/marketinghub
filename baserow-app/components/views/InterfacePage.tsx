@@ -15,6 +15,7 @@ export default function InterfacePage({ viewId }: InterfacePageProps) {
 
   useEffect(() => {
     loadBlocks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewId])
 
   async function loadBlocks() {

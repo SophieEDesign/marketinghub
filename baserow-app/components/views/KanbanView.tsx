@@ -20,6 +20,7 @@ export default function KanbanView({ tableId, viewId, groupingFieldId, fieldIds 
 
   useEffect(() => {
     loadRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadRows() {

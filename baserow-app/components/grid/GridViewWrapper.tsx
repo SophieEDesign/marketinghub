@@ -189,6 +189,7 @@ export default function GridViewWrapper({
   // Load fields
   useEffect(() => {
     loadFields()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadFields() {

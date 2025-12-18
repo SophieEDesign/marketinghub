@@ -28,6 +28,7 @@ export default function RowDetailView({
 
   useEffect(() => {
     loadRow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowId])
 
   async function loadRow() {

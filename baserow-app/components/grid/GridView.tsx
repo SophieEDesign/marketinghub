@@ -63,6 +63,7 @@ export default function GridView({
 
   useEffect(() => {
     loadRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseTableName, viewFilters, viewSorts, tableFields])
 
   async function loadRows() {

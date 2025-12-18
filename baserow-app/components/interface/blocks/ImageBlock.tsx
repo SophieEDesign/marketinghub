@@ -44,6 +44,7 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
         />
         {url && (
           <div className="mt-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={url}
               alt={alt}
@@ -68,6 +69,7 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
 
   return (
     <div className="h-full p-4 flex items-center justify-center">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imageUrl}
         alt={imageAlt}

@@ -18,6 +18,7 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
 
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [automationId])
 
   async function loadData() {

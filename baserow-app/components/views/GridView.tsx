@@ -24,10 +24,12 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
 
   useEffect(() => {
     loadViewConfig()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewId])
 
   useEffect(() => {
     loadRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, page, filters, sorts])
 
   async function loadViewConfig() {

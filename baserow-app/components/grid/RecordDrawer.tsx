@@ -41,6 +41,7 @@ export default function RecordDrawer({
       setRecord(null)
       setFormData({})
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, rowId, tableName])
 
   useEffect(() => {

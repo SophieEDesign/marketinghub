@@ -23,6 +23,7 @@ export default function KPIBlock({ block, isEditing = false }: KPIBlockProps) {
     if (tableId) {
       loadKPI()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, field, aggregate])
 
   async function loadKPI() {

@@ -22,6 +22,7 @@ export default function CalendarView({ tableId, viewId, dateFieldId, fieldIds }:
 
   useEffect(() => {
     loadRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadRows() {

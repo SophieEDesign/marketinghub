@@ -698,7 +698,7 @@ export default function AutomationBuilder({
         <div className="space-y-2">
           {actions.length === 0 ? (
             <div className="text-center py-8 text-gray-500 text-sm">
-              No actions yet. Click "Add Action" to get started.
+              No actions yet. Click &quot;Add Action&quot; to get started.
             </div>
           ) : (
             actions.map((action, index) => (
