@@ -444,16 +444,14 @@ export default function AirtableGridView({
     )
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <React.Fragment>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-500">Loading...</div>
+        </div>
+      ) : (
+        <div className="flex flex-col h-full bg-gray-50">
       {/* Grid Container */}
       <div
         ref={gridRef}
@@ -592,5 +590,7 @@ export default function AirtableGridView({
         </div>
       </div>
     </div>
+      )}
+    </React.Fragment>
   )
 }
