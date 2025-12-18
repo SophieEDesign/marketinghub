@@ -45,6 +45,8 @@ interface AirtableGridViewProps {
     field_name: string
     direction: string
   }>
+  groupBy?: string
+  rowHeight?: "short" | "medium" | "tall"
   tableFields: TableField[]
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
@@ -52,7 +54,9 @@ interface AirtableGridViewProps {
   onReorderFields?: (fieldNames: string[]) => void
 }
 
-const ROW_HEIGHT = 40
+const ROW_HEIGHT_SHORT = 32
+const ROW_HEIGHT_MEDIUM = 40
+const ROW_HEIGHT_TALL = 56
 const HEADER_HEIGHT = 40
 const COLUMN_MIN_WIDTH = 150
 const COLUMN_DEFAULT_WIDTH = 200
@@ -64,12 +68,15 @@ export default function AirtableGridView({
   viewFields,
   viewFilters = [],
   viewSorts = [],
+  groupBy,
+  rowHeight = "medium",
   tableFields = [],
   onAddField,
   onEditField,
   onDeleteField,
   onReorderFields,
 }: AirtableGridViewProps) {
+  const ROW_HEIGHT = rowHeight === "short" ? ROW_HEIGHT_SHORT : rowHeight === "tall" ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
@@ -106,7 +113,8 @@ export default function AirtableGridView({
   // Load rows
   useEffect(() => {
     loadRows()
-  }, [supabaseTableName, viewFilters, viewSorts, tableFields])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supabaseTableName, viewFilters, viewSorts, tableFields, groupBy])
 
   // Update container height
   useEffect(() => {
@@ -133,15 +141,31 @@ export default function AirtableGridView({
       // Apply filters
       for (const filter of viewFilters) {
         const fieldValue = filter.value
+        const field = tableFields.find(f => f.name === filter.field_name)
+        
         switch (filter.operator) {
           case "equal":
-            query = query.eq(filter.field_name, fieldValue)
+            if (field?.type === "checkbox") {
+              query = query.eq(filter.field_name, fieldValue === "true" || fieldValue === "1")
+            } else {
+              query = query.eq(filter.field_name, fieldValue)
+            }
             break
           case "not_equal":
-            query = query.neq(filter.field_name, fieldValue)
+            if (field?.type === "checkbox") {
+              query = query.neq(filter.field_name, fieldValue === "true" || fieldValue === "1")
+            } else {
+              query = query.neq(filter.field_name, fieldValue)
+            }
             break
           case "contains":
-            query = query.ilike(filter.field_name, `%${fieldValue}%`)
+          case "not_contains":
+            const likePattern = `%${fieldValue}%`
+            if (filter.operator === "contains") {
+              query = query.ilike(filter.field_name, likePattern)
+            } else {
+              query = query.not(filter.field_name, "ilike", likePattern)
+            }
             break
           case "is_empty":
             query = query.or(`${filter.field_name}.is.null,${filter.field_name}.eq.`)
@@ -152,8 +176,32 @@ export default function AirtableGridView({
           case "greater_than":
             query = query.gt(filter.field_name, fieldValue)
             break
+          case "greater_than_or_equal":
+            query = query.gte(filter.field_name, fieldValue)
+            break
           case "less_than":
             query = query.lt(filter.field_name, fieldValue)
+            break
+          case "less_than_or_equal":
+            query = query.lte(filter.field_name, fieldValue)
+            break
+          case "date_equal":
+          case "date_before":
+          case "date_after":
+          case "date_on_or_before":
+          case "date_on_or_after":
+            const dateValue = fieldValue
+            if (filter.operator === "date_equal") {
+              query = query.eq(filter.field_name, dateValue)
+            } else if (filter.operator === "date_before") {
+              query = query.lt(filter.field_name, dateValue)
+            } else if (filter.operator === "date_after") {
+              query = query.gt(filter.field_name, dateValue)
+            } else if (filter.operator === "date_on_or_before") {
+              query = query.lte(filter.field_name, dateValue)
+            } else if (filter.operator === "date_on_or_after") {
+              query = query.gte(filter.field_name, dateValue)
+            }
             break
         }
       }
@@ -189,12 +237,42 @@ export default function AirtableGridView({
     }
   }
 
+  // Grouping
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const groupedRows = useMemo(() => {
+    if (!groupBy) return { ungrouped: rows }
+    
+    const groups: Record<string, typeof rows> = {}
+    rows.forEach((row) => {
+      const groupValue = String(row[groupBy] || "—")
+      if (!groups[groupValue]) {
+        groups[groupValue] = []
+      }
+      groups[groupValue].push(row)
+    })
+    return groups
+  }, [rows, groupBy])
+
   // Virtualization calculations
+  const allRowsForVirtualization = groupBy 
+    ? Object.values(groupedRows).flat()
+    : rows
   const visibleRowCount = Math.ceil(containerHeight / ROW_HEIGHT) + 2
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 1)
-  const endIndex = Math.min(rows.length, startIndex + visibleRowCount)
-  const visibleRows = rows.slice(startIndex, endIndex)
+  const endIndex = Math.min(allRowsForVirtualization.length, startIndex + visibleRowCount)
   const totalWidth = visibleFields.reduce((sum, vf) => sum + (columnWidths[vf.field_name] || COLUMN_DEFAULT_WIDTH), 0) + 50
+
+  function toggleGroup(groupValue: string) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupValue)) {
+        next.delete(groupValue)
+      } else {
+        next.add(groupValue)
+      }
+      return next
+    })
+  }
 
   function handleResizeStart(fieldName: string) {
     setResizingColumn(fieldName)
@@ -290,6 +368,87 @@ export default function AirtableGridView({
     return String(value)
   }
 
+  function renderRow(row: Record<string, any>, rowIndex: number, isEven: boolean) {
+    return (
+      <div
+        key={row.id}
+        className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
+          isEven ? "bg-white" : "bg-gray-50/50"
+        }`}
+        style={{ height: ROW_HEIGHT }}
+      >
+        {/* Row number */}
+        <div
+          className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
+          style={{ width: 50, height: ROW_HEIGHT }}
+        >
+          {rowIndex + 1}
+        </div>
+
+        {/* Cells */}
+        {visibleFields.map((vf) => {
+          const field = vf.field!
+          const width = columnWidths[vf.field_name] || COLUMN_DEFAULT_WIDTH
+          const isEditing = editingCell?.rowId === row.id && editingCell?.fieldName === vf.field_name
+          const isSelected = selectedCell?.rowId === row.id && selectedCell?.fieldName === vf.field_name
+          const value = row[vf.field_name]
+          const displayValue = formatCellValue(value, field)
+
+          return (
+            <div
+              key={vf.field_name}
+              className={`border-r border-gray-100 flex items-center relative ${
+                isSelected ? "bg-blue-100 ring-2 ring-blue-500 ring-inset" : ""
+              }`}
+              style={{ width, height: ROW_HEIGHT }}
+              onClick={() => setSelectedCell({ rowId: row.id, fieldName: vf.field_name })}
+              onDoubleClick={() => {
+                setEditingCell({ rowId: row.id, fieldName: vf.field_name })
+                setCellValue(String(value || ""))
+              }}
+            >
+              {isEditing ? (
+                <input
+                  type={field.type === "number" ? "number" : "text"}
+                  value={cellValue}
+                  onChange={(e) => setCellValue(e.target.value)}
+                  onBlur={() => {
+                    const newValue = field.type === "number" ? parseFloat(cellValue) : cellValue
+                    handleCellSave(row.id, vf.field_name, newValue)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const newValue = field.type === "number" ? parseFloat(cellValue) : cellValue
+                      handleCellSave(row.id, vf.field_name, newValue)
+                    } else if (e.key === "Escape") {
+                      setEditingCell(null)
+                    }
+                  }}
+                  className="w-full h-full px-3 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded"
+                  autoFocus
+                />
+              ) : (
+                <div className="px-3 text-sm text-gray-900 truncate w-full">
+                  {displayValue || <span className="text-gray-400">—</span>}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Row actions */}
+        <div
+          className="border-r border-gray-200 bg-gray-50 flex items-center justify-center"
+          style={{ width: 50, height: ROW_HEIGHT }}
+        >
+          <button className="p-1 hover:bg-gray-200 rounded transition-opacity opacity-0 group-hover:opacity-100">
+            <MoreVertical className="h-4 w-4 text-gray-500" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -308,7 +467,7 @@ export default function AirtableGridView({
         style={{ height: "calc(100vh - 14rem)" }}
       >
         {/* Grid */}
-        <div style={{ width: totalWidth, height: rows.length * ROW_HEIGHT, position: "relative" }}>
+        <div style={{ width: totalWidth, position: "relative" }}>
           {/* Header */}
           <div
             className="sticky top-0 z-10 bg-white border-b border-gray-300 shadow-sm flex"
@@ -365,90 +524,56 @@ export default function AirtableGridView({
           </div>
 
           {/* Rows */}
-          <div style={{ marginTop: startIndex * ROW_HEIGHT }}>
-            {visibleRows.map((row, rowIdx) => {
-              const actualRowIndex = startIndex + rowIdx
-              const isEven = actualRowIndex % 2 === 0
-              return (
-                <div
-                  key={row.id}
-                  className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
-                    isEven ? "bg-white" : "bg-gray-50/50"
-                  }`}
-                  style={{ height: ROW_HEIGHT }}
-                >
-                  {/* Row number */}
-                  <div
-                    className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
-                    style={{ width: 50, height: ROW_HEIGHT }}
-                  >
-                    {actualRowIndex + 1}
-                  </div>
-
-                  {/* Cells */}
-                  {visibleFields.map((vf) => {
-                    const field = vf.field!
-                    const width = columnWidths[vf.field_name] || COLUMN_DEFAULT_WIDTH
-                    const isEditing = editingCell?.rowId === row.id && editingCell?.fieldName === vf.field_name
-                    const isSelected = selectedCell?.rowId === row.id && selectedCell?.fieldName === vf.field_name
-                    const value = row[vf.field_name]
-                    const displayValue = formatCellValue(value, field)
-
-                    return (
-                      <div
-                        key={vf.field_name}
-                        className={`border-r border-gray-100 flex items-center relative ${
-                          isSelected ? "bg-blue-100 ring-2 ring-blue-500 ring-inset" : ""
-                        }`}
-                        style={{ width, height: ROW_HEIGHT }}
-                        onClick={() => setSelectedCell({ rowId: row.id, fieldName: vf.field_name })}
-                        onDoubleClick={() => {
-                          setEditingCell({ rowId: row.id, fieldName: vf.field_name })
-                          setCellValue(String(value || ""))
-                        }}
-                      >
-                        {isEditing ? (
-                          <input
-                            type={field.type === "number" ? "number" : "text"}
-                            value={cellValue}
-                            onChange={(e) => setCellValue(e.target.value)}
-                            onBlur={() => {
-                              const newValue = field.type === "number" ? parseFloat(cellValue) : cellValue
-                              handleCellSave(row.id, vf.field_name, newValue)
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                const newValue = field.type === "number" ? parseFloat(cellValue) : cellValue
-                                handleCellSave(row.id, vf.field_name, newValue)
-                              } else if (e.key === "Escape") {
-                                setEditingCell(null)
-                              }
-                            }}
-                            className="w-full h-full px-3 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded"
-                            autoFocus
-                          />
+          <div>
+            {groupBy ? (
+              // Grouped rows
+              Object.entries(groupedRows).map(([groupValue, groupRows]) => {
+                const isCollapsed = collapsedGroups.has(groupValue)
+                const groupField = tableFields.find(f => f.name === groupBy)
+                
+                return (
+                  <div key={groupValue} className="border-b border-gray-200">
+                    {/* Group Header */}
+                    <div
+                      className="flex items-center bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
+                      style={{ height: ROW_HEIGHT }}
+                      onClick={() => toggleGroup(groupValue)}
+                    >
+                      <div className="px-3">
+                        {isCollapsed ? (
+                          <ChevronRight className="h-4 w-4 text-gray-600" />
                         ) : (
-                          <div className="px-3 text-sm text-gray-900 truncate w-full">
-                            {displayValue || <span className="text-gray-400">—</span>}
-                          </div>
+                          <ChevronDown className="h-4 w-4 text-gray-600" />
                         )}
                       </div>
-                    )
-                  })}
-
-                  {/* Row actions */}
-                  <div
-                    className="border-r border-gray-200 bg-gray-50 flex items-center justify-center"
-                    style={{ width: 50, height: ROW_HEIGHT }}
-                  >
-                    <button className="p-1 hover:bg-gray-200 rounded transition-opacity opacity-0 group-hover:opacity-100">
-                      <MoreVertical className="h-4 w-4 text-gray-500" />
-                    </button>
+                      <div className="flex-1 flex items-center gap-2 px-3">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {groupBy}: {formatCellValue(groupValue, groupField)}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({groupRows.length} {groupRows.length === 1 ? "record" : "records"})
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Group Rows */}
+                    {!isCollapsed && groupRows.map((row, rowIdx) => {
+                      const isEven = rowIdx % 2 === 0
+                      return renderRow(row, rowIdx, isEven)
+                    })}
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })
+            ) : (
+              // Ungrouped rows (with virtualization)
+              <div style={{ marginTop: startIndex * ROW_HEIGHT }}>
+                {allRowsForVirtualization.slice(startIndex, endIndex).map((row, rowIdx) => {
+                  const actualRowIndex = startIndex + rowIdx
+                  const isEven = actualRowIndex % 2 === 0
+                  return renderRow(row, actualRowIndex, isEven)
+                })}
+              </div>
+            )}
         </div>
       </div>
     </div>

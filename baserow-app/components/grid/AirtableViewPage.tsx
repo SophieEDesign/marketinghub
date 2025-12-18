@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import ViewTopBar from "@/components/layout/ViewTopBar"
+import ViewBuilderToolbar from "./ViewBuilderToolbar"
 import AirtableGridView from "./AirtableGridView"
 import FieldBuilderModal from "./FieldBuilderModal"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import type { ViewType } from "@/types/database"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -55,9 +56,17 @@ export default function AirtableViewPage({
   const router = useRouter()
   const [viewFields, setViewFields] = useState(initialViewFields)
   const [tableFields, setTableFields] = useState<TableField[]>(initialTableFields)
+  const [filters, setFilters] = useState(initialViewFilters)
+  const [sorts, setSorts] = useState(initialViewSorts)
+  const [groupBy, setGroupBy] = useState<string | null>((view.config as { groupBy?: string })?.groupBy || null)
+  const [rowHeight, setRowHeight] = useState<"short" | "medium" | "tall">(
+    (view.config as { row_height?: "short" | "medium" | "tall" })?.row_height || "medium"
+  )
+  const [hiddenFields, setHiddenFields] = useState<string[]>(
+    viewFields.filter(f => !f.visible).map(f => f.field_name)
+  )
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
 
   async function loadFields() {
@@ -160,6 +169,112 @@ export default function AirtableViewPage({
     }
   }
 
+  async function handleSaveView() {
+    const name = prompt("Enter name for the new view:")
+    if (!name || !name.trim()) return
+
+    try {
+      // Get current view data
+      const { data: currentView } = await supabase
+        .from("views")
+        .select("*")
+        .eq("id", viewId)
+        .single()
+
+      if (!currentView) {
+        alert("Current view not found")
+        return
+      }
+
+      // Get view fields, filters, sorts
+      const [fieldsRes, filtersRes, sortsRes] = await Promise.all([
+        supabase.from("view_fields").select("*").eq("view_id", viewId),
+        supabase.from("view_filters").select("*").eq("view_id", viewId),
+        supabase.from("view_sorts").select("*").eq("view_id", viewId),
+      ])
+
+      // Create new view with current config
+      const newConfig = {
+        groupBy: groupBy || null,
+        row_height: rowHeight,
+        hidden_columns: hiddenFields,
+      }
+
+      const { data: newView, error: viewError } = await supabase
+        .from("views")
+        .insert([
+          {
+            table_id: tableId,
+            name: name.trim(),
+            type: currentView.type,
+            config: newConfig,
+          },
+        ])
+        .select()
+        .single()
+
+      if (viewError || !newView) {
+        alert("Failed to create new view")
+        return
+      }
+
+      // Copy view fields
+      if (fieldsRes.data && fieldsRes.data.length > 0) {
+        await supabase.from("view_fields").insert(
+          fieldsRes.data.map((f) => ({
+            view_id: newView.id,
+            field_name: f.field_name,
+            visible: f.visible,
+            position: f.position,
+          }))
+        )
+      }
+
+      // Copy filters
+      if (filtersRes.data && filtersRes.data.length > 0) {
+        await supabase.from("view_filters").insert(
+          filtersRes.data.map((f) => ({
+            view_id: newView.id,
+            field_name: f.field_name,
+            operator: f.operator,
+            value: f.value,
+          }))
+        )
+      }
+
+      // Copy sorts
+      if (sortsRes.data && sortsRes.data.length > 0) {
+        await supabase.from("view_sorts").insert(
+          sortsRes.data.map((f) => ({
+            view_id: newView.id,
+            field_name: f.field_name,
+            direction: f.direction,
+            order_index: f.order_index,
+          }))
+        )
+      }
+
+      router.push(`/tables/${tableId}/views/${newView.id}`)
+    } catch (error) {
+      console.error("Error saving view:", error)
+      alert("Failed to save view")
+    }
+  }
+
+  async function handleViewTypeChange(newType: ViewType) {
+    try {
+      await supabase
+        .from("views")
+        .update({ type: newType })
+        .eq("id", viewId)
+
+      router.refresh()
+    } catch (error) {
+      console.error("Error changing view type:", error)
+      alert("Failed to change view type")
+    }
+  }
+
   async function handleNewRecord() {
     try {
       const { data, error } = await supabase
@@ -182,32 +297,48 @@ export default function AirtableViewPage({
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <ViewTopBar
+      <ViewBuilderToolbar
+        viewId={viewId}
         viewName={view.name}
-        viewType={view.type as "grid" | "kanban" | "calendar" | "form"}
-        onDesign={() => setDesignSidebarOpen(true)}
-        onAddField={handleAddField}
-        onNewRecord={handleNewRecord}
-        onSearch={setSearchQuery}
-        onFilter={() => {
-          // TODO: Implement filter dialog
-          alert("Filter functionality coming soon")
+        viewType={view.type as ViewType}
+        tableId={tableId}
+        tableFields={tableFields}
+        viewFields={viewFields}
+        filters={filters}
+        sorts={sorts}
+        groupBy={groupBy || undefined}
+        rowHeight={rowHeight}
+        hiddenFields={hiddenFields}
+        userRole="editor"
+        onViewTypeChange={handleViewTypeChange}
+        onFiltersChange={(newFilters) => {
+          setFilters(newFilters as typeof filters)
+          router.refresh()
         }}
-        onSort={() => {
-          // TODO: Implement sort dialog
-          alert("Sort functionality coming soon")
+        onSortsChange={(newSorts) => {
+          setSorts(newSorts as typeof sorts)
+          router.refresh()
         }}
-        onGroup={() => {
-          // TODO: Implement group dialog
-          alert("Group functionality coming soon")
+        onGroupChange={(fieldName) => {
+          setGroupBy(fieldName)
+          router.refresh()
         }}
-        onHideFields={() => {
-          // TODO: Implement hide fields dialog
-          alert("Hide fields functionality coming soon")
+        onRowHeightChange={(height) => {
+          setRowHeight(height)
+          router.refresh()
         }}
-        onShare={() => {
-          // TODO: Implement share dialog
-          alert("Share functionality coming soon")
+        onHiddenFieldsChange={(fields) => {
+          setHiddenFields(fields)
+          router.refresh()
+        }}
+        onSaveView={handleSaveView}
+        onViewAction={(action) => {
+          if (action === "delete") {
+            // Handled in ViewManagementDialog
+          } else if (action === "setDefault") {
+            // TODO: Implement set as default
+            alert("Set as default functionality coming soon")
+          }
         }}
       />
       <div className="flex-1 overflow-hidden">
@@ -216,8 +347,10 @@ export default function AirtableViewPage({
           viewId={viewId}
           supabaseTableName={table.supabase_table}
           viewFields={viewFields}
-          viewFilters={initialViewFilters}
-          viewSorts={initialViewSorts}
+          viewFilters={filters}
+          viewSorts={sorts}
+          groupBy={groupBy || undefined}
+          rowHeight={rowHeight}
           tableFields={tableFields}
           onAddField={handleAddField}
           onEditField={handleEditField}
