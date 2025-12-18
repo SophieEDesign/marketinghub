@@ -86,6 +86,15 @@ export function CellFactory({
         />
       )
 
+    case 'url':
+      return <UrlCell {...commonProps} />
+
+    case 'email':
+      return <EmailCell {...commonProps} />
+
+    case 'json':
+      return <JsonCell {...commonProps} editable={false} />
+
     case 'link_to_table':
     case 'formula':
     case 'lookup':
@@ -131,13 +140,19 @@ export function inferFieldTypeFromColumn(
 
   // Check for specific patterns
   if (lowerName.includes('email') || lowerName.includes('mail')) {
-    return 'text' // Will be detected as email in CellFactory
+    return 'email'
   }
   if (lowerName.includes('url') || lowerName.includes('link') || lowerName.includes('website')) {
-    return 'text' // Will be detected as URL in CellFactory
+    return 'url'
   }
   if (lowerName.includes('attachment') || lowerName.includes('file')) {
     return 'attachment'
+  }
+  if (lowerName.includes('json') || lowerType.includes('jsonb')) {
+    // Only return 'json' if it's explicitly a json/jsonb column, not if it's used for attachments
+    if (!lowerName.includes('attachment') && !lowerName.includes('file')) {
+      return 'json'
+    }
   }
 
   // Map PostgreSQL types
@@ -151,7 +166,11 @@ export function inferFieldTypeFromColumn(
     return 'date'
   }
   if (lowerType.includes('json') || lowerType.includes('jsonb')) {
-    return 'attachment' // JSONB often used for attachments
+    // Check if it's explicitly named as attachment/file, otherwise treat as json
+    if (lowerName.includes('attachment') || lowerName.includes('file')) {
+      return 'attachment'
+    }
+    return 'json'
   }
   if (lowerType.includes('text') || lowerType.includes('varchar') || lowerType.includes('char')) {
     // Check value to determine if it's long text

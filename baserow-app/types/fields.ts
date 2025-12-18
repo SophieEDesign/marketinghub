@@ -9,6 +9,9 @@ export type FieldType =
   | 'multi_select'
   | 'checkbox'
   | 'attachment'
+  | 'url'
+  | 'email'
+  | 'json'
   | 'link_to_table'
   | 'formula'
   | 'lookup'
@@ -68,6 +71,9 @@ export const FIELD_TYPES: FieldTypeInfo[] = [
   { type: 'multi_select', label: 'Multiple select', isVirtual: false, postgresType: 'text[]', requiresOptions: true },
   { type: 'checkbox', label: 'Checkbox', isVirtual: false, postgresType: 'boolean' },
   { type: 'attachment', label: 'Attachment', isVirtual: false, postgresType: 'jsonb' },
+  { type: 'url', label: 'URL', isVirtual: false, postgresType: 'text' },
+  { type: 'email', label: 'Email', isVirtual: false, postgresType: 'text' },
+  { type: 'json', label: 'JSON', isVirtual: false, postgresType: 'jsonb' },
   { type: 'link_to_table', label: 'Link to table', isVirtual: false, postgresType: 'uuid', requiresOptions: true },
   { type: 'formula', label: 'Formula', isVirtual: true },
   { type: 'lookup', label: 'Lookup', isVirtual: true, requiresOptions: true },

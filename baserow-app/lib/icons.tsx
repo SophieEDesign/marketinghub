@@ -16,6 +16,7 @@ import {
   Search,
   Mail,
   Globe,
+  FileJson,
 } from 'lucide-react'
 import type { FieldType } from '@/types/fields'
 
@@ -51,6 +52,8 @@ export function getFieldIcon(type: FieldType | string): React.ReactElement {
       return <Mail className={iconClass} />
     case "url":
       return <Globe className={iconClass} />
+    case "json":
+      return <FileJson className={iconClass} />
     default:
       return <Type className={iconClass} />
   }

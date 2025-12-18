@@ -7,6 +7,8 @@ export function mapFieldTypeToPostgres(fieldType: FieldType, options?: FieldOpti
   switch (fieldType) {
     case 'text':
     case 'long_text':
+    case 'url':
+    case 'email':
       return 'text'
     case 'number':
     case 'percent':
@@ -21,6 +23,7 @@ export function mapFieldTypeToPostgres(fieldType: FieldType, options?: FieldOpti
     case 'checkbox':
       return 'boolean'
     case 'attachment':
+    case 'json':
       return 'jsonb'
     case 'link_to_table':
       return 'uuid'
