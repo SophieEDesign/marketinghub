@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { 
   GripVertical, 
   MoreVertical, 
@@ -371,7 +371,6 @@ export default function AirtableGridView({
   function renderRow(row: Record<string, any>, rowIndex: number, isEven: boolean) {
     return (
       <div
-        key={row.id}
         className={`flex border-b border-gray-100 hover:bg-blue-50 group transition-colors ${
           isEven ? "bg-white" : "bg-gray-50/50"
         }`}
@@ -559,7 +558,11 @@ export default function AirtableGridView({
                     {/* Group Rows */}
                     {!isCollapsed && groupRows.map((row, rowIdx) => {
                       const isEven = rowIdx % 2 === 0
-                      return renderRow(row, rowIdx, isEven)
+                      return (
+                        <React.Fragment key={row.id}>
+                          {renderRow(row, rowIdx, isEven)}
+                        </React.Fragment>
+                      )
                     })}
                   </div>
                 )
@@ -570,7 +573,11 @@ export default function AirtableGridView({
                 {allRowsForVirtualization.slice(startIndex, endIndex).map((row, rowIdx) => {
                   const actualRowIndex = startIndex + rowIdx
                   const isEven = actualRowIndex % 2 === 0
-                  return renderRow(row, actualRowIndex, isEven)
+                  return (
+                    <React.Fragment key={row.id}>
+                      {renderRow(row, actualRowIndex, isEven)}
+                    </React.Fragment>
+                  )
                 })}
               </div>
             )}

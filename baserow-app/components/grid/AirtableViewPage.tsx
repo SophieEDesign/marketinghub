@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import ViewBuilderToolbar from "./ViewBuilderToolbar"
 import AirtableGridView from "./AirtableGridView"
+import AirtableKanbanView from "./AirtableKanbanView"
 import FieldBuilderModal from "./FieldBuilderModal"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
@@ -64,6 +65,12 @@ export default function AirtableViewPage({
   )
   const [hiddenFields, setHiddenFields] = useState<string[]>(
     viewFields.filter(f => !f.visible).map(f => f.field_name)
+  )
+  const [kanbanGroupField, setKanbanGroupField] = useState<string | undefined>(
+    (view.config as { kanban_group_field?: string })?.kanban_group_field
+  )
+  const [cardFields, setCardFields] = useState<string[]>(
+    (view.config as { card_fields?: string[] })?.card_fields || []
   )
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
@@ -263,9 +270,28 @@ export default function AirtableViewPage({
 
   async function handleViewTypeChange(newType: ViewType) {
     try {
+      const { data: currentView } = await supabase
+        .from("views")
+        .select("config")
+        .eq("id", viewId)
+        .single()
+
+      const currentConfig = (currentView?.config as Record<string, any>) || {}
+      let newConfig = { ...currentConfig }
+
+      // If switching to kanban, try to auto-detect a select field
+      if (newType === "kanban" && !newConfig.kanban_group_field) {
+        const selectField = tableFields.find(
+          (f) => f.type === "single_select" || f.type === "multi_select"
+        )
+        if (selectField) {
+          newConfig.kanban_group_field = selectField.name
+        }
+      }
+
       await supabase
         .from("views")
-        .update({ type: newType })
+        .update({ type: newType, config: newConfig })
         .eq("id", viewId)
 
       router.refresh()
@@ -341,22 +367,37 @@ export default function AirtableViewPage({
           }
         }}
       />
-      <div className="flex-1 overflow-hidden">
-        <AirtableGridView
-          tableId={tableId}
-          viewId={viewId}
-          supabaseTableName={table.supabase_table}
-          viewFields={viewFields}
-          viewFilters={filters}
-          viewSorts={sorts}
-          groupBy={groupBy || undefined}
-          rowHeight={rowHeight}
-          tableFields={tableFields}
-          onAddField={handleAddField}
-          onEditField={handleEditField}
-          onDeleteField={handleDeleteField}
-          onReorderFields={handleReorderFields}
-        />
+      <div className="flex-1 overflow-hidden relative">
+        {view.type === "grid" ? (
+          <AirtableGridView
+            tableId={tableId}
+            viewId={viewId}
+            supabaseTableName={table.supabase_table}
+            viewFields={viewFields}
+            viewFilters={filters}
+            viewSorts={sorts}
+            groupBy={groupBy || undefined}
+            rowHeight={rowHeight}
+            tableFields={tableFields}
+            onAddField={handleAddField}
+            onEditField={handleEditField}
+            onDeleteField={handleDeleteField}
+            onReorderFields={handleReorderFields}
+          />
+        ) : view.type === "kanban" ? (
+          <AirtableKanbanView
+            tableId={tableId}
+            viewId={viewId}
+            supabaseTableName={table.supabase_table}
+            tableFields={tableFields}
+            viewFields={viewFields}
+            viewFilters={filters}
+            viewSorts={sorts}
+            kanbanGroupField={kanbanGroupField}
+            cardFields={cardFields}
+            userRole="editor"
+          />
+        ) : null}
       </div>
       <FieldBuilderModal
         isOpen={fieldBuilderOpen}
