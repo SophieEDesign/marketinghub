@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { PageBlock, TableField } from "@/lib/interface/types"
+import type { PageBlock } from "@/lib/interface/types"
 import type { TableField as FieldType } from "@/types/database"
 
 interface FormBlockProps {
