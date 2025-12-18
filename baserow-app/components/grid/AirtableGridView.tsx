@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { 
   GripVertical, 
   MoreVertical, 
@@ -119,14 +119,14 @@ export default function AirtableGridView({
 
   // Update container height
   useEffect(() => {
-    if (gridRef.current) {
-      const updateHeight = () => {
-        setContainerHeight(gridRef.current?.clientHeight || 600)
-      }
-      updateHeight()
-      window.addEventListener("resize", updateHeight)
-      return () => window.removeEventListener("resize", updateHeight)
+    if (!gridRef.current) return
+    
+    const updateHeight = () => {
+      setContainerHeight(gridRef.current?.clientHeight || 600)
     }
+    updateHeight()
+    window.addEventListener("resize", updateHeight)
+    return () => window.removeEventListener("resize", updateHeight)
   }, [])
 
   async function loadRows() {
@@ -296,14 +296,15 @@ export default function AirtableGridView({
   }
 
   useEffect(() => {
-    if (resizingColumn) {
-      document.addEventListener("mousemove", handleResize)
-      document.addEventListener("mouseup", handleResizeEnd)
-      return () => {
-        document.removeEventListener("mousemove", handleResize)
-        document.removeEventListener("mouseup", handleResizeEnd)
-      }
+    if (!resizingColumn) return
+    
+    document.addEventListener("mousemove", handleResize)
+    document.addEventListener("mouseup", handleResizeEnd)
+    return () => {
+      document.removeEventListener("mousemove", handleResize)
+      document.removeEventListener("mouseup", handleResizeEnd)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resizingColumn])
 
   async function handleCellSave(rowId: string, fieldName: string, value: any) {
@@ -370,7 +371,7 @@ export default function AirtableGridView({
 
   function renderRowContent(row: Record<string, any>, rowIndex: number, isEven: boolean) {
     return (
-      <>
+      <React.Fragment>
         {/* Row number */}
         <div
           className="border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium"
@@ -439,7 +440,7 @@ export default function AirtableGridView({
             <MoreVertical className="h-4 w-4 text-gray-500" />
           </button>
         </div>
-      </>
+      </React.Fragment>
     )
   }
 
