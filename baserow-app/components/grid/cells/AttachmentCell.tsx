@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Paperclip, X } from 'lucide-react'
 
@@ -48,7 +48,7 @@ export default function AttachmentCell({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
 
-  const attachments = value || []
+  const attachments = useMemo(() => value || [], [value])
 
   const handleFiles = useCallback(
     async (files: FileList) => {
@@ -181,6 +181,7 @@ export default function AttachmentCell({
               >
                 {isImage(file.type) ? (
                   <div className="w-8 h-8 rounded border border-gray-300 overflow-hidden bg-gray-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={file.url}
                       alt={file.name}
@@ -261,6 +262,7 @@ function AttachmentPreviewModal({
         </button>
 
         {isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={file.url} alt={file.name} className="max-h-[60vh] mx-auto rounded" />
         ) : (
           <div className="text-center py-12">

@@ -36,6 +36,9 @@ export function useGridData({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const filtersString = JSON.stringify(filters)
+  const sortsString = JSON.stringify(sorts)
+
   const loadData = useCallback(async () => {
     if (!tableName) {
       setLoading(false)
@@ -108,7 +111,8 @@ export function useGridData({
     } finally {
       setLoading(false)
     }
-  }, [tableName, JSON.stringify(filters), JSON.stringify(sorts), limit])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableName, filtersString, sortsString, limit])
 
   useEffect(() => {
     loadData()

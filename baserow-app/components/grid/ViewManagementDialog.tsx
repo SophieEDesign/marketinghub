@@ -249,7 +249,7 @@ export default function ViewManagementDialog({
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-gray-700">
-              Are you sure you want to delete "{viewName}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
             </p>
           </div>
           <div className="flex items-center justify-end gap-2">

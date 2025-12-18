@@ -82,6 +82,7 @@ export default function MultiSelectCell({
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, selectedValues, value])
 
   if (editing && editable) {
