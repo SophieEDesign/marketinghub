@@ -590,6 +590,7 @@ export default function AirtableGridView({
                 })}
               </div>
             )}
+          </div>
         </div>
       </div>
     </div>
