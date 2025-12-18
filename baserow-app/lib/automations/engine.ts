@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { evaluateTrigger } from './triggers'
 import { executeAction } from './actions'
+import type { Automation } from '@/types/database'
 import type {
-  Automation,
   AutomationContext,
   AutomationRun,
   AutomationLog,
