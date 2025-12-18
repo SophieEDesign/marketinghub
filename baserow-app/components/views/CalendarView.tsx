@@ -68,28 +68,26 @@ export default function CalendarView({ tableId, viewId, dateFieldId, fieldIds }:
   }
 
   return (
-    <div className="w-full p-4">
-      <Card>
-        <CardContent className="p-4">
-          <FullCalendar
-            plugins={[dayGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            events={getEvents()}
-            editable={true}
-            eventClick={(info) => {
-              console.log("Event clicked:", info.event.extendedProps)
-            }}
-            dateClick={(info) => {
-              console.log("Date clicked:", info.dateStr)
-            }}
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,dayGridWeek,dayGridDay",
-            }}
-          />
-        </CardContent>
-      </Card>
+    <div className="w-full h-full p-6 bg-gray-50">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          events={getEvents()}
+          editable={true}
+          headerToolbar={{
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,dayGridWeek,dayGridDay",
+          }}
+          eventClick={(info) => {
+            console.log("Event clicked:", info.event.extendedProps)
+          }}
+          dateClick={(info) => {
+            console.log("Date clicked:", info.dateStr)
+          }}
+        />
+      </div>
     </div>
   )
 }

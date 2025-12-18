@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Sidebar from "./Sidebar"
+import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import type { Table, View, Automation } from "@/types/database"
 
@@ -54,19 +54,15 @@ export default function WorkspaceShell({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar
+      <AirtableSidebar
         tables={tables}
         views={views}
         interfacePages={interfacePages}
-        dashboards={dashboards}
         automations={automations}
-        userRole={userRole}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar title={title} />
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

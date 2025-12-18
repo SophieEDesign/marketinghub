@@ -1,9 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
-import Link from "next/link"
-import GridViewWrapper from "@/components/grid/GridViewWrapper"
-import FormView from "@/components/views/FormView"
-import KanbanView from "@/components/views/KanbanView"
-import CalendarView from "@/components/views/CalendarView"
+import AirtableViewPage from "@/components/grid/AirtableViewPage"
+import NonGridViewWrapper from "@/components/grid/NonGridViewWrapper"
 import InterfacePage from "@/components/views/InterfacePage"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
@@ -81,60 +78,28 @@ export default async function ViewPage({
 
     return (
       <WorkspaceShellWrapper title={view.name}>
-        <div>
-          <div className="mb-6">
-            <Link
-              href={`/tables/${params.tableId}`}
-              className="text-sm text-muted-foreground hover:text-foreground mb-2 inline-block"
-            >
-              ← Back to {table.name}
-            </Link>
-            <h1 className="text-2xl font-bold mt-2">{view.name}</h1>
-            <p className="text-muted-foreground mt-1">
-              {table.name} • {view.type} view
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              {view.type === "grid" && (
-                <GridViewWrapper
-                  tableId={params.tableId}
-                  viewId={params.viewId}
-                  supabaseTableName={table.supabase_table}
-                  viewFields={viewFields}
-                  initialFilters={viewFilters}
-                  initialSorts={viewSorts}
-                  initialGroupBy={groupBy}
-                  initialTableFields={tableFields}
-                />
-              )}
-              {view.type === "form" && (
-                <FormView
-                  tableId={params.tableId}
-                  viewId={params.viewId}
-                  fieldIds={viewFields.map((f) => f.field_name)}
-                />
-              )}
-              {view.type === "kanban" && (
-                <KanbanView
-                  tableId={params.tableId}
-                  viewId={params.viewId}
-                  groupingFieldId={viewFields[0]?.field_name || ""}
-                  fieldIds={viewFields.map((f) => f.field_name)}
-                />
-              )}
-              {view.type === "calendar" && (
-                <CalendarView
-                  tableId={params.tableId}
-                  viewId={params.viewId}
-                  dateFieldId={viewFields[0]?.field_name || ""}
-                  fieldIds={viewFields.map((f) => f.field_name)}
-                />
-              )}
-            </div>
-          </div>
-        </div>
+        {view.type === "grid" ? (
+          <AirtableViewPage
+            tableId={params.tableId}
+            viewId={params.viewId}
+            table={table}
+            view={view}
+            initialViewFields={viewFields}
+            initialViewFilters={viewFilters}
+            initialViewSorts={viewSorts}
+            initialTableFields={tableFields}
+          />
+        ) : (
+          <NonGridViewWrapper
+            viewType={view.type as "form" | "kanban" | "calendar"}
+            viewName={view.name}
+            tableId={params.tableId}
+            viewId={params.viewId}
+            fieldIds={viewFields.map((f) => f.field_name)}
+            groupingFieldId={view.type === "kanban" ? viewFields[0]?.field_name : undefined}
+            dateFieldId={view.type === "calendar" ? viewFields[0]?.field_name : undefined}
+          />
+        )}
       </WorkspaceShellWrapper>
     )
   } catch (error) {

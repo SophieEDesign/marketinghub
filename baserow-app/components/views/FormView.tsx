@@ -86,29 +86,39 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{rowId ? "Edit Record" : "New Record"}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+    <div className="w-full h-full flex items-center justify-center bg-gray-50 p-6">
+      <Card className="w-full max-w-2xl shadow-lg border-gray-200">
+        <CardHeader className="border-b border-gray-200 bg-white rounded-t-lg">
+          <CardTitle className="text-xl font-semibold text-gray-900">
+            {rowId ? "Edit Record" : "New Record"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6 p-6 bg-white">
           {fieldIds.map((fieldId) => (
             <div key={fieldId} className="space-y-2">
-              <label className="text-sm font-medium">Field {fieldId}</label>
+              <label className="block text-sm font-medium text-gray-700">
+                {fieldId}
+              </label>
               <Input
                 value={formData[fieldId] || ""}
                 onChange={(e) => handleFieldChange(fieldId, e.target.value)}
+                placeholder={`Enter ${fieldId}`}
+                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
           ))}
-          <div className="flex justify-end pt-4">
-            <Button onClick={handleSave} disabled={saving}>
+          <div className="flex justify-end pt-4 border-t border-gray-200">
+            <Button 
+              onClick={handleSave} 
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            >
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save"}
             </Button>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
