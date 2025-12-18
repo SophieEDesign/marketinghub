@@ -109,7 +109,8 @@ export default function AirtableGridView({
       widths[vf.field_name] = COLUMN_DEFAULT_WIDTH
     })
     setColumnWidths(widths)
-  }, [visibleFields.map(vf => vf.field_name).join(",")])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleFields.length])
 
   // Load rows
   useEffect(() => {
