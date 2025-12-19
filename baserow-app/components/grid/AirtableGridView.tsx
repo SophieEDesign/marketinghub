@@ -89,22 +89,6 @@ export default function AirtableGridView({
     sorts,
   })
 
-  // Get visible fields in order
-  const visibleFields = useMemo(() => {
-    return columnOrder
-      .map((fieldName) => fields.find((f) => f.name === fieldName))
-      .filter((f): f is TableField => f !== undefined)
-  }, [columnOrder, fields])
-
-  // Filter rows by search query (only visible fields)
-  const visibleFieldNames = useMemo(() => {
-    return visibleFields.map((f) => f.name)
-  }, [visibleFields])
-
-  const rows = useMemo(() => {
-    return filterRowsBySearch(allRows, fields, searchQuery, visibleFieldNames)
-  }, [allRows, fields, searchQuery, visibleFieldNames])
-
   // Initialize column widths and order from localStorage or defaults
   useEffect(() => {
     if (fields.length === 0) return
@@ -189,6 +173,23 @@ export default function AirtableGridView({
     }
   }, [])
 
+  // Get visible fields in order (needed for search filtering and rendering)
+  const visibleFields = useMemo(() => {
+    if (columnOrder.length === 0) return []
+    return columnOrder
+      .map((fieldName) => fields.find((f) => f.name === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [columnOrder, fields])
+
+  // Filter rows by search query (only visible fields)
+  const visibleFieldNames = useMemo(() => {
+    return visibleFields.map((f) => f.name)
+  }, [visibleFields])
+
+  const rows = useMemo(() => {
+    return filterRowsBySearch(allRows, fields, searchQuery, visibleFieldNames)
+  }, [allRows, fields, searchQuery, visibleFieldNames])
+
   // Virtualization calculations
   const visibleRowCount = Math.ceil(containerHeight / ROW_HEIGHT) + 5
   const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 2)
@@ -257,13 +258,6 @@ export default function AirtableGridView({
       return filtered
     })
   }, [])
-
-  // Get visible fields in order
-  const visibleFields = useMemo(() => {
-    return columnOrder
-      .map((fieldName) => fields.find((f) => f.name === fieldName))
-      .filter((f): f is TableField => f !== undefined)
-  }, [columnOrder, fields])
 
   if (loading) {
     return (
