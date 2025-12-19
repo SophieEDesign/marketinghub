@@ -17,7 +17,8 @@ import {
   Layers,
   Zap,
   Settings,
-  Home
+  Home,
+  Upload
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { Table, View, Automation } from "@/types/database"
@@ -184,6 +185,28 @@ export default function AirtableSidebar({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
+        {/* Quick Actions */}
+        <div className="py-2 border-b border-gray-100">
+          <div className="px-3 mb-1">
+            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Quick Actions
+            </div>
+          </div>
+          <div className="space-y-0.5 px-2">
+            <Link
+              href="/import"
+              className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                pathname.includes("/import")
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              <Upload className="h-4 w-4 flex-shrink-0" />
+              <span className="text-sm">Import CSV</span>
+            </Link>
+          </div>
+        </div>
+
         {/* Tables Section */}
         <div className="py-2">
           <div className="px-3 mb-1">
@@ -293,25 +316,36 @@ export default function AirtableSidebar({
             </button>
           </div>
           {expandedSections.has("pages") && (
-            <div className="space-y-0.5 px-2">
-              {interfacePages.map((page) => {
-                const isActive = pathname.includes(`/pages/${page.id}`)
-                return (
-                  <Link
-                    key={page.id}
-                    href={`/pages/${page.id}`}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    <Layers className="h-4 w-4 flex-shrink-0" />
-                    <span className="text-sm truncate">{page.name}</span>
-                  </Link>
-                )
-              })}
-            </div>
+            <>
+              <div className="px-2 mb-1">
+                <Link
+                  href="/interface/new"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>New Page</span>
+                </Link>
+              </div>
+              <div className="space-y-0.5 px-2">
+                {interfacePages.map((page) => {
+                  const isActive = pathname.includes(`/pages/${page.id}`) || pathname.includes(`/interface/${page.id}`)
+                  return (
+                    <Link
+                      key={page.id}
+                      href={`/interface/${page.id}`}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                        isActive
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Layers className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate">{page.name}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
 

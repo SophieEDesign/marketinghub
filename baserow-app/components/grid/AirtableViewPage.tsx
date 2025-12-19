@@ -366,6 +366,9 @@ export default function AirtableViewPage({
             alert("Set as default functionality coming soon")
           }
         }}
+        onDesign={() => setDesignSidebarOpen(true)}
+        onAddField={() => setDesignSidebarOpen(true)}
+        onNewRecord={handleNewRecord}
       />
       <div className="flex-1 overflow-hidden relative">
         {view.type === "grid" ? (

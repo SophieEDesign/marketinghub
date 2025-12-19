@@ -19,6 +19,8 @@ import {
   Star,
   Minus,
   Maximize2,
+  Settings,
+  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -70,6 +72,9 @@ interface ViewBuilderToolbarProps {
   onHiddenFieldsChange?: (fields: string[]) => void
   onSaveView?: () => void
   onViewAction?: (action: "duplicate" | "rename" | "delete" | "setDefault") => void
+  onDesign?: () => void
+  onAddField?: () => void
+  onNewRecord?: () => void
 }
 
 export default function ViewBuilderToolbar({
@@ -93,6 +98,9 @@ export default function ViewBuilderToolbar({
   onHiddenFieldsChange,
   onSaveView,
   onViewAction,
+  onDesign,
+  onAddField,
+  onNewRecord,
 }: ViewBuilderToolbarProps) {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [sortDialogOpen, setSortDialogOpen] = useState(false)
@@ -154,6 +162,38 @@ export default function ViewBuilderToolbar({
 
         {/* Right side - Action buttons */}
         <div className="flex items-center gap-1">
+          {onDesign && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDesign}
+              className="h-7 px-2.5 text-xs font-normal border-gray-300 hover:bg-gray-50"
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
+              Design
+            </Button>
+          )}
+          {onAddField && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAddField}
+              className="h-7 px-2.5 text-xs font-normal border-gray-300 hover:bg-gray-50"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add Field
+            </Button>
+          )}
+          {onNewRecord && (
+            <Button
+              size="sm"
+              onClick={onNewRecord}
+              className="h-7 px-2.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Record
+            </Button>
+          )}
           {canEdit && (
             <>
               <Button
