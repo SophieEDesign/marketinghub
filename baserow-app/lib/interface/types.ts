@@ -80,6 +80,7 @@ export interface Page {
 }
 
 export interface PageSettings {
+  icon?: string
   access?: 'public' | 'authenticated' | 'roles'
   allowed_roles?: string[]
   layout?: {
