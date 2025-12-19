@@ -1,0 +1,200 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Trash2, Save } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import type { Page } from "@/lib/interface/types"
+
+interface PageSettingsDrawerProps {
+  page: Page
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onPageUpdate: () => void
+}
+
+export default function PageSettingsDrawer({
+  page,
+  open,
+  onOpenChange,
+  onPageUpdate,
+}: PageSettingsDrawerProps) {
+  const router = useRouter()
+  const [name, setName] = useState(page.name)
+  const [icon, setIcon] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    setName(page.name)
+    // Extract icon from settings if it exists
+    const pageIcon = page.settings?.icon || ""
+    setIcon(pageIcon)
+  }, [page])
+
+  async function handleSave() {
+    if (!name.trim()) {
+      alert("Page name is required")
+      return
+    }
+
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/pages/${page.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          settings: {
+            ...page.settings,
+            icon: icon.trim() || null,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update page")
+      }
+
+      onPageUpdate()
+      onOpenChange(false)
+    } catch (error: any) {
+      console.error("Failed to update page:", error)
+      alert(error.message || "Failed to update page")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/pages/${page.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to delete page")
+      }
+
+      // Redirect to home or interface list
+      router.push("/")
+    } catch (error: any) {
+      console.error("Failed to delete page:", error)
+      alert(error.message || "Failed to delete page")
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="w-[400px] sm:w-[400px]">
+          <SheetHeader>
+            <SheetTitle>Page Settings</SheetTitle>
+            <SheetDescription>
+              Manage your page name, icon, and other settings
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="page-name">Page Name</Label>
+              <Input
+                id="page-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My Dashboard"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="page-icon">Icon (Emoji)</Label>
+              <Input
+                id="page-icon"
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                placeholder="📊"
+                maxLength={2}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional: Add an emoji to represent this page
+              </p>
+            </div>
+
+            <div className="pt-4 border-t">
+              <Button
+                onClick={handleSave}
+                disabled={saving || !name.trim()}
+                className="w-full"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+
+            <div className="pt-4 border-t">
+              <div className="space-y-2">
+                <Label className="text-red-600">Danger Zone</Label>
+                <Button
+                  variant="destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="w-full"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Page
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This action cannot be undone. All blocks on this page will be deleted.
+                </p>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete "{page.name}" and all its blocks. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? "Deleting..." : "Delete Page"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}

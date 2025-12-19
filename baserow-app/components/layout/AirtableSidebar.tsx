@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import NewPageModal from "@/components/interface/NewPageModal"
 import { 
   Table2, 
   ChevronRight, 
@@ -46,6 +47,7 @@ export default function AirtableSidebar({
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tables"]))
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [newPageModalOpen, setNewPageModalOpen] = useState(false)
 
   // Extract tableId and viewId from pathname
   const pathMatch = pathname.match(/\/tables\/([^\/]+)(?:\/views\/([^\/]+))?/)
@@ -318,13 +320,13 @@ export default function AirtableSidebar({
           {expandedSections.has("pages") && (
             <>
               <div className="px-2 mb-1">
-                <Link
-                  href="/interface/new"
+                <button
+                  onClick={() => setNewPageModalOpen(true)}
                   className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   <span>New Page</span>
-                </Link>
+                </button>
               </div>
               <div className="space-y-0.5 px-2">
                 {interfacePages.map((page) => {
@@ -402,6 +404,9 @@ export default function AirtableSidebar({
           </Link>
         </div>
       </div>
+
+      {/* New Page Modal */}
+      <NewPageModal open={newPageModalOpen} onOpenChange={setNewPageModalOpen} />
     </div>
   )
 }
