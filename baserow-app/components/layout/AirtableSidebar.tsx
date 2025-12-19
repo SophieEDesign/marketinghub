@@ -71,7 +71,7 @@ export default function AirtableSidebar({
     if (isAutomation) {
       setExpandedSections(prev => new Set(prev).add("automations"))
     }
-  }, [currentTableId, currentViewId, isInterfacePage, isAutomation])
+  }, [currentTableId, currentViewId, isInterfacePage, isAutomation, expandedTables])
 
   function toggleTable(tableId: string) {
     setExpandedTables(prev => {

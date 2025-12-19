@@ -146,7 +146,7 @@ export default function ViewBuilderToolbar({
     if (urlQuery !== searchQuery) {
       setSearchQuery(urlQuery)
     }
-  }, [searchParams])
+  }, [searchParams, searchQuery])
 
   function handleClearSearch() {
     setSearchQuery("")

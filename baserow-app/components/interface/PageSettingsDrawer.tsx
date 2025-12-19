@@ -178,7 +178,7 @@ export default function PageSettingsDrawer({
           <DialogHeader>
             <DialogTitle>Are you sure?</DialogTitle>
             <DialogDescription>
-              This will permanently delete "{page.name}" and all its blocks. This action cannot be undone.
+              This will permanently delete &quot;{page.name}&quot; and all its blocks. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   DndContext,
@@ -114,6 +114,16 @@ export default function AirtableKanbanView({
     })
   )
 
+  const loadColumns = useCallback((field: TableField) => {
+    const choices = field.options?.choices || []
+    const columnList: KanbanColumn[] = choices.map((choice, index) => ({
+      id: choice,
+      name: choice,
+      collapsed: collapsedColumns.has(choice),
+    }))
+    setColumns(columnList)
+  }, [collapsedColumns])
+
   // Find groupable field
   useEffect(() => {
     if (kanbanGroupField) {
@@ -132,26 +142,9 @@ export default function AirtableKanbanView({
         loadColumns(selectField)
       }
     }
-  }, [kanbanGroupField, tableFields])
+  }, [kanbanGroupField, tableFields, loadColumns])
 
-  function loadColumns(field: TableField) {
-    const choices = field.options?.choices || []
-    const columnList: KanbanColumn[] = choices.map((choice, index) => ({
-      id: choice,
-      name: choice,
-      collapsed: collapsedColumns.has(choice),
-    }))
-    setColumns(columnList)
-  }
-
-  // Load rows
-  useEffect(() => {
-    if (supabaseTableName && groupField) {
-      loadRows()
-    }
-  }, [supabaseTableName, groupField, viewFilters, viewSorts])
-
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     if (!supabaseTableName || !groupField) return
 
     setLoading(true)
@@ -205,7 +198,14 @@ export default function AirtableKanbanView({
     } finally {
       setLoading(false)
     }
-  }
+  }, [supabaseTableName, groupField, viewFilters, viewSorts])
+
+  // Load rows
+  useEffect(() => {
+    if (supabaseTableName && groupField) {
+      loadRows()
+    }
+  }, [supabaseTableName, groupField, loadRows])
 
   // Filter rows by search query
   const visibleFieldNames = useMemo(() => {

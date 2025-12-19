@@ -82,7 +82,7 @@ export default function ViewTopBar({
     if (urlQuery !== searchQuery) {
       setSearchQuery(urlQuery)
     }
-  }, [searchParams])
+  }, [searchParams, searchQuery])
 
   function handleSearchChange(value: string) {
     setSearchQuery(value)
