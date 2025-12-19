@@ -162,17 +162,41 @@ export default function CSVImportPanel({
         }
       })
 
+      // Create new fields and wait for them to be created
       for (const fieldData of fieldsToCreate) {
-        await fetch(`/api/tables/${tableId}/fields`, {
+        const response = await fetch(`/api/tables/${tableId}/fields`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(fieldData),
         })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(`Failed to create field "${fieldData.name}": ${errorData.error || 'Unknown error'}`)
+        }
       }
 
-      // Reload fields to get new field IDs
+      // Reload fields to get new field IDs - wait a bit for database to update
+      await new Promise(resolve => setTimeout(resolve, 500))
       await loadFields()
-      const updatedFields = await fetch(`/api/tables/${tableId}/fields`).then(r => r.json()).then(d => d.fields || [])
+      const updatedFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
+      if (!updatedFieldsResponse.ok) {
+        throw new Error('Failed to reload fields after creation')
+      }
+      const updatedFields = await updatedFieldsResponse.json().then(d => d.fields || [])
+      
+      if (updatedFields.length === 0) {
+        throw new Error('No fields found in table. Please ensure the table has at least one field.')
+      }
+
+      // Create a set of valid field names (these should match column names in Supabase)
+      // Field names are sanitized when created, so they match the actual column names
+      const validFieldNames = new Set(updatedFields.map((f: TableField) => f.name))
+      
+      // Also include standard columns that always exist
+      validFieldNames.add('id')
+      validFieldNames.add('created_at')
+      validFieldNames.add('updated_at')
 
       // Parse full CSV
       const file = fileInputRef.current?.files?.[0]
@@ -211,28 +235,69 @@ export default function CSVImportPanel({
         allRows.push(row)
       }
 
-      // Map and insert rows
+      // Validate that all CSV headers are either mapped or have new fields defined
+      const unmappedHeaders = csvHeaders.filter(header => {
+        const mappedField = fieldMappings[header]
+        const hasNewField = newFields[header]
+        return !mappedField && !hasNewField
+      })
+
+      if (unmappedHeaders.length > 0) {
+        throw new Error(
+          `The following CSV columns are not mapped to fields: ${unmappedHeaders.join(', ')}. ` +
+          `Please map them to existing fields or create new fields for them.`
+        )
+      }
+
+      // Map and insert rows - only include columns that exist in the table
       const rowsToInsert = allRows.map((csvRow) => {
         const mappedRow: Record<string, any> = {}
         csvHeaders.forEach((csvHeader) => {
-          const fieldName = fieldMappings[csvHeader] || csvHeader
+          // Only process if mapped to an existing field or has a new field definition
+          const fieldName = fieldMappings[csvHeader]
+          if (!fieldName && !newFields[csvHeader]) {
+            return // Skip unmapped columns
+          }
+
           const field = updatedFields.find((f: TableField) => f.name === fieldName)
+          
           if (field) {
+            // Verify the field name is valid (should match column name in Supabase)
+            if (!validFieldNames.has(field.name)) {
+              console.warn(`Field ${field.name} is not in valid fields list, skipping`)
+              return // Skip this field
+            }
+            
             let value: any = csvRow[csvHeader]
+            
+            // Skip if value is empty and field is not required
+            if ((value === null || value === undefined || value === '') && !field.required) {
+              return // Skip this field
+            }
             
             // Type conversion
             if (field.type === "number" || field.type === "currency" || field.type === "percent") {
-              value = parseFloat(value) || 0
+              value = value === '' || value === null ? null : (parseFloat(value) || 0)
             } else if (field.type === "checkbox") {
-              value = value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes"
+              value = value === '' || value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
             } else if (field.type === "date") {
               // Try to parse date
-              const date = new Date(value)
-              value = isNaN(date.getTime()) ? null : date.toISOString()
+              if (value === '' || value === null) {
+                value = null
+              } else {
+                const date = new Date(value)
+                value = isNaN(date.getTime()) ? null : date.toISOString()
+              }
+            } else {
+              // For text fields, convert to string or null
+              value = value === '' || value === null ? null : String(value)
             }
             
-            mappedRow[fieldName] = value
+            // Use field.name which should match the sanitized column name in Supabase
+            // Field names are sanitized when created, so they match column names
+            mappedRow[field.name] = value
           }
+          // If field doesn't exist, skip it (don't include in mappedRow)
         })
         return mappedRow
       })
@@ -248,6 +313,16 @@ export default function CSVImportPanel({
 
         if (error) {
           console.error("Error inserting batch:", error)
+          // Provide more helpful error message
+          if (error.message?.includes('column') && error.message?.includes('schema cache')) {
+            const columnMatch = error.message.match(/column ['"]([^'"]+)['"]/)
+            const columnName = columnMatch ? columnMatch[1] : 'unknown'
+            throw new Error(
+              `Column "${columnName}" does not exist in table "${supabaseTableName}". ` +
+              `Please create a field for this column first, or map it to an existing field. ` +
+              `Original error: ${error.message}`
+            )
+          }
           throw error
         }
 
