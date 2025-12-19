@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -20,6 +21,7 @@ import { Plus } from 'lucide-react'
 import { useGridData } from '@/lib/grid/useGridData'
 import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
+import { filterRowsBySearch } from '@/lib/search/filterRows'
 import type { TableField } from '@/types/fields'
 
 interface AirtableGridViewProps {
@@ -76,12 +78,32 @@ export default function AirtableGridView({
     })
   )
 
+  // Get search query from URL
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get("q") || ""
+
   // Load data
-  const { rows, loading, error, updateCell } = useGridData({
+  const { rows: allRows, loading, error, updateCell } = useGridData({
     tableName,
     fields,
     sorts,
   })
+
+  // Get visible fields in order
+  const visibleFields = useMemo(() => {
+    return columnOrder
+      .map((fieldName) => fields.find((f) => f.name === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [columnOrder, fields])
+
+  // Filter rows by search query (only visible fields)
+  const visibleFieldNames = useMemo(() => {
+    return visibleFields.map((f) => f.name)
+  }, [visibleFields])
+
+  const rows = useMemo(() => {
+    return filterRowsBySearch(allRows, fields, searchQuery, visibleFieldNames)
+  }, [allRows, fields, searchQuery, visibleFieldNames])
 
   // Initialize column widths and order from localStorage or defaults
   useEffect(() => {
@@ -255,6 +277,26 @@ export default function AirtableGridView({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-red-500">Error: {error}</div>
+      </div>
+    )
+  }
+
+  // Empty state for search
+  if (searchQuery && rows.length === 0 && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+        <div className="text-sm mb-2">No records match your search</div>
+        <button
+          onClick={() => {
+            const params = new URLSearchParams(window.location.search)
+            params.delete("q")
+            window.history.replaceState({}, "", `?${params.toString()}`)
+            window.location.reload()
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 underline"
+        >
+          Clear search
+        </button>
       </div>
     )
   }

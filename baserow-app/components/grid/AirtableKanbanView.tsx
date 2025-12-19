@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   DndContext,
   DragOverlay,
@@ -44,6 +45,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import ColumnManagementDialog from "./ColumnManagementDialog"
 import RecordDrawer from "./RecordDrawer"
+import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
 
 interface AirtableKanbanViewProps {
@@ -89,6 +91,8 @@ export default function AirtableKanbanView({
   cardFields = [],
   userRole = "editor",
 }: AirtableKanbanViewProps) {
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get("q") || ""
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [columns, setColumns] = useState<KanbanColumn[]>([])
@@ -203,11 +207,21 @@ export default function AirtableKanbanView({
     }
   }
 
+  // Filter rows by search query
+  const visibleFieldNames = useMemo(() => {
+    return viewFields.filter((f) => f.visible).map((f) => f.field_name)
+  }, [viewFields])
+
+  const filteredRows = useMemo(() => {
+    if (!searchQuery) return rows
+    return filterRowsBySearch(rows, tableFields, searchQuery, visibleFieldNames)
+  }, [rows, tableFields, searchQuery, visibleFieldNames])
+
   // Group rows by column
   const groupedRows = useMemo(() => {
     if (!groupField) return {}
-    const groups: Record<string, typeof rows> = {}
-    rows.forEach((row) => {
+    const groups: Record<string, typeof filteredRows> = {}
+    filteredRows.forEach((row) => {
       const value = row[groupField.name]
       const columnValue = value || "—"
       if (!groups[columnValue]) {
@@ -216,7 +230,7 @@ export default function AirtableKanbanView({
       groups[columnValue].push(row)
     })
     return groups
-  }, [rows, groupField])
+  }, [filteredRows, groupField])
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string)
@@ -344,6 +358,26 @@ export default function AirtableKanbanView({
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-gray-500">Loading...</div>
+      </div>
+    )
+  }
+
+  // Empty state for search
+  if (searchQuery && filteredRows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+        <div className="text-sm mb-2">No records match your search</div>
+        <button
+          onClick={() => {
+            const params = new URLSearchParams(window.location.search)
+            params.delete("q")
+            window.history.replaceState({}, "", `?${params.toString()}`)
+            window.location.reload()
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 underline"
+        >
+          Clear search
+        </button>
       </div>
     )
   }

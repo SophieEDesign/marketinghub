@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { 
   Filter, 
   ArrowUpDown, 
@@ -14,7 +15,8 @@ import {
   Calendar,
   FileText,
   ChevronDown,
-  Settings
+  Settings,
+  X
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,11 +50,47 @@ export default function ViewTopBar({
   onSearch,
   onDesign,
 }: ViewTopBarProps) {
-  const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
+
+  // Debounce search query (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Update URL when debounced query changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (debouncedQuery.trim()) {
+      params.set("q", debouncedQuery.trim())
+    } else {
+      params.delete("q")
+    }
+    router.replace(`?${params.toString()}`, { scroll: false })
+    onSearch?.(debouncedQuery)
+  }, [debouncedQuery, router, searchParams, onSearch])
+
+  // Sync with URL on mount/change
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") || ""
+    if (urlQuery !== searchQuery) {
+      setSearchQuery(urlQuery)
+    }
+  }, [searchParams])
 
   function handleSearchChange(value: string) {
     setSearchQuery(value)
-    onSearch?.(value)
+  }
+
+  function handleClearSearch() {
+    setSearchQuery("")
+    setDebouncedQuery("")
   }
 
   function getViewIcon(type: string) {
@@ -102,11 +140,20 @@ export default function ViewTopBar({
             <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search records..."
+              placeholder="Search this view…"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-8 h-8 text-sm bg-gray-50 border-gray-200 focus:bg-white"
+              className="pl-8 pr-8 h-8 text-sm bg-gray-50 border-gray-200 focus:bg-white"
             />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
 

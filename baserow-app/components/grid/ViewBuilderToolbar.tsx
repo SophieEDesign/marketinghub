@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import {
   Filter,
   ArrowUpDown,
@@ -21,8 +22,11 @@ import {
   Maximize2,
   Settings,
   Plus,
+  Search,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -102,15 +106,52 @@ export default function ViewBuilderToolbar({
   onAddField,
   onNewRecord,
 }: ViewBuilderToolbarProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [sortDialogOpen, setSortDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [hideFieldsDialogOpen, setHideFieldsDialogOpen] = useState(false)
   const [viewManagementDialogOpen, setViewManagementDialogOpen] = useState(false)
   const [viewManagementAction, setViewManagementAction] = useState<"rename" | "duplicate" | "delete" | null>(null)
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
 
   const canEdit = userRole === "admin" || userRole === "editor"
   const canManageViews = userRole === "admin"
+
+  // Debounce search query (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // Update URL when debounced query changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (debouncedQuery.trim()) {
+      params.set("q", debouncedQuery.trim())
+    } else {
+      params.delete("q")
+    }
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [debouncedQuery, router, searchParams])
+
+  // Sync with URL on mount/change
+  useEffect(() => {
+    const urlQuery = searchParams.get("q") || ""
+    if (urlQuery !== searchQuery) {
+      setSearchQuery(urlQuery)
+    }
+  }, [searchParams])
+
+  function handleClearSearch() {
+    setSearchQuery("")
+    setDebouncedQuery("")
+  }
 
   function getViewIcon(type: ViewType) {
     switch (type) {
@@ -158,6 +199,27 @@ export default function ViewBuilderToolbar({
             ))}
           </div>
           <span className="text-sm font-medium text-gray-700 ml-2">{viewName}</span>
+          
+          {/* Search */}
+          <div className="relative w-64 ml-4">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search this view…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 pr-8 h-7 text-xs bg-white border-gray-200 focus:bg-white"
+            />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400 hover:text-gray-600"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Right side - Action buttons */}

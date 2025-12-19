@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import ViewTopBar from "@/components/layout/ViewTopBar"
 import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
+import type { TableField } from "@/types/fields"
 
 interface NonGridViewWrapperProps {
   viewType: "form" | "kanban" | "calendar"
@@ -29,8 +30,11 @@ export default function NonGridViewWrapper({
   dateFieldId,
 }: NonGridViewWrapperProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams.get("q") || ""
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
   const [tableInfo, setTableInfo] = useState<{ name: string; supabase_table: string } | null>(null)
+  const [tableFields, setTableFields] = useState<TableField[]>([])
 
   useEffect(() => {
     async function loadTableInfo() {
@@ -50,6 +54,23 @@ export default function NonGridViewWrapper({
     }
     loadTableInfo()
   }, [tableId])
+
+  // Load table fields
+  useEffect(() => {
+    async function loadFields() {
+      try {
+        const response = await fetch(`/api/tables/${tableId}/fields`)
+        const data = await response.json()
+        if (data.fields) {
+          setTableFields(data.fields)
+        }
+      } catch (error) {
+        console.error("Error loading fields:", error)
+      }
+    }
+    loadFields()
+  }, [tableId])
+
 
   async function handleNewRecord() {
     if (!tableInfo) return
@@ -79,9 +100,7 @@ export default function NonGridViewWrapper({
       <ViewTopBar
         viewName={viewName}
         viewType={viewType}
-        onSearch={(query) => {
-          // TODO: Implement search
-        }}
+        onSearch={() => {}} // Handled via URL params
         onDesign={() => setDesignSidebarOpen(true)}
         onAddField={() => setDesignSidebarOpen(true)}
         onNewRecord={handleNewRecord}
@@ -100,6 +119,8 @@ export default function NonGridViewWrapper({
             viewId={viewId}
             groupingFieldId={groupingFieldId || fieldIds[0] || ""}
             fieldIds={fieldIds}
+            searchQuery={searchQuery}
+            tableFields={tableFields}
           />
         )}
         {viewType === "calendar" && (
@@ -108,6 +129,8 @@ export default function NonGridViewWrapper({
             viewId={viewId}
             dateFieldId={dateFieldId || fieldIds[0] || ""}
             fieldIds={fieldIds}
+            searchQuery={searchQuery}
+            tableFields={tableFields}
           />
         )}
       </div>

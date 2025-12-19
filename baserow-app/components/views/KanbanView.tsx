@@ -1,20 +1,31 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus } from "lucide-react"
+import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
+import type { TableField } from "@/types/fields"
 
 interface KanbanViewProps {
   tableId: string
   viewId: string
   groupingFieldId: string
   fieldIds: string[]
+  searchQuery?: string
+  tableFields?: any[]
 }
 
-export default function KanbanView({ tableId, viewId, groupingFieldId, fieldIds }: KanbanViewProps) {
+export default function KanbanView({ 
+  tableId, 
+  viewId, 
+  groupingFieldId, 
+  fieldIds,
+  searchQuery = "",
+  tableFields = []
+}: KanbanViewProps) {
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -39,9 +50,27 @@ export default function KanbanView({ tableId, viewId, groupingFieldId, fieldIds 
     setLoading(false)
   }
 
+  // Filter rows by search query
+  const filteredRows = useMemo(() => {
+    if (!searchQuery || !tableFields.length) return rows
+    
+    // Convert TableRow format to flat format for search
+    const flatRows = rows.map((row) => ({
+      ...row.data,
+      _rowId: row.id, // Preserve row ID
+    }))
+    
+    // Filter using search helper
+    const filtered = filterRowsBySearch(flatRows, tableFields, searchQuery, fieldIds)
+    const filteredIds = new Set(filtered.map((r) => r._rowId))
+    
+    // Map back to TableRow format
+    return rows.filter((row) => filteredIds.has(row.id))
+  }, [rows, tableFields, searchQuery, fieldIds])
+
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
-    rows.forEach((row) => {
+    filteredRows.forEach((row) => {
       const groupValue = row.data[groupingFieldId] || "Uncategorized"
       if (!groups[groupValue]) {
         groups[groupValue] = []
@@ -57,6 +86,26 @@ export default function KanbanView({ tableId, viewId, groupingFieldId, fieldIds 
 
   const groupedRows = groupRowsByField()
   const groups = Object.keys(groupedRows)
+
+  // Empty state for search
+  if (searchQuery && filteredRows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+        <div className="text-sm mb-2">No records match your search</div>
+        <button
+          onClick={() => {
+            const params = new URLSearchParams(window.location.search)
+            params.delete("q")
+            window.history.replaceState({}, "", `?${params.toString()}`)
+            window.location.reload()
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 underline"
+        >
+          Clear search
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="w-full h-full overflow-x-auto bg-gray-50">
