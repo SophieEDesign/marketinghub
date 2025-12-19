@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import { sanitizeFieldName } from "@/lib/fields/validation"
 
 interface CSVImportPanelProps {
   tableId: string
@@ -253,51 +254,69 @@ export default function CSVImportPanel({
       const rowsToInsert = allRows.map((csvRow) => {
         const mappedRow: Record<string, any> = {}
         csvHeaders.forEach((csvHeader) => {
-          // Only process if mapped to an existing field or has a new field definition
-          const fieldName = fieldMappings[csvHeader]
-          if (!fieldName && !newFields[csvHeader]) {
-            return // Skip unmapped columns
+          // Determine the field name: either from mapping or from new field creation
+          // When a new field is created, it uses the CSV header name (sanitized)
+          const mappedFieldName = fieldMappings[csvHeader]
+          const isNewField = !mappedFieldName && newFields[csvHeader]
+          
+          // Find the field - either by mapped name or by CSV header name (for new fields)
+          let field: TableField | undefined
+          if (mappedFieldName) {
+            field = updatedFields.find((f: TableField) => f.name === mappedFieldName)
+          } else if (isNewField) {
+            // For new fields, the field name is the sanitized version of the CSV header
+            // The API sanitizes field names when creating them, so we need to match by sanitized name
+            const sanitizedHeader = sanitizeFieldName(csvHeader)
+            field = updatedFields.find((f: TableField) => f.name === sanitizedHeader)
+            
+            // If still not found, try case-insensitive match as fallback
+            if (!field) {
+              field = updatedFields.find((f: TableField) => 
+                f.name.toLowerCase() === sanitizedHeader.toLowerCase()
+              )
+            }
+          }
+          
+          if (!field) {
+            // Field not found - skip this column
+            console.warn(`Field not found for CSV column "${csvHeader}" (mapped: ${mappedFieldName || 'new field'})`)
+            return
           }
 
-          const field = updatedFields.find((f: TableField) => f.name === fieldName)
-          
-          if (field) {
-            // Verify the field name is valid (should match column name in Supabase)
-            if (!validFieldNames.has(field.name)) {
-              console.warn(`Field ${field.name} is not in valid fields list, skipping`)
-              return // Skip this field
-            }
-            
-            let value: any = csvRow[csvHeader]
-            
-            // Skip if value is empty and field is not required
-            if ((value === null || value === undefined || value === '') && !field.required) {
-              return // Skip this field
-            }
-            
-            // Type conversion
-            if (field.type === "number" || field.type === "currency" || field.type === "percent") {
-              value = value === '' || value === null ? null : (parseFloat(value) || 0)
-            } else if (field.type === "checkbox") {
-              value = value === '' || value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
-            } else if (field.type === "date") {
-              // Try to parse date
-              if (value === '' || value === null) {
-                value = null
-              } else {
-                const date = new Date(value)
-                value = isNaN(date.getTime()) ? null : date.toISOString()
-              }
-            } else {
-              // For text fields, convert to string or null
-              value = value === '' || value === null ? null : String(value)
-            }
-            
-            // Use field.name which should match the sanitized column name in Supabase
-            // Field names are sanitized when created, so they match column names
-            mappedRow[field.name] = value
+          // Verify the field name is valid (should match column name in Supabase)
+          if (!validFieldNames.has(field.name)) {
+            console.warn(`Field ${field.name} is not in valid fields list, skipping`)
+            return // Skip this field
           }
-          // If field doesn't exist, skip it (don't include in mappedRow)
+          
+          let value: any = csvRow[csvHeader]
+          
+          // Skip if value is empty and field is not required
+          if ((value === null || value === undefined || value === '') && !field.required) {
+            return // Skip this field
+          }
+          
+          // Type conversion
+          if (field.type === "number" || field.type === "currency" || field.type === "percent") {
+            value = value === '' || value === null ? null : (parseFloat(value) || 0)
+          } else if (field.type === "checkbox") {
+            value = value === '' || value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
+          } else if (field.type === "date") {
+            // Try to parse date
+            if (value === '' || value === null) {
+              value = null
+            } else {
+              const date = new Date(value)
+              value = isNaN(date.getTime()) ? null : date.toISOString()
+            }
+          } else {
+            // For text fields, convert to string or null
+            value = value === '' || value === null ? null : String(value)
+          }
+          
+          // Use field.name which should match the sanitized column name in Supabase
+          // Field names are sanitized when created, so they match column names
+          mappedRow[field.name] = value
         })
         return mappedRow
       })

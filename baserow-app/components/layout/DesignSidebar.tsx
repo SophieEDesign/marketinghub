@@ -40,7 +40,7 @@ export default function DesignSidebar({
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1">
             <TabsTrigger value="fields">Fields</TabsTrigger>
             <TabsTrigger value="import">Import CSV</TabsTrigger>
           </TabsList>
