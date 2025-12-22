@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import WorkspaceShellWrapper from '@/components/layout/WorkspaceShellWrapper'
 import { Settings, Shield, Database, Key, FileText } from 'lucide-react'
@@ -10,14 +9,7 @@ import SettingsStorageTab from '@/components/settings/StorageTab'
 import SettingsApiTab from '@/components/settings/ApiTab'
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  // Authentication disabled for consistency with other pages
 
   return (
     <WorkspaceShellWrapper title="Settings">
