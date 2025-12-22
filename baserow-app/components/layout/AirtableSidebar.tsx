@@ -40,6 +40,8 @@ interface AirtableSidebarProps {
   interfacePages?: InterfacePage[]
   interfaceGroups?: InterfaceGroup[]
   automations?: Automation[]
+  tables?: Table[]
+  views?: Record<string, View[]>
   userRole?: 'admin' | 'member' | null
 }
 
