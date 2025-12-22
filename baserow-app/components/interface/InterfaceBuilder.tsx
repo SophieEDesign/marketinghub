@@ -49,11 +49,30 @@ export default function InterfaceBuilder({
     async (layout: LayoutItem[]) => {
       // Auto-save layout changes
       try {
-        await fetch(`/api/pages/${page.id}/blocks`, {
+        const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ layout }),
         })
+
+        if (response.ok) {
+          // Update local state to reflect saved positions
+          setBlocks((prevBlocks) => {
+            return prevBlocks.map((block) => {
+              const layoutItem = layout.find((item) => item.i === block.id)
+              if (layoutItem) {
+                return {
+                  ...block,
+                  x: layoutItem.x,
+                  y: layoutItem.y,
+                  w: layoutItem.w,
+                  h: layoutItem.h,
+                }
+              }
+              return block
+            })
+          })
+        }
       } catch (error) {
         console.error("Failed to save layout:", error)
       }
@@ -220,6 +239,7 @@ export default function InterfaceBuilder({
             onLayoutChange={handleLayoutChange}
             onBlockUpdate={handleBlockUpdate}
             onBlockClick={setSelectedBlockId}
+            onBlockDelete={handleDeleteBlock}
             selectedBlockId={selectedBlockId}
             layoutSettings={page.settings?.layout}
           />

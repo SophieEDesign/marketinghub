@@ -181,11 +181,16 @@ export default function CSVImportPanel({
         // Get the created field data to know the exact sanitized name
         const createdField = await response.json().catch(() => null)
         if (createdField?.field?.name) {
+          // API returns { field: { name: "...", ... } }
           createdFieldNames[fieldData.name] = createdField.field.name
+        } else if (createdField?.name) {
+          // Sometimes API might return field directly
+          createdFieldNames[fieldData.name] = createdField.name
         } else {
           // Fallback: sanitize the name ourselves (should match API)
           const sanitized = sanitizeFieldName(fieldData.name)
           createdFieldNames[fieldData.name] = sanitized
+          console.warn(`Field creation response format unexpected for "${fieldData.name}", using sanitized name: ${sanitized}`)
         }
       }
 
@@ -465,13 +470,24 @@ export default function CSVImportPanel({
                       value={mappedField || "new"}
                       onValueChange={(value) => {
                         if (value === "new") {
+                          // Remove mapping and ensure field type is set
                           setFieldMappings((prev) => {
                             const newMappings = { ...prev }
                             delete newMappings[csvHeader]
                             return newMappings
                           })
+                          // Set default field type if not already set
+                          if (!newFields[csvHeader]) {
+                            handleNewFieldType(csvHeader, "text")
+                          }
                         } else {
+                          // Map to existing field - clear new field type
                           handleMappingChange(csvHeader, value)
+                          setNewFields((prev) => {
+                            const newFields = { ...prev }
+                            delete newFields[csvHeader]
+                            return newFields
+                          })
                         }
                       }}
                     >
@@ -479,7 +495,7 @@ export default function CSVImportPanel({
                         <SelectValue placeholder="Select or create field" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="new">Create new field</SelectItem>
+                        <SelectItem value="new">+ Create new field</SelectItem>
                         {tableFields.map((field) => (
                           <SelectItem key={field.id} value={field.name}>
                             {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
@@ -489,21 +505,27 @@ export default function CSVImportPanel({
                     </Select>
 
                     {!mappedField && (
-                      <Select
-                        value={newFields[csvHeader] || "text"}
-                        onValueChange={(value) => handleNewFieldType(csvHeader, value as FieldType)}
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {FIELD_TYPES.filter(ft => !ft.isVirtual).map((ft) => (
-                            <SelectItem key={ft.type} value={ft.type}>
-                              {ft.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-gray-600">Field Type</Label>
+                        <Select
+                          value={newFields[csvHeader] || "text"}
+                          onValueChange={(value) => handleNewFieldType(csvHeader, value as FieldType)}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Select field type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {FIELD_TYPES.filter(ft => !ft.isVirtual).map((ft) => (
+                              <SelectItem key={ft.type} value={ft.type}>
+                                {ft.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500">
+                          A new field "{csvHeader}" will be created with this type
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>
