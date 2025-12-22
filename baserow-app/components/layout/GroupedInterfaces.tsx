@@ -72,7 +72,8 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
-  const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups)
+  // Filter out any null/undefined groups (safety check)
+  const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
   const [pages, setPages] = useState<InterfacePage[]>(interfacePages)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
@@ -242,7 +243,19 @@ export default function GroupedInterfaces({
 
       if (response.ok) {
         const { group } = await response.json()
-        setGroups((prev) => [...prev, group])
+        
+        // Check if group was actually created (might be null if table doesn't exist)
+        if (!group || !group.id) {
+          // Silently fail - table might not exist yet (migration not run)
+          console.warn("Failed to create group: table may not exist or RLS blocking")
+          return
+        }
+        
+        setGroups((prev) => {
+          // Safety check: only add if group is valid
+          if (!group || !group.id) return prev
+          return [...prev, group]
+        })
         // Immediately start editing
         setEditingGroupId(group.id)
         setEditingName(defaultName)
