@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/roles'
 import WorkspaceShellWrapper from '@/components/layout/WorkspaceShellWrapper'
-import { Settings, Shield, Database, Key, FileText, Palette } from 'lucide-react'
+import { Settings, Shield, Database, Key, FileText, Palette, Table2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import SettingsWorkspaceTab from '@/components/settings/WorkspaceTab'
 import SettingsPagesTab from '@/components/settings/PagesTab'
@@ -57,6 +57,10 @@ export default async function SettingsPage() {
               <Shield className="mr-2 h-4 w-4" />
               Permissions
             </TabsTrigger>
+            <TabsTrigger value="data">
+              <Table2 className="mr-2 h-4 w-4" />
+              Data
+            </TabsTrigger>
             <TabsTrigger value="storage">
               <Database className="mr-2 h-4 w-4" />
               Storage
@@ -64,6 +68,10 @@ export default async function SettingsPage() {
             <TabsTrigger value="api">
               <Key className="mr-2 h-4 w-4" />
               API Keys
+            </TabsTrigger>
+            <TabsTrigger value="branding">
+              <Palette className="mr-2 h-4 w-4" />
+              Branding
             </TabsTrigger>
           </TabsList>
 
