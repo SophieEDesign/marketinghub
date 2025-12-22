@@ -31,7 +31,6 @@ interface ViewTopBarProps {
   onShare?: () => void
   onAddField?: () => void
   onNewRecord?: () => void
-  onViewChange?: (type: "grid" | "kanban" | "calendar" | "form") => void
   onSearch?: (query: string) => void
   onDesign?: () => void
 }
@@ -46,7 +45,6 @@ export default function ViewTopBar({
   onShare,
   onAddField,
   onNewRecord,
-  onViewChange,
   onSearch,
   onDesign,
 }: ViewTopBarProps) {
@@ -113,26 +111,7 @@ export default function ViewTopBar({
       {/* Left side - View name and controls */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <h1 className="text-base font-semibold text-gray-900 truncate">{viewName}</h1>
-        
-        {/* View Switcher */}
-        {onViewChange && (
-          <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
-            {(["grid", "kanban", "calendar", "form"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => onViewChange(type)}
-                className={`p-1.5 rounded transition-colors ${
-                  viewType === type
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-                title={type.charAt(0).toUpperCase() + type.slice(1)}
-              >
-                {getViewIcon(type)}
-              </button>
-            ))}
-          </div>
-        )}
+        <span className="text-xs text-gray-500 capitalize">({viewType})</span>
 
         {/* Search */}
         {onSearch && (

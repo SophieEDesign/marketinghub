@@ -61,7 +61,7 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
         .single()
 
       if (error) {
-        throw new Error(error.message || "Failed to create page")
+        throw new Error(error.message || "Failed to create interface")
       }
 
       if (view) {
@@ -69,14 +69,14 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
         setName("")
         setIcon("")
         onOpenChange(false)
-        // Redirect to the new page route
+        // Redirect to the new interface route
         router.push(`/pages/${view.id}`)
         router.refresh()
         window.dispatchEvent(new CustomEvent('pages-updated'))
       }
     } catch (error: any) {
-      console.error("Failed to create page:", error)
-      alert(error.message || "Failed to create page")
+      console.error("Failed to create interface:", error)
+      alert(error.message || "Failed to create interface")
     } finally {
       setLoading(false)
     }
@@ -120,7 +120,7 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
               placeholder="📊"
             />
             <p className="text-xs text-muted-foreground">
-              Optional: Select an icon to represent this page
+              Optional: Select an icon to represent this interface
             </p>
           </div>
         </div>

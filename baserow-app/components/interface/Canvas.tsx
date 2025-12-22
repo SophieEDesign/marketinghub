@@ -36,31 +36,47 @@ export default function Canvas({
 }: CanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
+  const isInitializedRef = useRef(false)
 
-  // Sync layout from blocks only when block IDs change (add/remove), not on position changes
-  // Position changes come from user drag/resize and are handled by handleLayoutChange
+  /**
+   * Hydrates react-grid-layout from Supabase on page load
+   * 
+   * CRITICAL: Only syncs from blocks prop on:
+   * 1. Initial page load (restores saved positions from view_blocks table)
+   * 2. When blocks are added/removed (block count changes)
+   * 
+   * Does NOT reset layout when:
+   * - User drags/resizes blocks (handled by handleLayoutChange)
+   * - Blocks prop updates with same block IDs (preserves user's current positions)
+   * 
+   * Layout positions come from: view_blocks.position_x, position_y, width, height
+   */
   useEffect(() => {
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
     
-    // Only update layout if:
-    // 1. First load (previousBlockIds is empty)
-    // 2. Block IDs changed (block added or removed)
-    if (previousBlockIds === "" || currentBlockIds !== previousBlockIds) {
-      // Convert blocks to layout format - use saved positions from blocks
+    // Only update layout from blocks prop if:
+    // 1. First load (not yet initialized)
+    // 2. Block IDs changed (block added or removed, not just position change)
+    const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
+    
+    if (!isInitializedRef.current || blockIdsChanged) {
+      // Convert blocks to layout format - use saved positions from Supabase
+      // These positions come from view_blocks.position_x, position_y, width, height
       const newLayout: Layout[] = blocks.map((block) => ({
         i: block.id,
-        x: block.x,
-        y: block.y,
-        w: block.w,
-        h: block.h,
+        x: block.x ?? 0,
+        y: block.y ?? 0,
+        w: block.w ?? 4,
+        h: block.h ?? 4,
         minW: 2,
         minH: 2,
       }))
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
+      isInitializedRef.current = true
     }
-    // If block IDs haven't changed, don't update layout - preserve user's drag/resize positions
+    // If block IDs haven't changed, preserve current layout state (user's drag/resize positions)
   }, [blocks])
 
   const handleLayoutChange = useCallback(
@@ -111,10 +127,12 @@ export default function Canvas({
         isDraggable={isEditing}
         isResizable={isEditing}
         isBounded={true}
-        preventCollision={true}
+        preventCollision={false}
         onLayoutChange={handleLayoutChange}
         compactType="vertical"
         draggableHandle=".drag-handle"
+        allowOverlap={false}
+        resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
       >
         {blocks.map((block) => (
           <div
@@ -129,9 +147,21 @@ export default function Canvas({
                 : "bg-transparent border-0 shadow-none"
             }`}
             onClick={(e) => {
-              // Only allow selection in edit mode, and not if clicking buttons
-              if (isEditing && !(e.target as HTMLElement).closest('button')) {
-                onBlockClick?.(block.id)
+              // Only allow selection in edit mode, and not if clicking:
+              // - buttons
+              // - inside editor content (quill, textarea, input)
+              // - inside any interactive element
+              if (isEditing) {
+                const target = e.target as HTMLElement
+                const isEditorContent = target.closest('.ql-editor') || 
+                                       target.closest('textarea') || 
+                                       target.closest('input') ||
+                                       target.closest('[contenteditable="true"]') ||
+                                       target.closest('button')
+                
+                if (!isEditorContent) {
+                  onBlockClick?.(block.id)
+                }
               }
             }}
           >

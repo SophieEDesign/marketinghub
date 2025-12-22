@@ -68,7 +68,6 @@ interface ViewBuilderToolbarProps {
   rowHeight?: "short" | "medium" | "tall"
   hiddenFields?: string[]
   userRole?: "admin" | "editor" | "viewer" | null
-  onViewTypeChange?: (type: ViewType) => void
   onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: string; value?: string }>) => void
   onSortsChange?: (sorts: Array<{ id?: string; field_name: string; direction: string }>) => void
   onGroupChange?: (fieldName: string | null) => void
@@ -94,7 +93,6 @@ export default function ViewBuilderToolbar({
   rowHeight = "medium",
   hiddenFields = [],
   userRole = "editor",
-  onViewTypeChange,
   onFiltersChange,
   onSortsChange,
   onGroupChange,
@@ -179,26 +177,10 @@ export default function ViewBuilderToolbar({
   return (
     <>
       <div className="h-10 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4">
-        {/* Left side - View type selector */}
+        {/* Left side - View name (view type is locked, no selector) */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-white rounded-md border border-gray-200 p-0.5">
-            {(["grid", "kanban", "calendar", "form", "gallery"] as ViewType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => canEdit && onViewTypeChange?.(type)}
-                disabled={!canEdit}
-                className={`p-1.5 rounded transition-colors ${
-                  viewType === type
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                } ${!canEdit ? "opacity-50 cursor-not-allowed" : ""}`}
-                title={type.charAt(0).toUpperCase() + type.slice(1)}
-              >
-                {getViewIcon(type)}
-              </button>
-            ))}
-          </div>
-          <span className="text-sm font-medium text-gray-700 ml-2">{viewName}</span>
+          <span className="text-sm font-medium text-gray-700">{viewName}</span>
+          <span className="text-xs text-gray-500 capitalize">({viewType})</span>
           
           {/* Search */}
           <div className="relative w-64 ml-4">

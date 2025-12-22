@@ -1,6 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
 import type { PageBlock, LayoutItem } from '@/lib/interface/types'
 
+/**
+ * Saves block layout positions to Supabase
+ * 
+ * Persists block positions (x, y, w, h) to the view_blocks table.
+ * 
+ * Database columns:
+ * - position_x: Block's X position in grid (from LayoutItem.x)
+ * - position_y: Block's Y position in grid (from LayoutItem.y)
+ * - width: Block width in grid units (from LayoutItem.w)
+ * - height: Block height in grid units (from LayoutItem.h)
+ * - order_index: Display order (from array index)
+ * 
+ * Called by: /api/pages/[pageId]/blocks PATCH endpoint
+ * Triggered by: User drag/resize in edit mode (debounced) or "Done" button click
+ */
 export async function saveBlockLayout(
   pageId: string,
   layout: LayoutItem[]

@@ -268,38 +268,8 @@ export default function AirtableViewPage({
     }
   }
 
-  async function handleViewTypeChange(newType: ViewType) {
-    try {
-      const { data: currentView } = await supabase
-        .from("views")
-        .select("config")
-        .eq("id", viewId)
-        .single()
-
-      const currentConfig = (currentView?.config as Record<string, any>) || {}
-      let newConfig = { ...currentConfig }
-
-      // If switching to kanban, try to auto-detect a select field
-      if (newType === "kanban" && !newConfig.kanban_group_field) {
-        const selectField = tableFields.find(
-          (f) => f.type === "single_select" || f.type === "multi_select"
-        )
-        if (selectField) {
-          newConfig.kanban_group_field = selectField.name
-        }
-      }
-
-      await supabase
-        .from("views")
-        .update({ type: newType, config: newConfig })
-        .eq("id", viewId)
-
-      router.refresh()
-    } catch (error) {
-      console.error("Error changing view type:", error)
-      alert("Failed to change view type")
-    }
-  }
+  // View type is locked at creation - cannot be changed
+  // Users should create a new view instead
 
   async function handleNewRecord() {
     try {
@@ -336,7 +306,6 @@ export default function AirtableViewPage({
         rowHeight={rowHeight}
         hiddenFields={hiddenFields}
         userRole="editor"
-        onViewTypeChange={handleViewTypeChange}
         onFiltersChange={(newFilters) => {
           setFilters(newFilters as typeof filters)
           router.refresh()

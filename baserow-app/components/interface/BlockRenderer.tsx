@@ -79,7 +79,7 @@ export default function BlockRenderer({
         <ImageBlock
           block={block}
           isEditing={isEditing}
-          onUpdate={(url, alt) => handleUpdate({ image_url: url, image_alt: alt })}
+          onUpdate={(updates) => handleUpdate(updates)}
         />
       )
 

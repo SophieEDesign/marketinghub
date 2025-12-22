@@ -53,7 +53,7 @@ export default function PageSettingsDrawer({
 
   async function handleSave() {
     if (!name.trim()) {
-      alert("Page name is required")
+      alert("Interface name is required")
       return
     }
 
@@ -73,22 +73,17 @@ export default function PageSettingsDrawer({
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || "Failed to update page")
+        throw new Error(error.error || "Failed to update interface")
       }
 
       // Trigger sidebar refresh
       window.dispatchEvent(new CustomEvent('pages-updated'))
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to update page")
-      }
-
       onPageUpdate()
       onOpenChange(false)
     } catch (error: any) {
-      console.error("Failed to update page:", error)
-      alert(error.message || "Failed to update page")
+      console.error("Failed to update interface:", error)
+      alert(error.message || "Failed to update interface")
     } finally {
       setSaving(false)
     }
@@ -145,7 +140,7 @@ export default function PageSettingsDrawer({
                 placeholder="📊"
               />
               <p className="text-xs text-muted-foreground">
-                Optional: Select an icon to represent this page
+                Optional: Select an icon to represent this interface
               </p>
             </div>
 
@@ -169,7 +164,7 @@ export default function PageSettingsDrawer({
                   className="w-full"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Page
+                  Delete Interface
                 </Button>
                 <p className="text-xs text-muted-foreground">
                   This action cannot be undone. All blocks on this interface will be deleted.

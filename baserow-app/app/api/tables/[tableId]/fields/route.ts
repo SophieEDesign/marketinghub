@@ -109,9 +109,17 @@ export async function POST(
 
     if (fieldError) {
       // If table_fields doesn't exist, provide helpful error
-      if (fieldError.code === '42P01') {
+      // Supabase returns PGRST116 for missing tables, 42P01 for PostgreSQL errors
+      if (fieldError.code === '42P01' || fieldError.code === 'PGRST116' || 
+          fieldError.message?.includes('relation') || 
+          fieldError.message?.includes('does not exist') ||
+          fieldError.message?.includes('table_fields')) {
         return NextResponse.json(
-          { error: 'table_fields table does not exist. Please run the migration to create it.' },
+          { 
+            error: 'table_fields table does not exist. Please run the migration create_table_fields.sql in Supabase.',
+            code: 'MISSING_TABLE',
+            details: 'The table_fields table is required for field management. Run the migration file: supabase/migrations/create_table_fields.sql'
+          },
           { status: 500 }
         )
       }

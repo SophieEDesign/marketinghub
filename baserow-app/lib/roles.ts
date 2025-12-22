@@ -20,10 +20,16 @@ export async function getUserRole(): Promise<UserRole | null> {
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
   
+  // If table doesn't exist or no role found, default to viewer
   if (error || !data) {
-    // Default to viewer if no role found
+    // Check if error is due to missing table (PGRST116) or just no data
+    if (error?.code === 'PGRST116' || error?.message?.includes('relation') || error?.message?.includes('does not exist')) {
+      // Table doesn't exist - that's okay, default to viewer
+      return 'viewer'
+    }
+    // No role found for user - default to viewer
     return 'viewer'
   }
   

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
@@ -44,10 +44,26 @@ export default function InterfaceBuilder({
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
+  const [pendingLayout, setPendingLayout] = useState<LayoutItem[] | null>(null)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const handleLayoutChange = useCallback(
+  /**
+   * Saves block layout to Supabase
+   * 
+   * This function persists block positions (x, y, w, h) to the view_blocks table.
+   * Layout is saved to: view_blocks.position_x, position_y, width, height
+   * 
+   * Called:
+   * - After user stops dragging/resizing (debounced, 500ms delay)
+   * - When user clicks "Done" to exit edit mode (immediate)
+   * 
+   * Only saves when isEditing is true - view mode never mutates layout.
+   */
+  const saveLayout = useCallback(
     async (layout: LayoutItem[]) => {
-      // Auto-save layout changes
+      // Only save in edit mode - view mode must never mutate layout
+      if (!isEditing) return
+
       try {
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
@@ -57,6 +73,7 @@ export default function InterfaceBuilder({
 
         if (response.ok) {
           // Update local state to reflect saved positions
+          // This ensures UI stays in sync with database
           setBlocks((prevBlocks) => {
             return prevBlocks.map((block) => {
               const layoutItem = layout.find((item) => item.i === block.id)
@@ -72,13 +89,104 @@ export default function InterfaceBuilder({
               return block
             })
           })
+          setPendingLayout(null)
         }
       } catch (error) {
         console.error("Failed to save layout:", error)
       }
     },
-    [page.id]
+    [page.id, isEditing]
   )
+
+  /**
+   * Handles layout changes from react-grid-layout
+   * 
+   * Called when user drags or resizes blocks in edit mode.
+   * Updates local state immediately for responsive UI, then debounces save to Supabase.
+   * 
+   * Debounce delay: 500ms - prevents hammering the API during rapid drag/resize operations.
+   */
+  const handleLayoutChange = useCallback(
+    (layout: LayoutItem[]) => {
+      // Only save in edit mode - view mode never mutates layout
+      if (!isEditing) return
+
+      // Update local state immediately for responsive UI
+      // This gives instant feedback while dragging/resizing
+      setBlocks((prevBlocks) => {
+        return prevBlocks.map((block) => {
+          const layoutItem = layout.find((item) => item.i === block.id)
+          if (layoutItem) {
+            return {
+              ...block,
+              x: layoutItem.x,
+              y: layoutItem.y,
+              w: layoutItem.w,
+              h: layoutItem.h,
+            }
+          }
+          return block
+        })
+      })
+
+      // Store pending layout for debounced save
+      setPendingLayout(layout)
+
+      // Clear existing timeout to reset debounce timer
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+
+      // Debounce save: wait 500ms after last change before saving to Supabase
+      // This prevents excessive API calls during rapid drag/resize
+      saveTimeoutRef.current = setTimeout(() => {
+        saveLayout(layout)
+      }, 500)
+    },
+    [isEditing, saveLayout]
+  )
+
+  // Save layout immediately when exiting edit mode
+  const handleExitEditMode = useCallback(async () => {
+    // Clear any pending debounced save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    // Get current layout from blocks state and save before exiting edit mode
+    // This ensures any unsaved drag/resize changes are persisted
+    const currentLayout: LayoutItem[] = blocks.map((block) => ({
+      i: block.id,
+      x: block.x,
+      y: block.y,
+      w: block.w,
+      h: block.h,
+    }))
+
+    if (currentLayout.length > 0) {
+      setIsSaving(true)
+      try {
+        await saveLayout(currentLayout)
+      } catch (error) {
+        console.error("Failed to save layout on exit:", error)
+      } finally {
+        setIsSaving(false)
+      }
+    }
+
+    setIsEditing(false)
+    setSelectedBlockId(null)
+  }, [blocks, saveLayout])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const handleBlockUpdate = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
@@ -210,13 +318,11 @@ export default function InterfaceBuilder({
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    setIsEditing(false)
-                    setSelectedBlockId(null)
-                  }}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2"
+                  onClick={handleExitEditMode}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2 disabled:opacity-50"
                 >
-                  Done
+                  {isSaving ? "Saving..." : "Done"}
                 </button>
               </>
             ) : (

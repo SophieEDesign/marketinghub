@@ -1,10 +1,167 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { X, Upload, Image as ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
 import type { Table, View, Automation, TableField } from "@/types/database"
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
+function ImageBlockSettings({ config, setConfig }: { config: BlockConfig; setConfig: (config: BlockConfig) => void }) {
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop() || 'jpg'
+      const filePath = `interface-images/${generateUUID()}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file, { upsert: false })
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        alert('Failed to upload image. Please try again.')
+        return
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath)
+
+      setConfig({ ...config, image_url: urlData.publicUrl })
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('Failed to upload image. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <>
+      <div>
+        <Label htmlFor="image-upload">Upload Image</Label>
+        <div className="mt-1">
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+            id="image-upload"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-full"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {uploading ? "Uploading..." : "Select Image"}
+          </Button>
+        </div>
+        {config.image_url && (
+          <div className="mt-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={config.image_url}
+              alt={config.image_alt || ""}
+              className="max-w-full h-32 object-contain rounded-md border border-gray-200"
+            />
+          </div>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="image-url">Image URL</Label>
+        <Input
+          id="image-url"
+          type="url"
+          value={config.image_url || ""}
+          onChange={(e) => setConfig({ ...config, image_url: e.target.value })}
+          placeholder="https://example.com/image.jpg"
+          className="mt-1"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Or paste an image URL directly
+        </p>
+      </div>
+
+      <div>
+        <Label htmlFor="image-alt">Alt Text</Label>
+        <Input
+          id="image-alt"
+          type="text"
+          value={config.image_alt || ""}
+          onChange={(e) => setConfig({ ...config, image_alt: e.target.value })}
+          placeholder="Description of the image"
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="image-alignment">Alignment</Label>
+        <Select
+          value={config.image_alignment || "center"}
+          onValueChange={(value) => setConfig({ ...config, image_alignment: value })}
+        >
+          <SelectTrigger id="image-alignment" className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="left">Left</SelectItem>
+            <SelectItem value="center">Center</SelectItem>
+            <SelectItem value="right">Right</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <Label htmlFor="image-width">Width</Label>
+        <Select
+          value={config.image_width || "auto"}
+          onValueChange={(value) => setConfig({ ...config, image_width: value })}
+        >
+          <SelectTrigger id="image-width" className="mt-1">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto</SelectItem>
+            <SelectItem value="full">Full Width</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  )
+}
 
 interface SettingsPanelProps {
   block: PageBlock | null
@@ -348,6 +505,9 @@ export default function SettingsPanel({
             </div>
           </>
         )
+
+      case "image":
+        return <ImageBlockSettings config={config} setConfig={setConfig} />
 
       default:
         return null

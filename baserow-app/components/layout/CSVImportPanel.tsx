@@ -121,17 +121,76 @@ export default function CSVImportPanel({
 
     // Auto-map headers to existing fields
     const mappings: Record<string, string> = {}
+    const autoDetectedTypes: Record<string, FieldType> = {}
+    
     headers.forEach((header) => {
       const matchingField = tableFields.find(
         (f) => f.name.toLowerCase() === header.toLowerCase()
       )
       if (matchingField) {
         mappings[header] = matchingField.name
+      } else {
+        // Auto-detect field type from sample data
+        const sampleValues = rows.slice(0, 10).map(row => row[header]).filter(v => v && v.trim())
+        if (sampleValues.length > 0) {
+          const detectedType = detectFieldType(sampleValues)
+          autoDetectedTypes[header] = detectedType
+        }
       }
     })
+    
     setFieldMappings(mappings)
+    // Merge auto-detected types with any existing newFields
+    setNewFields((prev) => ({ ...prev, ...autoDetectedTypes }))
 
     setStep("mapping")
+  }
+
+  // Auto-detect field type from sample values
+  function detectFieldType(sampleValues: string[]): FieldType {
+    // Check for email pattern
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (sampleValues.every(v => emailPattern.test(v))) {
+      return 'text' // Use text for email (can add email type later)
+    }
+
+    // Check for URL pattern
+    const urlPattern = /^https?:\/\//
+    if (sampleValues.every(v => urlPattern.test(v))) {
+      return 'text' // Use text for URL (can add url type later)
+    }
+
+    // Check for date pattern (common formats)
+    const datePatterns = [
+      /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
+      /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
+      /^\d{2}-\d{2}-\d{4}$/, // MM-DD-YYYY
+    ]
+    if (sampleValues.every(v => datePatterns.some(p => p.test(v)))) {
+      return 'date'
+    }
+
+    // Check for number (integer or decimal)
+    const numberPattern = /^-?\d+(\.\d+)?$/
+    if (sampleValues.every(v => numberPattern.test(v.trim()))) {
+      // Check if it's a percentage or currency
+      if (sampleValues.some(v => v.includes('%'))) {
+        return 'percent'
+      }
+      if (sampleValues.some(v => v.includes('$') || v.includes('€') || v.includes('£'))) {
+        return 'currency'
+      }
+      return 'number'
+    }
+
+    // Check for boolean/checkbox
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n']
+    if (sampleValues.every(v => booleanValues.includes(v.toLowerCase().trim()))) {
+      return 'checkbox'
+    }
+
+    // Default to text
+    return 'text'
   }
 
   function handleMappingChange(csvHeader: string, fieldName: string) {
@@ -463,9 +522,16 @@ export default function CSVImportPanel({
               return (
                 <div key={csvHeader} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex items-center justify-between mb-2">
-                    <Label className="text-xs font-medium text-gray-700">
-                      {csvHeader}
-                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-medium text-gray-700">
+                        {csvHeader}
+                      </Label>
+                      {newFields[csvHeader] && !mappedField && (
+                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                          Detected: {FIELD_TYPES.find(t => t.type === newFields[csvHeader])?.label || newFields[csvHeader]}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-gray-500">
                       Sample: {csvRows[0]?.[csvHeader]?.substring(0, 30) || "—"}
                     </span>
@@ -511,7 +577,14 @@ export default function CSVImportPanel({
 
                     {!mappedField && (
                       <div className="space-y-1">
-                        <Label className="text-xs text-gray-600">Field Type</Label>
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs text-gray-600">Field Type</Label>
+                          {newFields[csvHeader] && (
+                            <span className="text-xs text-blue-600">
+                              Auto-detected
+                            </span>
+                          )}
+                        </div>
                         <Select
                           value={newFields[csvHeader] || "text"}
                           onValueChange={(value) => handleNewFieldType(csvHeader, value as FieldType)}
@@ -529,6 +602,7 @@ export default function CSVImportPanel({
                         </Select>
                         <p className="text-xs text-gray-500">
                           A new field &quot;{csvHeader}&quot; will be created with this type
+                          {newFields[csvHeader] && " (you can override the detected type above)"}
                         </p>
                       </div>
                     )}

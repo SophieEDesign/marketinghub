@@ -31,11 +31,12 @@ export default function SettingsWorkspaceTab() {
       const { data: { user } } = await supabase.auth.getUser()
       
       // Try to get workspace from workspaces table
+      // Use maybeSingle() to handle missing table gracefully (returns null instead of error)
       const { data, error } = await supabase
         .from('workspaces')
         .select('name, icon, created_at, created_by')
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (!error && data) {
         setWorkspaceName(data.name || 'Marketing Hub')
