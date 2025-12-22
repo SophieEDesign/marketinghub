@@ -26,6 +26,14 @@ const nextConfig = {
       },
     })
     
+    // Prevent webpack from trying to resolve @radix-ui/react-alert-dialog
+    // by aliasing it to our shim file
+    const path = require('path')
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@radix-ui/react-alert-dialog': path.resolve(__dirname, 'components/ui/alert-dialog.tsx'),
+    }
+    
     return config
   },
 }

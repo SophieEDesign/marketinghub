@@ -2,6 +2,8 @@
 // This file exists to satisfy build cache that may reference alert-dialog
 // All actual usage has been migrated to Dialog component
 
+"use client"
+
 import * as React from "react"
 import {
   Dialog,
