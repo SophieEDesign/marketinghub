@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Plus, Grid, FileText, Columns, Calendar } from "lucide-react"
 import { getTable } from "@/lib/crud/tables"
 import { getViews } from "@/lib/crud/views"
+import { createClient } from "@/lib/supabase/server"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import type { View } from "@/types/database"
 
@@ -35,7 +36,34 @@ export default async function TablePage({
       )
     }
 
-    const views = await getViews(params.tableId).catch(() => [])
+    let views = await getViews(params.tableId).catch(() => [])
+
+    // If no views exist, create a default "All Records" grid view
+    if (!views || views.length === 0) {
+      try {
+        const supabase = await createClient()
+        const { data: newView, error: createError } = await supabase
+          .from('views')
+          .insert([
+            {
+              table_id: params.tableId,
+              name: 'All Records',
+              type: 'grid',
+              config: {},
+              access_level: 'authenticated',
+            },
+          ])
+          .select()
+          .single()
+
+        if (!createError && newView) {
+          views = [newView as View]
+        }
+      } catch (createError) {
+        console.error('Error creating default view:', createError)
+        // Continue to show view creation screen if creation fails
+      }
+    }
 
     // Find default grid view or first non-interface view
     // Note: Interface views don't have table_id, so they won't be in this list

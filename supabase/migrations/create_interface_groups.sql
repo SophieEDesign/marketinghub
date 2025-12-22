@@ -14,9 +14,31 @@ CREATE TABLE IF NOT EXISTS public.interface_groups (
 );
 
 -- 2. Add group_id and order_index to views table (for interfaces)
-ALTER TABLE public.views
-  ADD COLUMN IF NOT EXISTS group_id uuid REFERENCES public.interface_groups(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS order_index integer NOT NULL DEFAULT 0;
+-- Note: order_index needs special handling since it has NOT NULL constraint
+DO $$
+BEGIN
+  -- Add group_id if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'views' 
+    AND column_name = 'group_id'
+  ) THEN
+    ALTER TABLE public.views
+      ADD COLUMN group_id uuid REFERENCES public.interface_groups(id) ON DELETE SET NULL;
+  END IF;
+
+  -- Add order_index if it doesn't exist
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'views' 
+    AND column_name = 'order_index'
+  ) THEN
+    ALTER TABLE public.views
+      ADD COLUMN order_index integer NOT NULL DEFAULT 0;
+  END IF;
+END $$;
 
 -- 3. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_interface_groups_workspace_id ON public.interface_groups(workspace_id);
@@ -26,6 +48,12 @@ CREATE INDEX IF NOT EXISTS idx_views_order_index ON public.views(order_index);
 
 -- 4. Add RLS policies for interface_groups
 ALTER TABLE public.interface_groups ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (idempotent)
+DROP POLICY IF EXISTS "Allow authenticated users to read interface groups" ON public.interface_groups;
+DROP POLICY IF EXISTS "Allow authenticated users to insert interface groups" ON public.interface_groups;
+DROP POLICY IF EXISTS "Allow authenticated users to update interface groups" ON public.interface_groups;
+DROP POLICY IF EXISTS "Allow authenticated users to delete interface groups" ON public.interface_groups;
 
 -- Allow authenticated users to read all groups
 CREATE POLICY "Allow authenticated users to read interface groups"
