@@ -90,16 +90,17 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
       )
     }
 
-    const alignmentClass = {
+    const alignmentClass: Record<string, string> = {
       left: "justify-start",
       center: "justify-center",
       right: "justify-end",
-    }[imageAlignment] || "justify-center"
+    }
+    const alignment = alignmentClass[imageAlignment as string] || "justify-center"
 
     const widthClass = imageWidth === "auto" ? "w-auto max-w-full" : "w-full"
 
     return (
-      <div className={`h-full p-4 flex ${alignmentClass}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`h-full p-4 flex ${alignment}`} onClick={(e) => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
