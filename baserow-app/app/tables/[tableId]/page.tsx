@@ -47,13 +47,14 @@ export default async function TablePage({
     }
 
     // If no views exist, show view creation screen
-    const viewIcons = {
+    const viewIcons: Record<string, typeof Grid> = {
       grid: Grid,
       form: FileText,
       kanban: Columns,
       calendar: Calendar,
       gallery: Grid,
       page: FileText,
+      interface: FileText, // Interface pages use FileText icon
     }
 
     return (
