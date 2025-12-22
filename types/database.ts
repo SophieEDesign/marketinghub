@@ -1,6 +1,6 @@
 export type AccessLevel = 'public' | 'authenticated' | 'owner'
 
-export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'gallery' | 'page'
+export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'gallery' | 'page' | 'interface'
 
 export type FilterOperator =
   | 'equal'
@@ -40,7 +40,7 @@ export interface Table {
 
 export interface View {
   id: string
-  table_id: string
+  table_id: string | null // null for interface views
   name: string
   type: ViewType
   config?: Record<string, any>

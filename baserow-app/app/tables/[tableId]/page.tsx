@@ -37,7 +37,8 @@ export default async function TablePage({
 
     const views = await getViews(params.tableId).catch(() => [])
 
-    // Find default grid view or first grid view
+    // Find default grid view or first non-interface view
+    // Note: Interface views don't have table_id, so they won't be in this list
     const defaultGridView = views.find((v: View) => v.type === 'grid') || views.find((v: View) => v.type !== 'interface')
     
     // If default grid view exists, redirect to it directly

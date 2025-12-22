@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import NewPageModal from "@/components/interface/NewPageModal"
+import GroupedInterfaces from "./GroupedInterfaces"
 import { 
   Table2, 
   ChevronRight, 
@@ -28,12 +29,23 @@ interface InterfacePage {
   id: string
   name: string
   description?: string
+  group_id?: string | null
+  order_index?: number
+}
+
+interface InterfaceGroup {
+  id: string
+  name: string
+  order_index: number
+  collapsed: boolean
+  workspace_id?: string | null
 }
 
 interface AirtableSidebarProps {
   tables: Table[]
   views: Record<string, View[]>
   interfacePages?: InterfacePage[]
+  interfaceGroups?: InterfaceGroup[]
   automations?: Automation[]
 }
 
@@ -41,6 +53,7 @@ export default function AirtableSidebar({
   tables, 
   views, 
   interfacePages = [], 
+  interfaceGroups = [],
   automations = [] 
 }: AirtableSidebarProps) {
   const pathname = usePathname()
@@ -204,36 +217,14 @@ export default function AirtableSidebar({
             </button>
           </div>
           {expandedSections.has("interfaces") && (
-            <>
-              <div className="px-2 mb-1">
-                <button
-                  onClick={() => setNewPageModalOpen(true)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Interface</span>
-                </button>
-              </div>
-              <div className="space-y-0.5 px-2">
-                {interfacePages.map((page) => {
-                  const isActive = pathname.includes(`/pages/${page.id}`) || pathname.includes(`/interface/${page.id}`)
-                  return (
-                    <Link
-                      key={page.id}
-                      href={`/pages/${page.id}`}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
-                    >
-                      <Layers className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{page.name}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </>
+            <GroupedInterfaces
+              interfacePages={interfacePages}
+              interfaceGroups={interfaceGroups}
+              onRefresh={() => {
+                window.dispatchEvent(new CustomEvent('pages-updated'))
+                window.location.reload()
+              }}
+            />
           )}
         </div>
 

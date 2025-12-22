@@ -40,13 +40,30 @@ export default async function WorkspaceShellWrapper({
     })
   )
 
+  // Fetch interface groups
+  let interfaceGroups: any[] = []
+  try {
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('interface_groups')
+      .select('*')
+      .order('order_index', { ascending: true })
+    
+    if (!groupsError && groupsData) {
+      interfaceGroups = groupsData
+    }
+  } catch (error) {
+    // If fails, interfaceGroups remains empty array
+    console.error('Error loading interface groups:', error)
+  }
+
   // Fetch interface pages from views table where type='interface'
   let interfacePages: any[] = []
   try {
     const { data: interfacePagesData, error: pagesError } = await supabase
       .from('views')
-      .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id')
+      .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index')
       .eq('type', 'interface')
+      .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
     
     if (!pagesError && interfacePagesData) {
@@ -60,6 +77,8 @@ export default async function WorkspaceShellWrapper({
         owner_id: view.owner_id || undefined,
         created_at: view.created_at,
         updated_at: view.updated_at,
+        group_id: view.group_id || null,
+        order_index: view.order_index || 0,
       }))
     }
   } catch (error) {
@@ -115,6 +134,7 @@ export default async function WorkspaceShellWrapper({
       tables={tables}
       views={viewsByTable}
       interfacePages={interfacePages}
+      interfaceGroups={interfaceGroups}
       dashboards={dashboards}
       automations={automations}
       userRole={userRole}

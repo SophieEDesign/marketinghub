@@ -29,12 +29,21 @@ interface Dashboard {
   updated_at: string
 }
 
+interface InterfaceGroup {
+  id: string
+  name: string
+  order_index: number
+  collapsed: boolean
+  workspace_id?: string | null
+}
+
 interface WorkspaceShellProps {
   children: React.ReactNode
   title?: string
   tables: Table[]
   views: Record<string, View[]>
   interfacePages: InterfacePage[]
+  interfaceGroups?: InterfaceGroup[]
   dashboards: Dashboard[]
   automations: Automation[]
   userRole: "admin" | "editor" | "viewer" | null
@@ -47,6 +56,7 @@ export default function WorkspaceShell({
   tables,
   views,
   interfacePages,
+  interfaceGroups = [],
   dashboards,
   automations,
   userRole,
@@ -60,6 +70,7 @@ export default function WorkspaceShell({
         tables={tables}
         views={views}
         interfacePages={interfacePages}
+        interfaceGroups={interfaceGroups}
         automations={automations}
       />
       <div className="flex-1 flex flex-col overflow-hidden">

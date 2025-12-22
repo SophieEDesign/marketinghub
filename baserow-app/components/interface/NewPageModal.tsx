@@ -19,9 +19,10 @@ import { IconPicker } from "@/components/ui/icon-picker"
 interface NewPageModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  defaultGroupId?: string | null
 }
 
-export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) {
+export default function NewPageModal({ open, onOpenChange, defaultGroupId }: NewPageModalProps) {
   const router = useRouter()
   const [name, setName] = useState("")
   const [icon, setIcon] = useState("")
@@ -39,6 +40,18 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
+      // Get max order_index for the group (or uncategorized)
+      const { data: lastInterface } = await supabase
+        .from('views')
+        .select('order_index')
+        .eq('type', 'interface')
+        .eq('group_id', defaultGroupId || null)
+        .order('order_index', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const orderIndex = lastInterface ? (lastInterface.order_index + 1) : 0
+
       const { data: view, error } = await supabase
         .from('views')
         .insert([
@@ -46,6 +59,8 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
             name: name.trim(),
             type: 'interface',
             table_id: null,
+            group_id: defaultGroupId || null,
+            order_index: orderIndex,
             config: {
               settings: {
                 icon: icon.trim() || null,
