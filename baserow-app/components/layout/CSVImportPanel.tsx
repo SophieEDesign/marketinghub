@@ -152,48 +152,79 @@ export default function CSVImportPanel({
     if (sampleValues.length === 0) return 'text'
     
     const threshold = Math.max(1, Math.floor(sampleValues.length * 0.7)) // 70% threshold
+    const nonEmptyValues = sampleValues.filter(v => v && v.trim())
+
+    if (nonEmptyValues.length === 0) return 'text'
 
     // Check for email pattern (at least 70% match)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const emailMatches = sampleValues.filter(v => emailPattern.test(v.trim())).length
+    const emailMatches = nonEmptyValues.filter(v => emailPattern.test(v.trim())).length
     if (emailMatches >= threshold) {
-      return 'text' // Use text for email (can add email type later)
+      return 'email'
     }
 
-    // Check for URL pattern (at least 70% match)
-    const urlPattern = /^https?:\/\//
-    const urlMatches = sampleValues.filter(v => urlPattern.test(v.trim())).length
+    // Check for URL pattern (at least 70% match) - more comprehensive
+    const urlPatterns = [
+      /^https?:\/\//i, // http:// or https://
+      /^www\./i, // www.example.com
+      /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}/i, // domain.com
+    ]
+    const urlMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.trim()
+      return urlPatterns.some(p => p.test(trimmed)) || 
+             (trimmed.includes('.') && trimmed.includes('/') && !trimmed.includes(' '))
+    }).length
     if (urlMatches >= threshold) {
-      return 'text' // Use text for URL (can add url type later)
+      return 'url'
     }
 
     // Check for date pattern (common formats) - at least 70% match
+    // More comprehensive date patterns
     const datePatterns = [
       /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/, // YYYY-MM-DD, YYYY/MM/DD
       /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}$/, // MM/DD/YYYY, DD-MM-YYYY
       /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2}$/, // MM/DD/YY
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}\s+\d{1,2}:\d{2}/, // MM/DD/YYYY HH:MM
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO datetime
+      /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}/i, // DD Mon YYYY
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}/i, // Mon DD, YYYY
     ]
-    const dateMatches = sampleValues.filter(v => 
-      datePatterns.some(p => p.test(v.trim()))
-    ).length
+    
+    // Also try parsing as Date object
+    const dateMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.trim()
+      // Check regex patterns
+      if (datePatterns.some(p => p.test(trimmed))) {
+        return true
+      }
+      // Try parsing as date
+      const date = new Date(trimmed)
+      if (!isNaN(date.getTime())) {
+        // Additional validation: check if it's a reasonable date (not epoch 0)
+        const year = date.getFullYear()
+        return year >= 1900 && year <= 2100
+      }
+      return false
+    }).length
+    
     if (dateMatches >= threshold) {
       return 'date'
     }
 
     // Check for number (integer or decimal) - at least 70% match
     // Remove currency symbols and percentage signs for number detection
-    const cleanedValues = sampleValues.map(v => v.trim().replace(/[$€£%,\s]/g, ''))
+    const cleanedValues = nonEmptyValues.map(v => v.trim().replace(/[$€£¥%,\s]/g, ''))
     const numberPattern = /^-?\d+(\.\d+)?$/
     const numberMatches = cleanedValues.filter(v => numberPattern.test(v)).length
     
     if (numberMatches >= threshold) {
       // Check if it's a percentage (contains % in original)
-      const percentCount = sampleValues.filter(v => v.includes('%')).length
+      const percentCount = nonEmptyValues.filter(v => v.includes('%')).length
       if (percentCount >= threshold) {
         return 'percent'
       }
       // Check if it's currency (contains currency symbols)
-      const currencyCount = sampleValues.filter(v => 
+      const currencyCount = nonEmptyValues.filter(v => 
         /[$€£¥]/.test(v) || v.toLowerCase().includes('usd') || v.toLowerCase().includes('gbp')
       ).length
       if (currencyCount >= threshold) {
@@ -204,11 +235,34 @@ export default function CSVImportPanel({
 
     // Check for boolean/checkbox - at least 70% match
     const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
-    const booleanMatches = sampleValues.filter(v => 
+    const booleanMatches = nonEmptyValues.filter(v => 
       booleanValues.includes(v.toLowerCase().trim())
     ).length
     if (booleanMatches >= threshold) {
       return 'checkbox'
+    }
+
+    // Check for categorical data (single_select or multi_select)
+    // If there are limited unique values that repeat frequently, it's likely a category
+    const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()))
+    const uniqueCount = uniqueValues.size
+    const totalCount = nonEmptyValues.length
+    
+    // If we have relatively few unique values compared to total (e.g., < 20 unique values for 10+ samples)
+    // and values repeat, it's likely categorical
+    if (totalCount >= 5 && uniqueCount <= Math.min(20, Math.floor(totalCount * 0.8))) {
+      // Check if values contain commas or semicolons (multi-select indicator)
+      const multiSelectIndicators = nonEmptyValues.filter(v => 
+        /[,;]/.test(v.trim())
+      ).length
+      
+      if (multiSelectIndicators >= Math.floor(totalCount * 0.5)) {
+        // More than 50% have separators - likely multi-select
+        return 'multi_select'
+      } else {
+        // Likely single-select category
+        return 'single_select'
+      }
     }
 
     // Default to text
@@ -234,13 +288,76 @@ export default function CSVImportPanel({
 
     try {
       // First, create any new fields
-      const fieldsToCreate: Array<{ name: string; type: FieldType }> = []
+      // Parse full CSV to extract choices for select fields
+      const file = fileInputRef.current?.files?.[0]
+      if (!file) return
+
+      const text = await file.text()
+      const lines = text.split("\n").filter(line => line.trim())
+      
+      function parseLine(line: string): string[] {
+        const result: string[] = []
+        let current = ""
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          if (char === '"') {
+            inQuotes = !inQuotes
+          } else if (char === "," && !inQuotes) {
+            result.push(current.trim())
+            current = ""
+          } else {
+            current += char
+          }
+        }
+        result.push(current.trim())
+        return result
+      }
+
+      const allHeaders = parseLine(lines[0])
+      const allRows: CSVRow[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseLine(lines[i])
+        const row: CSVRow = {}
+        allHeaders.forEach((header, index) => {
+          row[header] = values[index] || ""
+        })
+        allRows.push(row)
+      }
+
+      const fieldsToCreate: Array<{ name: string; type: FieldType; options?: any }> = []
       csvHeaders.forEach((header) => {
         if (!fieldMappings[header] && newFields[header]) {
-          fieldsToCreate.push({
+          const fieldType = newFields[header]
+          const fieldData: { name: string; type: FieldType; options?: any } = {
             name: header,
-            type: newFields[header],
-          })
+            type: fieldType,
+          }
+
+          // Extract choices for select fields
+          if (fieldType === 'single_select' || fieldType === 'multi_select') {
+            const uniqueChoices = new Set<string>()
+            allRows.forEach(row => {
+              const value = row[header]
+              if (value && value.trim()) {
+                if (fieldType === 'multi_select') {
+                  // Split by comma or semicolon for multi-select
+                  const parts = value.split(/[,;]/).map(p => p.trim()).filter(p => p)
+                  parts.forEach(part => uniqueChoices.add(part))
+                } else {
+                  uniqueChoices.add(value.trim())
+                }
+              }
+            })
+            
+            // Convert to sorted array and limit to reasonable number
+            const choices = Array.from(uniqueChoices).sort().slice(0, 100)
+            if (choices.length > 0) {
+              fieldData.options = { choices }
+            }
+          }
+
+          fieldsToCreate.push(fieldData)
         }
       })
 
@@ -318,42 +435,7 @@ export default function CSVImportPanel({
       validFieldNames.add('created_at')
       validFieldNames.add('updated_at')
 
-      // Parse full CSV
-      const file = fileInputRef.current?.files?.[0]
-      if (!file) return
-
-      const text = await file.text()
-      const lines = text.split("\n").filter(line => line.trim())
-      const allRows: CSVRow[] = []
-
-      function parseLine(line: string): string[] {
-        const result: string[] = []
-        let current = ""
-        let inQuotes = false
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i]
-          if (char === '"') {
-            inQuotes = !inQuotes
-          } else if (char === "," && !inQuotes) {
-            result.push(current.trim())
-            current = ""
-          } else {
-            current += char
-          }
-        }
-        result.push(current.trim())
-        return result
-      }
-
-      const headers = parseLine(lines[0])
-      for (let i = 1; i < lines.length; i++) {
-        const values = parseLine(lines[i])
-        const row: CSVRow = {}
-        headers.forEach((header, index) => {
-          row[header] = values[index] || ""
-        })
-        allRows.push(row)
-      }
+      // Use already parsed CSV data (allRows was created above)
 
       // Validate that all CSV headers are either mapped or have new fields defined
       const unmappedHeaders = csvHeaders.filter(header => {
@@ -436,13 +518,29 @@ export default function CSVImportPanel({
           } else if (field.type === "checkbox") {
             value = value === '' || value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
           } else if (field.type === "date") {
-            // Try to parse date
+            // Try to parse date - handle various formats
             if (value === '' || value === null) {
               value = null
             } else {
               const date = new Date(value)
-              value = isNaN(date.getTime()) ? null : date.toISOString()
+              if (isNaN(date.getTime())) {
+                value = null
+              } else {
+                // Return ISO string for timestamptz
+                value = date.toISOString()
+              }
             }
+          } else if (field.type === "multi_select") {
+            // Convert comma/semicolon-separated values to array
+            if (value === '' || value === null) {
+              value = []
+            } else {
+              const parts = String(value).split(/[,;]/).map(p => p.trim()).filter(p => p)
+              value = parts
+            }
+          } else if (field.type === "single_select") {
+            // Single select is just a string
+            value = value === '' || value === null ? null : String(value).trim()
           } else {
             // For text fields, convert to string or null
             value = value === '' || value === null ? null : String(value)

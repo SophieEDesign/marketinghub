@@ -164,18 +164,17 @@ export default function ViewManagementDialog({
   }
 
   async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete the view "${viewName}"? This action cannot be undone.`)) {
-      return
-    }
-
     try {
-      await supabase.from("views").delete().eq("id", viewId)
+      const { error } = await supabase.from("views").delete().eq("id", viewId)
+      
+      if (error) throw error
+      
       onAction?.("delete")
-      router.push(`/tables/${tableId}`)
       onClose()
+      router.push(`/tables/${tableId}`)
     } catch (error) {
       console.error("Error deleting view:", error)
-      alert("Failed to delete view")
+      alert("Failed to delete view: " + (error as Error).message)
     }
   }
 

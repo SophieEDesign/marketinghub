@@ -165,9 +165,13 @@ export default function GroupedInterfaces({
         )
         setEditingGroupId(null)
         onRefresh?.()
+      } else {
+        console.warn("Failed to update group:", response.status, response.statusText)
+        // Silently fail - groups might not be available
       }
     } catch (error) {
-      console.error("Failed to update group:", error)
+      console.warn("Failed to update group:", error)
+      // Silently fail - groups are optional
     }
   }
 
@@ -185,9 +189,13 @@ export default function GroupedInterfaces({
         setGroups((prev) => prev.filter((g) => g.id !== groupId))
         setPages((prev) => prev.map((p) => (p.group_id === groupId ? { ...p, group_id: null } : p)))
         onRefresh?.()
+      } else {
+        console.warn("Failed to delete group:", response.status, response.statusText)
+        // Silently fail - groups might not be available
       }
     } catch (error) {
-      console.error("Failed to delete group:", error)
+      console.warn("Failed to delete group:", error)
+      // Silently fail - groups are optional
     }
   }
 
@@ -247,18 +255,14 @@ export default function GroupedInterfaces({
         })
         onRefresh?.()
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create group' }))
-        console.error("Failed to create group:", errorData.error || response.statusText)
-        // If 401, the table might not exist or user isn't authenticated
-        if (response.status === 401) {
-          alert("Please ensure you're logged in and the interface_groups table exists. Run the migration in Supabase if needed.")
-        } else {
-          alert(errorData.error || "Failed to create group")
-        }
+        // Silently fail - table might not exist yet (migration not run)
+        // User can still use interfaces without groups
+        console.warn("Failed to create group:", response.status, response.statusText)
+        // Don't show alert - groups are optional
       }
     } catch (error) {
-      console.error("Failed to create group:", error)
-      alert("Failed to create group. Please check your connection and try again.")
+      // Silently fail - groups are optional feature
+      console.warn("Failed to create group:", error)
     }
   }
 

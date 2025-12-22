@@ -25,8 +25,21 @@ export async function GET(
     return NextResponse.json({ fields: fields || [] })
   } catch (error: any) {
     // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array
-    if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
-      console.warn(`table_fields table may not exist for table ${params.tableId}, returning empty fields array`)
+    // Also handle HTTP status codes and various error formats
+    const errorCode = error.code || error.status || ''
+    const errorMessage = error.message || ''
+    const errorDetails = error.details || ''
+    
+    if (errorCode === '42P01' || 
+        errorCode === 'PGRST116' || 
+        errorCode === '404' ||
+        errorCode === 404 ||
+        errorMessage?.includes('relation') || 
+        errorMessage?.includes('does not exist') ||
+        errorMessage?.includes('table_fields') ||
+        errorDetails?.includes('relation') ||
+        errorDetails?.includes('does not exist')) {
+      console.warn(`table_fields table may not exist for table ${params.tableId} (code: ${errorCode}), returning empty fields array`)
       return NextResponse.json({ fields: [] })
     }
     console.error('Error fetching fields:', error)

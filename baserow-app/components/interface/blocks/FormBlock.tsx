@@ -28,14 +28,35 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
   async function loadFields() {
     if (!tableId) return
 
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("table_fields")
-      .select("*")
-      .eq("table_id", tableId)
-      .order("position", { ascending: true })
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
 
-    setFields((data || []) as FieldType[])
+      // If table_fields doesn't exist, just use empty array
+      if (error) {
+        const errorCode = error.code || ''
+        const errorMessage = error.message || ''
+        if (errorCode === '42P01' || 
+            errorCode === 'PGRST116' || 
+            errorCode === '404' ||
+            errorMessage?.includes('relation') || 
+            errorMessage?.includes('does not exist')) {
+          console.warn('table_fields table may not exist, using empty fields array')
+          setFields([])
+          return
+        }
+        throw error
+      }
+
+      setFields((data || []) as FieldType[])
+    } catch (error) {
+      console.warn('Error loading fields for form block:', error)
+      setFields([])
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

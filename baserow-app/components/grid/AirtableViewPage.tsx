@@ -329,7 +329,8 @@ export default function AirtableViewPage({
         onSaveView={handleSaveView}
         onViewAction={(action) => {
           if (action === "delete") {
-            // Handled in ViewManagementDialog
+            // ViewManagementDialog handles the deletion and redirect
+            // No additional action needed here
           } else if (action === "setDefault") {
             // TODO: Implement set as default
             alert("Set as default functionality coming soon")

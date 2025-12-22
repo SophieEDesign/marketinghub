@@ -166,7 +166,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   return (
     <div className="h-full overflow-auto">
-      <div className="prose prose-sm max-w-none">
+      <div className="text-block-content max-w-none">
         {content ? (
           <div dangerouslySetInnerHTML={{ __html: content }} />
         ) : (

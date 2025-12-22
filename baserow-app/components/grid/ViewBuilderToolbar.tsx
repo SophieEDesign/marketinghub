@@ -369,9 +369,8 @@ export default function ViewBuilderToolbar({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
-                      if (confirm(`Are you sure you want to delete "${viewName}"? This action cannot be undone.`)) {
-                        onViewAction?.("delete")
-                      }
+                      setViewManagementAction("delete")
+                      setViewManagementDialogOpen(true)
                     }}
                     className="text-red-600 focus:text-red-600"
                   >
