@@ -24,8 +24,22 @@ export default function InterfaceBuilder({
   onSave,
 }: InterfaceBuilderProps) {
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
+  
   // Default to view mode - editing is explicit and intentional
-  const [isEditing, setIsEditing] = useState(false)
+  // Persist edit mode preference in localStorage per page
+  const [isEditing, setIsEditing] = useState(() => {
+    if (typeof window === 'undefined') return false
+    if (isViewer) return false // Force view mode if viewer prop is set
+    const saved = localStorage.getItem(`interface-edit-mode-${page.id}`)
+    return saved === 'true'
+  })
+  
+  // Sync edit mode to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isViewer) {
+      localStorage.setItem(`interface-edit-mode-${page.id}`, String(isEditing))
+    }
+  }, [isEditing, page.id, isViewer])
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
