@@ -230,13 +230,13 @@ export default function Sidebar({
         </div>
 
         {/* Interface Pages Section */}
-        <div className="mb-4">
-          {!isCollapsed && (
-            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="mb-4">
+            {!isCollapsed && (
+              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Pages
-            </div>
-          )}
-          <div className="space-y-0.5">
+              </div>
+            )}
+            <div className="space-y-0.5">
             {!isCollapsed && (
               <SidebarItem
                 href="/interface/new"
@@ -245,20 +245,20 @@ export default function Sidebar({
                 active={isActive("/interface/new")}
               />
             )}
-            {interfacePages.map((page) => {
-              const isPageActive = isActive(`/interface/${page.id}`)
-              return (
-                <SidebarItem
-                  key={page.id}
-                  href={`/interface/${page.id}`}
-                  icon={FileText}
-                  label={page.name}
-                  active={isPageActive}
-                />
-              )
-            })}
+              {interfacePages.map((page) => {
+                const isPageActive = isActive(`/interface/${page.id}`)
+                return (
+                  <SidebarItem
+                    key={page.id}
+                    href={`/interface/${page.id}`}
+                    icon={FileText}
+                    label={page.name}
+                    active={isPageActive}
+                  />
+                )
+              })}
+            </div>
           </div>
-        </div>
 
         {/* Dashboards Section - Only for admin/editor */}
         {userRole && userRole !== "viewer" && dashboards.length > 0 && (

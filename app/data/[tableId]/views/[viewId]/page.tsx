@@ -91,54 +91,54 @@ export default async function ViewPage({
       viewName={view.name}
       viewType={view.type}
     >
-      <div className="container mx-auto p-6">
-        <div className="space-y-6">
-          {view.type === 'grid' && rowsData && (
-            <GridView
-              tableId={params.tableId}
-              viewId={params.viewId}
-              rows={rowsData.rows}
-              visibleFields={rowsData.visibleFields}
-              filters={rowsData.filters}
-              sorts={rowsData.sorts}
-            />
-          )}
+    <div className="container mx-auto p-6">
+      <div className="space-y-6">
+        {view.type === 'grid' && rowsData && (
+          <GridView
+            tableId={params.tableId}
+            viewId={params.viewId}
+            rows={rowsData.rows}
+            visibleFields={rowsData.visibleFields}
+            filters={rowsData.filters}
+            sorts={rowsData.sorts}
+          />
+        )}
 
-          {view.type === 'kanban' && rowsData && (
-            <KanbanView
-              tableId={params.tableId}
-              viewId={params.viewId}
-              rows={rowsData.rows}
-              visibleFields={rowsData.visibleFields}
-            />
-          )}
+        {view.type === 'kanban' && rowsData && (
+          <KanbanView
+            tableId={params.tableId}
+            viewId={params.viewId}
+            rows={rowsData.rows}
+            visibleFields={rowsData.visibleFields}
+          />
+        )}
 
-          {view.type === 'calendar' && rowsData && (
-            <CalendarView
-              tableId={params.tableId}
-              viewId={params.viewId}
-              rows={rowsData.rows}
-              visibleFields={rowsData.visibleFields}
-            />
-          )}
+        {view.type === 'calendar' && rowsData && (
+          <CalendarView
+            tableId={params.tableId}
+            viewId={params.viewId}
+            rows={rowsData.rows}
+            visibleFields={rowsData.visibleFields}
+          />
+        )}
 
-          {view.type === 'form' && (
-            <FormView
-              tableId={params.tableId}
-              viewId={params.viewId}
-              visibleFields={viewFields}
-            />
-          )}
+        {view.type === 'form' && (
+          <FormView
+            tableId={params.tableId}
+            viewId={params.viewId}
+            visibleFields={viewFields}
+          />
+        )}
 
-          {view.type === 'gallery' && (
-            <InterfacePage
-              viewId={params.viewId}
-              blocks={blocks}
-              tabs={tabs}
-            />
-          )}
-        </div>
+        {view.type === 'gallery' && (
+          <InterfacePage
+            viewId={params.viewId}
+            blocks={blocks}
+            tabs={tabs}
+          />
+        )}
       </div>
+    </div>
     </ViewPageClient>
   )
 }
