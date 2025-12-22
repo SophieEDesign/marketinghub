@@ -22,6 +22,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   
   // Use refs for uncontrolled editor state to prevent re-renders
   const quillRef = useRef<any>(null)
+  const quillEditorRef = useRef<any>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSavedContentRef = useRef<string>(content)
@@ -67,18 +68,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [onUpdate, editorContent])
 
-  // Sync content when switching tabs
-  useEffect(() => {
-    if (activeTab === "visual" && quillRef.current) {
-      // Visual tab is active - content is already in editorContent
-      // No sync needed
-    } else if (activeTab === "html" && textareaRef.current) {
-      // HTML tab is active - ensure textarea shows current content
-      if (textareaRef.current.value !== editorContent) {
-        textareaRef.current.value = editorContent
-      }
+  // Get Quill editor instance callback
+  const handleQuillRef = useCallback((quill: any) => {
+    quillRef.current = quill
+    if (quill) {
+      quillEditorRef.current = quill.getEditor()
     }
-  }, [activeTab, editorContent])
+  }, [])
 
   // Configure Quill toolbar
   const quillModules = {
@@ -151,7 +147,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
               formats={quillFormats}
               placeholder="Enter text content..."
               className="flex-1 flex flex-col"
-              ref={quillRef}
             />
           </TabsContent>
           <TabsContent value="html" className="flex-1 mt-0">
