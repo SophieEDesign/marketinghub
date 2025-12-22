@@ -23,6 +23,7 @@ import {
   Upload
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useBranding } from "@/contexts/BrandingContext"
 import type { Table, View, Automation } from "@/types/database"
 
 interface InterfacePage {
@@ -47,6 +48,7 @@ interface AirtableSidebarProps {
   interfacePages?: InterfacePage[]
   interfaceGroups?: InterfaceGroup[]
   automations?: Automation[]
+  userRole?: 'admin' | 'member' | null
 }
 
 export default function AirtableSidebar({ 
@@ -54,14 +56,20 @@ export default function AirtableSidebar({
   views, 
   interfacePages = [], 
   interfaceGroups = [],
-  automations = [] 
+  automations = [],
+  userRole = null
 }: AirtableSidebarProps) {
   const pathname = usePathname()
+  const { brandName, logoUrl, primaryColor } = useBranding()
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
-  // Interfaces and Automations expanded by default, Core Data collapsed
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces", "automations"]))
+  // Interfaces and Automations expanded by default, Core Data collapsed (only for admins)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(userRole === 'admin' ? ["interfaces", "automations"] : ["interfaces"])
+  )
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
+  
+  const isAdmin = userRole === 'admin'
 
   // Extract tableId and viewId from pathname
   const pathMatch = pathname.match(/\/tables\/([^\/]+)(?:\/views\/([^\/]+))?/)
@@ -184,11 +192,17 @@ export default function AirtableSidebar({
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen shadow-sm">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+      {/* Header with Branding */}
+      <div className="p-3 border-b border-gray-200 flex items-center justify-between" style={{ borderBottomColor: primaryColor + '20' }}>
         <Link href="/" className="flex items-center gap-2">
-          <Home className="h-5 w-5 text-gray-700" />
-          <span className="text-sm font-semibold text-gray-900">Workspace</span>
+          {logoUrl ? (
+            <img src={logoUrl} alt={brandName} className="h-5 w-5 object-contain" />
+          ) : (
+            <Home className="h-5 w-5" style={{ color: primaryColor }} />
+          )}
+          <span className="text-sm font-semibold" style={{ color: primaryColor }}>
+            {brandName}
+          </span>
         </Link>
         <button
           onClick={() => setIsCollapsed(true)}
@@ -257,11 +271,11 @@ export default function AirtableSidebar({
               <div className="space-y-0.5 px-2">
                 <Link
                   href="/automations"
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                    pathname === "/automations"
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-100"
-                  }`}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+                  style={pathname === "/automations" ? { 
+                    backgroundColor: primaryColor + '15', 
+                    color: primaryColor 
+                  } : {}}
                 >
                   <Zap className="h-4 w-4 flex-shrink-0" />
                   <span className="text-sm">All Automations</span>
@@ -272,11 +286,11 @@ export default function AirtableSidebar({
                     <Link
                       key={automation.id}
                       href={`/automations/${automation.id}`}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+                      style={isActive ? { 
+                        backgroundColor: primaryColor + '15', 
+                        color: primaryColor 
+                      } : {}}
                     >
                       <Zap className="h-4 w-4 flex-shrink-0" />
                       <span className="text-sm truncate">{automation.name}</span>
@@ -287,8 +301,10 @@ export default function AirtableSidebar({
             </>
           )}
         </div>
+        )}
 
-        {/* Core Data Section - Secondary, Collapsed by Default */}
+        {/* Core Data Section - Admin Only */}
+        {isAdmin && (
         <div className="py-2 border-t border-gray-100">
           <div className="px-3 mb-1">
             <button
@@ -335,11 +351,11 @@ export default function AirtableSidebar({
                         </button>
                         <Link
                           href={`/tables/${table.id}`}
-                          className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                            isActive && !currentViewId
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-gray-700 hover:bg-gray-100"
-                          }`}
+                          className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-700 hover:bg-gray-100"
+                          style={isActive && !currentViewId ? { 
+                            backgroundColor: primaryColor + '15', 
+                            color: primaryColor 
+                          } : {}}
                         >
                           <Table2 className="h-4 w-4 flex-shrink-0" />
                           <span className="text-sm font-medium truncate">{table.name}</span>
@@ -353,11 +369,11 @@ export default function AirtableSidebar({
                               <Link
                                 key={view.id}
                                 href={`/tables/${table.id}/views/${view.id}`}
-                                className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                                  isViewActive
-                                    ? "bg-blue-50 text-blue-700"
-                                    : "text-gray-600 hover:bg-gray-100"
-                                }`}
+                                className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+                                style={isViewActive ? { 
+                                  backgroundColor: primaryColor + '15', 
+                                  color: primaryColor 
+                                } : {}}
                               >
                                 {getViewIcon(view.type)}
                                 <span className="text-sm truncate">{view.name}</span>
@@ -380,8 +396,10 @@ export default function AirtableSidebar({
             </>
           )}
         </div>
+        )}
 
-        {/* Settings */}
+        {/* Settings - Admin Only */}
+        {isAdmin && (
         <div className="py-2 border-t border-gray-100">
           <Link
             href="/settings"
@@ -390,11 +408,13 @@ export default function AirtableSidebar({
                 ? "bg-blue-50 text-blue-700"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
+            style={isSettings ? { backgroundColor: primaryColor + '15', color: primaryColor } : {}}
           >
             <Settings className="h-4 w-4 flex-shrink-0" />
             <span className="text-sm">Settings</span>
           </Link>
         </div>
+        )}
       </div>
 
       {/* New Page Modal */}

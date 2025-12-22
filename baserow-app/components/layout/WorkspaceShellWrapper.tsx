@@ -1,7 +1,9 @@
 import { getTables } from "@/lib/crud/tables"
 import { getViews } from "@/lib/crud/views"
 import { createClient } from "@/lib/supabase/server"
-import { getUserRole } from "@/lib/roles"
+import { getUserRole, isAdmin } from "@/lib/roles"
+import { getWorkspaceSettings } from "@/lib/branding"
+import { BrandingProvider } from "@/contexts/BrandingContext"
 import WorkspaceShell from "./WorkspaceShell"
 import type { View } from "@/types/database"
 import type { Automation } from "@/types/database"
@@ -20,10 +22,13 @@ export default async function WorkspaceShellWrapper({
   const supabase = await createClient()
   
   // Fetch all data in parallel using existing functions from baserow-app/lib/crud
-  const [tables, userRole] = await Promise.all([
+  const [tables, userRole, brandingSettings] = await Promise.all([
     getTables().catch(() => []),
     getUserRole(),
+    getWorkspaceSettings().catch(() => null),
   ])
+  
+  const userIsAdmin = await isAdmin()
 
   // Fetch views for all tables using existing getViews function
   // Handle errors gracefully - tables may not have views yet
@@ -139,18 +144,20 @@ export default async function WorkspaceShellWrapper({
   }
 
   return (
-    <WorkspaceShell
-      title={title}
-      tables={tables}
-      views={viewsByTable}
-      interfacePages={interfacePages}
-      interfaceGroups={interfaceGroups}
-      dashboards={dashboards}
-      automations={automations}
-      userRole={userRole}
-      hideTopbar={hideTopbar}
-    >
-      {children}
-    </WorkspaceShell>
+    <BrandingProvider settings={brandingSettings}>
+      <WorkspaceShell
+        title={title}
+        tables={tables}
+        views={viewsByTable}
+        interfacePages={interfacePages}
+        interfaceGroups={interfaceGroups}
+        dashboards={dashboards}
+        automations={automations}
+        userRole={userRole}
+        hideTopbar={hideTopbar}
+      >
+        {children}
+      </WorkspaceShell>
+    </BrandingProvider>
   )
 }

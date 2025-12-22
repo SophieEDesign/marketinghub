@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
+import { useBranding } from "@/contexts/BrandingContext"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
@@ -320,7 +321,25 @@ export default function InterfaceBuilder({
                 <button
                   onClick={handleExitEditMode}
                   disabled={isSaving}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2 disabled:opacity-50"
+                  className="px-3 py-1.5 text-sm font-medium text-white rounded-md flex items-center gap-2 disabled:opacity-50"
+                  style={{ 
+                    backgroundColor: primaryColor,
+                    opacity: isSaving ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSaving) {
+                      // Darken on hover (reduce lightness by 10%)
+                      const hslMatch = primaryColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+                      if (hslMatch) {
+                        const [, h, s, l] = hslMatch
+                        const newL = Math.max(0, parseInt(l) - 10)
+                        e.currentTarget.style.backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`
+                      }
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = primaryColor
+                  }}
                 >
                   {isSaving ? "Saving..." : "Done"}
                 </button>

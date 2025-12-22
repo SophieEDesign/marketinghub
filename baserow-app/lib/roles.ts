@@ -1,14 +1,17 @@
 import { createClient } from './supabase/server'
 
-export type UserRole = 'admin' | 'editor' | 'viewer'
+export type UserRole = 'admin' | 'member'
 
-export interface UserRoleData {
+export interface UserProfile {
+  id: string
   user_id: string
   role: UserRole
+  created_at: string
+  updated_at?: string
 }
 
 /**
- * Get the current user's role from the user_roles table
+ * Get the current user's role from the profiles table
  */
 export async function getUserRole(): Promise<UserRole | null> {
   const supabase = await createClient()
@@ -16,41 +19,69 @@ export async function getUserRole(): Promise<UserRole | null> {
   
   if (!user) return null
   
-  const { data, error } = await supabase
-    .from('user_roles')
+  // Try profiles table first (new system)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
     .select('role')
     .eq('user_id', user.id)
     .maybeSingle()
   
-  // If table doesn't exist or no role found, default to viewer
-  if (error || !data) {
-    // Check if error is due to missing table (PGRST116) or just no data
-    if (error?.code === 'PGRST116' || error?.message?.includes('relation') || error?.message?.includes('does not exist')) {
-      // Table doesn't exist - that's okay, default to viewer
-      return 'viewer'
-    }
-    // No role found for user - default to viewer
-    return 'viewer'
+  if (!profileError && profile) {
+    return profile.role as UserRole
   }
   
-  return data.role as UserRole
+  // Fallback to user_roles table (legacy support)
+  if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
+    const { data: legacyRole, error: legacyError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    
+    if (!legacyError && legacyRole) {
+      // Map legacy roles: admin/editor -> admin, viewer -> member
+      return legacyRole.role === 'admin' || legacyRole.role === 'editor' ? 'admin' : 'member'
+    }
+  }
+  
+  // Default to member if no role found
+  return 'member'
 }
 
 /**
- * Check if user has a specific role or higher
- * Hierarchy: admin > editor > viewer
+ * Get full user profile
  */
-export async function hasRole(minimumRole: UserRole): Promise<boolean> {
+export async function getUserProfile(): Promise<UserProfile | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) return null
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  
+  if (error || !data) return null
+  
+  return data as UserProfile
+}
+
+/**
+ * Check if user is admin
+ */
+export async function isAdmin(): Promise<boolean> {
   const role = await getUserRole()
-  if (!role) return false
-  
-  const hierarchy: Record<UserRole, number> = {
-    viewer: 1,
-    editor: 2,
-    admin: 3,
-  }
-  
-  return hierarchy[role] >= hierarchy[minimumRole]
+  return role === 'admin'
+}
+
+/**
+ * Check if user has a specific role
+ */
+export async function hasRole(role: UserRole): Promise<boolean> {
+  const userRole = await getUserRole()
+  return userRole === role
 }
 
 /**

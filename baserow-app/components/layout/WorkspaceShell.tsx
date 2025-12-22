@@ -46,7 +46,7 @@ interface WorkspaceShellProps {
   interfaceGroups?: InterfaceGroup[]
   dashboards: Dashboard[]
   automations: Automation[]
-  userRole: "admin" | "editor" | "viewer" | null
+  userRole: "admin" | "member" | null
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
 }
 
@@ -72,6 +72,7 @@ export default function WorkspaceShell({
         interfacePages={interfacePages}
         interfaceGroups={interfaceGroups}
         automations={automations}
+        userRole={userRole}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {!hideTopbar && <Topbar title={title} />}

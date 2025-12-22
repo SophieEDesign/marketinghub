@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
+import { isAdmin } from "@/lib/roles"
 import AirtableViewPage from "@/components/grid/AirtableViewPage"
 import NonGridViewWrapper from "@/components/grid/NonGridViewWrapper"
 import InterfacePage from "@/components/views/InterfacePage"
@@ -12,7 +14,26 @@ export default async function ViewPage({
 }: {
   params: { tableId: string; viewId: string }
 }) {
-  // Authentication disabled for testing
+  // Security: Only admins can access Core Data (tables/views)
+  const admin = await isAdmin()
+  if (!admin) {
+    // Redirect to first available interface
+    const supabase = await createClient()
+    const { data: firstInterface } = await supabase
+      .from('views')
+      .select('id')
+      .eq('type', 'interface')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    } else {
+      redirect('/')
+    }
+  }
   try {
     const supabase = await createClient()
     

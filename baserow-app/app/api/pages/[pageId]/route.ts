@@ -38,7 +38,7 @@ export async function PATCH(
   try {
     const supabase = await createClient()
     const body = await request.json()
-    const { name, description, settings } = body
+    const { name, description, settings, is_admin_only } = body
 
     // Get existing view to preserve config
     const { data: existing } = await supabase
@@ -54,6 +54,7 @@ export async function PATCH(
 
     if (name !== undefined) updates.name = name
     if (description !== undefined) updates.description = description
+    if (is_admin_only !== undefined) updates.is_admin_only = is_admin_only
     if (settings !== undefined) {
       // Merge settings into existing config
       const existingConfig = (existing?.config as any) || {}

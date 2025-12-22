@@ -1,15 +1,37 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { isAdmin } from '@/lib/roles'
 import WorkspaceShellWrapper from '@/components/layout/WorkspaceShellWrapper'
-import { Settings, Shield, Database, Key, FileText } from 'lucide-react'
+import { Settings, Shield, Database, Key, FileText, Palette } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import SettingsWorkspaceTab from '@/components/settings/WorkspaceTab'
 import SettingsPagesTab from '@/components/settings/PagesTab'
 import SettingsPermissionsTab from '@/components/settings/PermissionsTab'
 import SettingsStorageTab from '@/components/settings/StorageTab'
 import SettingsApiTab from '@/components/settings/ApiTab'
+import SettingsBrandingTab from '@/components/settings/BrandingTab'
 
 export default async function SettingsPage() {
-  // Authentication disabled for consistency with other pages
+  // Security: Only admins can access settings
+  const admin = await isAdmin()
+  if (!admin) {
+    // Redirect to first available interface
+    const supabase = await createClient()
+    const { data: firstInterface } = await supabase
+      .from('views')
+      .select('id')
+      .eq('type', 'interface')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    } else {
+      redirect('/')
+    }
+  }
 
   return (
     <WorkspaceShellWrapper title="Settings">
@@ -61,6 +83,10 @@ export default async function SettingsPage() {
 
           <TabsContent value="api" className="space-y-4">
             <SettingsApiTab />
+          </TabsContent>
+
+          <TabsContent value="branding" className="space-y-4">
+            <SettingsBrandingTab />
           </TabsContent>
         </Tabs>
       </div>

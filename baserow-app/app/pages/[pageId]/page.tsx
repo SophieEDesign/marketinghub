@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
+import { isAdmin } from "@/lib/roles"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
 
@@ -9,16 +10,50 @@ export default async function PagePage({
   params: { pageId: string }
 }) {
   const supabase = await createClient()
+  const admin = await isAdmin()
 
   // Load view (interface page) from views table
   const { data: view, error } = await supabase
     .from("views")
-    .select("id, name, type")
+    .select("id, name, type, is_admin_only")
     .eq("id", params.pageId)
     .single()
 
   if (error || !view) {
-    redirect('/settings?tab=pages')
+    // Redirect to first available interface
+    const { data: firstInterface } = await supabase
+      .from('views')
+      .select('id')
+      .eq('type', 'interface')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    } else {
+      redirect('/')
+    }
+  }
+
+  // Security check: If interface is admin-only and user is not admin, redirect
+  if (view.is_admin_only && !admin) {
+    // Redirect to first available interface
+    const { data: firstInterface } = await supabase
+      .from('views')
+      .select('id')
+      .eq('type', 'interface')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    } else {
+      redirect('/')
+    }
   }
 
   // Confirm it's an interface page

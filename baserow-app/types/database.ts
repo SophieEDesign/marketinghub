@@ -57,6 +57,7 @@ export interface View {
   updated_at?: string
   group_id?: string | null // For interface grouping
   order_index?: number // For ordering within groups
+  is_admin_only?: boolean // If true, only admins can see this interface
 }
 
 export interface ViewField {

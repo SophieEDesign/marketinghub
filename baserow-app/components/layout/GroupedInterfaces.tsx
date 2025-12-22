@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useBranding } from "@/contexts/BrandingContext"
 import {
   DndContext,
   DragOverlay,
@@ -72,6 +73,7 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
+  const { primaryColor } = useBranding()
   // Filter out any null/undefined groups (safety check)
   const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
   const [pages, setPages] = useState<InterfacePage[]>(interfacePages)
@@ -520,7 +522,11 @@ export default function GroupedInterfaces({
     })
 
     return (
-      <div ref={setNodeRef} className={isOver ? 'bg-blue-50 rounded' : ''}>
+      <div 
+        ref={setNodeRef} 
+        className="rounded"
+        style={isOver ? { backgroundColor: primaryColor + '15' } : {}}
+      >
         {children}
       </div>
     )
@@ -570,11 +576,11 @@ export default function GroupedInterfaces({
           ) : (
             <Link
               href={`/pages/${page.id}`}
-              className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                isActive
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+              style={isActive ? { 
+                backgroundColor: primaryColor + '15', 
+                color: primaryColor 
+              } : {}}
             >
               <Layers className="h-4 w-4 flex-shrink-0" />
               <span className="text-sm truncate">{page.name}</span>

@@ -77,6 +77,7 @@ export interface Page {
   created_at: string
   updated_at?: string
   created_by?: string
+  is_admin_only?: boolean // If true, only admins can see this interface
 }
 
 export interface PageSettings {

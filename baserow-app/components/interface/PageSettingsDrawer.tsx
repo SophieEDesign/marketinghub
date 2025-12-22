@@ -40,6 +40,7 @@ export default function PageSettingsDrawer({
   const router = useRouter()
   const [name, setName] = useState(page.name)
   const [icon, setIcon] = useState("")
+  const [isAdminOnly, setIsAdminOnly] = useState(page.is_admin_only || false)
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -49,6 +50,7 @@ export default function PageSettingsDrawer({
     // Extract icon from settings if it exists
     const pageIcon = page.settings?.icon || ""
     setIcon(pageIcon)
+    setIsAdminOnly(page.is_admin_only || false)
   }, [page])
 
   async function handleSave() {
@@ -141,6 +143,24 @@ export default function PageSettingsDrawer({
               />
               <p className="text-xs text-muted-foreground">
                 Optional: Select an icon to represent this interface
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="admin-only-setting"
+                  checked={isAdminOnly}
+                  onChange={(e) => setIsAdminOnly(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="admin-only-setting" className="text-sm font-normal cursor-pointer">
+                  Admin only (hide from members)
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                If enabled, only admins will be able to see this interface
               </p>
             </div>
 

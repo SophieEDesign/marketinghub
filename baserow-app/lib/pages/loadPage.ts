@@ -28,6 +28,7 @@ export async function loadPage(pageId: string): Promise<Page | null> {
     created_at: data.created_at,
     updated_at: data.updated_at,
     created_by: data.owner_id,
+    is_admin_only: data.is_admin_only || false,
   } as Page
 }
 

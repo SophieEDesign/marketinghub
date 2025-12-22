@@ -46,6 +46,7 @@ export default function SettingsPagesTab() {
   const [newPageName, setNewPageName] = useState('')
   const [newPageType, setNewPageType] = useState<'interface' | 'grid' | 'kanban' | 'calendar' | 'form'>('interface')
   const [newPageTableId, setNewPageTableId] = useState<string>('')
+  const [newPageIsAdminOnly, setNewPageIsAdminOnly] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [creating, setCreating] = useState(false)
 
@@ -160,6 +161,7 @@ export default function SettingsPagesTab() {
               },
               owner_id: user?.id,
               access_level: 'authenticated',
+              is_admin_only: newPageIsAdminOnly,
             },
           ])
           .select()
@@ -196,6 +198,7 @@ export default function SettingsPagesTab() {
       setNewPageName('')
       setNewPageType('interface')
       setNewPageTableId('')
+      setNewPageIsAdminOnly(false)
       setNewPageOpen(false)
       
       // Reload pages list
@@ -542,6 +545,20 @@ export default function SettingsPagesTab() {
                 </SelectContent>
               </Select>
             </div>
+            {newPageType === 'interface' && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="admin-only"
+                  checked={newPageIsAdminOnly}
+                  onChange={(e) => setNewPageIsAdminOnly(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="admin-only" className="text-sm font-normal cursor-pointer">
+                  Admin only (hide from members)
+                </Label>
+              </div>
+            )}
             {newPageType !== 'interface' && (
               <>
                 <div className="grid gap-2">

@@ -6,6 +6,7 @@ import { Plus, Grid, FileText, Columns, Calendar } from "lucide-react"
 import { getTable } from "@/lib/crud/tables"
 import { getViews } from "@/lib/crud/views"
 import { createClient } from "@/lib/supabase/server"
+import { isAdmin } from "@/lib/roles"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import type { View } from "@/types/database"
 
@@ -14,7 +15,26 @@ export default async function TablePage({
 }: {
   params: { tableId: string }
 }) {
-  // Authentication disabled for testing
+  // Security: Only admins can access Core Data (tables)
+  const admin = await isAdmin()
+  if (!admin) {
+    // Redirect to first available interface
+    const supabase = await createClient()
+    const { data: firstInterface } = await supabase
+      .from('views')
+      .select('id')
+      .eq('type', 'interface')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    } else {
+      redirect('/')
+    }
+  }
   try {
     console.log("Fetching table with ID:", params.tableId)
     const table = await getTable(params.tableId)
