@@ -400,7 +400,7 @@ export default function SettingsPagesTab() {
         <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Pages</CardTitle>
+                <CardTitle>Interfaces</CardTitle>
                 <CardDescription>Manage your interface pages and views</CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -500,14 +500,14 @@ export default function SettingsPagesTab() {
       <Dialog open={newPageOpen} onOpenChange={setNewPageOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create New Page</DialogTitle>
+            <DialogTitle>Create New Interface</DialogTitle>
             <DialogDescription>
               Create a new interface page or view
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="page-name">Page Name *</Label>
+              <Label htmlFor="page-name">Interface Name *</Label>
               <Input
                 id="page-name"
                 value={newPageName}
@@ -521,7 +521,7 @@ export default function SettingsPagesTab() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="page-type">Page Type *</Label>
+              <Label htmlFor="page-type">Interface Type *</Label>
               <Select value={newPageType} onValueChange={(value: any) => {
                 setNewPageType(value)
                 if (value === 'interface') {
@@ -567,7 +567,7 @@ export default function SettingsPagesTab() {
               Cancel
             </Button>
             <Button onClick={handleCreatePage} disabled={creating || !newPageName.trim()}>
-              {creating ? 'Creating...' : 'Create Page'}
+              {creating ? 'Creating...' : 'Create Interface'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -577,7 +577,7 @@ export default function SettingsPagesTab() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Page</DialogTitle>
+            <DialogTitle>Delete Interface</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &quot;{pageToDelete?.name}&quot;? This action cannot be undone.
             </DialogDescription>

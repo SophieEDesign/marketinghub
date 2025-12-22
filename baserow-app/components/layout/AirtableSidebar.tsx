@@ -45,7 +45,8 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tables"]))
+  // Interfaces expanded by default, Core Data collapsed
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces"]))
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
 
@@ -63,10 +64,10 @@ export default function AirtableSidebar({
       setExpandedTables(prev => new Set(prev).add(currentTableId))
     }
     if (currentTableId || currentViewId) {
-      setExpandedSections(prev => new Set(prev).add("tables"))
+      setExpandedSections(prev => new Set(prev).add("core-data"))
     }
     if (isInterfacePage) {
-      setExpandedSections(prev => new Set(prev).add("pages"))
+      setExpandedSections(prev => new Set(prev).add("interfaces"))
     }
     if (isAutomation) {
       setExpandedSections(prev => new Set(prev).add("automations"))
@@ -187,44 +188,71 @@ export default function AirtableSidebar({
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-        {/* Quick Actions */}
-        <div className="py-2 border-b border-gray-100">
-          <div className="px-3 mb-1">
-            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Quick Actions
-            </div>
-          </div>
-          <div className="space-y-0.5 px-2">
-            <Link
-              href="/import"
-              className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                pathname.includes("/import")
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              <Upload className="h-4 w-4 flex-shrink-0" />
-              <span className="text-sm">Import CSV</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* Tables Section */}
-        <div className="py-2">
+        {/* Interfaces Section - Primary Navigation */}
+        <div className="py-2 border-b border-gray-200">
           <div className="px-3 mb-1">
             <button
-              onClick={() => toggleSection("tables")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              onClick={() => toggleSection("interfaces")}
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
             >
-              <span>Tables</span>
-              {expandedSections.has("tables") ? (
+              <span>Interfaces</span>
+              {expandedSections.has("interfaces") ? (
                 <ChevronDown className="h-3 w-3" />
               ) : (
                 <ChevronRight className="h-3 w-3" />
               )}
             </button>
           </div>
-          {expandedSections.has("tables") && (
+          {expandedSections.has("interfaces") && (
+            <>
+              <div className="px-2 mb-1">
+                <button
+                  onClick={() => setNewPageModalOpen(true)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>New Interface</span>
+                </button>
+              </div>
+              <div className="space-y-0.5 px-2">
+                {interfacePages.map((page) => {
+                  const isActive = pathname.includes(`/pages/${page.id}`) || pathname.includes(`/interface/${page.id}`)
+                  return (
+                    <Link
+                      key={page.id}
+                      href={`/pages/${page.id}`}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                        isActive
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Layers className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate">{page.name}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Core Data Section - Secondary, Collapsed by Default */}
+        <div className="py-2 border-t border-gray-100">
+          <div className="px-3 mb-1">
+            <button
+              onClick={() => toggleSection("core-data")}
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+            >
+              <span className="text-gray-500">Core Data</span>
+              {expandedSections.has("core-data") ? (
+                <ChevronDown className="h-3 w-3 text-gray-400" />
+              ) : (
+                <ChevronRight className="h-3 w-3 text-gray-400" />
+              )}
+            </button>
+          </div>
+          {expandedSections.has("core-data") && (
             <>
               <div className="px-2 mb-1">
                 <button
@@ -302,54 +330,6 @@ export default function AirtableSidebar({
           )}
         </div>
 
-        {/* Interface Pages Section */}
-        <div className="py-2 border-t border-gray-100">
-          <div className="px-3 mb-1">
-            <button
-              onClick={() => toggleSection("pages")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
-            >
-              <span>Pages</span>
-              {expandedSections.has("pages") ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          </div>
-          {expandedSections.has("pages") && (
-            <>
-              <div className="px-2 mb-1">
-                <button
-                  onClick={() => setNewPageModalOpen(true)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Page</span>
-                </button>
-              </div>
-              <div className="space-y-0.5 px-2">
-                {interfacePages.map((page) => {
-                  const isActive = pathname.includes(`/pages/${page.id}`) || pathname.includes(`/interface/${page.id}`)
-                  return (
-                    <Link
-                      key={page.id}
-                      href={`/pages/${page.id}`}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                        isActive
-                          ? "bg-blue-50 text-blue-700"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
-                    >
-                      <Layers className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{page.name}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
 
         {/* Automations Section */}
         <div className="py-2 border-t border-gray-100">

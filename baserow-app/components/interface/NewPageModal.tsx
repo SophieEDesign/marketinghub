@@ -29,7 +29,7 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
 
   async function handleCreate() {
     if (!name.trim()) {
-      alert("Page name is required")
+      alert("Interface name is required")
       return
     }
 
@@ -92,14 +92,14 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Page</DialogTitle>
+          <DialogTitle>Create New Interface</DialogTitle>
           <DialogDescription>
-            Create a new interface page. You can add blocks and customize it after creation.
+            Create a new interface. You can add blocks and customize it after creation.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <Label htmlFor="page-name">Page Name *</Label>
+            <Label htmlFor="page-name">Interface Name *</Label>
             <Input
               id="page-name"
               value={name}
@@ -129,7 +129,7 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={loading || !name.trim()}>
-            {loading ? "Creating..." : "Create Page"}
+            {loading ? "Creating..." : "Create Interface"}
           </Button>
         </DialogFooter>
       </DialogContent>

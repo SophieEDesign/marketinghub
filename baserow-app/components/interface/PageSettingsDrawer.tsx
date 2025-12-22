@@ -120,15 +120,15 @@ export default function PageSettingsDrawer({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="right" className="w-[400px] sm:w-[400px]">
           <SheetHeader>
-            <SheetTitle>Page Settings</SheetTitle>
+            <SheetTitle>Interface Settings</SheetTitle>
             <SheetDescription>
-              Manage your page name, icon, and other settings
+              Manage your interface name, icon, and other settings
             </SheetDescription>
           </SheetHeader>
 
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="page-name">Page Name</Label>
+              <Label htmlFor="page-name">Interface Name</Label>
               <Input
                 id="page-name"
                 value={name}
@@ -172,7 +172,7 @@ export default function PageSettingsDrawer({
                   Delete Page
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  This action cannot be undone. All blocks on this page will be deleted.
+                  This action cannot be undone. All blocks on this interface will be deleted.
                 </p>
               </div>
             </div>
@@ -185,7 +185,7 @@ export default function PageSettingsDrawer({
           <DialogHeader>
             <DialogTitle>Are you sure?</DialogTitle>
             <DialogDescription>
-              This will permanently delete &quot;{page.name}&quot; and all its blocks. This action cannot be undone.
+              This will permanently delete the interface &quot;{page.name}&quot; and all its blocks. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -201,7 +201,7 @@ export default function PageSettingsDrawer({
               disabled={deleting}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
-              {deleting ? "Deleting..." : "Delete Page"}
+              {deleting ? "Deleting..." : "Delete Interface"}
             </Button>
           </DialogFooter>
         </DialogContent>
