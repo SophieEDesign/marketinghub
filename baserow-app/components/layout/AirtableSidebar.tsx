@@ -7,25 +7,17 @@ import { usePathname } from "next/navigation"
 import NewPageModal from "@/components/interface/NewPageModal"
 import GroupedInterfaces from "./GroupedInterfaces"
 import { 
-  Table2, 
   ChevronRight, 
   ChevronDown, 
   Plus, 
-  Grid3x3,
-  FileText,
-  Calendar,
-  Layout,
-  MoreVertical,
   X,
-  Layers,
   Zap,
   Settings,
   Home,
-  Upload
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
-import type { Table, View, Automation } from "@/types/database"
+import type { Automation } from "@/types/database"
 
 interface InterfacePage {
   id: string
@@ -44,8 +36,6 @@ interface InterfaceGroup {
 }
 
 interface AirtableSidebarProps {
-  tables: Table[]
-  views: Record<string, View[]>
   interfacePages?: InterfacePage[]
   interfaceGroups?: InterfaceGroup[]
   automations?: Automation[]
@@ -53,8 +43,6 @@ interface AirtableSidebarProps {
 }
 
 export default function AirtableSidebar({ 
-  tables, 
-  views, 
   interfacePages = [], 
   interfaceGroups = [],
   automations = [],
@@ -62,8 +50,7 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor } = useBranding()
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
-  // Interfaces and Automations expanded by default, Core Data collapsed (only for admins)
+  // Interfaces and Automations expanded by default (only for admins)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(userRole === 'admin' ? ["interfaces", "automations"] : ["interfaces"])
   )
@@ -72,41 +59,19 @@ export default function AirtableSidebar({
   
   const isAdmin = userRole === 'admin'
 
-  // Extract tableId and viewId from pathname
-  const pathMatch = pathname.match(/\/tables\/([^\/]+)(?:\/views\/([^\/]+))?/)
-  const currentTableId = pathMatch?.[1]
-  const currentViewId = pathMatch?.[2]
   const isInterfacePage = pathname.includes("/pages/")
   const isAutomation = pathname.includes("/automations/")
   const isSettings = pathname.includes("/settings")
 
-  // Auto-expand table if viewing one of its views
+  // Auto-expand sections based on current route
   useEffect(() => {
-    if (currentTableId && !expandedTables.has(currentTableId)) {
-      setExpandedTables(prev => new Set(prev).add(currentTableId))
-    }
-    if (currentTableId || currentViewId) {
-      setExpandedSections(prev => new Set(prev).add("core-data"))
-    }
     if (isInterfacePage) {
       setExpandedSections(prev => new Set(prev).add("interfaces"))
     }
     if (isAutomation || pathname === "/automations") {
       setExpandedSections(prev => new Set(prev).add("automations"))
     }
-  }, [currentTableId, currentViewId, isInterfacePage, isAutomation, expandedTables, pathname])
-
-  function toggleTable(tableId: string) {
-    setExpandedTables(prev => {
-      const next = new Set(prev)
-      if (next.has(tableId)) {
-        next.delete(tableId)
-      } else {
-        next.add(tableId)
-      }
-      return next
-    })
-  }
+  }, [isInterfacePage, isAutomation, pathname])
 
   function toggleSection(section: string) {
     setExpandedSections(prev => {
@@ -135,47 +100,6 @@ export default function AirtableSidebar({
     }
   }
 
-  async function handleNewTable() {
-    const name = prompt("Enter table name:")
-    if (!name) return
-
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("tables")
-      .insert([{ name }])
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating table:", error)
-      alert("Failed to create table")
-    } else {
-      window.location.href = `/tables/${data.id}`
-    }
-  }
-
-  async function handleNewView(tableId: string) {
-    const name = prompt("Enter view name:")
-    if (!name) return
-
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("views")
-      .insert([{ 
-        table_id: tableId,
-        name,
-        type: "grid"
-      }])
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating view:", error)
-      alert("Failed to create view")
-    } else {
-      window.location.href = `/tables/${tableId}/views/${data.id}`
-    }
-  }
 
   if (isCollapsed) {
     return (
@@ -313,100 +237,6 @@ export default function AirtableSidebar({
         </div>
         )}
 
-        {/* Core Data Section - Admin Only */}
-        {isAdmin && (
-        <div className="py-2 border-t border-gray-100">
-          <div className="px-3 mb-1">
-            <button
-              onClick={() => toggleSection("core-data")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
-            >
-              <span className="text-gray-500">Core Data</span>
-              {expandedSections.has("core-data") ? (
-                <ChevronDown className="h-3 w-3 text-gray-400" />
-              ) : (
-                <ChevronRight className="h-3 w-3 text-gray-400" />
-              )}
-            </button>
-          </div>
-          {expandedSections.has("core-data") && (
-            <>
-              <div className="px-2 mb-1">
-                <button
-                  onClick={handleNewTable}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Table</span>
-                </button>
-              </div>
-              <div className="space-y-0.5 px-2">
-                {tables.map((table) => {
-                  const isExpanded = expandedTables.has(table.id)
-                  const tableViews = views[table.id] || []
-                  const isActive = currentTableId === table.id
-
-                  return (
-                    <div key={table.id} className="group">
-                      <div className="flex items-center">
-                        <button
-                          onClick={() => toggleTable(table.id)}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
-                          )}
-                        </button>
-                        <Link
-                          href={`/tables/${table.id}`}
-                          className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-700 hover:bg-gray-100"
-                          style={isActive && !currentViewId ? { 
-                            backgroundColor: primaryColor + '15', 
-                            color: primaryColor 
-                          } : {}}
-                        >
-                          <Table2 className="h-4 w-4 flex-shrink-0" />
-                          <span className="text-sm font-medium truncate">{table.name}</span>
-                        </Link>
-                      </div>
-                      {isExpanded && (
-                        <div className="ml-6 space-y-0.5 mt-0.5">
-                          {tableViews.map((view) => {
-                            const isViewActive = currentViewId === view.id
-                            return (
-                              <Link
-                                key={view.id}
-                                href={`/tables/${table.id}/views/${view.id}`}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
-                                style={isViewActive ? { 
-                                  backgroundColor: primaryColor + '15', 
-                                  color: primaryColor 
-                                } : {}}
-                              >
-                                {getViewIcon(view.type)}
-                                <span className="text-sm truncate">{view.name}</span>
-                              </Link>
-                            )
-                          })}
-                          <button
-                            onClick={() => handleNewView(table.id)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                            <span>New View</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-        )}
 
         {/* Settings - Admin Only */}
         {isAdmin && (

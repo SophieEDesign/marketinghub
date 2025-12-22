@@ -2,8 +2,22 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: { code?: string }
+}) {
   const supabase = await createClient()
+  
+  // Handle email confirmation code if present
+  if (searchParams?.code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(searchParams.code)
+    if (error) {
+      // If there's an error, redirect to login with error message
+      redirect(`/login?error=${encodeURIComponent(error.message)}`)
+    }
+    // After successful confirmation, continue with normal flow
+  }
   
   // Check authentication - redirect to login if not authenticated
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,11 +45,12 @@ export default async function HomePage() {
     redirect(`/pages/${defaultInterface.id}`)
   }
 
-  // If no default, find first interface by created_at
+  // If no default, find first interface by order_index then created_at
   let firstQuery = supabase
     .from("views")
     .select("id")
     .eq("type", "interface")
+    .order("order_index", { ascending: true })
     .order("created_at", { ascending: true })
     .limit(1)
 

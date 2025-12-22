@@ -67,8 +67,6 @@ export default function WorkspaceShell({
   return (
     <div className="flex h-screen bg-gray-50">
       <AirtableSidebar
-        tables={tables}
-        views={views}
         interfacePages={interfacePages}
         interfaceGroups={interfaceGroups}
         automations={automations}

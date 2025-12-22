@@ -79,14 +79,22 @@ export default async function WorkspaceShellWrapper({
   }
 
   // Fetch interface pages from views table where type='interface'
+  // Filter by permissions: admin sees all, member sees only non-admin-only interfaces
   let interfacePages: any[] = []
   try {
-    const { data: interfacePagesData, error: pagesError } = await supabase
+    let interfaceQuery = supabase
       .from('views')
-      .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index')
+      .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index, is_admin_only')
       .eq('type', 'interface')
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: false })
+    
+    // Filter out admin-only interfaces for non-admin users
+    if (!userIsAdmin) {
+      interfaceQuery = interfaceQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+    }
+    
+    const { data: interfacePagesData, error: pagesError } = await interfaceQuery
     
     if (!pagesError && interfacePagesData) {
       interfacePages = interfacePagesData.map((view) => ({
@@ -101,6 +109,7 @@ export default async function WorkspaceShellWrapper({
         updated_at: view.updated_at,
         group_id: view.group_id || null,
         order_index: view.order_index || 0,
+        is_admin_only: view.is_admin_only || false,
       }))
     }
   } catch (error) {

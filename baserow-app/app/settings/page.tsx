@@ -10,6 +10,7 @@ import SettingsPermissionsTab from '@/components/settings/PermissionsTab'
 import SettingsStorageTab from '@/components/settings/StorageTab'
 import SettingsApiTab from '@/components/settings/ApiTab'
 import SettingsBrandingTab from '@/components/settings/BrandingTab'
+import SettingsDataTab from '@/components/settings/DataTab'
 
 export default async function SettingsPage() {
   // Security: Only admins can access settings
@@ -22,6 +23,7 @@ export default async function SettingsPage() {
       .select('id')
       .eq('type', 'interface')
       .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('order_index', { ascending: true })
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle()
@@ -75,6 +77,10 @@ export default async function SettingsPage() {
 
           <TabsContent value="permissions" className="space-y-4">
             <SettingsPermissionsTab />
+          </TabsContent>
+
+          <TabsContent value="data" className="space-y-4">
+            <SettingsDataTab />
           </TabsContent>
 
           <TabsContent value="storage" className="space-y-4">
