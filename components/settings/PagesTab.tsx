@@ -27,9 +27,8 @@ import { createClientSupabaseClient } from '@/lib/supabase'
 interface Page {
   id: string
   name: string
-  type: 'interface' | 'view'
-  viewType?: string
-  tableId?: string
+  type: 'interface' | 'grid' | 'kanban' | 'calendar' | 'form'
+  tableId?: string | null
   tableName?: string
   updated_at?: string
   created_at?: string
@@ -45,8 +44,7 @@ export default function SettingsPagesTab() {
   
   // New page form state
   const [newPageName, setNewPageName] = useState('')
-  const [newPageType, setNewPageType] = useState<'interface' | 'view'>('interface')
-  const [newViewType, setNewViewType] = useState<'grid' | 'kanban' | 'calendar' | 'form'>('grid')
+  const [newPageType, setNewPageType] = useState<'interface' | 'grid' | 'kanban' | 'calendar' | 'form'>('interface')
   const [newPageTableId, setNewPageTableId] = useState<string>('')
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [creating, setCreating] = useState(false)
@@ -80,17 +78,17 @@ export default function SettingsPagesTab() {
     try {
       const supabase = createClientSupabaseClient()
       
-      // Load interface pages (from pages table)
-      const { data: interfacePages, error: pagesError } = await supabase
-        .from('pages')
-        .select('id, name, updated_at, created_at')
-        .order('updated_at', { ascending: false })
-
-      // Load views (from views table) - these are view pages
+      // Load all views from views table (including interface pages with type='interface')
       const { data: views, error: viewsError } = await supabase
         .from('views')
         .select('id, name, type, table_id, updated_at, created_at')
         .order('updated_at', { ascending: false })
+
+      if (viewsError) {
+        console.error('Error loading views:', viewsError)
+        setPages([])
+        return
+      }
 
       // Load table names separately
       const tableIds = views?.map(v => v.table_id).filter(Boolean) || []
@@ -106,34 +104,15 @@ export default function SettingsPagesTab() {
         }
       }
 
-      const allPages: Page[] = []
-
-      if (!pagesError && interfacePages) {
-        interfacePages.forEach((page) => {
-          allPages.push({
-            id: page.id,
-            name: page.name,
-            type: 'interface',
-            updated_at: page.updated_at,
-            created_at: page.created_at,
-          })
-        })
-      }
-
-      if (!viewsError && views) {
-        views.forEach((view: any) => {
-          allPages.push({
-            id: view.id,
-            name: view.name,
-            type: 'view',
-            viewType: view.type,
-            tableId: view.table_id,
-            tableName: view.table_id ? tableMap.get(view.table_id) : undefined,
-            updated_at: view.updated_at,
-            created_at: view.created_at,
-          })
-        })
-      }
+      const allPages: Page[] = (views || []).map((view: any) => ({
+        id: view.id,
+        name: view.name,
+        type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
+        tableId: view.table_id,
+        tableName: view.table_id ? tableMap.get(view.table_id) : undefined,
+        updated_at: view.updated_at,
+        created_at: view.created_at,
+      }))
 
       // Sort by updated_at descending
       allPages.sort((a, b) => {
@@ -156,10 +135,10 @@ export default function SettingsPagesTab() {
       return
     }
 
-    if (newPageType === 'view' && !newPageTableId) {
-      alert('Please select a table for the view')
-      return
-    }
+      if (newPageType !== 'interface' && !newPageTableId) {
+        alert('Please select a table for the view')
+        return
+      }
 
     setCreating(true)
     try {
@@ -167,17 +146,20 @@ export default function SettingsPagesTab() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (newPageType === 'interface') {
-        // Create interface page
+        // Create interface page as a view with type='interface'
         const { data, error } = await supabase
-          .from('pages')
+          .from('views')
           .insert([
             {
               name: newPageName.trim(),
-              settings: {
+              type: 'interface',
+              table_id: null, // Interface pages don't belong to a table
+              config: {
                 access: 'authenticated',
                 layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
               },
-              created_by: user?.id,
+              owner_id: user?.id,
+              access_level: 'authenticated',
             },
           ])
           .select()
@@ -185,17 +167,17 @@ export default function SettingsPagesTab() {
 
         if (error) throw error
 
-        // Redirect to interface page builder
-        router.push(`/interface/${data.id}`)
+        // Redirect to pages route (not interface route)
+        router.push(`/pages/${data.id}`)
       } else {
-        // Create view
+        // Create view (grid, kanban, calendar, or form)
         const { data, error } = await supabase
           .from('views')
           .insert([
             {
               table_id: newPageTableId,
               name: newPageName.trim(),
-              type: newViewType,
+              type: newPageType, // grid, kanban, calendar, or form
               config: {},
               owner_id: user?.id,
               access_level: 'authenticated',
@@ -213,7 +195,7 @@ export default function SettingsPagesTab() {
       // Reset form and close modal
       setNewPageName('')
       setNewPageType('interface')
-      setNewViewType('grid')
+      setNewPageTableId('')
       setNewPageOpen(false)
       
       // Reload pages list
@@ -234,7 +216,7 @@ export default function SettingsPagesTab() {
 
   async function handleEdit(page: Page) {
     if (page.type === 'interface') {
-      router.push(`/interface/${page.id}`)
+      router.push(`/pages/${page.id}`)
     } else if (page.tableId) {
       router.push(`/tables/${page.tableId}/views/${page.id}`)
     } else {
@@ -260,31 +242,33 @@ export default function SettingsPagesTab() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (page.type === 'interface') {
-        // Load original page
+        // Load original view
         const { data: original, error: fetchError } = await supabase
-          .from('pages')
+          .from('views')
           .select('*')
           .eq('id', page.id)
           .single()
 
         if (fetchError) throw fetchError
 
-        // Load blocks
+        // Load blocks (from view_blocks table, using view_id)
         const { data: blocks } = await supabase
-          .from('page_blocks')
+          .from('view_blocks')
           .select('*')
-          .eq('page_id', page.id)
-          .order('order_index')
+          .eq('view_id', page.id)
+          .order('position')
 
-        // Create duplicate page
-        const { data: newPage, error: createError } = await supabase
-          .from('pages')
+        // Create duplicate view
+        const { data: newView, error: createError } = await supabase
+          .from('views')
           .insert([
             {
               name: `${original.name} (Copy)`,
-              description: original.description,
-              settings: original.settings,
-              created_by: user?.id,
+              type: 'interface',
+              table_id: null,
+              config: original.config || {},
+              owner_id: user?.id,
+              access_level: original.access_level || 'authenticated',
             },
           ])
           .select()
@@ -294,21 +278,18 @@ export default function SettingsPagesTab() {
 
         // Duplicate blocks
         if (blocks && blocks.length > 0) {
-          const newBlocks = blocks.map((block) => ({
-            page_id: newPage.id,
+          const newBlocks = blocks.map((block: any) => ({
+            view_id: newView.id,
             type: block.type,
-            x: block.x,
-            y: block.y,
-            w: block.w,
-            h: block.h,
-            config: block.config,
-            order_index: block.order_index,
+            position: block.position,
+            settings: block.settings,
+            visibility: block.visibility,
           }))
 
-          await supabase.from('page_blocks').insert(newBlocks)
+          await supabase.from('view_blocks').insert(newBlocks)
         }
 
-        router.push(`/interface/${newPage.id}`)
+        router.push(`/pages/${newView.id}`)
       } else {
         // Duplicate view
         const { data: original, error: fetchError } = await supabase
@@ -354,21 +335,15 @@ export default function SettingsPagesTab() {
     try {
       const supabase = createClientSupabaseClient()
 
-      if (pageToDelete.type === 'interface') {
-        const { error } = await supabase
-          .from('pages')
-          .delete()
-          .eq('id', pageToDelete.id)
+      // All pages are in views table
+      const { error } = await supabase
+        .from('views')
+        .delete()
+        .eq('id', pageToDelete.id)
 
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('views')
-          .delete()
-          .eq('id', pageToDelete.id)
-
-        if (error) throw error
-      }
+      if (error) throw error
+      
+      // If it was an interface page, blocks will be cascade deleted via view_blocks foreign key
 
       setDeleteDialogOpen(false)
       setPageToDelete(null)
@@ -383,19 +358,19 @@ export default function SettingsPagesTab() {
 
   function getPageTypeLabel(page: Page): string {
     if (page.type === 'interface') return 'Interface Page'
-    if (page.viewType === 'grid') return 'Grid View'
-    if (page.viewType === 'kanban') return 'Kanban View'
-    if (page.viewType === 'calendar') return 'Calendar View'
-    if (page.viewType === 'form') return 'Form View'
+    if (page.type === 'grid') return 'Grid View'
+    if (page.type === 'kanban') return 'Kanban View'
+    if (page.type === 'calendar') return 'Calendar View'
+    if (page.type === 'form') return 'Form View'
     return 'View'
   }
 
   function getPageTypeIcon(page: Page) {
     if (page.type === 'interface') return FileText
-    if (page.viewType === 'grid') return Grid
-    if (page.viewType === 'kanban') return Columns
-    if (page.viewType === 'calendar') return Calendar
-    if (page.viewType === 'form') return FileEdit
+    if (page.type === 'grid') return Grid
+    if (page.type === 'kanban') return Columns
+    if (page.type === 'calendar') return Calendar
+    if (page.type === 'form') return FileEdit
     return FileText
   }
 
@@ -423,16 +398,31 @@ export default function SettingsPagesTab() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Pages</CardTitle>
-              <CardDescription>Manage your interface pages and views</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Pages</CardTitle>
+                <CardDescription>Manage your interface pages and views</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setNewPageType('interface')
+                    setNewPageOpen(true)
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Interface Page
+                </Button>
+                <Button onClick={() => {
+                  setNewPageType('grid')
+                  setNewPageOpen(true)
+                }}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Page
+                </Button>
+              </div>
             </div>
-            <Button onClick={() => setNewPageOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Page
-            </Button>
-          </div>
         </CardHeader>
         <CardContent>
           {pages.length === 0 ? (
@@ -532,32 +522,28 @@ export default function SettingsPagesTab() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="page-type">Page Type *</Label>
-              <Select value={newPageType} onValueChange={(value: any) => setNewPageType(value)}>
+              <Select value={newPageType} onValueChange={(value: any) => {
+                setNewPageType(value)
+                if (value === 'interface') {
+                  setNewPageTableId('')
+                } else if (tables.length > 0 && !newPageTableId) {
+                  setNewPageTableId(tables[0].id)
+                }
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="interface">Interface Page</SelectItem>
-                  <SelectItem value="view">View (Grid/Kanban/Calendar/Form)</SelectItem>
+                  <SelectItem value="grid">Grid View</SelectItem>
+                  <SelectItem value="kanban">Kanban View</SelectItem>
+                  <SelectItem value="calendar">Calendar View</SelectItem>
+                  <SelectItem value="form">Form View</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {newPageType === 'view' && (
+            {newPageType !== 'interface' && (
               <>
-                <div className="grid gap-2">
-                  <Label htmlFor="view-type">View Type *</Label>
-                  <Select value={newViewType} onValueChange={(value: any) => setNewViewType(value)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="grid">Grid</SelectItem>
-                      <SelectItem value="kanban">Kanban</SelectItem>
-                      <SelectItem value="calendar">Calendar</SelectItem>
-                      <SelectItem value="form">Form</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="table">Table *</Label>
                   <Select value={newPageTableId} onValueChange={setNewPageTableId}>

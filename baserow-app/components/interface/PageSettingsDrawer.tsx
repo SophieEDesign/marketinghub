@@ -75,6 +75,14 @@ export default function PageSettingsDrawer({
         throw new Error(error.error || "Failed to update page")
       }
 
+      // Trigger sidebar refresh
+      window.dispatchEvent(new CustomEvent('pages-updated'))
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to update page")
+      }
+
       onPageUpdate()
       onOpenChange(false)
     } catch (error: any) {

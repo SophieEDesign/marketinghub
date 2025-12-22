@@ -38,49 +38,30 @@ export default async function WorkspaceShellWrapper({
     })
   )
 
-  // Fetch interface pages - check if pages table exists, otherwise use views with type='page'
+  // Fetch interface pages from views table where type='interface'
   let interfacePages: any[] = []
   try {
-    // Try pages table first
-    const { data: pagesData, error: pagesError } = await supabase
-      .from('pages')
-      .select('*')
+    const { data: interfacePagesData, error: pagesError } = await supabase
+      .from('views')
+      .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id')
+      .eq('type', 'interface')
       .order('created_at', { ascending: false })
     
-    if (!pagesError && pagesData) {
-      interfacePages = pagesData.map((page) => ({
-        id: page.id,
-        name: page.name,
-        description: page.description || undefined,
-        config: page.config || {},
-        access_level: page.access_level || 'authenticated',
-        allowed_roles: page.allowed_roles || undefined,
-        owner_id: page.owner_id || undefined,
-        created_at: page.created_at,
-        updated_at: page.updated_at || page.created_at,
-      }))
-    } else {
-      // Fallback to views with type='page' if pages table doesn't exist
-      const { data: interfacePagesData } = await supabase
-        .from('views')
-        .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at')
-        .eq('type', 'page')
-        .order('created_at', { ascending: false })
-      
-      interfacePages = (interfacePagesData || []).map((view) => ({
+    if (!pagesError && interfacePagesData) {
+      interfacePages = interfacePagesData.map((view) => ({
         id: view.id,
         name: view.name,
         description: view.description || undefined,
         config: {},
         access_level: view.access_level || 'authenticated',
         allowed_roles: view.allowed_roles || undefined,
-        owner_id: undefined,
+        owner_id: view.owner_id || undefined,
         created_at: view.created_at,
         updated_at: view.updated_at,
       }))
     }
   } catch (error) {
-    // If both fail, interfacePages remains empty array
+    // If fails, interfacePages remains empty array
     console.error('Error loading interface pages:', error)
   }
 

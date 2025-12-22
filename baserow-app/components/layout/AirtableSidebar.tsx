@@ -334,7 +334,7 @@ export default function AirtableSidebar({
                   return (
                     <Link
                       key={page.id}
-                      href={`/interface/${page.id}`}
+                      href={`/pages/${page.id}`}
                       className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
                         isActive
                           ? "bg-blue-50 text-blue-700"

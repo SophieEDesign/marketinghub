@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
 
 interface NewPageModalProps {
   open: boolean
@@ -33,34 +34,44 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
 
     setLoading(true)
     try {
-      const response = await fetch("/api/pages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: null,
-          settings: {
-            icon: icon.trim() || null,
-            access: "authenticated",
-            layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
-          },
-        }),
-      })
+      // Create interface page as a view with type='interface'
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to create page")
+      const { data: view, error } = await supabase
+        .from('views')
+        .insert([
+          {
+            name: name.trim(),
+            type: 'interface',
+            table_id: null,
+            config: {
+              settings: {
+                icon: icon.trim() || null,
+                access: 'authenticated',
+                layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
+              },
+            },
+            owner_id: user?.id,
+            access_level: 'authenticated',
+          },
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        throw new Error(error.message || "Failed to create page")
       }
 
-      const { page } = await response.json()
-
-      if (page) {
+      if (view) {
         // Reset form
         setName("")
         setIcon("")
         onOpenChange(false)
-        // Redirect to the new page in edit mode
-        router.push(`/interface/${page.id}`)
+        // Redirect to the new page route
+        router.push(`/pages/${view.id}`)
+        router.refresh()
+        window.dispatchEvent(new CustomEvent('pages-updated'))
       }
     } catch (error: any) {
       console.error("Failed to create page:", error)

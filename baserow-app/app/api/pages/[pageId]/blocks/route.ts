@@ -14,9 +14,9 @@ export async function GET(
     const supabase = await createClient()
 
     const { data, error } = await supabase
-      .from('page_blocks')
+      .from('view_blocks')
       .select('*')
-      .eq('page_id', params.pageId)
+      .eq('view_id', params.pageId)
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -26,7 +26,22 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ blocks: data || [] })
+    // Convert view_blocks to PageBlock format
+    const blocks = (data || []).map((block: any) => ({
+      id: block.id,
+      page_id: block.view_id,
+      type: block.type,
+      x: block.position_x,
+      y: block.position_y,
+      w: block.width,
+      h: block.height,
+      config: block.config || {},
+      order_index: block.order_index,
+      created_at: block.created_at,
+      updated_at: block.updated_at,
+    }))
+
+    return NextResponse.json({ blocks })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to load blocks' },
@@ -58,7 +73,7 @@ export async function PATCH(
       await Promise.all(
         blockUpdates.map((update: { id: string; config?: any }) =>
           supabase
-            .from('page_blocks')
+            .from('view_blocks')
             .update({
               config: update.config,
               updated_at: new Date().toISOString(),
@@ -105,7 +120,22 @@ export async function POST(
       config || {}
     )
 
-    return NextResponse.json({ block })
+    // Convert view_block to PageBlock format for response
+    const pageBlock = {
+      id: block.id,
+      page_id: block.view_id,
+      type: block.type,
+      x: block.position_x,
+      y: block.position_y,
+      w: block.width,
+      h: block.height,
+      config: block.config,
+      order_index: block.order_index,
+      created_at: block.created_at,
+      updated_at: block.updated_at,
+    }
+
+    return NextResponse.json({ block: pageBlock })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to create block' },
