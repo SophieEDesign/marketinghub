@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { IconPicker } from '@/components/ui/icon-picker'
 
 export default function SettingsWorkspaceTab() {
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
@@ -145,17 +146,15 @@ export default function SettingsWorkspaceTab() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="workspace-icon">Workspace Icon (Emoji)</Label>
-          <Input
-            id="workspace-icon"
+          <Label>Workspace Icon</Label>
+          <IconPicker
             value={workspaceIcon}
-            onChange={(e) => setWorkspaceIcon(e.target.value)}
+            onChange={setWorkspaceIcon}
             placeholder="📊"
             className="max-w-md"
-            maxLength={2}
           />
           <p className="text-xs text-muted-foreground">
-            Optional: Add an emoji or icon to represent your workspace
+            Optional: Select an icon to represent your workspace
           </p>
         </div>
 

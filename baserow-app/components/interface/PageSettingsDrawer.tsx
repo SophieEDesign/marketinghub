@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Trash2, Save } from "lucide-react"
+import { IconPicker } from "@/components/ui/icon-picker"
 import {
   Dialog,
   DialogContent,
@@ -137,16 +138,14 @@ export default function PageSettingsDrawer({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="page-icon">Icon (Emoji)</Label>
-              <Input
-                id="page-icon"
+              <Label>Icon</Label>
+              <IconPicker
                 value={icon}
-                onChange={(e) => setIcon(e.target.value)}
+                onChange={setIcon}
                 placeholder="📊"
-                maxLength={2}
               />
               <p className="text-xs text-muted-foreground">
-                Optional: Add an emoji to represent this page
+                Optional: Select an icon to represent this page
               </p>
             </div>
 

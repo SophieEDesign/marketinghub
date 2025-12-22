@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
+import { IconPicker } from "@/components/ui/icon-picker"
 
 interface NewPageModalProps {
   open: boolean
@@ -112,16 +113,14 @@ export default function NewPageModal({ open, onOpenChange }: NewPageModalProps) 
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="page-icon">Icon (Emoji)</Label>
-            <Input
-              id="page-icon"
+            <Label>Icon</Label>
+            <IconPicker
               value={icon}
-              onChange={(e) => setIcon(e.target.value)}
+              onChange={setIcon}
               placeholder="📊"
-              maxLength={2}
             />
             <p className="text-xs text-muted-foreground">
-              Optional: Add an emoji to represent this page
+              Optional: Select an icon to represent this page
             </p>
           </div>
         </div>

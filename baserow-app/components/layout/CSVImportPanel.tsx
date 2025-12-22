@@ -164,6 +164,8 @@ export default function CSVImportPanel({
       })
 
       // Create new fields and wait for them to be created
+      const createdFieldNames: Record<string, string> = {} // Maps CSV header to sanitized field name
+      
       for (const fieldData of fieldsToCreate) {
         const response = await fetch(`/api/tables/${tableId}/fields`, {
           method: "POST",
@@ -175,20 +177,51 @@ export default function CSVImportPanel({
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
           throw new Error(`Failed to create field "${fieldData.name}": ${errorData.error || 'Unknown error'}`)
         }
+        
+        // Get the created field data to know the exact sanitized name
+        const createdField = await response.json().catch(() => null)
+        if (createdField?.field?.name) {
+          createdFieldNames[fieldData.name] = createdField.field.name
+        } else {
+          // Fallback: sanitize the name ourselves (should match API)
+          const sanitized = sanitizeFieldName(fieldData.name)
+          createdFieldNames[fieldData.name] = sanitized
+        }
       }
 
-      // Reload fields to get new field IDs - wait a bit for database to update
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Wait longer for schema cache to update and reload fields
+      // Supabase schema cache can take a moment to refresh
+      await new Promise(resolve => setTimeout(resolve, 1500))
       await loadFields()
-      const updatedFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
-      if (!updatedFieldsResponse.ok) {
-        throw new Error('Failed to reload fields after creation')
+      
+      // Fetch updated fields multiple times to ensure we have the latest
+      let updatedFields: TableField[] = []
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const updatedFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
+        if (updatedFieldsResponse.ok) {
+          const data = await updatedFieldsResponse.json()
+          updatedFields = data.fields || []
+          
+          // Verify all created fields are present
+          const allCreatedFieldsFound = fieldsToCreate.every(fieldData => {
+            const sanitizedName = createdFieldNames[fieldData.name]
+            return updatedFields.some((f: TableField) => f.name === sanitizedName)
+          })
+          
+          if (updatedFields.length > 0 && allCreatedFieldsFound) {
+            break
+          }
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
-      const updatedFields = await updatedFieldsResponse.json().then(d => d.fields || [])
       
       if (updatedFields.length === 0) {
         throw new Error('No fields found in table. Please ensure the table has at least one field.')
       }
+      
+      // Log created field mappings for debugging
+      console.log('Created field mappings:', createdFieldNames)
+      console.log('Available fields:', updatedFields.map((f: TableField) => f.name))
 
       // Create a set of valid field names (these should match column names in Supabase)
       // Field names are sanitized when created, so they match the actual column names
@@ -264,23 +297,38 @@ export default function CSVImportPanel({
           if (mappedFieldName) {
             field = updatedFields.find((f: TableField) => f.name === mappedFieldName)
           } else if (isNewField) {
-            // For new fields, the field name is the sanitized version of the CSV header
-            // The API sanitizes field names when creating them, so we need to match by sanitized name
-            const sanitizedHeader = sanitizeFieldName(csvHeader)
-            field = updatedFields.find((f: TableField) => f.name === sanitizedHeader)
+            // For new fields, use the sanitized name we tracked during creation
+            const sanitizedFieldName = createdFieldNames[csvHeader] || sanitizeFieldName(csvHeader)
+            field = updatedFields.find((f: TableField) => f.name === sanitizedFieldName)
             
             // If still not found, try case-insensitive match as fallback
             if (!field) {
               field = updatedFields.find((f: TableField) => 
-                f.name.toLowerCase() === sanitizedHeader.toLowerCase()
+                f.name.toLowerCase() === sanitizedFieldName.toLowerCase()
+              )
+            }
+            
+            // Last resort: try exact match with original CSV header (in case it's already sanitized)
+            if (!field) {
+              field = updatedFields.find((f: TableField) => f.name === csvHeader)
+            }
+            
+            // If still not found, this is a critical error
+            if (!field) {
+              throw new Error(
+                `Field "${sanitizedFieldName}" (from CSV column "${csvHeader}") was created but not found in the table. ` +
+                `This may be a schema cache issue. Please try again in a few seconds. ` +
+                `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}`
               )
             }
           }
           
           if (!field) {
-            // Field not found - skip this column
-            console.warn(`Field not found for CSV column "${csvHeader}" (mapped: ${mappedFieldName || 'new field'})`)
-            return
+            // Field not found - this should not happen for mapped fields
+            throw new Error(
+              `Field not found for CSV column "${csvHeader}" (mapped to: ${mappedFieldName || 'new field'}). ` +
+              `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}`
+            )
           }
 
           // Verify the field name is valid (should match column name in Supabase)
