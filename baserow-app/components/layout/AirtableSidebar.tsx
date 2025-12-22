@@ -85,21 +85,6 @@ export default function AirtableSidebar({
     })
   }
 
-  function getViewIcon(type: string) {
-    switch (type) {
-      case "grid":
-        return <Grid3x3 className="h-3.5 w-3.5" />
-      case "form":
-        return <FileText className="h-3.5 w-3.5" />
-      case "kanban":
-        return <Layout className="h-3.5 w-3.5" />
-      case "calendar":
-        return <Calendar className="h-3.5 w-3.5" />
-      default:
-        return <Grid3x3 className="h-3.5 w-3.5" />
-    }
-  }
-
 
   if (isCollapsed) {
     return (

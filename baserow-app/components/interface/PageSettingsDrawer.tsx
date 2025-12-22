@@ -12,8 +12,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Trash2, Save } from "lucide-react"
 import { IconPicker } from "@/components/ui/icon-picker"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -22,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { createClient } from "@/lib/supabase/client"
 import type { Page } from "@/lib/interface/types"
 
 interface PageSettingsDrawerProps {
@@ -29,6 +38,17 @@ interface PageSettingsDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onPageUpdate: () => void
+}
+
+interface InterfaceGroup {
+  id: string
+  name: string
+}
+
+interface View {
+  id: string
+  name: string
+  table_id: string | null
 }
 
 export default function PageSettingsDrawer({
@@ -39,19 +59,65 @@ export default function PageSettingsDrawer({
 }: PageSettingsDrawerProps) {
   const router = useRouter()
   const [name, setName] = useState(page.name)
+  const [description, setDescription] = useState(page.description || "")
   const [icon, setIcon] = useState("")
   const [isAdminOnly, setIsAdminOnly] = useState(page.is_admin_only || false)
+  const [groupId, setGroupId] = useState<string | null>(null)
+  const [defaultView, setDefaultView] = useState<string | null>(null)
+  const [hideViewSwitcher, setHideViewSwitcher] = useState(false)
+  const [groups, setGroups] = useState<InterfaceGroup[]>([])
+  const [views, setViews] = useState<View[]>([])
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
+    if (open) {
+      loadGroups()
+      loadViews()
+    }
+  }, [open])
+
+  useEffect(() => {
     setName(page.name)
+    setDescription(page.description || "")
     // Extract icon from settings if it exists
     const pageIcon = page.settings?.icon || ""
     setIcon(pageIcon)
     setIsAdminOnly(page.is_admin_only || false)
+    // Load group_id and other settings from page
+    // Note: These might be in the page object or need to be fetched
+    setGroupId((page as any).group_id || null)
+    setDefaultView((page as any).default_view || null)
+    setHideViewSwitcher((page as any).hide_view_switcher || false)
   }, [page])
+
+  async function loadGroups() {
+    try {
+      const response = await fetch('/api/interface-groups')
+      const data = await response.json()
+      setGroups(data.groups || [])
+    } catch (error) {
+      console.error('Error loading groups:', error)
+    }
+  }
+
+  async function loadViews() {
+    try {
+      const supabase = createClient()
+      // Load all views that could be used as default views
+      // These would typically be grid/kanban/calendar views from tables
+      const { data: viewsData } = await supabase
+        .from('views')
+        .select('id, name, table_id, type')
+        .neq('type', 'interface')
+        .order('name', { ascending: true })
+      
+      setViews((viewsData || []) as View[])
+    } catch (error) {
+      console.error('Error loading views:', error)
+    }
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -66,6 +132,11 @@ export default function PageSettingsDrawer({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
+          description: description.trim() || null,
+          group_id: groupId || null,
+          default_view: defaultView || null,
+          hide_view_switcher: hideViewSwitcher,
+          is_admin_only: isAdminOnly,
           settings: {
             ...page.settings,
             icon: icon.trim() || null,
@@ -135,6 +206,17 @@ export default function PageSettingsDrawer({
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="page-description">Description</Label>
+              <Textarea
+                id="page-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional description for this interface"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label>Icon</Label>
               <IconPicker
                 value={icon}
@@ -143,6 +225,70 @@ export default function PageSettingsDrawer({
               />
               <p className="text-xs text-muted-foreground">
                 Optional: Select an icon to represent this interface
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="interface-group">Interface Group</Label>
+              <Select
+                value={groupId || ""}
+                onValueChange={(value) => setGroupId(value || null)}
+              >
+                <SelectTrigger id="interface-group">
+                  <SelectValue placeholder="No group (Uncategorized)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No group (Uncategorized)</SelectItem>
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Organize this interface into a group in the sidebar
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="default-view">Default View</Label>
+              <Select
+                value={defaultView || ""}
+                onValueChange={(value) => setDefaultView(value || null)}
+              >
+                <SelectTrigger id="default-view">
+                  <SelectValue placeholder="None (use interface blocks)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None (use interface blocks)</SelectItem>
+                  {views.map((view) => (
+                    <SelectItem key={view.id} value={view.id}>
+                      {view.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Optional: Default view to show when opening this interface
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="hide-view-switcher"
+                  checked={hideViewSwitcher}
+                  onChange={(e) => setHideViewSwitcher(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="hide-view-switcher" className="text-sm font-normal cursor-pointer">
+                  Hide view switcher
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                If enabled, the view switcher will be hidden in this interface
               </p>
             </div>
 

@@ -29,7 +29,10 @@ export async function loadPage(pageId: string): Promise<Page | null> {
     updated_at: data.updated_at,
     created_by: data.owner_id,
     is_admin_only: data.is_admin_only || false,
-  } as Page
+    group_id: data.group_id || null,
+    default_view: data.default_view || null,
+    hide_view_switcher: data.hide_view_switcher || false,
+  } as Page & { group_id?: string | null; default_view?: string | null; hide_view_switcher?: boolean }
 }
 
 /**

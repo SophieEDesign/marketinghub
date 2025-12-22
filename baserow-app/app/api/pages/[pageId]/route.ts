@@ -10,13 +10,37 @@ export async function GET(
   { params }: { params: { pageId: string } }
 ) {
   try {
-    const page = await loadPage(params.pageId)
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('views')
+      .select('*')
+      .eq('id', params.pageId)
+      .eq('type', 'interface')
+      .single()
 
-    if (!page) {
+    if (error || !data) {
       return NextResponse.json(
         { error: 'Page not found' },
         { status: 404 }
       )
+    }
+
+    // Convert view to Page format with all fields
+    const page = {
+      id: data.id,
+      name: data.name,
+      description: data.description || undefined,
+      settings: (data.config as any)?.settings || {
+        access: data.access_level || 'authenticated',
+        layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
+      },
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      created_by: data.owner_id,
+      is_admin_only: data.is_admin_only || false,
+      group_id: data.group_id || null,
+      default_view: data.default_view || null,
+      hide_view_switcher: data.hide_view_switcher || false,
     }
 
     return NextResponse.json({ page })
@@ -38,7 +62,7 @@ export async function PATCH(
   try {
     const supabase = await createClient()
     const body = await request.json()
-    const { name, description, settings, is_admin_only } = body
+    const { name, description, settings, is_admin_only, group_id, default_view, hide_view_switcher } = body
 
     // Get existing view to preserve config
     const { data: existing } = await supabase
@@ -55,6 +79,9 @@ export async function PATCH(
     if (name !== undefined) updates.name = name
     if (description !== undefined) updates.description = description
     if (is_admin_only !== undefined) updates.is_admin_only = is_admin_only
+    if (group_id !== undefined) updates.group_id = group_id || null
+    if (default_view !== undefined) updates.default_view = default_view || null
+    if (hide_view_switcher !== undefined) updates.hide_view_switcher = hide_view_switcher
     if (settings !== undefined) {
       // Merge settings into existing config
       const existingConfig = (existing?.config as any) || {}
@@ -94,6 +121,10 @@ export async function PATCH(
       created_at: data.created_at,
       updated_at: data.updated_at,
       created_by: data.owner_id,
+      is_admin_only: data.is_admin_only || false,
+      group_id: data.group_id || null,
+      default_view: data.default_view || null,
+      hide_view_switcher: data.hide_view_switcher || false,
     }
 
     return NextResponse.json({ page })

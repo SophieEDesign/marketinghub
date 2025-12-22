@@ -242,6 +242,24 @@ export default function CSVImportPanel({
       return 'checkbox'
     }
 
+    // Check for JSON pattern - at least 70% match
+    // JSON typically starts with { or [ and contains key-value pairs
+    const jsonPattern = /^[\s]*[{\[]/
+    const jsonMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.trim()
+      if (!jsonPattern.test(trimmed)) return false
+      try {
+        JSON.parse(trimmed)
+        return true
+      } catch {
+        return false
+      }
+    }).length
+    
+    if (jsonMatches >= threshold) {
+      return 'json'
+    }
+
     // Check for categorical data (single_select or multi_select)
     // If there are limited unique values that repeat frequently, it's likely a category
     const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()))
@@ -748,7 +766,7 @@ export default function CSVImportPanel({
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Preview</h3>
             <p className="text-xs text-gray-500">
-              Review the first 10 rows before importing
+              Review the first 10 rows before importing. Field types are auto-detected and can be changed by going back to mapping.
             </p>
           </div>
 
@@ -757,11 +775,28 @@ export default function CSVImportPanel({
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    {csvHeaders.map((header) => (
-                      <th key={header} className="px-2 py-2 text-left font-medium text-gray-700">
-                        {fieldMappings[header] || header}
-                      </th>
-                    ))}
+                    {csvHeaders.map((header) => {
+                      const mappedField = fieldMappings[header]
+                      const newFieldType = newFields[header]
+                      const fieldTypeLabel = mappedField 
+                        ? tableFields.find(f => f.name === mappedField)?.type 
+                        : newFieldType
+                        ? FIELD_TYPES.find(t => t.type === newFieldType)?.label || newFieldType
+                        : null
+                      
+                      return (
+                        <th key={header} className="px-2 py-2 text-left font-medium text-gray-700">
+                          <div className="flex flex-col">
+                            <span>{mappedField || header}</span>
+                            {fieldTypeLabel && (
+                              <span className="text-xs font-normal text-gray-500 mt-0.5">
+                                {mappedField ? `(${fieldTypeLabel})` : `New: ${fieldTypeLabel}`}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -785,7 +820,7 @@ export default function CSVImportPanel({
               onClick={() => setStep("mapping")}
               className="flex-1"
             >
-              Back
+              Back to Mapping
             </Button>
             <Button onClick={handleImport} className="flex-1">
               Import All Rows
