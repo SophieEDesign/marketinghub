@@ -120,22 +120,8 @@ export async function POST(
       config || {}
     )
 
-    // Convert view_block to PageBlock format for response
-    const pageBlock = {
-      id: block.id,
-      page_id: block.view_id,
-      type: block.type,
-      x: block.position_x,
-      y: block.position_y,
-      w: block.width,
-      h: block.height,
-      config: block.config,
-      order_index: block.order_index,
-      created_at: block.created_at,
-      updated_at: block.updated_at,
-    }
-
-    return NextResponse.json({ block: pageBlock })
+    // createBlock already returns a PageBlock, so we can return it directly
+    return NextResponse.json({ block })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to create block' },
