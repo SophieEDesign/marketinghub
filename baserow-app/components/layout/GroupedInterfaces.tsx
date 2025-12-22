@@ -365,7 +365,7 @@ export default function GroupedInterfaces({
         oldGroupPages.forEach((p, i) => {
           updates.push({
             id: p.id,
-            group_id: activePage.group_id,
+            group_id: activePage.group_id ?? null,
             order_index: i,
           })
         })
