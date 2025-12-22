@@ -65,6 +65,25 @@ export default function Canvas({
     [onLayoutChange]
   )
 
+  // Empty state: Show friendly message when no blocks exist
+  if (blocks.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">📄</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            This interface is empty
+          </h3>
+          <p className="text-sm text-gray-500">
+            {isEditing
+              ? "Click the 'Add block' button to get started building your interface."
+              : "Edit this interface to add blocks and customize it."}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full h-full">
       <ResponsiveGridLayout

@@ -45,8 +45,8 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
-  // Interfaces expanded by default, Core Data collapsed
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces"]))
+  // Interfaces and Automations expanded by default, Core Data collapsed
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces", "automations"]))
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
 
@@ -69,7 +69,7 @@ export default function AirtableSidebar({
     if (isInterfacePage) {
       setExpandedSections(prev => new Set(prev).add("interfaces"))
     }
-    if (isAutomation) {
+    if (isAutomation || pathname === "/automations") {
       setExpandedSections(prev => new Set(prev).add("automations"))
     }
   }, [currentTableId, currentViewId, isInterfacePage, isAutomation, expandedTables])
@@ -237,6 +237,66 @@ export default function AirtableSidebar({
           )}
         </div>
 
+        {/* Automations Section - Second Priority */}
+        <div className="py-2 border-t border-gray-100">
+          <div className="px-3 mb-1">
+            <button
+              onClick={() => toggleSection("automations")}
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+            >
+              <span>Automations</span>
+              {expandedSections.has("automations") ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+          </div>
+          {expandedSections.has("automations") && (
+            <>
+              <div className="px-2 mb-1">
+                <Link
+                  href="/automations"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>New Automation</span>
+                </Link>
+              </div>
+              <div className="space-y-0.5 px-2">
+                <Link
+                  href="/automations"
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                    pathname === "/automations"
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <Zap className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-sm">All Automations</span>
+                </Link>
+                {automations.map((automation) => {
+                  const isActive = pathname.includes(`/automations/${automation.id}`)
+                  return (
+                    <Link
+                      key={automation.id}
+                      href={`/automations/${automation.id}`}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
+                        isActive
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      <Zap className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate">{automation.name}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Core Data Section - Secondary, Collapsed by Default */}
         <div className="py-2 border-t border-gray-100">
           <div className="px-3 mb-1">
@@ -327,45 +387,6 @@ export default function AirtableSidebar({
                 })}
               </div>
             </>
-          )}
-        </div>
-
-
-        {/* Automations Section */}
-        <div className="py-2 border-t border-gray-100">
-          <div className="px-3 mb-1">
-            <button
-              onClick={() => toggleSection("automations")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
-            >
-              <span>Automations</span>
-              {expandedSections.has("automations") ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          </div>
-          {expandedSections.has("automations") && (
-            <div className="space-y-0.5 px-2">
-              {automations.map((automation) => {
-                const isActive = pathname.includes(`/automations/${automation.id}`)
-                return (
-                  <Link
-                    key={automation.id}
-                    href={`/automations/${automation.id}`}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded transition-colors ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    <Zap className="h-4 w-4 flex-shrink-0" />
-                    <span className="text-sm truncate">{automation.name}</span>
-                  </Link>
-                )
-              })}
-            </div>
           )}
         </div>
 

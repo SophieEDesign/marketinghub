@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
 import Canvas from "./Canvas"
-import BlockPicker from "./BlockPicker"
+import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
 import PageSettingsDrawer from "./PageSettingsDrawer"
 import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
@@ -28,7 +28,6 @@ export default function InterfaceBuilder({
   const [isEditing, setIsEditing] = useState(false)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [blockPickerCollapsed, setBlockPickerCollapsed] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
 
@@ -143,15 +142,7 @@ export default function InterfaceBuilder({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Block Picker */}
-      {isEditing && (
-        <BlockPicker
-          onSelectBlock={handleAddBlock}
-          isCollapsed={blockPickerCollapsed}
-        />
-      )}
-
-      {/* Main Canvas */}
+      {/* Main Canvas - Full width when not editing */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
         <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
@@ -201,7 +192,7 @@ export default function InterfaceBuilder({
                 className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
               >
                 <Edit2 className="h-4 w-4" />
-                Edit page
+                Edit interface
               </button>
             )}
           </div>
@@ -229,6 +220,11 @@ export default function InterfaceBuilder({
           onClose={() => setSelectedBlockId(null)}
           onSave={handleSaveSettings}
         />
+      )}
+
+      {/* Floating Block Picker - Only visible in edit mode */}
+      {isEditing && (
+        <FloatingBlockPicker onSelectBlock={handleAddBlock} />
       )}
 
       {/* Page Settings Drawer */}
