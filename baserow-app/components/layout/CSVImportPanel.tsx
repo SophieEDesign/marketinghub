@@ -43,6 +43,7 @@ export default function CSVImportPanel({
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({})
   const [newFields, setNewFields] = useState<Record<string, FieldType>>({})
   const [importedCount, setImportedCount] = useState(0)
+  const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load table fields
@@ -108,13 +109,16 @@ export default function CSVImportPanel({
     const file = e.target.files?.[0]
     if (!file) return
 
-    const text = await file.text()
-    const { headers, rows } = parseCSV(text)
+    setError(null)
+    
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCSV(text)
 
-    if (headers.length === 0) {
-      alert("CSV file appears to be empty or invalid")
-      return
-    }
+      if (headers.length === 0) {
+        setError("CSV file appears to be empty or invalid")
+        return
+      }
 
     setCsvHeaders(headers)
     setCsvRows(rows)
@@ -303,6 +307,7 @@ export default function CSVImportPanel({
 
   async function handleImport() {
     setStep("importing")
+    setError(null)
 
     try {
       // First, create any new fields
@@ -610,6 +615,12 @@ export default function CSVImportPanel({
 
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      
       {step === "upload" && (
         <div className="space-y-4">
           <div>
@@ -852,23 +863,24 @@ export default function CSVImportPanel({
               {importedCount} rows imported successfully
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setStep("upload")
-              setCsvHeaders([])
-              setCsvRows([])
-              setFieldMappings({})
-              setNewFields({})
-              setImportedCount(0)
-              if (fileInputRef.current) {
-                fileInputRef.current.value = ""
-              }
-            }}
-            variant="outline"
-            className="w-full"
-          >
-            Import Another File
-          </Button>
+            <Button
+              onClick={() => {
+                setStep("upload")
+                setCsvHeaders([])
+                setCsvRows([])
+                setFieldMappings({})
+                setNewFields({})
+                setImportedCount(0)
+                setError(null)
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = ""
+                }
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              Import Another File
+            </Button>
         </div>
       )}
     </div>

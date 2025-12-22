@@ -133,6 +133,9 @@ export default function RowDetailView({
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Row Details</DialogTitle>
+            <DialogDescription>
+              View and edit the details of this record.
+            </DialogDescription>
           </DialogHeader>
           {content}
         </DialogContent>

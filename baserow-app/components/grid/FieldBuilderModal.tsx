@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { X, Save } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -212,6 +212,9 @@ export default function FieldBuilderModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Field" : "Add Field"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "Update the field properties below." : "Create a new field for this table."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

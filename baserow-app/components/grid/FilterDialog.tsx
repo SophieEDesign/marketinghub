@@ -5,6 +5,7 @@ import { Plus, X, Trash2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -166,6 +167,9 @@ export default function FilterDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Filter Records</DialogTitle>
+          <DialogDescription>
+            Add filters to narrow down the records displayed in this view.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

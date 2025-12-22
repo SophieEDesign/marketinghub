@@ -5,6 +5,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, GripVertical } from "lucide-react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -109,6 +110,9 @@ export default function SortDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Sort Records</DialogTitle>
+          <DialogDescription>
+            Configure how records are sorted in this view.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4">
