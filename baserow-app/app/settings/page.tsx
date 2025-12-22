@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import WorkspaceShellWrapper from '@/components/layout/WorkspaceShellWrapper'
 import { Settings, Shield, Database, Key, FileText } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import SettingsWorkspaceTab from '../../../../components/settings/WorkspaceTab'
-import SettingsPagesTab from '../../../../components/settings/PagesTab'
-import SettingsPermissionsTab from '../../../../components/settings/PermissionsTab'
-import SettingsStorageTab from '../../../../components/settings/StorageTab'
-import SettingsApiTab from '../../../../components/settings/ApiTab'
+import SettingsWorkspaceTab from '../../../components/settings/WorkspaceTab'
+import SettingsPagesTab from '../../../components/settings/PagesTab'
+import SettingsPermissionsTab from '../../../components/settings/PermissionsTab'
+import SettingsStorageTab from '../../../components/settings/StorageTab'
+import SettingsApiTab from '../../../components/settings/ApiTab'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
