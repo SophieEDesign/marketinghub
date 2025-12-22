@@ -41,22 +41,57 @@ export default function SettingsBrandingTab() {
       const fileName = `logo-${Date.now()}.${fileExt}`
       const filePath = `branding/${fileName}`
 
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('public')
+      // Upload to Supabase Storage - try 'attachments' bucket first, fallback to 'public'
+      let uploadError = null
+      let publicUrl = null
+      
+      // Try attachments bucket first (most likely to exist)
+      const { error: attachmentsError } = await supabase.storage
+        .from('attachments')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         })
+      
+      if (!attachmentsError) {
+        const { data: { publicUrl: url } } = supabase.storage
+          .from('attachments')
+          .getPublicUrl(filePath)
+        publicUrl = url
+      } else {
+        // Try public bucket
+        const { error: publicError } = await supabase.storage
+          .from('public')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+        
+        if (publicError) {
+          uploadError = publicError
+        } else {
+          const { data: { publicUrl: url } } = supabase.storage
+            .from('public')
+            .getPublicUrl(filePath)
+          publicUrl = url
+        }
+      }
 
-      if (uploadError) throw uploadError
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError)
+        // If bucket doesn't exist, suggest creating it or using a URL instead
+        if (uploadError.message?.includes('Bucket not found')) {
+          alert('Storage bucket not found. Please create an "attachments" or "public" bucket in Supabase Storage, or enter a logo URL directly.')
+          return
+        }
+        throw uploadError
+      }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('public')
-        .getPublicUrl(filePath)
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL for uploaded file')
+      }
 
-      setLogoUrl(publicUrl)
+      setLogoUrl(publicUrl!)
     } catch (error) {
       console.error('Error uploading logo:', error)
       alert('Failed to upload logo')

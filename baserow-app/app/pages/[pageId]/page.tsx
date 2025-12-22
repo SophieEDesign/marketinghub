@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
+import { getInterfaceById, canAccessInterface, getDefaultInterface } from "@/lib/interfaces"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
 
@@ -12,72 +13,56 @@ export default async function PagePage({
   const supabase = await createClient()
   const admin = await isAdmin()
 
-  // Load view (interface page) from views table
-  const { data: view, error } = await supabase
-    .from("views")
-    .select("id, name, type, is_admin_only")
-    .eq("id", params.pageId)
-    .single()
+  // Try to load interface from new system
+  let interfaceData = await getInterfaceById(params.pageId)
+  let interfaceName = "Interface Page"
 
-  if (error || !view) {
-    // Redirect to first available interface
-    const { data: firstInterface } = await supabase
-      .from('views')
-      .select('id')
-      .eq('type', 'interface')
-      .or('is_admin_only.is.null,is_admin_only.eq.false')
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: true })
-      .limit(1)
+  // If not found in new system, fallback to views table
+  if (!interfaceData) {
+    const { data: view } = await supabase
+      .from("views")
+      .select("id, name, type, is_admin_only")
+      .eq("id", params.pageId)
       .maybeSingle()
-    
-    if (firstInterface) {
-      redirect(`/pages/${firstInterface.id}`)
-    } else {
-      redirect('/')
-    }
-  }
 
-  // Security check: If interface is admin-only and user is not admin, redirect
-  if (view.is_admin_only && !admin) {
-    // Redirect to first available interface
-    const { data: firstInterface } = await supabase
-      .from('views')
-      .select('id')
-      .eq('type', 'interface')
-      .or('is_admin_only.is.null,is_admin_only.eq.false')
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    
-    if (firstInterface) {
-      redirect(`/pages/${firstInterface.id}`)
-    } else {
-      redirect('/')
-    }
-  }
-
-  // Confirm it's an interface page
-  if (view.type !== 'interface') {
-    // If it's not an interface page, redirect to the appropriate view route
-    if (view.type && view.type !== 'interface') {
-      // Try to find the table_id
-      const { data: viewWithTable } = await supabase
-        .from('views')
-        .select('table_id')
-        .eq('id', params.pageId)
-        .single()
-      
-      if (viewWithTable?.table_id) {
-        redirect(`/tables/${viewWithTable.table_id}/views/${params.pageId}`)
+    if (!view || view.type !== 'interface') {
+      // Redirect to first available interface
+      const defaultInterface = await getDefaultInterface()
+      if (defaultInterface) {
+        redirect(`/pages/${defaultInterface.id}`)
+      } else {
+        redirect('/')
       }
     }
-    redirect('/settings?tab=pages')
+
+    // Check permissions for old system
+    if (view.is_admin_only && !admin) {
+      const defaultInterface = await getDefaultInterface()
+      if (defaultInterface) {
+        redirect(`/pages/${defaultInterface.id}`)
+      } else {
+        redirect('/')
+      }
+    }
+
+    interfaceName = view.name || "Interface Page"
+  } else {
+    // Check permissions for new system
+    const canAccess = await canAccessInterface(params.pageId)
+    if (!canAccess) {
+      const defaultInterface = await getDefaultInterface()
+      if (defaultInterface) {
+        redirect(`/pages/${defaultInterface.id}`)
+      } else {
+        redirect('/')
+      }
+    }
+
+    interfaceName = interfaceData.name || "Interface Page"
   }
 
   return (
-    <WorkspaceShellWrapper title={view.name || "Interface Page"} hideTopbar={true}>
+    <WorkspaceShellWrapper title={interfaceName} hideTopbar={true}>
       <InterfacePageClient pageId={params.pageId} />
     </WorkspaceShellWrapper>
   )

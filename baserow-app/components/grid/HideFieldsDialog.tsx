@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -81,6 +82,9 @@ export default function HideFieldsDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Hide Fields</DialogTitle>
+          <DialogDescription>
+            Select fields to hide from this view. Hidden fields will not be displayed but data is preserved.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-4 max-h-96 overflow-y-auto">

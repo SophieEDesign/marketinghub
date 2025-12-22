@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -186,6 +187,9 @@ export default function ViewManagementDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename View</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this view.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -245,12 +249,11 @@ export default function ViewManagementDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete View</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-700">
-              Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
-            </p>
-          </div>
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               Cancel

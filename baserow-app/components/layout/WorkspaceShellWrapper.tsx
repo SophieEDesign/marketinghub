@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getUserRole, isAdmin } from "@/lib/roles"
 import { getWorkspaceSettings } from "@/lib/branding"
 import { BrandingProvider } from "@/contexts/BrandingContext"
+import { getInterfaces, getInterfaceCategories, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import WorkspaceShell from "./WorkspaceShell"
 import type { View } from "@/types/database"
 import type { Automation } from "@/types/database"
@@ -165,7 +166,7 @@ export default async function WorkspaceShellWrapper({
         title={title}
         tables={tables}
         views={viewsByTable}
-        interfacePages={interfacePages}
+        interfacePages={interfacePages as any}
         interfaceGroups={interfaceGroups}
         dashboards={dashboards}
         automations={automations}

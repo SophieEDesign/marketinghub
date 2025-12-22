@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -81,14 +82,14 @@ export default function GroupDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Group Records</DialogTitle>
+          <DialogDescription>
+            Select a field to group records by. Records with the same value will be grouped together.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div>
             <Label className="text-sm font-medium text-gray-700">Group by Field</Label>
-            <p className="text-xs text-gray-500 mt-1 mb-3">
-              Select a field to group records by. Records with the same value will be grouped together.
-            </p>
             <Select value={selectedField} onValueChange={setSelectedField}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a field to group by" />

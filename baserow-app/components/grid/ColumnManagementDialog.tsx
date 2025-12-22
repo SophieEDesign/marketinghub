@@ -5,6 +5,7 @@ import { Plus, Trash2, Edit, X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -95,6 +96,9 @@ export default function ColumnManagementDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Manage Columns</DialogTitle>
+          <DialogDescription>
+            Configure column settings and visibility for this view.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

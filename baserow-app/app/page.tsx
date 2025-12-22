@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
+import { getDefaultInterface, getInterfaces } from "@/lib/interfaces"
 
 export default async function HomePage({
   searchParams,
@@ -27,42 +28,43 @@ export default async function HomePage({
   
   const admin = await isAdmin()
 
-  // Build query for interfaces based on role
-  let defaultQuery = supabase
-    .from("views")
-    .select("id")
-    .eq("type", "interface")
-    .eq("is_default", true)
-
-  // If not admin, filter out admin-only interfaces
-  if (!admin) {
-    defaultQuery = defaultQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+  // Try to get default interface using new system
+  try {
+    const defaultInterface = await getDefaultInterface()
+    if (defaultInterface) {
+      redirect(`/pages/${defaultInterface.id}`)
+    }
+  } catch (error) {
+    // Fallback to old system
+    console.warn('Error loading default interface, falling back to views table:', error)
   }
 
-  const { data: defaultInterface } = await defaultQuery.maybeSingle()
+  // If no default, get first accessible interface
+  try {
+    const interfaces = await getInterfaces()
+    if (interfaces.length > 0) {
+      redirect(`/pages/${interfaces[0].id}`)
+    }
+  } catch (error) {
+    // Fallback to old system
+    console.warn('Error loading interfaces, falling back to views table:', error)
+    
+    let firstQuery = supabase
+      .from("views")
+      .select("id")
+      .eq("type", "interface")
+      .order("order_index", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(1)
 
-  if (defaultInterface) {
-    redirect(`/pages/${defaultInterface.id}`)
-  }
+    if (!admin) {
+      firstQuery = firstQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+    }
 
-  // If no default, find first interface by order_index then created_at
-  let firstQuery = supabase
-    .from("views")
-    .select("id")
-    .eq("type", "interface")
-    .order("order_index", { ascending: true })
-    .order("created_at", { ascending: true })
-    .limit(1)
-
-  // If not admin, filter out admin-only interfaces
-  if (!admin) {
-    firstQuery = firstQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
-  }
-
-  const { data: firstInterface } = await firstQuery.maybeSingle()
-
-  if (firstInterface) {
-    redirect(`/pages/${firstInterface.id}`)
+    const { data: firstInterface } = await firstQuery.maybeSingle()
+    if (firstInterface) {
+      redirect(`/pages/${firstInterface.id}`)
+    }
   }
 
   // If no interfaces exist, redirect based on role
