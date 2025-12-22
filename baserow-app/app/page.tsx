@@ -4,6 +4,13 @@ import { isAdmin } from "@/lib/roles"
 
 export default async function HomePage() {
   const supabase = await createClient()
+  
+  // Check authentication - redirect to login if not authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/login')
+  }
+  
   const admin = await isAdmin()
 
   // Build query for interfaces based on role

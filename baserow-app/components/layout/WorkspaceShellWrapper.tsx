@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation"
 import { getTables } from "@/lib/crud/tables"
 import { getViews } from "@/lib/crud/views"
 import { createClient } from "@/lib/supabase/server"
@@ -20,6 +21,12 @@ export default async function WorkspaceShellWrapper({
   hideTopbar = false,
 }: WorkspaceShellWrapperProps) {
   const supabase = await createClient()
+  
+  // Check authentication - redirect to login if not authenticated
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/login')
+  }
   
   // Fetch all data in parallel using existing functions from baserow-app/lib/crud
   const [tables, userRole, brandingSettings] = await Promise.all([

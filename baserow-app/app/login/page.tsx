@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        router.push("/")
+      }
+    }
+    checkUser()
+  }, [router])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +39,7 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push("/tables")
+      router.push("/")
       router.refresh()
     }
   }
@@ -47,7 +58,7 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push("/tables")
+      router.push("/")
       router.refresh()
     }
   }
