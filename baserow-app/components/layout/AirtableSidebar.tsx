@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import NewPageModal from "@/components/interface/NewPageModal"
 import GroupedInterfaces from "./GroupedInterfaces"
@@ -196,7 +197,15 @@ export default function AirtableSidebar({
       <div className="p-3 border-b border-gray-200 flex items-center justify-between" style={{ borderBottomColor: primaryColor + '20' }}>
         <Link href="/" className="flex items-center gap-2">
           {logoUrl ? (
-            <img src={logoUrl} alt={brandName} className="h-5 w-5 object-contain" />
+            <div className="relative h-5 w-5">
+              <Image
+                src={logoUrl}
+                alt={brandName}
+                fill
+                className="object-contain"
+                unoptimized
+              />
+            </div>
           ) : (
             <Home className="h-5 w-5" style={{ color: primaryColor }} />
           )}

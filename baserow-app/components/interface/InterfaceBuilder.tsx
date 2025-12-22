@@ -24,6 +24,7 @@ export default function InterfaceBuilder({
   isViewer = false,
   onSave,
 }: InterfaceBuilderProps) {
+  const { primaryColor } = useBranding()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   
   // Default to view mode - editing is explicit and intentional
