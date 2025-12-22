@@ -242,7 +242,8 @@ export default function AirtableSidebar({
           )}
         </div>
 
-        {/* Automations Section - Second Priority */}
+        {/* Automations Section - Admin Only */}
+        {isAdmin && (
         <div className="py-2 border-t border-gray-100">
           <div className="px-3 mb-1">
             <button

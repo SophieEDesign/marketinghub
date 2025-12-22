@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -119,11 +120,15 @@ export default function SettingsBrandingTab() {
           <Label htmlFor="logo">Logo</Label>
           <div className="flex items-center gap-4">
             {logoUrl && (
-              <img
-                src={logoUrl}
-                alt="Logo preview"
-                className="h-12 w-12 object-contain border border-gray-200 rounded"
-              />
+              <div className="relative h-12 w-12 border border-gray-200 rounded overflow-hidden">
+                <Image
+                  src={logoUrl}
+                  alt="Logo preview"
+                  fill
+                  className="object-contain"
+                  unoptimized
+                />
+              </div>
             )}
             <div className="flex-1">
               <Input
