@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
@@ -35,19 +35,32 @@ export default function Canvas({
   layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
 }: CanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
+  const previousBlockIdsRef = useRef<string>("")
 
+  // Sync layout from blocks only when block IDs change (add/remove), not on position changes
+  // Position changes come from user drag/resize and are handled by handleLayoutChange
   useEffect(() => {
-    // Convert blocks to layout format
-    const newLayout: Layout[] = blocks.map((block) => ({
-      i: block.id,
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-      minW: 2,
-      minH: 2,
-    }))
-    setLayout(newLayout)
+    const currentBlockIds = blocks.map(b => b.id).sort().join(",")
+    const previousBlockIds = previousBlockIdsRef.current
+    
+    // Only update layout if:
+    // 1. First load (previousBlockIds is empty)
+    // 2. Block IDs changed (block added or removed)
+    if (previousBlockIds === "" || currentBlockIds !== previousBlockIds) {
+      // Convert blocks to layout format - use saved positions from blocks
+      const newLayout: Layout[] = blocks.map((block) => ({
+        i: block.id,
+        x: block.x,
+        y: block.y,
+        w: block.w,
+        h: block.h,
+        minW: 2,
+        minH: 2,
+      }))
+      setLayout(newLayout)
+      previousBlockIdsRef.current = currentBlockIds
+    }
+    // If block IDs haven't changed, don't update layout - preserve user's drag/resize positions
   }, [blocks])
 
   const handleLayoutChange = useCallback(

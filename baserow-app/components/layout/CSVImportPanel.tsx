@@ -523,7 +523,7 @@ export default function CSVImportPanel({
                           </SelectContent>
                         </Select>
                         <p className="text-xs text-gray-500">
-                          A new field "{csvHeader}" will be created with this type
+                          A new field &quot;{csvHeader}&quot; will be created with this type
                         </p>
                       </div>
                     )}
