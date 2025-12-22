@@ -50,10 +50,20 @@ export default async function WorkspaceShellWrapper({
     
     if (!groupsError && groupsData) {
       interfaceGroups = groupsData
+    } else if (groupsError) {
+      // If table doesn't exist (42P01) or RLS error, just return empty array
+      if (groupsError.code === '42P01' || groupsError.code === 'PGRST116' || 
+          groupsError.message?.includes('relation') || groupsError.message?.includes('does not exist') ||
+          groupsError.code === 'PGRST301' || groupsError.message?.includes('permission')) {
+        console.warn('interface_groups table may not exist or RLS blocking access, returning empty array')
+        interfaceGroups = []
+      } else {
+        console.error('Error loading interface groups:', groupsError)
+      }
     }
   } catch (error) {
     // If fails, interfaceGroups remains empty array
-    console.error('Error loading interface groups:', error)
+    console.warn('Error loading interface groups:', error)
   }
 
   // Fetch interface pages from views table where type='interface'

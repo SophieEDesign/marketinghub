@@ -147,45 +147,67 @@ export default function CSVImportPanel({
   }
 
   // Auto-detect field type from sample values
+  // Uses a threshold approach: if >70% of values match a pattern, use that type
   function detectFieldType(sampleValues: string[]): FieldType {
-    // Check for email pattern
+    if (sampleValues.length === 0) return 'text'
+    
+    const threshold = Math.max(1, Math.floor(sampleValues.length * 0.7)) // 70% threshold
+
+    // Check for email pattern (at least 70% match)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (sampleValues.every(v => emailPattern.test(v))) {
+    const emailMatches = sampleValues.filter(v => emailPattern.test(v.trim())).length
+    if (emailMatches >= threshold) {
       return 'text' // Use text for email (can add email type later)
     }
 
-    // Check for URL pattern
+    // Check for URL pattern (at least 70% match)
     const urlPattern = /^https?:\/\//
-    if (sampleValues.every(v => urlPattern.test(v))) {
+    const urlMatches = sampleValues.filter(v => urlPattern.test(v.trim())).length
+    if (urlMatches >= threshold) {
       return 'text' // Use text for URL (can add url type later)
     }
 
-    // Check for date pattern (common formats)
+    // Check for date pattern (common formats) - at least 70% match
     const datePatterns = [
-      /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-      /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
-      /^\d{2}-\d{2}-\d{4}$/, // MM-DD-YYYY
+      /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/, // YYYY-MM-DD, YYYY/MM/DD
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}$/, // MM/DD/YYYY, DD-MM-YYYY
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2}$/, // MM/DD/YY
     ]
-    if (sampleValues.every(v => datePatterns.some(p => p.test(v)))) {
+    const dateMatches = sampleValues.filter(v => 
+      datePatterns.some(p => p.test(v.trim()))
+    ).length
+    if (dateMatches >= threshold) {
       return 'date'
     }
 
-    // Check for number (integer or decimal)
+    // Check for number (integer or decimal) - at least 70% match
+    // Remove currency symbols and percentage signs for number detection
+    const cleanedValues = sampleValues.map(v => v.trim().replace(/[$€£%,\s]/g, ''))
     const numberPattern = /^-?\d+(\.\d+)?$/
-    if (sampleValues.every(v => numberPattern.test(v.trim()))) {
-      // Check if it's a percentage or currency
-      if (sampleValues.some(v => v.includes('%'))) {
+    const numberMatches = cleanedValues.filter(v => numberPattern.test(v)).length
+    
+    if (numberMatches >= threshold) {
+      // Check if it's a percentage (contains % in original)
+      const percentCount = sampleValues.filter(v => v.includes('%')).length
+      if (percentCount >= threshold) {
         return 'percent'
       }
-      if (sampleValues.some(v => v.includes('$') || v.includes('€') || v.includes('£'))) {
+      // Check if it's currency (contains currency symbols)
+      const currencyCount = sampleValues.filter(v => 
+        /[$€£¥]/.test(v) || v.toLowerCase().includes('usd') || v.toLowerCase().includes('gbp')
+      ).length
+      if (currencyCount >= threshold) {
         return 'currency'
       }
       return 'number'
     }
 
-    // Check for boolean/checkbox
-    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n']
-    if (sampleValues.every(v => booleanValues.includes(v.toLowerCase().trim()))) {
+    // Check for boolean/checkbox - at least 70% match
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
+    const booleanMatches = sampleValues.filter(v => 
+      booleanValues.includes(v.toLowerCase().trim())
+    ).length
+    if (booleanMatches >= threshold) {
       return 'checkbox'
     }
 

@@ -10,6 +10,13 @@ export async function PATCH(
 ) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // Optional: Check authentication (RLS will handle it, but we can be explicit)
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
+    
     const body = await request.json()
     const { name, order_index, collapsed } = body
 
@@ -51,6 +58,12 @@ export async function DELETE(
 ) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    // Optional: Check authentication (RLS will handle it, but we can be explicit)
+    // if (!user) {
+    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // }
 
     // Move all interfaces in this group to uncategorized
     await supabase

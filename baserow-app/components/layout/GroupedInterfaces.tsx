@@ -122,7 +122,7 @@ export default function GroupedInterfaces({
     pagesByGroup[groupId].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
   })
 
-  // Get uncategorized pages
+  // Get uncategorized pages (but we won't show them in a separate section)
   const uncategorizedPages = pagesByGroup["uncategorized"] || []
 
   // Sort groups by order_index
@@ -246,9 +246,19 @@ export default function GroupedInterfaces({
           return next
         })
         onRefresh?.()
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create group' }))
+        console.error("Failed to create group:", errorData.error || response.statusText)
+        // If 401, the table might not exist or user isn't authenticated
+        if (response.status === 401) {
+          alert("Please ensure you're logged in and the interface_groups table exists. Run the migration in Supabase if needed.")
+        } else {
+          alert(errorData.error || "Failed to create group")
+        }
       }
     } catch (error) {
       console.error("Failed to create group:", error)
+      alert("Failed to create group. Please check your connection and try again.")
     }
   }
 
@@ -607,23 +617,16 @@ export default function GroupedInterfaces({
             <SortableGroup key={group.id} group={group} />
           ))}
 
-          {/* Uncategorized Section - Always visible for dropping */}
-          <UncategorizedDroppable>
-            <div className="group">
-              <div className="flex items-center gap-1 px-2 py-1">
-                <span className="flex-1 px-1 py-0.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Uncategorized
-                </span>
+          {/* Uncategorized pages are shown directly under groups (no separate section) */}
+          {uncategorizedPages.length > 0 && (
+            <UncategorizedDroppable>
+              <div className="ml-4 space-y-0.5 mt-0.5">
+                {uncategorizedPages.map((page) => (
+                  <SortablePage key={page.id} page={page} />
+                ))}
               </div>
-              {uncategorizedPages.length > 0 && (
-                <div className="ml-4 space-y-0.5 mt-0.5">
-                  {uncategorizedPages.map((page) => (
-                    <SortablePage key={page.id} page={page} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </UncategorizedDroppable>
+            </UncategorizedDroppable>
+          )}
         </SortableContext>
       </div>
 
