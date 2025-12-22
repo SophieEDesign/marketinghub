@@ -54,7 +54,7 @@ export default function InterfacePageClient({ pageId }: InterfacePageClientProps
   const isViewer = searchParams.get("view") === "true"
 
   return (
-    <div className="h-screen -mt-14">
+    <div className="h-screen">
       <InterfaceBuilder
         page={page}
         initialBlocks={blocks}

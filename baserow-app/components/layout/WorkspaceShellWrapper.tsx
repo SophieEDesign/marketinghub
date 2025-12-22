@@ -9,11 +9,13 @@ import type { Automation } from "@/types/database"
 interface WorkspaceShellWrapperProps {
   children: React.ReactNode
   title?: string
+  hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
 }
 
 export default async function WorkspaceShellWrapper({
   children,
   title,
+  hideTopbar = false,
 }: WorkspaceShellWrapperProps) {
   const supabase = await createClient()
   
@@ -116,6 +118,7 @@ export default async function WorkspaceShellWrapper({
       dashboards={dashboards}
       automations={automations}
       userRole={userRole}
+      hideTopbar={hideTopbar}
     >
       {children}
     </WorkspaceShell>

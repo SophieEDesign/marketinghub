@@ -40,7 +40,7 @@ export default async function PagePage({
   }
 
   return (
-    <WorkspaceShellWrapper title={view.name || "Interface Page"}>
+    <WorkspaceShellWrapper title={view.name || "Interface Page"} hideTopbar={true}>
       <InterfacePageClient pageId={params.pageId} />
     </WorkspaceShellWrapper>
   )

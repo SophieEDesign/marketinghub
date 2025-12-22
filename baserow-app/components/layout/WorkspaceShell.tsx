@@ -38,6 +38,7 @@ interface WorkspaceShellProps {
   dashboards: Dashboard[]
   automations: Automation[]
   userRole: "admin" | "editor" | "viewer" | null
+  hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
 }
 
 export default function WorkspaceShell({
@@ -49,6 +50,7 @@ export default function WorkspaceShell({
   dashboards,
   automations,
   userRole,
+  hideTopbar = false,
 }: WorkspaceShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -61,7 +63,7 @@ export default function WorkspaceShell({
         automations={automations}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar title={title} />
+        {!hideTopbar && <Topbar title={title} />}
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
