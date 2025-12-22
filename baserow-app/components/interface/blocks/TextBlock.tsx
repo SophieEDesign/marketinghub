@@ -53,7 +53,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   function handleChange(value: string) {
     setEditingContent(value)
-    // Auto-save on change (debounced by ReactQuill internally)
+    // Auto-save on change
     if (onUpdate) {
       onUpdate(value)
     }
@@ -70,48 +70,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           formats={quillFormats}
           placeholder="Enter text content..."
           className="h-full flex flex-col"
-          style={{
-            height: "100%",
-            display: "flex",
-            flexDirection: "column",
-          }}
         />
-        <style jsx global>{`
-          .ql-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            font-size: 14px;
-          }
-          .ql-editor {
-            flex: 1;
-            min-height: 200px;
-          }
-          .ql-toolbar {
-            border-top: 1px solid #e5e7eb;
-            border-left: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            border-bottom: none;
-            border-radius: 0.375rem 0.375rem 0 0;
-          }
-          .ql-container {
-            border-bottom: 1px solid #e5e7eb;
-            border-left: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            border-top: none;
-            border-radius: 0 0 0.375rem 0.375rem;
-          }
-          .ql-editor.ql-blank::before {
-            color: #9ca3af;
-            font-style: normal;
-          }
-        `}</style>
       </div>
     )
   }
 
   return (
-    <div className="h-full p-4 overflow-auto">
+    <div className="h-full overflow-auto">
       <div className="prose prose-sm max-w-none">
         {content ? (
           <div dangerouslySetInnerHTML={{ __html: content }} />

@@ -68,7 +68,7 @@ export default function Canvas({
   return (
     <div className="w-full h-full">
       <ResponsiveGridLayout
-        className="layout"
+        className={`layout ${isEditing ? "" : "view-mode"}`}
         layouts={{ lg: layout }}
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
@@ -80,24 +80,44 @@ export default function Canvas({
         preventCollision={true}
         onLayoutChange={handleLayoutChange}
         compactType="vertical"
+        draggableHandle=".drag-handle"
       >
         {blocks.map((block) => (
           <div
             key={block.id}
-            className={`bg-white border rounded-lg shadow-sm overflow-hidden relative ${
-              selectedBlockId === block.id
-                ? "ring-2 ring-blue-500 border-blue-500"
-                : "border-gray-200 hover:border-gray-300"
-            } ${isEditing ? "cursor-move" : ""}`}
+            className={`relative group ${
+              isEditing
+                ? `bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
+                    selectedBlockId === block.id
+                      ? "ring-2 ring-blue-500 border-blue-500"
+                      : ""
+                  }`
+                : "bg-transparent border-0 shadow-none"
+            }`}
             onClick={(e) => {
-              // Click to select block (but not if clicking the settings button)
+              // Only allow selection in edit mode, and not if clicking buttons
               if (isEditing && !(e.target as HTMLElement).closest('button')) {
                 onBlockClick?.(block.id)
               }
             }}
           >
+            {/* Drag Handle - Only visible in edit mode on hover */}
             {isEditing && (
-              <div className="absolute top-2 right-2 z-10">
+              <div className="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity drag-handle">
+                <div
+                  className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+                  title="Drag to reorder"
+                >
+                  <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 12h16M4 16h16" />
+                  </svg>
+                </div>
+              </div>
+            )}
+
+            {/* Settings Button - Only visible in edit mode on hover */}
+            {isEditing && (
+              <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -107,7 +127,7 @@ export default function Canvas({
                   className={`p-1.5 rounded-md shadow-sm transition-all ${
                     selectedBlockId === block.id
                       ? "bg-blue-600 text-white opacity-100"
-                      : "bg-white text-gray-600 opacity-0 group-hover:opacity-100 border border-gray-300 hover:bg-gray-50"
+                      : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
                   }`}
                   title="Configure block"
                 >
@@ -118,7 +138,9 @@ export default function Canvas({
                 </button>
               </div>
             )}
-            <div className="h-full w-full group">
+
+            {/* Block Content */}
+            <div className="h-full w-full">
               <BlockRenderer
                 block={block}
                 isEditing={isEditing}

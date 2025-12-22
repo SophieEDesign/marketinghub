@@ -24,7 +24,8 @@ export default function InterfaceBuilder({
   onSave,
 }: InterfaceBuilderProps) {
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
-  const [isEditing, setIsEditing] = useState(!isViewer)
+  // Default to view mode - editing is explicit and intentional
+  const [isEditing, setIsEditing] = useState(false)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [blockPickerCollapsed, setBlockPickerCollapsed] = useState(false)
@@ -168,20 +169,13 @@ export default function InterfaceBuilder({
             >
               <Settings className="h-4 w-4" />
             </button>
-            {isEditing && (
+            {isEditing ? (
               <>
                 {selectedBlock && (
                   <div className="px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md">
                     Selected: {selectedBlock.type} block
                   </div>
                 )}
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  Preview
-                </button>
                 {selectedBlockId && (
                   <button
                     onClick={() => handleDeleteBlock(selectedBlockId)}
@@ -191,15 +185,23 @@ export default function InterfaceBuilder({
                     Delete
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    setIsEditing(false)
+                    setSelectedBlockId(null)
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md flex items-center gap-2"
+                >
+                  Done
+                </button>
               </>
-            )}
-            {!isEditing && (
+            ) : (
               <button
                 onClick={() => setIsEditing(true)}
                 className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
               >
                 <Edit2 className="h-4 w-4" />
-                Edit
+                Edit page
               </button>
             )}
           </div>
