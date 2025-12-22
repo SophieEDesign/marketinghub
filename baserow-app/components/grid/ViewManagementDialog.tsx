@@ -219,6 +219,9 @@ export default function ViewManagementDialog({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Duplicate View</DialogTitle>
+            <DialogDescription>
+              Create a copy of this view with a new name.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -253,8 +256,7 @@ export default function ViewManagementDialog({
               Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 pt-4">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
