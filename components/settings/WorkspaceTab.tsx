@@ -11,32 +11,54 @@ import { createClientSupabaseClient } from '@/lib/supabase'
 export default function SettingsWorkspaceTab() {
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
   const [workspaceIcon, setWorkspaceIcon] = useState('📊')
+  const [workspaceSlug, setWorkspaceSlug] = useState('marketing-hub')
+  const [createdAt, setCreatedAt] = useState<string>('')
+  const [ownerEmail, setOwnerEmail] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     loadWorkspace()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function loadWorkspace() {
     setLoading(true)
     try {
       const supabase = createClientSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
       
       // Try to get workspace from workspaces table
       const { data, error } = await supabase
         .from('workspaces')
-        .select('name, icon')
+        .select('name, icon, created_at, created_by')
         .limit(1)
         .single()
 
       if (!error && data) {
         setWorkspaceName(data.name || 'Marketing Hub')
         setWorkspaceIcon(data.icon || '📊')
+        setCreatedAt(data.created_at || '')
+        
+        // Generate slug from name
+        const slug = (data.name || 'Marketing Hub')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+        setWorkspaceSlug(slug)
+
+        // Load owner email - use current user email for now
+        // (admin.getUserById requires admin privileges, so we'll use current user)
+        if (user?.email) {
+          setOwnerEmail(user.email)
+        }
       } else {
         // If table doesn't exist or no workspace found, use defaults
-        // This is fine for v1 - we'll create the workspace on first save
+        if (user?.email) {
+          setOwnerEmail(user.email)
+        }
+        setCreatedAt(new Date().toISOString())
       }
     } catch (error) {
       console.error('Error loading workspace:', error)
@@ -135,6 +157,38 @@ export default function SettingsWorkspaceTab() {
           <p className="text-xs text-muted-foreground">
             Optional: Add an emoji or icon to represent your workspace
           </p>
+        </div>
+
+        <div className="pt-4 border-t space-y-4">
+          <div className="space-y-2">
+            <Label>Workspace Slug</Label>
+            <Input
+              value={workspaceSlug}
+              readOnly
+              className="max-w-md bg-gray-50"
+            />
+            <p className="text-xs text-muted-foreground">
+              Read-only. Used for workspace URLs.
+            </p>
+          </div>
+
+          {createdAt && (
+            <div className="space-y-2">
+              <Label>Created</Label>
+              <div className="text-sm text-muted-foreground">
+                {new Date(createdAt).toLocaleDateString()} at {new Date(createdAt).toLocaleTimeString()}
+              </div>
+            </div>
+          )}
+
+          {ownerEmail && (
+            <div className="space-y-2">
+              <Label>Owner</Label>
+              <div className="text-sm text-muted-foreground">
+                {ownerEmail}
+              </div>
+            </div>
+          )}
         </div>
 
         {message && (

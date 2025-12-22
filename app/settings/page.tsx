@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { Settings, Shield, Database, Key } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Settings, Shield, Database, Key, FileText } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import SettingsWorkspaceTab from '@/components/settings/WorkspaceTab'
+import SettingsPagesTab from '@/components/settings/PagesTab'
+import SettingsPermissionsTab from '@/components/settings/PermissionsTab'
 import SettingsStorageTab from '@/components/settings/StorageTab'
 import SettingsApiTab from '@/components/settings/ApiTab'
 
@@ -30,6 +31,10 @@ export default async function SettingsPage() {
             <Settings className="mr-2 h-4 w-4" />
             Workspace
           </TabsTrigger>
+          <TabsTrigger value="pages">
+            <FileText className="mr-2 h-4 w-4" />
+            Pages
+          </TabsTrigger>
           <TabsTrigger value="permissions">
             <Shield className="mr-2 h-4 w-4" />
             Permissions
@@ -48,19 +53,12 @@ export default async function SettingsPage() {
           <SettingsWorkspaceTab />
         </TabsContent>
 
+        <TabsContent value="pages" className="space-y-4">
+          <SettingsPagesTab />
+        </TabsContent>
+
         <TabsContent value="permissions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permissions</CardTitle>
-              <CardDescription>Manage access control and user permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="p-8 text-center text-muted-foreground">
-                <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-sm">Coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+          <SettingsPermissionsTab />
         </TabsContent>
 
         <TabsContent value="storage" className="space-y-4">
