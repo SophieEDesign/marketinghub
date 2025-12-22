@@ -111,6 +111,7 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
         initialSorts={viewSorts}
         initialGroupBy={groupBy}
         initialTableFields={tableFields}
+        isEditing={isEditing}
       />
     </div>
   )

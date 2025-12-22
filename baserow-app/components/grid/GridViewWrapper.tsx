@@ -42,6 +42,7 @@ interface GridViewWrapperProps {
   }>
   initialGroupBy?: string
   initialTableFields?: TableField[]
+  isEditing?: boolean // When false, hide builder controls (add field, etc.)
 }
 
 export default function GridViewWrapper({
@@ -53,6 +54,7 @@ export default function GridViewWrapper({
   initialSorts,
   initialGroupBy,
   initialTableFields = [],
+  isEditing = false,
 }: GridViewWrapperProps) {
   const [filters, setFilters] = useState<Filter[]>(initialFilters)
   const [sorts, setSorts] = useState<Sort[]>(initialSorts)
@@ -223,19 +225,22 @@ export default function GridViewWrapper({
 
   return (
     <div className="w-full">
-      <Toolbar
-        viewId={viewId}
-        fields={viewFields}
-        filters={filters}
-        sorts={sorts}
-        groupBy={groupBy}
-        onSearchChange={setSearchTerm}
-        onFilterCreate={handleFilterCreate}
-        onFilterDelete={handleFilterDelete}
-        onSortCreate={handleSortCreate}
-        onSortDelete={handleSortDelete}
-        onGroupByChange={handleGroupByChange}
-      />
+      {/* Only show toolbar in edit mode - interfaces should look clean in view mode */}
+      {isEditing && (
+        <Toolbar
+          viewId={viewId}
+          fields={viewFields}
+          filters={filters}
+          sorts={sorts}
+          groupBy={groupBy}
+          onSearchChange={setSearchTerm}
+          onFilterCreate={handleFilterCreate}
+          onFilterDelete={handleFilterDelete}
+          onSortCreate={handleSortCreate}
+          onSortDelete={handleSortDelete}
+          onGroupByChange={handleGroupByChange}
+        />
+      )}
       <GridView
         tableId={tableId}
         viewId={viewId}
@@ -246,8 +251,9 @@ export default function GridViewWrapper({
         searchTerm={searchTerm}
         groupBy={groupBy}
         tableFields={fields}
-        onAddField={handleAddField}
-        onEditField={handleEditField}
+        onAddField={isEditing ? handleAddField : undefined}
+        onEditField={isEditing ? handleEditField : undefined}
+        isEditing={isEditing}
       />
       <FieldBuilderDrawer
         isOpen={fieldBuilderOpen}
