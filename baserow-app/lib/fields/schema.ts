@@ -14,8 +14,9 @@ export async function getTableFields(tableId: string): Promise<TableField[]> {
     .order('position', { ascending: true })
 
   if (error) {
-    // If table doesn't exist, return empty array
-    if (error.code === '42P01') {
+    // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array
+    if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+      console.warn(`table_fields table may not exist, returning empty array`)
       return []
     }
     throw error

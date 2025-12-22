@@ -431,12 +431,17 @@ export default function CSVImportPanel({
               className="hidden"
               id="csv-upload"
             />
-            <label htmlFor="csv-upload">
-              <Button variant="outline" className="cursor-pointer">
-                <FileText className="h-4 w-4 mr-2" />
-                Choose CSV File
-              </Button>
-            </label>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => {
+                fileInputRef.current?.click()
+              }}
+              type="button"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Choose CSV File
+            </Button>
           </div>
         </div>
       )}

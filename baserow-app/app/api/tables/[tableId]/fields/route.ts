@@ -24,8 +24,9 @@ export async function GET(
     // If no fields exist, return empty array (table_fields table might not exist yet)
     return NextResponse.json({ fields: fields || [] })
   } catch (error: any) {
-    // If table doesn't exist, return empty array
-    if (error.code === '42P01') {
+    // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array
+    if (error.code === '42P01' || error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+      console.warn(`table_fields table may not exist for table ${params.tableId}, returning empty fields array`)
       return NextResponse.json({ fields: [] })
     }
     console.error('Error fetching fields:', error)

@@ -36,7 +36,8 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
     try {
       const supabase = createClient()
 
-      const [tableRes, viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes, viewRes] = await Promise.all([
+      // Use Promise.allSettled to handle missing tables gracefully
+      const [tableRes, viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes, viewRes] = await Promise.allSettled([
         supabase.from("tables").select("supabase_table").eq("id", tableId).single(),
         supabase
           .from("view_fields")
@@ -50,23 +51,22 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
         supabase
           .from("view_sorts")
           .select("id, field_name, direction")
-          .eq("view_id", viewId)
-          .order("order_index", { ascending: true }),
+          .eq("view_id", viewId),
         supabase
           .from("table_fields")
           .select("*")
           .eq("table_id", tableId)
           .order("position", { ascending: true }),
-        supabase.from("views").select("config").eq("id", viewId).single(),
+        supabase.from("views").select("config, id").eq("id", viewId).maybeSingle(),
       ])
 
-      if (tableRes.data) setTable(tableRes.data)
-      if (viewFieldsRes.data) setViewFields(viewFieldsRes.data)
-      if (viewFiltersRes.data) setViewFilters(viewFiltersRes.data)
-      if (viewSortsRes.data) setViewSorts(viewSortsRes.data)
-      if (tableFieldsRes.data) setTableFields(tableFieldsRes.data)
-      if (viewRes.data?.config) {
-        const config = viewRes.data.config as { groupBy?: string }
+      if (tableRes.status === 'fulfilled' && !tableRes.value.error && tableRes.value.data) setTable(tableRes.value.data)
+      if (viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error && viewFieldsRes.value.data) setViewFields(viewFieldsRes.value.data)
+      if (viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error && viewFiltersRes.value.data) setViewFilters(viewFiltersRes.value.data)
+      if (viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error && viewSortsRes.value.data) setViewSorts(viewSortsRes.value.data)
+      if (tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error && tableFieldsRes.value.data) setTableFields(tableFieldsRes.value.data)
+      if (viewRes.status === 'fulfilled' && !viewRes.value.error && viewRes.value.data?.config) {
+        const config = viewRes.value.data.config as { groupBy?: string }
         setGroupBy(config.groupBy)
       }
     } catch (error) {

@@ -46,7 +46,8 @@ export default async function ViewPage({
     }
 
     // Get view fields, filters, sorts, config, and table fields dynamically
-    const [viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes] = await Promise.all([
+    // Use Promise.allSettled to handle missing tables gracefully
+    const [viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes] = await Promise.allSettled([
       supabase
         .from("view_fields")
         .select("field_name, visible, position")
@@ -59,8 +60,7 @@ export default async function ViewPage({
       supabase
         .from("view_sorts")
         .select("id, field_name, direction")
-        .eq("view_id", params.viewId)
-        .order("order_index", { ascending: true }),
+        .eq("view_id", params.viewId),
       supabase
         .from("table_fields")
         .select("*")
@@ -68,10 +68,10 @@ export default async function ViewPage({
         .order("position", { ascending: true }),
     ])
 
-    const viewFields = viewFieldsRes.data || []
-    const viewFilters = viewFiltersRes.data || []
-    const viewSorts = viewSortsRes.data || []
-    const tableFields = tableFieldsRes.data || []
+    const viewFields = viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error ? (viewFieldsRes.value.data || []) : []
+    const viewFilters = viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error ? (viewFiltersRes.value.data || []) : []
+    const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error ? (viewSortsRes.value.data || []) : []
+    const tableFields = tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error ? (tableFieldsRes.value.data || []) : []
     
     // Get groupBy from view config
     const groupBy = (view.config as { groupBy?: string })?.groupBy
