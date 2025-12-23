@@ -485,7 +485,14 @@ export default function CSVImportModal({
                   )
                 })}
               </div>
-              <Button onClick={handleImport} className="w-full" disabled={Object.keys(fieldMappings).length === 0}>
+              <Button 
+                onClick={handleImport} 
+                className="w-full" 
+                disabled={
+                  Object.values(fieldMappings).filter(v => v && v !== "").length === 0 &&
+                  Object.values(newFields).filter(v => v === true).length === 0
+                }
+              >
                 Start Import
               </Button>
             </div>
