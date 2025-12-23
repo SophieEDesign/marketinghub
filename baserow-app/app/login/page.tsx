@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +13,8 @@ function LoginForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [brandName, setBrandName] = useState<string>("Marketing Hub")
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -75,8 +78,21 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Sign In</CardTitle>
+        <CardHeader className="text-center">
+          {logoUrl && (
+            <div className="flex justify-center mb-4">
+              <div className="relative h-12 w-12">
+                <Image
+                  src={logoUrl}
+                  alt={brandName}
+                  fill
+                  className="object-contain"
+                  unoptimized
+                />
+              </div>
+            </div>
+          )}
+          <CardTitle>{brandName}</CardTitle>
           <CardDescription>Enter your credentials to access your workspace</CardDescription>
         </CardHeader>
         <CardContent>

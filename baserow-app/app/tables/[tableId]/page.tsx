@@ -157,10 +157,17 @@ export default async function TablePage({
     )
   } catch (error) {
     console.error("Error loading table:", error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
     return (
       <WorkspaceShellWrapper title="Error">
         <div className="text-center py-12">
-          <p className="text-destructive">An error occurred while loading this table.</p>
+          <p className="text-destructive mb-2">An error occurred while loading this table.</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {errorMessage}
+          </p>
+          <Button asChild>
+            <Link href="/tables">Back to Tables</Link>
+          </Button>
         </div>
       </WorkspaceShellWrapper>
     )

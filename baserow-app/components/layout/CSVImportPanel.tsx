@@ -463,7 +463,7 @@ export default function CSVImportPanel({
 
       // Use already parsed CSV data (allRows was created above)
 
-      // Validate that all CSV headers are either mapped or have new fields defined
+      // Check for unmapped headers (warn but don't block - they'll be skipped)
       const unmappedHeaders = csvHeaders.filter(header => {
         const mappedField = fieldMappings[header]
         const hasNewField = newFields[header]
@@ -471,9 +471,17 @@ export default function CSVImportPanel({
       })
 
       if (unmappedHeaders.length > 0) {
+        console.warn(`Skipping unmapped CSV columns: ${unmappedHeaders.join(', ')}`)
+      }
+
+      // Ensure at least one column is mapped
+      const mappedHeaders = csvHeaders.filter(header => {
+        return fieldMappings[header] || newFields[header]
+      })
+
+      if (mappedHeaders.length === 0) {
         throw new Error(
-          `The following CSV columns are not mapped to fields: ${unmappedHeaders.join(', ')}. ` +
-          `Please map them to existing fields or create new fields for them.`
+          `No CSV columns are mapped to fields. Please map at least one column to an existing field or create a new field for it.`
         )
       }
 
@@ -485,6 +493,11 @@ export default function CSVImportPanel({
           // When a new field is created, it uses the CSV header name (sanitized)
           const mappedFieldName = fieldMappings[csvHeader]
           const isNewField = !mappedFieldName && newFields[csvHeader]
+          
+          // Skip if this column is not mapped and not a new field
+          if (!mappedFieldName && !isNewField) {
+            return // Skip unmapped columns
+          }
           
           // Find the field - either by mapped name or by CSV header name (for new fields)
           let field: TableField | undefined
@@ -533,8 +546,13 @@ export default function CSVImportPanel({
           
           let value: any = csvRow[csvHeader]
           
-          // Skip if value is empty and field is not required
-          if ((value === null || value === undefined || value === '') && !field.required) {
+          // Convert empty strings to null for consistency
+          if (value === '') {
+            value = null
+          }
+          
+          // Skip if value is null/undefined and field is not required
+          if ((value === null || value === undefined) && !field.required) {
             return // Skip this field
           }
           
@@ -577,7 +595,18 @@ export default function CSVImportPanel({
           mappedRow[field.name] = value
         })
         return mappedRow
-      })
+      }).filter(row => Object.keys(row).length > 0) // Filter out completely empty rows
+
+      // Validate we have rows to insert
+      if (rowsToInsert.length === 0) {
+        const mappedCount = csvHeaders.filter(h => fieldMappings[h] || newFields[h]).length
+        throw new Error(
+          `No valid rows to import. ` +
+          `Total CSV rows: ${allRows.length}, ` +
+          `Mapped columns: ${mappedCount}/${csvHeaders.length}. ` +
+          `Please ensure at least one column is mapped and contains data.`
+        )
+      }
 
       // Insert in batches
       const batchSize = 100
@@ -590,6 +619,8 @@ export default function CSVImportPanel({
 
         if (error) {
           console.error("Error inserting batch:", error)
+          console.error("Batch data:", JSON.stringify(batch.slice(0, 1), null, 2)) // Log first row for debugging
+          
           // Provide more helpful error message
           if (error.message?.includes('column') && error.message?.includes('schema cache')) {
             const columnMatch = error.message.match(/column ['"]([^'"]+)['"]/)
@@ -600,18 +631,29 @@ export default function CSVImportPanel({
               `Original error: ${error.message}`
             )
           }
-          throw error
+          
+          // Check for null constraint violations
+          if (error.message?.includes('null value') || error.code === '23502') {
+            throw new Error(
+              `Required field is missing data. Please ensure all required fields have values in your CSV. ` +
+              `Error: ${error.message}`
+            )
+          }
+          
+          throw new Error(`Failed to insert rows: ${error.message || JSON.stringify(error)}`)
         }
 
         imported += batch.length
         setImportedCount(imported)
+        console.log(`Successfully imported ${imported} rows so far`)
       }
 
       setStep("complete")
       onImportComplete()
-    } catch (error) {
-      console.error("Error importing CSV:", error)
-      alert("Failed to import CSV: " + (error as Error).message)
+    } catch (err) {
+      console.error("Error importing CSV:", err)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setError(`Failed to import CSV: ${errorMessage}`)
       setStep("mapping")
     }
   }
