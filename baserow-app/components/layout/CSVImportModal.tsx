@@ -339,7 +339,22 @@ export default function CSVImportModal({
     } catch (err) {
       console.error("Error importing CSV:", err)
       const errorMessage = err instanceof Error ? err.message : String(err)
-      setError(`Failed to import CSV: ${errorMessage}`)
+      
+      // Check if the error is about missing table_fields table
+      if (errorMessage.includes('table_fields table does not exist') || 
+          errorMessage.includes('MISSING_TABLE')) {
+        setError(
+          `Database Setup Required\n\n` +
+          `The table_fields table is missing. To fix this:\n\n` +
+          `1. Go to your Supabase Dashboard\n` +
+          `2. Navigate to SQL Editor\n` +
+          `3. Run the migration file: supabase/migrations/create_table_fields.sql\n\n` +
+          `This migration creates the required table for field management.`
+        )
+      } else {
+        setError(`Failed to import CSV: ${errorMessage}`)
+      }
+      
       setStatus('error')
       setProgress("")
       setImportedCount(0)

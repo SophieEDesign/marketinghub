@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.table_fields (
     'link_to_table', 'formula', 'lookup', 'url', 'email', 'json'
   )),
   position INTEGER NOT NULL DEFAULT 0,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  group_name TEXT,
   required BOOLEAN DEFAULT FALSE,
   default_value JSONB,
   options JSONB DEFAULT '{}',
@@ -23,6 +25,8 @@ CREATE TABLE IF NOT EXISTS public.table_fields (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_table_fields_table_id ON public.table_fields(table_id);
 CREATE INDEX IF NOT EXISTS idx_table_fields_position ON public.table_fields(table_id, position);
+CREATE INDEX IF NOT EXISTS idx_table_fields_order_index ON public.table_fields(table_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_table_fields_group ON public.table_fields(table_id, group_name);
 
 -- RLS Policies (if RLS is enabled)
 ALTER TABLE public.table_fields ENABLE ROW LEVEL SECURITY;

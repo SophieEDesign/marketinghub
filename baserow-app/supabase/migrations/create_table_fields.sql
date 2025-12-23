@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS table_fields (
     'link_to_table', 'formula', 'lookup', 'url', 'email', 'json'
   )),
   position INTEGER NOT NULL DEFAULT 0,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  group_name TEXT,
   required BOOLEAN DEFAULT FALSE,
   default_value JSONB,
   options JSONB DEFAULT '{}',
@@ -22,6 +24,8 @@ CREATE TABLE IF NOT EXISTS table_fields (
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_table_fields_table_id ON table_fields(table_id);
 CREATE INDEX IF NOT EXISTS idx_table_fields_position ON table_fields(table_id, position);
+CREATE INDEX IF NOT EXISTS idx_table_fields_order_index ON table_fields(table_id, order_index);
+CREATE INDEX IF NOT EXISTS idx_table_fields_group ON table_fields(table_id, group_name);
 
 -- Function to get table columns from information_schema
 CREATE OR REPLACE FUNCTION get_table_columns(table_name text)
