@@ -19,6 +19,7 @@ const PermissionsTab = memo(function PermissionsTab({ tableId, tableName }: Perm
   useEffect(() => {
     loadPermissions()
     loadUserRole()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadUserRole() {

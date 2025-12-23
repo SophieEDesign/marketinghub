@@ -26,6 +26,7 @@ const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
 
   useEffect(() => {
     loadViews()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   async function loadViews() {

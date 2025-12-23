@@ -68,6 +68,7 @@ export default function InterfaceDetailDrawer({
       loadGroups()
       loadViews()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, iface.id])
 
   useEffect(() => {

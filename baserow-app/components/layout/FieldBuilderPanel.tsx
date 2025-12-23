@@ -1,7 +1,24 @@
 "use client"
 
-import { useState, useEffect, memo } from "react"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { useState, useEffect, memo, useMemo } from "react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { Plus, Edit, Trash2, Save, X, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -229,19 +246,55 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         />
       )}
 
-      <div className="space-y-2">
-        {fields.map((field) => (
-          <FieldItem
-            key={field.id}
-            field={field}
-            onEdit={() => {
-              setEditingField(field)
-              setSettingsDrawerOpen(true)
-            }}
-            onDelete={() => handleDeleteField(field.id, field.name)}
-          />
-        ))}
-      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={fields.map((f) => f.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-4">
+            {/* Ungrouped fields */}
+            {groupedFields.ungrouped.length > 0 && (
+              <div className="space-y-2">
+                {groupedFields.ungrouped.map((field) => (
+                  <SortableFieldItem
+                    key={field.id}
+                    field={field}
+                    onEdit={() => {
+                      setEditingField(field)
+                      setSettingsDrawerOpen(true)
+                    }}
+                    onDelete={() => handleDeleteField(field.id, field.name)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Grouped fields */}
+            {Object.entries(groupedFields.groups).map(([groupName, groupFields]) => (
+              <div key={groupName} className="space-y-2">
+                <div className="px-2 py-1 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-50 rounded">
+                  {groupName}
+                </div>
+                {groupFields.map((field) => (
+                  <SortableFieldItem
+                    key={field.id}
+                    field={field}
+                    onEdit={() => {
+                      setEditingField(field)
+                      setSettingsDrawerOpen(true)
+                    }}
+                    onDelete={() => handleDeleteField(field.id, field.name)}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <FieldSettingsDrawer
         field={editingField}
