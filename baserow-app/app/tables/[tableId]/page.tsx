@@ -56,6 +56,47 @@ export default async function TablePage({
       )
     }
 
+    // Verify the Supabase table exists before proceeding
+    if (table.supabase_table) {
+      const supabase = await createClient()
+      // Try a simple query to verify the table exists
+      const { error: tableCheckError } = await supabase
+        .from(table.supabase_table)
+        .select('id')
+        .limit(1)
+      
+      if (tableCheckError) {
+        // Table doesn't exist or has schema issues
+        const isTableNotFound = 
+          tableCheckError.code === '42P01' || 
+          tableCheckError.code === 'PGRST116' ||
+          tableCheckError.message?.includes('does not exist') ||
+          tableCheckError.message?.includes('relation')
+        
+        if (isTableNotFound) {
+          return (
+            <WorkspaceShellWrapper title={table.name}>
+              <div className="text-center py-12">
+                <p className="text-destructive mb-2">Supabase table not found</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  The table &quot;{table.supabase_table}&quot; does not exist in Supabase. 
+                  This may happen if the table was deleted or never created.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button asChild>
+                    <Link href="/tables">Back to Tables</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href={`/tables/${params.tableId}/views/new`}>Create View</Link>
+                  </Button>
+                </div>
+              </div>
+            </WorkspaceShellWrapper>
+          )
+        }
+      }
+    }
+
     let views = await getViews(params.tableId).catch(() => [])
 
     // If no views exist, create a default "All Records" grid view
@@ -90,8 +131,22 @@ export default async function TablePage({
     const defaultGridView = views.find((v: View) => v.type === 'grid') || views.find((v: View) => v.type !== 'interface')
     
     // If default grid view exists, redirect to it directly
-    if (defaultGridView) {
-      redirect(`/tables/${params.tableId}/views/${defaultGridView.id}`)
+    // Only redirect if we have a valid view ID to prevent redirect loops
+    if (defaultGridView && defaultGridView.id) {
+      // Verify the view actually exists before redirecting
+      const supabase = await createClient()
+      const { data: viewCheck } = await supabase
+        .from('views')
+        .select('id')
+        .eq('id', defaultGridView.id)
+        .maybeSingle()
+      
+      if (viewCheck) {
+        redirect(`/tables/${params.tableId}/views/${defaultGridView.id}`)
+      } else {
+        console.warn(`View ${defaultGridView.id} not found, showing view selection screen`)
+        // Fall through to show view selection screen
+      }
     }
 
     // If no views exist, show view creation screen
@@ -155,7 +210,13 @@ export default async function TablePage({
         </div>
       </WorkspaceShellWrapper>
     )
-  } catch (error) {
+  } catch (error: any) {
+    // Don't catch redirect errors - let Next.js handle them
+    // Next.js redirect() throws an error with digest property
+    if (error?.digest?.startsWith('NEXT_REDIRECT') || error?.message?.includes('NEXT_REDIRECT')) {
+      throw error // Re-throw redirect errors so Next.js can handle them
+    }
+    
     console.error("Error loading table:", error)
     const errorMessage = error instanceof Error ? error.message : String(error)
     return (

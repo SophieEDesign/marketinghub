@@ -110,6 +110,7 @@ export default function CSVImportPanel({
     if (!file) return
 
     setError(null)
+    setImportedCount(0) // Reset count at start of import
     
     try {
       const text = await file.text()
@@ -154,38 +155,101 @@ export default function CSVImportPanel({
   }
 
   // Auto-detect field type from sample values
-  // Uses a threshold approach: if >70% of values match a pattern, use that type
+  // Uses a threshold approach: if >60% of values match a pattern, use that type
   function detectFieldType(sampleValues: string[]): FieldType {
     if (sampleValues.length === 0) return 'text'
     
-    const threshold = Math.max(1, Math.floor(sampleValues.length * 0.7)) // 70% threshold
+    const threshold = Math.max(1, Math.floor(sampleValues.length * 0.6)) // 60% threshold (lowered from 70%)
     const nonEmptyValues = sampleValues.filter(v => v && v.trim())
 
     if (nonEmptyValues.length === 0) return 'text'
 
-    // Check for email pattern (at least 70% match)
+    // Check for JSON pattern first (most specific) - at least 60% match
+    const jsonPattern = /^[\s]*[{\[]/
+    const jsonMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.trim()
+      if (!jsonPattern.test(trimmed)) return false
+      try {
+        JSON.parse(trimmed)
+        return true
+      } catch {
+        return false
+      }
+    }).length
+    
+    if (jsonMatches >= threshold) {
+      return 'json'
+    }
+
+    // Check for email pattern (at least 60% match)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     const emailMatches = nonEmptyValues.filter(v => emailPattern.test(v.trim())).length
     if (emailMatches >= threshold) {
       return 'email'
     }
 
-    // Check for URL pattern (at least 70% match) - more comprehensive
-    const urlPatterns = [
-      /^https?:\/\//i, // http:// or https://
-      /^www\./i, // www.example.com
-      /^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,}/i, // domain.com
-    ]
+    // Check for URL pattern (at least 60% match) - improved detection
     const urlMatches = nonEmptyValues.filter(v => {
-      const trimmed = v.trim()
-      return urlPatterns.some(p => p.test(trimmed)) || 
-             (trimmed.includes('.') && trimmed.includes('/') && !trimmed.includes(' '))
+      const trimmed = v.trim().toLowerCase()
+      // Check for http/https
+      if (/^https?:\/\//.test(trimmed)) return true
+      // Check for www.
+      if (/^www\./.test(trimmed)) return true
+      // Check for domain pattern (has TLD)
+      if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}/.test(trimmed)) return true
+      // Check for URLs with paths (contains . and /)
+      if (trimmed.includes('.') && trimmed.includes('/') && !trimmed.includes(' ')) return true
+      // Check for common URL patterns
+      if (trimmed.match(/^[a-z]+:\/\//)) return true
+      return false
     }).length
     if (urlMatches >= threshold) {
       return 'url'
     }
 
-    // Check for date pattern (common formats) - at least 70% match
+    // Check for boolean/checkbox - at least 60% match
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
+    const booleanMatches = nonEmptyValues.filter(v => 
+      booleanValues.includes(v.toLowerCase().trim())
+    ).length
+    if (booleanMatches >= threshold) {
+      return 'checkbox'
+    }
+
+    // Check for categorical data (single_select or multi_select) BEFORE checking dates/numbers
+    // This is important because dates/numbers might match loosely
+    const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()))
+    const uniqueCount = uniqueValues.size
+    const totalCount = nonEmptyValues.length
+    
+    // Improved categorical detection: if we have few unique values relative to total
+    // Lower threshold: if uniqueCount <= 50% of totalCount OR uniqueCount <= 15
+    if (totalCount >= 3 && (uniqueCount <= Math.max(2, Math.floor(totalCount * 0.5)) || uniqueCount <= 15)) {
+      // Check if values contain commas or semicolons (multi-select indicator)
+      const multiSelectIndicators = nonEmptyValues.filter(v => 
+        /[,;]/.test(v.trim())
+      ).length
+      
+      if (multiSelectIndicators >= Math.floor(totalCount * 0.4)) {
+        // More than 40% have separators - likely multi-select
+        return 'multi_select'
+      } else {
+        // Likely single-select category (check if values repeat)
+        // Count how many times the most common value appears
+        const valueCounts = new Map<string, number>()
+        nonEmptyValues.forEach(v => {
+          const key = v.trim().toLowerCase()
+          valueCounts.set(key, (valueCounts.get(key) || 0) + 1)
+        })
+        const maxCount = Math.max(...Array.from(valueCounts.values()))
+        // If most common value appears at least twice and we have few unique values, it's categorical
+        if (maxCount >= 2 && uniqueCount <= 15) {
+          return 'single_select'
+        }
+      }
+    }
+
+    // Check for date pattern (common formats) - at least 60% match
     // More comprehensive date patterns
     const datePatterns = [
       /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/, // YYYY-MM-DD, YYYY/MM/DD
@@ -200,16 +264,21 @@ export default function CSVImportPanel({
     // Also try parsing as Date object
     const dateMatches = nonEmptyValues.filter(v => {
       const trimmed = v.trim()
-      // Check regex patterns
+      // Check regex patterns first
       if (datePatterns.some(p => p.test(trimmed))) {
         return true
       }
-      // Try parsing as date
+      // Try parsing as date - but be more strict
       const date = new Date(trimmed)
       if (!isNaN(date.getTime())) {
         // Additional validation: check if it's a reasonable date (not epoch 0)
         const year = date.getFullYear()
-        return year >= 1900 && year <= 2100
+        // Also check that the parsed date actually matches the input (not just any parseable string)
+        const dateStr = date.toISOString().split('T')[0]
+        const inputMatch = trimmed.match(/\d{4}/)
+        if (inputMatch && dateStr.startsWith(inputMatch[0])) {
+          return year >= 1900 && year <= 2100
+        }
       }
       return false
     }).length
@@ -218,7 +287,7 @@ export default function CSVImportPanel({
       return 'date'
     }
 
-    // Check for number (integer or decimal) - at least 70% match
+    // Check for number (integer or decimal) - at least 60% match
     // Remove currency symbols and percentage signs for number detection
     const cleanedValues = nonEmptyValues.map(v => v.trim().replace(/[$€£¥%,\s]/g, ''))
     const numberPattern = /^-?\d+(\.\d+)?$/
@@ -238,56 +307,6 @@ export default function CSVImportPanel({
         return 'currency'
       }
       return 'number'
-    }
-
-    // Check for boolean/checkbox - at least 70% match
-    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
-    const booleanMatches = nonEmptyValues.filter(v => 
-      booleanValues.includes(v.toLowerCase().trim())
-    ).length
-    if (booleanMatches >= threshold) {
-      return 'checkbox'
-    }
-
-    // Check for JSON pattern - at least 70% match
-    // JSON typically starts with { or [ and contains key-value pairs
-    const jsonPattern = /^[\s]*[{\[]/
-    const jsonMatches = nonEmptyValues.filter(v => {
-      const trimmed = v.trim()
-      if (!jsonPattern.test(trimmed)) return false
-      try {
-        JSON.parse(trimmed)
-        return true
-      } catch {
-        return false
-      }
-    }).length
-    
-    if (jsonMatches >= threshold) {
-      return 'json'
-    }
-
-    // Check for categorical data (single_select or multi_select)
-    // If there are limited unique values that repeat frequently, it's likely a category
-    const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()))
-    const uniqueCount = uniqueValues.size
-    const totalCount = nonEmptyValues.length
-    
-    // If we have relatively few unique values compared to total (e.g., < 20 unique values for 10+ samples)
-    // and values repeat, it's likely categorical
-    if (totalCount >= 5 && uniqueCount <= Math.min(20, Math.floor(totalCount * 0.8))) {
-      // Check if values contain commas or semicolons (multi-select indicator)
-      const multiSelectIndicators = nonEmptyValues.filter(v => 
-        /[,;]/.test(v.trim())
-      ).length
-      
-      if (multiSelectIndicators >= Math.floor(totalCount * 0.5)) {
-        // More than 50% have separators - likely multi-select
-        return 'multi_select'
-      } else {
-        // Likely single-select category
-        return 'single_select'
-      }
     }
 
     // Default to text
@@ -486,8 +505,17 @@ export default function CSVImportPanel({
       }
 
       // Map and insert rows - only include columns that exist in the table
-      const rowsToInsert = allRows.map((csvRow) => {
+      console.log(`📊 Mapping ${allRows.length} CSV rows to database format`)
+      console.log(`📋 CSV headers:`, csvHeaders)
+      console.log(`🗺️ Mapped headers:`, csvHeaders.filter(h => fieldMappings[h] || newFields[h]))
+      console.log(`📝 Field mappings:`, fieldMappings)
+      console.log(`🆕 New fields:`, newFields)
+      console.log(`📑 Updated fields:`, updatedFields.map((f: TableField) => ({ name: f.name, type: f.type })))
+      
+      const rowsToInsert = allRows.map((csvRow, rowIndex) => {
         const mappedRow: Record<string, any> = {}
+        let fieldsAdded = 0
+        
         csvHeaders.forEach((csvHeader) => {
           // Determine the field name: either from mapping or from new field creation
           // When a new field is created, it uses the CSV header name (sanitized)
@@ -593,17 +621,40 @@ export default function CSVImportPanel({
           // Use field.name which should match the sanitized column name in Supabase
           // Field names are sanitized when created, so they match column names
           mappedRow[field.name] = value
+          fieldsAdded++
         })
+        
+        // Log first few rows for debugging
+        if (rowIndex < 3) {
+          console.log(`Row ${rowIndex + 1}: added ${fieldsAdded} fields, keys:`, Object.keys(mappedRow))
+          if (rowIndex === 0) {
+            console.log(`Sample mapped row:`, mappedRow)
+          }
+        }
+        
         return mappedRow
-      }).filter(row => Object.keys(row).length > 0) // Filter out completely empty rows
+      }).filter(row => {
+        // Filter out completely empty rows, but log them for debugging
+        const isEmpty = Object.keys(row).length === 0
+        if (isEmpty) {
+          console.warn('Filtered out empty row:', row)
+        }
+        return !isEmpty
+      })
 
+      console.log(`Prepared ${rowsToInsert.length} rows to insert (from ${allRows.length} CSV rows)`)
+      
       // Validate we have rows to insert
       if (rowsToInsert.length === 0) {
         const mappedCount = csvHeaders.filter(h => fieldMappings[h] || newFields[h]).length
+        const sampleRow = allRows[0] || {}
+        const sampleValues = csvHeaders.map(h => `${h}: "${sampleRow[h]}"`).join(', ')
+        
         throw new Error(
           `No valid rows to import. ` +
           `Total CSV rows: ${allRows.length}, ` +
           `Mapped columns: ${mappedCount}/${csvHeaders.length}. ` +
+          `Sample row values: ${sampleValues}. ` +
           `Please ensure at least one column is mapped and contains data.`
         )
       }
@@ -611,24 +662,43 @@ export default function CSVImportPanel({
       // Insert in batches
       const batchSize = 100
       let imported = 0
+      console.log(`Starting batch insert: ${rowsToInsert.length} rows in ${Math.ceil(rowsToInsert.length / batchSize)} batches`)
+      console.log(`Supabase table: ${supabaseTableName}`)
+      console.log(`First row sample:`, rowsToInsert[0])
+      
       for (let i = 0; i < rowsToInsert.length; i += batchSize) {
         const batch = rowsToInsert.slice(i, i + batchSize)
-        const { error } = await supabase
+        const batchNum = Math.floor(i / batchSize) + 1
+        const totalBatches = Math.ceil(rowsToInsert.length / batchSize)
+        
+        console.log(`Inserting batch ${batchNum}/${totalBatches}, rows ${i + 1}-${Math.min(i + batchSize, rowsToInsert.length)}`)
+        console.log(`Batch keys:`, Object.keys(batch[0] || {}))
+        
+        const { error, data } = await supabase
           .from(supabaseTableName)
           .insert(batch)
+          .select()
 
         if (error) {
           console.error("Error inserting batch:", error)
-          console.error("Batch data:", JSON.stringify(batch.slice(0, 1), null, 2)) // Log first row for debugging
+          console.error("Batch size:", batch.length)
+          console.error("Batch keys (first row):", Object.keys(batch[0] || {}))
+          console.error("Batch sample (first row):", JSON.stringify(batch[0], null, 2))
+          console.error("Supabase table name:", supabaseTableName)
+          console.error("Available fields:", updatedFields.map((f: TableField) => f.name))
           
-          // Provide more helpful error message
-          if (error.message?.includes('column') && error.message?.includes('schema cache')) {
-            const columnMatch = error.message.match(/column ['"]([^'"]+)['"]/)
+          // Provide more helpful error message for column errors
+          if (error.message?.includes('column') || error.code === '42703' || error.code === '42P01' || error.code === 'PGRST116') {
+            const columnMatch = error.message?.match(/column ['"]([^'"]+)['"]/) || 
+                               error.message?.match(/Could not find a relationship between ['"]([^'"]+)['"]/)
             const columnName = columnMatch ? columnMatch[1] : 'unknown'
+            const batchKeys = Object.keys(batch[0] || {})
             throw new Error(
               `Column "${columnName}" does not exist in table "${supabaseTableName}". ` +
-              `Please create a field for this column first, or map it to an existing field. ` +
-              `Original error: ${error.message}`
+              `Batch is trying to insert columns: ${batchKeys.join(', ')}. ` +
+              `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}. ` +
+              `Please ensure field names match column names. ` +
+              `Original error: ${error.message || JSON.stringify(error)}`
             )
           }
           
@@ -640,12 +710,20 @@ export default function CSVImportPanel({
             )
           }
           
+          // Check for foreign key violations
+          if (error.code === '23503') {
+            throw new Error(
+              `Foreign key constraint violation. Please check that referenced records exist. ` +
+              `Error: ${error.message}`
+            )
+          }
+          
           throw new Error(`Failed to insert rows: ${error.message || JSON.stringify(error)}`)
         }
 
         imported += batch.length
         setImportedCount(imported)
-        console.log(`Successfully imported ${imported} rows so far`)
+        console.log(`✅ Successfully imported batch ${batchNum}/${totalBatches}: ${batch.length} rows (total: ${imported}/${rowsToInsert.length})`)
       }
 
       setStep("complete")

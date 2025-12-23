@@ -123,11 +123,27 @@ export default async function ViewPage({
         )}
       </WorkspaceShellWrapper>
     )
-  } catch (error) {
+  } catch (error: any) {
+    // Don't catch redirect errors - let Next.js handle them
+    // Next.js redirect() throws an error with digest property
+    if (error?.digest?.startsWith('NEXT_REDIRECT') || error?.message?.includes('NEXT_REDIRECT')) {
+      throw error // Re-throw redirect errors so Next.js can handle them
+    }
+    
     console.error("Error rendering view page:", error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    
     return (
       <WorkspaceShellWrapper title="Error">
-        <div>An error occurred while loading this view.</div>
+        <div className="text-center py-12">
+          <p className="text-destructive mb-2">An error occurred while loading this view.</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {errorMessage}
+          </p>
+          <Button asChild>
+            <Link href={`/tables/${params.tableId}`}>Back to Table</Link>
+          </Button>
+        </div>
       </WorkspaceShellWrapper>
     )
   }
