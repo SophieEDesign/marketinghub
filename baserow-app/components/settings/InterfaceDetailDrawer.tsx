@@ -96,9 +96,9 @@ export default function InterfaceDetailDrawer({
     } catch (error) {
       console.error('Error loading interface details:', error)
     }
-  }
+  }, [iface.id])
 
-  async function loadGroups() {
+  const loadGroups = useCallback(async () => {
     try {
       const supabase = createClient()
       // Groups are stored as views with type='group' or we can use group_id from views
@@ -131,7 +131,7 @@ export default function InterfaceDetailDrawer({
     } catch (error) {
       console.error('Error loading groups:', error)
     }
-  }
+  }, [])
 
   const loadViews = useCallback(async () => {
     setLoadingViews(true)

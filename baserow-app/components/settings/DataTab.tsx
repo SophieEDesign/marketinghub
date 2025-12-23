@@ -138,6 +138,38 @@ export default function SettingsDataTab() {
     })
   }
 
+  function handleDeleteClick(table: Table) {
+    setTableToDelete(table)
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDelete() {
+    if (!tableToDelete) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/tables/${tableToDelete.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || 'Failed to delete table')
+      }
+
+      // Refresh the list
+      await loadTables()
+      setDeleteDialogOpen(false)
+      setTableToDelete(null)
+      router.refresh()
+    } catch (error: any) {
+      console.error('Error deleting table:', error)
+      alert(`Failed to delete table: ${error.message || 'Unknown error'}`)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   function getViewIcon(type: string) {
     switch (type) {
       case "grid":
@@ -248,6 +280,26 @@ export default function SettingsDataTab() {
           </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Table</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{tableToDelete?.name}&quot;? This will permanently delete the table, all its data, views, and fields. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
