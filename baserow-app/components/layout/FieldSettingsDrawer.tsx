@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { X, Plus } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { FIELD_TYPES } from '@/types/fields'
 import { canChangeType } from '@/lib/fields/validation'
