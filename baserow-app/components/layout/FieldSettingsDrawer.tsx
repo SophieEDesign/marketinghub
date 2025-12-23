@@ -53,6 +53,7 @@ export default function FieldSettingsDrawer({
   const [saving, setSaving] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTables, setLoadingTables] = useState(false)
+  const [typeChangeWarning, setTypeChangeWarning] = useState<string | null>(null)
 
   // Load tables for link_to_table fields
   useEffect(() => {
