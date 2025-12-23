@@ -86,19 +86,61 @@ export default function SettingsDataTab() {
     const name = prompt("Enter table name:")
     if (!name) return
 
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("tables")
-      .insert([{ name }])
-      .select()
-      .single()
+    try {
+      const supabase = createClient()
+      
+      // Generate a unique table name for the Supabase table
+      const sanitizedName = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+      const timestamp = Date.now()
+      const supabaseTableName = `table_${sanitizedName}_${timestamp}`
 
-    if (error) {
-      console.error("Error creating table:", error)
-      alert("Failed to create table")
-    } else {
+      // Create the table metadata record
+      const { data, error: insertError } = await supabase
+        .from("tables")
+        .insert([
+          {
+            name,
+            supabase_table: supabaseTableName,
+          },
+        ])
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("Error creating table:", insertError)
+        alert(`Failed to create table: ${insertError.message || 'Unknown error'}`)
+        return
+      }
+
+      // Try to create the actual Supabase table
+      try {
+        const createResponse = await fetch('/api/tables/create-table', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tableName: supabaseTableName })
+        })
+        
+        const createResult = await createResponse.json()
+        
+        if (!createResult.success) {
+          console.warn('Supabase table creation:', createResult.message || createResult.error)
+          // Don't fail the whole operation - table metadata is created
+          // User can create the table manually if needed
+        }
+      } catch (createError) {
+        console.warn('Failed to create Supabase table automatically:', createError)
+        // Continue anyway - table metadata is created
+      }
+
       router.refresh()
       loadTables()
+    } catch (error: any) {
+      console.error("Error creating table:", error)
+      alert(`Failed to create table: ${error.message || 'Unknown error'}`)
     }
   }
 

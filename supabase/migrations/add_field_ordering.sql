@@ -19,3 +19,16 @@ CREATE INDEX IF NOT EXISTS idx_table_fields_order_index ON public.table_fields(t
 
 -- Create index for grouping
 CREATE INDEX IF NOT EXISTS idx_table_fields_group ON public.table_fields(table_id, group_name);
+
+-- Ensure UNIQUE constraint on (table_id, name) if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'table_fields_table_id_name_key'
+    AND conrelid = 'public.table_fields'::regclass
+  ) THEN
+    ALTER TABLE public.table_fields 
+    ADD CONSTRAINT table_fields_table_id_name_key UNIQUE (table_id, name);
+  END IF;
+END $$;

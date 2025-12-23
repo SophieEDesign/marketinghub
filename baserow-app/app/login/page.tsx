@@ -15,8 +15,32 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>("Marketing Hub")
+  const [primaryColor, setPrimaryColor] = useState<string>("hsl(222.2, 47.4%, 11.2%)")
   const router = useRouter()
   const searchParams = useSearchParams()
+  
+  // Load branding from workspace settings
+  useEffect(() => {
+    const loadBranding = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('workspace_settings')
+          .select('brand_name, logo_url, primary_color')
+          .maybeSingle()
+        
+        if (!error && data) {
+          if (data.brand_name) setBrandName(data.brand_name)
+          if (data.logo_url) setLogoUrl(data.logo_url)
+          if (data.primary_color) setPrimaryColor(data.primary_color)
+        }
+      } catch (err) {
+        // Silently fail - use defaults
+        console.warn('Could not load branding:', err)
+      }
+    }
+    
+    loadBranding()
+  }, [])
   
   // Check for error message from URL (e.g., from email confirmation failure)
   useEffect(() => {
@@ -133,7 +157,26 @@ function LoginForm() {
                 type="submit"
                 onClick={handleSignIn}
                 disabled={loading}
-                className="flex-1"
+                className="flex-1 text-white"
+                style={{ 
+                  backgroundColor: primaryColor,
+                  borderColor: primaryColor,
+                  color: 'white',
+                }}
+                onMouseEnter={(e) => {
+                  // Darken on hover (reduce lightness by 10%)
+                  const hslMatch = primaryColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+                  if (hslMatch) {
+                    const [, h, s, l] = hslMatch
+                    const newL = Math.max(0, parseInt(l) - 10)
+                    e.currentTarget.style.backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`
+                    e.currentTarget.style.borderColor = `hsl(${h}, ${s}%, ${newL}%)`
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = primaryColor
+                  e.currentTarget.style.borderColor = primaryColor
+                }}
               >
                 Sign In
               </Button>
