@@ -454,12 +454,12 @@ export default function CSVImportModal({
                     <div key={header} className="flex items-center gap-2">
                       <div className="flex-1 text-sm font-medium">{header}</div>
                       <Select
-                        value={mappedField || (needsNew ? "__new__" : "")}
+                        value={mappedField || (needsNew ? "__new__" : "__skip__")}
                         onValueChange={(value) => {
                           if (value === "__new__") {
                             setNewFields({ ...newFields, [header]: true })
                             setFieldMappings({ ...fieldMappings, [header]: "" })
-                          } else if (value === "") {
+                          } else if (value === "__skip__") {
                             setNewFields({ ...newFields, [header]: false })
                             setFieldMappings({ ...fieldMappings, [header]: "" })
                           } else {
@@ -472,7 +472,7 @@ export default function CSVImportModal({
                           <SelectValue placeholder="Select field" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Skip column</SelectItem>
+                          <SelectItem value="__skip__">Skip column</SelectItem>
                           <SelectItem value="__new__">Create new field (text)</SelectItem>
                           {tableFields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>

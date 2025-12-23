@@ -231,14 +231,14 @@ export default function PageSettingsDrawer({
             <div className="space-y-2">
               <Label htmlFor="interface-group">Interface Group</Label>
               <Select
-                value={groupId || ""}
-                onValueChange={(value) => setGroupId(value || null)}
+                value={groupId || "__none__"}
+                onValueChange={(value) => setGroupId(value === "__none__" ? null : value)}
               >
                 <SelectTrigger id="interface-group">
                   <SelectValue placeholder="No group (Uncategorized)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No group (Uncategorized)</SelectItem>
+                  <SelectItem value="__none__">No group (Uncategorized)</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
@@ -254,14 +254,14 @@ export default function PageSettingsDrawer({
             <div className="space-y-2">
               <Label htmlFor="default-view">Default View</Label>
               <Select
-                value={defaultView || ""}
-                onValueChange={(value) => setDefaultView(value || null)}
+                value={defaultView || "__none__"}
+                onValueChange={(value) => setDefaultView(value === "__none__" ? null : value)}
               >
                 <SelectTrigger id="default-view">
                   <SelectValue placeholder="None (use interface blocks)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (use interface blocks)</SelectItem>
+                  <SelectItem value="__none__">None (use interface blocks)</SelectItem>
                   {views.map((view) => (
                     <SelectItem key={view.id} value={view.id}>
                       {view.name}

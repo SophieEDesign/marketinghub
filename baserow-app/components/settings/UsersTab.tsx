@@ -55,7 +55,7 @@ export default function UsersTab() {
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
-  const [inviteDefaultInterface, setInviteDefaultInterface] = useState<string>('')
+  const [inviteDefaultInterface, setInviteDefaultInterface] = useState<string>('__none__')
   const [interfaces, setInterfaces] = useState<Array<{ id: string; name: string }>>([])
   const [inviting, setInviting] = useState(false)
 
@@ -168,7 +168,7 @@ export default function UsersTab() {
       setInviteDialogOpen(false)
       setInviteEmail('')
       setInviteRole('member')
-      setInviteDefaultInterface('')
+      setInviteDefaultInterface('__none__')
       loadUsers()
     } catch (error: any) {
       console.error('Error inviting user:', error)
@@ -375,7 +375,7 @@ export default function UsersTab() {
                   <SelectValue placeholder="Select default interface" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
                   {interfaces.map((iface) => (
                     <SelectItem key={iface.id} value={iface.id}>
                       {iface.name}

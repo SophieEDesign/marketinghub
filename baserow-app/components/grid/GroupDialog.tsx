@@ -61,7 +61,7 @@ export default function GroupDialog({
       const currentConfig = (viewData?.config as Record<string, any>) || {}
       const newConfig = {
         ...currentConfig,
-        groupBy: selectedField || null,
+        groupBy: selectedField === "__none__" ? null : selectedField,
       }
 
       await supabase
@@ -90,12 +90,12 @@ export default function GroupDialog({
         <div className="space-y-4 py-4">
           <div>
             <Label className="text-sm font-medium text-gray-700">Group by Field</Label>
-            <Select value={selectedField} onValueChange={setSelectedField}>
+            <Select value={selectedField || "__none__"} onValueChange={(value) => setSelectedField(value === "__none__" ? "" : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a field to group by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No grouping</SelectItem>
+                <SelectItem value="__none__">No grouping</SelectItem>
                 {groupableFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
