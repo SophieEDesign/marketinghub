@@ -22,6 +22,8 @@ export interface TableField {
   name: string
   type: FieldType
   position: number
+  order_index?: number
+  group_name?: string | null
   required?: boolean
   default_value?: any
   options?: FieldOptions
@@ -39,6 +41,9 @@ export interface FieldOptions {
   // For currency
   currency_symbol?: string
   
+  // For date
+  date_format?: string
+  
   // For link_to_table
   linked_table_id?: string
   linked_field_id?: string
@@ -50,6 +55,9 @@ export interface FieldOptions {
   lookup_table_id?: string
   lookup_field_id?: string
   lookup_result_field_id?: string
+  
+  // For read-only (stored in options since not in schema)
+  read_only?: boolean
 }
 
 export interface FieldTypeInfo {

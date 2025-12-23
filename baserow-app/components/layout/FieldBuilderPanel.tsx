@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Plus, Edit, Trash2, X, Save, Check } from "lucide-react"
+import { useState, useEffect, memo } from "react"
+import { Plus, Edit, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +15,7 @@ import {
 import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
+import FieldSettingsDrawer from "./FieldSettingsDrawer"
 
 interface FieldBuilderPanelProps {
   tableId: string
@@ -22,7 +23,7 @@ interface FieldBuilderPanelProps {
   onFieldsUpdated: () => void
 }
 
-export default function FieldBuilderPanel({
+const FieldBuilderPanel = memo(function FieldBuilderPanel({
   tableId,
   supabaseTableName,
   onFieldsUpdated,
@@ -31,6 +32,7 @@ export default function FieldBuilderPanel({
   const [loading, setLoading] = useState(true)
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [showNewField, setShowNewField] = useState(false)
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
 
   useEffect(() => {
     loadFields()
@@ -42,7 +44,14 @@ export default function FieldBuilderPanel({
       const response = await fetch(`/api/tables/${tableId}/fields`)
       const data = await response.json()
       if (data.fields) {
-        setFields(data.fields)
+        // Sort by order_index, then by position, then by name
+        const sortedFields = [...data.fields].sort((a, b) => {
+          const aOrder = a.order_index ?? a.position ?? 0
+          const bOrder = b.order_index ?? b.position ?? 0
+          if (aOrder !== bOrder) return aOrder - bOrder
+          return a.name.localeCompare(b.name)
+        })
+        setFields(sortedFields)
       }
     } catch (error) {
       console.error("Error loading fields:", error)
@@ -50,6 +59,77 @@ export default function FieldBuilderPanel({
       setLoading(false)
     }
   }
+
+  async function handleReorderFields(newOrder: TableField[]) {
+    try {
+      // Update order_index for all fields
+      const updates = newOrder.map((field, index) => ({
+        id: field.id,
+        order_index: index,
+      }))
+
+      const response = await fetch(`/api/tables/${tableId}/fields/reorder`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || "Failed to reorder fields")
+        await loadFields() // Revert on error
+        return
+      }
+
+      setFields(newOrder)
+      onFieldsUpdated()
+    } catch (error) {
+      console.error("Error reordering fields:", error)
+      alert("Failed to reorder fields")
+      await loadFields() // Revert on error
+    }
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = fields.findIndex((f) => f.id === active.id)
+      const newIndex = fields.findIndex((f) => f.id === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(fields, oldIndex, newIndex)
+        handleReorderFields(newOrder)
+      }
+    }
+  }
+
+  // Group fields by group_name
+  const groupedFields = useMemo(() => {
+    const groups: Record<string, TableField[]> = {}
+    const ungrouped: TableField[] = []
+
+    fields.forEach((field) => {
+      const group = field.group_name || null
+      if (group) {
+        if (!groups[group]) {
+          groups[group] = []
+        }
+        groups[group].push(field)
+      } else {
+        ungrouped.push(field)
+      }
+    })
+
+    return { groups, ungrouped }
+  }, [fields])
 
   async function handleCreateField(fieldData: Partial<TableField>) {
     try {
@@ -154,15 +234,31 @@ export default function FieldBuilderPanel({
           <FieldItem
             key={field.id}
             field={field}
-            isEditing={editingField?.id === field.id}
-            onEdit={() => setEditingField(field)}
-            onSave={(updates) => handleUpdateField(field.id, updates)}
-            onCancel={() => setEditingField(null)}
+            onEdit={() => {
+              setEditingField(field)
+              setSettingsDrawerOpen(true)
+            }}
             onDelete={() => handleDeleteField(field.id, field.name)}
-            tableFields={fields}
           />
         ))}
       </div>
+
+      <FieldSettingsDrawer
+        field={editingField}
+        open={settingsDrawerOpen}
+        onOpenChange={(open) => {
+          setSettingsDrawerOpen(open)
+          if (!open) {
+            setEditingField(null)
+          }
+        }}
+        tableId={tableId}
+        tableFields={fields}
+        onSave={async () => {
+          await loadFields()
+          onFieldsUpdated()
+        }}
+      />
     </div>
   )
 }
@@ -262,176 +358,47 @@ function NewFieldForm({
   )
 }
 
-function FieldItem({
+function SortableFieldItem({
   field,
-  isEditing,
   onEdit,
-  onSave,
-  onCancel,
   onDelete,
-  tableFields,
 }: {
   field: TableField
-  isEditing: boolean
   onEdit: () => void
-  onSave: (updates: Partial<TableField>) => void
-  onCancel: () => void
   onDelete: () => void
-  tableFields: TableField[]
 }) {
-  const [name, setName] = useState(field.name)
-  const [type, setType] = useState<FieldType>(field.type)
-  const [required, setRequired] = useState(field.required || false)
-  const [options, setOptions] = useState<FieldOptions>(field.options || {})
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
 
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === field.type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
 
-  useEffect(() => {
-    if (isEditing) {
-      setName(field.name)
-      setType(field.type)
-      setRequired(field.required || false)
-      setOptions(field.options || {})
-    }
-  }, [isEditing, field])
-
-  function handleSave() {
-    onSave({
-      name: name.trim(),
-      type,
-      required,
-      options: Object.keys(options).length > 0 ? options : undefined,
-    })
-  }
-
-  if (isEditing) {
-    return (
-      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
-        <div>
-          <Label className="text-xs font-medium text-gray-700">Field Name</Label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 h-8 text-sm"
-          />
-        </div>
-
-        <div>
-          <Label className="text-xs font-medium text-gray-700">Field Type</Label>
-          <Select value={type} onValueChange={(v) => setType(v as FieldType)}>
-            <SelectTrigger className="mt-1 h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FIELD_TYPES.map((ft) => (
-                <SelectItem key={ft.type} value={ft.type}>
-                  {ft.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {!isVirtual && (
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id={`required-${field.id}`}
-              checked={required}
-              onChange={(e) => setRequired(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <Label htmlFor={`required-${field.id}`} className="text-xs text-gray-700">
-              Required
-            </Label>
-          </div>
-        )}
-
-        {/* Type-specific options */}
-        {type === "single_select" || type === "multi_select" ? (
-          <div>
-            <Label className="text-xs font-medium text-gray-700">Choices</Label>
-            <div className="mt-1 space-y-2">
-              {(options.choices || [""]).map((choice, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={choice}
-                    onChange={(e) => {
-                      const newChoices = [...(options.choices || [])]
-                      newChoices[index] = e.target.value
-                      setOptions({ ...options, choices: newChoices })
-                    }}
-                    className="h-8 text-sm"
-                    placeholder="Option name"
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      const newChoices = (options.choices || []).filter((_, i) => i !== index)
-                      setOptions({ ...options, choices: newChoices })
-                    }}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setOptions({
-                    ...options,
-                    choices: [...(options.choices || []), ""],
-                  })
-                }}
-                className="h-8 text-sm"
-              >
-                + Add choice
-              </Button>
-            </div>
-          </div>
-        ) : type === "formula" ? (
-          <div>
-            <Label className="text-xs font-medium text-gray-700">Formula</Label>
-            <div className="mt-1">
-              <FormulaEditor
-                value={options.formula || ""}
-                onChange={(formula) => setOptions({ ...options, formula })}
-                tableFields={tableFields.filter(f => f.id !== field.id && f.type !== 'formula')}
-              />
-            </div>
-          </div>
-        ) : null}
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={!name.trim()}
-            className="flex-1 h-8 text-sm"
-          >
-            <Check className="h-3.5 w-3.5 mr-1.5" />
-            Save
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onCancel}
-            className="h-8 text-sm"
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
-      <div className="flex items-start justify-between">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="p-3 bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 mt-0.5"
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-900 truncate">
@@ -471,4 +438,6 @@ function FieldItem({
       </div>
     </div>
   )
-}
+})
+
+export default FieldBuilderPanel

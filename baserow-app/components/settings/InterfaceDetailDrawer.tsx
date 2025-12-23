@@ -77,7 +77,7 @@ export default function InterfaceDetailDrawer({
     setGroup(iface.group_id || '')
   }, [iface])
 
-  async function loadInterfaceDetails() {
+  const loadInterfaceDetails = useCallback(async () => {
     try {
       const supabase = createClient()
       const { data: view } = await supabase

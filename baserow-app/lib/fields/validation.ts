@@ -113,5 +113,45 @@ export function canChangeType(
     return { canChange: true, warning: 'Changing to multi-select may require data migration' }
   }
 
+  // Text to date - data may not be compatible
+  if (oldType === 'text' && newType === 'date') {
+    return { 
+      canChange: true, 
+      warning: 'Changing from text to date: existing data will not be automatically converted. Only metadata and UI will update. Invalid date values will display as empty.' 
+    }
+  }
+
+  // Text to number - data may not be compatible
+  if (oldType === 'text' && newType === 'number') {
+    return { 
+      canChange: true, 
+      warning: 'Changing from text to number: existing data will not be automatically converted. Only metadata and UI will update. Invalid number values will display as empty.' 
+    }
+  }
+
+  // Text to checkbox - data may not be compatible
+  if (oldType === 'text' && newType === 'checkbox') {
+    return { 
+      canChange: true, 
+      warning: 'Changing from text to checkbox: existing data will not be automatically converted. Only metadata and UI will update.' 
+    }
+  }
+
+  // Date to text - format loss
+  if (oldType === 'date' && newType === 'text') {
+    return { 
+      canChange: true, 
+      warning: 'Changing from date to text: date formatting will be lost. Data will be converted to ISO string format.' 
+    }
+  }
+
+  // Number to text - precision may be lost
+  if (oldType === 'number' && newType === 'text') {
+    return { 
+      canChange: true, 
+      warning: 'Changing from number to text: numeric precision will be lost.' 
+    }
+  }
+
   return { canChange: true }
 }

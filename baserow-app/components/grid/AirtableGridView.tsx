@@ -119,7 +119,14 @@ export default function AirtableGridView({
         setColumnOrder(fields.map((f) => f.name))
       }
     } else {
-      setColumnOrder(fields.map((f) => f.name))
+      // Sort fields by order_index, then by position, then by name
+      const sortedFields = [...fields].sort((a, b) => {
+        const aOrder = a.order_index ?? a.position ?? 0
+        const bOrder = b.order_index ?? b.position ?? 0
+        if (aOrder !== bOrder) return aOrder - bOrder
+        return a.name.localeCompare(b.name)
+      })
+      setColumnOrder(sortedFields.map((f) => f.name))
     }
 
     // Set default widths for fields without saved widths
@@ -416,7 +423,7 @@ export default function AirtableGridView({
                         value={row[field.name]}
                         rowId={row.id}
                         tableName={tableName}
-                        editable={editable}
+                        editable={editable && !field.options?.read_only}
                         onSave={(value) => handleCellSave(row.id, field.name, value)}
                       />
                     </div>

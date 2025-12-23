@@ -109,6 +109,12 @@ export async function POST(
       )
     }
     const position = existingFields.length
+    // Set order_index to the max order_index + 1, or use position if no order_index exists
+    const maxOrderIndex = existingFields.reduce((max, f) => {
+      const orderIndex = f.order_index ?? f.position ?? 0
+      return Math.max(max, orderIndex)
+    }, -1)
+    const order_index = maxOrderIndex + 1
 
     // Start transaction-like operation
     // 1. Create metadata record (table_fields table must exist)
@@ -120,6 +126,7 @@ export async function POST(
           name: finalSanitizedName,
           type: type as FieldType,
           position,
+          order_index,
           required: required || false,
           default_value: default_value || null,
           options: options || {},
@@ -216,7 +223,7 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { fieldId, name, type, required, default_value, options } = body
+    const { fieldId, name, type, required, default_value, options, group_name } = body
 
     if (!fieldId) {
       return NextResponse.json(
@@ -318,9 +325,16 @@ export async function PATCH(
       updates.type = type as FieldType
       updates.options = options || existingField.options || {}
 
-      // Only change SQL column if both are physical types
+      // Only change SQL column type for certain conversions
+      // For text → date/number/checkbox, we update metadata only (no data migration)
+      const shouldMigrateData = !(
+        existingField.type === 'text' && 
+        (type === 'date' || type === 'number' || type === 'checkbox')
+      )
+
+      // Only change SQL column if both are physical types AND we should migrate data
       if (existingField.type !== 'formula' && existingField.type !== 'lookup' &&
-          type !== 'formula' && type !== 'lookup') {
+          type !== 'formula' && type !== 'lookup' && shouldMigrateData) {
         sqlOperations.push(
           generateChangeColumnTypeSQL(
             table.supabase_table,
@@ -358,6 +372,11 @@ export async function PATCH(
         )
       }
       updates.options = options
+    }
+
+    // Handle group_name update
+    if (group_name !== undefined) {
+      updates.group_name = group_name || null
     }
 
     // Handle other updates

@@ -58,10 +58,17 @@ export default function GridView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
 
-  // Get visible fields ordered by position
+  // Get visible fields ordered by order_index (from table_fields) or position
   const visibleFields = viewFields
     .filter((f) => f.visible)
-    .sort((a, b) => a.position - b.position)
+    .map((vf) => {
+      const tableField = tableFields.find((tf) => tf.name === vf.field_name)
+      return {
+        ...vf,
+        order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+      }
+    })
+    .sort((a, b) => a.order_index - b.order_index)
 
   useEffect(() => {
     loadRows()

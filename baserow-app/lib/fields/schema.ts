@@ -11,6 +11,7 @@ export async function getTableFields(tableId: string): Promise<TableField[]> {
     .from('table_fields')
     .select('*')
     .eq('table_id', tableId)
+    .order('order_index', { ascending: true })
     .order('position', { ascending: true })
 
   if (error) {

@@ -1,16 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Button } from "@/components/ui/button"
-import { FileText } from "lucide-react"
-import FieldBuilderPanel from "./FieldBuilderPanel"
-import CSVImportModal from "./CSVImportModal"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import FieldsTab from "./design/FieldsTab"
+import ViewsTab from "./design/ViewsTab"
+import PermissionsTab from "./design/PermissionsTab"
+import ImportCSVTab from "./design/ImportCSVTab"
 
 interface DesignSidebarProps {
   isOpen: boolean
@@ -29,47 +30,62 @@ export default function DesignSidebar({
   supabaseTableName,
   onFieldsUpdated,
 }: DesignSidebarProps) {
-  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("fields")
+
+  // Memoize callback to prevent re-renders
+  const handleFieldsUpdated = useCallback(() => {
+    onFieldsUpdated()
+  }, [onFieldsUpdated])
 
   return (
-    <>
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent className="w-[380px] sm:w-[380px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="text-lg font-semibold text-gray-900">
-              Design: {tableName}
-            </SheetTitle>
-          </SheetHeader>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-[380px] sm:w-[380px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-lg font-semibold text-gray-900">
+            Design: {tableName}
+          </SheetTitle>
+        </SheetHeader>
 
-          <div className="mt-4 space-y-4">
-            <FieldBuilderPanel
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="fields" className="text-xs">Fields</TabsTrigger>
+            <TabsTrigger value="views" className="text-xs">Views</TabsTrigger>
+            <TabsTrigger value="permissions" className="text-xs">Permissions</TabsTrigger>
+            <TabsTrigger value="import" className="text-xs">Import</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="fields" className="mt-4">
+            <FieldsTab
               tableId={tableId}
               supabaseTableName={supabaseTableName}
-              onFieldsUpdated={onFieldsUpdated}
+              onFieldsUpdated={handleFieldsUpdated}
             />
-            
-            <div className="pt-4 border-t">
-              <Button
-                onClick={() => setImportModalOpen(true)}
-                variant="outline"
-                className="w-full"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Import CSV
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+          </TabsContent>
 
-      <CSVImportModal
-        open={importModalOpen}
-        onOpenChange={setImportModalOpen}
-        tableId={tableId}
-        tableName={tableName}
-        supabaseTableName={supabaseTableName}
-        onImportComplete={onFieldsUpdated}
-      />
-    </>
+          <TabsContent value="views" className="mt-4">
+            <ViewsTab
+              tableId={tableId}
+              tableName={tableName}
+            />
+          </TabsContent>
+
+          <TabsContent value="permissions" className="mt-4">
+            <PermissionsTab
+              tableId={tableId}
+              tableName={tableName}
+            />
+          </TabsContent>
+
+          <TabsContent value="import" className="mt-4">
+            <ImportCSVTab
+              tableId={tableId}
+              tableName={tableName}
+              supabaseTableName={supabaseTableName}
+              onImportComplete={handleFieldsUpdated}
+            />
+          </TabsContent>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
   )
 }
