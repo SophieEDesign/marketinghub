@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import AirtableViewPage from "@/components/grid/AirtableViewPage"
@@ -7,6 +8,7 @@ import InterfacePage from "@/components/views/InterfacePage"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import { getTable } from "@/lib/crud/tables"
 import { getView } from "@/lib/crud/views"
+import { Button } from "@/components/ui/button"
 import type { View } from "@/types/database"
 
 export default async function ViewPage({
