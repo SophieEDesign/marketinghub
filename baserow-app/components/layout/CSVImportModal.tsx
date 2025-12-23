@@ -145,7 +145,22 @@ export default function CSVImportModal({
       setProgress('Mapping columns to fields...')
       
       const columnMappings: Record<string, string> = {} // CSV column name -> field name
-      const fieldsToCreate: string[] = [] // CSV column names that need new fields
+      const fieldsToCreate: Array<{ name: string; type: string }> = [] // CSV column names and detected types
+
+      // Map CSV parser types to system field types
+      const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): string => {
+        switch (csvType) {
+          case 'number':
+            return 'number'
+          case 'boolean':
+            return 'checkbox'
+          case 'date':
+            return 'date'
+          case 'text':
+          default:
+            return 'text'
+        }
+      }
 
       // Auto-map columns to existing fields by name match
       parsedData.columns.forEach((col) => {
@@ -157,35 +172,38 @@ export default function CSVImportModal({
         if (existingField) {
           columnMappings[col.name] = existingField.name
         } else {
-          fieldsToCreate.push(col.name)
+          fieldsToCreate.push({
+            name: col.name,
+            type: mapCSVTypeToFieldType(col.type)
+          })
         }
       })
 
-      // Phase 2: Create new fields (all as 'text' type)
+      // Phase 2: Create new fields with auto-detected types
       if (fieldsToCreate.length > 0) {
         setProgress(`Creating ${fieldsToCreate.length} new fields...`)
         
-        for (const colName of fieldsToCreate) {
-          const sanitizedName = sanitizeFieldNameSafe(colName)
+        for (const fieldInfo of fieldsToCreate) {
+          const sanitizedName = sanitizeFieldNameSafe(fieldInfo.name)
           
           const response = await fetch(`/api/tables/${tableId}/fields`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: sanitizedName,
-              type: "text", // Always default to text
+              type: fieldInfo.type, // Use auto-detected type
               required: false,
             }),
           })
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-            throw new Error(`Failed to create field "${colName}": ${errorData.error || 'Unknown error'}`)
+            throw new Error(`Failed to create field "${fieldInfo.name}": ${errorData.error || 'Unknown error'}`)
           }
 
           const createdField = await response.json().catch(() => null)
           if (createdField?.field?.name) {
-            columnMappings[colName] = createdField.field.name
+            columnMappings[fieldInfo.name] = createdField.field.name
           }
         }
 
@@ -334,7 +352,7 @@ export default function CSVImportModal({
         <DialogHeader>
           <DialogTitle>Import CSV to {tableName}</DialogTitle>
           <DialogDescription>
-            Import data from a CSV file. All new fields will be created as text type.
+            Import data from a CSV file. New fields will be created with auto-detected types (text, number, date, checkbox).
           </DialogDescription>
         </DialogHeader>
 
@@ -391,26 +409,27 @@ export default function CSVImportModal({
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">Preview</h3>
                 <p className="text-sm text-muted-foreground">
-                  Columns will be automatically mapped to existing fields with matching names, or new fields will be created (as text type).
+                  Columns will be automatically mapped to existing fields with matching names, or new fields will be created with auto-detected types.
                 </p>
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
+                      <thead className="bg-gray-50 border-b sticky top-0 z-10">
                         <tr>
                           {parsedData.columns.map((col) => {
                             const sanitizedColName = sanitizeFieldNameSafe(col.name)
                             const existingField = tableFields.find(
                               (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
                             )
+                            const detectedType = col.type === 'boolean' ? 'checkbox' : col.type
                             return (
-                              <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700">
+                              <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700 bg-gray-50">
                                 <div className="flex flex-col">
                                   <span>{col.name}</span>
                                   <span className="text-xs font-normal text-gray-500">
-                                    {existingField ? `→ ${existingField.name}` : `→ New field (text)`}
+                                    {existingField ? `→ ${existingField.name} (${existingField.type})` : `→ New field (${detectedType})`}
                                   </span>
-                                  <span className="text-xs text-gray-400">({col.type})</span>
+                                  <span className="text-xs text-gray-400">Detected: {col.type}</span>
                                 </div>
                               </th>
                             )

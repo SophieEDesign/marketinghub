@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Table2, ChevronRight, ChevronDown, Grid3x3, FileText, Calendar, Layout } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Plus, Table2, ChevronRight, ChevronDown, Grid3x3, FileText, Calendar, Layout, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface Table {
@@ -27,6 +35,9 @@ export default function SettingsDataTab() {
   const [viewsByTable, setViewsByTable] = useState<Record<string, View[]>>({})
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [tableToDelete, setTableToDelete] = useState<Table | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadTables()
@@ -179,7 +190,7 @@ export default function SettingsDataTab() {
               const tableViews = viewsByTable[table.id] || []
 
               return (
-                <div key={table.id} className="group border rounded-lg p-2 hover:bg-gray-50">
+                <div key={table.id} className="group border rounded-lg p-2 hover:bg-gray-50 relative">
                   <div className="flex items-center">
                     <button
                       onClick={() => toggleTable(table.id)}
@@ -198,6 +209,17 @@ export default function SettingsDataTab() {
                     >
                       {table.name}
                     </Link>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleDeleteClick(table)
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600 hover:text-red-700"
+                      title="Delete table"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                   {isExpanded && (
                     <div className="ml-8 mt-2 space-y-1">
