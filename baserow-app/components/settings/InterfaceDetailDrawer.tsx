@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -133,7 +133,7 @@ export default function InterfaceDetailDrawer({
     }
   }
 
-  async function loadViews() {
+  const loadViews = useCallback(async () => {
     setLoadingViews(true)
     try {
       const supabase = createClient()
@@ -184,7 +184,22 @@ export default function InterfaceDetailDrawer({
     } finally {
       setLoadingViews(false)
     }
-  }
+  }, [iface.id])
+
+  useEffect(() => {
+    if (open) {
+      loadInterfaceDetails()
+      loadGroups()
+      loadViews()
+    }
+  }, [open, iface.id, loadInterfaceDetails, loadGroups, loadViews])
+
+  useEffect(() => {
+    setName(iface.name)
+    setIsAdminOnly(iface.is_admin_only)
+    setIsDefault(iface.is_default || false)
+    setGroup(iface.group_id || '')
+  }, [iface])
 
   async function handleSave() {
     setSaving(true)

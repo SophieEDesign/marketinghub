@@ -58,6 +58,18 @@ export default function CSVImportModal({
   const [importedCount, setImportedCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const loadTableFields = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/tables/${tableId}/fields`)
+      if (response.ok) {
+        const data = await response.json()
+        setTableFields(data.fields || [])
+      }
+    } catch (error) {
+      console.error("Error loading fields:", error)
+    }
+  }, [tableId])
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!open) {
@@ -73,19 +85,7 @@ export default function CSVImportModal({
     } else {
       loadTableFields()
     }
-  }, [open, tableId])
-
-  async function loadTableFields() {
-    try {
-      const response = await fetch(`/api/tables/${tableId}/fields`)
-      if (response.ok) {
-        const data = await response.json()
-        setTableFields(data.fields || [])
-      }
-    } catch (error) {
-      console.error("Error loading fields:", error)
-    }
-  }
+  }, [open, tableId, loadTableFields])
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (!selectedFile.name.endsWith('.csv')) {
@@ -477,7 +477,7 @@ export default function CSVImportModal({
               </div>
               <h2 className="text-2xl font-semibold">Import Complete!</h2>
               <p className="text-muted-foreground">
-                Successfully imported {importedCount} rows into "{tableName}"
+                Successfully imported {importedCount} rows into &quot;{tableName}&quot;
               </p>
             </div>
           )}
