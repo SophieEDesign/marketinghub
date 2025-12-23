@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { Upload, FileText, CheckCircle, XCircle, Loader2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,8 +10,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/client"
-import type { TableField } from "@/types/fields"
+import type { TableField, FieldType } from "@/types/fields"
+import { FIELD_TYPES } from "@/types/fields"
 import { parseCSV, type ParsedCSV } from "@/lib/import/csvParser"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { RESERVED_WORDS } from "@/types/fields"
@@ -53,6 +62,8 @@ export default function CSVImportModal({
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({}) // CSV column -> field name
+  const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>({}) // CSV column -> field type
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
   const [importedCount, setImportedCount] = useState(0)
@@ -101,7 +112,7 @@ export default function CSVImportModal({
     try {
       const parsed = await parseCSV(selectedFile)
       setParsedData(parsed)
-      setStatus('preview')
+      setStatus('mapping')
       setProgress('')
     } catch (err: any) {
       setError(err.message || 'Failed to parse CSV file')
@@ -191,7 +202,7 @@ export default function CSVImportModal({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: sanitizedName,
-              type: fieldInfo.type, // Use auto-detected type
+              type: fieldInfo.type, // Use user-selected type
               required: false,
             }),
           })
@@ -229,10 +240,13 @@ export default function CSVImportModal({
           
           parsedData.columns.forEach((col) => {
             const fieldName = columnMappings[col.name]
-            if (!fieldName) return // Skip unmapped columns
+            if (!fieldName) return // Skip unmapped columns (user chose not to import this column)
 
             const field = allFields.find((f: TableField) => f.name === fieldName)
-            if (!field) return
+            if (!field) {
+              console.warn(`Field "${fieldName}" not found, skipping column "${col.name}"`)
+              return
+            }
 
             let value: any = csvRow[col.name]
             
@@ -424,7 +438,7 @@ export default function CSVImportModal({
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">Preview</h3>
                 <p className="text-sm text-muted-foreground">
-                  Columns will be automatically mapped to existing fields with matching names, or new fields will be created with auto-detected types.
+                  Review the data before importing. {parsedData.rows.length} rows will be imported.
                 </p>
                 <div className="border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
@@ -472,8 +486,15 @@ export default function CSVImportModal({
 
               <div className="flex gap-2">
                 <Button
+                  onClick={() => setStatus('mapping')}
+                  variant="outline"
+                >
+                  Back to Mapping
+                </Button>
+                <Button
                   onClick={handleImport}
                   disabled={parsedData.rows.length === 0}
+                  className="flex-1"
                 >
                   Import {parsedData.rows.length} Rows
                 </Button>
@@ -482,6 +503,8 @@ export default function CSVImportModal({
                   onClick={() => {
                     setFile(null)
                     setParsedData(null)
+                    setFieldMappings({})
+                    setNewFieldTypes({})
                     setStatus('idle')
                     setError(null)
                   }}
