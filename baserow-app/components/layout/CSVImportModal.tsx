@@ -1,10 +1,8 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Upload, FileText, Check, X, AlertCircle } from "lucide-react"
+import { useState, useRef, useEffect, useCallback } from "react"
+import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -12,16 +10,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import { parseCSV, type ParsedCSV } from "@/lib/import/csvParser"
 import { sanitizeFieldName } from "@/lib/fields/validation"
+import { RESERVED_WORDS } from "@/types/fields"
+
+/**
+ * Sanitize field name and handle reserved words
+ */
+function sanitizeFieldNameSafe(name: string): string {
+  let sanitized = sanitizeFieldName(name)
+  
+  // If sanitized name is a reserved word, add suffix
+  if (RESERVED_WORDS.includes(sanitized.toLowerCase())) {
+    sanitized = `${sanitized}_field`
+  }
+  
+  return sanitized
+}
 
 interface CSVImportModalProps {
   open: boolean
@@ -32,11 +39,7 @@ interface CSVImportModalProps {
   onImportComplete: () => void
 }
 
-type ImportPhase = "idle" | "parsing" | "mapping_fields" | "creating_fields" | "inserting_rows" | "completed" | "error"
-
-interface CSVRow {
-  [key: string]: string
-}
+type ImportStatus = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error'
 
 export default function CSVImportModal({
   open,
@@ -46,28 +49,24 @@ export default function CSVImportModal({
   supabaseTableName,
   onImportComplete,
 }: CSVImportModalProps) {
-  const [phase, setPhase] = useState<ImportPhase>("idle")
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
-  const [csvRows, setCsvRows] = useState<CSVRow[]>([])
+  const [status, setStatus] = useState<ImportStatus>('idle')
+  const [file, setFile] = useState<File | null>(null)
+  const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({})
-  const [newFields, setNewFields] = useState<Record<string, boolean>>({}) // Just track which headers need new fields
-  const [importedCount, setImportedCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [progressMessage, setProgressMessage] = useState("")
+  const [progress, setProgress] = useState("")
+  const [importedCount, setImportedCount] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!open) {
-      setPhase("idle")
-      setCsvHeaders([])
-      setCsvRows([])
-      setFieldMappings({})
-      setNewFields({})
-      setImportedCount(0)
+      setStatus('idle')
+      setFile(null)
+      setParsedData(null)
       setError(null)
-      setProgressMessage("")
+      setProgress("")
+      setImportedCount(0)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
@@ -88,211 +87,173 @@ export default function CSVImportModal({
     }
   }
 
-  function parseCSV(text: string): { headers: string[]; rows: CSVRow[] } {
-    const lines = text.split("\n").filter(line => line.trim())
-    if (lines.length === 0) return { headers: [], rows: [] }
-
-    function parseLine(line: string): string[] {
-      const result: string[] = []
-      let current = ""
-      let inQuotes = false
-
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i]
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === "," && !inQuotes) {
-          result.push(current.trim())
-          current = ""
-        } else {
-          current += char
-        }
-      }
-      result.push(current.trim())
-      return result
-    }
-
-    const headers = parseLine(lines[0])
-    const rows: CSVRow[] = []
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = parseLine(lines[i])
-      const row: CSVRow = {}
-      headers.forEach((header, index) => {
-        row[header] = values[index] || ""
-      })
-      rows.push(row)
-    }
-
-    return { headers, rows }
-  }
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setError(null)
-    setPhase("parsing")
-    setProgressMessage("Parsing CSV file...")
-
-    try {
-      const text = await file.text()
-      const { headers, rows } = parseCSV(text)
-
-      if (headers.length === 0) {
-        throw new Error("CSV file appears to be empty or invalid")
-      }
-
-      setCsvHeaders(headers)
-      setCsvRows(rows)
-
-      // Auto-map headers to existing fields
-      const mappings: Record<string, string> = {}
-      const needsNewFields: Record<string, boolean> = {}
-
-      headers.forEach((header) => {
-        const sanitized = sanitizeFieldName(header)
-        const existingField = tableFields.find(
-          (f) => f.name.toLowerCase() === sanitized.toLowerCase()
-        )
-        if (existingField) {
-          mappings[header] = existingField.name
-        } else {
-          needsNewFields[header] = true
-        }
-      })
-
-      setFieldMappings(mappings)
-      setNewFields(needsNewFields)
-      setPhase("mapping_fields")
-      setProgressMessage("")
-    } catch (err) {
-      setError(`Failed to read CSV file: ${(err as Error).message}`)
-      setPhase("error")
-      setProgressMessage("")
-    }
-  }
-
-  async function handleImport() {
-    if (csvHeaders.length === 0 || csvRows.length === 0) {
-      setError("Please upload a CSV file first")
-      setPhase("error")
+  const handleFileSelect = useCallback(async (selectedFile: File) => {
+    if (!selectedFile.name.endsWith('.csv')) {
+      setError('Please select a CSV file')
       return
     }
 
+    setFile(selectedFile)
+    setStatus('parsing')
+    setError(null)
+    setProgress('Parsing CSV file...')
+
+    try {
+      const parsed = await parseCSV(selectedFile)
+      setParsedData(parsed)
+      setStatus('preview')
+      setProgress('')
+    } catch (err: any) {
+      setError(err.message || 'Failed to parse CSV file')
+      setStatus('error')
+      setFile(null)
+      setProgress('')
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const droppedFile = e.dataTransfer.files[0]
+    if (droppedFile) {
+      handleFileSelect(droppedFile)
+    }
+  }, [handleFileSelect])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+  }, [])
+
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      handleFileSelect(selectedFile)
+    }
+  }, [handleFileSelect])
+
+  async function handleImport() {
+    if (!parsedData) {
+      setError('Please upload a CSV file first')
+      return
+    }
+
+    setStatus('importing')
     setError(null)
     setImportedCount(0)
 
     try {
-      // Phase 1: Create new fields (all as 'text' type)
-      setPhase("creating_fields")
-      setProgressMessage("Creating new fields...")
+      // Phase 1: Map CSV columns to existing fields or create new ones
+      setProgress('Mapping columns to fields...')
+      
+      const columnMappings: Record<string, string> = {} // CSV column name -> field name
+      const fieldsToCreate: string[] = [] // CSV column names that need new fields
 
-      const fieldsToCreate = csvHeaders.filter(h => newFields[h] && !fieldMappings[h])
-      const createdFieldNames: Record<string, string> = {}
-
-      for (const header of fieldsToCreate) {
-        const sanitizedName = sanitizeFieldName(header)
+      // Auto-map columns to existing fields by name match
+      parsedData.columns.forEach((col) => {
+        const sanitizedColName = sanitizeFieldNameSafe(col.name)
+        const existingField = tableFields.find(
+          (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
+        )
         
-        const response = await fetch(`/api/tables/${tableId}/fields`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: sanitizedName,
-            type: "text", // Always default to text
-            required: false,
-          }),
-        })
+        if (existingField) {
+          columnMappings[col.name] = existingField.name
+        } else {
+          fieldsToCreate.push(col.name)
+        }
+      })
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(`Failed to create field "${header}": ${errorData.error || 'Unknown error'}`)
+      // Phase 2: Create new fields (all as 'text' type)
+      if (fieldsToCreate.length > 0) {
+        setProgress(`Creating ${fieldsToCreate.length} new fields...`)
+        
+        for (const colName of fieldsToCreate) {
+          const sanitizedName = sanitizeFieldNameSafe(colName)
+          
+          const response = await fetch(`/api/tables/${tableId}/fields`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: sanitizedName,
+              type: "text", // Always default to text
+              required: false,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(`Failed to create field "${colName}": ${errorData.error || 'Unknown error'}`)
+          }
+
+          const createdField = await response.json().catch(() => null)
+          if (createdField?.field?.name) {
+            columnMappings[colName] = createdField.field.name
+          }
         }
 
-        const createdField = await response.json().catch(() => null)
-        if (createdField?.field?.name) {
-          createdFieldNames[header] = createdField.field.name
-          fieldMappings[header] = createdField.field.name
-        }
+        // Reload fields after creation
+        await loadTableFields()
+        const response = await fetch(`/api/tables/${tableId}/fields`)
+        const fieldsData = await response.ok ? await response.json() : { fields: [] }
+        const updatedFields = fieldsData.fields || []
+        setTableFields(updatedFields)
       }
 
-      // Reload fields to get updated list
-      await loadTableFields()
+      // Reload fields one more time to ensure we have the latest
+      const finalFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
+      const finalFieldsData = finalFieldsResponse.ok ? await finalFieldsResponse.json() : { fields: [] }
+      const allFields = finalFieldsData.fields || tableFields
 
-      // Phase 2: Prepare rows for insertion
-      setPhase("inserting_rows")
-      setProgressMessage("Preparing rows for insertion...")
+      // Phase 3: Prepare rows for insertion
+      setProgress('Preparing rows for insertion...')
 
-      // Get updated field list
-      const response = await fetch(`/api/tables/${tableId}/fields`)
-      const fieldsData = await response.ok ? await response.json() : { fields: [] }
-      const updatedFields = fieldsData.fields || []
-
-      if (updatedFields.length === 0) {
-        throw new Error('No fields found in table. Please ensure the table has at least one field.')
-      }
-
-      // Map CSV rows to database format
-      const rowsToInsert = csvRows
+      const rowsToInsert = parsedData.rows
         .map((csvRow) => {
           const mappedRow: Record<string, any> = {}
           
-          csvHeaders.forEach((csvHeader) => {
-            const mappedFieldName = fieldMappings[csvHeader]
-            if (!mappedFieldName) return // Skip unmapped columns
+          parsedData.columns.forEach((col) => {
+            const fieldName = columnMappings[col.name]
+            if (!fieldName) return // Skip unmapped columns
 
-            const field = updatedFields.find((f: TableField) => f.name === mappedFieldName)
-            if (!field) return // Skip if field not found
+            const field = allFields.find((f: TableField) => f.name === fieldName)
+            if (!field) return
 
-            let value: any = csvRow[csvHeader]
+            let value: any = csvRow[col.name]
             
-            // Convert empty strings to null
-            if (value === '') {
+            if (value === '' || value === null || value === undefined) {
               value = null
-            }
-
-            // Type conversion based on field type
-            if (field.type === "number" || field.type === "currency" || field.type === "percent") {
-              value = value === null ? null : (parseFloat(value) || 0)
-            } else if (field.type === "checkbox") {
-              value = value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
-            } else if (field.type === "date") {
-              if (value === null) {
-                value = null
-              } else {
+            } else {
+              // Type conversion based on field type
+              if (field.type === "number" || field.type === "currency" || field.type === "percent") {
+                value = parseFloat(value) || 0
+              } else if (field.type === "checkbox") {
+                value = (String(value).toLowerCase() === "true" || value === "1" || String(value).toLowerCase() === "yes")
+              } else if (field.type === "date") {
                 const date = new Date(value)
                 value = isNaN(date.getTime()) ? null : date.toISOString()
-              }
-            } else if (field.type === "multi_select") {
-              if (value === null) {
-                value = []
-              } else {
+              } else if (field.type === "multi_select") {
                 value = String(value).split(/[,;]/).map(p => p.trim()).filter(p => p)
+              } else {
+                value = String(value).trim()
               }
-            } else {
-              // For text and other types, convert to string or null
-              value = value === null ? null : String(value).trim()
             }
 
-            mappedRow[field.name] = value
+            mappedRow[fieldName] = value
           })
 
           return mappedRow
         })
-        .filter(row => Object.keys(row).length > 0) // Filter out completely empty rows
+        .filter(row => Object.keys(row).length > 0)
 
-      // Validate we have rows to insert
       if (rowsToInsert.length === 0) {
         throw new Error(
           `No valid rows to import. ` +
-          `Total CSV rows: ${csvRows.length}, ` +
-          `Mapped columns: ${Object.keys(fieldMappings).length}/${csvHeaders.length}. ` +
+          `Total CSV rows: ${parsedData.rows.length}, ` +
+          `Mapped columns: ${Object.keys(columnMappings).length}/${parsedData.columns.length}. ` +
           `Please ensure at least one column is mapped and contains data.`
         )
       }
 
-      // Phase 3: Insert rows in batches
-      setProgressMessage(`Inserting ${rowsToInsert.length} rows...`)
+      // Phase 4: Insert rows in batches
+      setProgress(`Inserting ${rowsToInsert.length} rows...`)
 
       const batchSize = 100
       let totalImported = 0
@@ -308,19 +269,19 @@ export default function CSVImportModal({
           .select('id')
 
         if (insertError) {
-          console.error("❌ Error inserting batch:", insertError)
-          console.error("Batch size:", batch.length)
-          console.error("Batch sample:", JSON.stringify(batch[0], null, 2))
-          console.error("Supabase table:", supabaseTableName)
-          console.error("Available fields:", updatedFields.map((f: TableField) => f.name))
-
-          // Provide helpful error messages
+          console.error("Error inserting batch:", insertError)
+          
           if (insertError.message?.includes('column') || insertError.code === '42703' || insertError.code === '42P01' || insertError.code === 'PGRST116') {
             const columnMatch = insertError.message?.match(/column ['"]([^'"]+)['"]/)
             const columnName = columnMatch ? columnMatch[1] : 'unknown'
+            // Reload fields for error message
+            const errorFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
+            const errorFieldsData = errorFieldsResponse.ok ? await errorFieldsResponse.json() : { fields: [] }
+            const errorFields = errorFieldsData.fields || []
+            
             throw new Error(
               `Column "${columnName}" does not exist in table "${supabaseTableName}". ` +
-              `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}. ` +
+              `Available fields: ${errorFields.map((f: TableField) => f.name).join(', ')}. ` +
               `Original error: ${insertError.message}`
             )
           }
@@ -335,20 +296,18 @@ export default function CSVImportModal({
           throw new Error(`Failed to insert rows: ${insertError.message || JSON.stringify(insertError)}`)
         }
 
-        // Count inserted rows from response
         const insertedCount = insertedData?.length || batch.length
         totalImported += insertedCount
         setImportedCount(totalImported)
-        setProgressMessage(`Inserted ${totalImported} of ${rowsToInsert.length} rows...`)
+        setProgress(`Inserted ${totalImported} of ${rowsToInsert.length} rows...`)
       }
 
-      // Success - ensure we have imported rows
       if (totalImported === 0) {
         throw new Error("No rows were imported. Please check your data and field mappings.")
       }
 
-      setPhase("completed")
-      setProgressMessage(`Successfully imported ${totalImported} rows`)
+      setStatus('success')
+      setProgress(`Successfully imported ${totalImported} rows`)
       setImportedCount(totalImported)
 
       // Refresh grid immediately
@@ -360,37 +319,18 @@ export default function CSVImportModal({
       }, 2000)
 
     } catch (err) {
-      console.error("❌ Error importing CSV:", err)
+      console.error("Error importing CSV:", err)
       const errorMessage = err instanceof Error ? err.message : String(err)
       setError(`Failed to import CSV: ${errorMessage}`)
-      setPhase("error")
-      setProgressMessage("")
+      setStatus('error')
+      setProgress("")
       setImportedCount(0)
-    }
-  }
-
-  function getPhaseMessage() {
-    switch (phase) {
-      case "parsing":
-        return "Parsing CSV file..."
-      case "mapping_fields":
-        return "Map CSV columns to fields"
-      case "creating_fields":
-        return progressMessage || "Creating new fields..."
-      case "inserting_rows":
-        return progressMessage || "Inserting rows..."
-      case "completed":
-        return `Successfully imported ${importedCount} rows!`
-      case "error":
-        return "Import failed"
-      default:
-        return "Upload a CSV file to get started"
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Import CSV to {tableName}</DialogTitle>
           <DialogDescription>
@@ -398,137 +338,147 @@ export default function CSVImportModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Error Display */}
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <div>{error}</div>
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-5 w-5 text-red-600" />
+                <h3 className="font-semibold text-red-900">Import Failed</h3>
+              </div>
+              <p className="mt-2 text-sm text-red-700">{error}</p>
             </div>
           )}
 
-          {/* Phase: Upload */}
-          {phase === "idle" && (
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <Label htmlFor="csv-file" className="cursor-pointer">
-                  <span className="text-sm font-medium text-gray-700">
-                    Click to upload CSV file
-                  </span>
-                </Label>
-                <Input
-                  id="csv-file"
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Supports standard CSV format
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Phase: Parsing */}
-          {phase === "parsing" && (
-            <div className="text-center py-8 space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm text-gray-600">{getPhaseMessage()}</p>
-            </div>
-          )}
-
-          {/* Phase: Mapping Fields */}
-          {phase === "mapping_fields" && (
-            <div className="space-y-4">
-              <div className="text-sm text-gray-600">
-                Map CSV columns to existing fields or create new ones (all new fields will be text type).
-              </div>
-              <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-4">
-                {csvHeaders.map((header) => {
-                  const mappedField = fieldMappings[header]
-                  const needsNew = newFields[header]
-
-                  return (
-                    <div key={header} className="flex items-center gap-2">
-                      <div className="flex-1 text-sm font-medium">{header}</div>
-                      <Select
-                        value={mappedField || (needsNew ? "__new__" : "__skip__")}
-                        onValueChange={(value) => {
-                          if (value === "__new__") {
-                            setNewFields({ ...newFields, [header]: true })
-                            setFieldMappings({ ...fieldMappings, [header]: "" })
-                          } else if (value === "__skip__") {
-                            setNewFields({ ...newFields, [header]: false })
-                            setFieldMappings({ ...fieldMappings, [header]: "" })
-                          } else {
-                            setNewFields({ ...newFields, [header]: false })
-                            setFieldMappings({ ...fieldMappings, [header]: value })
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-48">
-                          <SelectValue placeholder="Select field" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__skip__">Skip column</SelectItem>
-                          <SelectItem value="__new__">Create new field (text)</SelectItem>
-                          {tableFields.map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {field.name} ({field.type})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )
-                })}
-              </div>
-              <Button 
-                onClick={handleImport} 
-                className="w-full" 
-                disabled={
-                  Object.values(fieldMappings).filter(v => v && v !== "").length === 0 &&
-                  Object.values(newFields).filter(v => v === true).length === 0
-                }
-              >
-                Start Import
+          {/* File Upload Area */}
+          {status === 'idle' || status === 'error' ? (
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition-colors cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Drop CSV file here or click to browse</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Supports CSV files exported from Airtable or any standard CSV format
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileInput}
+                className="hidden"
+              />
+              <Button>
+                <FileText className="h-4 w-4 mr-2" />
+                Choose CSV File
               </Button>
             </div>
+          ) : null}
+
+          {/* Parsing Status */}
+          {status === 'parsing' && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">{progress}</p>
+            </div>
           )}
 
-          {/* Phase: Creating Fields / Inserting Rows */}
-          {(phase === "creating_fields" || phase === "inserting_rows") && (
-            <div className="text-center py-8 space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-sm font-medium text-gray-900">{getPhaseMessage()}</p>
+          {/* Preview */}
+          {status === 'preview' && parsedData && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Preview</h3>
+                <p className="text-sm text-muted-foreground">
+                  Columns will be automatically mapped to existing fields with matching names, or new fields will be created (as text type).
+                </p>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          {parsedData.columns.map((col) => {
+                            const sanitizedColName = sanitizeFieldNameSafe(col.name)
+                            const existingField = tableFields.find(
+                              (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
+                            )
+                            return (
+                              <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700">
+                                <div className="flex flex-col">
+                                  <span>{col.name}</span>
+                                  <span className="text-xs font-normal text-gray-500">
+                                    {existingField ? `→ ${existingField.name}` : `→ New field (text)`}
+                                  </span>
+                                  <span className="text-xs text-gray-400">({col.type})</span>
+                                </div>
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {parsedData.previewRows.map((row, idx) => (
+                          <tr key={idx} className="border-b hover:bg-gray-50">
+                            {parsedData.columns.map((col) => (
+                              <td key={col.name} className="px-4 py-2">
+                                {String(row[col.name] || '').substring(0, 50)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Showing first 10 rows of {parsedData.rows.length} total rows
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleImport}
+                  disabled={parsedData.rows.length === 0}
+                >
+                  Import {parsedData.rows.length} Rows
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFile(null)
+                    setParsedData(null)
+                    setStatus('idle')
+                    setError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Importing Status */}
+          {status === 'importing' && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground">{progress}</p>
               {importedCount > 0 && (
-                <p className="text-xs text-gray-500">{importedCount} rows imported so far</p>
+                <p className="text-sm text-muted-foreground">{importedCount} rows imported so far</p>
               )}
             </div>
           )}
 
-          {/* Phase: Completed */}
-          {phase === "completed" && (
-            <div className="text-center py-8 space-y-4">
-              <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <Check className="h-6 w-6 text-green-600" />
+          {/* Success */}
+          {status === 'success' && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="rounded-full bg-green-100 p-3">
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
-              <p className="text-sm font-medium text-gray-900">{getPhaseMessage()}</p>
-            </div>
-          )}
-
-          {/* Phase: Error */}
-          {phase === "error" && (
-            <div className="space-y-4">
-              <div className="text-center py-4">
-                <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-900">Import failed</p>
-              </div>
-              <Button onClick={() => setPhase("mapping_fields")} variant="outline" className="w-full">
-                Try Again
-              </Button>
+              <h2 className="text-2xl font-semibold">Import Complete!</h2>
+              <p className="text-muted-foreground">
+                Successfully imported {importedCount} rows into "{tableName}"
+              </p>
             </div>
           )}
         </div>

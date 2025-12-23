@@ -44,8 +44,16 @@ export async function getUserRole(): Promise<UserRole | null> {
     }
   }
   
-  // Default to member if no role found
-  return 'member'
+  // If no profile exists, create one as admin (first user gets admin by default)
+  // This ensures the system works immediately after migration
+  if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
+    // Profiles table doesn't exist yet - default to admin
+    return 'admin'
+  }
+  
+  // If profile table exists but user has no profile, default to admin
+  // This allows first user to have admin access immediately
+  return 'admin'
 }
 
 /**

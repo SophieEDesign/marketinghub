@@ -81,8 +81,18 @@ export async function POST(
     const existingFields = await getTableFields(params.tableId)
     const existingNames = existingFields.map(f => f.name.toLowerCase())
 
-    // Validate field name
-    const nameValidation = validateFieldName(name, existingNames)
+    // Sanitize field name first (handles reserved words)
+    const sanitizedName = sanitizeFieldName(name)
+    
+    // Check if sanitized name is a reserved word and handle it
+    const { RESERVED_WORDS } = await import('@/types/fields')
+    let finalSanitizedName = sanitizedName
+    if (RESERVED_WORDS.includes(sanitizedName.toLowerCase())) {
+      finalSanitizedName = `${sanitizedName}_field`
+    }
+    
+    // Validate field name (using final sanitized name)
+    const nameValidation = validateFieldName(finalSanitizedName, existingNames)
     if (!nameValidation.valid) {
       return NextResponse.json(
         { error: nameValidation.error },
@@ -98,8 +108,6 @@ export async function POST(
         { status: 400 }
       )
     }
-
-    const sanitizedName = sanitizeFieldName(name)
     const position = existingFields.length
 
     // Start transaction-like operation
@@ -109,7 +117,7 @@ export async function POST(
       .insert([
         {
           table_id: params.tableId,
-          name: sanitizedName,
+          name: finalSanitizedName,
           type: type as FieldType,
           position,
           required: required || false,
@@ -146,7 +154,7 @@ export async function POST(
     // 2. Add column to physical table (if not virtual)
     if (type !== 'formula' && type !== 'lookup') {
       try {
-        const sql = generateAddColumnSQL(table.supabase_table, sanitizedName, type as FieldType, options)
+        const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, options)
         
         const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
           sql_text: sql
@@ -181,7 +189,7 @@ export async function POST(
     if (views && views.length > 0) {
       const viewFields = views.map(view => ({
         view_id: view.id,
-        field_name: sanitizedName,
+        field_name: finalSanitizedName,
         visible: true,
         position: position,
       }))
