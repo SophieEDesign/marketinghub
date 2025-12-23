@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.table_fields (
   type TEXT NOT NULL CHECK (type IN (
     'text', 'long_text', 'number', 'percent', 'currency', 'date',
     'single_select', 'multi_select', 'checkbox', 'attachment',
-    'link_to_table', 'formula', 'lookup'
+    'link_to_table', 'formula', 'lookup', 'url', 'email', 'json'
   )),
   position INTEGER NOT NULL DEFAULT 0,
   required BOOLEAN DEFAULT FALSE,

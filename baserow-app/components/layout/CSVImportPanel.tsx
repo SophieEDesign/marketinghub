@@ -120,34 +120,37 @@ export default function CSVImportPanel({
         return
       }
 
-    setCsvHeaders(headers)
-    setCsvRows(rows)
+      setCsvHeaders(headers)
+      setCsvRows(rows)
 
-    // Auto-map headers to existing fields
-    const mappings: Record<string, string> = {}
-    const autoDetectedTypes: Record<string, FieldType> = {}
-    
-    headers.forEach((header) => {
-      const matchingField = tableFields.find(
-        (f) => f.name.toLowerCase() === header.toLowerCase()
-      )
-      if (matchingField) {
-        mappings[header] = matchingField.name
-      } else {
-        // Auto-detect field type from sample data
-        const sampleValues = rows.slice(0, 10).map(row => row[header]).filter(v => v && v.trim())
-        if (sampleValues.length > 0) {
-          const detectedType = detectFieldType(sampleValues)
-          autoDetectedTypes[header] = detectedType
+      // Auto-map headers to existing fields
+      const mappings: Record<string, string> = {}
+      const autoDetectedTypes: Record<string, FieldType> = {}
+      
+      headers.forEach((header) => {
+        const matchingField = tableFields.find(
+          (f) => f.name.toLowerCase() === header.toLowerCase()
+        )
+        if (matchingField) {
+          mappings[header] = matchingField.name
+        } else {
+          // Auto-detect field type from sample data
+          const sampleValues = rows.slice(0, 10).map(row => row[header]).filter(v => v && v.trim())
+          if (sampleValues.length > 0) {
+            const detectedType = detectFieldType(sampleValues)
+            autoDetectedTypes[header] = detectedType
+          }
         }
-      }
-    })
-    
-    setFieldMappings(mappings)
-    // Merge auto-detected types with any existing newFields
-    setNewFields((prev) => ({ ...prev, ...autoDetectedTypes }))
+      })
+      
+      setFieldMappings(mappings)
+      // Merge auto-detected types with any existing newFields
+      setNewFields((prev) => ({ ...prev, ...autoDetectedTypes }))
 
-    setStep("mapping")
+      setStep("mapping")
+    } catch (err) {
+      setError(`Failed to read CSV file: ${(err as Error).message}`)
+    }
   }
 
   // Auto-detect field type from sample values
