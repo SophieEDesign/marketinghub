@@ -671,8 +671,14 @@ export default function CSVImportPanel({
         const batchNum = Math.floor(i / batchSize) + 1
         const totalBatches = Math.ceil(rowsToInsert.length / batchSize)
         
+        // Safety check: ensure batch is not empty
+        if (batch.length === 0) {
+          console.warn(`Skipping empty batch ${batchNum}`)
+          continue
+        }
+        
         console.log(`Inserting batch ${batchNum}/${totalBatches}, rows ${i + 1}-${Math.min(i + batchSize, rowsToInsert.length)}`)
-        console.log(`Batch keys:`, Object.keys(batch[0] || {}))
+        console.log(`Batch size: ${batch.length}, keys:`, Object.keys(batch[0] || {}))
         
         const { error, data } = await supabase
           .from(supabaseTableName)
@@ -726,13 +732,19 @@ export default function CSVImportPanel({
         console.log(`✅ Successfully imported batch ${batchNum}/${totalBatches}: ${batch.length} rows (total: ${imported}/${rowsToInsert.length})`)
       }
 
-      setStep("complete")
-      onImportComplete()
+      // Only set complete if we actually imported something
+      if (imported > 0) {
+        setStep("complete")
+        onImportComplete()
+      } else {
+        throw new Error("No rows were imported. Please check your data and field mappings.")
+      }
     } catch (err) {
-      console.error("Error importing CSV:", err)
+      console.error("❌ Error importing CSV:", err)
       const errorMessage = err instanceof Error ? err.message : String(err)
       setError(`Failed to import CSV: ${errorMessage}`)
-      setStep("mapping")
+      setStep("mapping") // Clear spinner state on error
+      setImportedCount(0) // Reset count on error
     }
   }
 

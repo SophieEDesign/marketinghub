@@ -1,15 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { FileText } from "lucide-react"
 import FieldBuilderPanel from "./FieldBuilderPanel"
-import CSVImportPanel from "./CSVImportPanel"
+import CSVImportModal from "./CSVImportModal"
 
 interface DesignSidebarProps {
   isOpen: boolean
@@ -28,41 +29,47 @@ export default function DesignSidebar({
   supabaseTableName,
   onFieldsUpdated,
 }: DesignSidebarProps) {
-  const [activeTab, setActiveTab] = useState("fields")
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent className="w-[380px] sm:w-[380px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="text-lg font-semibold text-gray-900">
-            Design: {tableName}
-          </SheetTitle>
-        </SheetHeader>
+    <>
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent className="w-[380px] sm:w-[380px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-lg font-semibold text-gray-900">
+              Design: {tableName}
+            </SheetTitle>
+          </SheetHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-1">
-            <TabsTrigger value="fields">Fields</TabsTrigger>
-            <TabsTrigger value="import">Import CSV</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="fields" className="mt-4">
+          <div className="mt-4 space-y-4">
             <FieldBuilderPanel
               tableId={tableId}
               supabaseTableName={supabaseTableName}
               onFieldsUpdated={onFieldsUpdated}
             />
-          </TabsContent>
+            
+            <div className="pt-4 border-t">
+              <Button
+                onClick={() => setImportModalOpen(true)}
+                variant="outline"
+                className="w-full"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Import CSV
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-          <TabsContent value="import" className="mt-4">
-            <CSVImportPanel
-              tableId={tableId}
-              tableName={tableName}
-              supabaseTableName={supabaseTableName}
-              onImportComplete={onFieldsUpdated}
-            />
-          </TabsContent>
-        </Tabs>
-      </SheetContent>
-    </Sheet>
+      <CSVImportModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        tableId={tableId}
+        tableName={tableName}
+        supabaseTableName={supabaseTableName}
+        onImportComplete={onFieldsUpdated}
+      />
+    </>
   )
 }

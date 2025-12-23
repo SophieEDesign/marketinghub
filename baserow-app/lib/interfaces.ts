@@ -153,11 +153,62 @@ async function getInterfacesFromViews(): Promise<Interface[]> {
 }
 
 /**
- * Get default interface
+ * Get default interface (for redirect on login)
  */
 export async function getDefaultInterface(): Promise<Interface | null> {
+  const supabase = await createClient()
+  const userRole = await getUserRole()
+  const userIsAdmin = await isAdmin()
+  
+  // First, try to get default interface from workspace_settings
+  const { data: workspaceSettings } = await supabase
+    .from('workspace_settings')
+    .select('default_interface_id')
+    .maybeSingle()
+  
+  if (workspaceSettings?.default_interface_id) {
+    // Try views table first (current system)
+    const { data: defaultView, error: viewError } = await supabase
+      .from('views')
+      .select('*')
+      .eq('id', workspaceSettings.default_interface_id)
+      .eq('type', 'interface')
+      .maybeSingle()
+    
+    if (!viewError && defaultView) {
+      // Check admin-only restriction
+      if (userIsAdmin || !defaultView.is_admin_only) {
+        return {
+          id: defaultView.id,
+          name: defaultView.name,
+          description: null,
+          category_id: defaultView.group_id,
+          icon: defaultView.config?.settings?.icon || null,
+          is_default: true,
+          created_at: defaultView.created_at,
+          updated_at: defaultView.updated_at || defaultView.created_at,
+        } as Interface
+      }
+    }
+    
+    // Fallback: try interfaces table (new system)
+    const { data: defaultInterface, error } = await supabase
+      .from('interfaces')
+      .select('*')
+      .eq('id', workspaceSettings.default_interface_id)
+      .maybeSingle()
+    
+    if (!error && defaultInterface) {
+      // Check if user can access it
+      if (userIsAdmin || await canAccessInterface(defaultInterface.id)) {
+        return defaultInterface as Interface
+      }
+    }
+  }
+  
+  // Fallback: get first accessible interface
   const interfaces = await getInterfaces()
-  return interfaces.find(i => i.is_default) || interfaces[0] || null
+  return interfaces.length > 0 ? interfaces[0] : null
 }
 
 /**
