@@ -261,7 +261,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       />
     </div>
   )
-}
+})
 
 function NewFieldForm({
   onSave,

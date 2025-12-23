@@ -11,7 +11,7 @@ interface PermissionsTabProps {
   tableName: string
 }
 
-function PermissionsTab({ tableId, tableName }: PermissionsTabProps) {
+const PermissionsTab = memo(function PermissionsTab({ tableId, tableName }: PermissionsTabProps) {
   const [isPublic, setIsPublic] = useState(false)
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string | null>(null)
