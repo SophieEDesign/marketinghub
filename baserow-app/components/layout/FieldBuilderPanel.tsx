@@ -438,6 +438,6 @@ function SortableFieldItem({
       </div>
     </div>
   )
-})
+}
 
 export default FieldBuilderPanel
