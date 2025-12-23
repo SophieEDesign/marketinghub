@@ -5,6 +5,7 @@ import { updateWorkspaceSettings } from '@/lib/branding'
 
 /**
  * GET /api/workspace-settings - Get workspace settings
+ * Public endpoint - allows unauthenticated access for login page branding
  */
 export async function GET(request: NextRequest) {
   try {
@@ -12,24 +13,30 @@ export async function GET(request: NextRequest) {
     
     const { data: settings, error } = await supabase
       .from('workspace_settings')
-      .select('*')
+      .select('brand_name, logo_url, primary_color, accent_color')
       .maybeSingle()
 
     if (error) {
-      // If table doesn't exist, return null
-      if (error.code === 'PGRST116' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+      // If table doesn't exist, return null (graceful degradation)
+      if (error.code === 'PGRST116' || 
+          error.message?.includes('relation') || 
+          error.message?.includes('does not exist')) {
         return NextResponse.json({ settings: null })
       }
-      throw error
+      // If RLS blocks access, return null (user needs to run migration)
+      if (error.code === '42501' || error.message?.includes('permission denied')) {
+        console.warn('RLS policy may need update. Run migration: allow_anonymous_branding_read.sql')
+        return NextResponse.json({ settings: null })
+      }
+      console.warn('Error loading workspace settings:', error)
+      return NextResponse.json({ settings: null })
     }
 
     return NextResponse.json({ settings })
   } catch (error: any) {
     console.error('Error loading workspace settings:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to load workspace settings' },
-      { status: 500 }
-    )
+    // Return null instead of error for graceful degradation
+    return NextResponse.json({ settings: null })
   }
 }
 

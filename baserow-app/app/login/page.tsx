@@ -19,19 +19,18 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Load branding from workspace settings
+  // Load branding from workspace settings via API (works for unauthenticated users)
   useEffect(() => {
     const loadBranding = async () => {
       try {
-        const { data, error } = await supabase
-          .from('workspace_settings')
-          .select('brand_name, logo_url, primary_color')
-          .maybeSingle()
-        
-        if (!error && data) {
-          if (data.brand_name) setBrandName(data.brand_name)
-          if (data.logo_url) setLogoUrl(data.logo_url)
-          if (data.primary_color) setPrimaryColor(data.primary_color)
+        const response = await fetch('/api/workspace-settings')
+        if (response.ok) {
+          const result = await response.json()
+          if (result.settings) {
+            if (result.settings.brand_name) setBrandName(result.settings.brand_name)
+            if (result.settings.logo_url) setLogoUrl(result.settings.logo_url)
+            if (result.settings.primary_color) setPrimaryColor(result.settings.primary_color)
+          }
         }
       } catch (err) {
         // Silently fail - use defaults
