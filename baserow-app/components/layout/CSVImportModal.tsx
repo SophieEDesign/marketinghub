@@ -39,6 +39,8 @@ function sanitizeFieldNameSafe(name: string): string {
   return sanitized
 }
 
+type ImportStatus = 'idle' | 'parsing' | 'mapping' | 'preview' | 'importing' | 'success' | 'error'
+
 interface CSVImportModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -47,8 +49,6 @@ interface CSVImportModalProps {
   supabaseTableName: string
   onImportComplete: () => void
 }
-
-type ImportStatus = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | 'error'
 
 export default function CSVImportModal({
   open,
