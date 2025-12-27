@@ -7,6 +7,7 @@ interface UrlCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  wrapText?: boolean
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -15,6 +16,7 @@ export default function UrlCell({
   value,
   fieldName,
   editable = true,
+  wrapText = false,
   onSave,
   placeholder = '—',
 }: UrlCellProps) {
@@ -110,17 +112,21 @@ export default function UrlCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 flex items-center gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group"
+      className={`w-full h-full px-2 gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group ${
+        wrapText ? 'flex items-start' : 'flex items-center'
+      }`}
     >
       <a
         href={getFullUrl(value)}
         target="_blank"
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        className="text-blue-600 hover:text-blue-800 underline truncate flex items-center gap-1"
+        className={`text-blue-600 hover:text-blue-800 underline flex items-center gap-1 ${
+          wrapText ? 'whitespace-pre-wrap break-words' : 'truncate'
+        }`}
       >
         {formatUrl(value)}
-        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
       </a>
     </div>
   )

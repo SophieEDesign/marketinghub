@@ -104,7 +104,7 @@ export default function Canvas({
 
   // Empty state: Show friendly message with actionable buttons
   if (blocks.length === 0) {
-    const commonBlocks = [
+    const commonBlocks: Array<{ type: BlockType; label: string; icon: string; description: string }> = [
       { type: 'grid', label: 'Grid View', icon: '📊', description: 'Display data in a table' },
       { type: 'form', label: 'Form', icon: '📝', description: 'Collect data with a form' },
       { type: 'chart', label: 'Chart', icon: '📈', description: 'Visualize data' },

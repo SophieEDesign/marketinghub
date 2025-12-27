@@ -62,6 +62,7 @@ export default function AirtableGridView({
   // State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [columnOrder, setColumnOrder] = useState<string[]>([])
+  const [columnWrapText, setColumnWrapText] = useState<Record<string, boolean>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; fieldName: string } | null>(null)
   const [scrollLeft, setScrollLeft] = useState(0)
@@ -104,6 +105,7 @@ export default function AirtableGridView({
     const storageKey = `grid_${tableName}_${viewName}`
     const savedWidths = localStorage.getItem(`${storageKey}_widths`)
     const savedOrder = localStorage.getItem(`${storageKey}_order`)
+    const savedWrapText = localStorage.getItem(`${storageKey}_wrapText`)
 
     if (savedWidths) {
       try {
@@ -136,6 +138,14 @@ export default function AirtableGridView({
       })
       setColumnOrder(sortedFields.map((f) => f.name))
     }
+    
+    if (savedWrapText) {
+      try {
+        setColumnWrapText(JSON.parse(savedWrapText))
+      } catch {
+        // Fallback to defaults
+      }
+    }
 
     // Set default widths for fields without saved widths
     setColumnWidths((prev) => {
@@ -156,7 +166,8 @@ export default function AirtableGridView({
     const storageKey = `grid_${tableName}_${viewName}`
     localStorage.setItem(`${storageKey}_widths`, JSON.stringify(columnWidths))
     localStorage.setItem(`${storageKey}_order`, JSON.stringify(columnOrder))
-  }, [columnWidths, columnOrder, tableName, viewName])
+    localStorage.setItem(`${storageKey}_wrapText`, JSON.stringify(columnWrapText))
+  }, [columnWidths, columnOrder, columnWrapText, tableName, viewName])
 
   // Update container height
   useEffect(() => {
@@ -496,10 +507,12 @@ export default function AirtableGridView({
                   field={field}
                   width={columnWidths[field.name] || COLUMN_DEFAULT_WIDTH}
                   isResizing={resizingColumn === field.name}
+                  wrapText={columnWrapText[field.name] || false}
                   onResizeStart={handleResizeStart}
                   onResize={handleResize}
                   onResizeEnd={handleResizeEnd}
                   onEdit={onEditField}
+                  onToggleWrapText={handleToggleWrapText}
                   sortDirection={
                     sorts.find((s) => s.field === field.name)?.direction || null
                   }
@@ -579,18 +592,21 @@ export default function AirtableGridView({
               const isSelected = selectedRowIds.has(row.id)
               const rowIndex = filteredRows.findIndex((r: any) => r.id === row.id)
               
+              // Check if any column in this row has wrap text enabled
+              const hasWrapText = visibleFields.some((field) => columnWrapText[field.name])
+              
               return (
                 <div
                   key={row.id}
                   className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors ${
                     isEven ? 'bg-white' : 'bg-gray-50/50'
                   } ${isSelected ? 'bg-blue-100' : ''}`}
-                  style={{ height: ROW_HEIGHT }}
+                  style={{ minHeight: ROW_HEIGHT, height: hasWrapText ? 'auto' : ROW_HEIGHT }}
                 >
                   {/* Checkbox */}
                   <div
                     className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, minHeight: ROW_HEIGHT, height: hasWrapText ? '100%' : ROW_HEIGHT }}
                     onClick={(e) => handleRowSelect(row.id, rowIndex, e)}
                   >
                     <input
@@ -609,7 +625,7 @@ export default function AirtableGridView({
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
                     className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium sticky left-[50px] z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, minHeight: ROW_HEIGHT, height: hasWrapText ? '100%' : ROW_HEIGHT }}
                   >
                     {actualIndex + 1}
                   </div>
@@ -617,16 +633,19 @@ export default function AirtableGridView({
                   {/* Cells */}
                   {visibleFields.map((field) => {
                     const width = columnWidths[field.name] || COLUMN_DEFAULT_WIDTH
+                    const wrapText = columnWrapText[field.name] || false
                     const isSelected =
                       selectedCell?.rowId === row.id && selectedCell?.fieldName === field.name
 
                     return (
                       <div
                         key={field.name}
-                        className={`border-r border-gray-100 flex items-center relative ${
+                        className={`border-r border-gray-100 relative ${
+                          wrapText ? 'flex items-start' : 'flex items-center'
+                        } ${
                           isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
                         }`}
-                        style={{ width, height: ROW_HEIGHT }}
+                        style={{ width, minHeight: ROW_HEIGHT, height: wrapText ? 'auto' : ROW_HEIGHT }}
                         onClick={() => setSelectedCell({ rowId: row.id, fieldName: field.name })}
                       >
                         <CellFactory
@@ -635,6 +654,7 @@ export default function AirtableGridView({
                           rowId={row.id}
                           tableName={tableName}
                           editable={editable && !field.options?.read_only}
+                          wrapText={wrapText}
                           onSave={(value) => handleCellSave(row.id, field.name, value)}
                         />
                       </div>

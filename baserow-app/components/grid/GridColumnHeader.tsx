@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, MoreVertical, ArrowUpDown } from 'lucide-react'
+import { GripVertical, MoreVertical, ArrowUpDown, WrapText } from 'lucide-react'
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 
@@ -11,10 +11,12 @@ interface GridColumnHeaderProps {
   field: TableField
   width: number
   isResizing: boolean
+  wrapText?: boolean
   onResizeStart: (fieldName: string) => void
   onResize: (fieldName: string, width: number) => void
   onResizeEnd: () => void
   onEdit?: (fieldName: string) => void
+  onToggleWrapText?: (fieldName: string) => void
   sortDirection?: 'asc' | 'desc' | null
   onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
 }
@@ -23,10 +25,12 @@ export default function GridColumnHeader({
   field,
   width,
   isResizing,
+  wrapText = false,
   onResizeStart,
   onResize,
   onResizeEnd,
   onEdit,
+  onToggleWrapText,
   sortDirection,
   onSort,
 }: GridColumnHeaderProps) {
@@ -112,6 +116,24 @@ export default function GridColumnHeader({
           {field.name}
         </span>
       </div>
+
+      {/* Wrap text button */}
+      {onToggleWrapText && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleWrapText(field.name)
+          }}
+          className={`p-1 rounded transition-colors ${
+            wrapText
+              ? 'text-blue-600 bg-blue-50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+          }`}
+          title={wrapText ? 'Text wrapping enabled' : 'Enable text wrapping'}
+        >
+          <WrapText className="h-3 w-3" />
+        </button>
+      )}
 
       {/* Sort button */}
       {onSort && (

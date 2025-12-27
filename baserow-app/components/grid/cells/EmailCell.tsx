@@ -7,6 +7,7 @@ interface EmailCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  wrapText?: boolean
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -15,6 +16,7 @@ export default function EmailCell({
   value,
   fieldName,
   editable = true,
+  wrapText = false,
   onSave,
   placeholder = '—',
 }: EmailCellProps) {
@@ -92,13 +94,17 @@ export default function EmailCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 flex items-center gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors"
+      className={`w-full h-full px-2 gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors ${
+        wrapText ? 'flex items-start' : 'flex items-center'
+      }`}
     >
-      <Mail className="h-3 w-3 text-gray-400" />
+      <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
       <a
         href={`mailto:${value}`}
         onClick={(e) => e.stopPropagation()}
-        className="text-blue-600 hover:text-blue-800 underline truncate"
+        className={`text-blue-600 hover:text-blue-800 underline ${
+          wrapText ? 'whitespace-pre-wrap break-words' : 'truncate'
+        }`}
       >
         {value}
       </a>

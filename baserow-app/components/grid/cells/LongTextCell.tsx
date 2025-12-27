@@ -6,6 +6,7 @@ interface LongTextCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  wrapText?: boolean
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -14,6 +15,7 @@ export default function LongTextCell({
   value,
   fieldName,
   editable = true,
+  wrapText = true,
   onSave,
   placeholder = '—',
 }: LongTextCellProps) {
@@ -82,9 +84,11 @@ export default function LongTextCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 py-1 flex items-start text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors"
+      className={`w-full h-full px-2 py-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors ${
+        wrapText ? 'flex items-start' : 'flex items-center'
+      }`}
     >
-      <span className={`truncate ${isPlaceholder ? 'text-gray-400' : 'text-gray-900'}`}>
+      <span className={`${wrapText ? 'whitespace-pre-wrap break-words' : 'truncate'} ${isPlaceholder ? 'text-gray-400' : 'text-gray-900'}`}>
         {displayValue}
       </span>
     </div>

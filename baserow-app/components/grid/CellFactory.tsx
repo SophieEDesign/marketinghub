@@ -20,6 +20,7 @@ interface CellFactoryProps {
   rowId: string
   tableName: string
   editable?: boolean
+  wrapText?: boolean
   onSave: (value: any) => Promise<void>
 }
 
@@ -29,12 +30,14 @@ export function CellFactory({
   rowId,
   tableName,
   editable = true,
+  wrapText = false,
   onSave,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
     value,
     fieldName: field.name,
     editable,
+    wrapText,
     onSave,
   }
 
