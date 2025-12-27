@@ -82,7 +82,7 @@ export default function InlineFieldEditor({
     }
   }
 
-  const isVirtual = field.type === "formula" || field.type === "lookup" || field.type === "rollup"
+  const isVirtual = field.type === "formula" || field.type === "lookup"
   const isReadOnly = isVirtual || field.options?.read_only
 
   // Linked records
