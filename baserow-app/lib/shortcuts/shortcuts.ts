@@ -157,7 +157,7 @@ export const ShortcutKeys = {
 } as const
 
 // Helper to format shortcut keys for display
-export function formatShortcutKeys(keys: string[]): string {
+export function formatShortcutKeys(keys: readonly string[] | string[]): string {
   return keys
     .map(key => {
       switch (key) {
