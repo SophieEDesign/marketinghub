@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { IconPicker } from "@/components/ui/icon-picker"
-import { LAYOUT_TEMPLATES, type LayoutTemplate } from "@/lib/interface/layoutTemplates"
-import type { BlockType } from "@/lib/interface/types"
+import { PAGE_TYPE_CATEGORIES, type PageTypeTemplate } from "@/lib/interface/pageTypes"
+import { seedBlocksFromTemplate } from "@/lib/interface/pageTypes.client"
 
 interface NewPageModalProps {
   open: boolean
@@ -33,13 +33,17 @@ interface NewPageModalProps {
 
 export default function NewPageModal({ open, onOpenChange, defaultGroupId }: NewPageModalProps) {
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
+  
   const [name, setName] = useState("")
   const [icon, setIcon] = useState("")
   const [primaryTableId, setPrimaryTableId] = useState<string>("")
-  const [layoutTemplate, setLayoutTemplate] = useState<LayoutTemplate>("table")
+  const [selectedPageType, setSelectedPageType] = useState<string>("")
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [pageTypes, setPageTypes] = useState<PageTypeTemplate[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingTables, setLoadingTables] = useState(false)
+  const [loadingPageTypes, setLoadingPageTypes] = useState(false)
 
   const loadTables = useCallback(async () => {
     setLoadingTables(true)
@@ -62,11 +66,50 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     }
   }, [primaryTableId])
 
-  useEffect(() => {
-    if (open) {
-      loadTables()
+  const loadPageTypes = useCallback(async () => {
+    setLoadingPageTypes(true)
+    try {
+      const response = await fetch('/api/page-types')
+      if (!response.ok) throw new Error('Failed to load page types')
+      const data = await response.json()
+      setPageTypes(data.templates || [])
+      
+      // Set default selection to first available type
+      if (data.templates && data.templates.length > 0 && !selectedPageType) {
+        setSelectedPageType(data.templates[0].type)
+      }
+    } catch (error) {
+      console.error('Error loading page types:', error)
+    } finally {
+      setLoadingPageTypes(false)
     }
-  }, [open, loadTables])
+  }, [selectedPageType])
+
+  useEffect(() => {
+    // Check if user is admin
+    const checkAdmin = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          setIsAdmin(profile?.role === 'admin')
+        }
+      } catch (error) {
+        console.error('Error checking admin status:', error)
+      }
+    }
+    
+    if (open) {
+      checkAdmin()
+      loadTables()
+      loadPageTypes()
+    }
+  }, [open, loadTables, loadPageTypes])
 
   async function handleCreate() {
     if (!name.trim()) {
@@ -79,10 +122,21 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
       return
     }
 
+    if (!selectedPageType) {
+      alert("Please select a page type")
+      return
+    }
+
     setLoading(true)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+
+      // Get the selected template
+      const template = pageTypes.find(t => t.type === selectedPageType)
+      if (!template) {
+        throw new Error('Selected page type template not found')
+      }
 
       // Get max order_index for the group (or uncategorized)
       const { data: lastInterface } = await supabase
@@ -106,13 +160,14 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
             table_id: primaryTableId,
             group_id: defaultGroupId || null,
             order_index: orderIndex,
+            page_type: selectedPageType, // Store page type
             config: {
               settings: {
                 icon: icon.trim() || null,
                 access: 'authenticated',
                 layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
                 primary_table_id: primaryTableId,
-                layout_template: layoutTemplate,
+                page_type: selectedPageType, // Also store in config for backward compatibility
               },
             },
             owner_id: user?.id,
@@ -127,9 +182,8 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
       }
 
       if (view) {
-        // Create blocks based on the selected layout template
-        const template = LAYOUT_TEMPLATES[layoutTemplate]
-        const blocksToCreate = template.blocks.map((blockDef, index) => ({
+        // Seed blocks from template
+        const blocksToCreate = seedBlocksFromTemplate(template, primaryTableId).map((blockDef, index) => ({
           view_id: view.id,
           type: blockDef.type,
           position_x: blockDef.x,
@@ -137,10 +191,7 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
           width: blockDef.w,
           height: blockDef.h,
           order_index: index,
-          config: {
-            ...blockDef.config,
-            table_id: primaryTableId, // Bind all blocks to primary table
-          },
+          config: blockDef.config,
         }))
 
         if (blocksToCreate.length > 0) {
@@ -158,7 +209,7 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
         setName("")
         setIcon("")
         setPrimaryTableId("")
-        setLayoutTemplate("table")
+        setSelectedPageType("")
         onOpenChange(false)
         // Redirect to the new interface route
         router.push(`/pages/${view.id}`)
@@ -177,19 +228,25 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     setName("")
     setIcon("")
     setPrimaryTableId("")
-    setLayoutTemplate("table")
+    setSelectedPageType("")
     onOpenChange(false)
   }
 
-  const selectedTemplate = LAYOUT_TEMPLATES[layoutTemplate]
+  // Group page types by category
+  const groupedTypes = PAGE_TYPE_CATEGORIES.map(category => ({
+    ...category,
+    templates: pageTypes.filter(t => t.category === category.id),
+  })).filter(group => group.templates.length > 0)
+
+  const selectedTemplate = pageTypes.find(t => t.type === selectedPageType)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Interface</DialogTitle>
           <DialogDescription>
-            Set up your interface with a primary table and choose a layout template to get started.
+            Choose a page type to get started with a pre-configured layout, or start from scratch.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-6 py-4">
@@ -201,7 +258,7 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
               onChange={(e) => setName(e.target.value)}
               placeholder="My Dashboard"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && name.trim() && primaryTableId) {
+                if (e.key === "Enter" && name.trim() && primaryTableId && selectedPageType) {
                   handleCreate()
                 }
               }}
@@ -232,41 +289,65 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="layout-template">Interface Type *</Label>
-            <Select value={layoutTemplate} onValueChange={(value) => setLayoutTemplate(value as LayoutTemplate)}>
-              <SelectTrigger id="layout-template">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(LAYOUT_TEMPLATES)
-                  .filter(([key]) => key !== 'blank') // Hide blank template from main list
-                  .map(([key, template]) => (
-                    <SelectItem key={key} value={key}>
-                      <div className="flex items-center gap-2">
-                        <span>{template.icon}</span>
-                        <div>
-                          <div className="font-medium">{template.name}</div>
-                          <div className="text-xs text-muted-foreground">{template.description}</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  ))}
-                <SelectItem value="blank">
-                  <div className="flex items-center gap-2">
-                    <span>🎨</span>
-                    <div>
-                      <div className="font-medium">Blank</div>
-                      <div className="text-xs text-muted-foreground">Start with an empty canvas</div>
+            <Label>Page Type *</Label>
+            {loadingPageTypes ? (
+              <div className="text-sm text-muted-foreground">Loading page types...</div>
+            ) : (
+              <div className="space-y-4">
+                {groupedTypes.map((category) => (
+                  <div key={category.id} className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                      <span>{category.icon}</span>
+                      <span>{category.label}</span>
+                      <span className="text-xs font-normal text-gray-500">({category.description})</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pl-6">
+                      {category.templates.map((template) => (
+                        <button
+                          key={template.type}
+                          type="button"
+                          onClick={() => setSelectedPageType(template.type)}
+                          className={`p-3 rounded-lg border-2 transition-all text-left ${
+                            selectedPageType === template.type
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-xl flex-shrink-0">{template.icon || '📄'}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-gray-900">{template.label}</div>
+                              {template.description && (
+                                <div className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                  {template.description}
+                                </div>
+                              )}
+                              {template.admin_only && (
+                                <div className="text-xs text-orange-600 mt-1">Admin only</div>
+                              )}
+                            </div>
+                            {selectedPageType === template.type && (
+                              <div className="flex-shrink-0">
+                                <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {selectedTemplate && (
+                ))}
+              </div>
+            )}
+            {selectedTemplate && selectedTemplate.default_blocks.length > 0 && (
               <div className="mt-2 p-3 bg-muted rounded-lg">
                 <p className="text-xs font-medium mb-1">This template includes:</p>
                 <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
-                  {selectedTemplate.blocks.map((block, idx) => (
+                  {selectedTemplate.default_blocks.map((block, idx) => (
                     <li key={idx}>
                       {block.type.charAt(0).toUpperCase() + block.type.slice(1)} block ({block.w}×{block.h})
                     </li>
@@ -292,7 +373,10 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
           <Button variant="outline" onClick={handleCancel} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={loading || !name.trim() || !primaryTableId}>
+          <Button 
+            onClick={handleCreate} 
+            disabled={loading || !name.trim() || !primaryTableId || !selectedPageType}
+          >
             {loading ? "Creating..." : "Create Interface"}
           </Button>
         </DialogFooter>
@@ -300,3 +384,4 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     </Dialog>
   )
 }
+
