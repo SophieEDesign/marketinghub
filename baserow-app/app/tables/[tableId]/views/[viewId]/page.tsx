@@ -114,13 +114,17 @@ export default async function ViewPage({
           />
         ) : (
           <NonGridViewWrapper
-            viewType={view.type as "form" | "kanban" | "calendar"}
+            viewType={view.type as "form" | "kanban" | "calendar" | "timeline"}
             viewName={view.name}
             tableId={params.tableId}
             viewId={params.viewId}
             fieldIds={viewFields.map((f) => f.field_name)}
             groupingFieldId={view.type === "kanban" ? viewFields[0]?.field_name : undefined}
-            dateFieldId={view.type === "calendar" ? viewFields[0]?.field_name : undefined}
+            dateFieldId={
+              view.type === "calendar" || view.type === "timeline"
+                ? viewFields[0]?.field_name
+                : undefined
+            }
           />
         )}
       </WorkspaceShellWrapper>

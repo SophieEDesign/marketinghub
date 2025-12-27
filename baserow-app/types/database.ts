@@ -1,6 +1,6 @@
 export type AccessControl = 'public' | 'authenticated' | 'role-based' | 'owner'
 
-export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'gallery' | 'page' | 'interface'
+export type ViewType = 'grid' | 'form' | 'kanban' | 'calendar' | 'timeline' | 'gallery' | 'page' | 'interface'
 
 export type FilterType =
   | 'equal'

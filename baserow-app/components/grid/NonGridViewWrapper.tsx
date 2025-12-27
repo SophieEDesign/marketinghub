@@ -6,12 +6,13 @@ import ViewTopBar from "@/components/layout/ViewTopBar"
 import FormView from "@/components/views/FormView"
 import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
+import TimelineView from "@/components/views/TimelineView"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 
 interface NonGridViewWrapperProps {
-  viewType: "form" | "kanban" | "calendar"
+  viewType: "form" | "kanban" | "calendar" | "timeline"
   viewName: string
   tableId: string
   viewId: string
@@ -125,6 +126,16 @@ export default function NonGridViewWrapper({
         )}
         {viewType === "calendar" && (
           <CalendarView
+            tableId={tableId}
+            viewId={viewId}
+            dateFieldId={dateFieldId || fieldIds[0] || ""}
+            fieldIds={fieldIds}
+            searchQuery={searchQuery}
+            tableFields={tableFields}
+          />
+        )}
+        {viewType === "timeline" && (
+          <TimelineView
             tableId={tableId}
             viewId={viewId}
             dateFieldId={dateFieldId || fieldIds[0] || ""}
