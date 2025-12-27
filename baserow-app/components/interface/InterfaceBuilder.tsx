@@ -10,6 +10,7 @@ import PageSettingsDrawer from "./PageSettingsDrawer"
 import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
+import { useToast } from "@/components/ui/use-toast"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -25,7 +26,9 @@ export default function InterfaceBuilder({
   onSave,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
+  const { toast } = useToast()
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   
   // Default to view mode - editing is explicit and intentional
   // Persist edit mode preference in localStorage per page
@@ -61,12 +64,16 @@ export default function InterfaceBuilder({
    * - When user clicks "Done" to exit edit mode (immediate)
    * 
    * Only saves when isEditing is true - view mode never mutates layout.
+   * 
+   * IMPORTANT: Does NOT update blocks state to prevent layout resets.
+   * Canvas manages its own layout state and only hydrates from blocks on mount.
    */
   const saveLayout = useCallback(
     async (layout: LayoutItem[]) => {
       // Only save in edit mode - view mode must never mutate layout
       if (!isEditing) return
 
+      setSaveStatus("saving")
       try {
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
@@ -75,30 +82,26 @@ export default function InterfaceBuilder({
         })
 
         if (response.ok) {
-          // Update local state to reflect saved positions
-          // This ensures UI stays in sync with database
-          setBlocks((prevBlocks) => {
-            return prevBlocks.map((block) => {
-              const layoutItem = layout.find((item) => item.i === block.id)
-              if (layoutItem) {
-                return {
-                  ...block,
-                  x: layoutItem.x,
-                  y: layoutItem.y,
-                  w: layoutItem.w,
-                  h: layoutItem.h,
-                }
-              }
-              return block
-            })
-          })
+          setSaveStatus("saved")
           setPendingLayout(null)
+          // Show success feedback briefly, then reset to idle
+          setTimeout(() => setSaveStatus("idle"), 2000)
+        } else {
+          const error = await response.text()
+          throw new Error(error || "Failed to save layout")
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to save layout:", error)
+        setSaveStatus("error")
+        toast({
+          variant: "destructive",
+          title: "Failed to save layout",
+          description: error.message || "Please try again",
+        })
+        setTimeout(() => setSaveStatus("idle"), 3000)
       }
     },
-    [page.id, isEditing]
+    [page.id, isEditing, toast]
   )
 
   /**
@@ -167,10 +170,10 @@ export default function InterfaceBuilder({
       h: block.h,
     }))
 
-    if (currentLayout.length > 0) {
+    if (currentLayout.length > 0 && pendingLayout) {
       setIsSaving(true)
       try {
-        await saveLayout(currentLayout)
+        await saveLayout(pendingLayout)
       } catch (error) {
         console.error("Failed to save layout on exit:", error)
       } finally {
@@ -180,7 +183,8 @@ export default function InterfaceBuilder({
 
     setIsEditing(false)
     setSelectedBlockId(null)
-  }, [blocks, saveLayout])
+    setSettingsPanelOpen(false)
+  }, [blocks, pendingLayout, saveLayout])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -194,7 +198,7 @@ export default function InterfaceBuilder({
   const handleBlockUpdate = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
       try {
-        await fetch(`/api/pages/${page.id}/blocks`, {
+        const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -202,15 +206,24 @@ export default function InterfaceBuilder({
           }),
         })
 
-        // Update local state
+        if (!response.ok) {
+          throw new Error("Failed to update block")
+        }
+
+        // Update local state optimistically
         setBlocks((prev) =>
           prev.map((b) => (b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b))
         )
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to update block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to save changes",
+          description: error.message || "Please try again",
+        })
       }
     },
-    [page.id]
+    [page.id, toast]
   )
 
   const handleAddBlock = useCallback(
@@ -320,31 +333,42 @@ export default function InterfaceBuilder({
                     Delete
                   </button>
                 )}
-                <button
-                  onClick={handleExitEditMode}
-                  disabled={isSaving}
-                  className="px-3 py-1.5 text-sm font-medium text-white rounded-md flex items-center gap-2 disabled:opacity-50"
-                  style={{ 
-                    backgroundColor: primaryColor,
-                    opacity: isSaving ? 0.5 : 1
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSaving) {
-                      // Darken on hover (reduce lightness by 10%)
-                      const hslMatch = primaryColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
-                      if (hslMatch) {
-                        const [, h, s, l] = hslMatch
-                        const newL = Math.max(0, parseInt(l) - 10)
-                        e.currentTarget.style.backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`
+                <div className="flex items-center gap-2">
+                  {saveStatus === "saving" && (
+                    <span className="text-xs text-gray-500">Saving...</span>
+                  )}
+                  {saveStatus === "saved" && (
+                    <span className="text-xs text-green-600">All changes saved</span>
+                  )}
+                  {saveStatus === "error" && (
+                    <span className="text-xs text-red-600">Save failed</span>
+                  )}
+                  <button
+                    onClick={handleExitEditMode}
+                    disabled={isSaving}
+                    className="px-3 py-1.5 text-sm font-medium text-white rounded-md flex items-center gap-2 disabled:opacity-50"
+                    style={{ 
+                      backgroundColor: primaryColor,
+                      opacity: isSaving ? 0.5 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSaving) {
+                        // Darken on hover (reduce lightness by 10%)
+                        const hslMatch = primaryColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/)
+                        if (hslMatch) {
+                          const [, h, s, l] = hslMatch
+                          const newL = Math.max(0, parseInt(l) - 10)
+                          e.currentTarget.style.backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`
+                        }
                       }
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = primaryColor
-                  }}
-                >
-                  {isSaving ? "Saving..." : "Done"}
-                </button>
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = primaryColor
+                    }}
+                  >
+                    {isSaving ? "Saving..." : "Done"}
+                  </button>
+                </div>
               </>
             ) : (
               <button

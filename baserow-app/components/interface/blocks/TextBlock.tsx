@@ -104,21 +104,22 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   ]
 
   // Handle Quill change - update local state immediately, debounce save
-  function handleQuillChange(value: string) {
+  // Use useCallback to prevent function recreation on every render
+  const handleQuillChange = useCallback((value: string) => {
     // Update local state immediately for responsive UI (no cursor jump)
     setEditorContent(value)
     // Debounce save to avoid excessive API calls
     debouncedSave(value)
-  }
+  }, [debouncedSave])
 
   // Handle HTML textarea change - update local state immediately, debounce save
-  function handleHtmlChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+  const handleHtmlChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     // Update local state immediately for responsive UI
     setEditorContent(value)
     // Debounce save to avoid excessive API calls
     debouncedSave(value)
-  }
+  }, [debouncedSave])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -131,7 +132,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   if (isEditing) {
     return (
-      <div className="h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className="h-full flex flex-col" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onFocus={(e) => e.stopPropagation()}
+      >
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "visual" | "html")} className="h-full flex flex-col">
           <TabsList className="mb-2">
             <TabsTrigger value="visual">Visual</TabsTrigger>
@@ -147,6 +153,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
               formats={quillFormats}
               placeholder="Enter text content..."
               className="flex-1 flex flex-col"
+              preserveWhitespace={true}
             />
           </TabsContent>
           <TabsContent value="html" className="flex-1 mt-0">

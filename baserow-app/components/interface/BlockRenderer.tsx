@@ -10,6 +10,7 @@ import TextBlock from "./blocks/TextBlock"
 import ImageBlock from "./blocks/ImageBlock"
 import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
+import { ErrorBoundary } from "./ErrorBoundary"
 
 interface BlockRendererProps {
   block: PageBlock
@@ -28,72 +29,80 @@ export default function BlockRenderer({
     }
   }
 
-  switch (block.type) {
-    case "grid":
-      return <GridBlock block={block} isEditing={isEditing} />
+  const renderBlock = () => {
+    switch (block.type) {
+      case "grid":
+        return <GridBlock block={block} isEditing={isEditing} />
 
-    case "form":
-      return (
-        <FormBlock
-          block={block}
-          isEditing={isEditing}
-          onSubmit={async (data) => {
-            // Handle form submission
-            const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
-            const tableId = block.config?.table_id
-            if (tableId) {
-              const { data: table } = await supabase
-                .from("tables")
-                .select("supabase_table")
-                .eq("id", tableId)
-                .single()
+      case "form":
+        return (
+          <FormBlock
+            block={block}
+            isEditing={isEditing}
+            onSubmit={async (data) => {
+              // Handle form submission
+              const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
+              const tableId = block.config?.table_id
+              if (tableId) {
+                const { data: table } = await supabase
+                  .from("tables")
+                  .select("supabase_table")
+                  .eq("id", tableId)
+                  .single()
 
-              if (table?.supabase_table) {
-                await supabase.from(table.supabase_table).insert([data])
+                if (table?.supabase_table) {
+                  await supabase.from(table.supabase_table).insert([data])
+                }
               }
-            }
-          }}
-        />
-      )
+            }}
+          />
+        )
 
-    case "record":
-      return <RecordBlock block={block} isEditing={isEditing} />
+      case "record":
+        return <RecordBlock block={block} isEditing={isEditing} />
 
-    case "chart":
-      return <ChartBlock block={block} isEditing={isEditing} />
+      case "chart":
+        return <ChartBlock block={block} isEditing={isEditing} />
 
-    case "kpi":
-      return <KPIBlock block={block} isEditing={isEditing} />
+      case "kpi":
+        return <KPIBlock block={block} isEditing={isEditing} />
 
-    case "text":
-      return (
-        <TextBlock
-          block={block}
-          isEditing={isEditing}
-          onUpdate={(content) => handleUpdate({ text_content: content })}
-        />
-      )
+      case "text":
+        return (
+          <TextBlock
+            block={block}
+            isEditing={isEditing}
+            onUpdate={(content) => handleUpdate({ text_content: content })}
+          />
+        )
 
-    case "image":
-      return (
-        <ImageBlock
-          block={block}
-          isEditing={isEditing}
-          onUpdate={(updates) => handleUpdate(updates)}
-        />
-      )
+      case "image":
+        return (
+          <ImageBlock
+            block={block}
+            isEditing={isEditing}
+            onUpdate={(updates) => handleUpdate(updates)}
+          />
+        )
 
-    case "divider":
-      return <DividerBlock block={block} isEditing={isEditing} />
+      case "divider":
+        return <DividerBlock block={block} isEditing={isEditing} />
 
-    case "button":
-      return <ButtonBlock block={block} isEditing={isEditing} />
+      case "button":
+        return <ButtonBlock block={block} isEditing={isEditing} />
 
-    default:
-      return (
-        <div className="h-full flex items-center justify-center text-gray-400">
-          Unknown block type: {block.type}
-        </div>
-      )
+      default:
+        return (
+          <div className="h-full flex items-center justify-center text-gray-400">
+            Unknown block type: {block.type}
+          </div>
+        )
+    }
   }
+
+  return (
+    <ErrorBoundary>
+      {renderBlock()}
+    </ErrorBoundary>
+  )
 }
