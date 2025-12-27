@@ -14,7 +14,7 @@ export type ShortcutContext =
 
 export interface Shortcut {
   id: string
-  keys: string[] // e.g., ['Meta', 'z'] or ['Delete']
+  keys: readonly string[] | string[] // e.g., ['Meta', 'z'] or ['Delete']
   description: string
   action: () => void | Promise<void>
   context: ShortcutContext[]

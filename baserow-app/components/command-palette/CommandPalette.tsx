@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -40,11 +40,44 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
   const inputRef = useRef<HTMLInputElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Helper functions
+  const getViewIcon = useCallback((type: string) => {
+    switch (type) {
+      case 'grid':
+        return <Grid3x3 className="h-4 w-4" />
+      case 'kanban':
+        return <Layout className="h-4 w-4" />
+      case 'calendar':
+        return <Calendar className="h-4 w-4" />
+      case 'timeline':
+        return <Clock className="h-4 w-4" />
+      default:
+        return <FileText className="h-4 w-4" />
+    }
+  }, [])
+
+  const navigateToEntity = useCallback((entityType: string, entityId: string, tableId?: string) => {
+    switch (entityType) {
+      case 'table':
+        router.push(`/tables/${entityId}`)
+        break
+      case 'page':
+      case 'interface':
+        router.push(`/pages/${entityId}`)
+        break
+      case 'view':
+        if (tableId) {
+          router.push(`/tables/${tableId}/views/${entityId}`)
+        }
+        break
+    }
+  }, [router])
+
   // Register command palette shortcut
   useShortcuts([
     {
       id: 'command-palette',
-      keys: ShortcutKeys.COMMAND_PALETTE,
+      keys: [...ShortcutKeys.COMMAND_PALETTE],
       description: 'Open command palette',
       action: () => onOpenChange(true),
       context: ['global'],
@@ -52,28 +85,8 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
     },
   ])
 
-  // Load commands when palette opens
-  useEffect(() => {
-    if (open) {
-      loadCommands()
-      setQuery("")
-      setSelectedIndex(0)
-      // Focus input after a brief delay to ensure dialog is rendered
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
-    }
-  }, [open])
-
-  // Reload commands when query changes
-  useEffect(() => {
-    if (open) {
-      loadCommands()
-      setSelectedIndex(0)
-    }
-  }, [query])
-
-  async function loadCommands() {
+  // Load commands function
+  const loadCommands = useCallback(async () => {
     setLoading(true)
     try {
       // Load tables, pages, views, and recent items
@@ -211,39 +224,28 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
     } finally {
       setLoading(false)
     }
-  }
+  }, [query, router, onOpenChange, navigateToEntity, getViewIcon])
 
-  function navigateToEntity(entityType: string, entityId: string, tableId?: string) {
-    switch (entityType) {
-      case 'table':
-        router.push(`/tables/${entityId}`)
-        break
-      case 'page':
-      case 'interface':
-        router.push(`/pages/${entityId}`)
-        break
-      case 'view':
-        if (tableId) {
-          router.push(`/tables/${tableId}/views/${entityId}`)
-        }
-        break
+  // Load commands when palette opens
+  useEffect(() => {
+    if (open) {
+      loadCommands()
+      setQuery("")
+      setSelectedIndex(0)
+      // Focus input after a brief delay to ensure dialog is rendered
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
     }
-  }
+  }, [open, loadCommands])
 
-  function getViewIcon(type: string) {
-    switch (type) {
-      case 'grid':
-        return <Grid3x3 className="h-4 w-4" />
-      case 'kanban':
-        return <Layout className="h-4 w-4" />
-      case 'calendar':
-        return <Calendar className="h-4 w-4" />
-      case 'timeline':
-        return <Clock className="h-4 w-4" />
-      default:
-        return <FileText className="h-4 w-4" />
+  // Reload commands when query changes
+  useEffect(() => {
+    if (open) {
+      loadCommands()
+      setSelectedIndex(0)
     }
-  }
+  }, [query, open, loadCommands])
 
   // Filter commands based on query
   const filteredCommands = useMemo(() => {
