@@ -64,6 +64,8 @@ export default function CSVImportModal({
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({}) // CSV column -> field name
   const [newFieldTypes, setNewFieldTypes] = useState<Record<string, FieldType>>({}) // CSV column -> field type
+  const [linkTableOptions, setLinkTableOptions] = useState<Record<string, string>>({}) // CSV column -> linked_table_id
+  const [availableTables, setAvailableTables] = useState<Array<{ id: string; name: string }>>([])
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
   const [importedCount, setImportedCount] = useState(0)
@@ -81,6 +83,21 @@ export default function CSVImportModal({
     }
   }, [tableId])
 
+  const loadAvailableTables = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tables')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (!error && data) {
+        setAvailableTables(data.filter(t => t.id !== tableId)) // Exclude current table
+      }
+    } catch (error) {
+      console.error('Error loading tables:', error)
+    }
+  }, [tableId])
+
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!open) {
@@ -90,13 +107,15 @@ export default function CSVImportModal({
       setError(null)
       setProgress("")
       setImportedCount(0)
+      setLinkTableOptions({})
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
     } else {
       loadTableFields()
+      loadAvailableTables()
     }
-  }, [open, tableId, loadTableFields])
+  }, [open, tableId, loadTableFields, loadAvailableTables])
 
   // Advanced field type detection from sample values
   const detectFieldType = useCallback((sampleValues: string[]): FieldType => {
@@ -381,12 +400,12 @@ export default function CSVImportModal({
         if (newFieldTypes[col.name]) {
           // Validate that the field type can be created from CSV import
           if (newFieldTypes[col.name] === 'link_to_table') {
-            throw new Error(
-              `Field "${col.name}" cannot be created as "Link to table" during CSV import. ` +
-              `This field type requires selecting a linked table, which cannot be determined from CSV data. ` +
-              `Please change the field type to "Single line text" or another appropriate type, ` +
-              `then create the link field manually after import.`
-            )
+            if (!linkTableOptions[col.name]) {
+              throw new Error(
+                `Field "${col.name}" is set as "Link to table" but no linked table has been selected. ` +
+                `Please select a table to link to in the mapping step.`
+              )
+            }
           }
           
           if (newFieldTypes[col.name] === 'lookup') {
@@ -455,6 +474,14 @@ export default function CSVImportModal({
             console.log(`Extracted ${choices.length} choices for "${col.name}" from ${valuesFound} values:`, choices.slice(0, 10))
           }
 
+          // Set linked_table_id for link_to_table fields
+          if (newFieldTypes[col.name] === 'link_to_table') {
+            const linkedTableId = linkTableOptions[col.name]
+            if (linkedTableId) {
+              fieldData.options = { linked_table_id: linkedTableId }
+            }
+          }
+
           fieldsToCreate.push(fieldData)
         }
         // Otherwise, column is unmapped and will be skipped
@@ -482,6 +509,15 @@ export default function CSVImportModal({
               )
             }
             requestBody.options = fieldInfo.options
+          } else if (fieldInfo.type === 'link_to_table') {
+            // Include linked_table_id for link_to_table fields
+            const linkedTableId = linkTableOptions[fieldInfo.name]
+            if (!linkedTableId) {
+              throw new Error(
+                `Field "${fieldInfo.name}" is set as link_to_table but no linked table has been selected.`
+              )
+            }
+            requestBody.options = { linked_table_id: linkedTableId }
           } else if (fieldInfo.options) {
             // Include options for other field types if present
             requestBody.options = fieldInfo.options
@@ -749,7 +785,12 @@ export default function CSVImportModal({
                           )}
                         </div>
                         <span className="text-xs text-gray-500">
-                          Sample: {parsedData.previewRows[0]?.[col.name]?.toString().substring(0, 30) || "—"}
+                          Sample: {(() => {
+                            const sample = parsedData.previewRows[0]?.[col.name]
+                            if (sample === null || sample === undefined) return "—"
+                            if (Array.isArray(sample)) return sample.join(', ').substring(0, 30)
+                            return String(sample).substring(0, 30)
+                          })()}
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -836,8 +877,6 @@ export default function CSVImportModal({
                                 {FIELD_TYPES.filter(ft => {
                                   // Filter out virtual fields
                                   if (ft.isVirtual) return false
-                                  // Filter out link_to_table - requires linked_table_id which can't be determined from CSV
-                                  if (ft.type === 'link_to_table') return false
                                   // Filter out lookup - virtual and requires configuration
                                   if (ft.type === 'lookup') return false
                                   return true
@@ -848,6 +887,38 @@ export default function CSVImportModal({
                                 ))}
                               </SelectContent>
                             </Select>
+                            
+                            {/* Show linked table selector for link_to_table fields */}
+                            {newFieldTypes[col.name] === 'link_to_table' && (
+                              <div className="space-y-1 mt-2">
+                                <Label className="text-xs text-gray-600">Linked Table</Label>
+                                <Select
+                                  value={linkTableOptions[col.name] || ''}
+                                  onValueChange={(tableId) => {
+                                    setLinkTableOptions((prev) => ({
+                                      ...prev,
+                                      [col.name]: tableId,
+                                    }))
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 text-sm">
+                                    <SelectValue placeholder="Select a table to link to" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">Select a table</SelectItem>
+                                    {availableTables.map((table) => (
+                                      <SelectItem key={table.id} value={table.id}>
+                                        {table.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-gray-500">
+                                  Select the table this field should link to
+                                </p>
+                              </div>
+                            )}
+                            
                             <p className="text-xs text-gray-500">
                               A new field &quot;{col.name}&quot; will be created with this type
                               {newFieldTypes[col.name] && " (you can override the detected type above)"}
@@ -868,6 +939,7 @@ export default function CSVImportModal({
                     setParsedData(null)
                     setFieldMappings({})
                     setNewFieldTypes({})
+                    setLinkTableOptions({})
                     setStatus('idle')
                     setError(null)
                   }}
@@ -928,11 +1000,23 @@ export default function CSVImportModal({
                       <tbody>
                         {parsedData.previewRows.map((row, idx) => (
                           <tr key={idx} className="border-b hover:bg-gray-50">
-                            {parsedData.columns.map((col) => (
-                              <td key={col.name} className="px-4 py-2">
-                                {String(row[col.name] || '').substring(0, 50)}
-                              </td>
-                            ))}
+                            {parsedData.columns.map((col) => {
+                              const value = row[col.name]
+                              // Handle arrays (multi-select) and other non-string values
+                              let displayValue = ''
+                              if (value === null || value === undefined) {
+                                displayValue = ''
+                              } else if (Array.isArray(value)) {
+                                displayValue = value.join(', ')
+                              } else {
+                                displayValue = String(value)
+                              }
+                              return (
+                                <td key={col.name} className="px-4 py-2">
+                                  {displayValue.substring(0, 50)}
+                                </td>
+                              )
+                            })}
                           </tr>
                         ))}
                       </tbody>
@@ -965,6 +1049,7 @@ export default function CSVImportModal({
                     setParsedData(null)
                     setFieldMappings({})
                     setNewFieldTypes({})
+                    setLinkTableOptions({})
                     setStatus('idle')
                     setError(null)
                   }}

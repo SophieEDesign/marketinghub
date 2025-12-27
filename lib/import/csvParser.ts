@@ -208,18 +208,32 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             // Get sample values from first 100 rows
             const sampleValues = data
               .slice(0, 100)
-              .map(row => row[name])
+              .map(row => {
+                const value = row[name]
+                // Handle arrays (from CSV parsing) - convert to string
+                if (Array.isArray(value)) {
+                  return value.join(', ')
+                }
+                return value
+              })
               .filter(v => v !== null && v !== undefined && v !== '')
             
             const type = inferColumnType(
-              data.slice(0, 100).map(row => row[name])
+              data.slice(0, 100).map(row => {
+                const value = row[name]
+                // Handle arrays - convert to string for type inference
+                if (Array.isArray(value)) {
+                  return value.join(', ')
+                }
+                return value
+              })
             )
 
             return {
               name: name.trim(),
               sanitizedName,
               type,
-              sampleValues: sampleValues.slice(0, 5), // Keep first 5 for preview
+              sampleValues: Array.isArray(sampleValues) ? sampleValues.slice(0, 5) : [], // Keep first 5 for preview
             }
           })
 
