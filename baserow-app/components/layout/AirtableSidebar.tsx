@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
+import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import type { Automation, Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -249,6 +250,9 @@ export default function AirtableSidebar({
         </div>
         )}
 
+
+        {/* Recents & Favorites */}
+        <RecentsFavoritesSection primaryColor={primaryColor} />
 
         {/* Core Data Section - Collapsed by default */}
         {tables.length > 0 && (
