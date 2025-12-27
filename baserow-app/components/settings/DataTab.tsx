@@ -13,7 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Table2, ChevronRight, ChevronDown, Grid3x3, FileText, Calendar, Layout, Trash2 } from 'lucide-react'
+import { Plus, Table2, ChevronRight, ChevronDown, Grid3x3, FileText, Calendar, Layout, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 
 interface Table {
@@ -38,6 +39,9 @@ export default function SettingsDataTab() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tableToDelete, setTableToDelete] = useState<Table | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editingTableId, setEditingTableId] = useState<string | null>(null)
+  const [editingTableName, setEditingTableName] = useState<string>('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => {
     loadTables()
@@ -277,23 +281,67 @@ export default function SettingsDataTab() {
                       )}
                     </button>
                     <Table2 className="h-4 w-4 text-gray-500 mr-2" />
-                    <Link
-                      href={`/tables/${table.id}`}
-                      className="flex-1 text-sm font-medium text-gray-700 hover:text-gray-900"
-                    >
-                      {table.name}
-                    </Link>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleDeleteClick(table)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600 hover:text-red-700"
-                      title="Delete table"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {editingTableId === table.id ? (
+                      <div className="flex-1 flex items-center gap-2">
+                        <Input
+                          value={editingTableName}
+                          onChange={(e) => setEditingTableName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveName()
+                            } else if (e.key === 'Escape') {
+                              handleCancelEdit()
+                            }
+                          }}
+                          className="h-7 text-sm"
+                          autoFocus
+                          disabled={savingName}
+                        />
+                        <button
+                          onClick={handleSaveName}
+                          disabled={savingName}
+                          className="p-1 hover:bg-green-100 rounded transition-all text-green-600 hover:text-green-700 disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          disabled={savingName}
+                          className="p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700 disabled:opacity-50"
+                          title="Cancel"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <Link
+                          href={`/tables/${table.id}`}
+                          className="flex-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+                        >
+                          {table.name}
+                        </Link>
+                        <button
+                          onClick={(e) => handleEditClick(table, e)}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700"
+                          title="Edit table name"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDeleteClick(table)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600 hover:text-red-700"
+                          title="Delete table"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                   {isExpanded && (
                     <div className="ml-8 mt-2 space-y-1">

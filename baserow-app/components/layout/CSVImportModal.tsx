@@ -112,6 +112,40 @@ export default function CSVImportModal({
     try {
       const parsed = await parseCSV(selectedFile)
       setParsedData(parsed)
+      
+      // Auto-map headers to existing fields and auto-detect types for new fields
+      const mappings: Record<string, string> = {}
+      const autoDetectedTypes: Record<string, FieldType> = {}
+      
+      parsed.columns.forEach((col) => {
+        const sanitizedColName = sanitizeFieldNameSafe(col.name)
+        const existingField = tableFields.find(
+          (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
+        )
+        
+        if (existingField) {
+          mappings[col.name] = existingField.name
+        } else {
+          // Map CSV parser types to field types
+          const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): FieldType => {
+            switch (csvType) {
+              case 'number':
+                return 'number'
+              case 'boolean':
+                return 'checkbox'
+              case 'date':
+                return 'date'
+              case 'text':
+              default:
+                return 'text'
+            }
+          }
+          autoDetectedTypes[col.name] = mapCSVTypeToFieldType(col.type)
+        }
+      })
+      
+      setFieldMappings(mappings)
+      setNewFieldTypes(autoDetectedTypes)
       setStatus('mapping')
       setProgress('')
     } catch (err: any) {
@@ -120,7 +154,7 @@ export default function CSVImportModal({
       setFile(null)
       setProgress('')
     }
-  }, [])
+  }, [tableFields])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -147,50 +181,45 @@ export default function CSVImportModal({
       return
     }
 
+    // Validate that at least one column is mapped
+    const mappedColumns = parsedData.columns.filter(col => 
+      fieldMappings[col.name] || newFieldTypes[col.name]
+    )
+    
+    if (mappedColumns.length === 0) {
+      setError('Please map at least one CSV column to a field before importing.')
+      return
+    }
+
     setStatus('importing')
     setError(null)
     setImportedCount(0)
 
     try {
-      // Phase 1: Map CSV columns to existing fields or create new ones
+      // Phase 1: Use user's field mappings and create new fields as specified
       setProgress('Mapping columns to fields...')
       
-      const columnMappings: Record<string, string> = {} // CSV column name -> field name
-      const fieldsToCreate: Array<{ name: string; type: string }> = [] // CSV column names and detected types
+      const columnMappings: Record<string, string> = { ...fieldMappings } // CSV column name -> field name
+      const fieldsToCreate: Array<{ name: string; type: FieldType }> = []
 
-      // Map CSV parser types to system field types
-      const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): string => {
-        switch (csvType) {
-          case 'number':
-            return 'number'
-          case 'boolean':
-            return 'checkbox'
-          case 'date':
-            return 'date'
-          case 'text':
-          default:
-            return 'text'
-        }
-      }
-
-      // Auto-map columns to existing fields by name match
+      // Collect fields that need to be created (from newFieldTypes)
       parsedData.columns.forEach((col) => {
-        const sanitizedColName = sanitizeFieldNameSafe(col.name)
-        const existingField = tableFields.find(
-          (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
-        )
+        // If column is mapped to existing field, skip
+        if (columnMappings[col.name]) {
+          return
+        }
         
-        if (existingField) {
-          columnMappings[col.name] = existingField.name
-        } else {
+        // If column has a new field type specified, add it to create list
+        if (newFieldTypes[col.name]) {
           fieldsToCreate.push({
             name: col.name,
-            type: mapCSVTypeToFieldType(col.type)
+            type: newFieldTypes[col.name]
           })
         }
+        // Otherwise, column is unmapped and will be skipped
       })
 
-      // Phase 2: Create new fields with auto-detected types
+      // Phase 2: Create new fields with user-selected types
       if (fieldsToCreate.length > 0) {
         setProgress(`Creating ${fieldsToCreate.length} new fields...`)
         
@@ -202,7 +231,7 @@ export default function CSVImportModal({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: sanitizedName,
-              type: fieldInfo.type, // Use user-selected type
+              type: fieldInfo.type,
               required: false,
             }),
           })
@@ -432,6 +461,164 @@ export default function CSVImportModal({
             </div>
           )}
 
+          {/* Mapping Step */}
+          {status === 'mapping' && parsedData && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Map Columns</h3>
+                <p className="text-sm text-muted-foreground">
+                  Map CSV columns to existing fields or create new ones. Field types are auto-detected and can be changed.
+                </p>
+              </div>
+
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {parsedData.columns.map((col) => {
+                  const mappedField = fieldMappings[col.name]
+                  const isNewField = !mappedField && newFieldTypes[col.name]
+
+                  return (
+                    <div key={col.name} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-medium text-gray-700">
+                            {col.name}
+                          </Label>
+                          {newFieldTypes[col.name] && !mappedField && (
+                            <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                              Detected: {FIELD_TYPES.find(t => t.type === newFieldTypes[col.name])?.label || newFieldTypes[col.name]}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          Sample: {parsedData.previewRows[0]?.[col.name]?.toString().substring(0, 30) || "—"}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <Select
+                          value={mappedField || "new"}
+                          onValueChange={(value) => {
+                            if (value === "new") {
+                              // Remove mapping and ensure field type is set
+                              setFieldMappings((prev) => {
+                                const newMappings = { ...prev }
+                                delete newMappings[col.name]
+                                return newMappings
+                              })
+                              // Set default field type if not already set
+                              if (!newFieldTypes[col.name]) {
+                                const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): FieldType => {
+                                  switch (csvType) {
+                                    case 'number':
+                                      return 'number'
+                                    case 'boolean':
+                                      return 'checkbox'
+                                    case 'date':
+                                      return 'date'
+                                    case 'text':
+                                    default:
+                                      return 'text'
+                                  }
+                                }
+                                setNewFieldTypes((prev) => ({
+                                  ...prev,
+                                  [col.name]: mapCSVTypeToFieldType(col.type)
+                                }))
+                              }
+                            } else {
+                              // Map to existing field - clear new field type
+                              setFieldMappings((prev) => ({
+                                ...prev,
+                                [col.name]: value,
+                              }))
+                              setNewFieldTypes((prev) => {
+                                const newTypes = { ...prev }
+                                delete newTypes[col.name]
+                                return newTypes
+                              })
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder="Select or create field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new">+ Create new field</SelectItem>
+                            {tableFields.map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label || field.type})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {!mappedField && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs text-gray-600">Field Type</Label>
+                              {newFieldTypes[col.name] && (
+                                <span className="text-xs text-blue-600">
+                                  Auto-detected
+                                </span>
+                              )}
+                            </div>
+                            <Select
+                              value={newFieldTypes[col.name] || "text"}
+                              onValueChange={(value) => {
+                                setNewFieldTypes((prev) => ({
+                                  ...prev,
+                                  [col.name]: value as FieldType,
+                                }))
+                              }}
+                            >
+                              <SelectTrigger className="h-9 text-sm">
+                                <SelectValue placeholder="Select field type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {FIELD_TYPES.filter(ft => !ft.isVirtual).map((ft) => (
+                                  <SelectItem key={ft.type} value={ft.type}>
+                                    {ft.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-gray-500">
+                              A new field &quot;{col.name}&quot; will be created with this type
+                              {newFieldTypes[col.name] && " (you can override the detected type above)"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFile(null)
+                    setParsedData(null)
+                    setFieldMappings({})
+                    setNewFieldTypes({})
+                    setStatus('idle')
+                    setError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => setStatus('preview')}
+                  className="flex-1"
+                  disabled={parsedData.columns.length === 0}
+                >
+                  Continue to Preview
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Preview */}
           {status === 'preview' && parsedData && (
             <div className="space-y-6">
@@ -446,19 +633,25 @@ export default function CSVImportModal({
                       <thead className="bg-gray-50 border-b sticky top-0 z-10">
                         <tr>
                           {parsedData.columns.map((col) => {
-                            const sanitizedColName = sanitizeFieldNameSafe(col.name)
-                            const existingField = tableFields.find(
-                              (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
-                            )
-                            const detectedType = col.type === 'boolean' ? 'checkbox' : col.type
+                            const mappedField = fieldMappings[col.name]
+                            const newFieldType = newFieldTypes[col.name]
+                            const fieldTypeLabel = mappedField 
+                              ? tableFields.find(f => f.name === mappedField)?.type 
+                              : newFieldType
+                                ? FIELD_TYPES.find(t => t.type === newFieldType)?.label || newFieldType
+                                : null
+                            
                             return (
                               <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700 bg-gray-50">
                                 <div className="flex flex-col">
                                   <span>{col.name}</span>
                                   <span className="text-xs font-normal text-gray-500">
-                                    {existingField ? `→ ${existingField.name} (${existingField.type})` : `→ New field (${detectedType})`}
+                                    {mappedField 
+                                      ? `→ ${mappedField} (${fieldTypeLabel || 'unknown'})`
+                                      : newFieldType
+                                        ? `→ New field: ${fieldTypeLabel || newFieldType}`
+                                        : `→ Skipped (unmapped)`}
                                   </span>
-                                  <span className="text-xs text-gray-400">Detected: {col.type}</span>
                                 </div>
                               </th>
                             )
@@ -493,7 +686,7 @@ export default function CSVImportModal({
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={parsedData.rows.length === 0}
+                  disabled={parsedData.rows.length === 0 || parsedData.columns.filter(col => fieldMappings[col.name] || newFieldTypes[col.name]).length === 0}
                   className="flex-1"
                 >
                   Import {parsedData.rows.length} Rows

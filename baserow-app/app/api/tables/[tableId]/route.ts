@@ -3,6 +3,70 @@ import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
 import { isAdmin } from '@/lib/roles'
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { tableId: string } }
+) {
+  try {
+    // Check admin permissions
+    const admin = await isAdmin()
+    if (!admin) {
+      return NextResponse.json(
+        { error: 'Unauthorized. Admin access required.' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = await createClient()
+    const body = await request.json()
+    const { name, description } = body
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Table name is required and must be a non-empty string' },
+        { status: 400 }
+      )
+    }
+
+    const table = await getTable(params.tableId)
+    if (!table) {
+      return NextResponse.json(
+        { error: 'Table not found' },
+        { status: 404 }
+      )
+    }
+
+    const updates: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (name !== undefined) updates.name = name.trim()
+    if (description !== undefined) updates.description = description || null
+
+    const { data: updatedTable, error: updateError } = await supabase
+      .from('tables')
+      .update(updates)
+      .eq('id', params.tableId)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: `Failed to update table: ${updateError.message}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ table: updatedTable })
+  } catch (error: any) {
+    console.error('Error updating table:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to update table' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { tableId: string } }
