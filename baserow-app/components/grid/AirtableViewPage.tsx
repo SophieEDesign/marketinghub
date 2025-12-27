@@ -344,6 +344,7 @@ export default function AirtableViewPage({
         {view.type === "grid" ? (
           <AirtableGridView
             tableName={table.supabase_table}
+            tableId={tableId}
             viewName={view.name}
             rowHeight={rowHeight}
             editable={true}

@@ -5,7 +5,7 @@ import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight } from "lucide-react"
 import Cell from "./Cell"
-import RecordDrawer from "./RecordDrawer"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 
@@ -51,10 +51,9 @@ export default function GridView({
   onEditField,
   isEditing = false,
 }: GridViewProps) {
+  const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
 
@@ -280,22 +279,8 @@ export default function GridView({
   }
 
   function handleRowClick(rowId: string) {
-    setSelectedRowId(rowId)
-    setDrawerOpen(true)
-  }
-
-  function handleDrawerClose() {
-    setDrawerOpen(false)
-    setSelectedRowId(null)
-  }
-
-  function handleDrawerSave() {
-    loadRows()
-  }
-
-  function handleDrawerDelete() {
-    loadRows()
-    handleDrawerClose()
+    // Open record in global panel
+    openRecord(tableId, rowId, supabaseTableName)
   }
 
   // Apply client-side search
@@ -556,17 +541,7 @@ export default function GridView({
         </div>
       </div>
 
-      {/* Record Drawer */}
-      <RecordDrawer
-        isOpen={drawerOpen}
-        onClose={handleDrawerClose}
-        tableName={supabaseTableName}
-        rowId={selectedRowId}
-        fieldNames={visibleFields.map((f) => f.field_name)}
-        tableFields={tableFields}
-        onSave={handleDrawerSave}
-        onDelete={handleDrawerDelete}
-      />
+      {/* Record panel is now global - no local drawer needed */}
     </div>
   )
 }

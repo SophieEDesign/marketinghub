@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 
@@ -14,60 +15,41 @@ export default function RecordBlock({ block, isEditing = false }: RecordBlockPro
   const { config } = block
   const tableId = config?.table_id
   const recordId = config?.record_id
-  const [record, setRecord] = useState<any>(null)
-  const [fields, setFields] = useState<TableField[]>([])
+  const { openRecord } = useRecordPanel()
+  const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (tableId && recordId) {
-      loadRecord()
-    }
     if (tableId) {
-      loadFields()
+      loadTableName()
+    }
+    // Open record panel when recordId is set
+    if (tableId && recordId && tableName) {
+      openRecord(tableId, recordId, tableName)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, recordId])
+  }, [tableId, recordId, tableName])
 
-  async function loadRecord() {
-    if (!tableId || !recordId) return
-
-    setLoading(true)
-    const supabase = createClient()
-
-    // Get table name
-    const { data: table } = await supabase
-      .from("tables")
-      .select("supabase_table")
-      .eq("id", tableId)
-      .single()
-
-    if (!table?.supabase_table) {
-      setLoading(false)
-      return
-    }
-
-    // Load record
-    const { data } = await supabase
-      .from(table.supabase_table)
-      .select("*")
-      .eq("id", recordId)
-      .single()
-
-    setRecord(data)
-    setLoading(false)
-  }
-
-  async function loadFields() {
+  async function loadTableName() {
     if (!tableId) return
 
-    const supabase = createClient()
-    const { data } = await supabase
-      .from("table_fields")
-      .select("*")
-      .eq("table_id", tableId)
-      .order("position", { ascending: true })
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
 
-    setFields((data || []) as TableField[])
+      if (table?.supabase_table) {
+        setTableName(table.supabase_table)
+      }
+    } catch (error) {
+      console.error("Error loading table:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!tableId || !recordId) {
@@ -86,30 +68,13 @@ export default function RecordBlock({ block, isEditing = false }: RecordBlockPro
     )
   }
 
-  if (!record) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        Record not found
-      </div>
-    )
-  }
-
+  // Record block now opens the global record panel
+  // The panel will handle displaying the record
   return (
-    <div className="h-full overflow-auto p-4">
-      <div className="space-y-4">
-        {fields.map((field) => {
-          const value = record[field.name]
-          return (
-            <div key={field.id} className="border-b border-gray-200 pb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {field.name}
-              </label>
-              <div className="text-sm text-gray-900">
-                {value !== null && value !== undefined ? String(value) : <span className="text-gray-400">—</span>}
-              </div>
-            </div>
-          )
-        })}
+    <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+      <div className="text-center">
+        <p className="mb-2">Record panel opened</p>
+        <p className="text-xs text-gray-500">View and edit the record in the side panel</p>
       </div>
     </div>
   )

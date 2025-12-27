@@ -3,6 +3,8 @@
 import { useState } from "react"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
+import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
+import RecordPanel from "@/components/records/RecordPanel"
 import type { Table, View, Automation } from "@/types/database"
 
 interface InterfacePage {
@@ -65,21 +67,25 @@ export default function WorkspaceShell({
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <AirtableSidebar
-        interfacePages={interfacePages}
-        interfaceGroups={interfaceGroups}
-        automations={automations}
-        tables={tables}
-        views={views}
-        userRole={userRole}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {!hideTopbar && <Topbar title={title} />}
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+    <RecordPanelProvider>
+      <div className="flex h-screen bg-gray-50">
+        <AirtableSidebar
+          interfacePages={interfacePages}
+          interfaceGroups={interfaceGroups}
+          automations={automations}
+          tables={tables}
+          views={views}
+          userRole={userRole}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {!hideTopbar && <Topbar title={title} />}
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
+        {/* Global Record Panel */}
+        <RecordPanel />
       </div>
-    </div>
+    </RecordPanelProvider>
   )
 }

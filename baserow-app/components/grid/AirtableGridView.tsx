@@ -23,10 +23,13 @@ import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
 import BulkActionBar from './BulkActionBar'
 import { filterRowsBySearch } from '@/lib/search/filterRows'
+import { useRecordPanel } from '@/contexts/RecordPanelContext'
+import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 
 interface AirtableGridViewProps {
   tableName: string
+  tableId?: string // Table ID for opening records
   viewName?: string
   rowHeight?: 'short' | 'medium' | 'tall'
   editable?: boolean
@@ -47,6 +50,7 @@ const FROZEN_COLUMN_WIDTH = 50
 
 export default function AirtableGridView({
   tableName,
+  tableId,
   viewName = 'default',
   rowHeight = 'medium',
   editable = true,
@@ -56,6 +60,36 @@ export default function AirtableGridView({
   groupBy,
   userRole = "editor",
 }: AirtableGridViewProps) {
+  const { openRecord } = useRecordPanel()
+  const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
+
+  // Load tableId from tableName if not provided
+  useEffect(() => {
+    if (!tableIdState && tableName) {
+      const loadTableId = async () => {
+        try {
+          const supabase = createClient()
+          const { data } = await supabase
+            .from("tables")
+            .select("id")
+            .eq("supabase_table", tableName)
+            .single()
+          if (data) {
+            setTableIdState(data.id)
+          }
+        } catch (error) {
+          console.warn("Could not load table ID:", error)
+        }
+      }
+      loadTableId()
+    }
+  }, [tableIdState, tableName])
+
+  const handleRowClick = useCallback((rowId: string) => {
+    if (tableIdState && tableName) {
+      openRecord(tableIdState, rowId, tableName)
+    }
+  }, [tableIdState, tableName, openRecord])
   const ROW_HEIGHT =
     rowHeight === 'short' ? ROW_HEIGHT_SHORT : rowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
 
@@ -606,16 +640,26 @@ export default function AirtableGridView({
               return (
                 <div
                   key={row.id}
-                  className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                  className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${
                     isEven ? 'bg-white' : 'bg-gray-50/50'
                   } ${isSelected ? 'bg-blue-100' : ''}`}
                   style={{ minHeight: ROW_HEIGHT, height: hasWrapText ? 'auto' : ROW_HEIGHT }}
+                  onClick={(e) => {
+                    // Don't open panel if clicking checkbox or cell editor
+                    const target = e.target as HTMLElement
+                    if (!target.closest('input[type="checkbox"]') && !target.closest('.cell-editor')) {
+                      handleRowClick(row.id)
+                    }
+                  }}
                 >
                   {/* Checkbox */}
                   <div
                     className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-10"
                     style={{ width: FROZEN_COLUMN_WIDTH, minHeight: ROW_HEIGHT, height: hasWrapText ? '100%' : ROW_HEIGHT }}
-                    onClick={(e) => handleRowSelect(row.id, rowIndex, e)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleRowSelect(row.id, rowIndex, e)
+                    }}
                   >
                     <input
                       type="checkbox"
