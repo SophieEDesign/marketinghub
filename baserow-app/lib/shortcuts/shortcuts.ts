@@ -98,7 +98,7 @@ class ShortcutManager {
   /**
    * Check if keyboard event matches shortcut keys
    */
-  private matchesShortcut(event: KeyboardEvent, keys: string[]): boolean {
+  private matchesShortcut(event: KeyboardEvent, keys: readonly string[] | string[]): boolean {
     const pressedKeys = new Set<string>()
 
     // Add modifier keys
