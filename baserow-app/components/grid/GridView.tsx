@@ -264,10 +264,9 @@ export default function GridView({
         }
       } else {
         await loadRows()
-        // Optionally select the new row
-        if (data) {
-          setSelectedRowId(data.id)
-          setDrawerOpen(true)
+        // Open the new record in the global panel
+        if (data && data.id) {
+          openRecord(tableId, data.id, supabaseTableName)
         }
       }
     } catch (error: any) {
