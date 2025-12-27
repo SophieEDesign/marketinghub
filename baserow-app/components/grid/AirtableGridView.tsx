@@ -446,7 +446,7 @@ export default function AirtableGridView({
       {/* Header */}
       <div
         ref={headerScrollRef}
-        className="flex-shrink-0 border-b border-gray-300 bg-white shadow-sm overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="flex-shrink-0 border-b border-gray-300 bg-white shadow-sm overflow-x-auto overflow-y-hidden grid-scroll-container"
         style={{ height: HEADER_HEIGHT }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
@@ -456,7 +456,7 @@ export default function AirtableGridView({
           }
         }}
       >
-        <div className="flex" style={{ width: totalWidth, minWidth: '100%' }}>
+        <div className="flex" style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content' }}>
           {/* Checkbox column */}
           <div
             className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-20"
@@ -530,7 +530,7 @@ export default function AirtableGridView({
       {/* Body */}
       <div
         ref={bodyScrollRef}
-        className="flex-1 overflow-auto bg-white"
+        className="flex-1 overflow-x-auto overflow-y-auto bg-white grid-scroll-container"
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
           const top = e.currentTarget.scrollTop
@@ -541,7 +541,7 @@ export default function AirtableGridView({
           }
         }}
       >
-        <div style={{ width: totalWidth, minWidth: '100%', position: 'relative' }}>
+        <div style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content', position: 'relative' }}>
           {/* Virtualized items */}
           <div style={{ height: offsetTop }} />
           {visibleItems.map((item, idx) => {

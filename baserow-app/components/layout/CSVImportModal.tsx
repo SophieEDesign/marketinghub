@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Upload, FileText, CheckCircle, XCircle, Loader2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -58,6 +59,7 @@ export default function CSVImportModal({
   supabaseTableName,
   onImportComplete,
 }: CSVImportModalProps) {
+  const router = useRouter()
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
@@ -668,6 +670,9 @@ export default function CSVImportModal({
 
       // Refresh grid immediately
       onImportComplete()
+      
+      // Refresh the page to show new data
+      router.refresh()
 
       // Close modal after short delay
       setTimeout(() => {

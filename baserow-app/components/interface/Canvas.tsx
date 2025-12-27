@@ -5,7 +5,7 @@ import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import BlockRenderer from "./BlockRenderer"
-import type { PageBlock, LayoutItem } from "@/lib/interface/types"
+import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -17,7 +17,7 @@ interface CanvasProps {
   onBlockClick?: (blockId: string) => void
   onBlockSettingsClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void
-  onAddBlock?: (type: string) => void
+  onAddBlock?: (type: BlockType) => void | Promise<void>
   selectedBlockId?: string | null
   layoutSettings?: {
     cols?: number
