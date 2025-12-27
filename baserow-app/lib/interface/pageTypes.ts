@@ -65,13 +65,13 @@ export async function getPageTypeTemplate(
     .from('page_type_templates')
     .select('*')
     .eq('type', type)
-    .single()
 
+  // Filter out admin-only templates for non-admins (before .single())
   if (!userIsAdmin) {
     query = query.eq('admin_only', false)
   }
 
-  const { data, error } = await query
+  const { data, error } = await query.single()
 
   if (error || !data) {
     return null
