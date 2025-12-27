@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -41,13 +41,7 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
   const [loading, setLoading] = useState(false)
   const [loadingTables, setLoadingTables] = useState(false)
 
-  useEffect(() => {
-    if (open) {
-      loadTables()
-    }
-  }, [open])
-
-  async function loadTables() {
+  const loadTables = useCallback(async () => {
     setLoadingTables(true)
     try {
       const supabase = createClient()
@@ -66,7 +60,13 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     } finally {
       setLoadingTables(false)
     }
-  }
+  }, [primaryTableId])
+
+  useEffect(() => {
+    if (open) {
+      loadTables()
+    }
+  }, [open, loadTables])
 
   async function handleCreate() {
     if (!name.trim()) {

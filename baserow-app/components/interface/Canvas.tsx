@@ -15,6 +15,7 @@ interface CanvasProps {
   onLayoutChange?: (layout: LayoutItem[]) => void
   onBlockUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   onBlockClick?: (blockId: string) => void
+  onBlockSettingsClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void
   onAddBlock?: (type: string) => void
   selectedBlockId?: string | null
