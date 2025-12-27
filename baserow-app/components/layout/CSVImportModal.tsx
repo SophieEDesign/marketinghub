@@ -701,7 +701,7 @@ export default function CSVImportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Import CSV to {tableName}</DialogTitle>
           <DialogDescription>
@@ -966,9 +966,9 @@ export default function CSVImportModal({
                 <p className="text-sm text-muted-foreground">
                   Review the data before importing. {parsedData.rows.length} rows will be imported.
                 </p>
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-                    <table className="w-full text-sm" style={{ minWidth: 'max-content' }}>
+                <div className="border rounded-lg overflow-hidden w-full">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full" style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}>
+                    <table className="text-sm" style={{ minWidth: 'max-content' }}>
                       <thead className="bg-gray-50 border-b sticky top-0 z-10">
                         <tr>
                           {parsedData.columns.map((col) => {
@@ -981,7 +981,7 @@ export default function CSVImportModal({
                                 : null
                             
                             return (
-                              <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700 bg-gray-50">
+                              <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700 bg-gray-50 whitespace-nowrap">
                                 <div className="flex flex-col">
                                   <span>{col.name}</span>
                                   <span className="text-xs font-normal text-gray-500">

@@ -350,6 +350,8 @@ export default function AirtableViewPage({
             fields={tableFields}
             onAddField={handleAddField}
             onEditField={handleEditField}
+            groupBy={groupBy || undefined}
+            userRole="editor"
           />
         ) : view.type === "kanban" ? (
           <AirtableKanbanView
