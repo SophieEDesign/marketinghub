@@ -237,8 +237,20 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             }
           })
 
-          // Get preview rows (first 10)
-          const previewRows = data.slice(0, 10)
+          // Get preview rows (first 10) and ensure all values are properly formatted
+          const previewRows = data.slice(0, 10).map(row => {
+            const processedRow: Record<string, any> = {}
+            for (const key in row) {
+              const value = row[key]
+              // Convert arrays to strings for display
+              if (Array.isArray(value)) {
+                processedRow[key] = value.join(', ')
+              } else {
+                processedRow[key] = value
+              }
+            }
+            return processedRow
+          })
 
           resolve({
             columns,

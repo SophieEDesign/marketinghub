@@ -967,8 +967,8 @@ export default function CSVImportModal({
                   Review the data before importing. {parsedData.rows.length} rows will be imported.
                 </p>
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-sm">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                    <table className="w-full text-sm" style={{ minWidth: 'max-content' }}>
                       <thead className="bg-gray-50 border-b sticky top-0 z-10">
                         <tr>
                           {parsedData.columns.map((col) => {
@@ -998,27 +998,33 @@ export default function CSVImportModal({
                         </tr>
                       </thead>
                       <tbody>
-                        {parsedData.previewRows.map((row, idx) => (
-                          <tr key={idx} className="border-b hover:bg-gray-50">
-                            {parsedData.columns.map((col) => {
-                              const value = row[col.name]
-                              // Handle arrays (multi-select) and other non-string values
-                              let displayValue = ''
-                              if (value === null || value === undefined) {
-                                displayValue = ''
-                              } else if (Array.isArray(value)) {
-                                displayValue = value.join(', ')
-                              } else {
-                                displayValue = String(value)
-                              }
-                              return (
-                                <td key={col.name} className="px-4 py-2">
-                                  {displayValue.substring(0, 50)}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
+                        {(Array.isArray(parsedData.previewRows) ? parsedData.previewRows : []).map((row, idx) => {
+                          // Ensure row is an object
+                          if (!row || typeof row !== 'object') {
+                            return null
+                          }
+                          return (
+                            <tr key={idx} className="border-b hover:bg-gray-50">
+                              {parsedData.columns.map((col) => {
+                                const value = row[col.name]
+                                // Handle arrays (multi-select) and other non-string values
+                                let displayValue = ''
+                                if (value === null || value === undefined) {
+                                  displayValue = ''
+                                } else if (Array.isArray(value)) {
+                                  displayValue = Array.isArray(value) ? value.join(', ') : String(value)
+                                } else {
+                                  displayValue = String(value)
+                                }
+                                return (
+                                  <td key={col.name} className="px-4 py-2 whitespace-nowrap">
+                                    {displayValue.substring(0, 50)}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
