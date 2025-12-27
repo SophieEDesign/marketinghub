@@ -4,7 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
-import type { PageTypeTemplate, BlockDefinition } from './pageTypes'
+import type { PageTypeTemplate, BlockDefinition } from './pageTypes.types'
+import { seedBlocksFromTemplate as seedBlocksFromTemplateShared } from './pageTypes.types'
 
 /**
  * Fetch all page type templates from the database (client-side)
@@ -44,18 +45,7 @@ export async function getPageTypeTemplatesClient(userIsAdmin: boolean = false): 
 
 /**
  * Seed blocks from a page type template (client-side)
+ * Re-export shared function for convenience
  */
-export function seedBlocksFromTemplate(
-  template: PageTypeTemplate,
-  primaryTableId: string
-): BlockDefinition[] {
-  return template.default_blocks.map((block) => ({
-    ...block,
-    config: {
-      ...block.config,
-      // Replace empty table_id with primary table ID
-      table_id: block.config.table_id || primaryTableId || '',
-    },
-  }))
-}
+export { seedBlocksFromTemplateShared as seedBlocksFromTemplate }
 

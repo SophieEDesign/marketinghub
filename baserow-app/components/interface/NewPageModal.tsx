@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { IconPicker } from "@/components/ui/icon-picker"
-import { PAGE_TYPE_CATEGORIES, type PageTypeTemplate } from "@/lib/interface/pageTypes"
+import { PAGE_TYPE_CATEGORIES, type PageTypeTemplate } from "@/lib/interface/pageTypes.types"
 import { seedBlocksFromTemplate } from "@/lib/interface/pageTypes.client"
 
 interface NewPageModalProps {
