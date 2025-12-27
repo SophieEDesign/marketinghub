@@ -168,6 +168,9 @@ interface SettingsPanelProps {
   isOpen: boolean
   onClose: () => void
   onSave: (blockId: string, config: Partial<BlockConfig>) => void
+  onMoveToTop?: (blockId: string) => void
+  onMoveToBottom?: (blockId: string) => void
+  onLock?: (blockId: string, locked: boolean) => void
 }
 
 export default function SettingsPanel({
@@ -175,6 +178,9 @@ export default function SettingsPanel({
   isOpen,
   onClose,
   onSave,
+  onMoveToTop,
+  onMoveToBottom,
+  onLock,
 }: SettingsPanelProps) {
   const [tables, setTables] = useState<Table[]>([])
   const [views, setViews] = useState<View[]>([])
@@ -275,6 +281,68 @@ export default function SettingsPanel({
         {/* Block-specific settings */}
         {renderBlockSettings()}
       </div>
+
+      {/* Block Actions */}
+      {(onMoveToTop || onMoveToBottom || onLock) && (
+        <div className="border-t border-gray-200 p-4 space-y-2">
+          <Label className="text-xs font-semibold text-gray-700 uppercase">Block Actions</Label>
+          <div className="flex flex-col gap-2">
+            {onMoveToTop && (
+              <button
+                onClick={() => {
+                  if (block) onMoveToTop(block.id)
+                }}
+                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
+                Move to Top
+              </button>
+            )}
+            {onMoveToBottom && (
+              <button
+                onClick={() => {
+                  if (block) onMoveToBottom(block.id)
+                }}
+                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+                Move to Bottom
+              </button>
+            )}
+            {onLock && (
+              <button
+                onClick={() => {
+                  if (block) {
+                    const isLocked = block.config?.locked || false
+                    onLock(block.id, !isLocked)
+                  }
+                }}
+                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+              >
+                {block?.config?.locked ? (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    </svg>
+                    Unlock Block
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Lock Block (View Only)
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">

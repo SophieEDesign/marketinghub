@@ -232,23 +232,34 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="layout-template">Default Layout *</Label>
+            <Label htmlFor="layout-template">Interface Type *</Label>
             <Select value={layoutTemplate} onValueChange={(value) => setLayoutTemplate(value as LayoutTemplate)}>
               <SelectTrigger id="layout-template">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(LAYOUT_TEMPLATES).map(([key, template]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className="flex items-center gap-2">
-                      <span>{template.icon}</span>
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        <div className="text-xs text-muted-foreground">{template.description}</div>
+                {Object.entries(LAYOUT_TEMPLATES)
+                  .filter(([key]) => key !== 'blank') // Hide blank template from main list
+                  .map(([key, template]) => (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        <span>{template.icon}</span>
+                        <div>
+                          <div className="font-medium">{template.name}</div>
+                          <div className="text-xs text-muted-foreground">{template.description}</div>
+                        </div>
                       </div>
+                    </SelectItem>
+                  ))}
+                <SelectItem value="blank">
+                  <div className="flex items-center gap-2">
+                    <span>🎨</span>
+                    <div>
+                      <div className="font-medium">Blank</div>
+                      <div className="text-xs text-muted-foreground">Start with an empty canvas</div>
                     </div>
-                  </SelectItem>
-                ))}
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
             {selectedTemplate && (

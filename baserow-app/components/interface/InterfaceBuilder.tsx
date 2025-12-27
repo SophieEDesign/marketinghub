@@ -336,6 +336,117 @@ export default function InterfaceBuilder({
     [page.id, blocks, toast]
   )
 
+  const handleMoveBlockToTop = useCallback(
+    async (blockId: string) => {
+      const blockToMove = blocks.find((b) => b.id === blockId)
+      if (!blockToMove) return
+
+      // Find minimum Y position
+      const minY = Math.min(...blocks.map((b) => b.y || 0))
+      
+      // Move block to top (y = minY - 1 or 0)
+      const newY = Math.max(0, minY - 1)
+
+      try {
+        const layout: LayoutItem[] = blocks.map((b) => ({
+          i: b.id,
+          x: b.id === blockId ? blockToMove.x : b.x,
+          y: b.id === blockId ? newY : b.y,
+          w: b.w,
+          h: b.h,
+        }))
+
+        await saveLayout(layout)
+        
+        // Update local state
+        setBlocks((prev) =>
+          prev.map((b) => (b.id === blockId ? { ...b, y: newY } : b))
+        )
+
+        toast({
+          variant: "success",
+          title: "Block moved",
+          description: "Block moved to top",
+        })
+      } catch (error: any) {
+        console.error("Failed to move block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to move block",
+          description: error.message || "Please try again",
+        })
+      }
+    },
+    [page.id, blocks, saveLayout, toast]
+  )
+
+  const handleMoveBlockToBottom = useCallback(
+    async (blockId: string) => {
+      const blockToMove = blocks.find((b) => b.id === blockId)
+      if (!blockToMove) return
+
+      // Find maximum Y position
+      const maxY = Math.max(...blocks.map((b) => (b.y || 0) + (b.h || 4)))
+      
+      // Move block to bottom
+      const newY = maxY
+
+      try {
+        const layout: LayoutItem[] = blocks.map((b) => ({
+          i: b.id,
+          x: b.id === blockId ? blockToMove.x : b.x,
+          y: b.id === blockId ? newY : b.y,
+          w: b.w,
+          h: b.h,
+        }))
+
+        await saveLayout(layout)
+        
+        // Update local state
+        setBlocks((prev) =>
+          prev.map((b) => (b.id === blockId ? { ...b, y: newY } : b))
+        )
+
+        toast({
+          variant: "success",
+          title: "Block moved",
+          description: "Block moved to bottom",
+        })
+      } catch (error: any) {
+        console.error("Failed to move block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to move block",
+          description: error.message || "Please try again",
+        })
+      }
+    },
+    [page.id, blocks, saveLayout, toast]
+  )
+
+  const handleLockBlock = useCallback(
+    async (blockId: string, locked: boolean) => {
+      try {
+        await handleBlockUpdate(blockId, { locked })
+        toast({
+          variant: "success",
+          title: locked ? "Block locked" : "Block unlocked",
+          description: locked 
+            ? "Block is now view-only" 
+            : "Block can be edited",
+        })
+      } catch (error: any) {
+        console.error("Failed to lock block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to update block",
+          description: error.message || "Please try again",
+        })
+      }
+    },
+    [handleBlockUpdate, toast]
+  )
+
   const handleSaveSettings = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
       await handleBlockUpdate(blockId, config)
@@ -396,23 +507,35 @@ export default function InterfaceBuilder({
     <div className="flex h-screen bg-gray-50">
       {/* Main Canvas - Full width when not editing */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Toolbar */}
-        <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">{currentPage.name}</h1>
-            {currentPage.description && (
-              <span className="text-sm text-gray-500">— {currentPage.description}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPageSettingsOpen(true)}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-              title="Interface Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-            {isEditing ? (
+        {/* Toolbar / Interface Header */}
+        <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              {/* Icon */}
+              {currentPage.settings?.icon && (
+                <span className="text-xl flex-shrink-0" title="Interface icon">
+                  {currentPage.settings.icon}
+                </span>
+              )}
+              {/* Title and Description */}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg font-semibold text-gray-900 truncate">{currentPage.name}</h1>
+                {currentPage.description && (
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">{currentPage.description}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Settings button */}
+              <button
+                onClick={() => setPageSettingsOpen(true)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                title="Interface Settings"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </button>
+              {isEditing ? (
               <>
                 {selectedBlock && (
                   <div className="px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md">
@@ -468,12 +591,14 @@ export default function InterfaceBuilder({
             ) : (
               <button
                 onClick={() => setIsEditing(true)}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors"
               >
                 <Edit2 className="h-4 w-4" />
-                Edit interface
+                <span className="hidden sm:inline">Edit interface</span>
+                <span className="sm:hidden">Edit</span>
               </button>
             )}
+            </div>
           </div>
         </div>
 
@@ -495,6 +620,8 @@ export default function InterfaceBuilder({
             selectedBlockId={selectedBlockId}
             layoutSettings={page.settings?.layout}
             primaryTableId={page.settings?.primary_table_id || null}
+            layoutTemplate={(page.settings as any)?.layout_template || null}
+            interfaceDescription={page.description || null}
           />
         </div>
       </div>
@@ -509,6 +636,9 @@ export default function InterfaceBuilder({
             setSelectedBlockId(null)
           }}
           onSave={handleSaveSettings}
+          onMoveToTop={handleMoveBlockToTop}
+          onMoveToBottom={handleMoveBlockToBottom}
+          onLock={handleLockBlock}
         />
       )}
 

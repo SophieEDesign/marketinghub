@@ -26,13 +26,18 @@ export async function GET(
     }
 
     // Convert view to Page format with all fields
+    const configSettings = (data.config as any)?.settings || {}
     const page = {
       id: data.id,
       name: data.name,
       description: data.description || undefined,
-      settings: (data.config as any)?.settings || {
-        access: data.access_level || 'authenticated',
-        layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
+      settings: {
+        ...configSettings,
+        access: configSettings.access || data.access_level || 'authenticated',
+        layout: configSettings.layout || { cols: 12, rowHeight: 30, margin: [10, 10] },
+        primary_table_id: configSettings.primary_table_id || data.table_id || null,
+        layout_template: configSettings.layout_template || null,
+        icon: configSettings.icon || null,
       },
       created_at: data.created_at,
       updated_at: data.updated_at,
@@ -110,13 +115,18 @@ export async function PATCH(
     }
 
     // Convert view to Page format
+    const configSettings = (data.config as any)?.settings || {}
     const page = {
       id: data.id,
       name: data.name,
       description: data.description || undefined,
-      settings: (data.config as any)?.settings || {
-        access: data.access_level || 'authenticated',
-        layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
+      settings: {
+        ...configSettings,
+        access: configSettings.access || data.access_level || 'authenticated',
+        layout: configSettings.layout || { cols: 12, rowHeight: 30, margin: [10, 10] },
+        primary_table_id: configSettings.primary_table_id || data.table_id || null,
+        layout_template: configSettings.layout_template || null,
+        icon: configSettings.icon || null,
       },
       created_at: data.created_at,
       updated_at: data.updated_at,

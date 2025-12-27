@@ -19,6 +19,8 @@ interface CanvasProps {
   onBlockSettingsClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void
   onBlockDuplicate?: (blockId: string) => void
+  onBlockMoveToTop?: (blockId: string) => void
+  onBlockMoveToBottom?: (blockId: string) => void
   onAddBlock?: (type: BlockType) => void | Promise<void>
   selectedBlockId?: string | null
   layoutSettings?: {
@@ -27,6 +29,8 @@ interface CanvasProps {
     margin?: [number, number]
   }
   primaryTableId?: string | null
+  layoutTemplate?: string | null
+  interfaceDescription?: string | null
 }
 
 export default function Canvas({
@@ -38,10 +42,14 @@ export default function Canvas({
   onBlockSettingsClick,
   onBlockDelete,
   onBlockDuplicate,
+  onBlockMoveToTop,
+  onBlockMoveToBottom,
   onAddBlock,
   selectedBlockId,
   layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
   primaryTableId,
+  layoutTemplate,
+  interfaceDescription,
 }: CanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
@@ -109,31 +117,86 @@ export default function Canvas({
     [onLayoutChange]
   )
 
-  // Empty state: Show friendly message with actionable buttons
+  // Empty state: Show template-specific guidance
   if (blocks.length === 0) {
-    const commonBlocks: Array<{ type: BlockType; label: string; icon: string; description: string }> = [
-      { type: 'grid', label: 'Grid View', icon: '📊', description: 'Display data in a table' },
-      { type: 'form', label: 'Form', icon: '📝', description: 'Collect data with a form' },
-      { type: 'chart', label: 'Chart', icon: '📈', description: 'Visualize data' },
-      { type: 'kpi', label: 'KPI', icon: '📊', description: 'Show key metrics' },
-    ]
+    // Template-specific empty state content
+    const getEmptyStateContent = () => {
+      switch (layoutTemplate) {
+        case 'dashboard':
+          return {
+            icon: '📈',
+            title: 'Build your dashboard',
+            description: interfaceDescription || 'Add KPIs, charts, and data grids to create a comprehensive overview.',
+            suggestedBlocks: [
+              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Show key metrics' },
+              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize trends' },
+              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
+            ],
+          }
+        case 'planning':
+          return {
+            icon: '📋',
+            title: 'Set up your planning board',
+            description: interfaceDescription || 'Organize your work with grids, KPIs, and progress tracking.',
+            suggestedBlocks: [
+              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'View all items' },
+              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Track progress' },
+              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize status' },
+            ],
+          }
+        case 'form':
+          return {
+            icon: '📝',
+            title: 'Create your form',
+            description: interfaceDescription || 'Add a form block to collect data and text blocks for instructions.',
+            suggestedBlocks: [
+              { type: 'form' as BlockType, label: 'Form', icon: '📝', description: 'Collect data' },
+              { type: 'text' as BlockType, label: 'Text', icon: '📄', description: 'Add instructions' },
+            ],
+          }
+        case 'record-management':
+          return {
+            icon: '📄',
+            title: 'Set up record management',
+            description: interfaceDescription || 'Add a grid to browse records and a record panel to view details.',
+            suggestedBlocks: [
+              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Browse records' },
+              { type: 'record' as BlockType, label: 'Record Panel', icon: '📄', description: 'View details' },
+            ],
+          }
+        default:
+          return {
+            icon: '🎨',
+            title: 'Build your interface',
+            description: interfaceDescription || 'Get started by adding your first block.',
+            suggestedBlocks: [
+              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
+              { type: 'form' as BlockType, label: 'Form', icon: '📝', description: 'Collect data' },
+              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize data' },
+              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Show metrics' },
+            ],
+          }
+      }
+    }
+
+    const emptyState = getEmptyStateContent()
 
     return (
       <div className="w-full h-full flex items-center justify-center p-8">
         <div className="text-center max-w-2xl">
-          <div className="text-6xl mb-4">🎨</div>
+          <div className="text-6xl mb-4">{emptyState.icon}</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Build your interface
+            {emptyState.title}
           </h3>
           <p className="text-sm text-gray-500 mb-6">
             {isEditing
-              ? "Get started by adding your first block. Choose from common blocks below or use the + button for more options."
+              ? emptyState.description
               : "Edit this interface to add blocks and customize it."}
           </p>
           
           {isEditing && onAddBlock && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-              {commonBlocks.map((block) => (
+              {emptyState.suggestedBlocks.map((block) => (
                 <button
                   key={block.type}
                   onClick={() => onAddBlock(block.type)}
@@ -208,6 +271,7 @@ export default function Canvas({
               // - inside editor content (quill, textarea, input)
               // - inside any interactive element
               // - inside text block editor (prevent settings panel from opening while typing)
+              // CRITICAL: Settings panel should ONLY open when clicking the settings icon, not on block selection
               if (isEditing) {
                 const target = e.target as HTMLElement
                 const isEditorContent = target.closest('.ql-editor') || 
@@ -216,8 +280,12 @@ export default function Canvas({
                                        target.closest('[contenteditable="true"]') ||
                                        target.closest('button') ||
                                        target.closest('.ql-toolbar') ||
-                                       target.closest('[role="textbox"]')
+                                       target.closest('[role="textbox"]') ||
+                                       target.closest('.ql-container') ||
+                                       target.closest('.ql-snow')
                 
+                // Only select block if not clicking editor content
+                // This prevents settings panel from opening when clicking inside text blocks
                 if (!isEditorContent) {
                   onBlockClick?.(block.id)
                 }
@@ -298,12 +366,23 @@ export default function Canvas({
               </>
             )}
 
+            {/* Lock Indicator */}
+            {block.config?.locked && (
+              <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-xs text-yellow-800">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                View Only
+              </div>
+            )}
+
             {/* Block Content */}
-            <div className="h-full w-full">
+            <div className={`h-full w-full ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}>
               <BlockRenderer
                 block={block}
-                isEditing={isEditing}
+                isEditing={isEditing && !block.config?.locked}
                 onUpdate={onBlockUpdate}
+                isLocked={block.config?.locked || false}
               />
             </div>
             </div>

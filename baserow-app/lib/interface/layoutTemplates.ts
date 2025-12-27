@@ -1,6 +1,6 @@
 import type { BlockType, BlockConfig } from './types'
 
-export type LayoutTemplate = 'table' | 'planning' | 'dashboard' | 'form'
+export type LayoutTemplate = 'table' | 'planning' | 'dashboard' | 'form' | 'record-management' | 'blank'
 
 export interface LayoutTemplateDefinition {
   name: string
@@ -215,6 +215,64 @@ export const LAYOUT_TEMPLATES: Record<LayoutTemplate, LayoutTemplateDefinition> 
         config: {
           title: 'Instructions',
           text_content: '## Instructions\n\n- Fill out all required fields\n- Click submit when done\n- You will receive a confirmation',
+        },
+      },
+    ],
+  },
+  'record-management': {
+    name: 'Record Management',
+    description: 'Focus on viewing and editing individual records',
+    icon: '📄',
+    blocks: [
+      {
+        type: 'text',
+        x: 0,
+        y: 0,
+        w: 12,
+        h: 2,
+        config: {
+          title: 'Record Management',
+          text_content: '# Record Management\n\nView and manage individual records from your table.',
+        },
+      },
+      {
+        type: 'grid',
+        x: 0,
+        y: 2,
+        w: 8,
+        h: 10,
+        config: {
+          title: 'Records',
+          table_id: '',
+        },
+      },
+      {
+        type: 'record',
+        x: 8,
+        y: 2,
+        w: 4,
+        h: 10,
+        config: {
+          title: 'Record Details',
+          table_id: '',
+        },
+      },
+    ],
+  },
+  blank: {
+    name: 'Blank',
+    description: 'Start with an empty canvas',
+    icon: '🎨',
+    blocks: [
+      {
+        type: 'text',
+        x: 0,
+        y: 0,
+        w: 12,
+        h: 2,
+        config: {
+          title: 'Welcome',
+          text_content: '# Welcome to your new interface\n\nAdd blocks to get started. Use the + button to add your first block.',
         },
       },
     ],

@@ -215,6 +215,7 @@ export default function PageSettingsDrawer({
   }
 
   async function handleDelete() {
+    // Confirmation is already shown in the dialog, so proceed
     setDeleting(true)
     try {
       const response = await fetch(`/api/pages/${page.id}`, {
@@ -223,14 +224,16 @@ export default function PageSettingsDrawer({
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || "Failed to delete page")
+        throw new Error(error.error || "Failed to delete interface")
       }
 
       // Redirect to home or interface list
       router.push("/")
+      // Trigger sidebar refresh
+      window.dispatchEvent(new CustomEvent('pages-updated'))
     } catch (error: any) {
-      console.error("Failed to delete page:", error)
-      alert(error.message || "Failed to delete page")
+      console.error("Failed to delete interface:", error)
+      alert(error.message || "Failed to delete interface")
       setDeleting(false)
     }
   }
@@ -414,9 +417,12 @@ export default function PageSettingsDrawer({
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogTitle>Delete Interface?</DialogTitle>
             <DialogDescription>
-              This will permanently delete the interface &quot;{page.name}&quot; and all its blocks. This action cannot be undone.
+              This will permanently delete the interface &quot;<strong>{page.name}</strong>&quot; and all its blocks.
+              <br />
+              <br />
+              <strong className="text-red-600">This action cannot be undone.</strong>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

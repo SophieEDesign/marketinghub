@@ -16,12 +16,14 @@ interface BlockRendererProps {
   block: PageBlock
   isEditing?: boolean
   onUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
+  isLocked?: boolean
 }
 
 export default function BlockRenderer({
   block,
   isEditing = false,
   onUpdate,
+  isLocked = false,
 }: BlockRendererProps) {
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
     if (onUpdate) {
@@ -30,15 +32,17 @@ export default function BlockRenderer({
   }
 
   const renderBlock = () => {
+    const canEdit = isEditing && !isLocked
+    
     switch (block.type) {
       case "grid":
-        return <GridBlock block={block} isEditing={isEditing} />
+        return <GridBlock block={block} isEditing={canEdit} />
 
       case "form":
         return (
           <FormBlock
             block={block}
-            isEditing={isEditing}
+            isEditing={canEdit}
             onSubmit={async (data) => {
               // Handle form submission
               const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
@@ -59,19 +63,19 @@ export default function BlockRenderer({
         )
 
       case "record":
-        return <RecordBlock block={block} isEditing={isEditing} />
+        return <RecordBlock block={block} isEditing={canEdit} />
 
       case "chart":
-        return <ChartBlock block={block} isEditing={isEditing} />
+        return <ChartBlock block={block} isEditing={canEdit} />
 
       case "kpi":
-        return <KPIBlock block={block} isEditing={isEditing} />
+        return <KPIBlock block={block} isEditing={canEdit} />
 
       case "text":
         return (
           <TextBlock
             block={block}
-            isEditing={isEditing}
+            isEditing={canEdit}
             onUpdate={(content) => handleUpdate({ text_content: content })}
           />
         )
@@ -80,16 +84,16 @@ export default function BlockRenderer({
         return (
           <ImageBlock
             block={block}
-            isEditing={isEditing}
+            isEditing={canEdit}
             onUpdate={(updates) => handleUpdate(updates)}
           />
         )
 
       case "divider":
-        return <DividerBlock block={block} isEditing={isEditing} />
+        return <DividerBlock block={block} isEditing={canEdit} />
 
       case "button":
-        return <ButtonBlock block={block} isEditing={isEditing} />
+        return <ButtonBlock block={block} isEditing={canEdit} />
 
       default:
         return (
