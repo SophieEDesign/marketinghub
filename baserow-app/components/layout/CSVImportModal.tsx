@@ -900,10 +900,17 @@ export default function CSVImportModal({
                                 <Select
                                   value={linkTableOptions[col.name] || undefined}
                                   onValueChange={(tableId) => {
-                                    setLinkTableOptions((prev) => ({
-                                      ...prev,
-                                      [col.name]: tableId || undefined,
-                                    }))
+                                    setLinkTableOptions((prev) => {
+                                      if (tableId) {
+                                        return {
+                                          ...prev,
+                                          [col.name]: tableId,
+                                        }
+                                      } else {
+                                        const { [col.name]: _, ...rest } = prev
+                                        return rest
+                                      }
+                                    })
                                   }}
                                 >
                                   <SelectTrigger className="h-9 text-sm">
