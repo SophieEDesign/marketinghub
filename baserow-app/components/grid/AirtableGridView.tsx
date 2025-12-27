@@ -360,6 +360,14 @@ export default function AirtableGridView({
     return FROZEN_COLUMN_WIDTH * 2 + columnsWidth + (onAddField ? FROZEN_COLUMN_WIDTH : 0)
   }, [columnOrder, columnWidths, onAddField])
 
+  // Handle wrap text toggle
+  const handleToggleWrapText = useCallback((fieldName: string) => {
+    setColumnWrapText((prev) => ({
+      ...prev,
+      [fieldName]: !prev[fieldName],
+    }))
+  }, [])
+
   // Handle column resize
   const handleResizeStart = useCallback((fieldName: string) => {
     setResizingColumn(fieldName)
