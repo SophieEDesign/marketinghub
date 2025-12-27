@@ -12,9 +12,9 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Clock, User, RotateCcw, Eye, Loader2 } from "lucide-react"
-import { getVersionsClient, restoreVersionClient, type EntityVersion } from "@/lib/versioning/versioning.client"
+import { getVersionsClient, restoreVersionClient } from "@/lib/versioning/versioning.client"
 import { useToast } from "@/components/ui/use-toast"
-import type { EntityType } from "@/lib/versioning/versioning"
+import type { EntityType, EntityVersion } from "@/lib/versioning/versioning"
 
 interface VersionHistoryPanelProps {
   open: boolean
