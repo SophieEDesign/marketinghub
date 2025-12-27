@@ -4,16 +4,12 @@ import { useState } from "react"
 import { Edit, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import BulkEditModal from "./BulkEditModal"
+import type { TableField } from "@/types/fields"
 
 interface BulkActionBarProps {
   selectedCount: number
   tableName: string
-  tableFields: Array<{
-    id: string
-    name: string
-    type: string
-    options?: any
-  }>
+  tableFields: TableField[]
   userRole?: "admin" | "editor" | "viewer" | null
   onClearSelection: () => void
   onBulkUpdate: (updates: Record<string, any>) => Promise<void>
