@@ -189,6 +189,53 @@ export default function SettingsDataTab() {
     setDeleteDialogOpen(true)
   }
 
+  function handleEditClick(table: Table, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditingTableId(table.id)
+    setEditingTableName(table.name)
+  }
+
+  function handleCancelEdit() {
+    setEditingTableId(null)
+    setEditingTableName('')
+    setSavingName(false)
+  }
+
+  async function handleSaveName() {
+    if (!editingTableId || !editingTableName.trim()) {
+      handleCancelEdit()
+      return
+    }
+
+    setSavingName(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('tables')
+        .update({ name: editingTableName.trim() })
+        .eq('id', editingTableId)
+
+      if (error) {
+        throw error
+      }
+
+      // Update local state
+      setTables(prev => prev.map(t => 
+        t.id === editingTableId ? { ...t, name: editingTableName.trim() } : t
+      ))
+
+      setEditingTableId(null)
+      setEditingTableName('')
+      router.refresh()
+    } catch (error: any) {
+      console.error('Error updating table name:', error)
+      alert(`Failed to update table name: ${error.message || 'Unknown error'}`)
+    } finally {
+      setSavingName(false)
+    }
+  }
+
   async function handleDelete() {
     if (!tableToDelete) return
 
