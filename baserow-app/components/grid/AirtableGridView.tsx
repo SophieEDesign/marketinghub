@@ -34,6 +34,7 @@ interface AirtableGridViewProps {
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
   groupBy?: string
+  userRole?: "admin" | "editor" | "viewer" | null
 }
 
 const ROW_HEIGHT_SHORT = 32
