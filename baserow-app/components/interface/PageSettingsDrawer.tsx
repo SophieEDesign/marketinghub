@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Trash2, Save } from "lucide-react"
+import { Trash2, Save, Clock } from "lucide-react"
 import { IconPicker } from "@/components/ui/icon-picker"
+import VersionHistoryPanel from "@/components/versioning/VersionHistoryPanel"
 import {
   Select,
   SelectContent,
@@ -71,6 +72,7 @@ export default function PageSettingsDrawer({
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -395,6 +397,20 @@ export default function PageSettingsDrawer({
             </div>
 
             <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setVersionHistoryOpen(true)}
+                className="w-full"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                Version History
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                View and restore previous versions of this interface
+              </p>
+            </div>
+
+            <div className="pt-4 border-t">
               <div className="space-y-2">
                 <Label className="text-red-600">Danger Zone</Label>
                 <Button
@@ -443,6 +459,17 @@ export default function PageSettingsDrawer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VersionHistoryPanel
+        open={versionHistoryOpen}
+        onOpenChange={setVersionHistoryOpen}
+        entityType="page"
+        entityId={page.id}
+        onRestore={() => {
+          // Refresh page data after restore
+          onPageUpdate()
+        }}
+      />
     </>
   )
 }

@@ -16,14 +16,15 @@ import {
   FileText,
   ChevronDown,
   Settings,
-  X
+  X,
+  Clock
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 interface ViewTopBarProps {
   viewName: string
-  viewType?: "grid" | "kanban" | "calendar" | "form"
+  viewType?: "grid" | "kanban" | "calendar" | "form" | "timeline"
   onFilter?: () => void
   onSort?: () => void
   onGroup?: () => void
@@ -99,6 +100,8 @@ export default function ViewTopBar({
         return <Layout className="h-4 w-4" />
       case "calendar":
         return <Calendar className="h-4 w-4" />
+      case "timeline":
+        return <Clock className="h-4 w-4" />
       case "form":
         return <FileText className="h-4 w-4" />
       default:
