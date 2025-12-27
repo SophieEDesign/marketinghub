@@ -398,7 +398,9 @@ export default function InlineFieldEditor({
       <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
         {field.name}
         {isVirtual && (
-          <Calculator className="h-3 w-3 text-gray-400" title="Formula field" />
+          <span title="Formula or lookup field">
+            <Calculator className="h-3 w-3 text-gray-400" />
+          </span>
         )}
       </label>
       {isReadOnly ? (
