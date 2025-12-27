@@ -266,7 +266,8 @@ export default function AirtableGridView({
       // Range selection
       const start = Math.min(lastSelectedIndex, index)
       const end = Math.max(lastSelectedIndex, index)
-      const rangeIds = filteredRows.slice(start, end + 1).map((row: any) => row.id)
+      const rowsArray = Array.isArray(filteredRows) ? filteredRows : []
+      const rangeIds = rowsArray.slice(start, end + 1).map((row: any) => row.id)
       setSelectedRowIds((prev) => {
         const next = new Set(prev)
         rangeIds.forEach(id => next.add(id))

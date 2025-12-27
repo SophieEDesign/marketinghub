@@ -180,7 +180,9 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
       transformHeader: (header) => header.trim(),
       complete: (results) => {
         try {
-          const data = results.data as Record<string, any>[]
+          // Ensure results.data is an array
+          const rawData = results.data
+          const data = Array.isArray(rawData) ? rawData : []
           
           if (data.length === 0) {
             reject(new Error('CSV file is empty or has no data rows'))
@@ -188,7 +190,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
           }
 
           // Get all column names from first row
-          const firstRow = data[0]
+          const firstRow = data[0] || {}
           const columnNames = Object.keys(firstRow)
           
           if (columnNames.length === 0) {
@@ -201,14 +203,17 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             return
           }
 
+          // Ensure data is always an array
+          const dataArray = Array.isArray(data) ? data : []
+
           // Analyze each column
           const columns: ParsedColumn[] = columnNames.map((name, index) => {
             const sanitizedName = sanitizeColumnName(name)
             
             // Get sample values from first 100 rows
-            const sampleValues = data
+            const sampleValues = dataArray
               .slice(0, 100)
-              .map(row => {
+              .map((row: any) => {
                 const value = row[name]
                 // Handle arrays (from CSV parsing) - convert to string
                 if (Array.isArray(value)) {
@@ -216,10 +221,10 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
                 }
                 return value
               })
-              .filter(v => v !== null && v !== undefined && v !== '')
+              .filter((v: any) => v !== null && v !== undefined && v !== '')
             
             const type = inferColumnType(
-              data.slice(0, 100).map(row => {
+              dataArray.slice(0, 100).map((row: any) => {
                 const value = row[name]
                 // Handle arrays - convert to string for type inference
                 if (Array.isArray(value)) {
@@ -238,7 +243,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
           })
 
           // Get preview rows (first 10) and ensure all values are properly formatted
-          const previewRows = data.slice(0, 10).map(row => {
+          const previewRows = dataArray.slice(0, 10).map((row: any) => {
             const processedRow: Record<string, any> = {}
             for (const key in row) {
               const value = row[key]
@@ -254,7 +259,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
 
           resolve({
             columns,
-            rows: data,
+            rows: dataArray,
             previewRows,
           })
         } catch (error: any) {

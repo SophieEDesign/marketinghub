@@ -38,7 +38,7 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
 
       // Use Promise.allSettled to handle missing tables gracefully
       const [tableRes, viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes, viewRes] = await Promise.allSettled([
-        supabase.from("tables").select("supabase_table").eq("id", tableId).single(),
+        supabase.from("tables").select("supabase_table").eq("id", tableId).maybeSingle(),
         supabase
           .from("view_fields")
           .select("field_name, visible, position")
@@ -60,7 +60,14 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
         supabase.from("views").select("config, id").eq("id", viewId).maybeSingle(),
       ])
 
-      if (tableRes.status === 'fulfilled' && !tableRes.value.error && tableRes.value.data) setTable(tableRes.value.data)
+      if (tableRes.status === 'fulfilled') {
+        if (tableRes.value.error) {
+          // Handle 406 or other errors gracefully
+          console.warn('Error loading table:', tableRes.value.error)
+        } else if (tableRes.value.data) {
+          setTable(tableRes.value.data)
+        }
+      }
       if (viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error && viewFieldsRes.value.data) setViewFields(viewFieldsRes.value.data)
       if (viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error && viewFiltersRes.value.data) setViewFilters(viewFiltersRes.value.data)
       if (viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error && viewSortsRes.value.data) setViewSorts(viewSortsRes.value.data)

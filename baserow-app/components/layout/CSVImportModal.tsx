@@ -893,11 +893,11 @@ export default function CSVImportModal({
                               <div className="space-y-1 mt-2">
                                 <Label className="text-xs text-gray-600">Linked Table</Label>
                                 <Select
-                                  value={linkTableOptions[col.name] || ''}
+                                  value={linkTableOptions[col.name] || undefined}
                                   onValueChange={(tableId) => {
                                     setLinkTableOptions((prev) => ({
                                       ...prev,
-                                      [col.name]: tableId,
+                                      [col.name]: tableId || undefined,
                                     }))
                                   }}
                                 >
@@ -905,7 +905,6 @@ export default function CSVImportModal({
                                     <SelectValue placeholder="Select a table to link to" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Select a table</SelectItem>
                                     {availableTables.map((table) => (
                                       <SelectItem key={table.id} value={table.id}>
                                         {table.name}

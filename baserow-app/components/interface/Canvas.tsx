@@ -16,12 +16,14 @@ interface CanvasProps {
   onBlockUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   onBlockClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void
+  onAddBlock?: (type: string) => void
   selectedBlockId?: string | null
   layoutSettings?: {
     cols?: number
     rowHeight?: number
     margin?: [number, number]
   }
+  primaryTableId?: string | null
 }
 
 export default function Canvas({
@@ -30,9 +32,12 @@ export default function Canvas({
   onLayoutChange,
   onBlockUpdate,
   onBlockClick,
+  onBlockSettingsClick,
   onBlockDelete,
+  onAddBlock,
   selectedBlockId,
   layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
+  primaryTableId,
 }: CanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
@@ -96,20 +101,51 @@ export default function Canvas({
     [onLayoutChange]
   )
 
-  // Empty state: Show friendly message when no blocks exist
+  // Empty state: Show friendly message with actionable buttons
   if (blocks.length === 0) {
+    const commonBlocks = [
+      { type: 'grid', label: 'Grid View', icon: '📊', description: 'Display data in a table' },
+      { type: 'form', label: 'Form', icon: '📝', description: 'Collect data with a form' },
+      { type: 'chart', label: 'Chart', icon: '📈', description: 'Visualize data' },
+      { type: 'kpi', label: 'KPI', icon: '📊', description: 'Show key metrics' },
+    ]
+
     return (
-      <div className="w-full h-full flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">📄</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            This interface is empty
+      <div className="w-full h-full flex items-center justify-center p-8">
+        <div className="text-center max-w-2xl">
+          <div className="text-6xl mb-4">🎨</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            Build your interface
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-6">
             {isEditing
-              ? "Click the 'Add block' button to get started building your interface."
+              ? "Get started by adding your first block. Choose from common blocks below or use the + button for more options."
               : "Edit this interface to add blocks and customize it."}
           </p>
+          
+          {isEditing && onAddBlock && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+              {commonBlocks.map((block) => (
+                <button
+                  key={block.type}
+                  onClick={() => onAddBlock(block.type)}
+                  className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
+                >
+                  <span className="text-2xl">{block.icon}</span>
+                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
+                    {block.label}
+                  </div>
+                  <div className="text-xs text-gray-500">{block.description}</div>
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {!isEditing && (
+            <p className="text-xs text-gray-400 mt-4">
+              Switch to edit mode to add blocks
+            </p>
+          )}
         </div>
       </div>
     )
@@ -187,6 +223,7 @@ export default function Canvas({
                     e.stopPropagation()
                     e.preventDefault()
                     onBlockClick?.(block.id)
+                    onBlockSettingsClick?.(block.id)
                   }}
                   className={`p-1.5 rounded-md shadow-sm transition-all ${
                     selectedBlockId === block.id

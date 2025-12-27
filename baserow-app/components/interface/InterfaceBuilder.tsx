@@ -43,6 +43,7 @@ export default function InterfaceBuilder({
     }
   }, [isEditing, page.id, isViewer])
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
@@ -365,19 +366,28 @@ export default function InterfaceBuilder({
             onLayoutChange={handleLayoutChange}
             onBlockUpdate={handleBlockUpdate}
             onBlockClick={setSelectedBlockId}
+            onBlockSettingsClick={(blockId) => {
+              setSelectedBlockId(blockId)
+              setSettingsPanelOpen(true)
+            }}
             onBlockDelete={handleDeleteBlock}
+            onAddBlock={handleAddBlock}
             selectedBlockId={selectedBlockId}
             layoutSettings={page.settings?.layout}
+            primaryTableId={page.config?.settings?.primary_table_id || page.table_id || null}
           />
         </div>
       </div>
 
-      {/* Settings Panel */}
+      {/* Settings Panel - Only opens when explicitly clicked */}
       {isEditing && (
         <SettingsPanel
           block={selectedBlock}
-          isOpen={!!selectedBlock}
-          onClose={() => setSelectedBlockId(null)}
+          isOpen={settingsPanelOpen && !!selectedBlock}
+          onClose={() => {
+            setSettingsPanelOpen(false)
+            setSelectedBlockId(null)
+          }}
           onSave={handleSaveSettings}
         />
       )}

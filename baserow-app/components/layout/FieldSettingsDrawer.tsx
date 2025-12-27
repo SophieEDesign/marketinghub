@@ -382,9 +382,9 @@ export default function FieldSettingsDrawer({
             <div className="space-y-2">
               <Label htmlFor="linked-table">Linked Table</Label>
               <Select
-                value={options.linked_table_id || ''}
+                value={options.linked_table_id || undefined}
                 onValueChange={(tableId) =>
-                  setOptions({ ...options, linked_table_id: tableId })
+                  setOptions({ ...options, linked_table_id: tableId || undefined })
                 }
               >
                 <SelectTrigger id="linked-table">
@@ -392,18 +392,15 @@ export default function FieldSettingsDrawer({
                 </SelectTrigger>
                 <SelectContent>
                   {loadingTables ? (
-                    <SelectItem value="" disabled>Loading tables...</SelectItem>
+                    <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
                   ) : (
-                    <>
-                      <SelectItem value="">Select a table</SelectItem>
-                      {tables
-                        .filter(t => t.id !== tableId) // Don't allow linking to self
-                        .map((table) => (
-                          <SelectItem key={table.id} value={table.id}>
-                            {table.name}
-                          </SelectItem>
-                        ))}
-                    </>
+                    tables
+                      .filter(t => t.id !== tableId) // Don't allow linking to self
+                      .map((table) => (
+                        <SelectItem key={table.id} value={table.id}>
+                          {table.name}
+                        </SelectItem>
+                      ))
                   )}
                 </SelectContent>
               </Select>
@@ -415,9 +412,9 @@ export default function FieldSettingsDrawer({
               <div className="space-y-2">
                 <Label htmlFor="lookup-table">Lookup Table</Label>
                 <Select
-                  value={options.lookup_table_id || ''}
+                  value={options.lookup_table_id || undefined}
                   onValueChange={(tableId) =>
-                    setOptions({ ...options, lookup_table_id: tableId })
+                    setOptions({ ...options, lookup_table_id: tableId || undefined })
                   }
                 >
                   <SelectTrigger id="lookup-table">
@@ -425,18 +422,15 @@ export default function FieldSettingsDrawer({
                   </SelectTrigger>
                   <SelectContent>
                     {loadingTables ? (
-                      <SelectItem value="" disabled>Loading tables...</SelectItem>
+                      <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
                     ) : (
-                      <>
-                        <SelectItem value="">Select a table</SelectItem>
-                        {tables
-                          .filter(t => t.id !== tableId)
-                          .map((table) => (
-                            <SelectItem key={table.id} value={table.id}>
-                              {table.name}
-                            </SelectItem>
-                          ))}
-                      </>
+                      tables
+                        .filter(t => t.id !== tableId)
+                        .map((table) => (
+                          <SelectItem key={table.id} value={table.id}>
+                            {table.name}
+                          </SelectItem>
+                        ))
                     )}
                   </SelectContent>
                 </Select>
@@ -445,16 +439,15 @@ export default function FieldSettingsDrawer({
                 <div className="space-y-2">
                   <Label htmlFor="lookup-field">Lookup Field</Label>
                   <Select
-                    value={options.lookup_field_id || ''}
+                    value={options.lookup_field_id || undefined}
                     onValueChange={(fieldId) =>
-                      setOptions({ ...options, lookup_field_id: fieldId })
+                      setOptions({ ...options, lookup_field_id: fieldId || undefined })
                     }
                   >
                     <SelectTrigger id="lookup-field">
                       <SelectValue placeholder="Select a field" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Select a field</SelectItem>
                       {/* TODO: Load fields from lookup table */}
                     </SelectContent>
                   </Select>
