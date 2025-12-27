@@ -18,6 +18,7 @@ interface CanvasProps {
   onBlockClick?: (blockId: string) => void
   onBlockSettingsClick?: (blockId: string) => void
   onBlockDelete?: (blockId: string) => void
+  onBlockDuplicate?: (blockId: string) => void
   onAddBlock?: (type: BlockType) => void | Promise<void>
   selectedBlockId?: string | null
   layoutSettings?: {
@@ -36,6 +37,7 @@ export default function Canvas({
   onBlockClick,
   onBlockSettingsClick,
   onBlockDelete,
+  onBlockDuplicate,
   onAddBlock,
   selectedBlockId,
   layoutSettings = { cols: 12, rowHeight: 30, margin: [10, 10] },
@@ -148,9 +150,20 @@ export default function Canvas({
           )}
           
           {!isEditing && (
-            <p className="text-xs text-gray-400 mt-4">
-              Switch to edit mode to add blocks
-            </p>
+            <div className="mt-4">
+              <p className="text-xs text-gray-400 mb-2">
+                Switch to edit mode to add blocks
+              </p>
+              <button
+                onClick={() => {
+                  // Trigger edit mode via custom event
+                  window.dispatchEvent(new CustomEvent('interface-edit-mode-toggle'))
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Edit interface
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -226,7 +239,7 @@ export default function Canvas({
                   </div>
                 </div>
 
-                {/* Settings and Delete Buttons - Only visible on hover */}
+                {/* Block Toolbar - Only visible on hover */}
                 <div className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                   <button
                     onClick={(e) => {
@@ -248,21 +261,38 @@ export default function Canvas({
                     </svg>
                   </button>
                   {onBlockDelete && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        if (confirm("Are you sure you want to delete this block?")) {
-                          onBlockDelete(block.id)
-                        }
-                      }}
-                      className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 transition-all"
-                      title="Delete block"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <>
+                      {onBlockDuplicate && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            onBlockDuplicate(block.id)
+                          }}
+                          className="p-1.5 rounded-md shadow-sm bg-white text-gray-600 border border-gray-300 hover:bg-gray-50 transition-all"
+                          title="Duplicate block (Cmd+D)"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          if (confirm("Are you sure you want to delete this block?")) {
+                            onBlockDelete(block.id)
+                          }
+                        }}
+                        className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 transition-all"
+                        title="Delete block (Del)"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </>
                   )}
                 </div>
               </>

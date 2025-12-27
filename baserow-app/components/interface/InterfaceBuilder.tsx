@@ -17,6 +17,7 @@ interface InterfaceBuilderProps {
   initialBlocks: PageBlock[]
   isViewer?: boolean
   onSave?: () => void
+  onEditModeChange?: (isEditing: boolean) => void
 }
 
 export default function InterfaceBuilder({
@@ -24,6 +25,7 @@ export default function InterfaceBuilder({
   initialBlocks,
   isViewer = false,
   onSave,
+  onEditModeChange,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -44,7 +46,8 @@ export default function InterfaceBuilder({
     if (typeof window !== 'undefined' && !isViewer) {
       localStorage.setItem(`interface-edit-mode-${page.id}`, String(isEditing))
     }
-  }, [isEditing, page.id, isViewer])
+    onEditModeChange?.(isEditing)
+  }, [isEditing, page.id, isViewer, onEditModeChange])
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -260,19 +263,77 @@ export default function InterfaceBuilder({
       if (!confirm("Are you sure you want to delete this block?")) return
 
       try {
-        await fetch(`/api/pages/${page.id}/blocks/${blockId}`, {
+        const response = await fetch(`/api/pages/${page.id}/blocks/${blockId}`, {
           method: "DELETE",
         })
+
+        if (!response.ok) {
+          throw new Error("Failed to delete block")
+        }
 
         setBlocks((prev) => prev.filter((b) => b.id !== blockId))
         if (selectedBlockId === blockId) {
           setSelectedBlockId(null)
+          setSettingsPanelOpen(false)
         }
-      } catch (error) {
+        toast({
+          variant: "success",
+          title: "Block deleted",
+          description: "The block has been removed",
+        })
+      } catch (error: any) {
         console.error("Failed to delete block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to delete block",
+          description: error.message || "Please try again",
+        })
       }
     },
-    [page.id, selectedBlockId]
+    [page.id, selectedBlockId, toast]
+  )
+
+  const handleDuplicateBlock = useCallback(
+    async (blockId: string) => {
+      const blockToDuplicate = blocks.find((b) => b.id === blockId)
+      if (!blockToDuplicate) return
+
+      try {
+        const response = await fetch(`/api/pages/${page.id}/blocks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: blockToDuplicate.type,
+            x: blockToDuplicate.x,
+            y: (blockToDuplicate.y || 0) + (blockToDuplicate.h || 4), // Place below original
+            w: blockToDuplicate.w,
+            h: blockToDuplicate.h,
+            config: blockToDuplicate.config,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to duplicate block")
+        }
+
+        const { block } = await response.json()
+        setBlocks((prev) => [...prev, block])
+        setSelectedBlockId(block.id)
+        toast({
+          variant: "success",
+          title: "Block duplicated",
+          description: "The block has been copied",
+        })
+      } catch (error: any) {
+        console.error("Failed to duplicate block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to duplicate block",
+          description: error.message || "Please try again",
+        })
+      }
+    },
+    [page.id, blocks, toast]
   )
 
   const handleSaveSettings = useCallback(
@@ -296,6 +357,40 @@ export default function InterfaceBuilder({
   }, [page.id])
 
   const selectedBlock = blocks.find((b) => b.id === selectedBlockId) || null
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isEditing) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input/textarea
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return
+      }
+
+      // Delete block: Del or Backspace
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedBlockId) {
+        e.preventDefault()
+        handleDeleteBlock(selectedBlockId)
+      }
+      
+      // Duplicate block: Cmd/Ctrl + D
+      if ((e.metaKey || e.ctrlKey) && e.key === "d" && selectedBlockId) {
+        e.preventDefault()
+        handleDuplicateBlock(selectedBlockId)
+      }
+      
+      // Exit edit mode: Esc
+      if (e.key === "Escape") {
+        e.preventDefault()
+        handleExitEditMode()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode])
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -395,6 +490,7 @@ export default function InterfaceBuilder({
               setSettingsPanelOpen(true)
             }}
             onBlockDelete={handleDeleteBlock}
+            onBlockDuplicate={handleDuplicateBlock}
             onAddBlock={handleAddBlock}
             selectedBlockId={selectedBlockId}
             layoutSettings={page.settings?.layout}

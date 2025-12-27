@@ -65,6 +65,7 @@ export default function PageSettingsDrawer({
   const [groupId, setGroupId] = useState<string | null>(null)
   const [defaultView, setDefaultView] = useState<string | null>(null)
   const [hideViewSwitcher, setHideViewSwitcher] = useState(false)
+  const [isDefault, setIsDefault] = useState(false)
   const [groups, setGroups] = useState<InterfaceGroup[]>([])
   const [views, setViews] = useState<View[]>([])
   const [saving, setSaving] = useState(false)
@@ -75,8 +76,23 @@ export default function PageSettingsDrawer({
     if (open) {
       loadGroups()
       loadViews()
+      loadDefaultStatus()
     }
-  }, [open])
+  }, [open, page.id])
+
+  async function loadDefaultStatus() {
+    try {
+      const supabase = createClient()
+      const { data: workspaceSettings } = await supabase
+        .from('workspace_settings')
+        .select('default_interface_id')
+        .maybeSingle()
+      
+      setIsDefault(workspaceSettings?.default_interface_id === page.id)
+    } catch (error) {
+      console.error('Error loading default status:', error)
+    }
+  }
 
   useEffect(() => {
     setName(page.name)
@@ -147,6 +163,42 @@ export default function PageSettingsDrawer({
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || "Failed to update interface")
+      }
+
+      // Update default interface setting
+      const supabase = createClient()
+      const { data: existing } = await supabase
+        .from('workspace_settings')
+        .select('id')
+        .maybeSingle()
+
+      if (isDefault) {
+        if (existing) {
+          await supabase
+            .from('workspace_settings')
+            .update({ default_interface_id: page.id })
+            .eq('id', existing.id)
+        } else {
+          await supabase
+            .from('workspace_settings')
+            .insert({ default_interface_id: page.id })
+        }
+      } else {
+        // Remove default if unchecked
+        if (existing) {
+          const { data: currentSettings } = await supabase
+            .from('workspace_settings')
+            .select('default_interface_id')
+            .eq('id', existing.id)
+            .single()
+          
+          if (currentSettings?.default_interface_id === page.id) {
+            await supabase
+              .from('workspace_settings')
+              .update({ default_interface_id: null })
+              .eq('id', existing.id)
+          }
+        }
       }
 
       // Trigger sidebar refresh
@@ -289,6 +341,24 @@ export default function PageSettingsDrawer({
               </div>
               <p className="text-xs text-muted-foreground">
                 If enabled, the view switcher will be hidden in this interface
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="set-as-default"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="set-as-default" className="text-sm font-normal cursor-pointer">
+                  Set as default landing page
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Users will be redirected to this interface when they log in
               </p>
             </div>
 
