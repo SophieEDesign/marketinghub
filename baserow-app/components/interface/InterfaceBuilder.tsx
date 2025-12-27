@@ -374,7 +374,7 @@ export default function InterfaceBuilder({
             onAddBlock={handleAddBlock}
             selectedBlockId={selectedBlockId}
             layoutSettings={page.settings?.layout}
-            primaryTableId={page.config?.settings?.primary_table_id || page.table_id || null}
+            primaryTableId={page.settings?.primary_table_id || null}
           />
         </div>
       </div>

@@ -84,6 +84,7 @@ export interface PageSettings {
   icon?: string
   access?: 'public' | 'authenticated' | 'roles'
   allowed_roles?: string[]
+  primary_table_id?: string
   layout?: {
     cols?: number
     rowHeight?: number
