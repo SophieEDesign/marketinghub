@@ -27,33 +27,60 @@ function inferType(value: any): 'text' | 'number' | 'boolean' | 'date' {
     return 'text' // Default to text for empty values
   }
 
-  // Check for boolean
-  const stringValue = String(value).toLowerCase().trim()
-  if (stringValue === 'true' || stringValue === 'false' || stringValue === '1' || stringValue === '0') {
+  const stringValue = String(value).trim()
+  if (stringValue === '') {
+    return 'text'
+  }
+
+  // Check for boolean first (most specific)
+  const lowerValue = stringValue.toLowerCase()
+  const booleanValues = ['true', 'false', 'yes', 'no', 'y', 'n', '1', '0', 't', 'f']
+  if (booleanValues.includes(lowerValue)) {
     return 'boolean'
   }
 
-  // Check for number
-  if (!isNaN(Number(value)) && value !== '' && !isNaN(parseFloat(value))) {
-    // Make sure it's not just whitespace
-    if (String(value).trim() === String(Number(value))) {
-      return 'number'
+  // Check for date (try parsing first, then check patterns)
+  // Try parsing as date first - Date constructor is quite flexible
+  const date = new Date(stringValue)
+  if (!isNaN(date.getTime())) {
+    // Additional validation: check if it's a reasonable date (not epoch 0 or far future)
+    const year = date.getFullYear()
+    if (year >= 1900 && year <= 2100) {
+      // Check if the input looks like a date (has numbers and separators)
+      const datePatterns = [
+        /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/, // YYYY-MM-DD or YYYY/MM/DD
+        /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/, // MM/DD/YYYY or DD-MM-YYYY
+        /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i, // DD Mon YYYY
+        /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}/i, // Mon DD
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO datetime
+      ]
+      
+      // If it matches a date pattern OR if it's a valid date and contains date-like characters
+      if (datePatterns.some(pattern => pattern.test(stringValue)) || 
+          (/\d{1,2}[-\/\s]\d{1,2}[-\/\s]\d{2,4}/.test(stringValue) && stringValue.length <= 50)) {
+        return 'date'
+      }
     }
   }
 
-  // Check for date (ISO format or common date formats)
-  const datePatterns = [
-    /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO datetime
-    /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
-    /^\d{2}-\d{2}-\d{4}$/, // MM-DD-YYYY
-  ]
+  // Check for number - improved detection
+  // Remove common formatting characters (commas, currency symbols, spaces, percent signs)
+  const cleanedValue = stringValue.replace(/[$€£¥,\s%]/g, '')
   
-  const dateStr = String(value).trim()
-  if (datePatterns.some(pattern => pattern.test(dateStr))) {
-    const date = new Date(dateStr)
-    if (!isNaN(date.getTime())) {
-      return 'date'
+  // Check if it's a valid number after cleaning
+  if (cleanedValue !== '' && !isNaN(Number(cleanedValue)) && isFinite(Number(cleanedValue))) {
+    // Additional check: make sure it's not just text that happens to parse as a number
+    // (e.g., "NaN", "Infinity" would pass the above check)
+    const numValue = Number(cleanedValue)
+    if (isFinite(numValue) && !isNaN(numValue)) {
+      // Check if original value contains mostly numeric characters
+      const numericChars = stringValue.replace(/[^0-9.-]/g, '').length
+      const totalChars = stringValue.length
+      
+      // If at least 50% of characters are numeric, or if it's a simple number
+      if (numericChars / totalChars >= 0.5 || /^-?\d+(\.\d+)?$/.test(cleanedValue)) {
+        return 'number'
+      }
     }
   }
 
@@ -83,16 +110,28 @@ function inferColumnType(values: any[]): 'text' | 'number' | 'boolean' | 'date' 
     typeCounts[type]++
   })
 
-  // Return the most common type, but prefer more specific types
-  if (typeCounts.date > 0 && typeCounts.date / nonEmptyValues.length > 0.5) {
+  const total = nonEmptyValues.length
+  
+  // Use a lower threshold (40%) and prefer more specific types
+  // This allows for some mixed data but still detects the dominant type
+  const threshold = 0.4
+
+  // Prefer more specific types first (date > boolean > number > text)
+  if (typeCounts.date > 0 && typeCounts.date / total >= threshold) {
     return 'date'
   }
-  if (typeCounts.boolean > 0 && typeCounts.boolean / nonEmptyValues.length > 0.5) {
+  if (typeCounts.boolean > 0 && typeCounts.boolean / total >= threshold) {
     return 'boolean'
   }
-  if (typeCounts.number > 0 && typeCounts.number / nonEmptyValues.length > 0.5) {
+  if (typeCounts.number > 0 && typeCounts.number / total >= threshold) {
     return 'number'
   }
+
+  // If no type meets threshold, use the most common type
+  const maxCount = Math.max(typeCounts.date, typeCounts.boolean, typeCounts.number, typeCounts.text)
+  if (typeCounts.date === maxCount && maxCount > 0) return 'date'
+  if (typeCounts.boolean === maxCount && maxCount > 0) return 'boolean'
+  if (typeCounts.number === maxCount && maxCount > 0) return 'number'
 
   return 'text'
 }

@@ -200,7 +200,7 @@ export default function CSVImportModal({
       setProgress('Mapping columns to fields...')
       
       const columnMappings: Record<string, string> = { ...fieldMappings } // CSV column name -> field name
-      const fieldsToCreate: Array<{ name: string; type: FieldType }> = []
+      const fieldsToCreate: Array<{ name: string; type: FieldType; options?: any }> = []
 
       // Collect fields that need to be created (from newFieldTypes)
       parsedData.columns.forEach((col) => {
@@ -211,10 +211,65 @@ export default function CSVImportModal({
         
         // If column has a new field type specified, add it to create list
         if (newFieldTypes[col.name]) {
-          fieldsToCreate.push({
+          const fieldData: { name: string; type: FieldType; options?: any } = {
             name: col.name,
-            type: newFieldTypes[col.name]
-          })
+            type: newFieldTypes[col.name],
+          }
+
+          // Extract choices for select fields
+          if (newFieldTypes[col.name] === 'single_select' || newFieldTypes[col.name] === 'multi_select') {
+            const uniqueChoices = new Set<string>()
+            let valuesFound = 0
+            
+            // Extract from all rows in parsedData
+            // Use the exact column name from the parsed data
+            parsedData.rows.forEach((row, rowIndex) => {
+              // Try exact match first, then try case-insensitive
+              let value = row[col.name]
+              if (value === undefined) {
+                // Try case-insensitive match
+                const matchingKey = Object.keys(row).find(key => key.toLowerCase() === col.name.toLowerCase())
+                if (matchingKey) {
+                  value = row[matchingKey]
+                }
+              }
+              
+              if (value !== null && value !== undefined && value !== '') {
+                const stringValue = String(value).trim()
+                if (stringValue) {
+                  valuesFound++
+                  if (newFieldTypes[col.name] === 'multi_select') {
+                    // Split by comma or semicolon for multi-select
+                    const parts = stringValue.split(/[,;]/).map(p => p.trim()).filter(p => p)
+                    parts.forEach(part => uniqueChoices.add(part))
+                  } else {
+                    // Single select - use value as-is
+                    uniqueChoices.add(stringValue)
+                  }
+                }
+              }
+            })
+            
+            // Convert to sorted array and limit to reasonable number
+            const choices = Array.from(uniqueChoices).sort().slice(0, 100)
+            
+            // Single_select and multi_select require at least one choice
+            if (choices.length === 0) {
+              const availableColumns = parsedData.rows.length > 0 ? Object.keys(parsedData.rows[0]).join(', ') : 'none'
+              throw new Error(
+                `Field "${col.name}" is set as ${newFieldTypes[col.name]}, but no valid choices were found in the CSV data. ` +
+                `Found ${parsedData.rows.length} rows, ${valuesFound} non-empty values. ` +
+                `Available columns: ${availableColumns}. ` +
+                `Please either change the field type or ensure the column contains selectable values.`
+              )
+            }
+            
+            // Always set options for select fields
+            fieldData.options = { choices }
+            console.log(`Extracted ${choices.length} choices for "${col.name}" from ${valuesFound} values:`, choices.slice(0, 10))
+          }
+
+          fieldsToCreate.push(fieldData)
         }
         // Otherwise, column is unmapped and will be skipped
       })
@@ -226,14 +281,32 @@ export default function CSVImportModal({
         for (const fieldInfo of fieldsToCreate) {
           const sanitizedName = sanitizeFieldNameSafe(fieldInfo.name)
           
+          const requestBody: any = {
+            name: sanitizedName,
+            type: fieldInfo.type,
+            required: false,
+          }
+
+          // Always include options for select fields (required by validation)
+          if (fieldInfo.type === 'single_select' || fieldInfo.type === 'multi_select') {
+            if (!fieldInfo.options || !fieldInfo.options.choices || fieldInfo.options.choices.length === 0) {
+              throw new Error(
+                `Field "${fieldInfo.name}" is set as ${fieldInfo.type} but has no choices configured. ` +
+                `This should not happen - please report this error.`
+              )
+            }
+            requestBody.options = fieldInfo.options
+          } else if (fieldInfo.options) {
+            // Include options for other field types if present
+            requestBody.options = fieldInfo.options
+          }
+          
+          console.log(`Creating field "${fieldInfo.name}" (${fieldInfo.type}) with options:`, requestBody.options)
+          
           const response = await fetch(`/api/tables/${tableId}/fields`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: sanitizedName,
-              type: fieldInfo.type,
-              required: false,
-            }),
+            body: JSON.stringify(requestBody),
           })
 
           if (!response.ok) {
