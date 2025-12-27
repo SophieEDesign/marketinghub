@@ -98,6 +98,142 @@ export default function CSVImportModal({
     }
   }, [open, tableId, loadTableFields])
 
+  // Advanced field type detection from sample values
+  const detectFieldType = useCallback((sampleValues: string[]): FieldType => {
+    if (sampleValues.length === 0) return 'text'
+    
+    const threshold = Math.max(1, Math.floor(sampleValues.length * 0.4)) // 40% threshold
+    const nonEmptyValues = sampleValues.filter(v => v && String(v).trim())
+
+    if (nonEmptyValues.length === 0) return 'text'
+
+    // Check for JSON pattern first (most specific)
+    const jsonPattern = /^[\s]*[{\[]/
+    const jsonMatches = nonEmptyValues.filter(v => {
+      const trimmed = String(v).trim()
+      if (!jsonPattern.test(trimmed)) return false
+      try {
+        JSON.parse(trimmed)
+        return true
+      } catch {
+        return false
+      }
+    }).length
+    
+    if (jsonMatches >= threshold) {
+      return 'json'
+    }
+
+    // Check for email pattern
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const emailMatches = nonEmptyValues.filter(v => emailPattern.test(String(v).trim())).length
+    if (emailMatches >= threshold) {
+      return 'email'
+    }
+
+    // Check for URL pattern - improved detection
+    const urlMatches = nonEmptyValues.filter(v => {
+      const trimmed = String(v).trim().toLowerCase()
+      // Check for http/https
+      if (/^https?:\/\//.test(trimmed)) return true
+      // Check for www.
+      if (/^www\./.test(trimmed)) return true
+      // Check for domain pattern (has TLD)
+      if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}/.test(trimmed)) return true
+      // Check for URLs with paths (contains . and /)
+      if (trimmed.includes('.') && trimmed.includes('/') && !trimmed.includes(' ')) return true
+      // Check for common URL patterns
+      if (trimmed.match(/^[a-z]+:\/\//)) return true
+      return false
+    }).length
+    if (urlMatches >= threshold) {
+      return 'url'
+    }
+
+    // Check for boolean/checkbox
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
+    const booleanMatches = nonEmptyValues.filter(v => 
+      booleanValues.includes(String(v).toLowerCase().trim())
+    ).length
+    if (booleanMatches >= threshold) {
+      return 'checkbox'
+    }
+
+    // Check for categorical data (single_select or multi_select) BEFORE checking dates/numbers
+    const uniqueValues = new Set(nonEmptyValues.map(v => String(v).trim().toLowerCase()))
+    const uniqueCount = uniqueValues.size
+    const totalCount = nonEmptyValues.length
+    
+    // If we have few unique values relative to total, it's likely categorical
+    if (totalCount >= 3 && (uniqueCount <= Math.max(2, Math.floor(totalCount * 0.5)) || uniqueCount <= 15)) {
+      // Check if values contain commas or semicolons (multi-select indicator)
+      const multiSelectIndicators = nonEmptyValues.filter(v => 
+        /[,;]/.test(String(v).trim())
+      ).length
+      
+      if (multiSelectIndicators >= Math.floor(totalCount * 0.4)) {
+        return 'multi_select'
+      } else {
+        // Likely single-select category
+        const valueCounts = new Map<string, number>()
+        nonEmptyValues.forEach(v => {
+          const key = String(v).trim().toLowerCase()
+          valueCounts.set(key, (valueCounts.get(key) || 0) + 1)
+        })
+        const maxCount = Math.max(...Array.from(valueCounts.values()))
+        if (maxCount >= 2 && uniqueCount <= 15) {
+          return 'single_select'
+        }
+      }
+    }
+
+    // Check for date pattern
+    const datePatterns = [
+      /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/,
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/,
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+      /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}/i,
+    ]
+    
+    const dateMatches = nonEmptyValues.filter(v => {
+      const trimmed = String(v).trim()
+      if (datePatterns.some(p => p.test(trimmed))) return true
+      const date = new Date(trimmed)
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear()
+        return year >= 1900 && year <= 2100
+      }
+      return false
+    }).length
+    
+    if (dateMatches >= threshold) {
+      return 'date'
+    }
+
+    // Check for number
+    const cleanedValues = nonEmptyValues.map(v => String(v).trim().replace(/[$€£¥%,\s]/g, ''))
+    const numberPattern = /^-?\d+(\.\d+)?$/
+    const numberMatches = cleanedValues.filter(v => numberPattern.test(v)).length
+    
+    if (numberMatches >= threshold) {
+      const percentCount = nonEmptyValues.filter(v => String(v).includes('%')).length
+      if (percentCount >= threshold) {
+        return 'percent'
+      }
+      const currencyCount = nonEmptyValues.filter(v => 
+        /[$€£¥]/.test(String(v)) || String(v).toLowerCase().includes('usd') || String(v).toLowerCase().includes('gbp')
+      ).length
+      if (currencyCount >= threshold) {
+        return 'currency'
+      }
+      return 'number'
+    }
+
+    // Default to text
+    return 'text'
+  }, [])
+
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (!selectedFile.name.endsWith('.csv')) {
       setError('Please select a CSV file')
@@ -126,21 +262,53 @@ export default function CSVImportModal({
         if (existingField) {
           mappings[col.name] = existingField.name
         } else {
-          // Map CSV parser types to field types
-          const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): FieldType => {
-            switch (csvType) {
-              case 'number':
-                return 'number'
-              case 'boolean':
-                return 'checkbox'
-              case 'date':
-                return 'date'
-              case 'text':
-              default:
-                return 'text'
+          // Extract sample values from across the dataset for better detection
+          // Check up to 200 rows to find patterns even if some rows are empty
+          const totalRows = parsed.rows.length
+          const maxSampleRows = Math.min(200, totalRows)
+          
+          const sampleValues: any[] = []
+          // Sample evenly across the dataset, not just from the beginning
+          const step = totalRows > maxSampleRows ? Math.ceil(totalRows / maxSampleRows) : 1
+          
+          for (let i = 0; i < totalRows && sampleValues.length < maxSampleRows; i += step) {
+            const value = parsed.rows[i]?.[col.name]
+            if (value !== null && value !== undefined && value !== '') {
+              sampleValues.push(value)
             }
           }
-          autoDetectedTypes[col.name] = mapCSVTypeToFieldType(col.type)
+          
+          // Also ensure we check the first 20 rows (in case step skips them)
+          if (step > 1 && sampleValues.length < maxSampleRows) {
+            for (let i = 0; i < Math.min(20, totalRows); i++) {
+              const value = parsed.rows[i]?.[col.name]
+              if (value !== null && value !== undefined && value !== '') {
+                sampleValues.push(value)
+                if (sampleValues.length >= maxSampleRows) break
+              }
+            }
+          }
+          
+          // Use advanced detection if we have sample values, otherwise fall back to basic CSV parser type
+          if (sampleValues.length > 0) {
+            autoDetectedTypes[col.name] = detectFieldType(sampleValues.map(v => String(v)))
+          } else {
+            // Fall back to basic CSV parser type
+            const mapCSVTypeToFieldType = (csvType: 'text' | 'number' | 'boolean' | 'date'): FieldType => {
+              switch (csvType) {
+                case 'number':
+                  return 'number'
+                case 'boolean':
+                  return 'checkbox'
+                case 'date':
+                  return 'date'
+                case 'text':
+                default:
+                  return 'text'
+              }
+            }
+            autoDetectedTypes[col.name] = mapCSVTypeToFieldType(col.type)
+          }
         }
       })
       
@@ -154,7 +322,7 @@ export default function CSVImportModal({
       setFile(null)
       setProgress('')
     }
-  }, [tableFields])
+  }, [tableFields, detectFieldType])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -211,6 +379,24 @@ export default function CSVImportModal({
         
         // If column has a new field type specified, add it to create list
         if (newFieldTypes[col.name]) {
+          // Validate that the field type can be created from CSV import
+          if (newFieldTypes[col.name] === 'link_to_table') {
+            throw new Error(
+              `Field "${col.name}" cannot be created as "Link to table" during CSV import. ` +
+              `This field type requires selecting a linked table, which cannot be determined from CSV data. ` +
+              `Please change the field type to "Single line text" or another appropriate type, ` +
+              `then create the link field manually after import.`
+            )
+          }
+          
+          if (newFieldTypes[col.name] === 'lookup') {
+            throw new Error(
+              `Field "${col.name}" cannot be created as "Lookup" during CSV import. ` +
+              `This is a virtual field type that cannot be imported. ` +
+              `Please change the field type to another appropriate type.`
+            )
+          }
+          
           const fieldData: { name: string; type: FieldType; options?: any } = {
             name: col.name,
             type: newFieldTypes[col.name],
@@ -647,7 +833,15 @@ export default function CSVImportModal({
                                 <SelectValue placeholder="Select field type" />
                               </SelectTrigger>
                               <SelectContent>
-                                {FIELD_TYPES.filter(ft => !ft.isVirtual).map((ft) => (
+                                {FIELD_TYPES.filter(ft => {
+                                  // Filter out virtual fields
+                                  if (ft.isVirtual) return false
+                                  // Filter out link_to_table - requires linked_table_id which can't be determined from CSV
+                                  if (ft.type === 'link_to_table') return false
+                                  // Filter out lookup - virtual and requires configuration
+                                  if (ft.type === 'lookup') return false
+                                  return true
+                                }).map((ft) => (
                                   <SelectItem key={ft.type} value={ft.type}>
                                     {ft.label}
                                   </SelectItem>
