@@ -203,8 +203,8 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             return
           }
 
-          // Ensure data is always an array
-          const dataArray = Array.isArray(data) ? data : []
+          // Ensure data is always an array and properly typed
+          const dataArray: Record<string, any>[] = Array.isArray(data) ? (data as Record<string, any>[]) : []
 
           // Analyze each column
           const columns: ParsedColumn[] = columnNames.map((name, index) => {
