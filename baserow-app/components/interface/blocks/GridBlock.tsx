@@ -114,14 +114,19 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
 
   // Render based on view type
   const renderView = () => {
+    const fieldIds = viewFields.map(f => f.field_name)
+    const groupingFieldId = config.group_by || viewFields[0]?.field_name || ''
+    const dateFieldId = viewFields.find(f => f.field_name.toLowerCase().includes('date'))?.field_name || viewFields[0]?.field_name || ''
+
     switch (viewType) {
       case 'kanban':
         return (
           <KanbanView
             tableId={tableId!}
             viewId={viewId || ''}
-            rows={[]} // Will be loaded by component
-            visibleFields={viewFields}
+            groupingFieldId={groupingFieldId}
+            fieldIds={fieldIds}
+            tableFields={tableFields}
           />
         )
       case 'calendar':
@@ -129,8 +134,9 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
           <CalendarView
             tableId={tableId!}
             viewId={viewId || ''}
-            rows={[]} // Will be loaded by component
-            visibleFields={viewFields}
+            dateFieldId={dateFieldId}
+            fieldIds={fieldIds}
+            tableFields={tableFields}
           />
         )
       case 'gallery':
