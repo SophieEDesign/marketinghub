@@ -95,22 +95,52 @@ export default function KPIBlock({ block, isEditing = false }: KPIBlockProps) {
     )
   }
 
+  // Apply appearance settings
+  const appearance = config.appearance || {}
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+  }
+
+  const displayLabel = appearance.title || label
+  const showTitle = appearance.show_title !== false && displayLabel && displayLabel !== label
+
   return (
-    <div className="h-full p-4 flex flex-col items-center justify-center">
-      <div className="text-center">
-        <p className="text-sm text-gray-500 mb-2">{label}</p>
-        <p className="text-3xl font-bold text-gray-900">
-          {value !== null ? (
-            aggregate === "avg" ? value.toFixed(2) : value.toLocaleString()
-          ) : (
-            "—"
+    <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>
+      {showTitle && (
+        <div
+          className="mb-4 pb-2 border-b"
+          style={{
+            backgroundColor: appearance.header_background,
+            color: appearance.header_text_color || appearance.title_color,
+          }}
+        >
+          <h3 className="text-lg font-semibold">{displayLabel}</h3>
+        </div>
+      )}
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="text-center">
+          {!showTitle && (
+            <p className="text-sm mb-2" style={{ color: appearance.title_color }}>
+              {displayLabel}
+            </p>
           )}
-        </p>
-        {aggregate !== "count" && field && (
-          <p className="text-xs text-gray-400 mt-1">
-            {aggregate.toUpperCase()} of {field}
+          <p className="text-3xl font-bold" style={{ color: appearance.title_color || '#111827' }}>
+            {value !== null ? (
+              aggregate === "avg" ? value.toFixed(2) : value.toLocaleString()
+            ) : (
+              "—"
+            )}
           </p>
-        )}
+          {aggregate !== "count" && field && (
+            <p className="text-xs mt-1" style={{ color: appearance.title_color || '#6b7280' }}>
+              {aggregate.toUpperCase()} of {field}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

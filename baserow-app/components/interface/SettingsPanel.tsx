@@ -254,8 +254,8 @@ export default function SettingsPanel({
 
   if (!isOpen || !block) return null
 
-  // Check if this block supports tabs (grid, form, record blocks)
-  const supportsTabs = block.type === 'grid' || block.type === 'form' || block.type === 'record'
+  // Check if this block supports tabs (data blocks: grid, form, record, chart, kpi)
+  const supportsTabs = block.type === 'grid' || block.type === 'form' || block.type === 'record' || block.type === 'chart' || block.type === 'kpi'
 
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">

@@ -70,10 +70,33 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
     )
   }
 
+  // Apply appearance settings
+  const appearance = config.appearance || {}
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+  }
+
+  const title = appearance.title || config.title
+
   // Simple chart rendering (in production, use a charting library like recharts)
   return (
-    <div className="h-full p-4">
-      <div className="h-full border border-gray-200 rounded-lg p-4 flex items-center justify-center">
+    <div className="h-full w-full overflow-auto" style={blockStyle}>
+      {appearance.show_title !== false && title && (
+        <div
+          className="mb-4 pb-2 border-b"
+          style={{
+            backgroundColor: appearance.header_background,
+            color: appearance.header_text_color || appearance.title_color,
+          }}
+        >
+          <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+      )}
+      <div className="h-full flex items-center justify-center">
         <div className="text-center">
           {chartType === "bar" && <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-2" />}
           {chartType === "line" && <LineChart className="h-12 w-12 mx-auto text-gray-400 mb-2" />}

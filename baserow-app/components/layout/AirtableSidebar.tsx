@@ -15,9 +15,12 @@ import {
   Settings,
   Home,
   Database,
+  Edit2,
+  Check,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
+import { useSidebarMode } from "@/contexts/SidebarModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import type { Automation, Table, View } from "@/types/database"
 
@@ -56,6 +59,7 @@ export default function AirtableSidebar({
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor } = useBranding()
+  const { mode, toggleMode } = useSidebarMode()
   // Interfaces and Automations expanded by default (only for admins)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(userRole === 'admin' ? ["interfaces", "automations"] : ["interfaces"])
@@ -65,6 +69,7 @@ export default function AirtableSidebar({
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
   
   const isAdmin = userRole === 'admin'
+  const isEditMode = mode === "edit"
 
   const isInterfacePage = pathname.includes("/pages/")
   const isAutomation = pathname.includes("/automations/")
@@ -163,10 +168,10 @@ export default function AirtableSidebar({
       <div className="flex-1 overflow-y-auto">
         {/* Interfaces Section - Primary Navigation */}
         <div className="py-2 border-b border-gray-200">
-          <div className="px-3 mb-1">
+          <div className="px-3 mb-1 flex items-center justify-between gap-2">
             <button
               onClick={() => toggleSection("interfaces")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              className="flex-1 flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
             >
               <span>Interfaces</span>
               {expandedSections.has("interfaces") ? (
@@ -175,11 +180,35 @@ export default function AirtableSidebar({
                 <ChevronRight className="h-3 w-3" />
               )}
             </button>
+            {expandedSections.has("interfaces") && (
+              <button
+                onClick={toggleMode}
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  isEditMode
+                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+                title={isEditMode ? "Done editing" : "Edit interfaces"}
+              >
+                {isEditMode ? (
+                  <>
+                    <Check className="h-3 w-3 inline mr-1" />
+                    Done
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="h-3 w-3 inline mr-1" />
+                    Edit
+                  </>
+                )}
+              </button>
+            )}
           </div>
           {expandedSections.has("interfaces") && (
             <GroupedInterfaces
               interfacePages={interfacePages}
               interfaceGroups={interfaceGroups}
+              editMode={isEditMode}
               onRefresh={() => {
                 window.dispatchEvent(new CustomEvent('pages-updated'))
                 window.location.reload()

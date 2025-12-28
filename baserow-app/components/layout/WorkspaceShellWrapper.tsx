@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getUserRole, isAdmin } from "@/lib/roles"
 import { getWorkspaceSettings } from "@/lib/branding"
 import { BrandingProvider } from "@/contexts/BrandingContext"
+import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
 import { getInterfaces, getInterfaceCategories, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import WorkspaceShell from "./WorkspaceShell"
 import type { View } from "@/types/database"
@@ -162,19 +163,21 @@ export default async function WorkspaceShellWrapper({
 
   return (
     <BrandingProvider settings={brandingSettings}>
-      <WorkspaceShell
-        title={title}
-        tables={tables}
-        views={viewsByTable}
-        interfacePages={interfacePages as any}
-        interfaceGroups={interfaceGroups}
-        dashboards={dashboards}
-        automations={automations}
-        userRole={userRole}
-        hideTopbar={hideTopbar}
-      >
-        {children}
-      </WorkspaceShell>
+      <SidebarModeProvider>
+        <WorkspaceShell
+          title={title}
+          tables={tables}
+          views={viewsByTable}
+          interfacePages={interfacePages as any}
+          interfaceGroups={interfaceGroups}
+          dashboards={dashboards}
+          automations={automations}
+          userRole={userRole}
+          hideTopbar={hideTopbar}
+        >
+          {children}
+        </WorkspaceShell>
+      </SidebarModeProvider>
     </BrandingProvider>
   )
 }

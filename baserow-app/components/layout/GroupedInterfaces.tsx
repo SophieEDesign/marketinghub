@@ -33,6 +33,7 @@ import {
   GripVertical,
   Layers,
   X,
+  Folder,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
@@ -64,12 +65,14 @@ interface InterfaceGroup {
 interface GroupedInterfacesProps {
   interfacePages: InterfacePage[]
   interfaceGroups: InterfaceGroup[]
+  editMode?: boolean
   onRefresh?: () => void
 }
 
 export default function GroupedInterfaces({
   interfacePages,
   interfaceGroups: initialGroups,
+  editMode = false,
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
@@ -424,6 +427,7 @@ export default function GroupedInterfaces({
   function SortableGroup({ group }: { group: InterfaceGroup }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: `group-${group.id}`,
+      disabled: !editMode,
     })
     const { setNodeRef: setDroppableRef, isOver } = useDroppable({
       id: `group-${group.id}`,
@@ -444,6 +448,34 @@ export default function GroupedInterfaces({
       setDroppableRef(node)
     }
 
+    if (!editMode) {
+      // Navigation mode - clean folder-style UI
+      return (
+        <div className="px-2 py-1">
+          <button
+            onClick={() => toggleGroup(group.id)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4 text-gray-500" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            )}
+            <Folder className="h-4 w-4 text-gray-500" />
+            <span className="flex-1 text-left truncate">{group.name}</span>
+          </button>
+          {!isCollapsed && (
+            <div className="ml-6 mt-0.5 space-y-0.5">
+              {groupPages.map((page) => (
+                <NavigationPage key={page.id} page={page} />
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Edit mode - full editing UI
     return (
       <div ref={combinedRef} style={style} className={`group ${isOver ? 'bg-blue-50' : ''}`}>
         <div className="flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded">
@@ -515,6 +547,25 @@ export default function GroupedInterfaces({
     )
   }
 
+  // Navigation Page Component (view mode)
+  function NavigationPage({ page }: { page: InterfacePage }) {
+    const isActive = pathname.includes(`/pages/${page.id}`)
+
+    return (
+      <Link
+        href={`/pages/${page.id}`}
+        className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-50"
+        style={isActive ? { 
+          backgroundColor: primaryColor + '10', 
+          color: primaryColor 
+        } : {}}
+      >
+        <Layers className="h-4 w-4 flex-shrink-0" />
+        <span className="text-sm truncate">{page.name}</span>
+      </Link>
+    )
+  }
+
   // Uncategorized Droppable Component
   function UncategorizedDroppable({ children }: { children: React.ReactNode }) {
     const { setNodeRef, isOver } = useDroppable({
@@ -532,10 +583,11 @@ export default function GroupedInterfaces({
     )
   }
 
-  // Sortable Page Component
+  // Sortable Page Component (edit mode)
   function SortablePage({ page }: { page: InterfacePage }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: `page-${page.id}`,
+      disabled: !editMode,
     })
 
     const style = {
@@ -609,6 +661,51 @@ export default function GroupedInterfaces({
     "uncategorized",
   ]
 
+  // Render based on mode
+  if (!editMode) {
+    // Navigation mode - clean UI
+    return (
+      <div className="space-y-1">
+        {sortedGroups.map((group) => {
+          const isCollapsed = collapsedGroups.has(group.id)
+          const groupPages = pagesByGroup[group.id] || []
+          return (
+            <div key={group.id} className="px-2 py-1">
+              <button
+                onClick={() => toggleGroup(group.id)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+                <Folder className="h-4 w-4 text-gray-500" />
+                <span className="flex-1 text-left truncate">{group.name}</span>
+              </button>
+              {!isCollapsed && (
+                <div className="ml-6 mt-0.5 space-y-0.5">
+                  {groupPages.map((page) => (
+                    <NavigationPage key={page.id} page={page} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {/* Uncategorized pages */}
+        {uncategorizedPages.length > 0 && (
+          <div className="ml-2 mt-0.5 space-y-0.5">
+            {uncategorizedPages.map((page) => (
+              <NavigationPage key={page.id} page={page} />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Edit mode - full editing UI
   return (
     <DndContext
       sensors={sensors}
