@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { X, Upload, Image as ImageIcon } from "lucide-react"
+import type { ViewType } from "@/lib/interface/types"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -249,7 +250,12 @@ export default function SettingsPanel({
     }
   }
 
+  const [activeTab, setActiveTab] = useState<'data' | 'appearance'>('data')
+
   if (!isOpen || !block) return null
+
+  // Check if this block supports tabs (grid, form, record blocks)
+  const supportsTabs = block.type === 'grid' || block.type === 'form' || block.type === 'record'
 
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
@@ -264,22 +270,62 @@ export default function SettingsPanel({
         </button>
       </div>
 
+      {/* Tabs */}
+      {supportsTabs && (
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('data')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'data'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Data
+          </button>
+          <button
+            onClick={() => setActiveTab('appearance')}
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'appearance'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Appearance
+          </button>
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Title */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Title</label>
-          <input
-            type="text"
-            value={config.title || ""}
-            onChange={(e) => setConfig({ ...config, title: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            placeholder="Block title"
-          />
-        </div>
-
-        {/* Block-specific settings */}
-        {renderBlockSettings()}
+        {supportsTabs ? (
+          activeTab === 'data' ? (
+            <>
+              {/* Block-specific data settings */}
+              {renderBlockSettings()}
+            </>
+          ) : (
+            <>
+              {/* Appearance settings */}
+              {renderAppearanceSettings()}
+            </>
+          )
+        ) : (
+          <>
+            {/* For blocks that don't support tabs, show all settings */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Title</label>
+              <input
+                type="text"
+                value={config.title || ""}
+                onChange={(e) => setConfig({ ...config, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="Block title"
+              />
+            </div>
+            {renderBlockSettings()}
+          </>
+        )}
       </div>
 
       {/* Block Actions */}
@@ -408,7 +454,86 @@ export default function SettingsPanel({
               </select>
             </div>
 
-            {(block.type === "grid" || block.type === "record") && (
+            {block.type === "grid" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">View Type</label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {(['grid', 'kanban', 'calendar', 'gallery', 'timeline'] as const).map((viewType) => (
+                      <button
+                        key={viewType}
+                        type="button"
+                        onClick={() => setConfig({ ...config, view_type: viewType })}
+                        className={`px-3 py-2 text-sm border rounded-md transition-colors ${
+                          config.view_type === viewType
+                            ? 'border-blue-600 bg-blue-50 text-blue-600'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {viewType.charAt(0).toUpperCase() + viewType.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Source</label>
+                  <select
+                    value={config.view_id ? `${config.table_id}::${config.view_id}` : config.table_id || ""}
+                    onChange={async (e) => {
+                      const value = e.target.value
+                      if (value.includes('::')) {
+                        const [tableId, viewId] = value.split('::')
+                        setConfig({ ...config, table_id: tableId, view_id: viewId })
+                      } else {
+                        setConfig({ ...config, table_id: value, view_id: undefined })
+                      }
+                      
+                      if (value && !value.includes('::')) {
+                        const supabase = createClient()
+                        const [viewsRes, fieldsRes] = await Promise.all([
+                          supabase.from("views").select("*").eq("table_id", value),
+                          supabase.from("table_fields").select("*").eq("table_id", value).order("position"),
+                        ])
+                        setViews((viewsRes.data || []) as View[])
+                        setFields((fieldsRes.data || []) as TableField[])
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="">Select a table...</option>
+                    {tables.map((table) => (
+                      <optgroup key={table.id} label={table.name}>
+                        <option value={table.id}>{table.name} (Record list)</option>
+                        {views.filter(v => v.table_id === table.id).map((view) => (
+                          <option key={view.id} value={`${table.id}::${view.id}`}>
+                            {view.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {config.table_id && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Field</label>
+                    <select
+                      value={config.group_by || ""}
+                      onChange={(e) => setConfig({ ...config, group_by: e.target.value || undefined })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="">Select a field...</option>
+                      {fields.map((field) => (
+                        <option key={field.id} value={field.name}>
+                          {field.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+
+            {(block.type === "record") && (
               <div>
                 <label className="block text-sm font-medium mb-1">View</label>
                 <select
@@ -580,5 +705,214 @@ export default function SettingsPanel({
       default:
         return null
     }
+  }
+
+  function renderAppearanceSettings() {
+    const appearance = config.appearance || {}
+    
+    return (
+      <>
+        <div>
+          <label className="block text-sm font-medium mb-1">Title</label>
+          <input
+            type="text"
+            value={appearance.title || config.title || ""}
+            onChange={(e) => setConfig({ 
+              ...config, 
+              title: e.target.value,
+              appearance: { ...appearance, title: e.target.value }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+            placeholder="Block title"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="show-title"
+            checked={appearance.show_title !== false}
+            onChange={(e) => setConfig({ 
+              ...config, 
+              appearance: { ...appearance, show_title: e.target.checked }
+            })}
+            className="w-4 h-4"
+          />
+          <label htmlFor="show-title" className="text-sm font-medium">
+            Show title
+          </label>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Title Color</label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={appearance.title_color || "#000000"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, title_color: e.target.value }
+              })}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={appearance.title_color || "#000000"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, title_color: e.target.value }
+              })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder="#000000"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Background Color</label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={appearance.background_color || "#ffffff"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, background_color: e.target.value }
+              })}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={appearance.background_color || "#ffffff"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, background_color: e.target.value }
+              })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder="#ffffff"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Border Color</label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={appearance.border_color || "#e5e7eb"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, border_color: e.target.value }
+              })}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={appearance.border_color || "#e5e7eb"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, border_color: e.target.value }
+              })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder="#e5e7eb"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Border Width</label>
+          <input
+            type="number"
+            min="0"
+            max="10"
+            value={appearance.border_width ?? 1}
+            onChange={(e) => setConfig({ 
+              ...config, 
+              appearance: { ...appearance, border_width: parseInt(e.target.value) || 0 }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Border Radius</label>
+          <input
+            type="number"
+            min="0"
+            max="20"
+            value={appearance.border_radius ?? 8}
+            onChange={(e) => setConfig({ 
+              ...config, 
+              appearance: { ...appearance, border_radius: parseInt(e.target.value) || 0 }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Padding</label>
+          <input
+            type="number"
+            min="0"
+            max="50"
+            value={appearance.padding ?? 16}
+            onChange={(e) => setConfig({ 
+              ...config, 
+              appearance: { ...appearance, padding: parseInt(e.target.value) || 0 }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Header Background</label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={appearance.header_background || "#f9fafb"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, header_background: e.target.value }
+              })}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={appearance.header_background || "#f9fafb"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, header_background: e.target.value }
+              })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder="#f9fafb"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Header Text Color</label>
+          <div className="flex gap-2">
+            <input
+              type="color"
+              value={appearance.header_text_color || "#111827"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, header_text_color: e.target.value }
+              })}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={appearance.header_text_color || "#111827"}
+              onChange={(e) => setConfig({ 
+                ...config, 
+                appearance: { ...appearance, header_text_color: e.target.value }
+              })}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+              placeholder="#111827"
+            />
+          </div>
+        </div>
+      </>
+    )
   }
 }

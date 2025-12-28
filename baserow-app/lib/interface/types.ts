@@ -27,10 +27,13 @@ export interface PageBlock {
   updated_at?: string
 }
 
+export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'timeline' | 'form'
+
 export interface BlockConfig {
   title?: string
   table_id?: string
   view_id?: string
+  view_type?: ViewType // View type for grid blocks (grid, kanban, calendar, gallery, timeline)
   record_id?: string
   fields?: string[]
   filters?: BlockFilter[]
@@ -49,6 +52,19 @@ export interface BlockConfig {
   button_label?: string
   button_automation_id?: string
   visibility_rules?: VisibilityRule[]
+  // Appearance settings
+  appearance?: {
+    title?: string
+    title_color?: string
+    background_color?: string
+    border_color?: string
+    border_width?: number
+    border_radius?: number
+    padding?: number
+    show_title?: boolean
+    header_background?: string
+    header_text_color?: string
+  }
   [key: string]: any
 }
 

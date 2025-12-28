@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { PageBlock } from "@/lib/interface/types"
+import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
+import KanbanView from "@/components/views/KanbanView"
+import CalendarView from "@/components/views/CalendarView"
 
 interface GridBlockProps {
   block: PageBlock
@@ -14,6 +16,7 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
   const { config } = block
   const tableId = config?.table_id
   const viewId = config?.view_id
+  const viewType: ViewType = config?.view_type || 'grid'
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string } | null>(null)
   const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
@@ -23,11 +26,11 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
   const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
 
   useEffect(() => {
-    if (tableId && viewId) {
+    if (tableId) {
       loadData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, viewId])
+  }, [tableId, viewId, viewType])
 
   async function loadData() {
     if (!tableId || !viewId) return
@@ -91,14 +94,6 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
     )
   }
 
-  if (!viewId) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        {isEditing ? "Select a view to display" : "No view selected"}
-      </div>
-    )
-  }
-
   if (loading || !table) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -107,19 +102,83 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
     )
   }
 
+  // Apply appearance settings
+  const appearance = config.appearance || {}
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+  }
+
+  // Render based on view type
+  const renderView = () => {
+    switch (viewType) {
+      case 'kanban':
+        return (
+          <KanbanView
+            tableId={tableId!}
+            viewId={viewId || ''}
+            rows={[]} // Will be loaded by component
+            visibleFields={viewFields}
+          />
+        )
+      case 'calendar':
+        return (
+          <CalendarView
+            tableId={tableId!}
+            viewId={viewId || ''}
+            rows={[]} // Will be loaded by component
+            visibleFields={viewFields}
+          />
+        )
+      case 'gallery':
+        // Gallery view - similar to grid but card-based
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <p className="text-gray-500">Gallery view coming soon</p>
+          </div>
+        )
+      case 'timeline':
+        // Timeline view
+        return (
+          <div className="space-y-4">
+            <p className="text-gray-500">Timeline view coming soon</p>
+          </div>
+        )
+      case 'grid':
+      default:
+        return (
+          <GridViewWrapper
+            tableId={tableId!}
+            viewId={viewId || ''}
+            supabaseTableName={table.supabase_table}
+            viewFields={viewFields}
+            initialFilters={viewFilters}
+            initialSorts={viewSorts}
+            initialGroupBy={groupBy}
+            initialTableFields={tableFields}
+            isEditing={isEditing}
+          />
+        )
+    }
+  }
+
   return (
-    <div className="h-full w-full overflow-auto">
-      <GridViewWrapper
-        tableId={tableId}
-        viewId={viewId}
-        supabaseTableName={table.supabase_table}
-        viewFields={viewFields}
-        initialFilters={viewFilters}
-        initialSorts={viewSorts}
-        initialGroupBy={groupBy}
-        initialTableFields={tableFields}
-        isEditing={isEditing}
-      />
+    <div className="h-full w-full overflow-auto" style={blockStyle}>
+      {appearance.show_title !== false && (appearance.title || config.title) && (
+        <div
+          className="mb-4 pb-2 border-b"
+          style={{
+            backgroundColor: appearance.header_background,
+            color: appearance.header_text_color || appearance.title_color,
+          }}
+        >
+          <h3 className="text-lg font-semibold">{appearance.title || config.title}</h3>
+        </div>
+      )}
+      {renderView()}
     </div>
   )
 }
