@@ -170,15 +170,38 @@ export default function GridViewWrapper({
 
   async function handleGroupByChange(fieldName: string | null) {
     try {
-      const config = fieldName ? { groupBy: fieldName } : {}
-      const { error } = await supabase
-        .from("views")
-        .update({ config })
-        .eq("id", viewId)
+      // Update grid view settings instead of views.config
+      const { data: existing } = await supabase
+        .from("grid_view_settings")
+        .select("id")
+        .eq("view_id", viewId)
+        .single()
 
-      if (error) {
-        console.error("Error updating group by:", error)
-        throw error
+      if (existing) {
+        // Update existing settings
+        const { error } = await supabase
+          .from("grid_view_settings")
+          .update({ group_by_field: fieldName })
+          .eq("view_id", viewId)
+
+        if (error) throw error
+      } else {
+        // Create new settings
+        const { error } = await supabase
+          .from("grid_view_settings")
+          .insert([
+            {
+              view_id: viewId,
+              group_by_field: fieldName,
+              column_widths: {},
+              column_order: [],
+              column_wrap_text: {},
+              row_height: 'medium',
+              frozen_columns: 0,
+            },
+          ])
+
+        if (error) throw error
       }
 
       setGroupBy(fieldName || undefined)

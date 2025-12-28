@@ -68,9 +68,9 @@ export default async function ViewPage({
       )
     }
 
-    // Get view fields, filters, sorts, config, and table fields dynamically
+    // Get view fields, filters, sorts, grid settings, and table fields dynamically
     // Use Promise.allSettled to handle missing tables gracefully
-    const [viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes] = await Promise.allSettled([
+    const [viewFieldsRes, viewFiltersRes, viewSortsRes, gridSettingsRes, tableFieldsRes] = await Promise.allSettled([
       supabase
         .from("view_fields")
         .select("field_name, visible, position")
@@ -85,6 +85,11 @@ export default async function ViewPage({
         .select("id, field_name, direction")
         .eq("view_id", params.viewId),
       supabase
+        .from("grid_view_settings")
+        .select("group_by_field")
+        .eq("view_id", params.viewId)
+        .maybeSingle(),
+      supabase
         .from("table_fields")
         .select("*")
         .eq("table_id", params.tableId)
@@ -96,8 +101,9 @@ export default async function ViewPage({
     const viewSorts = viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error ? (viewSortsRes.value.data || []) : []
     const tableFields = tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error ? (tableFieldsRes.value.data || []) : []
     
-    // Get groupBy from view config
-    const groupBy = (view.config as { groupBy?: string })?.groupBy
+    // Get groupBy from grid_view_settings (fallback to view.config for backward compatibility)
+    const gridSettings = gridSettingsRes.status === 'fulfilled' && !gridSettingsRes.value.error ? gridSettingsRes.value.data : null
+    const groupBy = gridSettings?.group_by_field || (view.config as { groupBy?: string })?.groupBy
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -111,6 +117,8 @@ export default async function ViewPage({
             initialViewFilters={viewFilters}
             initialViewSorts={viewSorts}
             initialTableFields={tableFields}
+            initialGroupBy={groupBy}
+            initialGridSettings={gridSettings}
           />
         ) : (
           <NonGridViewWrapper

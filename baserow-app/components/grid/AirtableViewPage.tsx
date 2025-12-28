@@ -42,6 +42,14 @@ interface AirtableViewPageProps {
     direction: string
   }>
   initialTableFields: any[]
+  initialGroupBy?: string | null
+  initialGridSettings?: {
+    group_by_field: string | null
+    column_widths?: Record<string, number>
+    column_order?: string[]
+    column_wrap_text?: Record<string, boolean>
+    row_height?: 'short' | 'medium' | 'tall'
+  } | null
 }
 
 export default function AirtableViewPage({
@@ -53,15 +61,17 @@ export default function AirtableViewPage({
   initialViewFilters,
   initialViewSorts,
   initialTableFields,
+  initialGroupBy,
+  initialGridSettings,
 }: AirtableViewPageProps) {
   const router = useRouter()
   const [viewFields, setViewFields] = useState(initialViewFields)
   const [tableFields, setTableFields] = useState<TableField[]>(initialTableFields)
   const [filters, setFilters] = useState(initialViewFilters)
   const [sorts, setSorts] = useState(initialViewSorts)
-  const [groupBy, setGroupBy] = useState<string | null>((view.config as { groupBy?: string })?.groupBy || null)
+  const [groupBy, setGroupBy] = useState<string | null>(initialGroupBy ?? null)
   const [rowHeight, setRowHeight] = useState<"short" | "medium" | "tall">(
-    (view.config as { row_height?: "short" | "medium" | "tall" })?.row_height || "medium"
+    initialGridSettings?.row_height || (view.config as { row_height?: "short" | "medium" | "tall" })?.row_height || "medium"
   )
   const [hiddenFields, setHiddenFields] = useState<string[]>(
     viewFields.filter(f => !f.visible).map(f => f.field_name)

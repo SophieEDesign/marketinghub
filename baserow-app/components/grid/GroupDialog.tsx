@@ -51,25 +51,40 @@ export default function GroupDialog({
 
   async function handleSave() {
     try {
-      // Update view config
-      const { data: viewData } = await supabase
-        .from("views")
-        .select("config")
-        .eq("id", viewId)
+      // Update grid view settings instead of views.config
+      const groupByValue = selectedField === "__none__" ? null : selectedField
+      
+      // Check if settings exist
+      const { data: existing } = await supabase
+        .from("grid_view_settings")
+        .select("id")
+        .eq("view_id", viewId)
         .single()
 
-      const currentConfig = (viewData?.config as Record<string, any>) || {}
-      const newConfig = {
-        ...currentConfig,
-        groupBy: selectedField === "__none__" ? null : selectedField,
+      if (existing) {
+        // Update existing settings
+        await supabase
+          .from("grid_view_settings")
+          .update({ group_by_field: groupByValue })
+          .eq("view_id", viewId)
+      } else {
+        // Create new settings
+        await supabase
+          .from("grid_view_settings")
+          .insert([
+            {
+              view_id: viewId,
+              group_by_field: groupByValue,
+              column_widths: {},
+              column_order: [],
+              column_wrap_text: {},
+              row_height: 'medium',
+              frozen_columns: 0,
+            },
+          ])
       }
 
-      await supabase
-        .from("views")
-        .update({ config: newConfig })
-        .eq("id", viewId)
-
-      onGroupChange?.(selectedField || null)
+      onGroupChange?.(groupByValue)
       onClose()
     } catch (error) {
       console.error("Error saving group:", error)
