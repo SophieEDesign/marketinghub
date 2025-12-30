@@ -249,7 +249,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
       )}
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          {chartType === "bar" && (
+          {chartType === "bar" ? (
             <BarChart data={chartData} onClick={handleChartClick}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
@@ -264,8 +264,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
               <Legend />
               <Bar dataKey="value" fill={COLORS[0]} />
             </BarChart>
-          )}
-          {chartType === "line" && (
+          ) : chartType === "line" ? (
             <LineChart data={chartData} onClick={handleChartClick}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
@@ -280,8 +279,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
               <Legend />
               <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
             </LineChart>
-          )}
-          {chartType === "pie" && (
+          ) : chartType === "pie" ? (
             <PieChart>
               <Pie
                 data={chartData}
@@ -301,8 +299,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
               <Tooltip />
               <Legend />
             </PieChart>
-          )}
-          {chartType === "stacked_bar" && (
+          ) : chartType === "stacked_bar" ? (
             <BarChart data={chartData} onClick={handleChartClick}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
@@ -317,7 +314,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
               <Legend />
               <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
             </BarChart>
-          )}
+          ) : null}
         </ResponsiveContainer>
       </div>
       {clickThrough && !isEditing && (
