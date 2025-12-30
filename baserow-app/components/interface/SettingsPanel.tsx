@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { X, Upload, Image as ImageIcon } from "lucide-react"
-import type { ViewType } from "@/lib/interface/types"
+import { X, Save, Check } from "lucide-react"
+import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -14,155 +17,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { PageBlock, BlockConfig } from "@/lib/interface/types"
-import type { Table, View, Automation, TableField } from "@/types/database"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0
-    const v = c === 'x' ? r : (r & 0x3 | 0x8)
-    return v.toString(16)
-  })
-}
-
-function ImageBlockSettings({ config, setConfig }: { config: BlockConfig; setConfig: (config: BlockConfig) => void }) {
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !file.type.startsWith('image/')) {
-      alert('Please select an image file')
-      return
-    }
-
-    setUploading(true)
-    try {
-      const supabase = createClient()
-      const ext = file.name.split('.').pop() || 'jpg'
-      const filePath = `interface-images/${generateUUID()}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('attachments')
-        .upload(filePath, file, { upsert: false })
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        alert('Failed to upload image. Please try again.')
-        return
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('attachments')
-        .getPublicUrl(filePath)
-
-      setConfig({ ...config, image_url: urlData.publicUrl })
-    } catch (error) {
-      console.error('Error uploading image:', error)
-      alert('Failed to upload image. Please try again.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <>
-      <div>
-        <Label htmlFor="image-upload">Upload Image</Label>
-        <div className="mt-1">
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="image-upload"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {uploading ? "Uploading..." : "Select Image"}
-          </Button>
-        </div>
-        {config.image_url && (
-          <div className="mt-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={config.image_url}
-              alt={config.image_alt || ""}
-              className="max-w-full h-32 object-contain rounded-md border border-gray-200"
-            />
-          </div>
-        )}
-      </div>
-
-      <div>
-        <Label htmlFor="image-url">Image URL</Label>
-        <Input
-          id="image-url"
-          type="url"
-          value={config.image_url || ""}
-          onChange={(e) => setConfig({ ...config, image_url: e.target.value })}
-          placeholder="https://example.com/image.jpg"
-          className="mt-1"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Or paste an image URL directly
-        </p>
-      </div>
-
-      <div>
-        <Label htmlFor="image-alt">Alt Text</Label>
-        <Input
-          id="image-alt"
-          type="text"
-          value={config.image_alt || ""}
-          onChange={(e) => setConfig({ ...config, image_alt: e.target.value })}
-          placeholder="Description of the image"
-          className="mt-1"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="image-alignment">Alignment</Label>
-        <Select
-          value={config.image_alignment || "center"}
-          onValueChange={(value) => setConfig({ ...config, image_alignment: value })}
-        >
-          <SelectTrigger id="image-alignment" className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="left">Left</SelectItem>
-            <SelectItem value="center">Center</SelectItem>
-            <SelectItem value="right">Right</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="image-width">Width</Label>
-        <Select
-          value={config.image_width || "auto"}
-          onValueChange={(value) => setConfig({ ...config, image_width: value })}
-        >
-          <SelectTrigger id="image-width" className="mt-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">Auto</SelectItem>
-            <SelectItem value="full">Full Width</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </>
-  )
-}
+// Import block-specific settings components
+import KPIDataSettings from "./settings/KPIDataSettings"
+import KPIAppearanceSettings from "./settings/KPIAppearanceSettings"
+import ChartDataSettings from "./settings/ChartDataSettings"
+import ChartAppearanceSettings from "./settings/ChartAppearanceSettings"
+import TableSnapshotDataSettings from "./settings/TableSnapshotDataSettings"
+import TableSnapshotAppearanceSettings from "./settings/TableSnapshotAppearanceSettings"
+import TextDataSettings from "./settings/TextDataSettings"
+import TextAppearanceSettings from "./settings/TextAppearanceSettings"
+import ActionDataSettings from "./settings/ActionDataSettings"
+import ActionAppearanceSettings from "./settings/ActionAppearanceSettings"
+import LinkPreviewDataSettings from "./settings/LinkPreviewDataSettings"
+import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSettings"
+import AdvancedSettings from "./settings/AdvancedSettings"
+import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
 
 interface SettingsPanelProps {
   block: PageBlock | null
@@ -186,8 +57,10 @@ export default function SettingsPanel({
   const [tables, setTables] = useState<Table[]>([])
   const [views, setViews] = useState<View[]>([])
   const [fields, setFields] = useState<TableField[]>([])
-  const [automations, setAutomations] = useState<Automation[]>([])
   const [config, setConfig] = useState<BlockConfig>({})
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (block) {
@@ -208,13 +81,6 @@ export default function SettingsPanel({
     // Load tables
     const { data: tablesData } = await supabase.from("tables").select("*").order("name")
     setTables((tablesData || []) as Table[])
-
-    // Load automations
-    const { data: automationsData } = await supabase
-      .from("automations")
-      .select("*")
-      .eq("enabled", true)
-    setAutomations((automationsData || []) as Automation[])
 
     // Load views if table is selected
     if (config.table_id) {
@@ -237,10 +103,6 @@ export default function SettingsPanel({
     }
   }
 
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
   const handleSave = useCallback(async () => {
     if (!block) return
     
@@ -249,7 +111,6 @@ export default function SettingsPanel({
     try {
       await onSave(block.id, config)
       setSaved(true)
-      // Show saved feedback briefly
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error("Failed to save block settings:", error)
@@ -259,19 +120,17 @@ export default function SettingsPanel({
     }
   }, [block, config, onSave])
 
-  // Auto-save on config change (debounced) - only when panel is open
+  // Auto-save on config change (debounced)
   useEffect(() => {
     if (!block || !isOpen) return
     
-    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
     
-    // Set new timeout for auto-save
     saveTimeoutRef.current = setTimeout(() => {
       handleSave()
-    }, 1500) // Auto-save after 1.5 seconds of inactivity
+    }, 1500)
 
     return () => {
       if (saveTimeoutRef.current) {
@@ -280,12 +139,18 @@ export default function SettingsPanel({
     }
   }, [config, block, isOpen, handleSave])
 
-  const [activeTab, setActiveTab] = useState<'data' | 'appearance'>('data')
-
   if (!isOpen || !block) return null
 
-  // Check if this block supports tabs (data blocks: grid, form, record, chart, kpi)
-  const supportsTabs = block.type === 'grid' || block.type === 'form' || block.type === 'record' || block.type === 'chart' || block.type === 'kpi'
+  const updateConfig = (updates: Partial<BlockConfig>) => {
+    setConfig({ ...config, ...updates })
+  }
+
+  const updateAppearance = (updates: Partial<BlockConfig['appearance']>) => {
+    setConfig({
+      ...config,
+      appearance: { ...config.appearance, ...updates }
+    })
+  }
 
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
@@ -300,125 +165,42 @@ export default function SettingsPanel({
         </button>
       </div>
 
-      {/* Tabs */}
-      {supportsTabs && (
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('data')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'data'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+      {/* Tabs - All blocks have three tabs */}
+      <Tabs defaultValue="data" className="flex-1 flex flex-col overflow-hidden">
+        <TabsList className="grid w-full grid-cols-3 border-b border-gray-200 rounded-none h-auto">
+          <TabsTrigger value="data" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
             Data
-          </button>
-          <button
-            onClick={() => setActiveTab('appearance')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'appearance'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
             Appearance
-          </button>
-        </div>
-      )}
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600">
+            Advanced
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {supportsTabs ? (
-          activeTab === 'data' ? (
-            <>
-              {/* Block-specific data settings */}
-              {renderBlockSettings()}
-            </>
-          ) : (
-            <>
-              {/* Appearance settings */}
-              {renderAppearanceSettings()}
-            </>
-          )
-        ) : (
-          <>
-            {/* For blocks that don't support tabs, show all settings */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Title</label>
-              <input
-                type="text"
-                value={config.title || ""}
-                onChange={(e) => setConfig({ ...config, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="Block title"
-              />
-            </div>
-            {renderBlockSettings()}
-          </>
-        )}
-      </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          <TabsContent value="data" className="mt-0 space-y-6">
+            {renderDataSettings()}
+          </TabsContent>
 
-      {/* Block Actions */}
-      {(onMoveToTop || onMoveToBottom || onLock) && (
-        <div className="border-t border-gray-200 p-4 space-y-2">
-          <Label className="text-xs font-semibold text-gray-700 uppercase">Block Actions</Label>
-          <div className="flex flex-col gap-2">
-            {onMoveToTop && (
-              <button
-                onClick={() => {
-                  if (block) onMoveToTop(block.id)
-                }}
-                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-                Move to Top
-              </button>
-            )}
-            {onMoveToBottom && (
-              <button
-                onClick={() => {
-                  if (block) onMoveToBottom(block.id)
-                }}
-                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-                Move to Bottom
-              </button>
-            )}
-            {onLock && (
-              <button
-                onClick={() => {
-                  if (block) {
-                    const isLocked = block.config?.locked || false
-                    onLock(block.id, !isLocked)
-                  }
-                }}
-                className="w-full px-3 py-2 text-sm text-left text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
-              >
-                {block?.config?.locked ? (
-                  <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
-                    Unlock Block
-                  </>
-                ) : (
-                  <>
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Lock Block (View Only)
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+          <TabsContent value="appearance" className="mt-0 space-y-6">
+            {renderAppearanceSettings()}
+          </TabsContent>
+
+          <TabsContent value="advanced" className="mt-0 space-y-6">
+            <AdvancedSettings
+              block={block}
+              config={config}
+              onUpdate={updateConfig}
+              onMoveToTop={onMoveToTop}
+              onMoveToBottom={onMoveToBottom}
+              onLock={onLock}
+            />
+          </TabsContent>
         </div>
-      )}
+      </Tabs>
 
       {/* Footer */}
       <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">
@@ -431,537 +213,173 @@ export default function SettingsPanel({
           )}
           {saved && !saving && (
             <>
-              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <Check className="h-4 w-4 text-green-500" />
               <span className="text-green-600">Saved</span>
             </>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="outline"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            size="sm"
           >
             Close
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            size="sm"
           >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </button>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
         </div>
       </div>
     </div>
   )
 
-  function renderBlockSettings() {
+  function renderDataSettings() {
+    const commonProps = {
+      config,
+      tables,
+      views,
+      fields,
+      onUpdate: updateConfig,
+      onTableChange: async (tableId: string) => {
+        updateConfig({ table_id: tableId })
+        if (tableId) {
+          const supabase = createClient()
+          const [viewsRes, fieldsRes] = await Promise.all([
+            supabase.from("views").select("*").eq("table_id", tableId),
+            supabase.from("table_fields").select("*").eq("table_id", tableId).order("position"),
+          ])
+          setViews((viewsRes.data || []) as View[])
+          setFields((fieldsRes.data || []) as TableField[])
+        }
+      },
+    }
+
     switch (block?.type) {
+      case "kpi":
+        return <KPIDataSettings {...commonProps} />
+      case "chart":
+        return <ChartDataSettings {...commonProps} />
+      case "table_snapshot":
+        return <TableSnapshotDataSettings {...commonProps} />
+      case "text":
+        return <TextDataSettings {...commonProps} />
+      case "action":
+        return <ActionDataSettings {...commonProps} />
+      case "link_preview":
+        return <LinkPreviewDataSettings {...commonProps} />
       case "grid":
       case "form":
       case "record":
-      case "chart":
-      case "kpi":
+        // Grid/Form/Record blocks use common data settings
         return (
-          <>
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Table</label>
-              <select
+              <Label>Table</Label>
+              <Select
                 value={config.table_id || ""}
-                onChange={async (e) => {
-                  const newTableId = e.target.value
-                  const newConfig = { ...config, table_id: newTableId }
-                  setConfig(newConfig)
-                  
-                  // Clear dependent fields
-                  if (!newTableId) {
-                    setViews([])
-                    setFields([])
-                    return
-                  }
-
-                  // Reload views and fields for new table
-                  const supabase = createClient()
-                  const [viewsRes, fieldsRes] = await Promise.all([
-                    supabase.from("views").select("*").eq("table_id", newTableId),
-                    supabase.from("table_fields").select("*").eq("table_id", newTableId).order("position"),
-                  ])
-                  
-                  setViews((viewsRes.data || []) as View[])
-                  setFields((fieldsRes.data || []) as TableField[])
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                onValueChange={commonProps.onTableChange}
               >
-                <option value="">Select a table...</option>
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    {table.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {block.type === "grid" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">View Type</label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {(['grid', 'kanban', 'calendar', 'gallery', 'timeline'] as const).map((viewType) => (
-                      <button
-                        key={viewType}
-                        type="button"
-                        onClick={() => setConfig({ ...config, view_type: viewType })}
-                        className={`px-3 py-2 text-sm border rounded-md transition-colors ${
-                          config.view_type === viewType
-                            ? 'border-blue-600 bg-blue-50 text-blue-600'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        {viewType.charAt(0).toUpperCase() + viewType.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Source</label>
-                  <select
-                    value={config.view_id ? `${config.table_id}::${config.view_id}` : config.table_id || ""}
-                    onChange={async (e) => {
-                      const value = e.target.value
-                      if (value.includes('::')) {
-                        const [tableId, viewId] = value.split('::')
-                        setConfig({ ...config, table_id: tableId, view_id: viewId })
-                      } else {
-                        setConfig({ ...config, table_id: value, view_id: undefined })
-                      }
-                      
-                      if (value && !value.includes('::')) {
-                        const supabase = createClient()
-                        const [viewsRes, fieldsRes] = await Promise.all([
-                          supabase.from("views").select("*").eq("table_id", value),
-                          supabase.from("table_fields").select("*").eq("table_id", value).order("position"),
-                        ])
-                        setViews((viewsRes.data || []) as View[])
-                        setFields((fieldsRes.data || []) as TableField[])
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  >
-                    <option value="">Select a table...</option>
-                    {tables.map((table) => (
-                      <optgroup key={table.id} label={table.name}>
-                        <option value={table.id}>{table.name} (Record list)</option>
-                        {views.filter(v => v.table_id === table.id).map((view) => (
-                          <option key={view.id} value={`${table.id}::${view.id}`}>
-                            {view.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                {config.table_id && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Field</label>
-                    <select
-                      value={config.group_by || ""}
-                      onChange={(e) => setConfig({ ...config, group_by: e.target.value || undefined })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    >
-                      <option value="">Select a field...</option>
-                      {fields.map((field) => (
-                        <option key={field.id} value={field.name}>
-                          {field.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-
-            {(block.type === "record") && (
-              <div>
-                <label className="block text-sm font-medium mb-1">View</label>
-                <select
-                  value={config.view_id || ""}
-                  onChange={(e) => setConfig({ ...config, view_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  disabled={!config.table_id}
-                >
-                  <option value="">Select a view...</option>
-                  {views.map((view) => (
-                    <option key={view.id} value={view.id}>
-                      {view.name}
-                    </option>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a table" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tables.map((table) => (
+                    <SelectItem key={table.id} value={table.id}>
+                      {table.name}
+                    </SelectItem>
                   ))}
-                </select>
-              </div>
-            )}
-
-            {block.type === "record" && (
+                </SelectContent>
+              </Select>
+            </div>
+            {config.table_id && (
               <div>
-                <label className="block text-sm font-medium mb-1">Record ID</label>
-                <input
-                  type="text"
-                  value={config.record_id || ""}
-                  onChange={(e) => setConfig({ ...config, record_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  placeholder="Enter record ID"
-                />
+                <Label>View (optional)</Label>
+                <Select
+                  value={config.view_id || ""}
+                  onValueChange={(value) => updateConfig({ view_id: value || undefined })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="All records" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All records</SelectItem>
+                    {views.map((view) => (
+                      <SelectItem key={view.id} value={view.id}>
+                        {view.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
-
-            {block.type === "chart" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Chart Type</label>
-                  <select
-                    value={config.chart_type || "bar"}
-                    onChange={(e) =>
-                      setConfig({ ...config, chart_type: e.target.value as any })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  >
-                    <option value="bar">Bar</option>
-                    <option value="line">Line</option>
-                    <option value="pie">Pie</option>
-                    <option value="area">Area</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">X-Axis Field</label>
-                  <select
-                    value={config.chart_x_axis || ""}
-                    onChange={(e) => setConfig({ ...config, chart_x_axis: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    disabled={!config.table_id}
-                  >
-                    <option value="">Select field...</option>
-                    {fields.map((field) => (
-                      <option key={field.id} value={field.name}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Y-Axis Field</label>
-                  <select
-                    value={config.chart_y_axis || ""}
-                    onChange={(e) => setConfig({ ...config, chart_y_axis: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    disabled={!config.table_id}
-                  >
-                    <option value="">Select field...</option>
-                    {fields.map((field) => (
-                      <option key={field.id} value={field.name}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </>
-            )}
-
-            {block.type === "kpi" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Field</label>
-                  <select
-                    value={config.kpi_field || ""}
-                    onChange={(e) => setConfig({ ...config, kpi_field: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    disabled={!config.table_id}
-                  >
-                    <option value="">Count (all records)</option>
-                    {fields.map((field) => (
-                      <option key={field.id} value={field.name}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Aggregate</label>
-                  <select
-                    value={config.kpi_aggregate || "count"}
-                    onChange={(e) =>
-                      setConfig({ ...config, kpi_aggregate: e.target.value as any })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  >
-                    <option value="count">Count</option>
-                    <option value="sum">Sum</option>
-                    <option value="avg">Average</option>
-                    <option value="min">Min</option>
-                    <option value="max">Max</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Label</label>
-                  <input
-                    type="text"
-                    value={config.kpi_label || ""}
-                    onChange={(e) => setConfig({ ...config, kpi_label: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="KPI label"
-                  />
-                </div>
-              </>
-            )}
-          </>
+          </div>
         )
-
-      case "button":
-        return (
-          <>
-            <div>
-              <label className="block text-sm font-medium mb-1">Button Label</label>
-              <input
-                type="text"
-                value={config.button_label || ""}
-                onChange={(e) => setConfig({ ...config, button_label: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                placeholder="Click Me"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Automation</label>
-              <select
-                value={config.button_automation_id || ""}
-                onChange={(e) =>
-                  setConfig({ ...config, button_automation_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="">Select automation...</option>
-                {automations.map((automation) => (
-                  <option key={automation.id} value={automation.id}>
-                    {automation.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
-        )
-
-      case "image":
-        return <ImageBlockSettings config={config} setConfig={setConfig} />
-
       default:
-        return null
+        return (
+          <div className="text-sm text-gray-500">
+            No data settings available for this block type.
+          </div>
+        )
     }
   }
 
   function renderAppearanceSettings() {
-    const appearance = config.appearance || {}
-    
-    return (
-      <>
-        <div>
-          <label className="block text-sm font-medium mb-1">Title</label>
-          <input
-            type="text"
-            value={appearance.title || config.title || ""}
-            onChange={(e) => setConfig({ 
-              ...config, 
-              title: e.target.value,
-              appearance: { ...appearance, title: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-            placeholder="Block title"
-          />
-        </div>
+    const commonProps = {
+      config,
+      onUpdate: updateAppearance,
+    }
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="show-title"
-            checked={appearance.show_title !== false}
-            onChange={(e) => setConfig({ 
-              ...config, 
-              appearance: { ...appearance, show_title: e.target.checked }
-            })}
-            className="w-4 h-4"
-          />
-          <label htmlFor="show-title" className="text-sm font-medium">
-            Show title
-          </label>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Title Color</label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              value={appearance.title_color || "#000000"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, title_color: e.target.value }
-              })}
-              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-            />
-            <input
-              type="text"
-              value={appearance.title_color || "#000000"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, title_color: e.target.value }
-              })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="#000000"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Background Color</label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              value={appearance.background_color || "#ffffff"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, background_color: e.target.value }
-              })}
-              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-            />
-            <input
-              type="text"
-              value={appearance.background_color || "#ffffff"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, background_color: e.target.value }
-              })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="#ffffff"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Border Color</label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              value={appearance.border_color || "#e5e7eb"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, border_color: e.target.value }
-              })}
-              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-            />
-            <input
-              type="text"
-              value={appearance.border_color || "#e5e7eb"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, border_color: e.target.value }
-              })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="#e5e7eb"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Border Width</label>
-          <input
-            type="number"
-            min="0"
-            max="10"
-            value={appearance.border_width ?? 1}
-            onChange={(e) => setConfig({ 
-              ...config, 
-              appearance: { ...appearance, border_width: parseInt(e.target.value) || 0 }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Border Radius</label>
-          <input
-            type="number"
-            min="0"
-            max="20"
-            value={appearance.border_radius ?? 8}
-            onChange={(e) => setConfig({ 
-              ...config, 
-              appearance: { ...appearance, border_radius: parseInt(e.target.value) || 0 }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Padding</label>
-          <input
-            type="number"
-            min="0"
-            max="50"
-            value={appearance.padding ?? 16}
-            onChange={(e) => setConfig({ 
-              ...config, 
-              appearance: { ...appearance, padding: parseInt(e.target.value) || 0 }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Header Background</label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              value={appearance.header_background || "#f9fafb"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, header_background: e.target.value }
-              })}
-              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-            />
-            <input
-              type="text"
-              value={appearance.header_background || "#f9fafb"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, header_background: e.target.value }
-              })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="#f9fafb"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Header Text Color</label>
-          <div className="flex gap-2">
-            <input
-              type="color"
-              value={appearance.header_text_color || "#111827"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, header_text_color: e.target.value }
-              })}
-              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-            />
-            <input
-              type="text"
-              value={appearance.header_text_color || "#111827"}
-              onChange={(e) => setConfig({ 
-                ...config, 
-                appearance: { ...appearance, header_text_color: e.target.value }
-              })}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="#111827"
-            />
-          </div>
-        </div>
-      </>
-    )
+    switch (block?.type) {
+      case "kpi":
+        return (
+          <>
+            <KPIAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "chart":
+        return (
+          <>
+            <ChartAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "table_snapshot":
+        return (
+          <>
+            <TableSnapshotAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "text":
+        return (
+          <>
+            <TextAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "action":
+        return (
+          <>
+            <ActionAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "link_preview":
+        return (
+          <>
+            <LinkPreviewAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      default:
+        return <CommonAppearanceSettings {...commonProps} />
+    }
   }
 }

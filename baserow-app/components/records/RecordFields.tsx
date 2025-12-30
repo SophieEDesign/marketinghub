@@ -70,16 +70,23 @@ export default function RecordFields({
   const handleLinkedRecordClick = useCallback(
     async (linkedTableId: string, linkedRecordId: string) => {
       try {
-        const supabase = createClient()
-        const { data: linkedTable } = await supabase
-          .from("tables")
-          .select("name, supabase_table")
-          .eq("id", linkedTableId)
-          .single()
+        // If RecordPanel context is available, use it
+        if (navigateToLinkedRecord) {
+          const supabase = createClient()
+          const { data: linkedTable } = await supabase
+            .from("tables")
+            .select("name, supabase_table")
+            .eq("id", linkedTableId)
+            .single()
 
-        if (linkedTable) {
-          navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table)
+          if (linkedTable) {
+            navigateToLinkedRecord(linkedTableId, linkedRecordId, linkedTable.supabase_table)
+            return
+          }
         }
+        
+        // Otherwise, navigate to record page
+        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       } catch (error: any) {
         console.error("Error navigating to linked record:", error)
         toast({

@@ -1,6 +1,6 @@
 "use client"
 
-import { Grid, FileText, BarChart3, TrendingUp, Type, Image, Minus, Zap, Layout } from "lucide-react"
+import { Grid, FileText, BarChart3, TrendingUp, Type, Image, Minus, Zap, Layout, Table2, ExternalLink } from "lucide-react"
 import { BLOCK_REGISTRY, getAllBlockTypes } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 
@@ -20,6 +20,9 @@ const iconMap: Record<BlockType, React.ElementType> = {
   divider: Minus,
   button: Zap,
   tabs: Layout,
+  table_snapshot: Table2,
+  action: Zap,
+  link_preview: ExternalLink,
 }
 
 export default function BlockPicker({ onSelectBlock, isCollapsed = false }: BlockPickerProps) {

@@ -618,7 +618,10 @@ export default function SettingsPagesTab() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="page-type">Page Type *</Label>
+              <Label>Page Type *</Label>
+              <div className="text-sm text-gray-500 mb-2">
+                Choose a page type. Interface pages use the card selector below. Table views use the dropdown.
+              </div>
               <Select value={newPageType} onValueChange={(value: any) => {
                 setNewPageType(value)
                 if (value === 'interface') {
@@ -628,16 +631,23 @@ export default function SettingsPagesTab() {
                 }
               }}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select page type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="interface">Interface Page</SelectItem>
+                  <SelectItem value="interface">Interface Page (Dashboard/List/etc.)</SelectItem>
                   <SelectItem value="grid">Grid View</SelectItem>
                   <SelectItem value="kanban">Kanban View</SelectItem>
                   <SelectItem value="calendar">Calendar View</SelectItem>
                   <SelectItem value="form">Form View</SelectItem>
                 </SelectContent>
               </Select>
+              {newPageType === 'interface' && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs text-blue-800">
+                    💡 Tip: After creating an interface page, you can choose a specific page type (Dashboard, List, etc.) when configuring it.
+                  </p>
+                </div>
+              )}
             </div>
             {newPageType === 'interface' && (
               <div className="flex items-center space-x-2">
