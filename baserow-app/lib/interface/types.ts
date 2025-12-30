@@ -9,8 +9,11 @@ export type BlockType =
   | 'divider'
   | 'button'
   | 'tabs'
+  | 'table_snapshot'
+  | 'action'
+  | 'link_preview'
 
-export type ChartType = 'bar' | 'line' | 'pie' | 'area'
+export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'
 
 export interface PageBlock {
@@ -52,6 +55,38 @@ export interface BlockConfig {
   button_label?: string
   button_automation_id?: string
   visibility_rules?: VisibilityRule[]
+  // Table snapshot
+  row_limit?: number
+  highlight_rules?: HighlightRule[]
+  // Action block
+  action_type?: 'navigate' | 'create_record'
+  label?: string
+  url?: string
+  route?: string
+  confirmation_message?: string
+  icon?: string
+  // Link preview
+  link_url?: string
+  link_title?: string
+  link_description?: string
+  // Text block
+  content?: string
+  markdown?: boolean
+  // KPI comparison
+  comparison?: {
+    date_field: string
+    current_start: string
+    current_end: string
+    previous_start: string
+    previous_end: string
+  }
+  target_value?: number | string
+  click_through?: {
+    view_id?: string
+  }
+  // Chart
+  group_by_field?: string
+  metric_field?: string
   // Appearance settings
   appearance?: {
     title?: string
@@ -83,6 +118,14 @@ export interface VisibilityRule {
   field?: string
   condition?: string
   value?: any
+}
+
+export interface HighlightRule {
+  field: string
+  operator: 'eq' | 'neq' | 'gt' | 'lt' | 'contains'
+  value: any
+  background_color?: string
+  text_color?: string
 }
 
 export interface Page {

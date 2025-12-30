@@ -523,6 +523,11 @@ export default function InterfaceBuilder({
                 {currentPage.description && (
                   <p className="text-xs text-gray-500 mt-0.5 truncate">{currentPage.description}</p>
                 )}
+                {currentPage.updated_at && !isEditing && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Last updated {new Date(currentPage.updated_at).toLocaleString()}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

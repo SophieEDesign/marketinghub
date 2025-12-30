@@ -1,71 +1,212 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
-import { BarChart3, LineChart, PieChart } from "lucide-react"
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts"
+import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon } from "lucide-react"
 
 interface ChartBlockProps {
   block: PageBlock
   isEditing?: boolean
 }
 
+interface ChartDataPoint {
+  name: string
+  value: number
+  [key: string]: any
+}
+
 export default function ChartBlock({ block, isEditing = false }: ChartBlockProps) {
+  const router = useRouter()
   const { config } = block
   const tableId = config?.table_id
   const chartType = config?.chart_type || "bar"
   const xAxis = config?.chart_x_axis
   const yAxis = config?.chart_y_axis
-  const [data, setData] = useState<any[]>([])
+  const groupBy = config?.group_by_field
+  const metric = config?.metric_field || yAxis
+  const clickThrough = config?.click_through
+  
+  const [rawData, setRawData] = useState<any[]>([])
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (tableId) {
+    if (tableId && xAxis && metric) {
       loadData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, xAxis, yAxis])
+  }, [tableId, xAxis, yAxis, groupBy, metric])
 
   async function loadData() {
-    if (!tableId) return
+    if (!tableId || !xAxis || !metric) return
 
     setLoading(true)
-    const supabase = createClient()
+    setError(null)
 
-    // Get table name
-    const { data: table } = await supabase
-      .from("tables")
-      .select("supabase_table")
-      .eq("id", tableId)
-      .single()
+    try {
+      const supabase = createClient()
 
-    if (!table?.supabase_table) {
+      // Get table name
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
+
+      if (!table?.supabase_table) {
+        throw new Error("Table not found")
+      }
+
+      // Load data with selected fields
+      const fieldsToSelect = [xAxis, metric]
+      if (groupBy && !fieldsToSelect.includes(groupBy)) {
+        fieldsToSelect.push(groupBy)
+      }
+
+      const { data: rows, error: fetchError } = await supabase
+        .from(table.supabase_table)
+        .select(fieldsToSelect.join(", "))
+        .limit(1000)
+
+      if (fetchError) throw fetchError
+
+      setRawData(rows || [])
+      
+      // Process data for chart
+      const processed = processChartData(rows || [], xAxis, metric, groupBy)
+      setChartData(processed)
+    } catch (err: any) {
+      console.error("Error loading chart data:", err)
+      setError(err.message || "Failed to load chart data")
+    } finally {
       setLoading(false)
-      return
     }
-
-    // Load data
-    const { data: rows } = await supabase
-      .from(table.supabase_table)
-      .select("*")
-      .limit(100)
-
-    setData(rows || [])
-    setLoading(false)
   }
 
-  if (!tableId) {
+  function processChartData(
+    rows: any[],
+    xField: string,
+    yField: string,
+    groupByField?: string
+  ): ChartDataPoint[] {
+    if (!rows || rows.length === 0) return []
+
+    // If grouping, aggregate by group
+    if (groupByField) {
+      const grouped: Record<string, number> = {}
+      
+      rows.forEach((row) => {
+        const groupValue = String(row[groupByField] || "Unknown")
+        const yValue = parseFloat(row[yField]) || 0
+        
+        if (!grouped[groupValue]) {
+          grouped[groupValue] = 0
+        }
+        grouped[groupValue] += yValue
+      })
+
+      return Object.entries(grouped).map(([name, value]) => ({
+        name,
+        value,
+      }))
+    }
+
+    // Simple aggregation by x-axis value
+    const aggregated: Record<string, number> = {}
+    
+    rows.forEach((row) => {
+      const xValue = String(row[xField] || "Unknown")
+      const yValue = parseFloat(row[yField]) || 0
+      
+      if (!aggregated[xValue]) {
+        aggregated[xValue] = 0
+      }
+      aggregated[xValue] += yValue
+    })
+
+    return Object.entries(aggregated)
+      .map(([name, value]) => ({
+        name: name.length > 20 ? name.substring(0, 20) + "..." : name,
+        value,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 20) // Limit to top 20 for readability
+  }
+
+  function handleChartClick(data: any) {
+    if (clickThrough && !isEditing && tableId) {
+      // Navigate to filtered view
+      if (clickThrough.view_id) {
+        router.push(`/tables/${tableId}/views/${clickThrough.view_id}`)
+      } else {
+        router.push(`/tables/${tableId}`)
+      }
+    }
+  }
+
+  // Empty state
+  if (!tableId || !xAxis || !metric) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        {isEditing ? "Configure chart settings" : "No data"}
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <p className="mb-1">{isEditing ? "Configure chart settings" : "No chart configuration"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Select table, X-axis, and metric in settings</p>
+          )}
+        </div>
       </div>
     )
   }
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400">
-        Loading chart data...
+      <div className="h-full flex items-center justify-center text-gray-400 p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2"></div>
+          <p className="text-sm">Loading chart data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex items-center justify-center text-red-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-1">Error loading chart</p>
+          <p className="text-xs">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (chartData.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <p className="mb-1">No data available</p>
+          <p className="text-xs text-gray-400">Try adjusting filters or date range</p>
+        </div>
       </div>
     )
   }
@@ -81,11 +222,21 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
   }
 
   const title = appearance.title || config.title
+  const showTitle = appearance.show_title !== false && title
 
-  // Simple chart rendering (in production, use a charting library like recharts)
+  // Color palette for charts
+  const COLORS = [
+    '#0088FE', '#00C49F', '#FFBB28', '#FF8042',
+    '#8884d8', '#82ca9d', '#ffc658', '#ff7300',
+    '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
+  ]
+
   return (
-    <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {appearance.show_title !== false && title && (
+    <div 
+      className={`h-full w-full overflow-auto flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
+      style={blockStyle}
+    >
+      {showTitle && (
         <div
           className="mb-4 pb-2 border-b"
           style={{
@@ -96,24 +247,84 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
       )}
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          {chartType === "bar" && <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-2" />}
-          {chartType === "line" && <LineChart className="h-12 w-12 mx-auto text-gray-400 mb-2" />}
-          {chartType === "pie" && <PieChart className="h-12 w-12 mx-auto text-gray-400 mb-2" />}
-          <p className="text-sm text-gray-500">
-            {chartType.toUpperCase()} Chart
-          </p>
-          <p className="text-xs text-gray-400 mt-1">
-            {data.length} records
-          </p>
-          {isEditing && (
-            <p className="text-xs text-gray-400 mt-2">
-              Configure axes in settings
-            </p>
+      <div className="flex-1 min-h-0">
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === "bar" && (
+            <BarChart data={chartData} onClick={handleChartClick}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="name" 
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={0}
+              />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" fill={COLORS[0]} />
+            </BarChart>
           )}
-        </div>
+          {chartType === "line" && (
+            <LineChart data={chartData} onClick={handleChartClick}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="name"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={0}
+              />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
+            </LineChart>
+          )}
+          {chartType === "pie" && (
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+                onClick={handleChartClick}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          )}
+          {chartType === "stacked_bar" && (
+            <BarChart data={chartData} onClick={handleChartClick}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="name"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+                interval={0}
+              />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
+            </BarChart>
+          )}
+        </ResponsiveContainer>
       </div>
+      {clickThrough && !isEditing && (
+        <div className="text-xs text-gray-400 text-center mt-2">
+          Click chart to view records
+        </div>
+      )}
     </div>
   )
 }

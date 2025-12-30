@@ -59,7 +59,7 @@ export default async function WorkspaceShellWrapper({
   try {
     const { data: groupsData, error: groupsError } = await supabase
       .from('interface_groups')
-      .select('*')
+      .select('id, name, order_index, collapsed, workspace_id, is_system')
       .order('order_index', { ascending: true })
     
     if (!groupsError && groupsData) {

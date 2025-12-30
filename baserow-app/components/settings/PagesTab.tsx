@@ -429,18 +429,8 @@ export default function SettingsPagesTab() {
                 <CardDescription>Manage your interface pages and views</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setNewPageType('interface')
-                    setNewPageOpen(true)
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Interface Page
-                </Button>
                 <Button onClick={() => {
-                  setNewPageType('grid')
+                  setNewPageType('interface')
                   setNewPageOpen(true)
                 }}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -607,19 +597,19 @@ export default function SettingsPagesTab() {
       <Dialog open={newPageOpen} onOpenChange={setNewPageOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Create New Interface</DialogTitle>
+            <DialogTitle>Create New Page</DialogTitle>
             <DialogDescription>
-              Create a new interface page or view
+              Choose a page type and configure it
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="page-name">Interface Name *</Label>
+              <Label htmlFor="page-name">Page Name *</Label>
               <Input
                 id="page-name"
                 value={newPageName}
                 onChange={(e) => setNewPageName(e.target.value)}
-                placeholder="My Dashboard"
+                placeholder="My Page"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && newPageName.trim() && !creating) {
                     handleCreatePage()
@@ -628,7 +618,7 @@ export default function SettingsPagesTab() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="page-type">Interface Type *</Label>
+              <Label htmlFor="page-type">Page Type *</Label>
               <Select value={newPageType} onValueChange={(value: any) => {
                 setNewPageType(value)
                 if (value === 'interface') {
@@ -688,7 +678,7 @@ export default function SettingsPagesTab() {
               Cancel
             </Button>
             <Button onClick={handleCreatePage} disabled={creating || !newPageName.trim()}>
-              {creating ? 'Creating...' : 'Create Interface'}
+              {creating ? 'Creating...' : 'Create Page'}
             </Button>
           </DialogFooter>
         </DialogContent>

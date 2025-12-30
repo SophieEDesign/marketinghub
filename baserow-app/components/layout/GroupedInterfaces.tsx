@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -82,6 +82,38 @@ export default function GroupedInterfaces({
   const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
   const [pages, setPages] = useState<InterfacePage[]>(interfacePages)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+
+  // Ensure we have an "Ungrouped" group if pages exist without group_id
+  // This handles the case where the migration hasn't run yet or pages exist without groups
+  const ungroupedGroupId = useMemo(() => {
+    // First, try to find existing "Ungrouped" group
+    const ungroupedGroup = groups.find(g => g.is_system && g.name === 'Ungrouped')
+    if (ungroupedGroup) return ungroupedGroup.id
+    
+    // If no ungrouped group exists, check if we have pages without group_id
+    const hasUngroupedPages = pages.some(p => !p.group_id)
+    if (hasUngroupedPages) {
+      // Return virtual ID - we'll create the group in allGroups
+      return 'ungrouped-system-virtual'
+    }
+    
+    // Default fallback ID (shouldn't happen, but ensures we always have an ID)
+    return 'ungrouped-system-virtual'
+  }, [groups, pages])
+  
+  // Add virtual "Ungrouped" group to groups list if needed
+  const allGroups = useMemo(() => {
+    if (ungroupedGroupId === 'ungrouped-system-virtual' && !groups.some(g => g.id === 'ungrouped-system-virtual')) {
+      return [...groups, {
+        id: 'ungrouped-system-virtual',
+        name: 'Ungrouped',
+        order_index: 9999,
+        collapsed: false,
+        is_system: true,
+      } as InterfaceGroup]
+    }
+    return groups
+  }, [groups, ungroupedGroupId])
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState("")
@@ -115,37 +147,59 @@ export default function GroupedInterfaces({
   }, [])
 
   // Organize pages by group
-  const pagesByGroup = pages.reduce((acc, page) => {
-    const groupId = page.group_id || "uncategorized"
-    if (!acc[groupId]) {
-      acc[groupId] = []
-    }
-    acc[groupId].push(page)
-    return acc
-  }, {} as Record<string, InterfacePage[]>)
-
-  // Sort pages within each group by order_index
-  Object.keys(pagesByGroup).forEach((groupId) => {
-    pagesByGroup[groupId].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-  })
+  // Pages without group_id go to "Ungrouped" system group
+  const pagesByGroup = useMemo(() => {
+    const result: Record<string, InterfacePage[]> = {}
+    
+    pages.forEach(page => {
+      // If page has no group_id, assign to "Ungrouped" system group
+      const groupId = page.group_id || ungroupedGroupId || 'ungrouped-system-virtual'
+      if (!result[groupId]) {
+        result[groupId] = []
+      }
+      result[groupId].push(page)
+    })
+    
+    // Sort pages within each group by order_index
+    Object.keys(result).forEach((groupId) => {
+      result[groupId].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+    })
+    
+    return result
+  }, [pages, ungroupedGroupId])
 
   // Get uncategorized pages (but we won't show them in a separate section)
   const uncategorizedPages = pagesByGroup["uncategorized"] || []
 
   // Filter groups based on mode
-  // In Browse mode, hide system groups (like "Ungrouped")
+  // In Browse mode, hide system groups (like "Ungrouped") BUT only if they're empty
   // In Edit mode, show all groups including system groups
-  const visibleGroups = editMode 
-    ? groups 
-    : groups.filter(g => !g.is_system)
+  const visibleGroups = useMemo(() => {
+    if (editMode) {
+      return allGroups
+    }
+    
+    // In Browse mode, show system groups only if they have pages
+    // Handle case where is_system might be undefined (column doesn't exist yet)
+    return allGroups.filter(g => {
+      const isSystemGroup = g.is_system === true || (g.name === 'Ungrouped' && g.id === ungroupedGroupId)
+      if (isSystemGroup) {
+        const groupPages = pagesByGroup[g.id] || []
+        return groupPages.length > 0 // Show system groups if they have pages
+      }
+      return true // Show all non-system groups
+    })
+  }, [editMode, allGroups, pagesByGroup, ungroupedGroupId])
 
   // Sort groups by order_index (system groups go to end)
-  const sortedGroups = [...visibleGroups].sort((a, b) => {
-    // System groups go to end
-    if (a.is_system && !b.is_system) return 1
-    if (!a.is_system && b.is_system) return -1
-    return a.order_index - b.order_index
-  })
+  const sortedGroups = useMemo(() => {
+    return [...visibleGroups].sort((a, b) => {
+      // System groups go to end
+      if (a.is_system && !b.is_system) return 1
+      if (!a.is_system && b.is_system) return -1
+      return a.order_index - b.order_index
+    })
+  }, [visibleGroups])
 
   const toggleGroup = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -708,7 +762,18 @@ export default function GroupedInterfaces({
 
   // Render based on mode
   if (!editMode) {
-    // Browse mode - clean navigation UI, hide system groups
+    // Browse mode - clean navigation UI
+    // If no groups exist but pages do, show pages directly
+    if (sortedGroups.length === 0 && pages.length > 0) {
+      return (
+        <div className="space-y-1">
+          {pages.map((page) => (
+            <NavigationPage key={page.id} page={page} />
+          ))}
+        </div>
+      )
+    }
+    
     return (
       <div className="space-y-1">
         {sortedGroups.map((group) => {

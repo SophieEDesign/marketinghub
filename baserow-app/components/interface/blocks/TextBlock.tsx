@@ -1,183 +1,67 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import dynamic from "next/dynamic"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import type { PageBlock } from "@/lib/interface/types"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
-import "react-quill/dist/quill.snow.css"
-
-// Dynamically import ReactQuill to avoid SSR issues
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false })
+import { FileText } from "lucide-react"
 
 interface TextBlockProps {
   block: PageBlock
   isEditing?: boolean
-  onUpdate?: (content: string) => void
 }
 
-export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
+export default function TextBlock({ block, isEditing = false }: TextBlockProps) {
   const { config } = block
-  const content = config?.text_content || ""
-  
-  // Use refs for uncontrolled editor state to prevent re-renders
-  const quillRef = useRef<any>(null)
-  const quillEditorRef = useRef<any>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const lastSavedContentRef = useRef<string>(content)
-  
-  const [activeTab, setActiveTab] = useState<"visual" | "html">("visual")
-  // Local state for editor content - only syncs from prop when content changes externally
-  const [editorContent, setEditorContent] = useState<string>(content)
+  const content = config?.content || config?.text || ""
+  const markdown = config?.markdown !== false // Default to markdown enabled
 
-  // Update editor content only when block content changes from external source (not from user typing)
-  useEffect(() => {
-    // Only update if content changed externally (not from our own save)
-    if (content !== lastSavedContentRef.current) {
-      setEditorContent(content)
-      lastSavedContentRef.current = content
-    }
-  }, [content])
-
-  // Debounced save function - saves after user stops typing
-  const debouncedSave = useCallback((value: string) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-    
-    saveTimeoutRef.current = setTimeout(() => {
-      if (onUpdate && value !== lastSavedContentRef.current) {
-        lastSavedContentRef.current = value
-        onUpdate(value)
-      }
-    }, 600) // 600ms debounce
-  }, [onUpdate])
-
-  // Save on blur (immediate) - use current editorContent state
-  const handleBlur = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-      saveTimeoutRef.current = null
-    }
-    
-    // Use current editorContent state (always in sync with what user sees)
-    if (onUpdate && editorContent !== lastSavedContentRef.current) {
-      lastSavedContentRef.current = editorContent
-      onUpdate(editorContent)
-    }
-  }, [onUpdate, editorContent])
-
-  // Get Quill editor instance callback
-  const handleQuillRef = useCallback((quill: any) => {
-    quillRef.current = quill
-    if (quill) {
-      quillEditorRef.current = quill.getEditor()
-    }
-  }, [])
-
-  // Configure Quill toolbar
-  const quillModules = {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ["bold", "italic", "underline", "strike"],
-      [{ list: "ordered" }, { list: "bullet" }],
-      [{ color: [] }, { background: [] }],
-      [{ align: [] }],
-      ["link"],
-      ["clean"],
-    ],
+  // Apply appearance settings
+  const appearance = config.appearance || {}
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+    color: appearance.text_color || appearance.title_color,
   }
 
-  const quillFormats = [
-    "header",
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "list",
-    "bullet",
-    "color",
-    "background",
-    "align",
-    "link",
-  ]
+  const title = appearance.title || config.title
+  const showTitle = appearance.show_title !== false && title
 
-  // Handle Quill change - update local state immediately, debounce save
-  // Use useCallback to prevent function recreation on every render
-  const handleQuillChange = useCallback((value: string) => {
-    // Update local state immediately for responsive UI (no cursor jump)
-    setEditorContent(value)
-    // Debounce save to avoid excessive API calls
-    debouncedSave(value)
-  }, [debouncedSave])
-
-  // Handle HTML textarea change - update local state immediately, debounce save
-  const handleHtmlChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    // Update local state immediately for responsive UI
-    setEditorContent(value)
-    // Debounce save to avoid excessive API calls
-    debouncedSave(value)
-  }, [debouncedSave])
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [])
-
-  if (isEditing) {
+  // Empty state
+  if (!content && isEditing) {
     return (
-      <div 
-        className="h-full flex flex-col" 
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onFocus={(e) => e.stopPropagation()}
-      >
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "visual" | "html")} className="h-full flex flex-col">
-          <TabsList className="mb-2">
-            <TabsTrigger value="visual">Visual</TabsTrigger>
-            <TabsTrigger value="html">HTML</TabsTrigger>
-          </TabsList>
-          <TabsContent value="visual" className="flex-1 flex flex-col mt-0">
-            <ReactQuill
-              theme="snow"
-              value={editorContent}
-              onChange={handleQuillChange}
-              onBlur={handleBlur}
-              modules={quillModules}
-              formats={quillFormats}
-              placeholder="Enter text content..."
-              className="flex-1 flex flex-col"
-              preserveWhitespace={true}
-            />
-          </TabsContent>
-          <TabsContent value="html" className="flex-1 mt-0">
-            <Textarea
-              ref={textareaRef}
-              value={editorContent}
-              onChange={handleHtmlChange}
-              onBlur={handleBlur}
-              placeholder="Enter HTML content..."
-              className="h-full font-mono text-sm resize-none"
-            />
-          </TabsContent>
-        </Tabs>
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4" style={blockStyle}>
+        <div className="text-center">
+          <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <p className="mb-1">Add text content</p>
+          <p className="text-xs text-gray-400">Edit in settings to add text or markdown</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="text-block-content max-w-none">
-        {content ? (
-          <div dangerouslySetInnerHTML={{ __html: content }} />
+    <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>
+      {showTitle && (
+        <div
+          className="mb-4 pb-2 border-b"
+          style={{
+            backgroundColor: appearance.header_background,
+            color: appearance.header_text_color || appearance.title_color,
+          }}
+        >
+          <h3 className="text-lg font-semibold">{title}</h3>
+        </div>
+      )}
+      <div className="flex-1 overflow-auto prose prose-sm max-w-none">
+        {markdown ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {content}
+          </ReactMarkdown>
         ) : (
-          <p className="text-gray-400 italic">Empty text block</p>
+          <div className="whitespace-pre-wrap">{content}</div>
         )}
       </div>
     </div>

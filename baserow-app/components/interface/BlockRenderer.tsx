@@ -10,6 +10,9 @@ import TextBlock from "./blocks/TextBlock"
 import ImageBlock from "./blocks/ImageBlock"
 import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
+import TableSnapshotBlock from "./blocks/TableSnapshotBlock"
+import ActionBlock from "./blocks/ActionBlock"
+import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 
 interface BlockRendererProps {
@@ -72,13 +75,16 @@ export default function BlockRenderer({
         return <KPIBlock block={block} isEditing={canEdit} />
 
       case "text":
-        return (
-          <TextBlock
-            block={block}
-            isEditing={canEdit}
-            onUpdate={(content) => handleUpdate({ text_content: content })}
-          />
-        )
+        return <TextBlock block={block} isEditing={canEdit} />
+
+      case "table_snapshot":
+        return <TableSnapshotBlock block={block} isEditing={canEdit} />
+
+      case "action":
+        return <ActionBlock block={block} isEditing={canEdit} />
+
+      case "link_preview":
+        return <LinkPreviewBlock block={block} isEditing={canEdit} />
 
       case "image":
         return (

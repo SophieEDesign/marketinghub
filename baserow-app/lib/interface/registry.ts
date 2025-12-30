@@ -152,6 +152,51 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       title: 'Tabs',
     },
   },
+  table_snapshot: {
+    type: 'table_snapshot',
+    label: 'Table Snapshot',
+    icon: 'Table2',
+    defaultWidth: 12,
+    defaultHeight: 8,
+    minWidth: 4,
+    minHeight: 4,
+    defaultConfig: {
+      title: 'Table Snapshot',
+      table_id: '',
+      view_id: '',
+      row_limit: 10,
+    },
+  },
+  action: {
+    type: 'action',
+    label: 'Action',
+    icon: 'Zap',
+    defaultWidth: 3,
+    defaultHeight: 2,
+    minWidth: 2,
+    minHeight: 2,
+    maxWidth: 6,
+    maxHeight: 3,
+    defaultConfig: {
+      title: 'Action',
+      action_type: 'navigate',
+      label: 'Click Me',
+      route: '',
+    },
+  },
+  link_preview: {
+    type: 'link_preview',
+    label: 'Link Preview',
+    icon: 'ExternalLink',
+    defaultWidth: 4,
+    defaultHeight: 4,
+    minWidth: 2,
+    minHeight: 2,
+    defaultConfig: {
+      title: 'Link Preview',
+      url: '',
+    },
+  },
 }
 
 export function getBlockDefinition(type: BlockType): BlockDefinition {
