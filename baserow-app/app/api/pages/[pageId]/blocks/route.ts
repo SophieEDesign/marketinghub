@@ -71,15 +71,28 @@ export async function PATCH(
       const supabase = await createClient()
       
       await Promise.all(
-        blockUpdates.map((update: { id: string; config?: any }) =>
-          supabase
+        blockUpdates.map(async (update: { id: string; config?: any }) => {
+          // Get current block config to merge properly
+          const { data: currentBlock } = await supabase
+            .from('view_blocks')
+            .select('config')
+            .eq('id', update.id)
+            .single()
+
+          // Merge configs - new config overrides existing
+          const mergedConfig = {
+            ...(currentBlock?.config || {}),
+            ...(update.config || {}),
+          }
+
+          return supabase
             .from('view_blocks')
             .update({
-              config: update.config,
+              config: mergedConfig,
               updated_at: new Date().toISOString(),
             })
             .eq('id', update.id)
-        )
+        })
       )
     }
 

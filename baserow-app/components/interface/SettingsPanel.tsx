@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { X, Upload, Image as ImageIcon } from "lucide-react"
 import type { ViewType } from "@/lib/interface/types"
 import { createClient } from "@/lib/supabase/client"
@@ -237,18 +237,48 @@ export default function SettingsPanel({
     }
   }
 
-  async function handleSave() {
-    if (block) {
-      try {
-        await onSave(block.id, config)
-        // Don't close automatically - let user see the changes
-        // onClose()
-      } catch (error) {
-        console.error("Failed to save block settings:", error)
-        alert("Failed to save settings. Please try again.")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleSave = useCallback(async () => {
+    if (!block) return
+    
+    setSaving(true)
+    setSaved(false)
+    try {
+      await onSave(block.id, config)
+      setSaved(true)
+      // Show saved feedback briefly
+      setTimeout(() => setSaved(false), 2000)
+    } catch (error) {
+      console.error("Failed to save block settings:", error)
+      alert("Failed to save settings. Please try again.")
+    } finally {
+      setSaving(false)
+    }
+  }, [block, config, onSave])
+
+  // Auto-save on config change (debounced) - only when panel is open
+  useEffect(() => {
+    if (!block || !isOpen) return
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+    }
+    
+    // Set new timeout for auto-save
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSave()
+    }, 1500) // Auto-save after 1.5 seconds of inactivity
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
       }
     }
-  }
+  }, [config, block, isOpen, handleSave])
 
   const [activeTab, setActiveTab] = useState<'data' | 'appearance'>('data')
 
@@ -392,18 +422,37 @@ export default function SettingsPanel({
 
       {/* Footer */}
       <div className="h-16 border-t border-gray-200 flex items-center justify-between px-4">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-        >
-          Close
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-        >
-          Save Changes
-        </button>
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          {saving && (
+            <>
+              <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+              <span>Saving...</span>
+            </>
+          )}
+          {saved && !saving && (
+            <>
+              <svg className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-green-600">Saved</span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Close
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   )

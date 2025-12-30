@@ -27,6 +27,7 @@ import { createClient } from '@/lib/supabase/client'
 interface Page {
   id: string
   name: string
+  displayName?: string // Display name with table info for views
   type: 'interface' | 'grid' | 'kanban' | 'calendar' | 'form'
   tableId?: string | null
   tableName?: string
@@ -105,24 +106,45 @@ export default function SettingsPagesTab() {
         }
       }
 
-      const allPages: Page[] = (views || []).map((view: any) => ({
-        id: view.id,
-        name: view.name,
-        type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
-        tableId: view.table_id,
-        tableName: view.table_id ? tableMap.get(view.table_id) : undefined,
-        updated_at: view.updated_at,
-        created_at: view.created_at,
-      }))
+      const allPages: Page[] = (views || []).map((view: any) => {
+        const tableName = view.table_id ? tableMap.get(view.table_id) : undefined
+        // For non-interface views, include table name in display name if it's generic
+        let displayName = view.name
+        if (view.type !== 'interface' && tableName && (view.name === 'All Records' || view.name.toLowerCase().includes('all records'))) {
+          displayName = `${view.name} (${tableName})`
+        }
+        
+        return {
+          id: view.id,
+          name: view.name, // Keep original name for editing
+          displayName: displayName, // Display name with table info
+          type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
+          tableId: view.table_id,
+          tableName: tableName,
+          updated_at: view.updated_at,
+          created_at: view.created_at,
+        }
+      })
 
-      // Sort by updated_at descending
-      allPages.sort((a, b) => {
+      // Separate interfaces and views
+      const interfaces = allPages.filter(p => p.type === 'interface')
+      const viewsList = allPages.filter(p => p.type !== 'interface')
+      
+      // Sort each group by updated_at descending
+      interfaces.sort((a, b) => {
+        const aDate = a.updated_at || a.created_at || ''
+        const bDate = b.updated_at || b.created_at || ''
+        return bDate.localeCompare(aDate)
+      })
+      
+      viewsList.sort((a, b) => {
         const aDate = a.updated_at || a.created_at || ''
         const bDate = b.updated_at || b.created_at || ''
         return bDate.localeCompare(aDate)
       })
 
-      setPages(allPages)
+      // Combine: interfaces first, then views
+      setPages([...interfaces, ...viewsList])
     } catch (error) {
       console.error('Error loading pages:', error)
     } finally {
@@ -434,66 +456,148 @@ export default function SettingsPagesTab() {
               <p className="text-sm">No pages yet. Create your first page to get started.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
-                <div className="col-span-4">Name</div>
-                <div className="col-span-2">Type</div>
-                <div className="col-span-2">Table</div>
-                <div className="col-span-2">Last Updated</div>
-                <div className="col-span-2 text-right">Actions</div>
-              </div>
-              {pages.map((page) => {
-                const Icon = getPageTypeIcon(page)
-                return (
-                  <div
-                    key={page.id}
-                    className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 rounded-md transition-colors border-b"
-                  >
-                    <div className="col-span-4 flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">{page.name}</span>
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-600">
-                      {getPageTypeLabel(page)}
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-600">
-                      {page.tableName || '—'}
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-500">
-                      {formatDate(page.updated_at)}
-                    </div>
-                    <div className="col-span-2 flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(page)}
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDuplicate(page)}
-                        title="Duplicate"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setPageToDelete(page)
-                          setDeleteDialogOpen(true)
-                        }}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
+            <div className="space-y-6">
+              {/* Interfaces Section */}
+              {pages.filter(p => p.type === 'interface').length > 0 && (
+                <div className="space-y-2">
+                  <div className="px-4 py-2">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                      Interface Pages
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">Custom dashboard pages with blocks and widgets</p>
                   </div>
-                )
-              })}
+                  <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
+                    <div className="col-span-4">Name</div>
+                    <div className="col-span-2">Type</div>
+                    <div className="col-span-2">Table</div>
+                    <div className="col-span-2">Last Updated</div>
+                    <div className="col-span-2 text-right">Actions</div>
+                  </div>
+                  {pages.filter(p => p.type === 'interface').map((page) => {
+                    const Icon = getPageTypeIcon(page)
+                    return (
+                      <div
+                        key={page.id}
+                        className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 rounded-md transition-colors border-b"
+                      >
+                        <div className="col-span-4 flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium">{page.name}</span>
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-600">
+                          {getPageTypeLabel(page)}
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-600">
+                          {page.tableName || '—'}
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-500">
+                          {formatDate(page.updated_at)}
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(page)}
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDuplicate(page)}
+                            title="Duplicate"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPageToDelete(page)
+                              setDeleteDialogOpen(true)
+                            }}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Views Section */}
+              {pages.filter(p => p.type !== 'interface').length > 0 && (
+                <div className="space-y-2">
+                  <div className="px-4 py-2">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                      Table Views
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">Grid, Kanban, Calendar, and Form views for your tables</p>
+                  </div>
+                  <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
+                    <div className="col-span-4">Name</div>
+                    <div className="col-span-2">Type</div>
+                    <div className="col-span-2">Table</div>
+                    <div className="col-span-2">Last Updated</div>
+                    <div className="col-span-2 text-right">Actions</div>
+                  </div>
+                  {pages.filter(p => p.type !== 'interface').map((page) => {
+                    const Icon = getPageTypeIcon(page)
+                    return (
+                      <div
+                        key={page.id}
+                        className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 rounded-md transition-colors border-b"
+                      >
+                        <div className="col-span-4 flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium">{page.displayName || page.name}</span>
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-600">
+                          {getPageTypeLabel(page)}
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-600">
+                          {page.tableName || '—'}
+                        </div>
+                        <div className="col-span-2 text-sm text-gray-500">
+                          {formatDate(page.updated_at)}
+                        </div>
+                        <div className="col-span-2 flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(page)}
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDuplicate(page)}
+                            title="Duplicate"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPageToDelete(page)
+                              setDeleteDialogOpen(true)
+                            }}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -112,7 +112,7 @@ export default function UsersTab() {
         user_id: profile.user_id,
         email: `User ${profile.user_id.substring(0, 8)}...`,
         name: null,
-        role: profile.role as 'admin' | 'member',
+        role: (profile.role || 'member') as 'admin' | 'member', // Default to 'member' if no role
         is_active: true,
         last_active: null,
         created_at: profile.created_at,
@@ -134,7 +134,7 @@ export default function UsersTab() {
           user_id: p.user_id,
           email: `User ${p.user_id.substring(0, 8)}...`,
           name: null,
-          role: p.role as 'admin' | 'member',
+          role: (p.role || 'member') as 'admin' | 'member', // Default to 'member' if no role
           is_active: true,
           last_active: null,
           created_at: p.created_at,
@@ -151,20 +151,37 @@ export default function UsersTab() {
       return
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(inviteEmail.trim())) {
+      alert('Please enter a valid email address')
+      return
+    }
+
     setInviting(true)
     try {
-      const supabase = createClient()
-      
-      // Invite user via Supabase Auth
-      const { data, error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail.trim(), {
-        data: {
+      // Call the API route instead of using admin API directly
+      const response = await fetch('/api/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
           role: inviteRole,
-          default_interface: inviteDefaultInterface || null,
-        }
+          default_interface: inviteDefaultInterface === '__none__' ? null : inviteDefaultInterface,
+        }),
       })
 
-      // Profile is created by the API route
+      const data = await response.json()
 
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to invite user')
+      }
+
+      // Success - show confirmation
+      alert(`Invitation sent successfully to ${inviteEmail.trim()}`)
+      
       setInviteDialogOpen(false)
       setInviteEmail('')
       setInviteRole('member')
@@ -181,10 +198,16 @@ export default function UsersTab() {
   async function handleRoleChange(user: User, newRole: 'admin' | 'member') {
     try {
       const supabase = createClient()
+      
+      // Ensure role is set (upsert to create profile if it doesn't exist)
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole })
-        .eq('user_id', user.user_id)
+        .upsert({
+          user_id: user.user_id,
+          role: newRole,
+        }, {
+          onConflict: 'user_id',
+        })
 
       if (error) throw error
 
@@ -294,11 +317,11 @@ export default function UsersTab() {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
                         <Select
-                          value={user.role}
+                          value={user.role || 'member'}
                           onValueChange={(value) => handleRoleChange(user, value as 'admin' | 'member')}
                         >
                           <SelectTrigger className="w-32">
-                            <SelectValue />
+                            <SelectValue placeholder="Select role" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>

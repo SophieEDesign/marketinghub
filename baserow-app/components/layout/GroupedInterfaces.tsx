@@ -60,6 +60,7 @@ interface InterfaceGroup {
   order_index: number
   collapsed: boolean
   workspace_id?: string | null
+  is_system?: boolean
 }
 
 interface GroupedInterfacesProps {
@@ -131,8 +132,20 @@ export default function GroupedInterfaces({
   // Get uncategorized pages (but we won't show them in a separate section)
   const uncategorizedPages = pagesByGroup["uncategorized"] || []
 
-  // Sort groups by order_index
-  const sortedGroups = [...groups].sort((a, b) => a.order_index - b.order_index)
+  // Filter groups based on mode
+  // In Browse mode, hide system groups (like "Ungrouped")
+  // In Edit mode, show all groups including system groups
+  const visibleGroups = editMode 
+    ? groups 
+    : groups.filter(g => !g.is_system)
+
+  // Sort groups by order_index (system groups go to end)
+  const sortedGroups = [...visibleGroups].sort((a, b) => {
+    // System groups go to end
+    if (a.is_system && !b.is_system) return 1
+    if (!a.is_system && b.is_system) return -1
+    return a.order_index - b.order_index
+  })
 
   const toggleGroup = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -182,26 +195,54 @@ export default function GroupedInterfaces({
   }
 
   const handleDeleteGroup = async (groupId: string) => {
-    if (!confirm("Delete this group? Interfaces will be moved to Uncategorized.")) {
+    const group = groups.find(g => g.id === groupId)
+    
+    // Prevent deleting system groups
+    if (group?.is_system) {
+      alert("Cannot delete system groups")
+      return
+    }
+
+    if (!confirm("Delete this group? Interfaces will be moved to Ungrouped.")) {
       return
     }
 
     try {
+      // Find the "Ungrouped" system group
+      const ungroupedGroup = groups.find(g => g.is_system && g.name === 'Ungrouped')
+      
+      if (!ungroupedGroup) {
+        alert("Cannot find Ungrouped group. Please refresh the page.")
+        return
+      }
+
+      // Move pages to Ungrouped group
+      const pagesToMove = pages.filter(p => p.group_id === groupId)
+      await Promise.all(
+        pagesToMove.map(page =>
+          fetch(`/api/pages/${page.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ group_id: ungroupedGroup.id }),
+          })
+        )
+      )
+
+      // Delete the group
       const response = await fetch(`/api/interface-groups/${groupId}`, {
         method: "DELETE",
       })
 
       if (response.ok) {
         setGroups((prev) => prev.filter((g) => g.id !== groupId))
-        setPages((prev) => prev.map((p) => (p.group_id === groupId ? { ...p, group_id: null } : p)))
+        setPages((prev) => prev.map((p) => (p.group_id === groupId ? { ...p, group_id: ungroupedGroup.id } : p)))
         onRefresh?.()
       } else {
         console.warn("Failed to delete group:", response.status, response.statusText)
-        // Silently fail - groups might not be available
       }
     } catch (error) {
       console.warn("Failed to delete group:", error)
-      // Silently fail - groups are optional
+      alert("Failed to delete group. Please try again.")
     }
   }
 
@@ -555,6 +596,10 @@ export default function GroupedInterfaces({
       <Link
         href={`/pages/${page.id}`}
         className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-50"
+        onClick={(e) => {
+          // Only navigate, don't toggle edit mode
+          e.stopPropagation()
+        }}
         style={isActive ? { 
           backgroundColor: primaryColor + '10', 
           color: primaryColor 
@@ -663,24 +708,32 @@ export default function GroupedInterfaces({
 
   // Render based on mode
   if (!editMode) {
-    // Navigation mode - clean UI
+    // Browse mode - clean navigation UI, hide system groups
     return (
       <div className="space-y-1">
         {sortedGroups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.id)
           const groupPages = pagesByGroup[group.id] || []
+          
+          // Skip empty groups in Browse mode
+          if (groupPages.length === 0) return null
+          
           return (
             <div key={group.id} className="px-2 py-1">
               <button
-                onClick={() => toggleGroup(group.id)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  toggleGroup(group.id)
+                }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                  <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                  <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 )}
-                <Folder className="h-4 w-4 text-gray-500" />
+                <Folder className="h-4 w-4 text-gray-500 flex-shrink-0" />
                 <span className="flex-1 text-left truncate">{group.name}</span>
               </button>
               {!isCollapsed && (
@@ -693,14 +746,6 @@ export default function GroupedInterfaces({
             </div>
           )
         })}
-        {/* Uncategorized pages */}
-        {uncategorizedPages.length > 0 && (
-          <div className="ml-2 mt-0.5 space-y-0.5">
-            {uncategorizedPages.map((page) => (
-              <NavigationPage key={page.id} page={page} />
-            ))}
-          </div>
-        )}
       </div>
     )
   }
@@ -736,17 +781,6 @@ export default function GroupedInterfaces({
           {sortedGroups.map((group) => (
             <SortableGroup key={group.id} group={group} />
           ))}
-
-          {/* Uncategorized pages are shown directly under groups (no separate section) */}
-          {uncategorizedPages.length > 0 && (
-            <UncategorizedDroppable>
-              <div className="ml-4 space-y-0.5 mt-0.5">
-                {uncategorizedPages.map((page) => (
-                  <SortablePage key={page.id} page={page} />
-                ))}
-              </div>
-            </UncategorizedDroppable>
-          )}
         </SortableContext>
       </div>
 
