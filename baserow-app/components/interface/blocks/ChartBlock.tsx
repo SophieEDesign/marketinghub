@@ -162,6 +162,109 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
     }
   }
 
+  function renderChart() {
+    // Color palette for charts
+    const COLORS = [
+      '#0088FE', '#00C49F', '#FFBB28', '#FF8042',
+      '#8884d8', '#82ca9d', '#ffc658', '#ff7300',
+      '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
+    ]
+
+    switch (chartType) {
+      case "bar":
+        return (
+          <BarChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              interval={0}
+            />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="value" fill={COLORS[0]} />
+          </BarChart>
+        )
+      case "line":
+        return (
+          <LineChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              interval={0}
+            />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
+          </LineChart>
+        )
+      case "pie":
+        return (
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
+              onClick={handleChartClick}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        )
+      case "stacked_bar":
+        return (
+          <BarChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              interval={0}
+            />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
+          </BarChart>
+        )
+      default:
+        // Default to bar chart if unknown type
+        return (
+          <BarChart data={chartData} onClick={handleChartClick}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45}
+              textAnchor="end"
+              height={80}
+              interval={0}
+            />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="value" fill={COLORS[0]} />
+          </BarChart>
+        )
+    }
+  }
+
   // Empty state
   if (!tableId || !xAxis || !metric) {
     return (
@@ -224,13 +327,6 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
   const title = appearance.title || config.title
   const showTitle = appearance.show_title !== false && title
 
-  // Color palette for charts
-  const COLORS = [
-    '#0088FE', '#00C49F', '#FFBB28', '#FF8042',
-    '#8884d8', '#82ca9d', '#ffc658', '#ff7300',
-    '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
-  ]
-
   return (
     <div 
       className={`h-full w-full overflow-auto flex flex-col ${clickThrough && !isEditing ? 'cursor-pointer' : ''}`}
@@ -249,72 +345,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
       )}
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          {chartType === "bar" ? (
-            <BarChart data={chartData} onClick={handleChartClick}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name" 
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                interval={0}
-              />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill={COLORS[0]} />
-            </BarChart>
-          ) : chartType === "line" ? (
-            <LineChart data={chartData} onClick={handleChartClick}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name"
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                interval={0}
-              />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
-            </LineChart>
-          ) : chartType === "pie" ? (
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-                onClick={handleChartClick}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          ) : chartType === "stacked_bar" ? (
-            <BarChart data={chartData} onClick={handleChartClick}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name"
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                interval={0}
-              />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
-            </BarChart>
-          ) : null}
+          {renderChart()}
         </ResponsiveContainer>
       </div>
       {clickThrough && !isEditing && (
