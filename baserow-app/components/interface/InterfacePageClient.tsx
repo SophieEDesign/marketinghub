@@ -1,56 +1,49 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import InterfaceBuilder from "./InterfaceBuilder"
-import InterfaceViewTabs from "./InterfaceViewTabs"
-import type { Page, PageBlock } from "@/lib/interface/types"
-import { createClient } from "@/lib/supabase/client"
-import type { View } from "@/types/database"
-import AirtableViewPage from "@/components/grid/AirtableViewPage"
+import type { InterfacePage } from "@/lib/interface/pages"
+import PageRenderer from "./PageRenderer"
+import { getPageTypeDefinition } from "@/lib/interface/page-types"
 
 interface InterfacePageClientProps {
   pageId: string
+  initialPage?: InterfacePage
+  initialData?: any[]
 }
 
-export default function InterfacePageClient({ pageId }: InterfacePageClientProps) {
+export default function InterfacePageClient({ 
+  pageId, 
+  initialPage,
+  initialData = []
+}: InterfacePageClientProps) {
   const searchParams = useSearchParams()
-  const [page, setPage] = useState<Page | null>(null)
-  const [blocks, setBlocks] = useState<PageBlock[]>([])
-  const [loading, setLoading] = useState(true)
-  const [activeViewId, setActiveViewId] = useState<string | null>(null)
-  const [activeView, setActiveView] = useState<View | null>(null)
+  const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
+  const [data, setData] = useState<any[]>(initialData)
+  const [loading, setLoading] = useState(!initialPage)
+  const [isGridMode, setIsGridMode] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
-    loadPage()
+    if (!initialPage) {
+      loadPage()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageId])
 
   useEffect(() => {
-    if (activeViewId) {
-      loadView(activeViewId)
-    } else {
-      setActiveView(null)
+    if (page && page.source_view) {
+      loadSqlViewData()
     }
-  }, [activeViewId])
+  }, [page?.source_view, page?.config])
 
   async function loadPage() {
     try {
-      const [pageRes, blocksRes] = await Promise.all([
-        fetch(`/api/pages/${pageId}`).catch(() => null),
-        fetch(`/api/pages/${pageId}/blocks`).catch(() => null),
-      ])
-
-      if (pageRes) {
-        const pageData = await pageRes.json()
-        setPage(pageData.page)
-      }
-
-      if (blocksRes) {
-        const blocksData = await blocksRes.json()
-        setBlocks(blocksData.blocks || [])
-      }
+      const res = await fetch(`/api/interface-pages/${pageId}`)
+      if (!res.ok) throw new Error('Failed to load page')
+      
+      const pageData = await res.json()
+      setPage(pageData)
     } catch (error) {
       console.error("Error loading page:", error)
     } finally {
@@ -58,28 +51,56 @@ export default function InterfacePageClient({ pageId }: InterfacePageClientProps
     }
   }
 
-  async function loadView(viewId: string) {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('views')
-        .select('*')
-        .eq('id', viewId)
-        .single()
+  async function loadSqlViewData() {
+    if (!page?.source_view) return
 
-      if (!error && data) {
-        setActiveView(data as View)
-      }
+    try {
+      const res = await fetch(`/api/sql-views/${encodeURIComponent(page.source_view)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters: page.config?.default_filters || {},
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to load SQL view data')
+      
+      const viewData = await res.json()
+      setData(viewData.data || [])
     } catch (error) {
-      console.error('Error loading view:', error)
+      console.error("Error loading SQL view data:", error)
+      setData([])
     }
   }
+
+  const handleGridToggle = () => {
+    setIsGridMode(!isGridMode)
+  }
+
+  // Determine if grid toggle should be shown
+  const showGridToggle = useMemo(() => {
+    if (!page) return false
+    const definition = getPageTypeDefinition(page.page_type)
+    return definition.supportsGridToggle && page.page_type !== 'dashboard' && page.page_type !== 'overview'
+  }, [page])
+
+  // Merge config with grid mode override
+  const pageWithConfig = useMemo(() => {
+    if (!page) return null
+    return {
+      ...page,
+      config: {
+        ...page.config,
+        visualisation: isGridMode ? 'grid' : (page.config?.visualisation || page.page_type),
+      },
+    }
+  }, [page, isGridMode])
 
   if (loading) {
     return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
   }
 
-  if (!page) {
+  if (!page || !pageWithConfig) {
     return <div className="h-screen flex items-center justify-center">Page not found</div>
   }
 
@@ -87,45 +108,15 @@ export default function InterfacePageClient({ pageId }: InterfacePageClientProps
 
   return (
     <div className="h-screen flex flex-col">
-      {/* View Tabs */}
-      <InterfaceViewTabs
-        pageId={pageId}
-        activeViewId={activeViewId}
-        onViewChange={setActiveViewId}
-        isEditing={isEditing}
-      />
-
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        {activeViewId && activeView ? (
-          // Show linked view (Grid, Calendar, Form, etc.)
-          <div className="h-full">
-            {activeView.table_id ? (
-              <AirtableViewPage
-                tableId={activeView.table_id}
-                viewId={activeView.id}
-                table={{ id: activeView.table_id, supabase_table: "" } as any}
-                view={activeView}
-                initialViewFields={[]}
-                initialViewFilters={[]}
-                initialViewSorts={[]}
-                initialTableFields={[]}
-              />
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-500">
-                View not linked to a table
-              </div>
-            )}
-          </div>
-        ) : (
-          // Show interface blocks (Overview)
-          <InterfaceBuilder
-            page={page}
-            initialBlocks={blocks}
-            isViewer={isViewer}
-            onEditModeChange={setIsEditing}
-          />
-        )}
+        <PageRenderer
+          page={pageWithConfig}
+          data={data}
+          isLoading={loading}
+          onGridToggle={showGridToggle ? handleGridToggle : undefined}
+          showGridToggle={showGridToggle}
+        />
       </div>
     </div>
   )

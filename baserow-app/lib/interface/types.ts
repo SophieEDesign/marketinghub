@@ -91,6 +91,7 @@ export interface BlockConfig {
   appearance?: {
     title?: string
     title_color?: string
+    text_color?: string // General text color
     background_color?: string
     border_color?: string
     border_width?: number
