@@ -99,6 +99,30 @@ export interface BlockConfig {
     show_title?: boolean
     header_background?: string
     header_text_color?: string
+    // Action block specific
+    button_background?: string
+    button_text_color?: string
+    button_style?: string
+    // Chart block specific
+    show_legend?: boolean
+    legend_position?: string
+    color_scheme?: string
+    show_grid?: boolean
+    // KPI block specific
+    number_format?: string
+    show_trend?: boolean
+    alignment?: string
+    value_size?: string
+    // Table snapshot specific
+    row_height?: string
+    show_headers?: boolean
+    // Text block specific
+    text_size?: string
+    text_align?: string
+    // Link preview specific
+    display_mode?: string
+    show_provider?: boolean
+    show_thumbnail?: boolean
   }
   [key: string]: any
 }
