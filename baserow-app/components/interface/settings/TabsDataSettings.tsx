@@ -36,7 +36,7 @@ export default function TabsDataSettings({
     }
     onUpdate({
       tabs: [...tabs, newTab],
-      default_tab_id: tabs.length === 0 ? newTab.id : defaultTabId,
+      default_tab_id: tabs.length === 0 ? newTab.id : defaultTabId || undefined,
     })
   }
 
