@@ -16,11 +16,30 @@ export async function GET(
     const { pageId } = await params
     const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from('view_blocks')
-      .select('*')
-      .eq('view_id', pageId)
-      .order('order_index', { ascending: true })
+    // Check if this is an interface_pages.id or views.id
+    // Try interface_pages first (new system)
+    const { data: page } = await supabase
+      .from('interface_pages')
+      .select('id')
+      .eq('id', pageId)
+      .maybeSingle()
+
+    let query
+    if (page) {
+      // This is an interface_pages.id - use page_id
+      query = supabase
+        .from('view_blocks')
+        .select('*')
+        .eq('page_id', pageId)
+    } else {
+      // This is a views.id - use view_id (backward compatibility)
+      query = supabase
+        .from('view_blocks')
+        .select('*')
+        .eq('view_id', pageId)
+    }
+
+    const { data, error } = await query.order('order_index', { ascending: true })
 
     if (error) {
       return NextResponse.json(
@@ -32,7 +51,7 @@ export async function GET(
     // Convert view_blocks to PageBlock format
     const blocks = (data || []).map((block: any) => ({
       id: block.id,
-      page_id: block.view_id,
+      page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
       type: block.type,
       x: block.position_x,
       y: block.position_y,
@@ -173,4 +192,3 @@ export async function POST(
     )
   }
 }
-

@@ -5,7 +5,7 @@ import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import RecordPanel from "@/components/records/RecordPanel"
-import type { Table, View, Automation } from "@/types/database"
+import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
   id: string
@@ -47,7 +47,6 @@ interface WorkspaceShellProps {
   interfacePages: InterfacePage[]
   interfaceGroups?: InterfaceGroup[]
   dashboards: Dashboard[]
-  automations: Automation[]
   userRole: "admin" | "member" | null
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
 }
@@ -60,7 +59,6 @@ export default function WorkspaceShell({
   interfacePages,
   interfaceGroups = [],
   dashboards,
-  automations,
   userRole,
   hideTopbar = false,
 }: WorkspaceShellProps) {
@@ -72,7 +70,6 @@ export default function WorkspaceShell({
         <AirtableSidebar
           interfacePages={interfacePages}
           interfaceGroups={interfaceGroups}
-          automations={automations}
           tables={tables}
           views={views}
           userRole={userRole}

@@ -58,13 +58,32 @@ export default async function WorkspaceShellWrapper({
   // Fetch interface groups
   let interfaceGroups: any[] = []
   try {
-    const { data: groupsData, error: groupsError } = await supabase
+    // Try to select is_system, but handle gracefully if column doesn't exist
+    let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, workspace_id, is_system')
+      .select('id, name, order_index, collapsed, workspace_id')
       .order('order_index', { ascending: true })
     
+    const { data: groupsData, error: groupsError } = await groupsQuery
+    
     if (!groupsError && groupsData) {
-      interfaceGroups = groupsData
+      // Try to fetch is_system separately if the column exists
+      try {
+        const { data: groupsWithSystem } = await supabase
+          .from('interface_groups')
+          .select('id, name, order_index, collapsed, workspace_id, is_system')
+          .order('order_index', { ascending: true })
+        
+        if (groupsWithSystem) {
+          interfaceGroups = groupsWithSystem
+        } else {
+          // Add default is_system = false if column doesn't exist
+          interfaceGroups = groupsData.map((g: any) => ({ ...g, is_system: false }))
+        }
+      } catch (systemError: any) {
+        // Column doesn't exist - add default value
+        interfaceGroups = groupsData.map((g: any) => ({ ...g, is_system: false }))
+      }
     } else if (groupsError) {
       // If table doesn't exist (42P01) or RLS error, just return empty array
       if (groupsError.code === '42P01' || groupsError.code === 'PGRST116' || 
@@ -213,7 +232,6 @@ export default async function WorkspaceShellWrapper({
             interfacePages={interfacePages as any}
             interfaceGroups={interfaceGroups}
             dashboards={dashboards}
-            automations={automations}
             userRole={userRole}
             hideTopbar={hideTopbar}
           >

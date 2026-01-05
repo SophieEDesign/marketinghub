@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { PageBlock, LayoutItem } from '@/lib/interface/types'
 
+
 /**
  * Saves block layout positions to Supabase
  * 
@@ -22,6 +23,15 @@ export async function saveBlockLayout(
 ): Promise<void> {
   const supabase = await createClient()
 
+  // Check if this is an interface_pages.id or views.id
+  const { data: page } = await supabase
+    .from('interface_pages')
+    .select('id')
+    .eq('id', pageId)
+    .maybeSingle()
+
+  const isInterfacePage = !!page
+
   // Update each block's position and size
   // Convert LayoutItem format (x, y, w, h) to view_blocks format (position_x, position_y, width, height)
   const updates = layout.map((item, index) => ({
@@ -34,9 +44,10 @@ export async function saveBlockLayout(
   }))
 
   // Batch update using Promise.all
+  // Filter blocks by page_id or view_id to ensure we only update blocks for this page
   await Promise.all(
-    updates.map((update) =>
-      supabase
+    updates.map(async (update) => {
+      let query = supabase
         .from('view_blocks')
         .update({
           position_x: update.position_x,
@@ -47,7 +58,16 @@ export async function saveBlockLayout(
           updated_at: new Date().toISOString(),
         })
         .eq('id', update.id)
-    )
+
+      // Ensure we're only updating blocks that belong to this page
+      if (isInterfacePage) {
+        query = query.eq('page_id', pageId)
+      } else {
+        query = query.eq('view_id', pageId)
+      }
+
+      return query
+    })
   )
 }
 
@@ -94,30 +114,57 @@ export async function createBlock(
 ): Promise<PageBlock> {
   const supabase = await createClient()
 
+  // Check if this is an interface_pages.id or views.id
+  const { data: page } = await supabase
+    .from('interface_pages')
+    .select('id')
+    .eq('id', pageId)
+    .maybeSingle()
+
+  const isInterfacePage = !!page
+
   // Get max order_index
-  const { data: blocks } = await supabase
-    .from('view_blocks')
-    .select('order_index')
-    .eq('view_id', pageId)
+  let blocksQuery
+  if (isInterfacePage) {
+    blocksQuery = supabase
+      .from('view_blocks')
+      .select('order_index')
+      .eq('page_id', pageId)
+  } else {
+    blocksQuery = supabase
+      .from('view_blocks')
+      .select('order_index')
+      .eq('view_id', pageId)
+  }
+
+  const { data: blocks } = await blocksQuery
     .order('order_index', { ascending: false })
     .limit(1)
 
   const orderIndex = blocks && blocks.length > 0 ? (blocks[0].order_index || 0) + 1 : 0
 
+  // Insert block with appropriate reference
+  const insertData: any = {
+    type,
+    position_x: x,
+    position_y: y,
+    width: w,
+    height: h,
+    config,
+    order_index: orderIndex,
+  }
+
+  if (isInterfacePage) {
+    insertData.page_id = pageId
+    insertData.view_id = null
+  } else {
+    insertData.view_id = pageId
+    insertData.page_id = null
+  }
+
   const { data, error } = await supabase
     .from('view_blocks')
-    .insert([
-      {
-        view_id: pageId,
-        type,
-        position_x: x,
-        position_y: y,
-        width: w,
-        height: h,
-        config,
-        order_index: orderIndex,
-      },
-    ])
+    .insert([insertData])
     .select()
     .single()
 
@@ -128,7 +175,7 @@ export async function createBlock(
   // Convert view_block to PageBlock format
   return {
     id: data.id,
-    page_id: data.view_id,
+    page_id: data.page_id || data.view_id, // Use page_id if available, fallback to view_id
     type: data.type,
     x: data.position_x,
     y: data.position_y,

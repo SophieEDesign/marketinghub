@@ -11,7 +11,6 @@ import {
   ChevronDown, 
   Plus, 
   X,
-  Zap,
   Settings,
   Home,
   Database,
@@ -43,7 +42,6 @@ interface InterfaceGroup {
 interface AirtableSidebarProps {
   interfacePages?: InterfacePage[]
   interfaceGroups?: InterfaceGroup[]
-  automations?: Automation[]
   tables?: Table[]
   views?: Record<string, View[]>
   userRole?: 'admin' | 'member' | null
@@ -52,7 +50,6 @@ interface AirtableSidebarProps {
 export default function AirtableSidebar({ 
   interfacePages = [], 
   interfaceGroups = [],
-  automations = [],
   tables = [],
   views = {},
   userRole = null
@@ -60,9 +57,9 @@ export default function AirtableSidebar({
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
-  // Interfaces and Automations expanded by default (only for admins)
+  // Interfaces expanded by default
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(userRole === 'admin' ? ["interfaces", "automations"] : ["interfaces"])
+    new Set(["interfaces"])
   )
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -72,7 +69,6 @@ export default function AirtableSidebar({
   const isEditMode = mode === "edit"
 
   const isInterfacePage = pathname.includes("/pages/")
-  const isAutomation = pathname.includes("/automations/")
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
 
@@ -80,9 +76,6 @@ export default function AirtableSidebar({
   useEffect(() => {
     if (isInterfacePage) {
       setExpandedSections(prev => new Set(prev).add("interfaces"))
-    }
-    if (isAutomation || pathname === "/automations") {
-      setExpandedSections(prev => new Set(prev).add("automations"))
     }
     if (isTablePage) {
       setExpandedSections(prev => new Set(prev).add("core-data"))
@@ -92,7 +85,7 @@ export default function AirtableSidebar({
         setExpandedTables(prev => new Set(prev).add(tableMatch[1]))
       }
     }
-  }, [isInterfacePage, isAutomation, isTablePage, pathname])
+  }, [isInterfacePage, isTablePage, pathname])
   
   function toggleTable(tableId: string) {
     setExpandedTables(prev => {
@@ -217,67 +210,6 @@ export default function AirtableSidebar({
           )}
         </div>
 
-        {/* Automations Section - Admin Only */}
-        {isAdmin && (
-        <div className="py-2 border-t border-gray-100">
-          <div className="px-3 mb-1">
-            <button
-              onClick={() => toggleSection("automations")}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
-            >
-              <span>Automations</span>
-              {expandedSections.has("automations") ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          </div>
-          {expandedSections.has("automations") && (
-            <>
-              <div className="px-2 mb-1">
-                <Link
-                  href="/automations"
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>New Automation</span>
-                </Link>
-              </div>
-              <div className="space-y-0.5 px-2">
-                <Link
-                  href="/automations"
-                  className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
-                  style={pathname === "/automations" ? { 
-                    backgroundColor: primaryColor + '15', 
-                    color: primaryColor 
-                  } : {}}
-                >
-                  <Zap className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm">All Automations</span>
-                </Link>
-                {automations.map((automation) => {
-                  const isActive = pathname.includes(`/automations/${automation.id}`)
-                  return (
-                    <Link
-                      key={automation.id}
-                      href={`/automations/${automation.id}`}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
-                      style={isActive ? { 
-                        backgroundColor: primaryColor + '15', 
-                        color: primaryColor 
-                      } : {}}
-                    >
-                      <Zap className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{automation.name}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
-        )}
 
 
         {/* Recents & Favorites */}

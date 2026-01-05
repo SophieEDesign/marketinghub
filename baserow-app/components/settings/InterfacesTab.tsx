@@ -51,17 +51,38 @@ export default function InterfacesTab() {
         .order('order_index', { ascending: true })
         .order('created_at', { ascending: true })
 
-      if (!pagesError && pagesData && pagesData.length > 0) {
-        // New system: use interface_pages table (matches sidebar)
-        await loadInterfacesFromPagesTable(pagesData)
-        return
+      // Log errors for debugging
+      if (pagesError) {
+        console.error('Error loading interface_pages:', pagesError)
+        // Check if it's a table doesn't exist error
+        if (pagesError.code === '42P01' || pagesError.code === 'PGRST116' || 
+            pagesError.message?.includes('relation') || 
+            pagesError.message?.includes('does not exist')) {
+          console.warn('interface_pages table does not exist, falling back to views table')
+          await loadInterfacesFromViewsTable()
+          return
+        }
+        // For other errors, still try to load groups
       }
 
-      // Fallback to old system: views table
-      await loadInterfacesFromViewsTable()
+      // New system: use interface_pages table (matches sidebar)
+      // Pass pagesData even if empty - we still want to show all interfaces
+      await loadInterfacesFromPagesTable(pagesData || [])
+
+      // If no pages found and no groups, fallback to old system
+      if ((!pagesData || pagesData.length === 0) && groups.length === 0) {
+        console.warn('No interface_pages found, trying fallback to views table')
+        await loadInterfacesFromViewsTable()
+      }
     } catch (error) {
       console.error('Error loading interfaces:', error)
-      setGroups([])
+      // Try fallback on error
+      try {
+        await loadInterfacesFromViewsTable()
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError)
+        setGroups([])
+      }
     } finally {
       setLoading(false)
     }
@@ -72,10 +93,47 @@ export default function InterfacesTab() {
     
     // Load ALL interface groups (interfaces) - not just ones with pages
     // This matches the sidebar: interfaces are the containers, pages belong to them
-    const { data: groupsData } = await supabase
-      .from('interface_groups')
-      .select('id, name, order_index, is_system')
-      .order('order_index', { ascending: true })
+    let groupsData: any[] = []
+    try {
+      const { data, error } = await supabase
+        .from('interface_groups')
+        .select('id, name, order_index, is_system')
+        .order('order_index', { ascending: true })
+      
+      if (!error && data) {
+        groupsData = data
+      } else if (error) {
+        console.error('Error loading interface_groups:', error)
+        // Check if it's a column error
+        if (error.code === '42703' || error.message?.includes('column "is_system" does not exist')) {
+          // Column doesn't exist - fetch without it
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('interface_groups')
+            .select('id, name, order_index')
+            .order('order_index', { ascending: true })
+          
+          if (!fallbackError && fallbackData) {
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false }))
+          } else if (fallbackError) {
+            console.error('Error loading interface_groups (fallback):', fallbackError)
+          }
+        } else {
+          // Other error - might be RLS or table doesn't exist
+          console.error('Failed to load interface_groups:', error)
+          // Try without is_system as fallback
+          const { data: fallbackData } = await supabase
+            .from('interface_groups')
+            .select('id, name, order_index')
+            .order('order_index', { ascending: true })
+          
+          if (fallbackData) {
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false }))
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Exception loading interface groups:', error)
+    }
 
     // Filter out system groups (like "Ungrouped") from display
     const allGroups = (groupsData || [])
@@ -118,10 +176,9 @@ export default function InterfacesTab() {
       interfaces: pagesByGroup.get(group.id) || [],
     }))
 
-    // Only show interfaces that have pages (matches sidebar behavior)
-    const filteredGroups = grouped.filter(g => g.interfaces.length > 0)
-
-    setGroups(filteredGroups)
+    // Show ALL interfaces, even if they have no pages (for settings, admins should see all)
+    // This allows admins to manage interfaces even if they don't have pages yet
+    setGroups(grouped)
   }
 
   async function loadInterfacesFromViewsTable() {
@@ -388,7 +445,10 @@ export default function InterfacesTab() {
           {groups.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg">
               <p className="text-sm mb-2">No interfaces found</p>
-              <p className="text-xs">Create your first interface and pages from the sidebar</p>
+              <p className="text-xs mb-4">Create your first interface and pages from the sidebar</p>
+              <p className="text-xs text-gray-400">
+                Check the browser console for any errors loading interfaces
+              </p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -408,7 +468,7 @@ export default function InterfacesTab() {
                   </div>
                   
                   {/* Pages under this Interface */}
-                  {group.interfaces.length > 0 && (
+                  {group.interfaces.length > 0 ? (
                     <div className="space-y-2 pl-6">
                       {group.interfaces.map((page) => (
                         <div
@@ -446,6 +506,10 @@ export default function InterfacesTab() {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="pl-6 py-2 text-sm text-muted-foreground italic">
+                      No pages in this interface yet
                     </div>
                   )}
                 </div>

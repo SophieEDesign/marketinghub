@@ -34,13 +34,34 @@ export default async function Sidebar() {
   }>> = new Map()
   
   try {
-    // Load interface groups (interfaces) - filter out system groups
-    const { data: groupsData, error: groupsError } = await supabase
+    // Load interface groups (interfaces) - try with is_system first, fallback if column doesn't exist
+    let groupsQuery = supabase
       .from('interface_groups')
       .select('id, name, order_index, collapsed, is_system')
       .order('order_index', { ascending: true })
     
-    if (!groupsError && groupsData) {
+    const { data: groupsData, error: groupsError } = await groupsQuery
+    
+    // If is_system column doesn't exist, try without it
+    if (groupsError && (groupsError.code === '42703' || groupsError.message?.includes('column "is_system" does not exist'))) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('interface_groups')
+        .select('id, name, order_index, collapsed')
+        .order('order_index', { ascending: true })
+      
+      if (!fallbackError && fallbackData) {
+        interfaceGroups = fallbackData
+          .filter(g => g.name !== 'Ungrouped') // Filter out "Ungrouped" by name if is_system doesn't exist
+          .map(g => ({
+            id: g.id,
+            name: g.name,
+            order_index: g.order_index || 0,
+            collapsed: g.collapsed || false,
+          }))
+      } else if (fallbackError) {
+        console.error('Error loading interface groups:', fallbackError)
+      }
+    } else if (!groupsError && groupsData) {
       // Filter out system groups (like "Ungrouped") from display
       interfaceGroups = groupsData
         .filter(g => !g.is_system)
@@ -50,6 +71,8 @@ export default async function Sidebar() {
           order_index: g.order_index || 0,
           collapsed: g.collapsed || false,
         }))
+    } else if (groupsError) {
+      console.error('Error loading interface groups:', groupsError)
     }
 
     // Load interface pages - these are the ONLY navigable items
@@ -65,7 +88,9 @@ export default async function Sidebar() {
     
     const { data: pagesData, error: pagesError } = await pagesQuery
     
-    if (!pagesError && pagesData) {
+    if (pagesError) {
+      console.error('Error loading interface pages:', pagesError)
+    } else if (pagesData) {
       // Group pages by group_id (interface)
       pagesData.forEach((page) => {
         const groupId = page.group_id
@@ -127,20 +152,26 @@ export default async function Sidebar() {
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Interfaces
             </div>
-            {interfaceGroups.map((group) => {
-              const pages = interfacePagesByGroup.get(group.id) || []
-              
-              return (
-                <InterfaceSection
-                  key={group.id}
-                  interfaceId={group.id}
-                  interfaceName={group.name}
-                  pages={pages}
-                  defaultCollapsed={group.collapsed}
-                  isAdmin={userIsAdmin}
-                />
-              )
-            })}
+            {interfaceGroups
+              .filter((group) => {
+                // Show groups that have pages, or empty groups for admins
+                const pages = interfacePagesByGroup.get(group.id) || []
+                return pages.length > 0 || userIsAdmin
+              })
+              .map((group) => {
+                const pages = interfacePagesByGroup.get(group.id) || []
+                
+                return (
+                  <InterfaceSection
+                    key={group.id}
+                    interfaceId={group.id}
+                    interfaceName={group.name}
+                    pages={pages}
+                    defaultCollapsed={group.collapsed}
+                    isAdmin={userIsAdmin}
+                  />
+                )
+              })}
           </div>
         )}
 

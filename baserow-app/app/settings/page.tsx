@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { isAdmin } from '@/lib/roles'
 import WorkspaceShellWrapper from '@/components/layout/WorkspaceShellWrapper'
-import { Settings, Shield, Database, Key, FileText, Palette, Table2, Users } from 'lucide-react'
+import { Settings, Shield, Database, Key, FileText, Palette, Table2, Users, Zap } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import SettingsWorkspaceTab from '@/components/settings/WorkspaceTab'
 import SettingsPagesTab from '@/components/settings/PagesTab'
@@ -13,6 +13,7 @@ import SettingsStorageTab from '@/components/settings/StorageTab'
 import SettingsApiTab from '@/components/settings/ApiTab'
 import SettingsBrandingTab from '@/components/settings/BrandingTab'
 import SettingsDataTab from '@/components/settings/DataTab'
+import SettingsAutomationsTab from '@/components/settings/AutomationsTab'
 
 export default async function SettingsPage() {
   // Security: Only admins can access settings
@@ -83,6 +84,10 @@ export default async function SettingsPage() {
               <Palette className="mr-2 h-4 w-4" />
               Branding
             </TabsTrigger>
+            <TabsTrigger value="automations">
+              <Zap className="mr-2 h-4 w-4" />
+              Automations
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="workspace" className="space-y-4">
@@ -119,6 +124,10 @@ export default async function SettingsPage() {
 
           <TabsContent value="branding" className="space-y-4">
             <SettingsBrandingTab />
+          </TabsContent>
+
+          <TabsContent value="automations" className="space-y-4">
+            <SettingsAutomationsTab />
           </TabsContent>
         </Tabs>
       </div>
