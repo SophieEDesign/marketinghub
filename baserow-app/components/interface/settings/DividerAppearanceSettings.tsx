@@ -77,7 +77,10 @@ export default function DividerAppearanceSettings({
           value={appearance.divider_style || 'solid'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, divider_style: value },
+              appearance: { 
+                ...appearance, 
+                divider_style: value as 'solid' | 'dashed' | 'dotted' 
+              },
             })
           }
         >
