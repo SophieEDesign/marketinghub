@@ -247,7 +247,7 @@ export default function FormDataSettings({
         <Label>Submit Action</Label>
         <Select
           value={config.submit_action || 'create'}
-          onValueChange={(value) => onUpdate({ submit_action: value })}
+          onValueChange={(value) => onUpdate({ submit_action: value as 'create' | 'update' | 'custom' })}
         >
           <SelectTrigger>
             <SelectValue />
