@@ -177,6 +177,20 @@ export async function updateInterfacePage(
 }
 
 /**
+ * Delete an interface page
+ */
+export async function deleteInterfacePage(pageId: string): Promise<void> {
+  const supabase = await createClient()
+  
+  const { error } = await supabase
+    .from('interface_pages')
+    .delete()
+    .eq('id', pageId)
+
+  if (error) throw error
+}
+
+/**
  * Query a SQL view by name
  * SQL views are first-class citizens - they contain the data and business logic
  */

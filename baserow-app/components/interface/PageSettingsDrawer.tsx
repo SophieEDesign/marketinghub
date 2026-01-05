@@ -85,14 +85,20 @@ export default function PageSettingsDrawer({
   async function loadDefaultStatus() {
     try {
       const supabase = createClient()
-      const { data: workspaceSettings } = await supabase
+      const { data: workspaceSettings, error } = await supabase
         .from('workspace_settings')
         .select('default_interface_id')
         .maybeSingle()
       
-      setIsDefault(workspaceSettings?.default_interface_id === page.id)
+      // Handle errors gracefully - column might not exist or RLS might block
+      if (!error && workspaceSettings) {
+        setIsDefault(workspaceSettings.default_interface_id === page.id)
+      } else {
+        setIsDefault(false)
+      }
     } catch (error) {
-      console.error('Error loading default status:', error)
+      console.warn('Error loading default status:', error)
+      setIsDefault(false)
     }
   }
 
@@ -168,39 +174,54 @@ export default function PageSettingsDrawer({
       }
 
       // Update default interface setting
-      const supabase = createClient()
-      const { data: existing } = await supabase
-        .from('workspace_settings')
-        .select('id')
-        .maybeSingle()
+      try {
+        const supabase = createClient()
+        const { data: existing, error: fetchError } = await supabase
+          .from('workspace_settings')
+          .select('id')
+          .maybeSingle()
 
-      if (isDefault) {
-        if (existing) {
-          await supabase
-            .from('workspace_settings')
-            .update({ default_interface_id: page.id })
-            .eq('id', existing.id)
-        } else {
-          await supabase
-            .from('workspace_settings')
-            .insert({ default_interface_id: page.id })
-        }
-      } else {
-        // Remove default if unchecked
-        if (existing) {
-          const { data: currentSettings } = await supabase
-            .from('workspace_settings')
-            .select('default_interface_id')
-            .eq('id', existing.id)
-            .single()
-          
-          if (currentSettings?.default_interface_id === page.id) {
-            await supabase
+        // Handle case where table/column doesn't exist or RLS blocks access
+        if (fetchError) {
+          console.warn('Could not access workspace_settings:', fetchError)
+          // Don't fail the save - just skip default interface update
+        } else if (isDefault) {
+          if (existing) {
+            const { error: updateError } = await supabase
               .from('workspace_settings')
-              .update({ default_interface_id: null })
+              .update({ default_interface_id: page.id })
               .eq('id', existing.id)
+            
+            if (updateError) console.warn('Could not update default interface:', updateError)
+          } else {
+            const { error: insertError } = await supabase
+              .from('workspace_settings')
+              .insert({ default_interface_id: page.id })
+            
+            if (insertError) console.warn('Could not insert default interface:', insertError)
+          }
+        } else {
+          // Remove default if unchecked
+          if (existing) {
+            const { data: currentSettings, error: currentError } = await supabase
+              .from('workspace_settings')
+              .select('default_interface_id')
+              .eq('id', existing.id)
+              .single()
+            
+            if (!currentError && currentSettings?.default_interface_id === page.id) {
+              const { error: updateError } = await supabase
+                .from('workspace_settings')
+                .update({ default_interface_id: null })
+                .eq('id', existing.id)
+              
+              if (updateError) console.warn('Could not remove default interface:', updateError)
+            }
           }
         }
+      } catch (error) {
+        console.warn('Error updating default interface setting:', error)
+        // Don't fail the save - just skip default interface update
       }
 
       // Trigger sidebar refresh

@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
+import { Edit2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import type { InterfacePage } from "@/lib/interface/pages"
 import PageRenderer from "./PageRenderer"
+import InterfacePageSettingsDrawer from "./InterfacePageSettingsDrawer"
 import { getPageTypeDefinition } from "@/lib/interface/page-types"
 
 interface InterfacePageClientProps {
@@ -23,6 +26,9 @@ export default function InterfacePageClient({
   const [loading, setLoading] = useState(!initialPage)
   const [isGridMode, setIsGridMode] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
+  const [blocks, setBlocks] = useState<any[]>([])
+  const [blocksLoading, setBlocksLoading] = useState(false)
 
   useEffect(() => {
     if (!initialPage) {
@@ -36,6 +42,13 @@ export default function InterfacePageClient({
       loadSqlViewData()
     }
   }, [page?.source_view, page?.config])
+
+  useEffect(() => {
+    // Load blocks for dashboard/overview pages when entering edit mode
+    if (isEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
+      loadBlocks()
+    }
+  }, [isEditing, page?.id, page?.page_type])
 
   async function loadPage() {
     try {
@@ -73,6 +86,38 @@ export default function InterfacePageClient({
     }
   }
 
+  async function loadBlocks() {
+    if (!page) return
+
+    setBlocksLoading(true)
+    try {
+      const res = await fetch(`/api/pages/${page.id}/blocks`)
+      if (!res.ok) throw new Error('Failed to load blocks')
+      
+      const data = await res.json()
+      // Convert view_blocks format to PageBlock format
+      const pageBlocks = (data.blocks || []).map((block: any) => ({
+        id: block.id,
+        page_id: block.page_id || page.id,
+        type: block.type,
+        x: block.x || block.position_x || 0,
+        y: block.y || block.position_y || 0,
+        w: block.w || block.width || 4,
+        h: block.h || block.height || 4,
+        config: block.config || {},
+        order_index: block.order_index || 0,
+        created_at: block.created_at,
+        updated_at: block.updated_at,
+      }))
+      setBlocks(pageBlocks)
+    } catch (error) {
+      console.error("Error loading blocks:", error)
+      setBlocks([])
+    } finally {
+      setBlocksLoading(false)
+    }
+  }
+
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)
   }
@@ -105,19 +150,93 @@ export default function InterfacePageClient({
   }
 
   const isViewer = searchParams.get("view") === "true"
+  const pageTypeDef = page ? getPageTypeDefinition(page.page_type) : null
+  const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview'
+
+  // For dashboard/overview pages, editing means editing blocks (InterfaceBuilder)
+  // For other pages, editing means editing page settings
+  const handleEditClick = () => {
+    if (isDashboardOrOverview) {
+      setIsEditing(true)
+    } else {
+      setPageSettingsOpen(true)
+    }
+  }
 
   return (
     <div className="h-screen flex flex-col">
+      {/* Header with Edit Button */}
+      {!isViewer && page && (
+        <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">{page.name}</h1>
+            {page.updated_at && (
+              <span className="text-xs text-gray-500">
+                Updated {new Date(page.updated_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {isDashboardOrOverview && isEditing ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(false)}
+              >
+                Done Editing
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEditClick}
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                {isDashboardOrOverview ? 'Edit Page' : 'Page Settings'}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        <PageRenderer
-          page={pageWithConfig}
-          data={data}
-          isLoading={loading}
-          onGridToggle={showGridToggle ? handleGridToggle : undefined}
-          showGridToggle={showGridToggle}
-        />
+        {isDashboardOrOverview && isEditing ? (
+          // For dashboard/overview in edit mode, use InterfaceBuilder
+          blocksLoading ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-gray-500">Loading blocks...</div>
+            </div>
+          ) : (
+            <InterfaceBuilder
+              page={{ id: page.id, name: page.name } as any}
+              initialBlocks={blocks}
+              isViewer={false}
+            />
+          )
+        ) : (
+          <PageRenderer
+            page={pageWithConfig}
+            data={data}
+            isLoading={loading}
+            onGridToggle={showGridToggle ? handleGridToggle : undefined}
+            showGridToggle={showGridToggle}
+          />
+        )}
       </div>
+
+      {/* Page Settings Drawer */}
+      {page && (
+        <InterfacePageSettingsDrawer
+          pageId={page.id}
+          isOpen={pageSettingsOpen}
+          onClose={() => setPageSettingsOpen(false)}
+          onUpdate={(updatedPage) => {
+            setPage(updatedPage)
+            setPageSettingsOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }

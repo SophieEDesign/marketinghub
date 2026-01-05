@@ -72,12 +72,21 @@ export default function InterfacesTab() {
       }
 
       // Check which interface is default (from workspace_settings or first interface)
-      const { data: defaultInterface } = await supabase
-        .from('workspace_settings')
-        .select('default_interface_id')
-        .maybeSingle()
+      let defaultId: string | null = null
+      try {
+        const { data: defaultInterface, error: settingsError } = await supabase
+          .from('workspace_settings')
+          .select('default_interface_id')
+          .maybeSingle()
 
-      const defaultId = defaultInterface?.default_interface_id
+        // Handle errors gracefully - column might not exist or RLS might block
+        if (!settingsError && defaultInterface) {
+          defaultId = defaultInterface.default_interface_id || null
+        }
+      } catch (error) {
+        // Ignore errors - defaultId remains null
+        console.warn('Could not load default interface setting:', error)
+      }
 
       // Group interfaces
       const grouped: InterfaceGroup[] = []
@@ -151,20 +160,31 @@ export default function InterfacesTab() {
       const supabase = createClient()
       
       // Get or create workspace_settings
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('workspace_settings')
         .select('id')
         .maybeSingle()
 
+      // Handle case where table/column doesn't exist or RLS blocks access
+      if (fetchError) {
+        console.warn('Could not access workspace_settings:', fetchError)
+        alert('Could not update default interface. The workspace_settings table may need to be configured.')
+        return
+      }
+
       if (existing) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('workspace_settings')
           .update({ default_interface_id: interfaceId })
           .eq('id', existing.id)
+
+        if (updateError) throw updateError
       } else {
-        await supabase
+        const { error: insertError } = await supabase
           .from('workspace_settings')
           .insert({ default_interface_id: interfaceId })
+
+        if (insertError) throw insertError
       }
 
       loadInterfaces()
