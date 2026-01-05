@@ -81,6 +81,12 @@ This document tracks the alignment of the sidebar navigation and page creation/e
 | Group | Interface | ✅ Updated |
 | SQL View selection | Table selection | ✅ Updated |
 | "Ungrouped" | "Ungrouped Interface" | ✅ Updated |
+| "Category" (in Interface settings) | "Interface" | ✅ Updated |
+| "Interface Group" | "Interface" | ✅ Updated |
+| "New Group" button | "New Interface" button | ✅ Updated |
+| "No group (Uncategorized)" | "Ungrouped Interface" | ✅ Updated |
+
+**Note:** "Group" is still used correctly for data grouping concepts (e.g., "Group By" in table views for grouping records by status/pipeline fields). This is intentional and refers to data organization, not navigation.
 
 ## 🎯 Product Model Compliance
 

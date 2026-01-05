@@ -389,14 +389,14 @@ export default function InterfaceDetailDrawer({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="group">Category</Label>
+              <Label htmlFor="group">Interface</Label>
               <select
                 id="group"
                 value={group}
                 onChange={(e) => setGroup(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="">Uncategorized</option>
+                <option value="">Ungrouped Interface</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}

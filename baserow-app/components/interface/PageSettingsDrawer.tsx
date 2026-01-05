@@ -314,16 +314,16 @@ export default function PageSettingsDrawer({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="interface-group">Interface Group</Label>
+              <Label htmlFor="interface-group">Interface</Label>
               <Select
                 value={groupId || "__none__"}
                 onValueChange={(value) => setGroupId(value === "__none__" ? null : value)}
               >
                 <SelectTrigger id="interface-group">
-                  <SelectValue placeholder="No group (Uncategorized)" />
+                  <SelectValue placeholder="Ungrouped Interface" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">No group (Uncategorized)</SelectItem>
+                  <SelectItem value="__none__">Ungrouped Interface</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       {group.name}
@@ -332,7 +332,7 @@ export default function PageSettingsDrawer({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Organize this interface into a group in the sidebar
+                Organize this page into an Interface in the sidebar
               </p>
             </div>
 

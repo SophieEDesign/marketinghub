@@ -257,20 +257,20 @@ export default function GroupedInterfaces({
       return
     }
 
-    if (!confirm("Delete this group? Interfaces will be moved to Ungrouped.")) {
+    if (!confirm("Delete this Interface? Pages will be moved to Ungrouped Interface.")) {
       return
     }
 
     try {
-      // Find the "Ungrouped" system group
+      // Find the "Ungrouped" system Interface
       const ungroupedGroup = groups.find(g => g.is_system && g.name === 'Ungrouped')
       
       if (!ungroupedGroup) {
-        alert("Cannot find Ungrouped group. Please refresh the page.")
+        alert("Cannot find Ungrouped Interface. Please refresh the page.")
         return
       }
 
-      // Move pages to Ungrouped group
+      // Move pages to Ungrouped Interface
       const pagesToMove = pages.filter(p => p.group_id === groupId)
       await Promise.all(
         pagesToMove.map(page =>
@@ -835,10 +835,10 @@ export default function GroupedInterfaces({
           <button
             onClick={handleCreateGroup}
             className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            title="New Group"
+            title="New Interface"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Group</span>
+            <span className="hidden sm:inline">Interface</span>
           </button>
         </div>
 
