@@ -161,14 +161,36 @@ export async function updateInterfacePage(
     }
   }
 
+  // First check if page exists
+  const existingPage = await getInterfacePage(pageId)
+  if (!existingPage) {
+    throw new Error('Page not found')
+  }
+
+  // Prepare update with updated_at timestamp
+  const updateData = {
+    ...updates,
+    updated_at: new Date().toISOString(),
+  }
+
   const { data, error } = await supabase
     .from('interface_pages')
-    .update(updates)
+    .update(updateData)
     .eq('id', pageId)
     .select()
     .single()
 
-  if (error) throw error
+  if (error) {
+    // If error is about no rows found, provide a clearer message
+    if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+      throw new Error('Page not found or you do not have permission to update it')
+    }
+    throw error
+  }
+
+  if (!data) {
+    throw new Error('Page not found after update')
+  }
 
   return {
     ...data,
