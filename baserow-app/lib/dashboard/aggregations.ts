@@ -45,7 +45,7 @@ export async function aggregateTableData(
     // Build query based on aggregate type
     if (aggregate === 'count') {
       // Count all rows (with filters if provided)
-      let query = supabase
+      let query: any = supabase
         .from(supabaseTable)
         .select('*', { count: 'exact', head: true })
 
@@ -120,7 +120,7 @@ export async function aggregateTableData(
     }
 
     // Fallback: Load data and aggregate client-side
-    let query = supabase
+    let query: any = supabase
       .from(supabaseTable)
       .select(fieldName)
       .limit(10000) // Reasonable limit
