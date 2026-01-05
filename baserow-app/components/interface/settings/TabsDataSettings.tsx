@@ -95,7 +95,7 @@ export default function TabsDataSettings({
 
         {tabs.length === 0 ? (
           <div className="text-sm text-gray-500 text-center py-4 border rounded">
-            No tabs yet. Click "Add Tab" to create one.
+            No tabs yet. Click &quot;Add Tab&quot; to create one.
           </div>
         ) : (
           <div className="space-y-2">
@@ -168,7 +168,7 @@ export default function TabsDataSettings({
       {/* Unassigned blocks warning */}
       {unassignedBlocks.length > 0 && (
         <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-          {unassignedBlocks.length} block(s) not assigned to any tab. They won't be visible.
+          {unassignedBlocks.length} block(s) not assigned to any tab. They won&apos;t be visible.
         </div>
       )}
     </div>
