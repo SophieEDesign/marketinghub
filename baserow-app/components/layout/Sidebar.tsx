@@ -25,6 +25,7 @@ interface InterfacePage {
   description?: string
   access_level: string
   allowed_roles?: string[]
+  is_new_system?: boolean
 }
 
 interface Dashboard {
