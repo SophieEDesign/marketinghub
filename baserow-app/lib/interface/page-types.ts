@@ -13,6 +13,7 @@ export type PageType =
   | 'dashboard'
   | 'overview'
   | 'record_review'
+  | 'content' // Content Pages are user-facing, block-based pages that do not require data sources and are used for documentation and resources.
   // 'blank' removed - invalid page type, pages must have an anchor
 
 export interface PageTypeDefinition {
@@ -107,6 +108,15 @@ export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
     supportsGridToggle: true,
     allowsInlineEditing: false,
   },
+  content: {
+    type: 'content',
+    label: 'Content Page',
+    description: 'Docs, links, resources, information',
+    requiresSourceView: false,
+    requiresBaseTable: false,
+    supportsGridToggle: false,
+    allowsInlineEditing: false,
+  },
   // blank removed - invalid page type
 }
 
@@ -141,7 +151,7 @@ export function validatePageConfig(
 /**
  * Get the required anchor type for a page type
  */
-export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashboard' | 'form' | 'record' {
+export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashboard' | 'form' | 'record' | null {
   switch (pageType) {
     case 'list':
     case 'gallery':
@@ -152,7 +162,8 @@ export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashb
       return 'saved_view'
     case 'dashboard':
     case 'overview':
-      return 'dashboard'
+    case 'content':
+      return 'dashboard' // Content pages use dashboard anchor (blocks) but don't require data
     case 'form':
       return 'form'
     default:
@@ -171,6 +182,17 @@ export function validatePageAnchor(
   recordConfigId: string | null
 ): { valid: boolean; error?: string } {
   const requiredAnchor = getRequiredAnchorType(pageType)
+  
+  // Content pages don't require any anchor (they use dashboard anchor but it's optional)
+  if (pageType === 'content') {
+    // Content pages can have dashboard_layout_id set (for blocks) but it's not required initially
+    // They will have it set after creation (self-reference like dashboard/overview)
+    return { valid: true }
+  }
+  
+  if (!requiredAnchor) {
+    return { valid: true } // Pages without required anchor are valid
+  }
   
   switch (requiredAnchor) {
     case 'saved_view':
@@ -195,7 +217,7 @@ export function validatePageAnchor(
       break
   }
 
-  // Ensure only one anchor is set
+  // Ensure only one anchor is set (for non-content pages)
   const anchorCount = [
     savedViewId,
     dashboardLayoutId,

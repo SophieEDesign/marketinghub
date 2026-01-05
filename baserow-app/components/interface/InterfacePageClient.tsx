@@ -63,9 +63,9 @@ export default function InterfacePageClient({
   }, [page?.source_view, page?.config])
 
   useEffect(() => {
-    // Load blocks for dashboard/overview pages when entering block edit mode
+    // Load blocks for dashboard/overview/content pages when entering block edit mode
     // Also load blocks immediately if we're already in edit mode (e.g., on page load)
-    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
+    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content')) {
       loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,7 +73,7 @@ export default function InterfacePageClient({
 
   // Load blocks when entering block edit mode (triggered by button click)
   useEffect(() => {
-    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview') && blocks.length === 0) {
+    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content') && blocks.length === 0) {
       loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,7 +199,7 @@ export default function InterfacePageClient({
   }
 
   const isViewer = searchParams.get("view") === "true"
-  const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview'
+  const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content'
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
@@ -280,7 +280,7 @@ export default function InterfacePageClient({
                       // Enter block edit mode
                       enterBlockEdit()
                       // Ensure blocks are loaded immediately
-                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
+                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content')) {
                         await loadBlocks()
                       }
                     }}
@@ -339,7 +339,15 @@ export default function InterfacePageClient({
             </div>
           ) : (
             <InterfaceBuilder
-              page={{ id: page.id, name: page.name } as any}
+              page={{ 
+                id: page.id, 
+                name: page.name,
+                settings: { 
+                  layout_template: page.page_type === 'content' ? 'content' : 
+                                  page.page_type === 'overview' ? 'overview' : 
+                                  page.page_type === 'dashboard' ? 'dashboard' : null
+                }
+              } as any}
               initialBlocks={blocks}
               isViewer={false}
               hideHeader={true}

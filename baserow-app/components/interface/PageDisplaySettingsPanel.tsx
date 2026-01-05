@@ -448,6 +448,37 @@ export default function PageDisplaySettingsPanel({
   const pageDefinition = getPageTypeDefinition(page.page_type)
   const isDataBacked = pageDefinition.requiresSourceView
   const supportsGrouping = ['list', 'kanban'].includes(page.page_type)
+  
+  // Content pages don't show data settings - they're block-based only
+  if (page.page_type === 'content') {
+    return (
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Page Settings</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            <div className="space-y-2">
+              <Label>Page Name</Label>
+              <Input value={page.name} disabled className="bg-gray-50" />
+            </div>
+            <div className="space-y-2">
+              <Label>Page Type</Label>
+              <Input value="Content Page" disabled className="bg-gray-50" />
+            </div>
+            <div className="space-y-2">
+              <Label>Interface</Label>
+              <Input value={page.group_id || 'N/A'} disabled className="bg-gray-50" />
+            </div>
+            <p className="text-sm text-gray-500">
+              Content Pages are block-based pages for documentation and resources. 
+              They don&apos;t require data sources.
+            </p>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
 
   if (!isDataBacked) {
     return null

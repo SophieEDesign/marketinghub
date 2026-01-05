@@ -137,11 +137,33 @@ export default function PageRenderer({
       case 'overview':
         return (
           <InterfaceBuilder
-            page={{ id: page.id, name: page.name } as any}
+            page={{ 
+              id: page.id, 
+              name: page.name,
+              settings: { layout_template: 'overview' }
+            } as any}
             initialBlocks={[]}
             isViewer={false}
             hideHeader={true}
           />
+        )
+      
+      case 'content':
+        // Content pages render blocks only - show empty state if no blocks
+        return (
+          <div className="h-full">
+            <InterfaceBuilder
+              page={{ 
+                id: page.id, 
+                name: page.name,
+                settings: { layout_template: 'content' },
+                description: 'This is a content page. Add blocks to build your page.'
+              } as any}
+              initialBlocks={[]}
+              isViewer={false}
+              hideHeader={true}
+            />
+          </div>
         )
 
       case 'record_review':

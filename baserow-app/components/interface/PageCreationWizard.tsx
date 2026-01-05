@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType } from "@/lib/interface/page-types"
-import { Database, LayoutDashboard, FileText, FileCheck } from "lucide-react"
+import { Database, LayoutDashboard, FileText, FileCheck, BookOpen } from "lucide-react"
 
 interface PageCreationWizardProps {
   open: boolean
@@ -40,7 +40,7 @@ export default function PageCreationWizard({
   const router = useRouter()
   const [step, setStep] = useState<WizardStep>('interface')
   const [selectedInterfaceId, setSelectedInterfaceId] = useState<string>(defaultGroupId || '')
-  const [pagePurpose, setPagePurpose] = useState<'view' | 'dashboard' | 'form' | 'record'>('view')
+  const [pagePurpose, setPagePurpose] = useState<'view' | 'dashboard' | 'form' | 'record' | 'content'>('view')
   const [pageType, setPageType] = useState<PageType | ''>('')
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
@@ -149,7 +149,7 @@ export default function PageCreationWizard({
     setStep('purpose')
   }
 
-  const handlePurposeSelect = (purpose: 'view' | 'dashboard' | 'form' | 'record') => {
+  const handlePurposeSelect = (purpose: 'view' | 'dashboard' | 'form' | 'record' | 'content') => {
     setPagePurpose(purpose)
     
     // Auto-select default page type for purpose
@@ -166,6 +166,11 @@ export default function PageCreationWizard({
       case 'record':
         setPageType('record_review')
         break
+      case 'content':
+        setPageType('content')
+        // Skip anchor step for content pages - go directly to name
+        setStep('name')
+        return
     }
     
     setStep('anchor')
@@ -188,14 +193,19 @@ export default function PageCreationWizard({
 
     const requiredAnchor = getRequiredAnchorType(pageType as PageType)
     
-    // Validate anchor is set - users select tables, not views
-    if ((requiredAnchor === 'saved_view' || requiredAnchor === 'record') && !tableId) {
-      alert('Please select a table')
-      return
-    }
-    if (requiredAnchor === 'form' && !tableId) {
-      alert('Please select a table for the form')
-      return
+    // Content pages don't require table/view
+    if (pageType === 'content') {
+      // Skip validation - content pages don't need data sources
+    } else {
+      // Validate anchor is set - users select tables, not views
+      if ((requiredAnchor === 'saved_view' || requiredAnchor === 'record') && !tableId) {
+        alert('Please select a table')
+        return
+      }
+      if (requiredAnchor === 'form' && !tableId) {
+        alert('Please select a table for the form')
+        return
+      }
     }
 
     setCreating(true)
@@ -213,11 +223,17 @@ export default function PageCreationWizard({
 
       // All page types that need data use base_table
       // SQL views will be auto-generated from base_table if needed
-      if (tableId && tableId.trim()) {
+      // Content pages don't use base_table
+      if (tableId && tableId.trim() && pageType !== 'content') {
         base_table = tableId.trim()
       }
 
-      switch (requiredAnchor) {
+      // Content pages use dashboard anchor but don't require data
+      if (pageType === 'content') {
+        // Generate a temporary UUID that we'll update to the page's ID after creation
+        dashboard_layout_id = crypto.randomUUID()
+      } else {
+        switch (requiredAnchor) {
         case 'saved_view':
           // For saved_view anchor, create a view first
           // Map page_type to view type
@@ -287,6 +303,7 @@ export default function PageCreationWizard({
 
           saved_view_id = recordView.id
           break
+        }
       }
 
       // Create interface page in interface_pages table
@@ -311,9 +328,9 @@ export default function PageCreationWizard({
 
       if (error) throw error
 
-      // For dashboard/overview pages, update dashboard_layout_id to the page's own ID (self-reference)
+      // For dashboard/overview/content pages, update dashboard_layout_id to the page's own ID (self-reference)
       // This allows the page to reference its own blocks in view_blocks table
-      if ((requiredAnchor === 'dashboard' || pageType === 'overview') && page) {
+      if ((requiredAnchor === 'dashboard' || pageType === 'overview' || pageType === 'content') && page) {
         const { error: updateError } = await supabase
           .from('interface_pages')
           .update({ dashboard_layout_id: page.id })
@@ -321,7 +338,7 @@ export default function PageCreationWizard({
         
         if (updateError) {
           console.error('Error updating dashboard_layout_id:', updateError)
-          throw updateError // Throw error since this is required for dashboard pages
+          throw updateError // Throw error since this is required for dashboard/content pages
         }
       }
 
@@ -413,6 +430,14 @@ export default function PageCreationWizard({
           <FileCheck className="h-6 w-6 mb-2 text-gray-600" />
           <h3 className="font-semibold">Record Review</h3>
           <p className="text-sm text-gray-500">Browse & Review Records</p>
+        </button>
+        <button
+          onClick={() => handlePurposeSelect('content')}
+          className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
+        >
+          <BookOpen className="h-6 w-6 mb-2 text-gray-600" />
+          <h3 className="font-semibold">Content Page</h3>
+          <p className="text-sm text-gray-500">Docs, links, resources, information</p>
         </button>
       </div>
     </div>

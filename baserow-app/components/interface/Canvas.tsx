@@ -164,6 +164,18 @@ export default function Canvas({
               { type: 'record' as BlockType, label: 'Record Panel', icon: '📄', description: 'View details' },
             ],
           }
+        case 'content':
+          return {
+            icon: '📄',
+            title: 'This is a content page',
+            description: interfaceDescription || 'Add blocks to build your page. Use text, headings, images, and links to create documentation and resources.',
+            suggestedBlocks: [
+              { type: 'text' as BlockType, label: 'Text', icon: '📝', description: 'Add content' },
+              { type: 'image' as BlockType, label: 'Image', icon: '🖼️', description: 'Add images' },
+              { type: 'divider' as BlockType, label: 'Divider', icon: '➖', description: 'Separate sections' },
+              { type: 'html' as BlockType, label: 'HTML', icon: '🌐', description: 'Rich content' },
+            ],
+          }
         default:
           return {
             icon: '🎨',

@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Settings, Database, LayoutDashboard, FileText, FileCheck } from "lucide-react"
+import { Settings, Database, LayoutDashboard, FileText, FileCheck, BookOpen } from "lucide-react"
 import { useRouter } from "next/navigation"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getRequiredAnchorType, getPageTypeDefinition } from "@/lib/interface/page-types"
@@ -17,6 +17,17 @@ export default function PageSetupState({ page, isAdmin }: PageSetupStateProps) {
   const definition = getPageTypeDefinition(page.page_type)
 
   const getSetupContent = () => {
+    // Content pages have a special setup message
+    if (page.page_type === 'content') {
+      return {
+        icon: BookOpen,
+        title: 'This is a content page',
+        description: 'Add blocks to build your page. Use text, headings, images, and links to create documentation and resources.',
+        actionLabel: 'Add Blocks',
+        actionPath: `/pages/${page.id}?edit=true`,
+      }
+    }
+    
     switch (requiredAnchor) {
       case 'saved_view':
         return {
