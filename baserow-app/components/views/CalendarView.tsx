@@ -37,6 +37,13 @@ export default function CalendarView({
   }, [tableId])
 
   async function loadRows() {
+    if (!tableId) {
+      console.warn("CalendarView: tableId is required")
+      setRows([])
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     const { data, error } = await supabase
       .from("table_rows")

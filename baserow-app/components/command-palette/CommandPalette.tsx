@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -331,6 +334,12 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] p-0 gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Command Palette</DialogTitle>
+          <DialogDescription>
+            Search tables, pages, views, or run commands
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex items-center border-b px-4 py-3">
           <Search className="h-4 w-4 text-gray-400 mr-2" />
           <Input

@@ -60,7 +60,7 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
           .select("*")
           .eq("table_id", tableId)
           .order("position", { ascending: true }),
-        supabase.from("views").select("config, id").eq("id", viewId).maybeSingle(),
+        supabase.from("views").select("config").eq("id", viewId).maybeSingle(),
       ])
 
       if (tableRes.status === 'fulfilled') {

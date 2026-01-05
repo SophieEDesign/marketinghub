@@ -35,6 +35,13 @@ export default function KanbanView({
   }, [tableId])
 
   async function loadRows() {
+    if (!tableId) {
+      console.warn("KanbanView: tableId is required")
+      setRows([])
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     const { data, error } = await supabase
       .from("table_rows")

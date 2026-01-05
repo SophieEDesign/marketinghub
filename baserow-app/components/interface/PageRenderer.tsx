@@ -128,6 +128,7 @@ export default function PageRenderer({
             page={{ id: page.id, name: page.name } as any}
             initialBlocks={[]}
             isViewer={false}
+            hideHeader={true}
           />
         )
 
