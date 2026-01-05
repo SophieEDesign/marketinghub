@@ -61,6 +61,15 @@ export default function PageSetupState({ page, isAdmin }: PageSetupStateProps) {
           actionLabel: 'Configure Review',
           actionPath: `/pages/${page.id}?edit=true`,
         }
+      default:
+        // Fallback for any unexpected cases
+        return {
+          icon: LayoutDashboard,
+          title: 'Configure this page',
+          description: `${definition.label} pages need configuration.`,
+          actionLabel: 'Configure Page',
+          actionPath: `/settings?tab=pages&page=${page.id}&action=configure`,
+        }
     }
   }
 
