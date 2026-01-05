@@ -22,18 +22,12 @@ export interface PageConfig {
   record_panel?: 'side' | 'bottom' | 'none'
   visible_columns?: string[]
   
-  // Gallery specific
-  cover_field?: string
-  title_field?: string
-  
-  // Calendar specific
+  // Calendar/Timeline specific
   start_date_field?: string
   end_date_field?: string
   
   // Timeline specific
   group_by_field?: string
-  start_date_field?: string
-  end_date_field?: string
   
   // Dashboard specific
   aggregation_views?: string[] // SQL view names for metrics
