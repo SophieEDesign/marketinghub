@@ -167,10 +167,8 @@ export async function getDefaultInterface(): Promise<Interface | null> {
     .select('default_interface_id')
     .maybeSingle()
   
-  // Ignore 400 errors (column doesn't exist) - this is expected in some setups
-  if (settingsError && settingsError.code !== 'PGRST116' && settingsError.code !== '42P01' && settingsError.status !== 400) {
-    // Only log unexpected errors
-  }
+  // Ignore errors if column doesn't exist (PGRST116 = column not found, 42P01 = relation doesn't exist)
+  // These are expected in some setups where the migration hasn't been run
   
   if (workspaceSettings?.default_interface_id) {
     // Try views table first (current system)
