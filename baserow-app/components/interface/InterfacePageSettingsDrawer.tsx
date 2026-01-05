@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dialog"
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import type { InterfacePage } from "@/lib/interface/pages"
+import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { PAGE_TYPE_DEFINITIONS } from "@/lib/interface/page-types"
 
 interface InterfacePageSettingsDrawerProps {

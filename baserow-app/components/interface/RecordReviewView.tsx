@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react'
-import { InterfacePage } from '@/lib/interface/pages'
+import type { InterfacePage } from '@/lib/interface/page-types-only'
 
 interface RecordReviewViewProps {
   page: InterfacePage

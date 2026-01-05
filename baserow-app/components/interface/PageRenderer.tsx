@@ -5,7 +5,7 @@
  * Renders pages based on page_type and config - no hardcoding
  */
 
-import { InterfacePage } from '@/lib/interface/pages'
+import type { InterfacePage } from '@/lib/interface/page-types-only'
 import { PageType } from '@/lib/interface/page-types'
 import { useMemo } from 'react'
 import dynamic from 'next/dynamic'

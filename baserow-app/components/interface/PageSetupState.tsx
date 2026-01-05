@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Settings, Database, LayoutDashboard, FileText, FileCheck } from "lucide-react"
 import { useRouter } from "next/navigation"
-import type { InterfacePage } from "@/lib/interface/pages"
+import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getRequiredAnchorType, getPageTypeDefinition } from "@/lib/interface/page-types"
 
 interface PageSetupStateProps {

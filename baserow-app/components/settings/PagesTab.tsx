@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import InterfacePageSettingsDrawer from '@/components/interface/InterfacePageSettingsDrawer'
 import PageCreationWizard from '@/components/interface/PageCreationWizard'
-import type { InterfacePage } from '@/lib/interface/pages'
+import type { InterfacePage } from '@/lib/interface/page-types-only'
 
 interface Page {
   id: string
@@ -637,108 +637,6 @@ export default function SettingsPagesTab() {
         onOpenChange={setNewPageOpen}
         defaultGroupId={null}
       />
-
-      {/* Legacy New Page Modal - Keep for backward compatibility but hide */}
-      {false && (
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Page</DialogTitle>
-            <DialogDescription>
-              Choose a page type and configure it
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="page-name">Page Name *</Label>
-              <Input
-                id="page-name"
-                value={newPageName}
-                onChange={(e) => setNewPageName(e.target.value)}
-                placeholder="My Page"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newPageName.trim() && !creating) {
-                    handleCreatePage()
-                  }
-                }}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Page Type *</Label>
-              <div className="text-sm text-gray-500 mb-2">
-                Choose a page type. Interface pages use the card selector below. Table views use the dropdown.
-              </div>
-              <Select value={newPageType} onValueChange={(value: any) => {
-                setNewPageType(value)
-                if (value === 'interface') {
-                  setNewPageTableId('')
-                } else if (tables.length > 0 && !newPageTableId) {
-                  setNewPageTableId(tables[0].id)
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select page type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="interface">Interface Page (Dashboard/List/etc.)</SelectItem>
-                  <SelectItem value="grid">Grid View</SelectItem>
-                  <SelectItem value="kanban">Kanban View</SelectItem>
-                  <SelectItem value="calendar">Calendar View</SelectItem>
-                  <SelectItem value="form">Form View</SelectItem>
-                </SelectContent>
-              </Select>
-              {newPageType === 'interface' && (
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs text-blue-800">
-                    💡 Tip: After creating an interface page, you can choose a specific page type (Dashboard, List, etc.) when configuring it.
-                  </p>
-                </div>
-              )}
-            </div>
-            {newPageType === 'interface' && (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="admin-only"
-                  checked={newPageIsAdminOnly}
-                  onChange={(e) => setNewPageIsAdminOnly(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="admin-only" className="text-sm font-normal cursor-pointer">
-                  Admin only (hide from members)
-                </Label>
-              </div>
-            )}
-            {newPageType !== 'interface' && (
-              <>
-                <div className="grid gap-2">
-                  <Label htmlFor="table">Table *</Label>
-                  <Select value={newPageTableId} onValueChange={setNewPageTableId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a table" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tables.map((table) => (
-                        <SelectItem key={table.id} value={table.id}>
-                          {table.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewPageOpen(false)} disabled={creating}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreatePage} disabled={creating || !newPageName.trim()}>
-              {creating ? 'Creating...' : 'Create Page'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
