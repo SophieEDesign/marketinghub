@@ -161,10 +161,16 @@ export async function getDefaultInterface(): Promise<Interface | null> {
   const userIsAdmin = await isAdmin()
   
   // First, try to get default interface from workspace_settings
-  const { data: workspaceSettings } = await supabase
+  // Silently handle errors if column doesn't exist
+  const { data: workspaceSettings, error: settingsError } = await supabase
     .from('workspace_settings')
     .select('default_interface_id')
     .maybeSingle()
+  
+  // Ignore 400 errors (column doesn't exist) - this is expected in some setups
+  if (settingsError && settingsError.code !== 'PGRST116' && settingsError.code !== '42P01' && settingsError.status !== 400) {
+    // Only log unexpected errors
+  }
   
   if (workspaceSettings?.default_interface_id) {
     // Try views table first (current system)

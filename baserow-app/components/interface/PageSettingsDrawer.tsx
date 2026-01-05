@@ -90,15 +90,22 @@ export default function PageSettingsDrawer({
         .select('default_interface_id')
         .maybeSingle()
       
-      // Handle errors gracefully - column might not exist or RLS might block
+      // Handle errors gracefully - column might not exist (400), RLS might block (403), or table might not exist
       if (!error && workspaceSettings) {
         setIsDefault(workspaceSettings.default_interface_id === page.id)
       } else {
         setIsDefault(false)
+        // Only log non-400 errors (400 means column/table doesn't exist, which is fine)
+        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && !error.message?.includes('column') && !error.message?.includes('does not exist')) {
+          console.warn('Error loading default status:', error)
+        }
       }
-    } catch (error) {
-      console.warn('Error loading default status:', error)
+    } catch (error: any) {
       setIsDefault(false)
+      // Don't log 400 errors as they're expected if the column doesn't exist
+      if (error?.status !== 400 && error?.code !== 'PGRST116' && error?.code !== '42P01') {
+        console.warn('Error loading default status:', error)
+      }
     }
   }
 

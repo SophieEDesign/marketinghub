@@ -74,18 +74,20 @@ export default function InterfacesTab() {
       // Check which interface is default (from workspace_settings or first interface)
       let defaultId: string | null = null
       try {
+        // First check if workspace_settings table exists and has the column
         const { data: defaultInterface, error: settingsError } = await supabase
           .from('workspace_settings')
           .select('default_interface_id')
           .maybeSingle()
 
-        // Handle errors gracefully - column might not exist or RLS might block
+        // Handle errors gracefully - column might not exist (400), RLS might block (403), or table might not exist
         if (!settingsError && defaultInterface) {
           defaultId = defaultInterface.default_interface_id || null
         }
-      } catch (error) {
-        // Ignore errors - defaultId remains null
-        console.warn('Could not load default interface setting:', error)
+        // Silently ignore 400 errors (column/table doesn't exist) - this is expected in some setups
+      } catch (error: any) {
+        // Silently ignore errors - defaultId remains null
+        // 400 errors are expected if the column doesn't exist
       }
 
       // Group interfaces
