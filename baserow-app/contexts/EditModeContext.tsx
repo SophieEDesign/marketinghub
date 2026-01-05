@@ -162,8 +162,8 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
   ) => {
     if (isViewer) return
 
-    setState(prev => {
-      const newScopes = new Set(prev.activeScopes)
+    setState((prev: EditModeState) => {
+      const newScopes = new Set<EditScope>(prev.activeScopes)
       newScopes.add(scope)
 
       const updates: Partial<EditModeState> = {
@@ -172,6 +172,9 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
 
       // Set context-specific IDs
       if (scope === "page" && options?.pageId) {
+        updates.editingPageId = options.pageId
+      } else if (scope === "block" && options?.pageId) {
+        // Block editing also needs pageId to track which page is being edited
         updates.editingPageId = options.pageId
       } else if (scope === "record" && options?.recordId) {
         updates.editingRecordId = options.recordId
@@ -185,8 +188,8 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
   }, [isViewer])
 
   const exitEditMode = useCallback((scope: EditScope) => {
-    setState(prev => {
-      const newScopes = new Set(prev.activeScopes)
+    setState((prev: EditModeState) => {
+      const newScopes = new Set<EditScope>(prev.activeScopes)
       newScopes.delete(scope)
 
       const updates: Partial<EditModeState> = {
@@ -196,6 +199,9 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
       // Clear context-specific IDs
       if (scope === "page") {
         updates.editingPageId = null
+      } else if (scope === "block") {
+        // Don't clear editingPageId for block scope - it might be used by page scope too
+        // Only clear if no other scopes are using it
       } else if (scope === "record") {
         updates.editingRecordId = null
       } else if (scope === "grid") {

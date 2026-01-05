@@ -398,7 +398,7 @@ export default function InterfacesTab() {
         <CardHeader>
           <CardTitle>Interface Access & Sharing</CardTitle>
           <CardDescription>
-            Manage who can see each interface page. Pages are organized into groups in the sidebar.
+            Manage access permissions and sharing for Interfaces. To create or edit Pages, use the Pages tab.
           </CardDescription>
         </CardHeader>
         <CardContent>

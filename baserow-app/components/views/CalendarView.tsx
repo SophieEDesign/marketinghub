@@ -37,8 +37,9 @@ export default function CalendarView({
   }, [tableId])
 
   async function loadRows() {
+    // Gracefully handle missing tableId for SQL-view backed pages
     if (!tableId) {
-      console.warn("CalendarView: tableId is required")
+      console.warn("CalendarView: tableId is required for table-backed pages. This page may be SQL-view backed.")
       setRows([])
       setLoading(false)
       return
@@ -52,6 +53,7 @@ export default function CalendarView({
 
     if (error) {
       console.error("Error loading rows:", error)
+      setRows([])
     } else {
       setRows(data || [])
     }
@@ -101,6 +103,20 @@ export default function CalendarView({
 
   if (loading) {
     return <div className="p-4">Loading...</div>
+  }
+
+  // Handle missing tableId gracefully (SQL-view backed pages)
+  if (!tableId) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center">
+          Calendar view requires a table connection. This page appears to be SQL-view backed.
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          Please configure this page with a table anchor in Settings.
+        </div>
+      </div>
+    )
   }
 
   // Empty state for search

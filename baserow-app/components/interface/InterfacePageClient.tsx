@@ -64,11 +64,20 @@ export default function InterfacePageClient({
 
   useEffect(() => {
     // Load blocks for dashboard/overview pages when entering block edit mode
+    // Also load blocks immediately if we're already in edit mode (e.g., on page load)
     if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
       loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBlockEditing, page?.id, page?.page_type])
+
+  // Load blocks when entering block edit mode (triggered by button click)
+  useEffect(() => {
+    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview') && blocks.length === 0) {
+      loadBlocks()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBlockEditing])
 
   async function loadPage() {
     if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
@@ -267,7 +276,14 @@ export default function InterfacePageClient({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => enterBlockEdit()}
+                    onClick={async () => {
+                      // Enter block edit mode
+                      enterBlockEdit()
+                      // Ensure blocks are loaded immediately
+                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
+                        await loadBlocks()
+                      }
+                    }}
                   >
                     <Edit2 className="h-4 w-4 mr-2" />
                     Edit interface
