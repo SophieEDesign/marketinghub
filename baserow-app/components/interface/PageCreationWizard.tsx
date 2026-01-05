@@ -362,7 +362,7 @@ export default function PageCreationWizard({
       return (
         <div className="space-y-4">
           <p className="text-sm text-gray-500">
-            Dashboard pages start empty. You'll add blocks after creation.
+            Dashboard pages start empty. You&apos;ll add blocks after creation.
           </p>
           <Button
             onClick={handleAnchorConfigured}
