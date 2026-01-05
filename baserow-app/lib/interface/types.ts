@@ -59,7 +59,7 @@ export interface BlockConfig {
   row_limit?: number
   highlight_rules?: HighlightRule[]
   // Action block
-  action_type?: 'navigate' | 'create_record'
+  action_type?: 'navigate' | 'create_record' | 'redirect'
   label?: string
   url?: string
   route?: string
