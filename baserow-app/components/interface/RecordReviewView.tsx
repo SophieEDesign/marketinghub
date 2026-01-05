@@ -7,7 +7,6 @@
 
 import { useState } from 'react'
 import { InterfacePage } from '@/lib/interface/pages'
-import GridView from '@/components/grid/AirtableGridView'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -24,18 +23,53 @@ export default function RecordReviewView({ page, data, config }: RecordReviewVie
 
   const selectedRecord = data.find(record => record.id === selectedRecordId)
 
+  // Get columns from config or data
+  const columns = config.visible_columns || (data.length > 0 ? Object.keys(data[0]) : [])
+
   return (
     <div className="h-full flex">
       {/* Main list/grid view */}
-      <div className={recordPanel === 'side' ? 'flex-1 border-r' : 'w-full'}>
-        <GridView
-          tableId={config.base_table || ''}
-          viewId={page.id}
-          rows={data}
-          config={config}
-          onRowClick={(recordId) => setSelectedRecordId(recordId)}
-          selectedRowId={selectedRecordId}
-        />
+      <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto' : 'w-full overflow-auto'}>
+        {data.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            No records available
+          </div>
+        ) : (
+          <div className="h-full overflow-auto">
+            <table className="w-full border-collapse">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  {columns.map((col: string) => (
+                    <th key={col} className="border p-2 text-left font-semibold text-sm">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row, idx) => {
+                  const isSelected = row.id === selectedRecordId
+                  return (
+                    <tr
+                      key={row.id || idx}
+                      onClick={() => setSelectedRecordId(row.id)}
+                      className={`
+                        hover:bg-gray-50 cursor-pointer transition-colors
+                        ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}
+                      `}
+                    >
+                      {columns.map((col: string) => (
+                        <td key={col} className="border p-2 text-sm">
+                          {row[col] !== null && row[col] !== undefined ? String(row[col]) : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Detail panel */}
