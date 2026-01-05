@@ -90,7 +90,7 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
       }
 
       // Load rows
-      let query = supabase
+      let query: any = supabase
         .from(table.supabase_table)
         .select(fieldNames.join(", "))
         .limit(rowLimit)
