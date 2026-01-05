@@ -51,7 +51,7 @@ export async function aggregateTableData(
 
       // Apply filters if provided
       if (filters && filters.length > 0) {
-        filters.forEach(filter => {
+        filters.forEach((filter: any) => {
           if (filter.operator === 'eq') {
             query = query.eq(filter.field, filter.value)
           } else if (filter.operator === 'neq') {
@@ -127,7 +127,7 @@ export async function aggregateTableData(
 
     // Apply filters
     if (filters && filters.length > 0) {
-      filters.forEach(filter => {
+      filters.forEach((filter: any) => {
         if (filter.operator === 'eq') {
           query = query.eq(filter.field, filter.value)
         } else if (filter.operator === 'neq') {
