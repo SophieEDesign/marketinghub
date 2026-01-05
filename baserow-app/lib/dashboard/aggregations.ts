@@ -169,10 +169,10 @@ export async function aggregateTableData(
     let result = 0
     switch (aggregate) {
       case 'sum':
-        result = values.reduce((a, b) => a + b, 0)
+        result = values.reduce((a: number, b: number) => a + b, 0)
         break
       case 'avg':
-        result = values.reduce((a, b) => a + b, 0) / values.length
+        result = values.reduce((a: number, b: number) => a + b, 0) / values.length
         break
       case 'min':
         result = Math.min(...values)
