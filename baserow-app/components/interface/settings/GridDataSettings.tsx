@@ -123,7 +123,7 @@ export default function GridDataSettings({
         <Label>Data Source</Label>
         <Select
           value={config.source_type || 'table'}
-          onValueChange={(value) => onUpdate({ source_type: value })}
+          onValueChange={(value) => onUpdate({ source_type: value as 'table' | 'sql_view' })}
         >
           <SelectTrigger>
             <SelectValue />
