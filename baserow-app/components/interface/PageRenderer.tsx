@@ -12,9 +12,9 @@ import dynamic from 'next/dynamic'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
-const KanbanView = dynamic(() => import('@/components/kanban/KanbanView'), { ssr: false })
-const CalendarView = dynamic(() => import('@/components/calendar/CalendarView'), { ssr: false })
-const FormView = dynamic(() => import('@/components/form/FormView'), { ssr: false })
+const KanbanView = dynamic(() => import('@/components/views/KanbanView'), { ssr: false })
+const CalendarView = dynamic(() => import('@/components/views/CalendarView'), { ssr: false })
+const FormView = dynamic(() => import('@/components/views/FormView'), { ssr: false })
 const InterfaceBuilder = dynamic(() => import('@/components/interface/InterfaceBuilder'), { ssr: false })
 const RecordReviewView = dynamic(() => import('@/components/interface/RecordReviewView'), { ssr: false })
 
@@ -78,22 +78,20 @@ export default function PageRenderer({
       case 'kanban':
         return (
           <KanbanView
-            tableId={config.base_table || ''}
-            viewId={page.id}
+            tableId={config.table_id || config.base_table || ''}
+            viewId={config.view_id || page.id}
             groupingFieldId={config.group_by || ''}
-            fieldIds={config.card_fields || []}
-            data={data}
+            fieldIds={config.card_fields || config.fields || []}
           />
         )
 
       case 'calendar':
         return (
           <CalendarView
-            tableId={config.base_table || ''}
-            viewId={page.id}
+            tableId={config.table_id || config.base_table || ''}
+            viewId={config.view_id || page.id}
             dateFieldId={config.start_date_field || ''}
-            endDateFieldId={config.end_date_field}
-            data={data}
+            fieldIds={config.fields || []}
           />
         )
 
@@ -105,12 +103,15 @@ export default function PageRenderer({
         )
 
       case 'form':
+        // FormView expects fieldIds as array of strings, not form_fields config
+        const formFieldIds = config.form_fields 
+          ? config.form_fields.map((f: any) => typeof f === 'string' ? f : f.field_id || f.field_name)
+          : config.fields || []
         return (
           <FormView
-            tableId={config.base_table || page.base_table || ''}
-            viewId={page.id}
-            fields={config.form_fields || []}
-            submitAction={config.submit_action || 'create'}
+            tableId={config.table_id || page.base_table || ''}
+            viewId={config.view_id || page.id}
+            fieldIds={formFieldIds}
           />
         )
 

@@ -150,6 +150,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minHeight: 4,
     defaultConfig: {
       title: 'Tabs',
+      tabs: [],
     },
   },
   table_snapshot: {

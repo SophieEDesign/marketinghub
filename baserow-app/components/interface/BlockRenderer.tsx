@@ -13,6 +13,7 @@ import ButtonBlock from "./blocks/ButtonBlock"
 import TableSnapshotBlock from "./blocks/TableSnapshotBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
+import TabsBlock from "./blocks/TabsBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 
 interface BlockRendererProps {
@@ -100,6 +101,15 @@ export default function BlockRenderer({
 
       case "button":
         return <ButtonBlock block={block} isEditing={canEdit} />
+
+      case "tabs":
+        return (
+          <TabsBlock
+            block={block}
+            isEditing={canEdit}
+            childBlocks={[]} // TODO: Pass actual child blocks from parent
+          />
+        )
 
       default:
         return (

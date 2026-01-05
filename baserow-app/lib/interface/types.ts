@@ -87,6 +87,26 @@ export interface BlockConfig {
   // Chart
   group_by_field?: string
   metric_field?: string
+  // Tabs
+  tabs?: Array<{
+    id: string
+    label: string
+    block_ids: string[]
+  }>
+  default_tab_id?: string
+  source_type?: 'table' | 'sql_view'
+  source_view?: string
+  // Form
+  form_fields?: Array<{
+    field_id: string
+    field_name: string
+    required: boolean
+    visible: boolean
+    order: number
+  }>
+  submit_action?: 'create' | 'update' | 'custom'
+  detail_fields?: string[]
+  allow_editing?: boolean
   // Appearance settings
   appearance?: {
     title?: string
@@ -124,6 +144,28 @@ export interface BlockConfig {
     display_mode?: string
     show_provider?: boolean
     show_thumbnail?: boolean
+    // Tabs specific
+    tab_style?: 'default' | 'pills' | 'underline'
+    tab_position?: 'top' | 'left' | 'right'
+    tab_background?: string
+    active_tab_color?: string
+    content_padding?: number
+    // Form specific
+    form_layout?: 'single' | 'two'
+    label_position?: 'top' | 'left' | 'inline'
+    field_spacing?: number
+    button_alignment?: 'left' | 'center' | 'right' | 'full'
+    // Image specific
+    image_size?: 'auto' | 'contain' | 'cover' | 'small' | 'medium' | 'large'
+    image_align?: 'left' | 'center' | 'right'
+    aspect_ratio?: 'auto' | '1:1' | '16:9' | '4:3' | '3:2'
+    max_width?: number
+    // Divider specific
+    divider_thickness?: number
+    divider_color?: string
+    divider_style?: 'solid' | 'dashed' | 'dotted'
+    divider_spacing_top?: number
+    divider_spacing_bottom?: number
   }
   [key: string]: any
 }

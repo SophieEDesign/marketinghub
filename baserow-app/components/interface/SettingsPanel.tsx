@@ -32,6 +32,15 @@ import ActionDataSettings from "./settings/ActionDataSettings"
 import ActionAppearanceSettings from "./settings/ActionAppearanceSettings"
 import LinkPreviewDataSettings from "./settings/LinkPreviewDataSettings"
 import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSettings"
+import GridDataSettings from "./settings/GridDataSettings"
+import FormDataSettings from "./settings/FormDataSettings"
+import FormAppearanceSettings from "./settings/FormAppearanceSettings"
+import RecordDataSettings from "./settings/RecordDataSettings"
+import ImageDataSettings from "./settings/ImageDataSettings"
+import ImageAppearanceSettings from "./settings/ImageAppearanceSettings"
+import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
+import TabsDataSettings from "./settings/TabsDataSettings"
+import TabsAppearanceSettings from "./settings/TabsAppearanceSettings"
 import AdvancedSettings from "./settings/AdvancedSettings"
 import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
 
@@ -274,51 +283,22 @@ export default function SettingsPanel({
       case "link_preview":
         return <LinkPreviewDataSettings {...commonProps} />
       case "grid":
+        return <GridDataSettings {...commonProps} />
       case "form":
+        return <FormDataSettings {...commonProps} />
       case "record":
-        // Grid/Form/Record blocks use common data settings
+        return <RecordDataSettings {...commonProps} />
+      case "image":
+        return <ImageDataSettings {...commonProps} />
+      case "tabs":
+        // Tabs need access to all blocks for assignment
+        // Note: In a real implementation, pass blocks from InterfaceBuilder
         return (
-          <div className="space-y-4">
-            <div>
-              <Label>Table</Label>
-              <Select
-                value={config.table_id || ""}
-                onValueChange={commonProps.onTableChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a table" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tables.map((table) => (
-                    <SelectItem key={table.id} value={table.id}>
-                      {table.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {config.table_id && (
-              <div>
-                <Label>View (optional)</Label>
-                <Select
-                  value={config.view_id || ""}
-                  onValueChange={(value) => updateConfig({ view_id: value || undefined })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All records" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All records</SelectItem>
-                    {views.map((view) => (
-                      <SelectItem key={view.id} value={view.id}>
-                        {view.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
+          <TabsDataSettings
+            config={config}
+            allBlocks={[]} // TODO: Pass actual blocks from parent context
+            onUpdate={updateConfig}
+          />
         )
       default:
         return (
@@ -375,6 +355,34 @@ export default function SettingsPanel({
         return (
           <>
             <LinkPreviewAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "form":
+        return (
+          <>
+            <FormAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "image":
+        return (
+          <>
+            <ImageAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "divider":
+        return (
+          <>
+            <DividerAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "tabs":
+        return (
+          <>
+            <TabsAppearanceSettings {...commonProps} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )
