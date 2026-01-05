@@ -6,6 +6,9 @@
 import type { BlockType, BlockConfig } from './types'
 import { validateBlockConfig } from './block-config-types'
 
+// Re-export validateBlockConfig for convenience
+export { validateBlockConfig } from './block-config-types'
+
 /**
  * Safely get a config value with fallback
  */

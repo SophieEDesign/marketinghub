@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { saveBlockLayout, createBlock, deleteBlock } from '@/lib/pages/saveBlocks'
-import { validateBlockConfig, normalizeBlockConfig } from '@/lib/interface/block-validator'
+import { normalizeBlockConfig } from '@/lib/interface/block-validator'
+import { validateBlockConfig } from '@/lib/interface/block-config-types'
 import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
 
 /**
