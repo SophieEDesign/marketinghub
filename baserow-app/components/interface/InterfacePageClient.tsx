@@ -4,10 +4,14 @@ import { useState, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { Edit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import dynamic from "next/dynamic"
 import type { InterfacePage } from "@/lib/interface/pages"
 import PageRenderer from "./PageRenderer"
 import InterfacePageSettingsDrawer from "./InterfacePageSettingsDrawer"
 import { getPageTypeDefinition } from "@/lib/interface/page-types"
+
+// Lazy load InterfaceBuilder for dashboard/overview pages
+const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 
 interface InterfacePageClientProps {
   pageId: string
@@ -41,6 +45,7 @@ export default function InterfacePageClient({
     if (page && page.source_view) {
       loadSqlViewData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.config])
 
   useEffect(() => {
@@ -48,6 +53,7 @@ export default function InterfacePageClient({
     if (isEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
       loadBlocks()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, page?.id, page?.page_type])
 
   async function loadPage() {

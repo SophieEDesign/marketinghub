@@ -74,6 +74,7 @@ export default function InterfacePageSettingsDrawer({
       loadSqlViews()
       loadTables()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, pageId])
 
   async function loadPage() {
