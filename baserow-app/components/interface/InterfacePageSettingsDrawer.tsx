@@ -55,12 +55,11 @@ export default function InterfacePageSettingsDrawer({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [pageType, setPageType] = useState<string>("")
-  const [sourceView, setSourceView] = useState<string>("")
+  const [sourceTable, setSourceTable] = useState<string>("") // Changed from sourceView - users select tables, not SQL views
   const [baseTable, setBaseTable] = useState<string>("")
-  const [groupId, setGroupId] = useState<string>("")
+  const [interfaceId, setInterfaceId] = useState<string>("") // Changed from groupId - terminology fix
   const [isAdminOnly, setIsAdminOnly] = useState(false)
-  const [groups, setGroups] = useState<InterfaceGroup[]>([])
-  const [sqlViews, setSqlViews] = useState<string[]>([])
+  const [interfaces, setInterfaces] = useState<InterfaceGroup[]>([]) // Changed from groups - terminology fix
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -70,8 +69,7 @@ export default function InterfacePageSettingsDrawer({
   useEffect(() => {
     if (isOpen && pageId) {
       loadPage()
-      loadGroups()
-      loadSqlViews()
+      loadInterfaces()
       loadTables()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,9 +85,12 @@ export default function InterfacePageSettingsDrawer({
       setName(pageData.name || "")
       setDescription("") // InterfacePage doesn't have description field
       setPageType(pageData.page_type || "")
-      setSourceView(pageData.source_view || "")
+      // Map source_view to sourceTable for display (users see tables, not SQL views)
+      // If page has source_view, we need to find which table it references
+      // For now, store the table ID if available, otherwise use base_table
+      setSourceTable(pageData.base_table || "")
       setBaseTable(pageData.base_table || "")
-      setGroupId(pageData.group_id || "__none__")
+      setInterfaceId(pageData.group_id || "") // Interface is required, no "__none__" option
       setIsAdminOnly(pageData.is_admin_only || false)
       setLoading(false)
     } catch (error) {
@@ -98,7 +99,7 @@ export default function InterfacePageSettingsDrawer({
     }
   }
 
-  async function loadGroups() {
+  async function loadInterfaces() {
     try {
       const supabase = createClient()
       const { data } = await supabase
@@ -107,22 +108,10 @@ export default function InterfacePageSettingsDrawer({
         .order('name')
       
       if (data) {
-        setGroups(data)
+        setInterfaces(data)
       }
     } catch (error) {
-      console.error('Error loading groups:', error)
-    }
-  }
-
-  async function loadSqlViews() {
-    try {
-      const res = await fetch('/api/sql-views')
-      if (!res.ok) return
-      
-      const data = await res.json()
-      setSqlViews(data.views || [])
-    } catch (error) {
-      console.error('Error loading SQL views:', error)
+      console.error('Error loading interfaces:', error)
     }
   }
 
@@ -147,16 +136,24 @@ export default function InterfacePageSettingsDrawer({
       return
     }
 
+    // Interface is required
+    if (!interfaceId) {
+      alert('Please select an Interface')
+      return
+    }
+
     setSaving(true)
     try {
+      // When user selects a table, we store it as base_table
+      // SQL views are created automatically behind the scenes
       const res = await fetch(`/api/interface-pages/${pageId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
-          source_view: sourceView || null,
-          base_table: baseTable || null,
-          group_id: groupId === '__none__' || !groupId ? null : groupId,
+          base_table: sourceTable || baseTable || null,
+          // source_view will be auto-generated from base_table if needed
+          group_id: interfaceId, // Required - no null option
           is_admin_only: isAdminOnly,
         }),
       })
@@ -252,40 +249,18 @@ export default function InterfacePageSettingsDrawer({
                 </p>
               </div>
 
-              {/* Source View (for most page types) */}
-              {pageTypeDef?.requiresSourceView && (
+              {/* Source Table (for pages that need data) */}
+              {(pageTypeDef?.requiresSourceView || pageTypeDef?.requiresBaseTable) && (
                 <div className="space-y-2">
-                  <Label htmlFor="sourceView">Source SQL View</Label>
+                  <Label htmlFor="sourceTable">Source Table *</Label>
                   <Select
-                    value={sourceView}
-                    onValueChange={setSourceView}
+                    value={sourceTable || baseTable}
+                    onValueChange={(value) => {
+                      setSourceTable(value)
+                      setBaseTable(value) // Keep both in sync
+                    }}
                   >
-                    <SelectTrigger id="sourceView">
-                      <SelectValue placeholder="Select SQL view" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sqlViews.map((view) => (
-                        <SelectItem key={view} value={view}>
-                          {view}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500">
-                    SQL view that provides data for this page
-                  </p>
-                </div>
-              )}
-
-              {/* Base Table (for forms) */}
-              {pageTypeDef?.requiresBaseTable && (
-                <div className="space-y-2">
-                  <Label htmlFor="baseTable">Base Table</Label>
-                  <Select
-                    value={baseTable}
-                    onValueChange={setBaseTable}
-                  >
-                    <SelectTrigger id="baseTable">
+                    <SelectTrigger id="sourceTable">
                       <SelectValue placeholder="Select table" />
                     </SelectTrigger>
                     <SelectContent>
@@ -297,30 +272,35 @@ export default function InterfacePageSettingsDrawer({
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500">
-                    Table used for form creation
+                    {pageTypeDef?.requiresBaseTable 
+                      ? 'Table used for this page'
+                      : 'Table that provides data for this page. SQL views are created automatically.'}
                   </p>
                 </div>
               )}
 
-              {/* Group */}
+              {/* Interface (required) */}
               <div className="space-y-2">
-                <Label htmlFor="group">Group</Label>
+                <Label htmlFor="interface">Interface *</Label>
                 <Select
-                  value={groupId}
-                  onValueChange={setGroupId}
+                  value={interfaceId}
+                  onValueChange={setInterfaceId}
+                  required
                 >
-                  <SelectTrigger id="group">
-                    <SelectValue placeholder="No group" />
+                  <SelectTrigger id="interface">
+                    <SelectValue placeholder="Select Interface" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">No group</SelectItem>
-                    {groups.map((group) => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
+                    {interfaces.map((iface) => (
+                      <SelectItem key={iface.id} value={iface.id}>
+                        {iface.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500">
+                  Every page must belong to an Interface
+                </p>
               </div>
 
               {/* Admin Only */}
@@ -391,4 +371,5 @@ export default function InterfacePageSettingsDrawer({
     </>
   )
 }
+
 

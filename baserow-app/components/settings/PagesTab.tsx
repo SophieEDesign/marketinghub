@@ -157,91 +157,11 @@ export default function SettingsPagesTab() {
     }
   }
 
+  // Page creation is now handled by PageCreationWizard component
+  // This function is kept for backward compatibility but should not be used
   async function handleCreatePage() {
-    if (!newPageName.trim()) {
-      alert('Page name is required')
-      return
-    }
-
-      if (newPageType !== 'interface' && !newPageTableId) {
-        alert('Please select a table for the view')
-        return
-      }
-
-    setCreating(true)
-    try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (newPageType === 'interface') {
-        // Create interface page as a view with type='interface'
-        const { data, error } = await supabase
-          .from('views')
-          .insert([
-            {
-              name: newPageName.trim(),
-              type: 'interface',
-              table_id: null, // Interface pages don't belong to a table
-              config: {
-                access: 'authenticated',
-                layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
-              },
-              owner_id: user?.id,
-              access_level: 'authenticated',
-              is_admin_only: newPageIsAdminOnly,
-            },
-          ])
-          .select()
-          .single()
-
-        if (error) throw error
-
-        // Redirect to pages route (not interface route)
-        router.push(`/pages/${data.id}`)
-      } else {
-        // Create view (grid, kanban, calendar, or form)
-        const { data, error } = await supabase
-          .from('views')
-          .insert([
-            {
-              table_id: newPageTableId,
-              name: newPageName.trim(),
-              type: newPageType, // grid, kanban, calendar, or form
-              config: {},
-              owner_id: user?.id,
-              access_level: 'authenticated',
-            },
-          ])
-          .select()
-          .single()
-
-        if (error) throw error
-
-        // Redirect to view
-        router.push(`/tables/${newPageTableId}/views/${data.id}`)
-      }
-
-      // Reset form and close modal
-      setNewPageName('')
-      setNewPageType('interface')
-      setNewPageTableId('')
-      setNewPageIsAdminOnly(false)
-      setNewPageOpen(false)
-      
-      // Reload pages list
-      await loadPages()
-      
-      // Refresh router to update sidebar - this will trigger server-side refetch
-      router.refresh()
-      
-      // Also trigger a window event that sidebar can listen to
-      window.dispatchEvent(new CustomEvent('pages-updated'))
-    } catch (error: any) {
-      console.error('Error creating page:', error)
-      alert(error.message || 'Failed to create page')
-    } finally {
-      setCreating(false)
-    }
+    // This is deprecated - use PageCreationWizard instead
+    console.warn('handleCreatePage is deprecated - use PageCreationWizard')
   }
 
   async function handleEdit(page: Page) {
@@ -483,7 +403,7 @@ export default function SettingsPagesTab() {
                     <div className="col-span-2 text-sm text-gray-600">
                       {page.group_id 
                         ? (interfaceGroups.find((g: { id: string; name: string }) => g.id === page.group_id)?.name || 'Unknown Interface')
-                        : 'Ungrouped'}
+                        : 'Ungrouped Interface'}
                     </div>
                     <div className="col-span-2 text-sm text-gray-500">
                       {formatDate(page.updated_at)}

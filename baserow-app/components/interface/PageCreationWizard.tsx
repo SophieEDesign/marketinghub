@@ -42,18 +42,15 @@ export default function PageCreationWizard({
   const [selectedInterfaceId, setSelectedInterfaceId] = useState<string>(defaultGroupId || '')
   const [pagePurpose, setPagePurpose] = useState<'view' | 'dashboard' | 'form' | 'record'>('view')
   const [pageType, setPageType] = useState<PageType | ''>('')
-  const [savedViewId, setSavedViewId] = useState<string>('')
-  const [tableId, setTableId] = useState<string>('')
+  const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
   const [creating, setCreating] = useState(false)
-  const [views, setViews] = useState<Array<{ id: string; name: string; table_id: string | null }>>([])
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
-      loadViews()
       loadTables()
       loadInterfaceGroups()
       // Reset state
@@ -61,7 +58,6 @@ export default function PageCreationWizard({
       setSelectedInterfaceId(defaultGroupId || '')
       setPagePurpose('view')
       setPageType('')
-      setSavedViewId('')
       setTableId('')
       setPageName('')
     }
@@ -123,25 +119,8 @@ export default function PageCreationWizard({
     }
   }
 
-  async function loadViews() {
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('views')
-        .select('id, name, table_id, type')
-        .in('type', ['grid', 'kanban', 'calendar', 'gallery'])
-        .order('name')
-
-      if (!error && data) {
-        setViews(data)
-      }
-    } catch (error) {
-      console.error('Error loading views:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Removed loadViews() - users select tables, not views
+  // Views are created automatically behind the scenes
 
   async function loadTables() {
     try {
@@ -209,9 +188,9 @@ export default function PageCreationWizard({
 
     const requiredAnchor = getRequiredAnchorType(pageType as PageType)
     
-    // Validate anchor is set
-    if (requiredAnchor === 'saved_view' && !savedViewId) {
-      alert('Please select a saved view')
+    // Validate anchor is set - users select tables, not views
+    if ((requiredAnchor === 'saved_view' || requiredAnchor === 'record') && !tableId) {
+      alert('Please select a table')
       return
     }
     if (requiredAnchor === 'form' && !tableId) {
@@ -225,15 +204,24 @@ export default function PageCreationWizard({
       const { data: { user } } = await supabase.auth.getUser()
 
       // Prepare anchor fields
-      // Convert empty strings to null for UUID fields
+      // Users select tables, not views - views are created automatically
       let saved_view_id: string | null = null
       let dashboard_layout_id: string | null = null
       let form_config_id: string | null = null
       let record_config_id: string | null = null
+      let base_table: string | null = null
+
+      // All page types that need data use base_table
+      // SQL views will be auto-generated from base_table if needed
+      if (tableId && tableId.trim()) {
+        base_table = tableId.trim()
+      }
 
       switch (requiredAnchor) {
         case 'saved_view':
-          saved_view_id = savedViewId && savedViewId.trim() ? savedViewId.trim() : null
+          // For saved_view anchor, we store the table
+          // A SQL view will be auto-created from this table
+          saved_view_id = null // Will be auto-generated
           break
         case 'dashboard':
           // For dashboard, we'll set it to null initially
@@ -244,7 +232,8 @@ export default function PageCreationWizard({
           form_config_id = tableId && tableId.trim() ? tableId.trim() : null
           break
         case 'record':
-          record_config_id = savedViewId && savedViewId.trim() ? savedViewId.trim() : null
+          // Record review pages also use tables
+          record_config_id = tableId && tableId.trim() ? tableId.trim() : null
           break
       }
 
@@ -255,11 +244,12 @@ export default function PageCreationWizard({
           {
             name: pageName.trim(),
             page_type: pageType,
-            saved_view_id,
+            base_table: base_table, // Store table selection
+            saved_view_id, // May be auto-generated from base_table
             dashboard_layout_id,
             form_config_id,
             record_config_id,
-            group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null,
+            group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null, // Required
             config: {},
             created_by: user?.id,
           },
@@ -288,7 +278,6 @@ export default function PageCreationWizard({
       setSelectedInterfaceId('')
       setPagePurpose('view')
       setPageType('')
-      setSavedViewId('')
       setTableId('')
       setPageName('')
       setCreating(false)
@@ -380,7 +369,7 @@ export default function PageCreationWizard({
   const renderAnchorStep = () => {
     const requiredAnchor = pageType ? getRequiredAnchorType(pageType as PageType) : null
 
-    if (requiredAnchor === 'saved_view') {
+    if (requiredAnchor === 'saved_view' || requiredAnchor === 'record') {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
@@ -390,35 +379,45 @@ export default function PageCreationWizard({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="list">List</SelectItem>
-                <SelectItem value="gallery">Gallery</SelectItem>
-                <SelectItem value="kanban">Kanban</SelectItem>
-                <SelectItem value="calendar">Calendar</SelectItem>
-                <SelectItem value="timeline">Timeline</SelectItem>
+                {requiredAnchor === 'saved_view' && (
+                  <>
+                    <SelectItem value="list">List</SelectItem>
+                    <SelectItem value="gallery">Gallery</SelectItem>
+                    <SelectItem value="kanban">Kanban</SelectItem>
+                    <SelectItem value="calendar">Calendar</SelectItem>
+                    <SelectItem value="timeline">Timeline</SelectItem>
+                  </>
+                )}
+                {requiredAnchor === 'record' && (
+                  <SelectItem value="record_review">Record Review</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Select Saved View *</Label>
-            <Select value={savedViewId} onValueChange={setSavedViewId}>
+            <Label>Select Table *</Label>
+            <Select value={tableId} onValueChange={setTableId}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a view" />
+                <SelectValue placeholder="Choose a table" />
               </SelectTrigger>
               <SelectContent>
-                {views.map((view) => (
-                  <SelectItem key={view.id} value={view.id}>
-                    {view.name} {view.table_id ? `(${tables.find(t => t.id === view.table_id)?.name || ''})` : ''}
+                {tables.map((table) => (
+                  <SelectItem key={table.id} value={table.id}>
+                    {table.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {views.length === 0 && (
-              <p className="text-sm text-gray-500">No views available. Create a view first.</p>
+            <p className="text-xs text-gray-500">
+              SQL views are created automatically from the selected table
+            </p>
+            {tables.length === 0 && (
+              <p className="text-sm text-gray-500">No tables available. Create a table first in Settings → Data.</p>
             )}
           </div>
           <Button
             onClick={handleAnchorConfigured}
-            disabled={!savedViewId || !pageType}
+            disabled={!tableId || !pageType}
             className="w-full"
           >
             Continue
