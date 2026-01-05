@@ -30,14 +30,23 @@ export function normalizeBlockConfig(
   blockType: BlockType,
   config: BlockConfig | undefined | null
 ): BlockConfig {
-  const safeConfig: BlockConfig = config || {}
+  // Ensure config is an object, not an array or other type
+  let safeConfig: BlockConfig = {}
+  
+  if (config && typeof config === 'object' && !Array.isArray(config)) {
+    safeConfig = config as BlockConfig
+  } else if (config) {
+    // If config is not a valid object (e.g., array), silently normalize to empty object
+    // This can happen with corrupted or malformed data
+    safeConfig = {}
+  }
 
   // Run validation
   const validation = validateBlockConfig(blockType, safeConfig)
 
   // If invalid, return minimal safe config
+  // Silently normalize invalid configs - this is expected for new/incomplete blocks
   if (!validation.valid) {
-    console.warn(`Invalid config for ${blockType} block:`, validation.errors)
     return getDefaultConfigForType(blockType)
   }
 

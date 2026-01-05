@@ -18,6 +18,7 @@ interface InterfaceBuilderProps {
   isViewer?: boolean
   onSave?: () => void
   onEditModeChange?: (isEditing: boolean) => void
+  hideHeader?: boolean
 }
 
 export default function InterfaceBuilder({
@@ -26,6 +27,7 @@ export default function InterfaceBuilder({
   isViewer = false,
   onSave,
   onEditModeChange,
+  hideHeader = false,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -508,6 +510,7 @@ export default function InterfaceBuilder({
       {/* Main Canvas - Full width when not editing */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar / Interface Header */}
+        {!hideHeader && (
         <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -524,7 +527,7 @@ export default function InterfaceBuilder({
                   <p className="text-xs text-gray-500 mt-0.5 truncate">{currentPage.description}</p>
                 )}
                 {currentPage.updated_at && !isEditing && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 mt-1" suppressHydrationWarning>
                     Last updated {new Date(currentPage.updated_at).toLocaleString()}
                   </p>
                 )}
@@ -606,6 +609,7 @@ export default function InterfaceBuilder({
             </div>
           </div>
         </div>
+        )}
 
         {/* Canvas */}
         <div className="flex-1 overflow-auto p-4">

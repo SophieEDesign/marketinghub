@@ -65,14 +65,14 @@ export default function KPIDataSettings({
         <div className="space-y-2">
           <Label>View (optional)</Label>
           <Select
-            value={config.view_id || ""}
-            onValueChange={(value) => onUpdate({ view_id: value || undefined })}
+            value={config.view_id || "__all__"}
+            onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="All records" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All records</SelectItem>
+              <SelectItem value="__all__">All records</SelectItem>
               {views.map((view) => (
                 <SelectItem key={view.id} value={view.id}>
                   {view.name}
@@ -259,16 +259,16 @@ export default function KPIDataSettings({
         <div className="space-y-2 border-t pt-4">
           <Label>Click-through View (optional)</Label>
           <Select
-            value={config.click_through?.view_id || ""}
+            value={config.click_through?.view_id || "__none__"}
             onValueChange={(value) => onUpdate({
-              click_through: { view_id: value || undefined }
+              click_through: value === "__none__" ? undefined : { view_id: value }
             })}
           >
             <SelectTrigger>
               <SelectValue placeholder="No click-through" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No click-through</SelectItem>
+              <SelectItem value="__none__">No click-through</SelectItem>
               {views.map((view) => (
                 <SelectItem key={view.id} value={view.id}>
                   {view.name}

@@ -60,14 +60,14 @@ export default function ChartDataSettings({
         <div className="space-y-2">
           <Label>View (optional)</Label>
           <Select
-            value={config.view_id || ""}
-            onValueChange={(value) => onUpdate({ view_id: value || undefined })}
+            value={config.view_id || "__all__"}
+            onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="All records" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All records</SelectItem>
+              <SelectItem value="__all__">All records</SelectItem>
               {views.map((view) => (
                 <SelectItem key={view.id} value={view.id}>
                   {view.name}
@@ -101,14 +101,14 @@ export default function ChartDataSettings({
       <div className="space-y-2">
         <Label>Group By</Label>
         <Select
-          value={config.group_by_field || ""}
-          onValueChange={(value) => onUpdate({ group_by_field: value || undefined })}
+          value={config.group_by_field || "__none__"}
+          onValueChange={(value) => onUpdate({ group_by_field: value === "__none__" ? undefined : value })}
         >
           <SelectTrigger>
             <SelectValue placeholder="No grouping" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">No grouping</SelectItem>
+            <SelectItem value="__none__">No grouping</SelectItem>
             {fields.map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}
@@ -163,14 +163,14 @@ export default function ChartDataSettings({
         <div className="space-y-2">
           <Label>Time Field</Label>
           <Select
-            value={config.time_field || ""}
-            onValueChange={(value) => onUpdate({ time_field: value || undefined })}
+            value={config.time_field || "__none__"}
+            onValueChange={(value) => onUpdate({ time_field: value === "__none__" ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="No time field" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No time field</SelectItem>
+              <SelectItem value="__none__">No time field</SelectItem>
               {fields.filter(f => f.type === 'date').map((field) => (
                 <SelectItem key={field.id} value={field.name}>
                   {field.name}
@@ -185,14 +185,14 @@ export default function ChartDataSettings({
       <div className="space-y-2">
         <Label>Sort By</Label>
         <Select
-          value={config.sort_field || ""}
-          onValueChange={(value) => onUpdate({ sort_field: value || undefined })}
+          value={config.sort_field || "__none__"}
+          onValueChange={(value) => onUpdate({ sort_field: value === "__none__" ? undefined : value })}
         >
           <SelectTrigger>
             <SelectValue placeholder="No sorting" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">No sorting</SelectItem>
+            <SelectItem value="__none__">No sorting</SelectItem>
             {fields.map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}

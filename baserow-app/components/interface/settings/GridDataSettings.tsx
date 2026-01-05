@@ -151,7 +151,7 @@ export default function GridDataSettings({
               </SelectTrigger>
               <SelectContent>
                 {sqlViews.length === 0 ? (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="__empty__" disabled>
                     No SQL views available
                   </SelectItem>
                 ) : (
@@ -197,14 +197,14 @@ export default function GridDataSettings({
             <div className="space-y-2">
               <Label>View (optional)</Label>
               <Select
-                value={config.view_id || ""}
-                onValueChange={(value) => onUpdate({ view_id: value || undefined })}
+                value={config.view_id || "__all__"}
+                onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All records" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All records</SelectItem>
+                  <SelectItem value="__all__">All records</SelectItem>
                   {views.map((view) => (
                     <SelectItem key={view.id} value={view.id}>
                       {view.name}
@@ -274,14 +274,14 @@ export default function GridDataSettings({
         <div className="space-y-2">
           <Label>Group By Field</Label>
           <Select
-            value={config.group_by || ""}
-            onValueChange={(value) => onUpdate({ group_by: value || undefined })}
+            value={config.group_by || "__none__"}
+            onValueChange={(value) => onUpdate({ group_by: value === "__none__" ? undefined : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a field" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="__none__">None</SelectItem>
               {fields.map((field) => (
                 <SelectItem key={field.id} value={field.name}>
                   {field.name}

@@ -62,12 +62,21 @@ export default function InterfacePageClient({
   async function loadPage() {
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)
-      if (!res.ok) throw new Error('Failed to load page')
+      if (!res.ok) {
+        if (res.status === 404) {
+          // Page not found - redirect to first available page or home
+          router.push('/')
+          return
+        }
+        throw new Error('Failed to load page')
+      }
       
       const pageData = await res.json()
       setPage(pageData)
     } catch (error) {
       console.error("Error loading page:", error)
+      // Redirect on error to prevent infinite loading state
+      router.push('/')
     } finally {
       setLoading(false)
     }
@@ -207,7 +216,7 @@ export default function InterfacePageClient({
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{page.name}</h1>
             {page.updated_at && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500" suppressHydrationWarning>
                 Updated {new Date(page.updated_at).toLocaleDateString()}
               </span>
             )}
@@ -241,7 +250,7 @@ export default function InterfacePageClient({
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{page.name}</h1>
             {page.updated_at && (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-gray-500" suppressHydrationWarning>
                 Updated {new Date(page.updated_at).toLocaleDateString()}
               </span>
             )}
@@ -265,6 +274,7 @@ export default function InterfacePageClient({
               page={{ id: page.id, name: page.name } as any}
               initialBlocks={blocks}
               isViewer={false}
+              hideHeader={true}
             />
           )
         ) : (
