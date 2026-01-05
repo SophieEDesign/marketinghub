@@ -44,9 +44,9 @@ export default function TabsDataSettings({
     const newTabs = tabs.filter(t => t.id !== tabId)
     onUpdate({
       tabs: newTabs,
-      default_tab_id: newTabs.length > 0 && defaultTabId === tabId 
-        ? newTabs[0].id 
-        : defaultTabId,
+      default_tab_id: newTabs.length > 0 && defaultTabId === tabId
+        ? newTabs[0].id
+        : defaultTabId || undefined,
     })
   }
 
