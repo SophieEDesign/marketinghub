@@ -171,7 +171,7 @@ export default function ChartDataSettings({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">No time field</SelectItem>
-              {fields.filter(f => f.type === 'date' || f.type === 'datetime').map((field) => (
+              {fields.filter(f => f.type === 'date').map((field) => (
                 <SelectItem key={field.id} value={field.name}>
                   {field.name}
                 </SelectItem>
