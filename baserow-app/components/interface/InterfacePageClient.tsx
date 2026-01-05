@@ -9,6 +9,7 @@ import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
+import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getPageTypeDefinition, getRequiredAnchorType } from "@/lib/interface/page-types"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
@@ -36,9 +37,11 @@ export default function InterfacePageClient({
   const [isEditing, setIsEditing] = useState(false)
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
 
   useEffect(() => {
-    if (!initialPage) {
+    if (!initialPage && !redirecting) {
       loadPage()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,11 +63,14 @@ export default function InterfacePageClient({
   }, [isEditing, page?.id, page?.page_type])
 
   async function loadPage() {
+    if (redirecting) return // Prevent multiple redirect attempts
+    
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)
       if (!res.ok) {
         if (res.status === 404) {
           // Page not found - redirect to first available page or home
+          setRedirecting(true)
           router.push('/')
           return
         }
@@ -76,7 +82,10 @@ export default function InterfacePageClient({
     } catch (error) {
       console.error("Error loading page:", error)
       // Redirect on error to prevent infinite loading state
-      router.push('/')
+      if (!redirecting) {
+        setRedirecting(true)
+        router.push('/')
+      }
     } finally {
       setLoading(false)
     }
@@ -159,6 +168,10 @@ export default function InterfacePageClient({
     }
   }, [page, isGridMode])
 
+  if (redirecting) {
+    return <div className="h-screen flex items-center justify-center">Redirecting...</div>
+  }
+
   if (loading) {
     return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
   }
@@ -191,20 +204,28 @@ export default function InterfacePageClient({
         setIsEditing(true)
         break
       case 'saved_view':
-        // Open view settings panel (to be implemented)
-        router.push(`/tables/${page.config?.table_id || ''}/views/${page.saved_view_id}?edit=true`)
+        // Open page display settings panel for data-backed pages
+        setDisplaySettingsOpen(true)
         break
       case 'form':
         // Open form builder (to be implemented)
         setIsEditing(true)
         break
       case 'record':
-        // Open record config panel (to be implemented)
-        setIsEditing(true)
+        // Open page display settings panel for record review pages
+        setDisplaySettingsOpen(true)
         break
       default:
         // Fallback: try to open settings
         router.push(`/settings?tab=pages&page=${page.id}&action=configure`)
+    }
+  }
+
+  async function handlePageUpdate() {
+    // Reload page data after settings update
+    await loadPage()
+    if (page?.source_view) {
+      await loadSqlViewData()
     }
   }
 
@@ -288,6 +309,15 @@ export default function InterfacePageClient({
         )}
       </div>
 
+      {/* Page Display Settings Panel */}
+      {page && (
+        <PageDisplaySettingsPanel
+          page={page}
+          isOpen={displaySettingsOpen}
+          onClose={() => setDisplaySettingsOpen(false)}
+          onUpdate={handlePageUpdate}
+        />
+      )}
     </div>
   )
 }
