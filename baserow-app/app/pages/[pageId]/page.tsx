@@ -78,6 +78,7 @@ export default async function PagePage({
         pageId={params.pageId} 
         initialPage={page || undefined}
         initialData={initialData}
+        isAdmin={admin}
       />
     </WorkspaceShellWrapper>
   )

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
 import type { InterfacePage } from "@/lib/interface/pages"
 import PageRenderer from "./PageRenderer"
-import InterfacePageSettingsDrawer from "./InterfacePageSettingsDrawer"
 import { getPageTypeDefinition } from "@/lib/interface/page-types"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
@@ -17,12 +16,14 @@ interface InterfacePageClientProps {
   pageId: string
   initialPage?: InterfacePage
   initialData?: any[]
+  isAdmin?: boolean
 }
 
 export default function InterfacePageClient({ 
   pageId, 
   initialPage,
-  initialData = []
+  initialData = [],
+  isAdmin = false
 }: InterfacePageClientProps) {
   const searchParams = useSearchParams()
   const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
@@ -30,7 +31,6 @@ export default function InterfacePageClient({
   const [loading, setLoading] = useState(!initialPage)
   const [isGridMode, setIsGridMode] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
 
@@ -158,20 +158,21 @@ export default function InterfacePageClient({
   const isViewer = searchParams.get("view") === "true"
   const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview'
 
-  // For dashboard/overview pages, editing means editing blocks (InterfaceBuilder)
-  // For other pages, editing opens the settings drawer
+  // Edit page opens block editing (InterfaceBuilder) for dashboard/overview pages
+  // For other page types, block editing isn't available yet
   const handleEditClick = () => {
     if (isDashboardOrOverview) {
       setIsEditing(true)
     } else {
-      setPageSettingsOpen(true)
+      // For non-dashboard/overview pages, show message that block editing isn't available
+      alert('Block editing is currently only available for Dashboard and Overview page types.')
     }
   }
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Header with Edit Button */}
-      {!isViewer && page && (
+      {/* Header with Edit Button - Admin Only */}
+      {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{page.name}</h1>
@@ -203,6 +204,20 @@ export default function InterfacePageClient({
           </div>
         </div>
       )}
+      
+      {/* Header without Edit Button - Non-admin */}
+      {!isViewer && page && !isAdmin && (
+        <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-semibold">{page.name}</h1>
+            {page.updated_at && (
+              <span className="text-xs text-gray-500">
+                Updated {new Date(page.updated_at).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
@@ -230,18 +245,6 @@ export default function InterfacePageClient({
         )}
       </div>
 
-      {/* Page Settings Drawer */}
-      {page && (
-        <InterfacePageSettingsDrawer
-          pageId={page.id}
-          isOpen={pageSettingsOpen}
-          onClose={() => setPageSettingsOpen(false)}
-          onUpdate={(updatedPage) => {
-            setPage(updatedPage)
-            setPageSettingsOpen(false)
-          }}
-        />
-      )}
     </div>
   )
 }
