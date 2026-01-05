@@ -31,7 +31,10 @@ export default function FormAppearanceSettings({
           value={appearance.form_layout || 'single'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, form_layout: value },
+              appearance: { 
+                ...appearance, 
+                form_layout: value as 'single' | 'two' 
+              },
             })
           }
         >
@@ -52,7 +55,10 @@ export default function FormAppearanceSettings({
           value={appearance.label_position || 'top'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, label_position: value },
+              appearance: { 
+                ...appearance, 
+                label_position: value as 'top' | 'left' | 'inline' 
+              },
             })
           }
         >
@@ -94,7 +100,10 @@ export default function FormAppearanceSettings({
           value={appearance.button_alignment || 'left'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, button_alignment: value },
+              appearance: { 
+                ...appearance, 
+                button_alignment: value as 'left' | 'center' | 'right' | 'full' 
+              },
             })
           }
         >

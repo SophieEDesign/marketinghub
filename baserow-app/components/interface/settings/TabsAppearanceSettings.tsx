@@ -31,7 +31,10 @@ export default function TabsAppearanceSettings({
           value={appearance.tab_style || 'default'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, tab_style: value },
+              appearance: { 
+                ...appearance, 
+                tab_style: value as 'default' | 'pills' | 'underline' 
+              },
             })
           }
         >
@@ -53,7 +56,10 @@ export default function TabsAppearanceSettings({
           value={appearance.tab_position || 'top'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, tab_position: value },
+              appearance: { 
+                ...appearance, 
+                tab_position: value as 'top' | 'left' | 'right' 
+              },
             })
           }
         >

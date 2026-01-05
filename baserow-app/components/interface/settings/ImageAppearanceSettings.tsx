@@ -31,7 +31,10 @@ export default function ImageAppearanceSettings({
           value={appearance.image_size || 'auto'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, image_size: value },
+              appearance: { 
+                ...appearance, 
+                image_size: value as 'auto' | 'contain' | 'cover' | 'small' | 'medium' | 'large' 
+              },
             })
           }
         >
@@ -56,7 +59,10 @@ export default function ImageAppearanceSettings({
           value={appearance.image_align || 'center'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, image_align: value },
+              appearance: { 
+                ...appearance, 
+                image_align: value as 'left' | 'center' | 'right' 
+              },
             })
           }
         >
@@ -78,7 +84,10 @@ export default function ImageAppearanceSettings({
           value={appearance.aspect_ratio || 'auto'}
           onValueChange={(value) =>
             onUpdate({
-              appearance: { ...appearance, aspect_ratio: value },
+              appearance: { 
+                ...appearance, 
+                aspect_ratio: value as 'auto' | '1:1' | '16:9' | '4:3' | '3:2' 
+              },
             })
           }
         >

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { saveBlockLayout, createBlock, deleteBlock } from '@/lib/pages/saveBlocks'
-import type { LayoutItem, PageBlock } from '@/lib/interface/types'
+import { validateBlockConfig, normalizeBlockConfig } from '@/lib/interface/block-validator'
+import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
 
 /**
  * GET /api/pages/[pageId]/blocks - Load blocks for a page
@@ -72,23 +73,39 @@ export async function PATCH(
       
       await Promise.all(
         blockUpdates.map(async (update: { id: string; config?: any }) => {
-          // Get current block config to merge properly
+          // Get current block to determine type
           const { data: currentBlock } = await supabase
             .from('view_blocks')
-            .select('config')
+            .select('type, config')
             .eq('id', update.id)
             .single()
 
+          if (!currentBlock) {
+            throw new Error(`Block ${update.id} not found`)
+          }
+
           // Merge configs - new config overrides existing
           const mergedConfig = {
-            ...(currentBlock?.config || {}),
+            ...(currentBlock.config || {}),
             ...(update.config || {}),
+          }
+
+          // Validate and normalize config
+          const normalizedConfig = normalizeBlockConfig(
+            currentBlock.type as BlockType,
+            mergedConfig
+          )
+
+          // Validate config (warn but don't fail - use normalized config)
+          const validation = validateBlockConfig(currentBlock.type as BlockType, normalizedConfig)
+          if (!validation.valid) {
+            console.warn(`Block ${update.id} config validation warnings:`, validation.errors)
           }
 
           return supabase
             .from('view_blocks')
             .update({
-              config: mergedConfig,
+              config: normalizedConfig,
               updated_at: new Date().toISOString(),
             })
             .eq('id', update.id)
@@ -123,6 +140,9 @@ export async function POST(
       )
     }
 
+    // Validate and normalize config before creating block
+    const normalizedConfig = normalizeBlockConfig(type as BlockType, config || {})
+    
     const block = await createBlock(
       params.pageId,
       type,
@@ -130,7 +150,7 @@ export async function POST(
       y || 0,
       w || 4,
       h || 4,
-      config || {}
+      normalizedConfig
     )
 
     // createBlock already returns a PageBlock, so we can return it directly

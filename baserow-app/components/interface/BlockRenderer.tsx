@@ -1,6 +1,7 @@
 "use client"
 
 import type { PageBlock } from "@/lib/interface/types"
+import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
 import RecordBlock from "./blocks/RecordBlock"
@@ -29,6 +30,13 @@ export default function BlockRenderer({
   onUpdate,
   isLocked = false,
 }: BlockRendererProps) {
+  // Normalize config to prevent crashes
+  const safeConfig = normalizeBlockConfig(block.type, block.config)
+  const safeBlock: PageBlock = {
+    ...block,
+    config: safeConfig,
+  }
+
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
     if (onUpdate) {
       onUpdate(block.id, updates)
@@ -38,19 +46,22 @@ export default function BlockRenderer({
   const renderBlock = () => {
     const canEdit = isEditing && !isLocked
     
+    // Check if config is complete enough to render
+    const isComplete = isBlockConfigComplete(block.type, safeConfig)
+    
     switch (block.type) {
       case "grid":
-        return <GridBlock block={block} isEditing={canEdit} />
+        return <GridBlock block={safeBlock} isEditing={canEdit} />
 
       case "form":
         return (
           <FormBlock
-            block={block}
+            block={safeBlock}
             isEditing={canEdit}
             onSubmit={async (data) => {
               // Handle form submission
               const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
-              const tableId = block.config?.table_id
+              const tableId = safeConfig.table_id
               if (tableId) {
                 const { data: table } = await supabase
                   .from("tables")
@@ -67,45 +78,45 @@ export default function BlockRenderer({
         )
 
       case "record":
-        return <RecordBlock block={block} isEditing={canEdit} />
+        return <RecordBlock block={safeBlock} isEditing={canEdit} />
 
       case "chart":
-        return <ChartBlock block={block} isEditing={canEdit} />
+        return <ChartBlock block={safeBlock} isEditing={canEdit} />
 
       case "kpi":
-        return <KPIBlock block={block} isEditing={canEdit} />
+        return <KPIBlock block={safeBlock} isEditing={canEdit} />
 
       case "text":
-        return <TextBlock block={block} isEditing={canEdit} />
+        return <TextBlock block={safeBlock} isEditing={canEdit} />
 
       case "table_snapshot":
-        return <TableSnapshotBlock block={block} isEditing={canEdit} />
+        return <TableSnapshotBlock block={safeBlock} isEditing={canEdit} />
 
       case "action":
-        return <ActionBlock block={block} isEditing={canEdit} />
+        return <ActionBlock block={safeBlock} isEditing={canEdit} />
 
       case "link_preview":
-        return <LinkPreviewBlock block={block} isEditing={canEdit} />
+        return <LinkPreviewBlock block={safeBlock} isEditing={canEdit} />
 
       case "image":
         return (
           <ImageBlock
-            block={block}
+            block={safeBlock}
             isEditing={canEdit}
             onUpdate={(updates) => handleUpdate(updates)}
           />
         )
 
       case "divider":
-        return <DividerBlock block={block} isEditing={canEdit} />
+        return <DividerBlock block={safeBlock} isEditing={canEdit} />
 
       case "button":
-        return <ButtonBlock block={block} isEditing={canEdit} />
+        return <ButtonBlock block={safeBlock} isEditing={canEdit} />
 
       case "tabs":
         return (
           <TabsBlock
-            block={block}
+            block={safeBlock}
             isEditing={canEdit}
             childBlocks={[]} // TODO: Pass actual child blocks from parent
           />
