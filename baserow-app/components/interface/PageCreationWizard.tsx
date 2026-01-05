@@ -219,21 +219,73 @@ export default function PageCreationWizard({
 
       switch (requiredAnchor) {
         case 'saved_view':
-          // For saved_view anchor, we store the table
-          // A SQL view will be auto-created from this table
-          saved_view_id = null // Will be auto-generated
+          // For saved_view anchor, create a view first
+          // Map page_type to view type
+          const viewTypeMap: Record<string, 'grid' | 'gallery' | 'kanban' | 'calendar' | 'timeline'> = {
+            'list': 'grid',
+            'gallery': 'gallery',
+            'kanban': 'kanban',
+            'calendar': 'calendar',
+            'timeline': 'timeline',
+            'record_review': 'grid', // record_review uses grid view
+          }
+          const viewType = viewTypeMap[pageType] || 'grid'
+          
+          // Create a view for this page
+          const { data: newView, error: viewError } = await supabase
+            .from('views')
+            .insert([
+              {
+                table_id: tableId,
+                name: `${pageName.trim()} View`,
+                type: viewType,
+                config: {},
+                access_level: 'authenticated',
+                owner_id: user?.id,
+              },
+            ])
+            .select()
+            .single()
+
+          if (viewError || !newView) {
+            throw new Error(`Failed to create view: ${viewError?.message || 'Unknown error'}`)
+          }
+
+          saved_view_id = newView.id
           break
         case 'dashboard':
-          // For dashboard, we'll set it to null initially
-          // The actual layout_id will be set to the page's own ID after creation
-          dashboard_layout_id = null
+          // For dashboard, generate a temporary UUID that we'll update to the page's ID after creation
+          // This satisfies the constraint that requires exactly one anchor
+          // We'll update it immediately after page creation
+          dashboard_layout_id = crypto.randomUUID()
           break
         case 'form':
           form_config_id = tableId && tableId.trim() ? tableId.trim() : null
           break
         case 'record':
-          // Record review pages also use tables
-          record_config_id = tableId && tableId.trim() ? tableId.trim() : null
+          // Record review pages use saved_view anchor (not record anchor)
+          // This case should not be hit since record_review maps to 'saved_view' anchor
+          // But keeping it for safety - create a view
+          const { data: recordView, error: recordViewError } = await supabase
+            .from('views')
+            .insert([
+              {
+                table_id: tableId,
+                name: `${pageName.trim()} View`,
+                type: 'grid',
+                config: {},
+                access_level: 'authenticated',
+                owner_id: user?.id,
+              },
+            ])
+            .select()
+            .single()
+
+          if (recordViewError || !recordView) {
+            throw new Error(`Failed to create view: ${recordViewError?.message || 'Unknown error'}`)
+          }
+
+          saved_view_id = recordView.id
           break
       }
 
@@ -245,7 +297,7 @@ export default function PageCreationWizard({
             name: pageName.trim(),
             page_type: pageType,
             base_table: base_table, // Store table selection
-            saved_view_id, // May be auto-generated from base_table
+            saved_view_id,
             dashboard_layout_id,
             form_config_id,
             record_config_id,
@@ -259,7 +311,7 @@ export default function PageCreationWizard({
 
       if (error) throw error
 
-      // For dashboard/overview pages, set dashboard_layout_id to the page's own ID (self-reference)
+      // For dashboard/overview pages, update dashboard_layout_id to the page's own ID (self-reference)
       // This allows the page to reference its own blocks in view_blocks table
       if ((requiredAnchor === 'dashboard' || pageType === 'overview') && page) {
         const { error: updateError } = await supabase
@@ -269,7 +321,7 @@ export default function PageCreationWizard({
         
         if (updateError) {
           console.error('Error updating dashboard_layout_id:', updateError)
-          // Don't throw - page was created successfully, this is just metadata
+          throw updateError // Throw error since this is required for dashboard pages
         }
       }
 

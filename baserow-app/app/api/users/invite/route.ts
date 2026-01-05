@@ -41,7 +41,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Use admin client to send invitation
-    const adminClient = createAdminClient()
+    let adminClient
+    try {
+      adminClient = createAdminClient()
+    } catch (error: any) {
+      console.error('Error creating admin client:', error)
+      
+      // Check if it's a missing service role key error
+      if (error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+        return NextResponse.json(
+          { 
+            error: 'Server configuration error: Service role key not configured. Please set SUPABASE_SERVICE_ROLE_KEY environment variable.',
+            details: 'Contact your administrator to configure user invitations.'
+          },
+          { status: 500 }
+        )
+      }
+      
+      return NextResponse.json(
+        { error: error.message || 'Failed to initialize admin client' },
+        { status: 500 }
+      )
+    }
     
     // Get the base URL for the redirect link
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
@@ -68,6 +89,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'A user with this email already exists' },
           { status: 400 }
+        )
+      }
+      
+      // Handle invalid API key error
+      if (inviteError.message?.includes('Invalid API key') || inviteError.message?.includes('JWT')) {
+        return NextResponse.json(
+          { 
+            error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
+            details: 'Contact your administrator to configure user invitations.'
+          },
+          { status: 500 }
         )
       }
 

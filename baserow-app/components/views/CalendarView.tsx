@@ -45,11 +45,14 @@ export default function CalendarView({
       return
     }
     
+    // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
+    const sanitizedTableId = tableId.split(':')[0]
+    
     setLoading(true)
     const { data, error } = await supabase
       .from("table_rows")
       .select("*")
-      .eq("table_id", tableId)
+      .eq("table_id", sanitizedTableId)
 
     if (error) {
       console.error("Error loading rows:", error)

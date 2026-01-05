@@ -9,7 +9,6 @@ import {
   Database,
   FileText,
   LayoutDashboard,
-  Zap,
   ChevronDown,
   ChevronUp,
   Upload,
@@ -17,7 +16,7 @@ import {
   Plus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Table, View, Automation } from "@/types/database"
+import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
   id: string
@@ -41,7 +40,6 @@ interface SidebarProps {
   views: Record<string, View[]>
   interfacePages: InterfacePage[]
   dashboards: Dashboard[]
-  automations: Automation[]
   userRole: "admin" | "editor" | "viewer" | null
   isCollapsed: boolean
   onToggleCollapse: () => void
@@ -52,7 +50,6 @@ export default function Sidebar({
   views,
   interfacePages,
   dashboards,
-  automations,
   userRole,
   isCollapsed,
   onToggleCollapse,
@@ -285,40 +282,6 @@ export default function Sidebar({
                 )
               })}
             </div>
-          </div>
-        )}
-
-        {/* Automations - Only for admin/editor */}
-        {userRole && userRole !== "viewer" && (
-          <div className="mb-4">
-            {!isCollapsed && (
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Automations
-              </div>
-            )}
-            {automations.length > 0 ? (
-              <div className="space-y-0.5">
-                {automations.map((automation) => {
-                  const isAutomationActive = isActive(`/automations/${automation.id}`)
-                  return (
-                    <SidebarItem
-                      key={automation.id}
-                      href={`/automations/${automation.id}`}
-                      icon={Zap}
-                      label={automation.name}
-                      active={isAutomationActive}
-                    />
-                  )
-                })}
-              </div>
-            ) : (
-              <SidebarItem
-                href="/automations"
-                icon={Zap}
-                label="Automations"
-                active={isActive("/automations")}
-              />
-            )}
           </div>
         )}
 

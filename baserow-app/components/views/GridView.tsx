@@ -108,12 +108,15 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       return
     }
 
+    // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
+    const sanitizedTableId = tableId.split(':')[0]
+
     setLoading(true)
     try {
       let query = supabase
         .from("table_rows")
         .select("*")
-        .eq("table_id", tableId)
+        .eq("table_id", sanitizedTableId)
         .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
 
       // Apply sorting

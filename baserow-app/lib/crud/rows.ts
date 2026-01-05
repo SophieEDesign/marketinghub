@@ -12,11 +12,14 @@ export async function getRows(tableId: string, options?: {
     return []
   }
 
+  // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
+  const sanitizedTableId = tableId.split(':')[0]
+
   const supabase = await createClient()
   let query = supabase
     .from('table_rows')
     .select('*')
-    .eq('table_id', tableId)
+    .eq('table_id', sanitizedTableId)
   
   if (options?.limit) {
     query = query.limit(options.limit)

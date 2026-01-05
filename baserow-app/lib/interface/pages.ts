@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { PageType, getPageTypeDefinition, validatePageConfig, validatePageAnchor } from './page-types'
+import { PageType, getPageTypeDefinition, validatePageConfig, validatePageAnchor, getRequiredAnchorType } from './page-types'
 import { PageConfig, getDefaultPageConfig } from './page-config'
 
 export interface InterfacePage {
@@ -122,6 +122,39 @@ export async function createInterfacePage(
   const defaultConfig = getDefaultPageConfig(pageType)
   const mergedConfig = { ...defaultConfig, ...config }
 
+  // Determine required anchor and set anchor fields
+  const requiredAnchor = getRequiredAnchorType(pageType)
+  let saved_view_id: string | null = null
+  let dashboard_layout_id: string | null = null
+  let form_config_id: string | null = null
+  let record_config_id: string | null = null
+
+  switch (requiredAnchor) {
+    case 'saved_view':
+      if (!sourceView) {
+        throw new Error(`${pageType} pages require a source view (saved_view_id)`)
+      }
+      saved_view_id = sourceView
+      break
+    case 'dashboard':
+      // Use temporary UUID that will be updated to page ID after creation
+      dashboard_layout_id = crypto.randomUUID()
+      break
+    case 'form':
+      if (!baseTable) {
+        throw new Error(`${pageType} pages require a base table (form_config_id)`)
+      }
+      form_config_id = baseTable
+      break
+    case 'record':
+      // record_review actually uses saved_view anchor, but handle this case defensively
+      if (!sourceView) {
+        throw new Error(`${pageType} pages require a source view`)
+      }
+      saved_view_id = sourceView
+      break
+  }
+
   const { data, error } = await supabase
     .from('interface_pages')
     .insert({
@@ -129,6 +162,10 @@ export async function createInterfacePage(
       page_type: pageType,
       source_view: sourceView,
       base_table: baseTable,
+      saved_view_id,
+      dashboard_layout_id,
+      form_config_id,
+      record_config_id,
       config: mergedConfig,
       group_id: groupId,
       order_index: 0,
@@ -137,6 +174,32 @@ export async function createInterfacePage(
     .single()
 
   if (error) throw error
+
+  // For dashboard/overview pages, update dashboard_layout_id to the page's own ID (self-reference)
+  if ((requiredAnchor === 'dashboard' || pageType === 'overview') && data) {
+    const { error: updateError } = await supabase
+      .from('interface_pages')
+      .update({ dashboard_layout_id: data.id })
+      .eq('id', data.id)
+    
+    if (updateError) {
+      throw new Error(`Failed to set dashboard layout: ${updateError.message}`)
+    }
+
+    // Return updated data
+    const { data: updatedData } = await supabase
+      .from('interface_pages')
+      .select('*')
+      .eq('id', data.id)
+      .single()
+
+    if (updatedData) {
+      return {
+        ...updatedData,
+        config: (updatedData.config || {}) as PageConfig,
+      }
+    }
+  }
 
   return {
     ...data,

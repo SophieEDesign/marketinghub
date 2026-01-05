@@ -26,26 +26,27 @@ export default function SettingsPermissionsTab() {
     try {
       const supabase = createClient()
       
-      // Load user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
+      // Load profiles (replaces user_roles)
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (rolesError) {
-        console.error('Error loading user roles:', rolesError)
+      if (profilesError) {
+        console.error('Error loading profiles:', profilesError)
         // If table doesn't exist, that's okay - show empty state
         setUsers([])
         return
       }
 
-      // Try to get user emails (this requires admin access or a different approach)
-      // For now, we'll just show the user IDs
-      const usersWithRoles: UserRole[] = (userRoles || []).map((role) => ({
-        id: role.id,
-        user_id: role.user_id,
-        role: role.role,
-        created_at: role.created_at,
+      // Map profiles to UserRole format
+      // Note: profiles uses 'admin'/'member' roles
+      // Map 'admin' -> 'admin', 'member' -> 'viewer' for display compatibility
+      const usersWithRoles: UserRole[] = (profiles || []).map((profile) => ({
+        id: profile.id,
+        user_id: profile.user_id,
+        role: profile.role === 'admin' ? 'admin' : 'viewer',
+        created_at: profile.created_at,
       }))
 
       setUsers(usersWithRoles)
