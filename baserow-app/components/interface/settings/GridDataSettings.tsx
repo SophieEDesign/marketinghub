@@ -12,6 +12,7 @@ import {
 import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch } from "lucide-react"
 import type { BlockConfig, ViewType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
+import type { FieldType } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
 
 interface GridDataSettingsProps {
@@ -28,7 +29,7 @@ interface ViewTypeOption {
   label: string
   icon: React.ComponentType<{ className?: string }>
   description: string
-  requiredFields: string[] // Field types required for this view
+  requiredFields: FieldType[] // Field types required for this view
 }
 
 const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
@@ -51,7 +52,7 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     label: 'Calendar',
     icon: Calendar,
     description: 'Month/week calendar view',
-    requiredFields: ['date', 'datetime'],
+    requiredFields: ['date'] as FieldType[],
   },
   {
     type: 'gallery',
@@ -65,7 +66,7 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     label: 'Timeline',
     icon: GitBranch,
     description: 'Chronological timeline view',
-    requiredFields: ['date', 'datetime'],
+    requiredFields: ['date'] as FieldType[],
   },
 ]
 
@@ -104,11 +105,11 @@ export default function GridDataSettings({
 
   // Determine compatible view types based on available fields
   const getCompatibleViewTypes = (): ViewType[] => {
-    const fieldTypes = new Set(fields.map(f => f.type))
+    const fieldTypes = new Set<FieldType>(fields.map(f => f.type as FieldType))
     
     return VIEW_TYPE_OPTIONS.filter(option => {
       if (option.requiredFields.length === 0) return true
-      return option.requiredFields.some(type => fieldTypes.has(type))
+      return option.requiredFields.some(type => fieldTypes.has(type as FieldType))
     }).map(option => option.type)
   }
 
