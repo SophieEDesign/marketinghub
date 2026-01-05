@@ -81,11 +81,29 @@ export default function InterfaceDetailDrawer({
   const loadInterfaceDetails = useCallback(async () => {
     try {
       const supabase = createClient()
+      
+      // Try interface_pages first (matches sidebar)
+      const { data: page } = await supabase
+        .from('interface_pages')
+        .select('name, config, group_id, is_admin_only')
+        .eq('id', iface.id)
+        .maybeSingle()
+
+      if (page) {
+        setName(page.name)
+        setIcon(page.config?.settings?.icon || '')
+        setDescription(page.config?.description || '')
+        setIsAdminOnly(page.is_admin_only || false)
+        setGroup(page.group_id || '')
+        return
+      }
+
+      // Fallback to views table
       const { data: view } = await supabase
         .from('views')
         .select('name, config, group_id, is_admin_only')
         .eq('id', iface.id)
-        .single()
+        .maybeSingle()
 
       if (view) {
         setName(view.name)
@@ -102,15 +120,19 @@ export default function InterfaceDetailDrawer({
   const loadGroups = useCallback(async () => {
     try {
       const supabase = createClient()
-      // Groups are stored as views with type='group' or we can use group_id from views
-      // For now, let's load all interface views and extract unique groups
-      const { data: groupViews } = await supabase
-        .from('views')
+      
+      // Try interface_groups first (matches sidebar)
+      const { data: groupsData } = await supabase
+        .from('interface_groups')
         .select('id, name')
-        .eq('type', 'interface')
-        .not('group_id', 'is', null)
+        .order('order_index', { ascending: true })
 
-      // Also get unique group_ids
+      if (groupsData && groupsData.length > 0) {
+        setGroups(groupsData.map(g => ({ id: g.id, name: g.name })))
+        return
+      }
+
+      // Fallback to old system: groups stored as views
       const { data: allInterfaces } = await supabase
         .from('views')
         .select('group_id')
@@ -120,13 +142,13 @@ export default function InterfaceDetailDrawer({
       const groupIds = [...new Set(allInterfaces?.map(v => v.group_id).filter(Boolean) || [])]
       
       if (groupIds.length > 0) {
-        const { data: groupsData } = await supabase
+        const { data: groupsDataOld } = await supabase
           .from('views')
           .select('id, name')
           .in('id', groupIds)
 
-        if (groupsData) {
-          setGroups(groupsData.map(g => ({ id: g.id, name: g.name })))
+        if (groupsDataOld) {
+          setGroups(groupsDataOld.map(g => ({ id: g.id, name: g.name })))
         }
       }
     } catch (error) {
@@ -207,7 +229,13 @@ export default function InterfaceDetailDrawer({
     try {
       const supabase = createClient()
       
-      // Update view
+      // Check if page exists in interface_pages table (matches sidebar)
+      const { data: pageData, error: checkError } = await supabase
+        .from('interface_pages')
+        .select('id')
+        .eq('id', iface.id)
+        .maybeSingle()
+
       const config: any = {}
       if (icon) {
         config.settings = { ...config.settings, icon }
@@ -216,17 +244,33 @@ export default function InterfaceDetailDrawer({
         config.description = description
       }
 
-      const { error: updateError } = await supabase
-        .from('views')
-        .update({
-          name,
-          group_id: group || null,
-          is_admin_only: isAdminOnly,
-          config,
-        })
-        .eq('id', iface.id)
+      if (!checkError && pageData) {
+        // Update interface_pages table
+        const { error: updateError } = await supabase
+          .from('interface_pages')
+          .update({
+            name,
+            group_id: group || null,
+            is_admin_only: isAdminOnly,
+            config,
+          })
+          .eq('id', iface.id)
 
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      } else {
+        // Fallback: update views table
+        const { error: updateError } = await supabase
+          .from('views')
+          .update({
+            name,
+            group_id: group || null,
+            is_admin_only: isAdminOnly,
+            config,
+          })
+          .eq('id', iface.id)
+
+        if (updateError) throw updateError
+      }
 
       // Update default interface
       if (isDefault) {

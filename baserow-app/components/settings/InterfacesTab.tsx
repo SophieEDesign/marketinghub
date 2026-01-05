@@ -44,16 +44,16 @@ export default function InterfacesTab() {
     try {
       const supabase = createClient()
       
-      // Try new interfaces table first
-      const { data: interfacesData, error: interfacesError } = await supabase
-        .from('interfaces')
-        .select('id, name, category_id, is_default, created_at, updated_at')
-        .order('is_default', { ascending: false })
+      // Try interface_pages table first (matches sidebar)
+      const { data: pagesData, error: pagesError } = await supabase
+        .from('interface_pages')
+        .select('id, name, group_id, order_index, is_admin_only, created_at, updated_at')
+        .order('order_index', { ascending: true })
         .order('created_at', { ascending: true })
 
-      if (!interfacesError && interfacesData && interfacesData.length > 0) {
-        // New system: use interfaces table
-        await loadInterfacesFromNewSystem(interfacesData)
+      if (!pagesError && pagesData && pagesData.length > 0) {
+        // New system: use interface_pages table (matches sidebar)
+        await loadInterfacesFromPagesTable(pagesData)
         return
       }
 
@@ -67,77 +67,54 @@ export default function InterfacesTab() {
     }
   }
 
-  async function loadInterfacesFromNewSystem(interfacesData: any[]) {
+  async function loadInterfacesFromPagesTable(pagesData: any[]) {
     const supabase = createClient()
     
-    // Load categories
-    const categoryIds = [...new Set(interfacesData.map(i => i.category_id).filter(Boolean))]
-    const categoryMap = new Map<string, { id: string; name: string }>()
+    // Load interface groups (matches sidebar)
+    const groupIds = [...new Set(pagesData.map(p => p.group_id).filter(Boolean))]
+    const groupMap = new Map<string, { id: string; name: string }>()
     
-    if (categoryIds.length > 0) {
-      const { data: categoriesData } = await supabase
-        .from('interface_categories')
+    if (groupIds.length > 0) {
+      const { data: groupsData } = await supabase
+        .from('interface_groups')
         .select('id, name')
-        .in('id', categoryIds)
+        .in('id', groupIds)
 
-      categoriesData?.forEach(c => {
-        categoryMap.set(c.id, { id: c.id, name: c.name })
+      groupsData?.forEach(g => {
+        groupMap.set(g.id, { id: g.id, name: g.name })
       })
     }
 
-    // Load permissions for all interfaces
-    const interfaceIds = interfacesData.map(i => i.id)
-    const { data: permissionsData } = await supabase
-      .from('interface_permissions')
-      .select('interface_id, role')
-      .in('interface_id', interfaceIds)
-
-    // Build permission map: interface is admin-only if it has 'admin' permission
-    // and doesn't have 'staff' or 'member' permissions
-    const permissionMap = new Map<string, { hasAdmin: boolean; hasOtherRoles: boolean }>()
-    permissionsData?.forEach(p => {
-      const current = permissionMap.get(p.interface_id) || { hasAdmin: false, hasOtherRoles: false }
-      if (p.role === 'admin') {
-        current.hasAdmin = true
-      } else if (p.role === 'staff' || p.role === 'member') {
-        current.hasOtherRoles = true
-      }
-      permissionMap.set(p.interface_id, current)
-    })
-
-    // Group interfaces
+    // Group pages by group_id (matches sidebar logic)
     const grouped: InterfaceGroup[] = []
     const uncategorized: Interface[] = []
 
-    interfacesData.forEach((iface) => {
-      const permissions = permissionMap.get(iface.id)
-      // Admin-only if it has admin permission but no other roles
-      const isAdminOnly = permissions?.hasAdmin === true && permissions?.hasOtherRoles === false
-      const categoryId = iface.category_id
-      const categoryName = categoryId ? categoryMap.get(categoryId)?.name || null : null
+    pagesData.forEach((page) => {
+      const groupId = page.group_id
+      const groupName = groupId ? groupMap.get(groupId)?.name || null : null
 
       const interfaceData: Interface = {
-        id: iface.id,
-        name: iface.name,
+        id: page.id,
+        name: page.name,
         type: 'interface',
-        group_id: categoryId,
-        category_id: categoryId,
-        group_name: categoryName,
-        category_name: categoryName,
-        order_index: 0, // New system doesn't use order_index
-        is_admin_only: isAdminOnly,
-        is_default: iface.is_default || false,
-        created_at: iface.created_at,
+        group_id: groupId,
+        category_id: groupId, // Use group_id as category_id for compatibility
+        group_name: groupName,
+        category_name: groupName,
+        order_index: page.order_index || 0,
+        is_admin_only: page.is_admin_only || false,
+        is_default: false, // interface_pages doesn't have is_default
+        created_at: page.created_at,
       }
 
-      if (categoryId && categoryMap.has(categoryId)) {
-        const group = grouped.find(g => g.id === categoryId)
+      if (groupId && groupMap.has(groupId)) {
+        const group = grouped.find(g => g.id === groupId)
         if (group) {
           group.interfaces.push(interfaceData)
         } else {
           grouped.push({
-            id: categoryId,
-            name: categoryMap.get(categoryId)!.name,
+            id: groupId,
+            name: groupMap.get(groupId)!.name,
             interfaces: [interfaceData],
           })
         }
@@ -146,25 +123,17 @@ export default function InterfacesTab() {
       }
     })
 
-    // Sort interfaces within each group
+    // Sort interfaces within each group by order_index
     grouped.forEach(group => {
-      group.interfaces.sort((a, b) => {
-        if (a.is_default) return -1
-        if (b.is_default) return 1
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      })
+      group.interfaces.sort((a, b) => a.order_index - b.order_index)
     })
-    uncategorized.sort((a, b) => {
-      if (a.is_default) return -1
-      if (b.is_default) return 1
-      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    })
+    uncategorized.sort((a, b) => a.order_index - b.order_index)
 
-    // Add uncategorized group if needed
+    // Add "Ungrouped" group if needed (matches sidebar)
     if (uncategorized.length > 0) {
       grouped.push({
-        id: 'uncategorized',
-        name: 'Uncategorized',
+        id: 'ungrouped-system-virtual',
+        name: 'Ungrouped',
         interfaces: uncategorized,
       })
     }
@@ -281,47 +250,60 @@ export default function InterfacesTab() {
     try {
       const supabase = createClient()
       
-      // Check if interface exists in new interfaces table
-      const { data: interfaceData, error: checkError } = await supabase
-        .from('interfaces')
+      // Check if page exists in interface_pages table (matches sidebar)
+      const { data: pageData, error: checkError } = await supabase
+        .from('interface_pages')
         .select('id')
         .eq('id', interfaceId)
         .maybeSingle()
 
-      if (!checkError && interfaceData) {
-        // New system: use interface_permissions table
-        if (!isAdminOnly) {
-          // Enable admin-only: add admin permission and remove other permissions
-          // First, remove all existing permissions
-          await supabase
-            .from('interface_permissions')
-            .delete()
-            .eq('interface_id', interfaceId)
-
-          // Then add admin permission
-          const { error: insertError } = await supabase
-            .from('interface_permissions')
-            .insert({ interface_id: interfaceId, role: 'admin' })
-
-          if (insertError) throw insertError
-        } else {
-          // Disable admin-only: remove admin permission (makes it public)
-          const { error: deleteError } = await supabase
-            .from('interface_permissions')
-            .delete()
-            .eq('interface_id', interfaceId)
-            .eq('role', 'admin')
-
-          if (deleteError) throw deleteError
-        }
-      } else {
-        // Old system: update views table
-        const { error } = await supabase
-          .from('views')
+      if (!checkError && pageData) {
+        // New system: update interface_pages table directly
+        const { error: updateError } = await supabase
+          .from('interface_pages')
           .update({ is_admin_only: !isAdminOnly })
           .eq('id', interfaceId)
 
-        if (error) throw error
+        if (updateError) throw updateError
+      } else {
+        // Fallback: check interfaces table
+        const { data: interfaceData, error: interfaceCheckError } = await supabase
+          .from('interfaces')
+          .select('id')
+          .eq('id', interfaceId)
+          .maybeSingle()
+
+        if (!interfaceCheckError && interfaceData) {
+          // Use interface_permissions table
+          if (!isAdminOnly) {
+            await supabase
+              .from('interface_permissions')
+              .delete()
+              .eq('interface_id', interfaceId)
+
+            const { error: insertError } = await supabase
+              .from('interface_permissions')
+              .insert({ interface_id: interfaceId, role: 'admin' })
+
+            if (insertError) throw insertError
+          } else {
+            const { error: deleteError } = await supabase
+              .from('interface_permissions')
+              .delete()
+              .eq('interface_id', interfaceId)
+              .eq('role', 'admin')
+
+            if (deleteError) throw deleteError
+          }
+        } else {
+          // Old system: update views table
+          const { error } = await supabase
+            .from('views')
+            .update({ is_admin_only: !isAdminOnly })
+            .eq('id', interfaceId)
+
+          if (error) throw error
+        }
       }
 
       loadInterfaces()
@@ -335,7 +317,7 @@ export default function InterfacesTab() {
     try {
       const supabase = createClient()
       
-      // Check if interface exists in new interfaces table
+      // interface_pages doesn't have is_default, so check interfaces table
       const { data: interfaceData, error: checkError } = await supabase
         .from('interfaces')
         .select('id')
@@ -416,14 +398,14 @@ export default function InterfacesTab() {
         <CardHeader>
           <CardTitle>Interface Access & Sharing</CardTitle>
           <CardDescription>
-            Manage who can see each interface. Interfaces are containers that group related pages together.
+            Manage who can see each interface page. Pages are organized into groups in the sidebar.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg">
-              <p className="text-sm mb-2">No interfaces found</p>
-              <p className="text-xs">Create your first Interface to group pages together</p>
+              <p className="text-sm mb-2">No interface pages found</p>
+              <p className="text-xs">Create your first page from the sidebar</p>
             </div>
           ) : (
             <div className="space-y-6">

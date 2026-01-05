@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Edit2 } from "lucide-react"
+import { Edit2, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
@@ -262,14 +262,35 @@ export default function InterfacePageClient({
                 Done Editing
               </Button>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEditClick}
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit Page
-              </Button>
+              <>
+                {isDashboardOrOverview ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => enterBlockEdit()}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit interface
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEditClick}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit Page
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDisplaySettingsOpen(true)}
+                  title="Page Settings"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </>
             )}
           </div>
         </div>
