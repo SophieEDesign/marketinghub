@@ -173,7 +173,7 @@ export default function KPIDataSettings({
                   <SelectValue placeholder="Select date field" />
                 </SelectTrigger>
                 <SelectContent>
-                  {fields.filter(f => f.type === 'date' || f.type === 'datetime').map((field) => (
+                  {fields.filter(f => f.type === 'date').map((field) => (
                     <SelectItem key={field.id} value={field.name}>
                       {field.name}
                     </SelectItem>
