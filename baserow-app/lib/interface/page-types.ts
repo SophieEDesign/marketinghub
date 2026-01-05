@@ -13,7 +13,7 @@ export type PageType =
   | 'dashboard'
   | 'overview'
   | 'record_review'
-  | 'blank'
+  // 'blank' removed - invalid page type, pages must have an anchor
 
 export interface PageTypeDefinition {
   type: PageType
@@ -107,15 +107,7 @@ export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
     supportsGridToggle: true,
     allowsInlineEditing: false,
   },
-  blank: {
-    type: 'blank',
-    label: 'Blank',
-    description: 'Clean canvas with no assumptions',
-    requiresSourceView: false,
-    requiresBaseTable: false,
-    supportsGridToggle: false,
-    allowsInlineEditing: false,
-  },
+  // blank removed - invalid page type
 }
 
 export function getPageTypeDefinition(type: PageType): PageTypeDefinition {
@@ -141,6 +133,78 @@ export function validatePageConfig(
       valid: false,
       error: `${definition.label} page type requires a base table`,
     }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Get the required anchor type for a page type
+ */
+export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashboard' | 'form' | 'record' {
+  switch (pageType) {
+    case 'list':
+    case 'gallery':
+    case 'kanban':
+    case 'calendar':
+    case 'timeline':
+    case 'record_review':
+      return 'saved_view'
+    case 'dashboard':
+    case 'overview':
+      return 'dashboard'
+    case 'form':
+      return 'form'
+    default:
+      throw new Error(`Unknown page type: ${pageType}`)
+  }
+}
+
+/**
+ * Validate that a page has the correct anchor for its type
+ */
+export function validatePageAnchor(
+  pageType: PageType,
+  savedViewId: string | null,
+  dashboardLayoutId: string | null,
+  formConfigId: string | null,
+  recordConfigId: string | null
+): { valid: boolean; error?: string } {
+  const requiredAnchor = getRequiredAnchorType(pageType)
+  
+  switch (requiredAnchor) {
+    case 'saved_view':
+      if (!savedViewId) {
+        return { valid: false, error: `${pageType} pages require a saved view` }
+      }
+      break
+    case 'dashboard':
+      if (!dashboardLayoutId) {
+        return { valid: false, error: `${pageType} pages require a dashboard layout` }
+      }
+      break
+    case 'form':
+      if (!formConfigId) {
+        return { valid: false, error: `${pageType} pages require form configuration` }
+      }
+      break
+    case 'record':
+      if (!recordConfigId) {
+        return { valid: false, error: `${pageType} pages require record configuration` }
+      }
+      break
+  }
+
+  // Ensure only one anchor is set
+  const anchorCount = [
+    savedViewId,
+    dashboardLayoutId,
+    formConfigId,
+    recordConfigId,
+  ].filter(Boolean).length
+
+  if (anchorCount !== 1) {
+    return { valid: false, error: 'Page must have exactly one anchor' }
   }
 
   return { valid: true }

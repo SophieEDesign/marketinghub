@@ -62,16 +62,16 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
     setError(null)
 
     try {
-      const supabase = createClient()
+    const supabase = createClient()
 
-      // Get table name
-      const { data: table } = await supabase
-        .from("tables")
-        .select("supabase_table")
-        .eq("id", tableId)
-        .single()
+    // Get table name
+    const { data: table } = await supabase
+      .from("tables")
+      .select("supabase_table")
+      .eq("id", tableId)
+      .single()
 
-      if (!table?.supabase_table) {
+    if (!table?.supabase_table) {
         throw new Error("Table not found")
       }
 
@@ -303,7 +303,7 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
   }
 
   if (chartData.length === 0) {
-    return (
+  return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
           <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />

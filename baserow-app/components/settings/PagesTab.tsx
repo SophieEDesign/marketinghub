@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Copy, Trash2, FileText, Grid, Calendar, Columns, FileEdit } from 'lucide-react'
+import { Plus, Edit, Copy, Trash2, FileText, Grid, Calendar, Columns, FileEdit, Settings } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import InterfacePageSettingsDrawer from '@/components/interface/InterfacePageSettingsDrawer'
+import PageCreationWizard from '@/components/interface/PageCreationWizard'
+import type { InterfacePage } from '@/lib/interface/pages'
 
 interface Page {
   id: string
@@ -33,6 +36,8 @@ interface Page {
   tableName?: string
   updated_at?: string
   created_at?: string
+  page_type?: string // For interface_pages
+  is_interface_page?: boolean // Flag to distinguish interface_pages from views
 }
 
 export default function SettingsPagesTab() {
@@ -50,6 +55,8 @@ export default function SettingsPagesTab() {
   const [newPageIsAdminOnly, setNewPageIsAdminOnly] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [creating, setCreating] = useState(false)
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
+  const [selectedPageForSettings, setSelectedPageForSettings] = useState<string | null>(null)
 
   useEffect(() => {
     loadPages()
@@ -80,17 +87,17 @@ export default function SettingsPagesTab() {
     try {
       const supabase = createClient()
       
-      // Load all views from views table (including interface pages with type='interface')
+      // Load interface pages from interface_pages table (new system)
+      const { data: interfacePages, error: interfacePagesError } = await supabase
+        .from('interface_pages')
+        .select('id, name, page_type, updated_at, created_at')
+        .order('updated_at', { ascending: false })
+
+      // Load all views from views table (including old interface pages with type='interface')
       const { data: views, error: viewsError } = await supabase
         .from('views')
         .select('id, name, type, table_id, updated_at, created_at')
         .order('updated_at', { ascending: false })
-
-      if (viewsError) {
-        console.error('Error loading views:', viewsError)
-        setPages([])
-        return
-      }
 
       // Load table names separately
       const tableIds = views?.map(v => v.table_id).filter(Boolean) || []
@@ -106,7 +113,21 @@ export default function SettingsPagesTab() {
         }
       }
 
-      const allPages: Page[] = (views || []).map((view: any) => {
+      // Convert interface_pages to Page format
+      const interfacePagesList: Page[] = (interfacePages || []).map((page: any) => ({
+        id: page.id,
+        name: page.name,
+        type: 'interface' as const,
+        page_type: page.page_type,
+        is_interface_page: true,
+        tableId: null,
+        tableName: undefined,
+        updated_at: page.updated_at,
+        created_at: page.created_at,
+      }))
+
+      // Convert views to Page format
+      const viewsList: Page[] = (views || []).map((view: any) => {
         const tableName = view.table_id ? tableMap.get(view.table_id) : undefined
         // For non-interface views, include table name in display name if it's generic
         let displayName = view.name
@@ -116,35 +137,36 @@ export default function SettingsPagesTab() {
         
         return {
           id: view.id,
-          name: view.name, // Keep original name for editing
-          displayName: displayName, // Display name with table info
+          name: view.name,
+          displayName: displayName,
           type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
           tableId: view.table_id,
           tableName: tableName,
+          is_interface_page: false,
           updated_at: view.updated_at,
           created_at: view.created_at,
         }
       })
 
       // Separate interfaces and views
-      const interfaces = allPages.filter(p => p.type === 'interface')
-      const viewsList = allPages.filter(p => p.type !== 'interface')
+      const allInterfaces = [...interfacePagesList, ...viewsList.filter(p => p.type === 'interface')]
+      const tableViews = viewsList.filter(p => p.type !== 'interface')
       
       // Sort each group by updated_at descending
-      interfaces.sort((a, b) => {
+      allInterfaces.sort((a, b) => {
         const aDate = a.updated_at || a.created_at || ''
         const bDate = b.updated_at || b.created_at || ''
         return bDate.localeCompare(aDate)
       })
       
-      viewsList.sort((a, b) => {
+      tableViews.sort((a, b) => {
         const aDate = a.updated_at || a.created_at || ''
         const bDate = b.updated_at || b.created_at || ''
         return bDate.localeCompare(aDate)
       })
 
       // Combine: interfaces first, then views
-      setPages([...interfaces, ...viewsList])
+      setPages([...allInterfaces, ...tableViews])
     } catch (error) {
       console.error('Error loading pages:', error)
     } finally {
@@ -256,6 +278,13 @@ export default function SettingsPagesTab() {
       if (view?.table_id) {
         router.push(`/tables/${view.table_id}/views/${page.id}`)
       }
+    }
+  }
+
+  function handlePageSettings(page: Page) {
+    if (page.is_interface_page) {
+      setSelectedPageForSettings(page.id)
+      setSettingsDrawerOpen(true)
     }
   }
 
@@ -430,7 +459,6 @@ export default function SettingsPagesTab() {
               </div>
               <div className="flex items-center gap-2">
                 <Button onClick={() => {
-                  setNewPageType('interface')
                   setNewPageOpen(true)
                 }}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -484,6 +512,16 @@ export default function SettingsPagesTab() {
                           {formatDate(page.updated_at)}
                         </div>
                         <div className="col-span-2 flex items-center justify-end gap-1">
+                          {page.is_interface_page && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handlePageSettings(page)}
+                              title="Page Settings"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -593,8 +631,16 @@ export default function SettingsPagesTab() {
         </CardContent>
       </Card>
 
-      {/* New Page Modal */}
-      <Dialog open={newPageOpen} onOpenChange={setNewPageOpen}>
+      {/* Page Creation Wizard */}
+      <PageCreationWizard
+        open={newPageOpen}
+        onOpenChange={setNewPageOpen}
+        defaultGroupId={null}
+      />
+
+      {/* Legacy New Page Modal - Keep for backward compatibility but hide */}
+      {false && (
+      <Dialog open={false} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Create New Page</DialogTitle>
@@ -713,6 +759,24 @@ export default function SettingsPagesTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Page Settings Drawer for Interface Pages */}
+      {selectedPageForSettings && (
+        <InterfacePageSettingsDrawer
+          pageId={selectedPageForSettings}
+          isOpen={settingsDrawerOpen}
+          onClose={() => {
+            setSettingsDrawerOpen(false)
+            setSelectedPageForSettings(null)
+          }}
+          onUpdate={(updatedPage: InterfacePage) => {
+            // Reload pages after update
+            loadPages()
+            setSettingsDrawerOpen(false)
+            setSelectedPageForSettings(null)
+          }}
+        />
+      )}
     </>
   )
 }

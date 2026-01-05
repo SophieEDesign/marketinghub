@@ -140,11 +140,11 @@ export default function PageRenderer({
           />
         )
 
-      case 'blank':
       default:
+        // Invalid page type or missing configuration
         return (
           <div className="p-4">
-            <BlankView />
+            <InvalidPageState page={page} />
           </div>
         )
     }
@@ -214,10 +214,24 @@ function DashboardView({ page, data, config }: { page: InterfacePage; data: any[
   )
 }
 
-function BlankView() {
+function InvalidPageState({ page }: { page: InterfacePage }) {
   return (
-    <div className="flex items-center justify-center h-full text-gray-400">
-      Blank page
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center max-w-md p-8">
+        <div className="text-4xl mb-4">⚠️</div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Page Configuration Required
+        </h3>
+        <p className="text-sm text-gray-500 mb-4">
+          This page is missing required configuration. Please configure it in Settings.
+        </p>
+        <a
+          href="/settings?tab=pages"
+          className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+        >
+          Go to Settings
+        </a>
+      </div>
     </div>
   )
 }

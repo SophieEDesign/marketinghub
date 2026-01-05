@@ -4,15 +4,15 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { PageType, getPageTypeDefinition, validatePageConfig } from './page-types'
+import { PageType, getPageTypeDefinition, validatePageConfig, validatePageAnchor } from './page-types'
 import { PageConfig, getDefaultPageConfig } from './page-config'
 
 export interface InterfacePage {
   id: string
   name: string
   page_type: PageType
-  source_view: string | null
-  base_table: string | null
+  source_view: string | null // Deprecated: use saved_view_id instead
+  base_table: string | null // Deprecated: use form_config_id instead
   config: PageConfig
   group_id: string | null
   order_index: number
@@ -20,6 +20,29 @@ export interface InterfacePage {
   updated_at: string
   created_by: string | null
   is_admin_only: boolean
+  // Page anchors - exactly one must be set
+  saved_view_id: string | null // For list/gallery/kanban/calendar/timeline/record_review
+  dashboard_layout_id: string | null // For dashboard/overview (references view_blocks.view_id)
+  form_config_id: string | null // For form pages
+  record_config_id: string | null // For record_review pages
+}
+
+/**
+ * Get the anchor type for a page
+ */
+export function getPageAnchor(page: InterfacePage): 'saved_view' | 'dashboard' | 'form' | 'record' | null {
+  if (page.saved_view_id) return 'saved_view'
+  if (page.dashboard_layout_id) return 'dashboard'
+  if (page.form_config_id) return 'form'
+  if (page.record_config_id) return 'record'
+  return null
+}
+
+/**
+ * Check if a page has a valid anchor
+ */
+export function hasPageAnchor(page: InterfacePage): boolean {
+  return getPageAnchor(page) !== null
 }
 
 /**

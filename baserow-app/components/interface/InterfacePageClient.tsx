@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Edit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
 import type { InterfacePage } from "@/lib/interface/pages"
+import { hasPageAnchor, getPageAnchor } from "@/lib/interface/pages"
 import PageRenderer from "./PageRenderer"
-import { getPageTypeDefinition } from "@/lib/interface/page-types"
+import PageSetupState from "./PageSetupState"
+import { getPageTypeDefinition, getRequiredAnchorType } from "@/lib/interface/page-types"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -26,6 +28,7 @@ export default function InterfacePageClient({
   isAdmin = false
 }: InterfacePageClientProps) {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
   const [data, setData] = useState<any[]>(initialData)
   const [loading, setLoading] = useState(!initialPage)
@@ -157,15 +160,42 @@ export default function InterfacePageClient({
 
   const isViewer = searchParams.get("view") === "true"
   const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview'
+  
+  // Check if page has a valid anchor
+  const pageHasAnchor = page ? hasPageAnchor(page) : false
+  const pageAnchor = page ? getPageAnchor(page) : null
+  const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
 
-  // Edit page opens block editing (InterfaceBuilder) for dashboard/overview pages
-  // For other page types, block editing isn't available yet
+  // Edit page behavior based on anchor type
   const handleEditClick = () => {
-    if (isDashboardOrOverview) {
-      setIsEditing(true)
-    } else {
-      // For non-dashboard/overview pages, show message that block editing isn't available
-      alert('Block editing is currently only available for Dashboard and Overview page types.')
+    if (!page) return
+    
+    // If page doesn't have anchor, redirect to setup
+    if (!pageHasAnchor) {
+      router.push(`/settings?tab=pages&page=${page.id}&action=configure`)
+      return
+    }
+
+    // Open appropriate editor based on anchor type
+    switch (pageAnchor) {
+      case 'dashboard':
+        setIsEditing(true)
+        break
+      case 'saved_view':
+        // Open view settings panel (to be implemented)
+        router.push(`/tables/${page.config?.table_id || ''}/views/${page.saved_view_id}?edit=true`)
+        break
+      case 'form':
+        // Open form builder (to be implemented)
+        setIsEditing(true)
+        break
+      case 'record':
+        // Open record config panel (to be implemented)
+        setIsEditing(true)
+        break
+      default:
+        // Fallback: try to open settings
+        router.push(`/settings?tab=pages&page=${page.id}&action=configure`)
     }
   }
 
@@ -221,7 +251,10 @@ export default function InterfacePageClient({
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        {isDashboardOrOverview && isEditing ? (
+        {/* Show setup state if page doesn't have anchor */}
+        {page && !pageHasAnchor ? (
+          <PageSetupState page={page} isAdmin={isAdmin} />
+        ) : isDashboardOrOverview && isEditing ? (
           // For dashboard/overview in edit mode, use InterfaceBuilder
           blocksLoading ? (
             <div className="h-full flex items-center justify-center">
