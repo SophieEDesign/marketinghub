@@ -80,11 +80,44 @@ export default async function WorkspaceShellWrapper({
     console.warn('Error loading interface groups:', error)
   }
 
-  // Fetch interface pages from views table where type='interface'
+  // Fetch interface pages from both old (views) and new (interface_pages) tables
   // Filter by permissions: admin sees all, member sees only non-admin-only interfaces
   let interfacePages: any[] = []
   try {
-    let interfaceQuery = supabase
+    // Load from new interface_pages table
+    let newPagesQuery = supabase
+      .from('interface_pages')
+      .select('id, name, page_type, group_id, order_index, created_at, updated_at, created_by, is_admin_only')
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: false })
+    
+    // Filter out admin-only interfaces for non-admin users
+    if (!userIsAdmin) {
+      newPagesQuery = newPagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+    }
+    
+    const { data: newPagesData, error: newPagesError } = await newPagesQuery
+    
+    if (!newPagesError && newPagesData) {
+      interfacePages = newPagesData.map((page) => ({
+        id: page.id,
+        name: page.name,
+        description: undefined,
+        config: {},
+        access_level: 'authenticated',
+        allowed_roles: undefined,
+        owner_id: page.created_by || undefined,
+        created_at: page.created_at,
+        updated_at: page.updated_at,
+        group_id: page.group_id || null,
+        order_index: page.order_index || 0,
+        is_admin_only: page.is_admin_only || false,
+        is_new_system: true, // Flag to indicate this is from new system
+      }))
+    }
+
+    // Also load from old views table for backward compatibility
+    let oldPagesQuery = supabase
       .from('views')
       .select('id, name, description, table_id, type, access_level, allowed_roles, created_at, updated_at, owner_id, group_id, order_index, is_admin_only')
       .eq('type', 'interface')
@@ -93,26 +126,33 @@ export default async function WorkspaceShellWrapper({
     
     // Filter out admin-only interfaces for non-admin users
     if (!userIsAdmin) {
-      interfaceQuery = interfaceQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+      oldPagesQuery = oldPagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
     }
     
-    const { data: interfacePagesData, error: pagesError } = await interfaceQuery
+    const { data: oldPagesData, error: oldPagesError } = await oldPagesQuery
     
-    if (!pagesError && interfacePagesData) {
-      interfacePages = interfacePagesData.map((view) => ({
-        id: view.id,
-        name: view.name,
-        description: view.description || undefined,
-        config: {},
-        access_level: view.access_level || 'authenticated',
-        allowed_roles: view.allowed_roles || undefined,
-        owner_id: view.owner_id || undefined,
-        created_at: view.created_at,
-        updated_at: view.updated_at,
-        group_id: view.group_id || null,
-        order_index: view.order_index || 0,
-        is_admin_only: view.is_admin_only || false,
-      }))
+    if (!oldPagesError && oldPagesData) {
+      // Merge old pages, avoiding duplicates (by ID)
+      const existingIds = new Set(interfacePages.map(p => p.id))
+      const oldPages = oldPagesData
+        .filter(view => !existingIds.has(view.id))
+        .map((view) => ({
+          id: view.id,
+          name: view.name,
+          description: view.description || undefined,
+          config: {},
+          access_level: view.access_level || 'authenticated',
+          allowed_roles: view.allowed_roles || undefined,
+          owner_id: view.owner_id || undefined,
+          created_at: view.created_at,
+          updated_at: view.updated_at,
+          group_id: view.group_id || null,
+          order_index: view.order_index || 0,
+          is_admin_only: view.is_admin_only || false,
+          is_new_system: false, // Flag to indicate this is from old system
+        }))
+      
+      interfacePages = [...interfacePages, ...oldPages]
     }
   } catch (error) {
     // If fails, interfacePages remains empty array

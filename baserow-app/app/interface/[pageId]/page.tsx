@@ -1,25 +1,40 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
+import { getInterfacePage } from "@/lib/interface/pages"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
-import type { Page } from "@/lib/interface/types"
 
 export default async function InterfacePage({
   params,
 }: {
-  params: { pageId: string }
+  params: Promise<{ pageId: string }>
 }) {
+  const { pageId } = await params
   const supabase = await createClient()
 
-  // Load page for title
-  const { data: page } = await supabase
-    .from("pages")
-    .select("name")
-    .eq("id", params.pageId)
-    .single()
+  // First check if it's a new system page (interface_pages table)
+  const newPage = await getInterfacePage(pageId)
+  if (newPage) {
+    // Redirect to new route
+    redirect(`/pages/${pageId}`)
+  }
+
+  // Otherwise, try old system (views table)
+  const { data: view } = await supabase
+    .from("views")
+    .select("id, name, type, is_admin_only")
+    .eq("id", pageId)
+    .eq("type", "interface")
+    .maybeSingle()
+
+  if (!view) {
+    // Page not found in either system, redirect to home
+    redirect('/')
+  }
 
   return (
-    <WorkspaceShellWrapper title={(page as Page)?.name || "Interface Page"}>
-      <InterfacePageClient pageId={params.pageId} />
+    <WorkspaceShellWrapper title={view.name || "Interface Page"}>
+      <InterfacePageClient pageId={pageId} />
     </WorkspaceShellWrapper>
   )
 }

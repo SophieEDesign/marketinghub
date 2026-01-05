@@ -152,6 +152,7 @@ export default function PageCreationWizard({
       const { data: { user } } = await supabase.auth.getUser()
 
       // Prepare anchor fields
+      // Convert empty strings to null for UUID fields
       let saved_view_id: string | null = null
       let dashboard_layout_id: string | null = null
       let form_config_id: string | null = null
@@ -159,18 +160,18 @@ export default function PageCreationWizard({
 
       switch (requiredAnchor) {
         case 'saved_view':
-          saved_view_id = savedViewId
+          saved_view_id = savedViewId && savedViewId.trim() ? savedViewId.trim() : null
           break
         case 'dashboard':
-          // For dashboard, we'll create it with a placeholder layout_id
-          // The actual layout will be created when blocks are added
-          dashboard_layout_id = 'pending' // Will be replaced with actual view_id when blocks are created
+          // For dashboard, we'll set it to null initially
+          // The actual layout_id will be set to the page's own ID after creation
+          dashboard_layout_id = null
           break
         case 'form':
-          form_config_id = tableId // Store table_id as form_config_id for now
+          form_config_id = tableId && tableId.trim() ? tableId.trim() : null
           break
         case 'record':
-          record_config_id = savedViewId || 'pending'
+          record_config_id = savedViewId && savedViewId.trim() ? savedViewId.trim() : null
           break
       }
 
@@ -185,7 +186,7 @@ export default function PageCreationWizard({
             dashboard_layout_id,
             form_config_id,
             record_config_id,
-            group_id: defaultGroupId || null,
+            group_id: defaultGroupId && defaultGroupId.trim() ? defaultGroupId.trim() : null,
             config: {},
             created_by: user?.id,
           },
@@ -195,30 +196,18 @@ export default function PageCreationWizard({
 
       if (error) throw error
 
-      // For dashboard pages, create initial view_blocks entry
-      if (requiredAnchor === 'dashboard' && page) {
-        // Create a view entry to hold blocks (if needed)
-        // The dashboard_layout_id will reference this
-        await supabase
-          .from('view_blocks')
-          .insert([
-            {
-              view_id: page.id,
-              type: 'text',
-              position_x: 0,
-              position_y: 0,
-              width: 4,
-              height: 2,
-              config: { title: 'Welcome to your dashboard' },
-              order_index: 0,
-            },
-          ])
-        
-        // Update dashboard_layout_id to reference itself
-        await supabase
+      // For dashboard/overview pages, set dashboard_layout_id to the page's own ID (self-reference)
+      // This allows the page to reference its own blocks in view_blocks table
+      if ((requiredAnchor === 'dashboard' || pageType === 'overview') && page) {
+        const { error: updateError } = await supabase
           .from('interface_pages')
           .update({ dashboard_layout_id: page.id })
           .eq('id', page.id)
+        
+        if (updateError) {
+          console.error('Error updating dashboard_layout_id:', updateError)
+          // Don't throw - page was created successfully, this is just metadata
+        }
       }
 
       // Reset and close

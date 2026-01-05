@@ -246,11 +246,13 @@ export default function Sidebar({
               />
             )}
               {interfacePages.map((page) => {
-                const isPageActive = isActive(`/interface/${page.id}`)
+                // Use /pages route for new system pages, /interface for old system pages
+                const href = page.is_new_system ? `/pages/${page.id}` : `/interface/${page.id}`
+                const isPageActive = isActive(href) || isActive(`/interface/${page.id}`) || isActive(`/pages/${page.id}`)
                 return (
                   <SidebarItem
                     key={page.id}
-                    href={`/interface/${page.id}`}
+                    href={href}
                     icon={FileText}
                     label={page.name}
                     active={isPageActive}
