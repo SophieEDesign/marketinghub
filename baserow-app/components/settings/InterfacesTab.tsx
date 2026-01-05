@@ -215,16 +215,16 @@ export default function InterfacesTab() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Interfaces</CardTitle>
+          <CardTitle>Interface Access & Sharing</CardTitle>
           <CardDescription>
-            Manage interface access and permissions by role
+            Manage who can see each interface. Interfaces are containers that group related pages together.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg">
               <p className="text-sm mb-2">No interfaces found</p>
-              <p className="text-xs">Create interfaces in the Pages tab</p>
+              <p className="text-xs">Create your first Interface to group pages together</p>
             </div>
           ) : (
             <div className="space-y-6">

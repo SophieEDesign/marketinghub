@@ -56,12 +56,12 @@ export default async function SettingsPage() {
               Users
             </TabsTrigger>
             <TabsTrigger value="interfaces">
-              <FileText className="mr-2 h-4 w-4" />
-              Interfaces
+              <Shield className="mr-2 h-4 w-4" />
+              Interface Access & Sharing
             </TabsTrigger>
             <TabsTrigger value="pages">
               <FileText className="mr-2 h-4 w-4" />
-              Pages
+              Interface Pages
             </TabsTrigger>
             <TabsTrigger value="permissions">
               <Shield className="mr-2 h-4 w-4" />

@@ -30,7 +30,7 @@ interface PageCreationWizardProps {
   defaultGroupId?: string | null
 }
 
-type WizardStep = 'purpose' | 'anchor' | 'name'
+type WizardStep = 'interface' | 'purpose' | 'anchor' | 'name'
 
 export default function PageCreationWizard({
   open,
@@ -38,7 +38,8 @@ export default function PageCreationWizard({
   defaultGroupId,
 }: PageCreationWizardProps) {
   const router = useRouter()
-  const [step, setStep] = useState<WizardStep>('purpose')
+  const [step, setStep] = useState<WizardStep>('interface')
+  const [selectedInterfaceId, setSelectedInterfaceId] = useState<string>(defaultGroupId || '')
   const [pagePurpose, setPagePurpose] = useState<'view' | 'dashboard' | 'form' | 'record'>('view')
   const [pageType, setPageType] = useState<PageType | ''>('')
   const [savedViewId, setSavedViewId] = useState<string>('')
@@ -47,21 +48,47 @@ export default function PageCreationWizard({
   const [creating, setCreating] = useState(false)
   const [views, setViews] = useState<Array<{ id: string; name: string; table_id: string | null }>>([])
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (open) {
       loadViews()
       loadTables()
+      loadInterfaceGroups()
       // Reset state
-      setStep('purpose')
+      setStep('interface')
+      setSelectedInterfaceId(defaultGroupId || '')
       setPagePurpose('view')
       setPageType('')
       setSavedViewId('')
       setTableId('')
       setPageName('')
     }
-  }, [open])
+  }, [open, defaultGroupId])
+
+  async function loadInterfaceGroups() {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('interface_groups')
+        .select('id, name')
+        .order('name')
+
+      if (!error && data) {
+        setInterfaceGroups(data)
+        // If defaultGroupId is provided and exists, select it
+        if (defaultGroupId && data.find(g => g.id === defaultGroupId)) {
+          setSelectedInterfaceId(defaultGroupId)
+        } else if (data.length > 0 && !selectedInterfaceId) {
+          // Auto-select first interface if none selected
+          setSelectedInterfaceId(data[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading interface groups:', error)
+    }
+  }
 
   async function loadViews() {
     setLoading(true)
@@ -102,6 +129,14 @@ export default function PageCreationWizard({
     }
   }
 
+  const handleInterfaceSelect = () => {
+    if (!selectedInterfaceId) {
+      alert('Please select an Interface')
+      return
+    }
+    setStep('purpose')
+  }
+
   const handlePurposeSelect = (purpose: 'view' | 'dashboard' | 'form' | 'record') => {
     setPagePurpose(purpose)
     
@@ -131,6 +166,11 @@ export default function PageCreationWizard({
   const handleCreate = async () => {
     if (!pageName.trim() || !pageType) {
       alert('Please complete all required fields')
+      return
+    }
+
+    if (!selectedInterfaceId) {
+      alert('Please select an Interface')
       return
     }
 
@@ -186,7 +226,7 @@ export default function PageCreationWizard({
             dashboard_layout_id,
             form_config_id,
             record_config_id,
-            group_id: defaultGroupId && defaultGroupId.trim() ? defaultGroupId.trim() : null,
+            group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null,
             config: {},
             created_by: user?.id,
           },
@@ -211,7 +251,8 @@ export default function PageCreationWizard({
       }
 
       // Reset and close
-      setStep('purpose')
+      setStep('interface')
+      setSelectedInterfaceId('')
       setPagePurpose('view')
       setPageType('')
       setSavedViewId('')
@@ -228,6 +269,41 @@ export default function PageCreationWizard({
       setCreating(false)
     }
   }
+
+  const renderInterfaceStep = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Select Interface *</Label>
+        <p className="text-sm text-gray-500 mb-2">
+          Every page must belong to an Interface. Interfaces are containers that group related pages together.
+        </p>
+        <Select value={selectedInterfaceId} onValueChange={setSelectedInterfaceId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Choose an Interface" />
+          </SelectTrigger>
+          <SelectContent>
+            {interfaceGroups.map((group) => (
+              <SelectItem key={group.id} value={group.id}>
+                {group.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {interfaceGroups.length === 0 && (
+          <p className="text-sm text-gray-500">
+            No interfaces found. Create an Interface first in Settings → Interface Access & Sharing.
+          </p>
+        )}
+      </div>
+      <Button
+        onClick={handleInterfaceSelect}
+        disabled={!selectedInterfaceId}
+        className="w-full"
+      >
+        Continue
+      </Button>
+    </div>
+  )
 
   const renderPurposeStep = () => (
     <div className="space-y-4">
@@ -386,7 +462,7 @@ export default function PageCreationWizard({
         <Button variant="outline" onClick={() => setStep('anchor')} className="flex-1">
           Back
         </Button>
-        <Button onClick={handleCreate} disabled={creating || !pageName.trim()} className="flex-1">
+        <Button onClick={handleCreate} disabled={creating || !pageName.trim() || !selectedInterfaceId} className="flex-1">
           {creating ? 'Creating...' : 'Create Page'}
         </Button>
       </div>
@@ -398,23 +474,36 @@ export default function PageCreationWizard({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
+            {step === 'interface' && 'Select Interface'}
             {step === 'purpose' && 'Create New Page'}
             {step === 'anchor' && 'Configure Page'}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
           <DialogDescription>
+            {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
             {step === 'anchor' && 'Set up the data source or layout'}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
+          {step === 'interface' && renderInterfaceStep()}
           {step === 'purpose' && renderPurposeStep()}
           {step === 'anchor' && renderAnchorStep()}
           {step === 'name' && renderNameStep()}
         </div>
+        {step === 'interface' && (
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        )}
         {step === 'purpose' && (
           <DialogFooter>
+            <Button variant="outline" onClick={() => setStep('interface')}>
+              Back
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
