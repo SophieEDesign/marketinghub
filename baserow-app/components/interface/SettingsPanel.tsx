@@ -347,7 +347,10 @@ export default function SettingsPanel({
       case "action":
         return (
           <>
-            <ActionAppearanceSettings {...commonProps} />
+            <ActionAppearanceSettings 
+              {...commonProps} 
+              onConfigUpdate={updateConfig}
+            />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )

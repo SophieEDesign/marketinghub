@@ -13,11 +13,13 @@ import type { BlockConfig } from "@/lib/interface/types"
 interface ActionAppearanceSettingsProps {
   config: BlockConfig
   onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
+  onConfigUpdate?: (updates: Partial<BlockConfig>) => void // For non-appearance properties like icon
 }
 
 export default function ActionAppearanceSettings({
   config,
   onUpdate,
+  onConfigUpdate,
 }: ActionAppearanceSettingsProps) {
   const appearance = config.appearance || {}
 
@@ -42,24 +44,26 @@ export default function ActionAppearanceSettings({
         </Select>
       </div>
 
-      {/* Icon */}
-      <div className="space-y-2">
-        <Label>Icon</Label>
-        <Select
-          value={config.icon || "arrow-right"}
-          onValueChange={(value) => onUpdate({ icon: value })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="arrow-right">Arrow Right</SelectItem>
-            <SelectItem value="plus">Plus</SelectItem>
-            <SelectItem value="external">External Link</SelectItem>
-            <SelectItem value="none">None</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Icon - This is a config property, not appearance */}
+      {onConfigUpdate && (
+        <div className="space-y-2">
+          <Label>Icon</Label>
+          <Select
+            value={config.icon || "arrow-right"}
+            onValueChange={(value) => onConfigUpdate({ icon: value })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="arrow-right">Arrow Right</SelectItem>
+              <SelectItem value="plus">Plus</SelectItem>
+              <SelectItem value="external">External Link</SelectItem>
+              <SelectItem value="none">None</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }
