@@ -156,11 +156,10 @@ export default function InterfacePageClient({
   }
 
   const isViewer = searchParams.get("view") === "true"
-  const pageTypeDef = page ? getPageTypeDefinition(page.page_type) : null
   const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview'
 
   // For dashboard/overview pages, editing means editing blocks (InterfaceBuilder)
-  // For other pages, editing means editing page settings
+  // For other pages, editing opens the settings drawer
   const handleEditClick = () => {
     if (isDashboardOrOverview) {
       setIsEditing(true)
@@ -198,7 +197,7 @@ export default function InterfacePageClient({
                 onClick={handleEditClick}
               >
                 <Edit2 className="h-4 w-4 mr-2" />
-                {isDashboardOrOverview ? 'Edit Page' : 'Page Settings'}
+                Edit Page
               </Button>
             )}
           </div>

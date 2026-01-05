@@ -89,7 +89,7 @@ export default function InterfacePageSettingsDrawer({
       setPageType(pageData.page_type || "")
       setSourceView(pageData.source_view || "")
       setBaseTable(pageData.base_table || "")
-      setGroupId(pageData.group_id || "")
+      setGroupId(pageData.group_id || "__none__")
       setIsAdminOnly(pageData.is_admin_only || false)
       setLoading(false)
     } catch (error) {
@@ -156,7 +156,7 @@ export default function InterfacePageSettingsDrawer({
           name: name.trim(),
           source_view: sourceView || null,
           base_table: baseTable || null,
-          group_id: groupId || null,
+          group_id: groupId === '__none__' || !groupId ? null : groupId,
           is_admin_only: isAdminOnly,
         }),
       })
@@ -313,7 +313,7 @@ export default function InterfacePageSettingsDrawer({
                     <SelectValue placeholder="No group" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No group</SelectItem>
+                    <SelectItem value="__none__">No group</SelectItem>
                     {groups.map((group) => (
                       <SelectItem key={group.id} value={group.id}>
                         {group.name}
