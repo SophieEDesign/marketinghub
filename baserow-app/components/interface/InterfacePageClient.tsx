@@ -41,7 +41,7 @@ export default function InterfacePageClient({
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
 
   useEffect(() => {
-    if (!initialPage && !redirecting) {
+    if (!initialPage && !redirecting && !loading) {
       loadPage()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,15 +63,16 @@ export default function InterfacePageClient({
   }, [isEditing, page?.id, page?.page_type])
 
   async function loadPage() {
-    if (redirecting) return // Prevent multiple redirect attempts
+    if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
     
+    setLoading(true)
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)
       if (!res.ok) {
         if (res.status === 404) {
           // Page not found - redirect to first available page or home
           setRedirecting(true)
-          router.push('/')
+          router.replace('/')
           return
         }
         throw new Error('Failed to load page')
@@ -84,7 +85,7 @@ export default function InterfacePageClient({
       // Redirect on error to prevent infinite loading state
       if (!redirecting) {
         setRedirecting(true)
-        router.push('/')
+        router.replace('/')
       }
     } finally {
       setLoading(false)

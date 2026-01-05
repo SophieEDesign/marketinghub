@@ -1,114 +1,338 @@
-# Schema Corrections Needed
+# SQL Schema Corrections Required
 
-## Critical Issues
+This document lists all corrections needed for the database schema to match the actual migrations and TypeScript types.
 
-### 1. `views` table
-**Issues:**
-- ❌ Type CHECK constraint includes `'page'` but NOT `'interface'` (we use `type='interface'` for interface pages)
-- ❌ Missing `description` column
-- ❌ Missing `updated_at` column  
-- ❌ `table_id` should be nullable (interface pages don't belong to a table)
-- ❌ `allowed_roles ARRAY` syntax is incorrect
+## 1. `automation_runs` Table - CRITICAL FIX
 
-**Corrected:**
+### Current (WRONG):
 ```sql
-CREATE TABLE public.views (
+CREATE TABLE public.automation_runs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  table_id uuid,  -- NULLABLE for interface pages
-  name text NOT NULL,
-  type text NOT NULL CHECK (type = ANY (ARRAY['grid'::text, 'kanban'::text, 'calendar'::text, 'form'::text, 'interface'::text])),
-  description text,
-  config jsonb DEFAULT '{}'::jsonb,
-  access_level text NOT NULL DEFAULT 'authenticated'::text,
-  allowed_roles text[],  -- Fixed syntax
-  owner_id uuid,
-  public_share_id uuid DEFAULT gen_random_uuid(),
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),  -- ADD THIS
-  CONSTRAINT views_pkey PRIMARY KEY (id),
-  CONSTRAINT views_table_id_fkey FOREIGN KEY (table_id) REFERENCES public.tables(id) ON DELETE CASCADE
+  automation_id uuid,
+  status text NOT NULL DEFAULT 'pending'::text,
+  input jsonb,
+  output jsonb,
+  error text,
+  executed_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT automation_runs_pkey PRIMARY KEY (id),
+  CONSTRAINT automation_runs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id)
 );
 ```
 
-### 2. `view_blocks` table
-**Issues:**
-- ❌ Has `position jsonb` but our code expects separate columns: `position_x`, `position_y`, `width`, `height`
-- ❌ Missing `config` column (has `settings` and `visibility` but we use `config`)
-- ❌ Missing `order_index` column
-
-**Corrected:**
+### Should be:
 ```sql
-CREATE TABLE public.view_blocks (
+CREATE TABLE public.automation_runs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  view_id uuid NOT NULL,
-  type text NOT NULL,
-  position_x integer NOT NULL DEFAULT 0,  -- CHANGED from position jsonb
-  position_y integer NOT NULL DEFAULT 0,  -- ADD THIS
-  width integer NOT NULL DEFAULT 4,       -- ADD THIS
-  height integer NOT NULL DEFAULT 4,       -- ADD THIS
-  config jsonb DEFAULT '{}'::jsonb,       -- CHANGED from settings/visibility
-  order_index integer NOT NULL DEFAULT 0, -- ADD THIS
+  automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'stopped')),
+  started_at timestamp with time zone NOT NULL DEFAULT now(),
+  completed_at timestamp with time zone,
+  error text,
+  context jsonb DEFAULT '{}',
   created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),  -- ADD THIS
-  CONSTRAINT view_blocks_pkey PRIMARY KEY (id),
-  CONSTRAINT view_blocks_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id) ON DELETE CASCADE
+  CONSTRAINT automation_runs_pkey PRIMARY KEY (id),
+  CONSTRAINT automation_runs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX idx_automation_runs_automation_id ON automation_runs(automation_id);
+CREATE INDEX idx_automation_runs_status ON automation_runs(status);
+CREATE INDEX idx_automation_runs_started_at ON automation_runs(started_at);
+```
+
+### Issues Fixed:
+- ❌ Status values wrong: 'pending' → should be 'running', 'completed', 'failed', 'stopped'
+- ❌ Missing `started_at` and `completed_at` columns
+- ❌ Has `executed_at` instead of `started_at`
+- ❌ Has `input`/`output` instead of `context`
+- ❌ Missing `created_at` column
+- ❌ Missing `ON DELETE CASCADE` on foreign key
+- ❌ Missing indexes for performance
+
+---
+
+## 2. `automation_logs` Table - CRITICAL FIX
+
+### Current (WRONG):
+```sql
+CREATE TABLE public.automation_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  automation_id uuid NOT NULL,
+  timestamp timestamp with time zone DEFAULT now(),
+  status text NOT NULL CHECK (status = ANY (ARRAY['success'::text, 'error'::text])),
+  input jsonb,
+  output jsonb,
+  error text,
+  duration_ms integer,
+  CONSTRAINT automation_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT automation_logs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id)
 );
 ```
 
-### 3. `tables` table
-**Issues:**
-- ❌ Missing `supabase_table` column (CRITICAL - used throughout the codebase)
-- ❌ Missing `created_by` column
-- ❌ Missing `updated_at` column
-
-**Corrected:**
+### Should be:
 ```sql
-CREATE TABLE public.tables (
+CREATE TABLE public.automation_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  automation_id uuid NOT NULL REFERENCES public.automations(id) ON DELETE CASCADE,
+  run_id uuid REFERENCES automation_runs(id) ON DELETE CASCADE,
+  level text NOT NULL CHECK (level IN ('info', 'warning', 'error')),
+  message text NOT NULL,
+  data jsonb DEFAULT '{}',
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT automation_logs_pkey PRIMARY KEY (id),
+  CONSTRAINT automation_logs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id) ON DELETE CASCADE,
+  CONSTRAINT automation_logs_run_id_fkey FOREIGN KEY (run_id) REFERENCES automation_runs(id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX idx_automation_logs_automation_id ON automation_logs(automation_id);
+CREATE INDEX idx_automation_logs_run_id ON automation_logs(run_id);
+CREATE INDEX idx_automation_logs_created_at ON automation_logs(created_at);
+```
+
+### Issues Fixed:
+- ❌ Field name wrong: `status` → should be `level`
+- ❌ Status values wrong: 'success', 'error' → should be 'info', 'warning', 'error'
+- ❌ Missing `run_id` foreign key to `automation_runs`
+- ❌ Missing `message` field (required)
+- ❌ Has `input`/`output` instead of `data`
+- ❌ Has `timestamp` instead of `created_at`
+- ❌ Remove `error` and `duration_ms` columns (not in migration)
+- ❌ Missing `ON DELETE CASCADE` on foreign keys
+- ❌ Missing indexes for performance
+
+---
+
+## 3. `interface_pages` Table - Remove 'blank' from page_type
+
+### Current (WRONG):
+```sql
+page_type text NOT NULL CHECK (page_type = ANY (ARRAY['list'::text, 'gallery'::text, 'kanban'::text, 'calendar'::text, 'timeline'::text, 'form'::text, 'dashboard'::text, 'overview'::text, 'record_review'::text]))
+```
+
+### Should be:
+```sql
+page_type text NOT NULL CHECK (page_type IN ('list', 'gallery', 'kanban', 'calendar', 'timeline', 'form', 'dashboard', 'overview', 'record_review'))
+```
+
+### Issue:
+- ❌ 'blank' is not a valid page_type (removed in `add_page_anchors.sql` migration)
+- ✅ Anchor columns (`saved_view_id`, `dashboard_layout_id`, `form_config_id`, `record_config_id`) are correct
+
+### Additional Indexes Needed:
+```sql
+CREATE INDEX idx_interface_pages_saved_view_id ON interface_pages(saved_view_id) WHERE saved_view_id IS NOT NULL;
+CREATE INDEX idx_interface_pages_dashboard_layout_id ON interface_pages(dashboard_layout_id) WHERE dashboard_layout_id IS NOT NULL;
+```
+
+---
+
+## 4. `views` Table - Verify Type Constraint
+
+### Current:
+```sql
+type text NOT NULL CHECK (type = ANY (ARRAY['grid'::text, 'kanban'::text, 'calendar'::text, 'form'::text, 'interface'::text]))
+```
+
+### Should include (if needed):
+```sql
+type text NOT NULL CHECK (type IN ('grid', 'kanban', 'calendar', 'form', 'interface', 'gallery', 'timeline'))
+```
+
+### Note:
+- Check if 'gallery' and 'timeline' should be included based on your ViewType definition
+- Current constraint matches migration, but TypeScript types include 'gallery' and 'timeline'
+
+---
+
+## 5. `view_filters` Table - Verify Field Name
+
+### Current:
+```sql
+CREATE TABLE public.view_filters (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  view_id uuid,
+  field_name text,
+  operator text,
+  value text,
+  CONSTRAINT view_filters_pkey PRIMARY KEY (id),
+  CONSTRAINT view_filters_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id)
+);
+```
+
+### Verify:
+- Migration uses `field_name`, but TypeScript types show `field_id`
+- Check which is correct based on your implementation
+- If using `field_id`, add foreign key: `REFERENCES table_fields(id)`
+
+---
+
+## 6. `view_sorts` Table - Verify Field Name
+
+### Current:
+```sql
+CREATE TABLE public.view_sorts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  view_id uuid,
+  field_name text NOT NULL,
+  direction text NOT NULL CHECK (direction = ANY (ARRAY['asc'::text, 'desc'::text])),
+  CONSTRAINT view_sorts_pkey PRIMARY KEY (id),
+  CONSTRAINT view_sorts_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id)
+);
+```
+
+### Verify:
+- Migration uses `field_name`, but TypeScript types show `field_id` and `order_direction`
+- Check which is correct based on your implementation
+- If using `field_id`, add foreign key: `REFERENCES table_fields(id)`
+- If using `order_direction`, rename `direction` column
+
+---
+
+## 7. Missing Indexes Summary
+
+### For `automation_runs`:
+```sql
+CREATE INDEX idx_automation_runs_automation_id ON automation_runs(automation_id);
+CREATE INDEX idx_automation_runs_status ON automation_runs(status);
+CREATE INDEX idx_automation_runs_started_at ON automation_runs(started_at);
+```
+
+### For `automation_logs`:
+```sql
+CREATE INDEX idx_automation_logs_automation_id ON automation_logs(automation_id);
+CREATE INDEX idx_automation_logs_run_id ON automation_logs(run_id);
+CREATE INDEX idx_automation_logs_created_at ON automation_logs(created_at);
+```
+
+### For `interface_pages`:
+```sql
+CREATE INDEX idx_interface_pages_saved_view_id ON interface_pages(saved_view_id) WHERE saved_view_id IS NOT NULL;
+CREATE INDEX idx_interface_pages_dashboard_layout_id ON interface_pages(dashboard_layout_id) WHERE dashboard_layout_id IS NOT NULL;
+```
+
+---
+
+## 8. Foreign Key Constraints - Add Missing
+
+### `automation_logs.run_id`:
+```sql
+CONSTRAINT automation_logs_run_id_fkey FOREIGN KEY (run_id) REFERENCES automation_runs(id) ON DELETE CASCADE
+```
+
+### `automation_runs.automation_id`:
+```sql
+-- Add ON DELETE CASCADE if missing
+CONSTRAINT automation_runs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id) ON DELETE CASCADE
+```
+
+### `automation_logs.automation_id`:
+```sql
+-- Add ON DELETE CASCADE if missing
+CONSTRAINT automation_logs_automation_id_fkey FOREIGN KEY (automation_id) REFERENCES public.automations(id) ON DELETE CASCADE
+```
+
+---
+
+## 9. `automations` Table - Verify Structure
+
+### Current:
+```sql
+CREATE TABLE public.automations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  supabase_table text NOT NULL,  -- ADD THIS (CRITICAL)
   description text DEFAULT ''::text,
-  category text,
-  created_by uuid REFERENCES auth.users(id),  -- ADD THIS
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now(),  -- ADD THIS
-  CONSTRAINT tables_pkey PRIMARY KEY (id)
-);
-```
-
-### 4. `view_fields` table
-**Issues:**
-- ❌ Uses `field_name` (text) - this might be okay if your implementation uses field names
-- ❌ Missing `visible` column (code uses `visible`, not `hidden`)
-
-**Note:** Your codebase uses `field_name` in some places, so this might be correct. But check if you need:
-```sql
-visible boolean DEFAULT true,  -- ADD THIS if using visible
--- OR keep hidden if that's what you use
-```
-
-### 5. Missing `workspaces` table
-**Issue:**
-- ❌ Missing `workspaces` table (used by Settings → Workspace tab)
-
-**Add:**
-```sql
-CREATE TABLE public.workspaces (
-  id text PRIMARY KEY DEFAULT 'default',
-  name text NOT NULL DEFAULT 'Marketing Hub',
-  icon text,
+  trigger jsonb NOT NULL,
+  actions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  enabled boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id)
+  conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'paused'::text])),
+  CONSTRAINT automations_pkey PRIMARY KEY (id)
 );
 ```
 
-## Summary
+### Note:
+- ✅ Structure matches migration
+- ⚠️ TypeScript types suggest `trigger_type` and `trigger_config` instead of `trigger` jsonb
+- Verify which structure is correct based on your implementation
 
-The main issues are:
-1. **views.type** must include `'interface'` (not just `'page'`)
-2. **view_blocks** needs separate position columns, not a JSONB position
-3. **tables** needs `supabase_table` column
-4. **views** needs `description` and `updated_at`
-5. **view_blocks** needs `config` and `order_index`
-6. Missing `workspaces` table
+---
+
+## 10. Priority Summary
+
+### 🔴 CRITICAL (Must Fix):
+1. **`automation_runs`** - Wrong structure, wrong status values
+2. **`automation_logs`** - Wrong field names, wrong values, missing FK
+
+### 🟡 IMPORTANT (Should Fix):
+3. **`interface_pages.page_type`** - Remove 'blank' from constraint
+4. **Missing indexes** - Add performance indexes
+5. **Foreign key cascades** - Add ON DELETE CASCADE
+
+### 🟢 VERIFY (Check Implementation):
+6. **`views.type`** - Verify if 'gallery' and 'timeline' should be included
+7. **`view_filters`** - Verify `field_name` vs `field_id`
+8. **`view_sorts`** - Verify `field_name` vs `field_id` and `direction` vs `order_direction`
+9. **`automations.trigger`** - Verify jsonb structure vs separate columns
+
+---
+
+## Migration Script Template
+
+```sql
+-- Fix automation_runs table
+ALTER TABLE automation_runs
+  DROP CONSTRAINT IF EXISTS automation_runs_status_check,
+  DROP COLUMN IF EXISTS input,
+  DROP COLUMN IF EXISTS output,
+  DROP COLUMN IF EXISTS executed_at;
+
+ALTER TABLE automation_runs
+  ADD COLUMN IF NOT EXISTS started_at timestamp with time zone NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS completed_at timestamp with time zone,
+  ADD COLUMN IF NOT EXISTS context jsonb DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
+
+ALTER TABLE automation_runs
+  ADD CONSTRAINT automation_runs_status_check CHECK (status IN ('running', 'completed', 'failed', 'stopped'));
+
+-- Fix automation_logs table
+ALTER TABLE automation_logs
+  DROP CONSTRAINT IF EXISTS automation_logs_status_check,
+  DROP COLUMN IF EXISTS status,
+  DROP COLUMN IF EXISTS input,
+  DROP COLUMN IF EXISTS output,
+  DROP COLUMN IF EXISTS error,
+  DROP COLUMN IF EXISTS duration_ms,
+  DROP COLUMN IF EXISTS timestamp;
+
+ALTER TABLE automation_logs
+  ADD COLUMN IF NOT EXISTS run_id uuid REFERENCES automation_runs(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS level text NOT NULL DEFAULT 'info',
+  ADD COLUMN IF NOT EXISTS message text NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS data jsonb DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS created_at timestamp with time zone DEFAULT now();
+
+ALTER TABLE automation_logs
+  ADD CONSTRAINT automation_logs_level_check CHECK (level IN ('info', 'warning', 'error'));
+
+-- Fix interface_pages page_type constraint
+ALTER TABLE interface_pages
+  DROP CONSTRAINT IF EXISTS interface_pages_page_type_check;
+
+ALTER TABLE interface_pages
+  ADD CONSTRAINT interface_pages_page_type_check 
+  CHECK (page_type IN ('list', 'gallery', 'kanban', 'calendar', 'timeline', 'form', 'dashboard', 'overview', 'record_review'));
+
+-- Add indexes
+CREATE INDEX IF NOT EXISTS idx_automation_runs_automation_id ON automation_runs(automation_id);
+CREATE INDEX IF NOT EXISTS idx_automation_runs_status ON automation_runs(status);
+CREATE INDEX IF NOT EXISTS idx_automation_runs_started_at ON automation_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_automation_id ON automation_logs(automation_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_run_id ON automation_logs(run_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_created_at ON automation_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_interface_pages_saved_view_id ON interface_pages(saved_view_id) WHERE saved_view_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_interface_pages_dashboard_layout_id ON interface_pages(dashboard_layout_id) WHERE dashboard_layout_id IS NOT NULL;
+```

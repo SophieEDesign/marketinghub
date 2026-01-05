@@ -3,10 +3,11 @@ import { getInterfacePage, updateInterfacePage, deleteInterfacePage } from '@/li
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
-    const page = await getInterfacePage(params.pageId)
+    const { pageId } = await params
+    const page = await getInterfacePage(pageId)
     
     if (!page) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })
@@ -24,11 +25,12 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { pageId } = await params
     const body = await request.json()
-    const page = await updateInterfacePage(params.pageId, body)
+    const page = await updateInterfacePage(pageId, body)
     return NextResponse.json(page)
   } catch (error: any) {
     console.error('Error updating interface page:', error)
@@ -41,10 +43,11 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
-    await deleteInterfacePage(params.pageId)
+    const { pageId } = await params
+    await deleteInterfacePage(pageId)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error deleting interface page:', error)

@@ -9,13 +9,14 @@ import InterfacePageClient from "@/components/interface/InterfacePageClient"
 export default async function PagePage({
   params,
 }: {
-  params: { pageId: string }
+  params: Promise<{ pageId: string }>
 }) {
+  const { pageId } = await params
   const supabase = await createClient()
   const admin = await isAdmin()
 
   // Load interface page from new system
-  let page = await getInterfacePage(params.pageId)
+  let page = await getInterfacePage(pageId)
   let pageName = "Interface Page"
   let initialData: any[] = []
 
@@ -24,7 +25,7 @@ export default async function PagePage({
     const { data: view } = await supabase
       .from("views")
       .select("id, name, type, is_admin_only")
-      .eq("id", params.pageId)
+      .eq("id", pageId)
       .maybeSingle()
 
     if (!view || view.type !== 'interface') {
@@ -75,7 +76,7 @@ export default async function PagePage({
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true}>
       <InterfacePageClient 
-        pageId={params.pageId} 
+        pageId={pageId} 
         initialPage={page || undefined}
         initialData={initialData}
         isAdmin={admin}
