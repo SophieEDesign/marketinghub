@@ -162,13 +162,37 @@ export async function getDefaultInterface(): Promise<Interface | null> {
   
   // First, try to get default interface from workspace_settings
   // Silently handle errors if column doesn't exist
-  const { data: workspaceSettings, error: settingsError } = await supabase
-    .from('workspace_settings')
-    .select('default_interface_id')
-    .maybeSingle()
-  
-  // Ignore errors if column doesn't exist (PGRST116 = column not found, 42P01 = relation doesn't exist)
-  // These are expected in some setups where the migration hasn't been run
+  let workspaceSettings: { default_interface_id?: string | null } | null = null
+  try {
+    const { data, error: settingsError } = await supabase
+      .from('workspace_settings')
+      .select('default_interface_id')
+      .maybeSingle()
+
+    if (settingsError) {
+      // Check for specific error codes that indicate column/table doesn't exist
+      if (settingsError.code === 'PGRST116' || 
+          settingsError.code === '42P01' || 
+          settingsError.code === '42703' ||
+          settingsError.message?.includes('column') ||
+          settingsError.message?.includes('does not exist') ||
+          settingsError.message?.includes('relation')) {
+        // Column or table doesn't exist - this is fine, just skip
+        workspaceSettings = null
+      } else {
+        // Other errors - log but don't fail
+        console.warn('Error loading workspace settings:', settingsError)
+      }
+    } else {
+      workspaceSettings = data
+    }
+  } catch (error: any) {
+    // Ignore errors if column doesn't exist (PGRST116 = column not found, 42P01 = relation doesn't exist)
+    // These are expected in some setups where the migration hasn't been run
+    if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
+      console.warn('Error loading workspace settings:', error)
+    }
+  }
   
   if (workspaceSettings?.default_interface_id) {
     // Try views table first (current system)

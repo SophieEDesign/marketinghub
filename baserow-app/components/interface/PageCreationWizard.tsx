@@ -70,19 +70,52 @@ export default function PageCreationWizard({
   async function loadInterfaceGroups() {
     try {
       const supabase = createClient()
+      
+      // Load from interface_groups table (interface_pages.group_id references this)
       const { data, error } = await supabase
         .from('interface_groups')
         .select('id, name')
-        .order('name')
+        .order('order_index', { ascending: true })
+        .order('name', { ascending: true })
 
       if (!error && data) {
-        setInterfaceGroups(data)
+        // Remove duplicates by id (in case there are any)
+        const uniqueGroups = Array.from(
+          new Map(data.map(g => [g.id, g])).values()
+        )
+        
+        setInterfaceGroups(uniqueGroups)
         // If defaultGroupId is provided and exists, select it
-        if (defaultGroupId && data.find(g => g.id === defaultGroupId)) {
+        if (defaultGroupId && uniqueGroups.find(g => g.id === defaultGroupId)) {
           setSelectedInterfaceId(defaultGroupId)
-        } else if (data.length > 0 && !selectedInterfaceId) {
+        } else if (uniqueGroups.length > 0 && !selectedInterfaceId) {
           // Auto-select first interface if none selected
-          setSelectedInterfaceId(data[0].id)
+          setSelectedInterfaceId(uniqueGroups[0].id)
+        }
+      } else if (error) {
+        console.error('Error loading interface groups:', error)
+        // If interface_groups doesn't exist, try loading from interfaces table
+        // and create a mapping (though this won't work for creating pages since
+        // interface_pages.group_id must reference interface_groups)
+        const { data: interfacesData, error: interfacesError } = await supabase
+          .from('interfaces')
+          .select('id, name')
+          .order('is_default', { ascending: false })
+          .order('created_at', { ascending: true })
+
+        if (!interfacesError && interfacesData && interfacesData.length > 0) {
+          // Map interfaces to groups format
+          const interfaceOptions = interfacesData.map(iface => ({
+            id: iface.id,
+            name: iface.name,
+          }))
+
+          setInterfaceGroups(interfaceOptions)
+          if (defaultGroupId && interfaceOptions.find(g => g.id === defaultGroupId)) {
+            setSelectedInterfaceId(defaultGroupId)
+          } else if (interfaceOptions.length > 0 && !selectedInterfaceId) {
+            setSelectedInterfaceId(interfaceOptions[0].id)
+          }
         }
       }
     } catch (error) {

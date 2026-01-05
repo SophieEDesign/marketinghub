@@ -33,47 +33,94 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   }, [tableId, page, filters, sorts])
 
   async function loadViewConfig() {
-    const { data: viewFilters } = await supabase
-      .from("view_filters")
-      .select("*")
-      .eq("view_id", viewId)
+    try {
+      const { data: viewFilters, error: filtersError } = await supabase
+        .from("view_filters")
+        .select("*")
+        .eq("view_id", viewId)
 
-    const { data: viewSorts } = await supabase
-      .from("view_sorts")
-      .select("*")
-      .eq("view_id", viewId)
-      .order("order_index", { ascending: true })
+      if (filtersError) {
+        console.warn("Error loading view filters:", filtersError)
+      } else if (viewFilters) {
+        setFilters(viewFilters)
+      }
 
-    if (viewFilters) setFilters(viewFilters)
-    if (viewSorts) setSorts(viewSorts)
+      // Try to load view sorts - handle case where order_index column doesn't exist
+      const { data: viewSorts, error: sortsError } = await supabase
+        .from("view_sorts")
+        .select("*")
+        .eq("view_id", viewId)
+
+      if (sortsError) {
+        // If order_index column doesn't exist, try without ordering
+        if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
+          const { data: sortsWithoutOrder } = await supabase
+            .from("view_sorts")
+            .select("*")
+            .eq("view_id", viewId)
+          
+          if (sortsWithoutOrder) {
+            setSorts(sortsWithoutOrder)
+          }
+        } else {
+          console.warn("Error loading view sorts:", sortsError)
+        }
+      } else if (viewSorts) {
+        // Sort client-side if order_index exists
+        const sorted = [...viewSorts].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+        setSorts(sorted)
+      }
+    } catch (error) {
+      console.error("Error loading view config:", error)
+    }
   }
 
   async function loadRows() {
+    if (!tableId) {
+      console.warn("GridView: tableId is required")
+      setRows([])
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    let query = supabase
-      .from("table_rows")
-      .select("*")
-      .eq("table_id", tableId)
-      .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+    try {
+      let query = supabase
+        .from("table_rows")
+        .select("*")
+        .eq("table_id", tableId)
+        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
 
-    // Apply sorting
-    if (sorts.length > 0) {
-      const firstSort = sorts[0]
-      query = query.order("created_at", {
-        ascending: firstSort.order_direction === "asc",
-      })
-    } else {
-      query = query.order("created_at", { ascending: false })
-    }
+      // Apply sorting
+      if (sorts.length > 0) {
+        const firstSort = sorts[0]
+        query = query.order("created_at", {
+          ascending: firstSort.order_direction === "asc",
+        })
+      } else {
+        query = query.order("created_at", { ascending: false })
+      }
 
-    const { data, error } = await query
+      const { data, error } = await query
 
-    if (error) {
+      if (error) {
+        // Handle case where table_rows doesn't exist (PGRST205)
+        if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
+          console.warn("table_rows table does not exist. Run migration to create it.")
+          setRows([])
+        } else {
+          console.error("Error loading rows:", error)
+          setRows([])
+        }
+      } else {
+        setRows(data || [])
+      }
+    } catch (error) {
       console.error("Error loading rows:", error)
-    } else {
-      setRows(data || [])
+      setRows([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handleCellEdit(rowId: string, fieldName: string, value: any) {
@@ -95,16 +142,31 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   }
 
   async function handleAddRow() {
-    const { data: { user } } = await supabase.auth.getUser()
-    const newRow = {
-      table_id: tableId,
-      data: {},
-      created_by: user?.id,
+    if (!tableId) {
+      console.warn("Cannot add row: tableId is required")
+      return
     }
 
-    const { error } = await supabase.from("table_rows").insert([newRow])
-    if (!error) {
-      loadRows()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const newRow = {
+        table_id: tableId,
+        data: {},
+        created_by: user?.id,
+      }
+
+      const { error } = await supabase.from("table_rows").insert([newRow])
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
+          console.warn("table_rows table does not exist. Run migration to create it.")
+        } else {
+          console.error("Error adding row:", error)
+        }
+      } else {
+        loadRows()
+      }
+    } catch (error) {
+      console.error("Error adding row:", error)
     }
   }
 

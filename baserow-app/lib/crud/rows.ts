@@ -7,6 +7,11 @@ export async function getRows(tableId: string, options?: {
   filters?: any[]
   sorts?: any[]
 }) {
+  if (!tableId) {
+    console.warn("getRows: tableId is required")
+    return []
+  }
+
   const supabase = await createClient()
   let query = supabase
     .from('table_rows')
@@ -33,8 +38,15 @@ export async function getRows(tableId: string, options?: {
   
   const { data, error } = await query
   
-  if (error) throw error
-  return data as TableRow[]
+  if (error) {
+    // Handle case where table_rows doesn't exist
+    if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
+      console.warn("table_rows table does not exist. Run migration to create it.")
+      return []
+    }
+    throw error
+  }
+  return (data || []) as TableRow[]
 }
 
 export async function getRow(id: string) {

@@ -11,6 +11,7 @@ import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getPageTypeDefinition, getRequiredAnchorType } from "@/lib/interface/page-types"
+import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -34,11 +35,18 @@ export default function InterfacePageClient({
   const [data, setData] = useState<any[]>(initialData)
   const [loading, setLoading] = useState(!initialPage)
   const [isGridMode, setIsGridMode] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
+  
+  // Use unified editing context
+  const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
+  const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
+  
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
+  
+  // Determine if we're in edit mode (page or block editing)
+  const isEditing = isPageEditing || isBlockEditing
 
   useEffect(() => {
     if (!initialPage && !redirecting && !loading) {
@@ -55,12 +63,12 @@ export default function InterfacePageClient({
   }, [page?.source_view, page?.config])
 
   useEffect(() => {
-    // Load blocks for dashboard/overview pages when entering edit mode
-    if (isEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
+    // Load blocks for dashboard/overview pages when entering block edit mode
+    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview')) {
       loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditing, page?.id, page?.page_type])
+  }, [isBlockEditing, page?.id, page?.page_type])
 
   async function loadPage() {
     if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
@@ -202,7 +210,8 @@ export default function InterfacePageClient({
     // Open appropriate editor based on anchor type
     switch (pageAnchor) {
       case 'dashboard':
-        setIsEditing(true)
+        // For dashboard pages, enter block editing mode
+        enterBlockEdit()
         break
       case 'saved_view':
         // Open page display settings panel for data-backed pages
@@ -210,7 +219,7 @@ export default function InterfacePageClient({
         break
       case 'form':
         // Open form builder (to be implemented)
-        setIsEditing(true)
+        enterPageEdit()
         break
       case 'record':
         // Open page display settings panel for record review pages
@@ -244,11 +253,11 @@ export default function InterfacePageClient({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isDashboardOrOverview && isEditing ? (
+            {isDashboardOrOverview && isBlockEditing ? (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditing(false)}
+                onClick={() => exitBlockEdit()}
               >
                 Done Editing
               </Button>
@@ -285,8 +294,8 @@ export default function InterfacePageClient({
         {/* Show setup state if page doesn't have anchor */}
         {page && !pageHasAnchor ? (
           <PageSetupState page={page} isAdmin={isAdmin} />
-        ) : isDashboardOrOverview && isEditing ? (
-          // For dashboard/overview in edit mode, use InterfaceBuilder
+        ) : isDashboardOrOverview && isBlockEditing ? (
+          // For dashboard/overview in block edit mode, use InterfaceBuilder
           blocksLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-gray-500">Loading blocks...</div>

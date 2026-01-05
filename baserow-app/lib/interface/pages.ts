@@ -211,6 +211,29 @@ export async function updateInterfacePage(
 export async function deleteInterfacePage(pageId: string): Promise<void> {
   const supabase = await createClient()
   
+  // Check if this page is set as default interface before deleting
+  // Clear default_interface_id if this page is the default
+  try {
+    const { data: workspaceSettings } = await supabase
+      .from('workspace_settings')
+      .select('id, default_interface_id')
+      .maybeSingle()
+
+    if (workspaceSettings?.default_interface_id === pageId) {
+      // Clear the default_interface_id before deleting
+      await supabase
+        .from('workspace_settings')
+        .update({ default_interface_id: null })
+        .eq('id', workspaceSettings.id)
+    }
+  } catch (settingsError: any) {
+    // Silently ignore errors - column might not exist or RLS might block
+    // The ON DELETE SET NULL constraint will handle it anyway
+    if (settingsError?.code !== 'PGRST116' && settingsError?.code !== '42P01') {
+      console.warn('Could not clear default_interface_id:', settingsError)
+    }
+  }
+  
   const { error } = await supabase
     .from('interface_pages')
     .delete()

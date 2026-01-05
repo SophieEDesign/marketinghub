@@ -14,7 +14,9 @@ interface Interface {
   name: string
   type: 'interface'
   group_id: string | null
+  category_id?: string | null
   group_name?: string | null
+  category_name?: string | null
   order_index: number
   is_admin_only: boolean
   is_default?: boolean
@@ -42,113 +44,285 @@ export default function InterfacesTab() {
     try {
       const supabase = createClient()
       
-      // Load interface views
-      const { data: views, error } = await supabase
-        .from('views')
-        .select('id, name, type, group_id, order_index, is_admin_only, created_at')
-        .eq('type', 'interface')
-        .order('order_index', { ascending: true })
+      // Try new interfaces table first
+      const { data: interfacesData, error: interfacesError } = await supabase
+        .from('interfaces')
+        .select('id, name, category_id, is_default, created_at, updated_at')
+        .order('is_default', { ascending: false })
         .order('created_at', { ascending: true })
 
-      if (error) {
-        console.error('Error loading interfaces:', error)
-        setGroups([])
+      if (!interfacesError && interfacesData && interfacesData.length > 0) {
+        // New system: use interfaces table
+        await loadInterfacesFromNewSystem(interfacesData)
         return
       }
 
-      // Load groups
-      const groupIds = [...new Set(views?.map(v => v.group_id).filter(Boolean) || [])]
-      const groupMap = new Map<string, { id: string; name: string }>()
-      
-      if (groupIds.length > 0) {
-        const { data: groupsData } = await supabase
-          .from('views')
-          .select('id, name')
-          .in('id', groupIds)
-
-        groupsData?.forEach(g => {
-          groupMap.set(g.id, { id: g.id, name: g.name })
-        })
-      }
-
-      // Check which interface is default (from workspace_settings or first interface)
-      let defaultId: string | null = null
-      try {
-        // First check if workspace_settings table exists and has the column
-        const { data: defaultInterface, error: settingsError } = await supabase
-          .from('workspace_settings')
-          .select('default_interface_id')
-          .maybeSingle()
-
-        // Handle errors gracefully - column might not exist (400), RLS might block (403), or table might not exist
-        if (!settingsError && defaultInterface) {
-          defaultId = defaultInterface.default_interface_id || null
-        }
-        // Silently ignore 400 errors (column/table doesn't exist) - this is expected in some setups
-      } catch (error: any) {
-        // Silently ignore errors - defaultId remains null
-        // 400 errors are expected if the column doesn't exist
-      }
-
-      // Group interfaces
-      const grouped: InterfaceGroup[] = []
-      const uncategorized: Interface[] = []
-
-      views?.forEach((view) => {
-        const interfaceData: Interface = {
-          ...view,
-          group_name: view.group_id ? groupMap.get(view.group_id)?.name || null : null,
-          is_default: view.id === defaultId,
-        }
-
-        if (view.group_id && groupMap.has(view.group_id)) {
-          const group = grouped.find(g => g.id === view.group_id)
-          if (group) {
-            group.interfaces.push(interfaceData)
-          } else {
-            grouped.push({
-              id: view.group_id!,
-              name: groupMap.get(view.group_id!)!.name,
-              interfaces: [interfaceData],
-            })
-          }
-        } else {
-          uncategorized.push(interfaceData)
-        }
-      })
-
-      // Sort interfaces within each group
-      grouped.forEach(group => {
-        group.interfaces.sort((a, b) => a.order_index - b.order_index)
-      })
-      uncategorized.sort((a, b) => a.order_index - b.order_index)
-
-      // Add uncategorized group if needed
-      if (uncategorized.length > 0) {
-        grouped.push({
-          id: 'uncategorized',
-          name: 'Uncategorized',
-          interfaces: uncategorized,
-        })
-      }
-
-      setGroups(grouped)
+      // Fallback to old system: views table
+      await loadInterfacesFromViewsTable()
     } catch (error) {
       console.error('Error loading interfaces:', error)
+      setGroups([])
     } finally {
       setLoading(false)
     }
   }
 
+  async function loadInterfacesFromNewSystem(interfacesData: any[]) {
+    const supabase = createClient()
+    
+    // Load categories
+    const categoryIds = [...new Set(interfacesData.map(i => i.category_id).filter(Boolean))]
+    const categoryMap = new Map<string, { id: string; name: string }>()
+    
+    if (categoryIds.length > 0) {
+      const { data: categoriesData } = await supabase
+        .from('interface_categories')
+        .select('id, name')
+        .in('id', categoryIds)
+
+      categoriesData?.forEach(c => {
+        categoryMap.set(c.id, { id: c.id, name: c.name })
+      })
+    }
+
+    // Load permissions for all interfaces
+    const interfaceIds = interfacesData.map(i => i.id)
+    const { data: permissionsData } = await supabase
+      .from('interface_permissions')
+      .select('interface_id, role')
+      .in('interface_id', interfaceIds)
+
+    // Build permission map: interface is admin-only if it has 'admin' permission
+    // and doesn't have 'staff' or 'member' permissions
+    const permissionMap = new Map<string, { hasAdmin: boolean; hasOtherRoles: boolean }>()
+    permissionsData?.forEach(p => {
+      const current = permissionMap.get(p.interface_id) || { hasAdmin: false, hasOtherRoles: false }
+      if (p.role === 'admin') {
+        current.hasAdmin = true
+      } else if (p.role === 'staff' || p.role === 'member') {
+        current.hasOtherRoles = true
+      }
+      permissionMap.set(p.interface_id, current)
+    })
+
+    // Group interfaces
+    const grouped: InterfaceGroup[] = []
+    const uncategorized: Interface[] = []
+
+    interfacesData.forEach((iface) => {
+      const permissions = permissionMap.get(iface.id)
+      // Admin-only if it has admin permission but no other roles
+      const isAdminOnly = permissions?.hasAdmin === true && permissions?.hasOtherRoles === false
+      const categoryId = iface.category_id
+      const categoryName = categoryId ? categoryMap.get(categoryId)?.name || null : null
+
+      const interfaceData: Interface = {
+        id: iface.id,
+        name: iface.name,
+        type: 'interface',
+        group_id: categoryId,
+        category_id: categoryId,
+        group_name: categoryName,
+        category_name: categoryName,
+        order_index: 0, // New system doesn't use order_index
+        is_admin_only: isAdminOnly,
+        is_default: iface.is_default || false,
+        created_at: iface.created_at,
+      }
+
+      if (categoryId && categoryMap.has(categoryId)) {
+        const group = grouped.find(g => g.id === categoryId)
+        if (group) {
+          group.interfaces.push(interfaceData)
+        } else {
+          grouped.push({
+            id: categoryId,
+            name: categoryMap.get(categoryId)!.name,
+            interfaces: [interfaceData],
+          })
+        }
+      } else {
+        uncategorized.push(interfaceData)
+      }
+    })
+
+    // Sort interfaces within each group
+    grouped.forEach(group => {
+      group.interfaces.sort((a, b) => {
+        if (a.is_default) return -1
+        if (b.is_default) return 1
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      })
+    })
+    uncategorized.sort((a, b) => {
+      if (a.is_default) return -1
+      if (b.is_default) return 1
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+
+    // Add uncategorized group if needed
+    if (uncategorized.length > 0) {
+      grouped.push({
+        id: 'uncategorized',
+        name: 'Uncategorized',
+        interfaces: uncategorized,
+      })
+    }
+
+    setGroups(grouped)
+  }
+
+  async function loadInterfacesFromViewsTable() {
+    const supabase = createClient()
+    
+    // Load interface views (old system)
+    const { data: views, error } = await supabase
+      .from('views')
+      .select('id, name, type, group_id, order_index, is_admin_only, created_at')
+      .eq('type', 'interface')
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Error loading interfaces:', error)
+      setGroups([])
+      return
+    }
+
+    // Load groups
+    const groupIds = [...new Set(views?.map(v => v.group_id).filter(Boolean) || [])]
+    const groupMap = new Map<string, { id: string; name: string }>()
+    
+    if (groupIds.length > 0) {
+      const { data: groupsData } = await supabase
+        .from('views')
+        .select('id, name')
+        .in('id', groupIds)
+
+      groupsData?.forEach(g => {
+        groupMap.set(g.id, { id: g.id, name: g.name })
+      })
+    }
+
+    // Check which interface is default (from workspace_settings)
+    let defaultId: string | null = null
+    try {
+      const { data: defaultInterface, error: settingsError } = await supabase
+        .from('workspace_settings')
+        .select('default_interface_id')
+        .maybeSingle()
+
+      if (settingsError) {
+        if (settingsError.code === 'PGRST116' || 
+            settingsError.code === '42P01' || 
+            settingsError.code === '42703' ||
+            settingsError.message?.includes('column') ||
+            settingsError.message?.includes('does not exist') ||
+            settingsError.message?.includes('relation')) {
+          defaultId = null
+        } else {
+          console.warn('Error checking default interface:', settingsError)
+        }
+      } else if (defaultInterface) {
+        defaultId = defaultInterface.default_interface_id || null
+      }
+    } catch (error: any) {
+      if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
+        console.warn('Error checking default interface:', error)
+      }
+    }
+
+    // Group interfaces
+    const grouped: InterfaceGroup[] = []
+    const uncategorized: Interface[] = []
+
+    views?.forEach((view) => {
+      const interfaceData: Interface = {
+        ...view,
+        group_name: view.group_id ? groupMap.get(view.group_id)?.name || null : null,
+        is_default: view.id === defaultId,
+      }
+
+      if (view.group_id && groupMap.has(view.group_id)) {
+        const group = grouped.find(g => g.id === view.group_id)
+        if (group) {
+          group.interfaces.push(interfaceData)
+        } else {
+          grouped.push({
+            id: view.group_id!,
+            name: groupMap.get(view.group_id!)!.name,
+            interfaces: [interfaceData],
+          })
+        }
+      } else {
+        uncategorized.push(interfaceData)
+      }
+    })
+
+    // Sort interfaces within each group
+    grouped.forEach(group => {
+      group.interfaces.sort((a, b) => a.order_index - b.order_index)
+    })
+    uncategorized.sort((a, b) => a.order_index - b.order_index)
+
+    // Add uncategorized group if needed
+    if (uncategorized.length > 0) {
+      grouped.push({
+        id: 'uncategorized',
+        name: 'Uncategorized',
+        interfaces: uncategorized,
+      })
+    }
+
+    setGroups(grouped)
+  }
+
   async function handleToggleAccess(interfaceId: string, isAdminOnly: boolean) {
     try {
       const supabase = createClient()
-      const { error } = await supabase
-        .from('views')
-        .update({ is_admin_only: !isAdminOnly })
+      
+      // Check if interface exists in new interfaces table
+      const { data: interfaceData, error: checkError } = await supabase
+        .from('interfaces')
+        .select('id')
         .eq('id', interfaceId)
+        .maybeSingle()
 
-      if (error) throw error
+      if (!checkError && interfaceData) {
+        // New system: use interface_permissions table
+        if (!isAdminOnly) {
+          // Enable admin-only: add admin permission and remove other permissions
+          // First, remove all existing permissions
+          await supabase
+            .from('interface_permissions')
+            .delete()
+            .eq('interface_id', interfaceId)
+
+          // Then add admin permission
+          const { error: insertError } = await supabase
+            .from('interface_permissions')
+            .insert({ interface_id: interfaceId, role: 'admin' })
+
+          if (insertError) throw insertError
+        } else {
+          // Disable admin-only: remove admin permission (makes it public)
+          const { error: deleteError } = await supabase
+            .from('interface_permissions')
+            .delete()
+            .eq('interface_id', interfaceId)
+            .eq('role', 'admin')
+
+          if (deleteError) throw deleteError
+        }
+      } else {
+        // Old system: update views table
+        const { error } = await supabase
+          .from('views')
+          .update({ is_admin_only: !isAdminOnly })
+          .eq('id', interfaceId)
+
+        if (error) throw error
+      }
 
       loadInterfaces()
     } catch (error: any) {
@@ -161,32 +335,57 @@ export default function InterfacesTab() {
     try {
       const supabase = createClient()
       
-      // Get or create workspace_settings
-      const { data: existing, error: fetchError } = await supabase
-        .from('workspace_settings')
+      // Check if interface exists in new interfaces table
+      const { data: interfaceData, error: checkError } = await supabase
+        .from('interfaces')
         .select('id')
+        .eq('id', interfaceId)
         .maybeSingle()
 
-      // Handle case where table/column doesn't exist or RLS blocks access
-      if (fetchError) {
-        console.warn('Could not access workspace_settings:', fetchError)
-        alert('Could not update default interface. The workspace_settings table may need to be configured.')
-        return
-      }
+      if (!checkError && interfaceData) {
+        // New system: update interfaces table directly
+        // First, unset all other defaults
+        await supabase
+          .from('interfaces')
+          .update({ is_default: false })
+          .neq('id', interfaceId)
 
-      if (existing) {
+        // Then set this one as default
         const { error: updateError } = await supabase
-          .from('workspace_settings')
-          .update({ default_interface_id: interfaceId })
-          .eq('id', existing.id)
+          .from('interfaces')
+          .update({ is_default: true })
+          .eq('id', interfaceId)
 
         if (updateError) throw updateError
       } else {
-        const { error: insertError } = await supabase
+        // Old system: use workspace_settings
+        // Get or create workspace_settings
+        const { data: existing, error: fetchError } = await supabase
           .from('workspace_settings')
-          .insert({ default_interface_id: interfaceId })
+          .select('id')
+          .maybeSingle()
 
-        if (insertError) throw insertError
+        // Handle case where table/column doesn't exist or RLS blocks access
+        if (fetchError) {
+          console.warn('Could not access workspace_settings:', fetchError)
+          alert('Could not update default interface. The workspace_settings table may need to be configured.')
+          return
+        }
+
+        if (existing) {
+          const { error: updateError } = await supabase
+            .from('workspace_settings')
+            .update({ default_interface_id: interfaceId })
+            .eq('id', existing.id)
+
+          if (updateError) throw updateError
+        } else {
+          const { error: insertError } = await supabase
+            .from('workspace_settings')
+            .insert({ default_interface_id: interfaceId })
+
+          if (insertError) throw insertError
+        }
       }
 
       loadInterfaces()

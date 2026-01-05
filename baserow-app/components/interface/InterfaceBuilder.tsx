@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
+import { useBlockEditMode } from "@/contexts/EditModeContext"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
@@ -34,22 +35,16 @@ export default function InterfaceBuilder({
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   
-  // Default to view mode - editing is explicit and intentional
-  // Persist edit mode preference in localStorage per page
-  const [isEditing, setIsEditing] = useState(() => {
-    if (typeof window === 'undefined') return false
-    if (isViewer) return false // Force view mode if viewer prop is set
-    const saved = localStorage.getItem(`interface-edit-mode-${page.id}`)
-    return saved === 'true'
-  })
+  // Use unified editing context for block editing
+  const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   
-  // Sync edit mode to localStorage when it changes
+  // Override edit mode if viewer mode is forced
+  const effectiveIsEditing = isViewer ? false : isEditing
+  
+  // Notify parent of edit mode changes
   useEffect(() => {
-    if (typeof window !== 'undefined' && !isViewer) {
-      localStorage.setItem(`interface-edit-mode-${page.id}`, String(isEditing))
-    }
-    onEditModeChange?.(isEditing)
-  }, [isEditing, page.id, isViewer, onEditModeChange])
+    onEditModeChange?.(effectiveIsEditing)
+  }, [effectiveIsEditing, onEditModeChange])
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -76,7 +71,7 @@ export default function InterfaceBuilder({
   const saveLayout = useCallback(
     async (layout: LayoutItem[]) => {
       // Only save in edit mode - view mode must never mutate layout
-      if (!isEditing) return
+      if (!effectiveIsEditing) return
 
       setSaveStatus("saving")
       try {
@@ -106,7 +101,7 @@ export default function InterfaceBuilder({
         setTimeout(() => setSaveStatus("idle"), 3000)
       }
     },
-    [page.id, isEditing, toast]
+    [page.id, effectiveIsEditing, toast]
   )
 
   /**
@@ -120,7 +115,7 @@ export default function InterfaceBuilder({
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
       // Only save in edit mode - view mode never mutates layout
-      if (!isEditing) return
+      if (!effectiveIsEditing) return
 
       // Update local state immediately for responsive UI
       // This gives instant feedback while dragging/resizing
@@ -154,7 +149,7 @@ export default function InterfaceBuilder({
         saveLayout(layout)
       }, 500)
     },
-    [isEditing, saveLayout]
+    [effectiveIsEditing, saveLayout]
   )
 
   // Save layout immediately when exiting edit mode
@@ -186,10 +181,10 @@ export default function InterfaceBuilder({
       }
     }
 
-    setIsEditing(false)
+    exitBlockEdit()
     setSelectedBlockId(null)
     setSettingsPanelOpen(false)
-  }, [blocks, pendingLayout, saveLayout])
+  }, [blocks, pendingLayout, saveLayout, exitBlockEdit])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -473,7 +468,7 @@ export default function InterfaceBuilder({
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (!isEditing) return
+    if (!effectiveIsEditing) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts if user is typing in an input/textarea
@@ -503,7 +498,7 @@ export default function InterfaceBuilder({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [isEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode])
+  }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode])
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -526,7 +521,7 @@ export default function InterfaceBuilder({
                 {currentPage.description && (
                   <p className="text-xs text-gray-500 mt-0.5 truncate">{currentPage.description}</p>
                 )}
-                {currentPage.updated_at && !isEditing && (
+                {currentPage.updated_at && !effectiveIsEditing && (
                   <p className="text-xs text-gray-400 mt-1" suppressHydrationWarning>
                     Last updated {new Date(currentPage.updated_at).toLocaleString()}
                   </p>
@@ -543,7 +538,7 @@ export default function InterfaceBuilder({
                 <Settings className="h-4 w-4" />
                 <span className="hidden sm:inline">Settings</span>
               </button>
-              {isEditing ? (
+              {effectiveIsEditing ? (
               <>
                 {selectedBlock && (
                   <div className="px-3 py-1.5 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md">
@@ -598,7 +593,7 @@ export default function InterfaceBuilder({
               </>
             ) : (
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={() => enterBlockEdit()}
                 className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors"
               >
                 <Edit2 className="h-4 w-4" />
@@ -615,7 +610,7 @@ export default function InterfaceBuilder({
         <div className="flex-1 overflow-auto p-4">
           <Canvas
             blocks={blocks}
-            isEditing={isEditing}
+            isEditing={effectiveIsEditing}
             onLayoutChange={handleLayoutChange}
             onBlockUpdate={handleBlockUpdate}
             onBlockClick={setSelectedBlockId}
@@ -636,7 +631,7 @@ export default function InterfaceBuilder({
       </div>
 
       {/* Settings Panel - Only opens when explicitly clicked */}
-      {isEditing && (
+      {effectiveIsEditing && (
         <SettingsPanel
           block={selectedBlock}
           isOpen={settingsPanelOpen && !!selectedBlock}
@@ -652,7 +647,7 @@ export default function InterfaceBuilder({
       )}
 
       {/* Floating Block Picker - Only visible in edit mode */}
-      {isEditing && (
+      {effectiveIsEditing && (
         <FloatingBlockPicker onSelectBlock={handleAddBlock} />
       )}
 

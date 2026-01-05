@@ -1,6 +1,16 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, ReactNode } from "react"
+import { useEditMode } from "./EditModeContext"
+
+/**
+ * SidebarModeContext - Backward compatibility wrapper
+ * 
+ * This context is now a thin wrapper around the unified EditModeContext
+ * to maintain backward compatibility with existing components.
+ * 
+ * @deprecated Use useSidebarEditMode() from EditModeContext instead
+ */
 
 type SidebarMode = "view" | "edit"
 
@@ -13,24 +23,21 @@ interface SidebarModeContextType {
 const SidebarModeContext = createContext<SidebarModeContextType | undefined>(undefined)
 
 export function SidebarModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<SidebarMode>("view")
+  const { isEditing, toggleEditMode, enterEditMode, exitEditMode } = useEditMode()
 
-  // Load mode from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("sidebar-mode")
-    if (saved === "edit" || saved === "view") {
-      setModeState(saved)
-    }
-  }, [])
-
-  // Save mode to localStorage when it changes
+  const isSidebarEditing = isEditing("sidebar")
+  const mode: SidebarMode = isSidebarEditing ? "edit" : "view"
+  
   const setMode = (newMode: SidebarMode) => {
-    setModeState(newMode)
-    localStorage.setItem("sidebar-mode", newMode)
+    if (newMode === "edit") {
+      enterEditMode("sidebar")
+    } else {
+      exitEditMode("sidebar")
+    }
   }
 
   const toggleMode = () => {
-    setMode(mode === "view" ? "edit" : "view")
+    toggleEditMode("sidebar")
   }
 
   return (

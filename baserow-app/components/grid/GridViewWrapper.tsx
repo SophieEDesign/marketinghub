@@ -171,11 +171,23 @@ export default function GridViewWrapper({
   async function handleGroupByChange(fieldName: string | null) {
     try {
       // Update grid view settings instead of views.config
-      const { data: existing } = await supabase
+      // Handle case where table doesn't exist (404)
+      const { data: existing, error: fetchError } = await supabase
         .from("grid_view_settings")
         .select("id")
         .eq("view_id", viewId)
-        .single()
+        .maybeSingle()
+
+      if (fetchError) {
+        // If table doesn't exist (PGRST205) or 404, skip update
+        if (fetchError.code === 'PGRST205' || fetchError.code === '42P01') {
+          console.warn("grid_view_settings table does not exist. Run migration to create it.")
+          // Fallback: update in views.config for backward compatibility
+          setGroupBy(fieldName || undefined)
+          return
+        }
+        throw fetchError
+      }
 
       if (existing) {
         // Update existing settings
@@ -184,7 +196,14 @@ export default function GridViewWrapper({
           .update({ group_by_field: fieldName })
           .eq("view_id", viewId)
 
-        if (error) throw error
+        if (error) {
+          if (error.code === 'PGRST205' || error.code === '42P01') {
+            console.warn("grid_view_settings table does not exist. Run migration to create it.")
+            setGroupBy(fieldName || undefined)
+            return
+          }
+          throw error
+        }
       } else {
         // Create new settings
         const { error } = await supabase
@@ -201,13 +220,21 @@ export default function GridViewWrapper({
             },
           ])
 
-        if (error) throw error
+        if (error) {
+          if (error.code === 'PGRST205' || error.code === '42P01') {
+            console.warn("grid_view_settings table does not exist. Run migration to create it.")
+            setGroupBy(fieldName || undefined)
+            return
+          }
+          throw error
+        }
       }
 
       setGroupBy(fieldName || undefined)
     } catch (error) {
       console.error("Error updating group by:", error)
-      throw error
+      // Don't throw - just log and update state
+      setGroupBy(fieldName || undefined)
     }
   }
 
