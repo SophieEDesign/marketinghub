@@ -112,13 +112,58 @@ export default function GridViewWrapper({
 
   async function handleSortCreate(sort: Omit<Sort, "id">) {
     try {
+      // Check if view exists first (for SQL-view backed pages)
+      const { data: viewExists } = await supabase
+        .from("views")
+        .select("id")
+        .eq("id", viewId)
+        .maybeSingle()
+
+      if (!viewExists) {
+        console.warn("View does not exist. Cannot create sort for SQL-view backed pages.")
+        return
+      }
+
       // Get current max order_index
-      const { data: existingSorts } = await supabase
+      const { data: existingSorts, error: fetchError } = await supabase
         .from("view_sorts")
         .select("order_index")
         .eq("view_id", viewId)
         .order("order_index", { ascending: false })
         .limit(1)
+
+      if (fetchError) {
+        // If order_index column doesn't exist, try without ordering
+        if (fetchError.code === '42703' || fetchError.message?.includes('order_index')) {
+          const { data: sortsWithoutOrder } = await supabase
+            .from("view_sorts")
+            .select("*")
+            .eq("view_id", viewId)
+          
+          const nextOrderIndex = sortsWithoutOrder ? sortsWithoutOrder.length : 0
+          
+          const { data, error } = await supabase
+            .from("view_sorts")
+            .insert([
+              {
+                view_id: viewId,
+                field_name: sort.field_name,
+                direction: sort.direction,
+              },
+            ])
+            .select()
+            .single()
+
+          if (error) {
+            console.error("Error creating sort:", error)
+            throw error
+          }
+
+          setSorts((prev) => [...prev, { ...sort, id: data.id }])
+          return
+        }
+        throw fetchError
+      }
 
       const nextOrderIndex = existingSorts && existingSorts.length > 0
         ? (existingSorts[0].order_index || 0) + 1

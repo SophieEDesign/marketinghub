@@ -86,9 +86,21 @@ export default function PageRenderer({
         )
 
       case 'calendar':
+        // Don't render CalendarView for SQL-view backed pages (no tableId)
+        const calendarTableId = config.table_id || config.base_table || page.base_table || ''
+        if (!calendarTableId && page.source_view) {
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center max-w-md">
+                <div className="text-sm mb-2">Calendar view requires a table connection.</div>
+                <div className="text-xs text-gray-400">This page is SQL-view backed. Please configure it with a table anchor in Settings.</div>
+              </div>
+            </div>
+          )
+        }
         return (
           <CalendarView
-            tableId={config.table_id || config.base_table || ''}
+            tableId={calendarTableId}
             viewId={config.view_id || page.id}
             dateFieldId={config.start_date_field || ''}
             fieldIds={config.fields || []}

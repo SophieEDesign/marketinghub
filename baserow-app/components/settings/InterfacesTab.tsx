@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Settings, GripVertical } from 'lucide-react'
+import { Settings, GripVertical, Folder } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import InterfaceDetailDrawer from './InterfaceDetailDrawer'
 
@@ -70,75 +70,58 @@ export default function InterfacesTab() {
   async function loadInterfacesFromPagesTable(pagesData: any[]) {
     const supabase = createClient()
     
-    // Load interface groups (matches sidebar)
-    const groupIds = [...new Set(pagesData.map(p => p.group_id).filter(Boolean))]
-    const groupMap = new Map<string, { id: string; name: string }>()
-    
-    if (groupIds.length > 0) {
-      const { data: groupsData } = await supabase
-        .from('interface_groups')
-        .select('id, name')
-        .in('id', groupIds)
+    // Load ALL interface groups (interfaces) - not just ones with pages
+    // This matches the sidebar: interfaces are the containers, pages belong to them
+    const { data: groupsData } = await supabase
+      .from('interface_groups')
+      .select('id, name, order_index, is_system')
+      .order('order_index', { ascending: true })
 
-      groupsData?.forEach(g => {
-        groupMap.set(g.id, { id: g.id, name: g.name })
-      })
-    }
+    // Filter out system groups (like "Ungrouped") from display
+    const allGroups = (groupsData || [])
+      .filter(g => !g.is_system)
+      .map(g => ({
+        id: g.id,
+        name: g.name,
+        order_index: g.order_index || 0,
+      }))
 
-    // Group pages by group_id (matches sidebar logic)
-    const grouped: InterfaceGroup[] = []
-    const uncategorized: Interface[] = []
-
+    // Group pages by group_id
+    const pagesByGroup = new Map<string, any[]>()
     pagesData.forEach((page) => {
       const groupId = page.group_id
-      const groupName = groupId ? groupMap.get(groupId)?.name || null : null
-
-      const interfaceData: Interface = {
-        id: page.id,
-        name: page.name,
-        type: 'interface',
-        group_id: groupId,
-        category_id: groupId, // Use group_id as category_id for compatibility
-        group_name: groupName,
-        category_name: groupName,
-        order_index: page.order_index || 0,
-        is_admin_only: page.is_admin_only || false,
-        is_default: false, // interface_pages doesn't have is_default
-        created_at: page.created_at,
-      }
-
-      if (groupId && groupMap.has(groupId)) {
-        const group = grouped.find(g => g.id === groupId)
-        if (group) {
-          group.interfaces.push(interfaceData)
-        } else {
-          grouped.push({
-            id: groupId,
-            name: groupMap.get(groupId)!.name,
-            interfaces: [interfaceData],
-          })
+      if (groupId) {
+        if (!pagesByGroup.has(groupId)) {
+          pagesByGroup.set(groupId, [])
         }
-      } else {
-        uncategorized.push(interfaceData)
+        pagesByGroup.get(groupId)!.push({
+          id: page.id,
+          name: page.name,
+          type: 'interface',
+          group_id: groupId,
+          order_index: page.order_index || 0,
+          is_admin_only: page.is_admin_only || false,
+          created_at: page.created_at,
+        })
       }
     })
 
-    // Sort interfaces within each group by order_index
-    grouped.forEach(group => {
-      group.interfaces.sort((a, b) => a.order_index - b.order_index)
+    // Sort pages within each group by order_index
+    pagesByGroup.forEach((pages) => {
+      pages.sort((a, b) => a.order_index - b.order_index)
     })
-    uncategorized.sort((a, b) => a.order_index - b.order_index)
 
-    // Add "Ungrouped" group if needed (matches sidebar)
-    if (uncategorized.length > 0) {
-      grouped.push({
-        id: 'ungrouped-system-virtual',
-        name: 'Ungrouped',
-        interfaces: uncategorized,
-      })
-    }
+    // Build grouped structure: interfaces (groups) with their pages
+    const grouped: InterfaceGroup[] = allGroups.map(group => ({
+      id: group.id,
+      name: group.name,
+      interfaces: pagesByGroup.get(group.id) || [],
+    }))
 
-    setGroups(grouped)
+    // Only show interfaces that have pages (matches sidebar behavior)
+    const filteredGroups = grouped.filter(g => g.interfaces.length > 0)
+
+    setGroups(filteredGroups)
   }
 
   async function loadInterfacesFromViewsTable() {
@@ -398,65 +381,73 @@ export default function InterfacesTab() {
         <CardHeader>
           <CardTitle>Interface Access & Sharing</CardTitle>
           <CardDescription>
-            Manage access permissions and sharing for Interfaces. To create or edit Pages, use the Pages tab.
+            Manage Interfaces (containers) and their Pages. Interfaces group related pages together. To create or edit Pages, use the Pages tab.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg">
-              <p className="text-sm mb-2">No interface pages found</p>
-              <p className="text-xs">Create your first page from the sidebar</p>
+              <p className="text-sm mb-2">No interfaces found</p>
+              <p className="text-xs">Create your first interface and pages from the sidebar</p>
             </div>
           ) : (
             <div className="space-y-6">
               {groups.map((group) => (
                 <div key={group.id} className="space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    {group.name}
-                  </h3>
-                  <div className="space-y-2">
-                    {group.interfaces.map((iface) => (
-                      <div
-                        key={iface.id}
-                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleOpenDetail(iface)}
-                                className="font-medium text-gray-900 hover:text-blue-600 text-left"
-                              >
-                                {iface.name}
-                              </button>
-                              {iface.is_default && (
-                                <Badge variant="outline" className="text-xs">
-                                  Default
-                                </Badge>
-                              )}
+                  {/* Interface Header */}
+                  <div className="flex items-center justify-between p-3 bg-gray-50 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Folder className="h-5 w-5 text-gray-500" />
+                      <h3 className="text-base font-semibold text-gray-900">
+                        {group.name}
+                      </h3>
+                      <Badge variant="outline" className="text-xs">
+                        {group.interfaces.length} {group.interfaces.length === 1 ? 'page' : 'pages'}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Pages under this Interface */}
+                  {group.interfaces.length > 0 && (
+                    <div className="space-y-2 pl-6">
+                      {group.interfaces.map((page) => (
+                        <div
+                          key={page.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleOpenDetail(page)}
+                                  className="font-medium text-gray-900 hover:text-blue-600 text-left"
+                                >
+                                  {page.name}
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Admin only</span>
-                            <Switch
-                              checked={iface.is_admin_only}
-                              onCheckedChange={() => handleToggleAccess(iface.id, iface.is_admin_only)}
-                            />
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Admin only</span>
+                              <Switch
+                                checked={page.is_admin_only}
+                                onCheckedChange={() => handleToggleAccess(page.id, page.is_admin_only)}
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenDetail(page)}
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDetail(iface)}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

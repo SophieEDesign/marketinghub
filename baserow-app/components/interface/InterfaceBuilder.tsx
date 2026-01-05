@@ -245,14 +245,30 @@ export default function InterfaceBuilder({
           }),
         })
 
-        const { block } = await response.json()
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to create block' }))
+          throw new Error(errorData.error || 'Failed to create block')
+        }
+
+        const data = await response.json()
+        const block = data.block
+
+        if (!block || !block.id) {
+          throw new Error('Invalid block data returned from server')
+        }
+
         setBlocks((prev) => [...prev, block])
         setSelectedBlockId(block.id)
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to create block:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to create block",
+          description: error.message || "Please try again",
+        })
       }
     },
-    [page.id, blocks]
+    [page.id, blocks, toast]
   )
 
   const handleDeleteBlock = useCallback(

@@ -10,15 +10,16 @@ import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { pageId } = await params
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('view_blocks')
       .select('*')
-      .eq('view_id', params.pageId)
+      .eq('view_id', pageId)
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -57,15 +58,16 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { pageId } = await params
     const body = await request.json()
     const { layout, blockUpdates } = body
 
     // Save layout if provided
     if (layout && Array.isArray(layout)) {
-      await saveBlockLayout(params.pageId, layout as LayoutItem[])
+      await saveBlockLayout(pageId, layout as LayoutItem[])
     }
 
     // Update individual blocks if provided
@@ -128,9 +130,10 @@ export async function PATCH(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { pageId: string } }
+  { params }: { params: Promise<{ pageId: string }> }
 ) {
   try {
+    const { pageId } = await params
     const body = await request.json()
     const { type, x, y, w, h, config } = body
 
@@ -145,7 +148,7 @@ export async function POST(
     const normalizedConfig = normalizeBlockConfig(type as BlockType, config || {})
     
     const block = await createBlock(
-      params.pageId,
+      pageId,
       type,
       x || 0,
       y || 0,
@@ -153,6 +156,13 @@ export async function POST(
       h || 4,
       normalizedConfig
     )
+
+    if (!block || !block.id) {
+      return NextResponse.json(
+        { error: 'Failed to create block: No block returned' },
+        { status: 500 }
+      )
+    }
 
     // createBlock already returns a PageBlock, so we can return it directly
     return NextResponse.json({ block })

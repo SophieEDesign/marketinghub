@@ -134,37 +134,85 @@ export default function PageDisplaySettingsPanel({
           setFilters(filtersWithNames)
 
           // Load sorts - need to map field_id to field name
-          const { data: sortsData } = await supabase
-            .from('view_sorts')
-            .select('*')
-            .eq('view_id', page.saved_view_id)
-            .order('order_index', { ascending: true })
-          
-          // Map field_id to field name
-          const sortsWithNames = (sortsData || []).map((s: any, idx: number) => {
-            let fieldName = s.field_name
-            if (!fieldName && s.field_id) {
-              // Look up field name from field_id
-              const field = fields.find((tf) => tf.id === s.field_id)
-              fieldName = field?.name || s.field_id
+          // Handle errors gracefully (view might not exist or table might not exist)
+          try {
+            const { data: sortsData, error: sortsError } = await supabase
+              .from('view_sorts')
+              .select('*')
+              .eq('view_id', page.saved_view_id)
+            
+            if (sortsError) {
+              // If order_index column doesn't exist, try without ordering
+              if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
+                const { data: sortsWithoutOrder } = await supabase
+                  .from('view_sorts')
+                  .select('*')
+                  .eq('view_id', page.saved_view_id)
+                
+                if (sortsWithoutOrder) {
+                  const sortsWithNames = sortsWithoutOrder.map((s: any, idx: number) => {
+                    let fieldName = s.field_name
+                    if (!fieldName && s.field_id) {
+                      const field = fields.find((tf) => tf.id === s.field_id)
+                      fieldName = field?.name || s.field_id
+                    }
+                    return {
+                      id: s.id,
+                      field_name: fieldName || '',
+                      direction: (s.direction || s.order_direction || 'asc') as 'asc' | 'desc',
+                      order_index: idx,
+                    }
+                  })
+                  setSorts(sortsWithNames)
+                }
+              } else {
+                console.warn('Error loading view sorts:', sortsError)
+                setSorts([])
+              }
+            } else if (sortsData) {
+              // Sort client-side if order_index exists
+              const sorted = [...sortsData].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+              const sortsWithNames = sorted.map((s: any, idx: number) => {
+                let fieldName = s.field_name
+                if (!fieldName && s.field_id) {
+                  const field = fields.find((tf) => tf.id === s.field_id)
+                  fieldName = field?.name || s.field_id
+                }
+                return {
+                  id: s.id,
+                  field_name: fieldName || '',
+                  direction: (s.direction || s.order_direction || 'asc') as 'asc' | 'desc',
+                  order_index: s.order_index ?? idx,
+                }
+              })
+              setSorts(sortsWithNames)
             }
-            return {
-              id: s.id,
-              field_name: fieldName || '',
-              direction: (s.direction || s.order_direction || 'asc') as 'asc' | 'desc',
-              order_index: idx,
-            }
-          })
-          setSorts(sortsWithNames)
+          } catch (error) {
+            console.warn('Error loading view sorts:', error)
+            setSorts([])
+          }
 
           // Load grouping from grid_view_settings
-          const { data: gridSettings } = await supabase
-            .from('grid_view_settings')
-            .select('group_by_field')
-            .eq('view_id', page.saved_view_id)
-            .single()
-          if (gridSettings?.group_by_field) {
-            setGroupBy(gridSettings.group_by_field)
+          // Handle errors gracefully (table might not exist)
+          try {
+            const { data: gridSettings, error: gridError } = await supabase
+              .from('grid_view_settings')
+              .select('group_by_field')
+              .eq('view_id', page.saved_view_id)
+              .maybeSingle()
+            
+            if (gridError) {
+              // If table doesn't exist, skip silently
+              if (gridError.code === 'PGRST205' || gridError.code === '42P01') {
+                console.warn('grid_view_settings table does not exist. Skipping group_by load.')
+              } else {
+                console.warn('Error loading grid_view_settings:', gridError)
+              }
+            } else if (gridSettings?.group_by_field) {
+              setGroupBy(gridSettings.group_by_field)
+            }
+          } catch (error) {
+            console.warn('Error loading grid_view_settings:', error)
           }
         }
       }

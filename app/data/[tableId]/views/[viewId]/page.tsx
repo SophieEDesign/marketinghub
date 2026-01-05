@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { checkViewAccess } from '@/lib/permissions'
+import { isAdmin } from '@/lib/roles'
 import { loadView, loadViewFields, loadViewTabs } from '@/lib/views'
 import { loadViewBlocks } from '@/lib/blocks'
 import { loadRows } from '@/lib/data'
@@ -16,6 +17,26 @@ export default async function ViewPage({
 }: {
   params: { tableId: string; viewId: string }
 }) {
+  // Security: Only admins can access Core Data (tables/views)
+  const admin = await isAdmin()
+  if (!admin) {
+    // Redirect to first available interface page
+    const supabase = await createServerSupabaseClient()
+    const { data: firstPage } = await supabase
+      .from('interface_pages')
+      .select('id')
+      .or('is_admin_only.is.null,is_admin_only.eq.false')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstPage) {
+      redirect(`/pages/${firstPage.id}`)
+    } else {
+      redirect('/')
+    }
+  }
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },

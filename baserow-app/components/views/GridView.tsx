@@ -34,6 +34,21 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
 
   async function loadViewConfig() {
     try {
+      // Check if view exists first (for SQL-view backed pages)
+      const { data: viewExists } = await supabase
+        .from("views")
+        .select("id")
+        .eq("id", viewId)
+        .maybeSingle()
+
+      if (!viewExists) {
+        // View doesn't exist - likely SQL-view backed page, skip loading config
+        console.warn("View does not exist. Skipping view config load for SQL-view backed pages.")
+        setFilters([])
+        setSorts([])
+        return
+      }
+
       const { data: viewFilters, error: filtersError } = await supabase
         .from("view_filters")
         .select("*")
@@ -52,8 +67,13 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
         .eq("view_id", viewId)
 
       if (sortsError) {
-        // If order_index column doesn't exist, try without ordering
-        if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
+        // Handle different error cases
+        if (sortsError.code === 'PGRST116' || sortsError.code === '42P01') {
+          // Table doesn't exist or no rows
+          console.warn("view_sorts table doesn't exist or view has no sorts")
+          setSorts([])
+        } else if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
+          // If order_index column doesn't exist, try without ordering
           const { data: sortsWithoutOrder } = await supabase
             .from("view_sorts")
             .select("*")
@@ -64,14 +84,19 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
           }
         } else {
           console.warn("Error loading view sorts:", sortsError)
+          setSorts([])
         }
       } else if (viewSorts) {
         // Sort client-side if order_index exists
         const sorted = [...viewSorts].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
         setSorts(sorted)
+      } else {
+        setSorts([])
       }
     } catch (error) {
       console.error("Error loading view config:", error)
+      setFilters([])
+      setSorts([])
     }
   }
 

@@ -1,19 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import {
-  getSidebarCategories,
-  getSidebarItems,
-  getTablesWithViews,
-  getDashboardViews,
-  ensureSidebarItemsForTables,
-  ensureDashboardsCategory,
-  getUserRoles,
-} from '@/lib/navigation'
-import SidebarCategory from './SidebarCategory'
-import SidebarItem from './SidebarItem'
+import { isAdmin } from '@/lib/roles'
+import { getTables } from '@/lib/navigation'
+import InterfaceSection from './InterfaceSection'
 import TableSection from './TableSection'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Plus, Upload } from 'lucide-react'
+import SidebarItem from './SidebarItem'
 
 export default async function Sidebar() {
   const supabase = await createServerSupabaseClient()
@@ -25,47 +15,85 @@ export default async function Sidebar() {
     return null
   }
 
-  // Ensure sidebar items exist for all tables
-  await ensureSidebarItemsForTables()
-  await ensureDashboardsCategory()
+  // Check if user is admin - tables are admin-only
+  const userIsAdmin = await isAdmin()
 
-  // Load sidebar structure
-  const categories = await getSidebarCategories()
-  const sidebarItems = await getSidebarItems()
-  const userRoles = await getUserRoles(user.id)
-
-  // Load tables with views
-  const tablesWithViews = await getTablesWithViews(user.id)
-
-  // Load dashboard views
-  const dashboardViews = await getDashboardViews()
-  const visibleDashboards = dashboardViews.filter((view) => {
-    if (view.access_level === 'public') return true
-    if (view.access_level === 'authenticated') return true
-    if (view.access_level === 'owner') {
-      if (view.allowed_roles && view.allowed_roles.length > 0) {
-        return view.allowed_roles.some((role) => userRoles.includes(role))
-      }
-      return true
+  // Load interface groups (interfaces) and their pages
+  // This is the ONLY navigation source - no legacy systems
+  let interfaceGroups: Array<{ 
+    id: string
+    name: string
+    order_index: number
+    collapsed: boolean
+  }> = []
+  
+  let interfacePagesByGroup: Map<string, Array<{ 
+    id: string
+    name: string
+    order_index: number
+  }>> = new Map()
+  
+  try {
+    // Load interface groups (interfaces) - filter out system groups
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('interface_groups')
+      .select('id, name, order_index, collapsed, is_system')
+      .order('order_index', { ascending: true })
+    
+    if (!groupsError && groupsData) {
+      // Filter out system groups (like "Ungrouped") from display
+      interfaceGroups = groupsData
+        .filter(g => !g.is_system)
+        .map(g => ({
+          id: g.id,
+          name: g.name,
+          order_index: g.order_index || 0,
+          collapsed: g.collapsed || false,
+        }))
     }
-    return false
-  })
 
-  // Get dashboards category
-  const dashboardsCategory = categories.find((c) => c.name === 'Dashboards')
-
-  // Group items by category
-  const itemsByCategory = new Map<string | null, typeof sidebarItems>()
-  sidebarItems.forEach((item) => {
-    const key = item.category_id || null
-    if (!itemsByCategory.has(key)) {
-      itemsByCategory.set(key, [])
+    // Load interface pages - these are the ONLY navigable items
+    let pagesQuery = supabase
+      .from('interface_pages')
+      .select('id, name, group_id, order_index, is_admin_only')
+      .order('order_index', { ascending: true })
+    
+    // Filter out admin-only pages for non-admin users
+    if (!userIsAdmin) {
+      pagesQuery = pagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
     }
-    itemsByCategory.get(key)!.push(item)
-  })
+    
+    const { data: pagesData, error: pagesError } = await pagesQuery
+    
+    if (!pagesError && pagesData) {
+      // Group pages by group_id (interface)
+      pagesData.forEach((page) => {
+        const groupId = page.group_id
+        if (groupId) {
+          if (!interfacePagesByGroup.has(groupId)) {
+            interfacePagesByGroup.set(groupId, [])
+          }
+          interfacePagesByGroup.get(groupId)!.push({
+            id: page.id,
+            name: page.name,
+            order_index: page.order_index || 0,
+          })
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Error loading interfaces:', error)
+  }
 
-  // Get tables from sidebar items
-  const tableItems = sidebarItems.filter((item) => item.item_type === 'table')
+  // Load tables for admin-only section
+  let tables: Array<{ id: string; name: string; supabase_table: string }> = []
+  if (userIsAdmin) {
+    try {
+      tables = await getTables()
+    } catch (error) {
+      console.error('Error loading tables:', error)
+    }
+  }
 
   return (
     <div className="flex h-full w-[260px] flex-col border-r bg-background">
@@ -93,106 +121,56 @@ export default async function Sidebar() {
           />
         </div>
 
-        {/* Render categories with their items */}
-        {categories
-          .filter((category) => category.name !== 'Dashboards') // Dashboards handled separately
-          .sort((a, b) => a.position - b.position)
-          .map((category) => {
-            const categoryItems = (itemsByCategory.get(category.id) || []).sort(
-              (a, b) => a.position - b.position
-            )
-            if (categoryItems.length === 0) return null
-            return (
-              <SidebarCategory
-                key={category.id}
-                id={category.id}
-                name={category.name}
-                icon={category.icon}
-                items={categoryItems.map((item) => ({
-                  id: item.id,
-                  label: item.label,
-                  href: item.href,
-                  icon: item.icon,
-                }))}
-              />
-            )
-          })}
-
-        {/* Dashboards Category */}
-        {dashboardsCategory && (
-          <SidebarCategory
-            id={dashboardsCategory.id}
-            name={dashboardsCategory.name}
-            icon={dashboardsCategory.icon}
-            items={visibleDashboards.map((view) => {
-              // Find table for this view
-              const table = tablesWithViews.find((t) => t.id === view.table_id)
-              return {
-                id: view.id,
-                label: view.name,
-                href: table ? `/data/${table.id}/views/${view.id}` : '#',
-                icon: 'layout-dashboard',
-              }
-            })}
-          >
-            <div className="pl-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start text-muted-foreground hover:text-foreground"
-                asChild
-              >
-                <Link href="/data/dashboards/new">
-                  <Plus className="mr-2 h-3 w-3" />
-                  Create Dashboard
-                </Link>
-              </Button>
-            </div>
-          </SidebarCategory>
-        )}
-
-        {/* Tables Section - from sidebar_items */}
-        {tableItems.length > 0 && (
+        {/* Interfaces Section - Primary Navigation */}
+        {interfaceGroups.length > 0 && (
           <div className="space-y-1">
-            {tableItems
-              .sort((a, b) => a.position - b.position)
-              .map((item) => {
-                const table = tablesWithViews.find((t) => t.id === item.item_id)
-                if (!table) return null
-
-                const tableViews = table.views.filter((v) => v.type !== 'page')
-
-                return (
-                  <TableSection
-                    key={item.id}
-                    tableId={table.id}
-                    tableName={table.name}
-                    views={tableViews}
-                  />
-                )
-              })}
+            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Interfaces
+            </div>
+            {interfaceGroups.map((group) => {
+              const pages = interfacePagesByGroup.get(group.id) || []
+              
+              return (
+                <InterfaceSection
+                  key={group.id}
+                  interfaceId={group.id}
+                  interfaceName={group.name}
+                  pages={pages}
+                  defaultCollapsed={group.collapsed}
+                  isAdmin={userIsAdmin}
+                />
+              )
+            })}
           </div>
         )}
 
-        {/* Uncategorized items */}
-        {itemsByCategory.has(null) && (
-          <div className="space-y-1">
-            {itemsByCategory
-              .get(null)!
-              .sort((a, b) => a.position - b.position)
-              .map((item) => (
-                <SidebarItem
-                  key={item.id}
-                  id={item.id}
-                  label={item.label}
-                  href={item.href}
-                  icon={item.icon}
-                />
-              ))}
+        {/* Empty State - No Interfaces */}
+        {interfaceGroups.length === 0 && (
+          <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+            <p className="mb-2">No interfaces yet</p>
+            {userIsAdmin && (
+              <p className="text-xs">Create interfaces and pages in Settings</p>
+            )}
+          </div>
+        )}
+
+        {/* Admin / Data Section - Admin Only */}
+        {userIsAdmin && tables.length > 0 && (
+          <div className="space-y-1 mt-6 border-t pt-4">
+            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Admin / Data
+            </div>
+            {tables.map((table) => (
+              <TableSection
+                key={table.id}
+                tableId={table.id}
+                tableName={table.name}
+                views={[]} // Views are internal-only, not shown
+              />
+            ))}
           </div>
         )}
       </div>
     </div>
   )
 }
-
