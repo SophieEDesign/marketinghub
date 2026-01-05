@@ -330,10 +330,12 @@ export default function RecordPageClient({
                   <h2 className="text-sm font-semibold text-gray-900">Activity</h2>
                 </div>
                 <div className="p-6">
-                  <RecordActivity
-                    tableId={tableId}
-                    recordId={recordId}
-                  />
+                  {record && (
+                    <RecordActivity
+                      tableId={tableId}
+                      record={record}
+                    />
+                  )}
                 </div>
               </div>
             </div>
