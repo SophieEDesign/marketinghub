@@ -132,7 +132,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
               <div 
                 className="prose prose-sm max-w-none"
                 style={{
-                  textAlign: appearance.text_align || 'left',
+                  textAlign: (appearance.text_align || 'left') as 'left' | 'center' | 'right' | 'justify',
                   fontSize: appearance.text_size === 'small' ? '0.875rem' :
                             appearance.text_size === 'large' ? '1.125rem' :
                             appearance.text_size === 'xlarge' ? '1.25rem' :
