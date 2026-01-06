@@ -124,23 +124,20 @@ export default function AirtableKanbanView({
     setColumns(columnList)
   }, [collapsedColumns])
 
-  // Find groupable field
+  // Find groupable field - require explicit selection, no auto-detection
   useEffect(() => {
     if (kanbanGroupField) {
       const field = tableFields.find((f) => f.name === kanbanGroupField)
       if (field && (field.type === "single_select" || field.type === "multi_select")) {
         setGroupField(field)
         loadColumns(field)
+      } else {
+        // Field not found or wrong type - clear group field
+        setGroupField(null)
       }
     } else {
-      // Auto-detect first select field
-      const selectField = tableFields.find(
-        (f) => f.type === "single_select" || f.type === "multi_select"
-      )
-      if (selectField) {
-        setGroupField(selectField)
-        loadColumns(selectField)
-      }
+      // No group field specified - require user to select one
+      setGroupField(null)
     }
   }, [kanbanGroupField, tableFields, loadColumns])
 
@@ -383,13 +380,55 @@ export default function AirtableKanbanView({
   }
 
   if (!groupField) {
+    // Check if there are any select fields available
+    const selectFields = tableFields.filter(
+      (f) => f.type === "single_select" || f.type === "multi_select"
+    )
+    
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center p-8">
-          <p className="text-gray-700 font-medium mb-2">No groupable fields available</p>
-          <p className="text-sm text-gray-500">
-            Create a select field first to use Kanban view
+      <div className="flex items-center justify-center h-full bg-gray-50">
+        <div className="text-center p-8 max-w-md">
+          <div className="mb-4">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+              />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            Group Field Required
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Kanban view requires a field to group cards by. Please select a single-select or multi-select field to use as the grouping field.
           </p>
+          {selectFields.length > 0 ? (
+            <div className="mt-4">
+              <p className="text-xs text-gray-500 mb-2">Available select fields:</p>
+              <ul className="text-sm text-gray-700 space-y-1">
+                {selectFields.map((field) => (
+                  <li key={field.id} className="flex items-center justify-center gap-2">
+                    <span className="font-medium">{field.name}</span>
+                    <span className="text-xs text-gray-400">({field.type})</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500 mt-4">
+                Configure the group field in view settings
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">
+              No select fields found. Create a single-select or multi-select field first.
+            </p>
+          )}
         </div>
       </div>
     )

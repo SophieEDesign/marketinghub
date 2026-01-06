@@ -104,6 +104,11 @@ export default async function ViewPage({
     // Get groupBy from grid_view_settings (fallback to view.config for backward compatibility)
     const gridSettings = gridSettingsRes.status === 'fulfilled' && !gridSettingsRes.value.error ? gridSettingsRes.value.data : null
     const groupBy = gridSettings?.group_by_field || (view.config as { groupBy?: string })?.groupBy
+    
+    // For Kanban views, get group field from settings or config
+    const kanbanGroupField = view.type === "kanban" 
+      ? (groupBy || (view.config as { kanbanGroupField?: string })?.kanbanGroupField)
+      : undefined
 
     return (
       <WorkspaceShellWrapper title={view.name}>
@@ -127,7 +132,7 @@ export default async function ViewPage({
             tableId={params.tableId}
             viewId={params.viewId}
             fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
-            groupingFieldId={view.type === "kanban" ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined : undefined}
+            groupingFieldId={kanbanGroupField}
             dateFieldId={
               view.type === "calendar" || view.type === "timeline"
                 ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined

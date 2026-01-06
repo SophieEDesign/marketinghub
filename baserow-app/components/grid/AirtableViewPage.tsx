@@ -77,7 +77,7 @@ export default function AirtableViewPage({
     viewFields.filter(f => !f.visible).map(f => f.field_name)
   )
   const [kanbanGroupField, setKanbanGroupField] = useState<string | undefined>(
-    (view.config as { kanban_group_field?: string })?.kanban_group_field
+    initialGroupBy || (view.config as { kanban_group_field?: string })?.kanban_group_field
   )
   const [cardFields, setCardFields] = useState<string[]>(
     (view.config as { card_fields?: string[] })?.card_fields || []
