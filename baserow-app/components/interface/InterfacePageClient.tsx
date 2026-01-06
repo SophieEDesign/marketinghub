@@ -5,11 +5,13 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { Edit2, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
+import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
+import FormPageSettingsPanel from "./FormPageSettingsPanel"
 import { getPageTypeDefinition, getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 
@@ -44,6 +46,7 @@ export default function InterfacePageClient({
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
+  const [formSettingsOpen, setFormSettingsOpen] = useState(false)
   
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
@@ -58,21 +61,24 @@ export default function InterfacePageClient({
   useEffect(() => {
     if (page && page.source_view) {
       loadSqlViewData()
+    } else if (page && page.page_type === 'record_review' && page.saved_view_id) {
+      // Load table data for record_review pages
+      loadRecordReviewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.source_view, page?.config])
+  }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config])
 
   // Load blocks for dashboard/overview/content/record_review pages in BOTH edit and view mode
   // CRITICAL: Blocks must load in view mode so they render correctly
   useEffect(() => {
     if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-      // Load blocks if not already loaded
-      if (blocks.length === 0 && !blocksLoading) {
+      // Always reload blocks when page changes or when entering edit mode
+      if (!blocksLoading) {
         loadBlocks()
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id, page?.page_type])
+  }, [page?.id, page?.page_type, isBlockEditing])
 
   async function loadPage() {
     if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
@@ -126,6 +132,74 @@ export default function InterfacePageClient({
     }
   }
 
+  async function loadRecordReviewData() {
+    if (!page?.saved_view_id) return
+
+    try {
+      // Get table ID from the view
+      const supabase = createClient()
+      const { data: view, error: viewError } = await supabase
+        .from('views')
+        .select('table_id')
+        .eq('id', page.saved_view_id)
+        .single()
+
+      if (viewError || !view?.table_id) {
+        console.error("Error loading view:", viewError)
+        setData([])
+        return
+      }
+
+      // Get table name
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', view.table_id)
+        .single()
+
+      if (tableError || !table?.supabase_table) {
+        console.error("Error loading table:", tableError)
+        setData([])
+        return
+      }
+
+      // Load rows from table_rows or the actual table
+      // Try table_rows first (if it exists)
+      const { data: rowsData, error: rowsError } = await supabase
+        .from('table_rows')
+        .select('*')
+        .eq('table_id', view.table_id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (!rowsError && rowsData) {
+        // Convert table_rows format to flat format for RecordReviewView
+        const flatData = rowsData.map((row: any) => ({
+          id: row.id,
+          ...row.data,
+        }))
+        setData(flatData)
+      } else {
+        // Fallback: try loading from the actual table
+        const { data: tableData, error: tableDataError } = await supabase
+          .from(table.supabase_table)
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100)
+
+        if (!tableDataError && tableData) {
+          setData(tableData || [])
+        } else {
+          console.error("Error loading table data:", tableDataError)
+          setData([])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading record review data:", error)
+      setData([])
+    }
+  }
+
   async function loadBlocks() {
     if (!page) return
 
@@ -158,14 +232,16 @@ export default function InterfacePageClient({
     }
   }
 
-  // Reload blocks when exiting edit mode to ensure view mode shows latest changes
+  // Reload blocks when entering edit mode to ensure blocks are fresh
   useEffect(() => {
-    if (!isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-      // Reload blocks when exiting edit mode
-      loadBlocks()
+    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+      // Reload blocks when entering edit mode to ensure we have the latest
+      if (!blocksLoading) {
+        loadBlocks()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlockEditing, page?.id])
+  }, [isBlockEditing])
 
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)
@@ -232,12 +308,17 @@ export default function InterfacePageClient({
         setDisplaySettingsOpen(true)
         break
       case 'form':
-        // Open form builder (to be implemented)
-        enterPageEdit()
+        // Open form settings panel
+        setFormSettingsOpen(true)
         break
       case 'record':
-        // Open page display settings panel for record review pages
-        setDisplaySettingsOpen(true)
+        // For record review pages, check if they should use block editing or settings
+        // If page has blocks, use block editing; otherwise use settings panel
+        if (blocks.length > 0) {
+          enterBlockEdit()
+        } else {
+          setDisplaySettingsOpen(true)
+        }
         break
       default:
         // Fallback: try to open settings
@@ -353,7 +434,7 @@ export default function InterfacePageClient({
                                   page.page_type === 'dashboard' ? 'dashboard' : null
                 }
               } as any}
-              initialBlocks={blocks}
+              initialBlocks={blocks || []}
               isViewer={false}
               hideHeader={true}
             />
@@ -365,17 +446,27 @@ export default function InterfacePageClient({
             isLoading={loading}
             onGridToggle={showGridToggle ? handleGridToggle : undefined}
             showGridToggle={showGridToggle}
-            blocks={(isDashboardOrOverview || page?.page_type === 'record_review') ? blocks : undefined}
+            blocks={(isDashboardOrOverview || page?.page_type === 'record_review' || page?.page_type === 'content') ? blocks : undefined}
           />
         )}
       </div>
 
-      {/* Page Display Settings Panel */}
-      {page && (
+      {/* Page Display Settings Panel - Only for pages with saved_view_id, not dashboard pages */}
+      {page && page.page_type !== 'dashboard' && page.page_type !== 'overview' && page.page_type !== 'content' && (
         <PageDisplaySettingsPanel
           page={page}
           isOpen={displaySettingsOpen}
           onClose={() => setDisplaySettingsOpen(false)}
+          onUpdate={handlePageUpdate}
+        />
+      )}
+
+      {/* Form Page Settings Panel */}
+      {page && page.page_type === 'form' && (
+        <FormPageSettingsPanel
+          page={page}
+          isOpen={formSettingsOpen}
+          onClose={() => setFormSettingsOpen(false)}
           onUpdate={handlePageUpdate}
         />
       )}

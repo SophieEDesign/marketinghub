@@ -45,17 +45,19 @@ export default async function SettingsPage() {
         </div>
 
         <Tabs defaultValue="workspace" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9">
-            <TabsTrigger value="workspace">Workspace</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="interfaces">Interface Access & Sharing</TabsTrigger>
-            <TabsTrigger value="pages">Interface Pages</TabsTrigger>
-            <TabsTrigger value="data">Data</TabsTrigger>
-            <TabsTrigger value="storage">Storage</TabsTrigger>
-            <TabsTrigger value="api">API Keys</TabsTrigger>
-            <TabsTrigger value="branding">Branding</TabsTrigger>
-            <TabsTrigger value="automations">Automations</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto">
+            <TabsList className="inline-flex w-auto min-w-full">
+              <TabsTrigger value="workspace">Workspace</TabsTrigger>
+              <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="interfaces">Interface Access & Sharing</TabsTrigger>
+              <TabsTrigger value="pages">Interface Pages</TabsTrigger>
+              <TabsTrigger value="data">Data</TabsTrigger>
+              <TabsTrigger value="storage">Storage</TabsTrigger>
+              <TabsTrigger value="api">API Keys</TabsTrigger>
+              <TabsTrigger value="branding">Branding</TabsTrigger>
+              <TabsTrigger value="automations">Automations</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="workspace" className="space-y-4">
             <p className="text-sm text-muted-foreground mb-4">Identity & metadata only</p>

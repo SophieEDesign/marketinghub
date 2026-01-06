@@ -49,6 +49,18 @@ export default function InterfaceBuilder({
   useEffect(() => {
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
+
+  // Sync initialBlocks to blocks state when they change (important for async loading)
+  useEffect(() => {
+    if (initialBlocks && initialBlocks.length > 0) {
+      setBlocks(initialBlocks)
+    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0) {
+      // Only clear blocks if initialBlocks is explicitly empty (not just undefined)
+      setBlocks([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialBlocks])
+
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)

@@ -126,11 +126,11 @@ export default async function ViewPage({
             viewName={view.name}
             tableId={params.tableId}
             viewId={params.viewId}
-            fieldIds={viewFields.map((f) => f.field_name)}
-            groupingFieldId={view.type === "kanban" ? viewFields[0]?.field_name : undefined}
+            fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
+            groupingFieldId={view.type === "kanban" ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined : undefined}
             dateFieldId={
               view.type === "calendar" || view.type === "timeline"
-                ? viewFields[0]?.field_name
+                ? (Array.isArray(viewFields) && viewFields[0]?.field_name) || undefined
                 : undefined
             }
           />

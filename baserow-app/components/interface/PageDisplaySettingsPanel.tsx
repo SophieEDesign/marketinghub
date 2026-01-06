@@ -86,6 +86,27 @@ export default function PageDisplaySettingsPanel({
   async function loadInitialData() {
     if (!page) return
 
+    // Don't load settings for dashboard/overview/content pages - they use block editing
+    if (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content') {
+      return
+    }
+
+    // Reset state when panel opens/closes to prevent glitching
+    if (!isOpen) {
+      setSelectedTableId("")
+      setTableFields([])
+      setFilters([])
+      setSorts([])
+      setGroupBy("")
+      setLayout("")
+      setRecordPreview(true)
+      setDensity("medium")
+      setReadOnly(false)
+      setDefaultFocus("first")
+      setIsInitialLoad(true)
+      return
+    }
+
     setLoading(true)
     try {
       const supabase = createClient()

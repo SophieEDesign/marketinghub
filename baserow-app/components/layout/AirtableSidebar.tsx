@@ -61,7 +61,6 @@ export default function AirtableSidebar({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["interfaces"])
   )
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
   
@@ -79,25 +78,8 @@ export default function AirtableSidebar({
     }
     if (isTablePage) {
       setExpandedSections(prev => new Set(prev).add("core-data"))
-      // Extract table ID from pathname and expand it
-      const tableMatch = pathname.match(/\/tables\/([^\/]+)/)
-      if (tableMatch) {
-        setExpandedTables(prev => new Set(prev).add(tableMatch[1]))
-      }
     }
   }, [isInterfacePage, isTablePage, pathname])
-  
-  function toggleTable(tableId: string) {
-    setExpandedTables(prev => {
-      const next = new Set(prev)
-      if (next.has(tableId)) {
-        next.delete(tableId)
-      } else {
-        next.add(tableId)
-      }
-      return next
-    })
-  }
 
   function toggleSection(section: string) {
     setExpandedSections(prev => {
@@ -234,66 +216,21 @@ export default function AirtableSidebar({
             {expandedSections.has("core-data") && (
               <div className="space-y-0.5 px-2">
                 {tables.map((table) => {
-                  const tableViews = views[table.id] || []
-                  const isExpanded = expandedTables.has(table.id)
                   const isTableActive = pathname.includes(`/tables/${table.id}`)
                   
                   return (
-                    <div key={table.id}>
-                      <div className="flex items-center">
-                        {tableViews.length > 0 ? (
-                          <button
-                            onClick={() => toggleTable(table.id)}
-                            className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
-                            style={isTableActive ? { 
-                              backgroundColor: primaryColor + '15', 
-                              color: primaryColor 
-                            } : {}}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3 flex-shrink-0" />
-                            )}
-                            <Database className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate">{table.name}</span>
-                          </button>
-                        ) : (
-                          <Link
-                            href={`/tables/${table.id}`}
-                            className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
-                            style={isTableActive ? { 
-                              backgroundColor: primaryColor + '15', 
-                              color: primaryColor 
-                            } : {}}
-                          >
-                            <Database className="h-4 w-4 flex-shrink-0" />
-                            <span className="text-sm truncate">{table.name}</span>
-                          </Link>
-                        )}
-                      </div>
-                      {isExpanded && tableViews.length > 0 && (
-                        <div className="ml-6 mt-0.5 space-y-0.5">
-                          {tableViews.map((view) => {
-                            const isViewActive = pathname.includes(`/tables/${table.id}/views/${view.id}`)
-                            return (
-                              <Link
-                                key={view.id}
-                                href={`/tables/${table.id}/views/${view.id}`}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100 text-sm"
-                                style={isViewActive ? { 
-                                  backgroundColor: primaryColor + '15', 
-                                  color: primaryColor 
-                                } : {}}
-                              >
-                                <span className="text-xs">•</span>
-                                <span className="truncate">{view.name}</span>
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
+                    <Link
+                      key={table.id}
+                      href={`/tables/${table.id}`}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+                      style={isTableActive ? { 
+                        backgroundColor: primaryColor + '15', 
+                        color: primaryColor 
+                      } : {}}
+                    >
+                      <Database className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm truncate">{table.name}</span>
+                    </Link>
                   )
                 })}
               </div>

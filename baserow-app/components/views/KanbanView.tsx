@@ -134,7 +134,7 @@ export default function KanbanView({
                 >
                   <CardContent className="p-4">
                     <div className="space-y-2">
-                      {fieldIds
+                      {(Array.isArray(fieldIds) ? fieldIds : [])
                         .filter((fid) => fid !== groupingFieldId)
                         .slice(0, 3)
                         .map((fieldId) => (

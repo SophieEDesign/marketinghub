@@ -9,8 +9,6 @@ import {
   Database,
   FileText,
   LayoutDashboard,
-  ChevronDown,
-  ChevronUp,
   Upload,
   Settings,
   Plus,
@@ -56,18 +54,7 @@ export default function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const pathname = usePathname()
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
-
-  const toggleTable = (tableId: string) => {
-    const newExpanded = new Set(expandedTables)
-    if (newExpanded.has(tableId)) {
-      newExpanded.delete(tableId)
-    } else {
-      newExpanded.add(tableId)
-    }
-    setExpandedTables(newExpanded)
-  }
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/")
 
@@ -165,64 +152,16 @@ export default function Sidebar({
           )}
           <div className="space-y-0.5">
             {tables.map((table) => {
-              const tableViews = views[table.id] || []
-              const isExpanded = expandedTables.has(table.id)
               const isTableActive = isActive(`/tables/${table.id}`)
 
               return (
                 <div key={table.id}>
-                  <div
-                    className={cn(
-                      "flex items-center",
-                      isCollapsed && "justify-center"
-                    )}
-                  >
-                    {!isCollapsed && tableViews.length > 0 ? (
-                      <button
-                        onClick={() => toggleTable(table.id)}
-                        className="flex-1"
-                      >
-                        <SidebarItem
-                          icon={Database}
-                          label={table.name}
-                          active={isTableActive}
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="h-3 w-3" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </SidebarItem>
-                      </button>
-                    ) : (
-                      <SidebarItem
-                        href={`/tables/${table.id}`}
-                        icon={Database}
-                        label={table.name}
-                        active={isTableActive}
-                      />
-                    )}
-                  </div>
-
-                  {/* Views submenu */}
-                  {!isCollapsed && isExpanded && tableViews.length > 0 && (
-                    <div className="ml-4 mt-0.5 space-y-0.5">
-                      {tableViews.map((view) => {
-                        const isViewActive = isActive(
-                          `/tables/${table.id}/views/${view.id}`
-                        )
-                        return (
-                          <SidebarItem
-                            key={view.id}
-                            href={`/tables/${table.id}/views/${view.id}`}
-                            icon={FileText}
-                            label={view.name}
-                            active={isViewActive}
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
+                  <SidebarItem
+                    href={`/tables/${table.id}`}
+                    icon={Database}
+                    label={table.name}
+                    active={isTableActive}
+                  />
                 </div>
               )
             })}

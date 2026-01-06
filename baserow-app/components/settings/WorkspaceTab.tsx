@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { IconPicker } from '@/components/ui/icon-picker'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function SettingsWorkspaceTab() {
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
@@ -20,9 +21,14 @@ export default function SettingsWorkspaceTab() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [originalName, setOriginalName] = useState('Marketing Hub')
   const [originalIcon, setOriginalIcon] = useState('📊')
+  const [defaultPageId, setDefaultPageId] = useState<string>('')
+  const [originalDefaultPageId, setOriginalDefaultPageId] = useState<string>('')
+  const [interfacePages, setInterfacePages] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingPages, setLoadingPages] = useState(false)
 
   useEffect(() => {
     loadWorkspace()
+    loadInterfacePages()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -68,10 +74,52 @@ export default function SettingsWorkspaceTab() {
         }
         setCreatedAt(new Date().toISOString())
       }
+
+      // Load default page setting from workspace_settings
+      try {
+        const { data: settings, error: settingsError } = await supabase
+          .from('workspace_settings')
+          .select('default_interface_id')
+          .maybeSingle()
+
+        if (!settingsError && settings?.default_interface_id) {
+          setDefaultPageId(settings.default_interface_id)
+          setOriginalDefaultPageId(settings.default_interface_id)
+        }
+      } catch (error) {
+        // Ignore errors if column doesn't exist yet
+        console.warn('Error loading default page setting:', error)
+      }
     } catch (error) {
       console.error('Error loading workspace:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadInterfacePages() {
+    setLoadingPages(true)
+    try {
+      const supabase = createClient()
+      
+      // Load interface pages from views table where type='interface'
+      const { data, error } = await supabase
+        .from('views')
+        .select('id, name')
+        .eq('type', 'interface')
+        .order('name', { ascending: true })
+
+      if (!error && data) {
+        setInterfacePages(data)
+      } else {
+        console.error('Error loading interface pages:', error)
+        setInterfacePages([])
+      }
+    } catch (error) {
+      console.error('Error loading interface pages:', error)
+      setInterfacePages([])
+    } finally {
+      setLoadingPages(false)
     }
   }
 
@@ -94,7 +142,7 @@ export default function SettingsWorkspaceTab() {
       }
 
       // Upsert workspace (create if doesn't exist, update if exists)
-      const { error } = await supabase
+      const { error: workspaceError } = await supabase
         .from('workspaces')
         .upsert({
           id: 'default', // Single workspace for now
@@ -105,19 +153,50 @@ export default function SettingsWorkspaceTab() {
           onConflict: 'id'
         })
 
-      if (error) {
+      if (workspaceError) {
         // If table doesn't exist, that's okay for v1 - we'll just show a message
-        console.error('Error saving workspace:', error)
+        console.error('Error saving workspace:', workspaceError)
         setMessage({ 
           type: 'error', 
           text: 'Could not save workspace settings. The workspaces table may need to be created.' 
         })
-      } else {
-        setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
-        setOriginalName(workspaceName.trim())
-        setOriginalIcon(workspaceIcon || '📊')
-        setTimeout(() => setMessage(null), 3000)
+        return
       }
+
+      // Save default page setting to workspace_settings
+      try {
+        const { error: settingsError } = await supabase
+          .from('workspace_settings')
+          .upsert({
+            id: 'default',
+            default_interface_id: defaultPageId || null,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'id'
+          })
+
+        if (settingsError) {
+          // Check if it's a column doesn't exist error
+          if (settingsError.code === 'PGRST116' || 
+              settingsError.code === '42703' ||
+              settingsError.message?.includes('column') ||
+              settingsError.message?.includes('does not exist')) {
+            console.warn('default_interface_id column may not exist yet:', settingsError)
+            // Don't fail the whole save, just warn
+          } else {
+            console.error('Error saving default page setting:', settingsError)
+          }
+        }
+      } catch (settingsError: any) {
+        // Ignore errors if column doesn't exist yet
+        console.warn('Error saving default page setting:', settingsError)
+      }
+
+      setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
+      setOriginalName(workspaceName.trim())
+      setOriginalIcon(workspaceIcon || '📊')
+      setOriginalDefaultPageId(defaultPageId)
+      setTimeout(() => setMessage(null), 3000)
     } catch (error: any) {
       console.error('Error saving workspace:', error)
       setMessage({ type: 'error', text: error.message || 'Failed to save workspace settings' })
@@ -136,7 +215,7 @@ export default function SettingsWorkspaceTab() {
     )
   }
 
-  const hasUnsavedChanges = workspaceName !== originalName || workspaceIcon !== originalIcon
+  const hasUnsavedChanges = workspaceName !== originalName || workspaceIcon !== originalIcon || defaultPageId !== originalDefaultPageId
 
   return (
     <Card>
@@ -161,6 +240,30 @@ export default function SettingsWorkspaceTab() {
               placeholder="📊"
               className="max-w-md"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="default-page">Default Page at Login</Label>
+            <Select
+              value={defaultPageId}
+              onValueChange={setDefaultPageId}
+              disabled={loadingPages}
+            >
+              <SelectTrigger id="default-page" className="max-w-md">
+                <SelectValue placeholder={loadingPages ? "Loading pages..." : "Select a default page"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None (use first available)</SelectItem>
+                {interfacePages.map((page) => (
+                  <SelectItem key={page.id} value={page.id}>
+                    {page.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The page users will be redirected to after logging in
+            </p>
           </div>
         </div>
 

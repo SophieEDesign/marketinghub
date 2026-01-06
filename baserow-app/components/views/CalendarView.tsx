@@ -135,7 +135,7 @@ export default function CalendarView({
       .filter((row) => row.data[dateFieldId])
       .map((row) => {
         const dateValue = row.data[dateFieldId]
-        const title = fieldIds
+        const title = (Array.isArray(fieldIds) ? fieldIds : [])
           .filter((fid) => fid !== dateFieldId)
           .slice(0, 1)
           .map((fid) => String(row.data[fid] || "Untitled"))

@@ -72,6 +72,17 @@ export default function InterfacePageSettingsDrawer({
       loadPage()
       loadInterfaces()
       loadTables()
+    } else if (!isOpen) {
+      // Reset state when drawer closes to prevent glitching
+      setPage(null)
+      setName("")
+      setDescription("")
+      setPageType("")
+      setSourceTable("")
+      setBaseTable("")
+      setInterfaceId("")
+      setIsAdminOnly(false)
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, pageId])

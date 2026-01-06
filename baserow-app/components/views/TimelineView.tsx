@@ -157,14 +157,14 @@ export default function TimelineView({
         }
 
         // Get title from first non-date field
-        const titleField = fieldIds.find(
+        const titleField = (Array.isArray(fieldIds) ? fieldIds : []).find(
           (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId
         )
         const title = titleField ? String(row.data[titleField] || "Untitled") : "Untitled"
 
         // Get color from select field if available
         const colorField = tableFields.find(
-          (f) => f.type === "single_select" && fieldIds.includes(f.id || f.name)
+          (f) => f.type === "single_select" && Array.isArray(fieldIds) && fieldIds.includes(f.id || f.name)
         )
         const color = colorField
           ? getColorForValue(row.data[colorField.id || colorField.name])

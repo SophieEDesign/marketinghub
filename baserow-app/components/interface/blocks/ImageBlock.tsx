@@ -33,8 +33,12 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
   const { config } = block
   const imageUrl = config?.image_url || ""
   const imageAlt = config?.image_alt || ""
-  const imageAlignment = config?.image_alignment || "center"
-  const imageWidth = config?.image_width || "auto"
+  
+  // Support both old format (image_alignment, image_width) and new format (appearance.image_align, appearance.image_size)
+  const appearance = config?.appearance || {}
+  const imageAlignment = config?.image_alignment || appearance?.image_align || "center"
+  const imageSize = config?.image_width || appearance?.image_size || "auto"
+  const maxWidth = appearance?.max_width
   
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -84,8 +88,11 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
   if (!isEditing) {
     if (!imageUrl) {
       return (
-        <div className="h-full flex items-center justify-center text-gray-400">
-          <ImageIcon className="h-8 w-8" />
+        <div className="h-full w-full flex items-center justify-center text-gray-400 min-h-[100px]">
+          <div className="text-center">
+            <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-xs">No image configured</p>
+          </div>
         </div>
       )
     }
@@ -97,21 +104,54 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
     }
     const alignment = alignmentClass[imageAlignment as string] || "justify-center"
 
-    const widthClass = imageWidth === "auto" ? "w-auto max-w-full" : "w-full"
+    // Determine width class based on image size setting
+    let widthClass = "w-auto max-w-full"
+    if (imageSize === "full" || imageSize === "w-full") {
+      widthClass = "w-full"
+    } else if (imageSize === "small") {
+      widthClass = "w-auto max-w-[200px]"
+    } else if (imageSize === "medium") {
+      widthClass = "w-auto max-w-[400px]"
+    } else if (imageSize === "large") {
+      widthClass = "w-auto max-w-[600px]"
+    }
+
+    // Determine object-fit based on image size setting
+    const objectFit = imageSize === "cover" ? "object-cover" : "object-contain"
+
+    // Apply max width if specified
+    const maxWidthStyle = maxWidth ? { maxWidth: `${maxWidth}px` } : {}
 
     return (
-      <div className={`h-full p-4 flex ${alignment}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`h-full w-full p-4 flex items-center ${alignment} min-h-[100px]`} onClick={(e) => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
           alt={imageAlt || ""}
-          className={`${widthClass} max-h-full object-contain rounded-md`}
+          className={`${widthClass} max-h-full ${objectFit} rounded-md`}
+          style={maxWidthStyle}
           onError={(e) => {
-            e.currentTarget.style.display = "none"
-            const parent = e.currentTarget.parentElement
+            const img = e.currentTarget
+            img.style.display = "none"
+            const parent = img.parentElement
             if (parent) {
-              parent.innerHTML = '<div class="text-gray-400 text-sm">Failed to load image</div>'
+              const errorDiv = document.createElement("div")
+              errorDiv.className = "text-gray-400 text-sm text-center"
+              errorDiv.innerHTML = `
+                <div class="mb-2">
+                  <svg class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>Failed to load image</div>
+                <div class="text-xs mt-1">URL: ${imageUrl.substring(0, 50)}${imageUrl.length > 50 ? '...' : ''}</div>
+              `
+              parent.appendChild(errorDiv)
             }
+          }}
+          onLoad={() => {
+            // Image loaded successfully
+            console.log('Image loaded successfully:', imageUrl)
           }}
         />
       </div>
