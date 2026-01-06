@@ -147,15 +147,18 @@ export default function CalendarView({
       const supabase = createClient()
       const { data: fields } = await supabase
         .from("table_fields")
-        .select("id, name, type, options")
+        .select("id, table_id, name, type, position, created_at, options")
         .eq("table_id", sanitizedTableId)
         .order("position", { ascending: true })
 
       if (fields) {
-        setLoadedTableFields(fields.map(f => ({ 
+        setLoadedTableFields(fields.map((f: any) => ({ 
+          id: f.id,
+          table_id: f.table_id,
           name: f.name, 
           type: f.type,
-          id: f.id,
+          position: f.position,
+          created_at: f.created_at,
           options: f.options 
         })))
       }
