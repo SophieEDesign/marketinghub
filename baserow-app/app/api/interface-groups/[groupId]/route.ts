@@ -65,10 +65,26 @@ export async function DELETE(
     //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     // }
 
-    // Move all interfaces in this group to uncategorized
+    // Find the "Ungrouped" system group to move pages to
+    const { data: ungroupedGroup } = await supabase
+      .from('interface_groups')
+      .select('id')
+      .eq('is_system', true)
+      .ilike('name', '%ungrouped%')
+      .maybeSingle()
+
+    const targetGroupId = ungroupedGroup?.id || null
+
+    // Move all interface pages in this group to Ungrouped (or null if no Ungrouped group)
+    await supabase
+      .from('interface_pages')
+      .update({ group_id: targetGroupId })
+      .eq('group_id', params.groupId)
+
+    // Also move views table entries (for backward compatibility)
     await supabase
       .from('views')
-      .update({ group_id: null })
+      .update({ group_id: targetGroupId })
       .eq('group_id', params.groupId)
       .eq('type', 'interface')
 

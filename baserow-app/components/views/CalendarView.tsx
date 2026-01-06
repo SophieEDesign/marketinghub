@@ -30,15 +30,64 @@ export default function CalendarView({
 }: CalendarViewProps) {
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [resolvedTableId, setResolvedTableId] = useState<string>(tableId)
 
   useEffect(() => {
-    loadRows()
+    resolveTableId()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId])
+  }, [tableId, viewId])
+
+  useEffect(() => {
+    if (resolvedTableId) {
+      loadRows()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTableId])
+
+  async function resolveTableId() {
+    // If tableId is provided, use it
+    if (tableId) {
+      setResolvedTableId(tableId)
+      return
+    }
+
+    // If no tableId but we have viewId, fetch the view's table_id
+    if (!tableId && viewId) {
+      try {
+        const { data: view, error } = await supabase
+          .from("views")
+          .select("table_id")
+          .eq("id", viewId)
+          .single()
+
+        if (error) {
+          console.error("Error loading view:", error)
+          setResolvedTableId("")
+          setLoading(false)
+          return
+        }
+
+        if (view?.table_id) {
+          setResolvedTableId(view.table_id)
+        } else {
+          console.warn("CalendarView: View does not have a table_id")
+          setResolvedTableId("")
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error("Error resolving tableId from view:", error)
+        setResolvedTableId("")
+        setLoading(false)
+      }
+    } else {
+      setResolvedTableId("")
+      setLoading(false)
+    }
+  }
 
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
-    if (!tableId) {
+    if (!resolvedTableId) {
       console.warn("CalendarView: tableId is required for table-backed pages. This page may be SQL-view backed.")
       setRows([])
       setLoading(false)
@@ -46,7 +95,7 @@ export default function CalendarView({
     }
     
     // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
-    const sanitizedTableId = tableId.split(':')[0]
+    const sanitizedTableId = resolvedTableId.split(':')[0]
     
     setLoading(true)
     const { data, error } = await supabase
@@ -109,7 +158,7 @@ export default function CalendarView({
   }
 
   // Handle missing tableId gracefully (SQL-view backed pages)
-  if (!tableId) {
+  if (!resolvedTableId) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
         <div className="text-sm mb-2 text-center">

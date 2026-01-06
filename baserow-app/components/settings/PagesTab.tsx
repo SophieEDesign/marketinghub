@@ -290,17 +290,30 @@ export default function SettingsPagesTab() {
     if (!pageToDelete) return
 
     try {
-      const supabase = createClient()
+      // Check if it's an interface page (from interface_pages table)
+      if (pageToDelete.is_interface_page) {
+        // Use the API endpoint for interface pages
+        const response = await fetch(`/api/interface-pages/${pageToDelete.id}`, {
+          method: 'DELETE',
+        })
 
-      // All pages are in views table
-      const { error } = await supabase
-        .from('views')
-        .delete()
-        .eq('id', pageToDelete.id)
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to delete page')
+        }
+      } else {
+        // Delete from views table (for backward compatibility with old system)
+        const supabase = createClient()
+        const { error } = await supabase
+          .from('views')
+          .delete()
+          .eq('id', pageToDelete.id)
 
-      if (error) throw error
-      
-      // If it was an interface page, blocks will be cascade deleted via view_blocks foreign key
+        if (error) {
+          console.error('Error deleting view:', error)
+          throw error
+        }
+      }
 
       setDeleteDialogOpen(false)
       setPageToDelete(null)
@@ -309,7 +322,7 @@ export default function SettingsPagesTab() {
       window.dispatchEvent(new CustomEvent('pages-updated'))
     } catch (error: any) {
       console.error('Error deleting page:', error)
-      alert(error.message || 'Failed to delete page')
+      alert(error.message || 'Failed to delete page. Make sure you have permission to delete pages.')
     }
   }
 

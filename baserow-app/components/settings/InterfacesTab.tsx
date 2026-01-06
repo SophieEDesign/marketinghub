@@ -5,9 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Settings, GripVertical, Folder } from 'lucide-react'
+import { Settings, GripVertical, Folder, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import InterfaceDetailDrawer from './InterfaceDetailDrawer'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface Interface {
   id: string
@@ -34,6 +42,9 @@ export default function InterfacesTab() {
   const [loading, setLoading] = useState(true)
   const [selectedInterface, setSelectedInterface] = useState<Interface | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [groupToDelete, setGroupToDelete] = useState<InterfaceGroup | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     loadInterfaces()
@@ -422,6 +433,92 @@ export default function InterfacesTab() {
     setDrawerOpen(true)
   }
 
+  async function handleDeleteGroup(group: InterfaceGroup) {
+    setGroupToDelete(group)
+    setDeleteDialogOpen(true)
+  }
+
+  async function confirmDeleteGroup() {
+    if (!groupToDelete) return
+
+    setDeleting(true)
+    try {
+      const supabase = createClient()
+
+      // Find the "Ungrouped" system group
+      let allGroups: any[] = []
+      try {
+        const { data, error } = await supabase
+          .from('interface_groups')
+          .select('id, name, is_system')
+          .order('order_index', { ascending: true })
+
+        if (error && (error.code === '42703' || error.message?.includes('column "is_system" does not exist'))) {
+          // Fallback: try without is_system column
+          const { data: fallbackData } = await supabase
+            .from('interface_groups')
+            .select('id, name')
+            .order('order_index', { ascending: true })
+          
+          allGroups = (fallbackData || []).map((g: any) => ({ ...g, is_system: false }))
+        } else if (data) {
+          allGroups = data
+        }
+      } catch (error) {
+        console.error('Error loading groups:', error)
+      }
+
+      const ungroupedGroup = allGroups.find(g => 
+        (g.is_system && g.name === 'Ungrouped') || 
+        (!g.is_system && g.name.toLowerCase() === 'ungrouped')
+      )
+
+      if (!ungroupedGroup) {
+        alert('Cannot find Ungrouped Interface. Pages will be moved to null group. Please refresh the page.')
+        // Continue with null group_id as fallback
+      }
+
+      const targetGroupId = ungroupedGroup?.id || null
+
+      // Move all pages in this group to Ungrouped (or null if no Ungrouped group found)
+      const pagesToMove = groupToDelete.interfaces || []
+      if (pagesToMove.length > 0) {
+        await Promise.all(
+          pagesToMove.map(page =>
+            supabase
+              .from('interface_pages')
+              .update({ group_id: targetGroupId })
+              .eq('id', page.id)
+          )
+        )
+      }
+
+      // Also move any pages from views table if using old system
+      await supabase
+        .from('views')
+        .update({ group_id: targetGroupId })
+        .eq('group_id', groupToDelete.id)
+        .eq('type', 'interface')
+
+      // Delete the group
+      const { error } = await supabase
+        .from('interface_groups')
+        .delete()
+        .eq('id', groupToDelete.id)
+
+      if (error) throw error
+
+      setDeleteDialogOpen(false)
+      setGroupToDelete(null)
+      await loadInterfaces()
+    } catch (error: any) {
+      console.error('Error deleting interface group:', error)
+      alert(error.message || 'Failed to delete interface group')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) {
     return (
       <Card>
@@ -465,6 +562,14 @@ export default function InterfacesTab() {
                         {group.interfaces.length} {group.interfaces.length === 1 ? 'page' : 'pages'}
                       </Badge>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteGroup(group)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                   
                   {/* Pages under this Interface */}
@@ -527,6 +632,36 @@ export default function InterfacesTab() {
           onUpdate={loadInterfaces}
         />
       )}
+
+      {/* Delete Interface Group Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Interface Group</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{groupToDelete?.name}&quot;? 
+              {groupToDelete && groupToDelete.interfaces.length > 0 && (
+                <>
+                  <br />
+                  <br />
+                  This will move {groupToDelete.interfaces.length} {groupToDelete.interfaces.length === 1 ? 'page' : 'pages'} to the &quot;Ungrouped&quot; interface.
+                </>
+              )}
+              <br />
+              <br />
+              <strong className="text-red-600">This action cannot be undone.</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteGroup} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete Interface Group'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

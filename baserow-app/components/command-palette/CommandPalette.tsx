@@ -333,10 +333,10 @@ export default function CommandPalette({ open, onOpenChange }: CommandPalettePro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] p-0 gap-0">
+      <DialogContent className="sm:max-w-[600px] p-0 gap-0" aria-describedby="command-palette-description">
         <DialogHeader className="sr-only">
           <DialogTitle>Command Palette</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="command-palette-description">
             Search tables, pages, views, or run commands
           </DialogDescription>
         </DialogHeader>

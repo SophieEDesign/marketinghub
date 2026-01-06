@@ -86,9 +86,18 @@ export default function PageRenderer({
         )
 
       case 'calendar':
+        // Get tableId from config, base_table, or from saved_view_id anchor
+        let calendarTableId = config.table_id || config.base_table || page.base_table || ''
+        
+        // If page has saved_view_id anchor, fetch the view's table_id
+        if (!calendarTableId && page.saved_view_id) {
+          // We'll need to fetch this in the component, but for now try to get it from config
+          // The CalendarView component will handle loading the view's table_id if needed
+          calendarTableId = config.table_id || ''
+        }
+        
         // Don't render CalendarView for SQL-view backed pages (no tableId)
-        const calendarTableId = config.table_id || config.base_table || page.base_table || ''
-        if (!calendarTableId && page.source_view) {
+        if (!calendarTableId && page.source_view && !page.saved_view_id) {
           return (
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
@@ -101,9 +110,11 @@ export default function PageRenderer({
         return (
           <CalendarView
             tableId={calendarTableId}
-            viewId={config.view_id || page.id}
-            dateFieldId={config.start_date_field || ''}
+            viewId={page.saved_view_id || config.view_id || page.id}
+            dateFieldId={config.start_date_field || config.calendar_date_field || ''}
             fieldIds={config.fields || []}
+            searchQuery={config.search_query || ''}
+            tableFields={config.table_fields || []}
           />
         )
 
