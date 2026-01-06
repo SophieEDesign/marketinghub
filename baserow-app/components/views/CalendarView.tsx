@@ -249,7 +249,7 @@ export default function CalendarView({
   const isValidDateField = useMemo(() => {
     if (!dateField) return false
     const fieldType = dateField.type
-    return fieldType === 'date' || fieldType === 'datetime' || fieldType === 'timestamp'
+    return fieldType === 'date'
   }, [dateField])
 
   function getEvents(): EventInput[] {
