@@ -1,15 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
 import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react"
+import { type FilterConfig } from "@/lib/interface/filters"
 
 interface KPIBlockProps {
   block: PageBlock
   isEditing?: boolean
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
+  filters?: FilterConfig[] // Page-level filters
 }
 
 interface ComparisonData {
@@ -20,7 +22,7 @@ interface ComparisonData {
   trend: 'up' | 'down' | 'neutral'
 }
 
-export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null }: KPIBlockProps) {
+export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: KPIBlockProps) {
   const router = useRouter()
   const { config } = block
   // Use page's tableId if block doesn't have one configured
@@ -36,13 +38,29 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Merge page filters with block filters
+  const blockFilters = config?.filters || []
+  const allFilters = useMemo(() => {
+    // Merge filters - block filters override page filters for same field
+    const merged: FilterConfig[] = [...filters]
+    for (const blockFilter of blockFilters) {
+      const existingIndex = merged.findIndex(f => f.field === blockFilter.field)
+      if (existingIndex >= 0) {
+        merged[existingIndex] = blockFilter as FilterConfig
+      } else {
+        merged.push(blockFilter as FilterConfig)
+      }
+    }
+    return merged
+  }, [filters, blockFilters])
 
   useEffect(() => {
     if (tableId) {
       loadKPI()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, field, aggregate, comparison])
+  }, [tableId, field, aggregate, comparison, allFilters])
 
   async function loadKPI() {
     if (!tableId) return
@@ -59,7 +77,7 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
           tableId,
           aggregate,
           fieldName: field,
-          filters: config?.filters || [],
+          filters: allFilters, // Use merged filters
           comparison: comparison ? {
             dateFieldName: comparison.date_field,
             currentStart: comparison.current_start,

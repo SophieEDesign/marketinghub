@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import {
   BarChart,
   Bar,
@@ -26,6 +27,7 @@ interface ChartBlockProps {
   isEditing?: boolean
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
+  filters?: FilterConfig[] // Page-level filters
 }
 
 interface ChartDataPoint {
@@ -34,7 +36,7 @@ interface ChartDataPoint {
   [key: string]: any
 }
 
-export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null }: ChartBlockProps) {
+export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
   // Use page's tableId if block doesn't have one configured
@@ -50,13 +52,55 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
+  
+  // Merge page filters with block filters
+  const blockFilters = config?.filters || []
+  const allFilters = useMemo(() => {
+    // Merge filters - block filters override page filters for same field
+    const merged: FilterConfig[] = [...filters]
+    for (const blockFilter of blockFilters) {
+      const existingIndex = merged.findIndex(f => f.field === blockFilter.field)
+      if (existingIndex >= 0) {
+        merged[existingIndex] = blockFilter as FilterConfig
+      } else {
+        merged.push(blockFilter as FilterConfig)
+      }
+    }
+    return merged
+  }, [filters, blockFilters])
+
+  useEffect(() => {
+    if (tableId) {
+      loadTableFields()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId])
 
   useEffect(() => {
     if (tableId && xAxis && metric) {
       loadData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, xAxis, yAxis, groupBy, metric])
+  }, [tableId, xAxis, yAxis, groupBy, metric, allFilters])
+
+  async function loadTableFields() {
+    if (!tableId) return
+    
+    try {
+      const supabase = createClient()
+      const { data: fields } = await supabase
+        .from("table_fields")
+        .select("name, type")
+        .eq("table_id", tableId)
+      
+      if (fields) {
+        setTableFields(fields.map(f => ({ name: f.name, type: f.type })))
+      }
+    } catch (err) {
+      console.error("Error loading table fields:", err)
+    }
+  }
 
   async function loadData() {
     if (!tableId || !xAxis || !metric) return
@@ -65,16 +109,16 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     setError(null)
 
     try {
-    const supabase = createClient()
+      const supabase = createClient()
 
-    // Get table name
-    const { data: table } = await supabase
-      .from("tables")
-      .select("supabase_table")
-      .eq("id", tableId)
-      .single()
+      // Get table name
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
 
-    if (!table?.supabase_table) {
+      if (!table?.supabase_table) {
         throw new Error("Table not found")
       }
 
@@ -84,10 +128,16 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         fieldsToSelect.push(groupBy)
       }
 
-      const { data: rows, error: fetchError } = await supabase
+      // Build query with filters
+      let query = supabase
         .from(table.supabase_table)
         .select(fieldsToSelect.join(", "))
         .limit(1000)
+
+      // Apply filters using shared filter system
+      query = applyFiltersToQuery(query, allFilters, tableFields)
+
+      const { data: rows, error: fetchError } = await query
 
       if (fetchError) throw fetchError
 

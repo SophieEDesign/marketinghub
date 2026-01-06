@@ -1,12 +1,15 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { supabase } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
+import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import type { EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -18,6 +21,8 @@ interface CalendarViewProps {
   fieldIds: string[]
   searchQuery?: string
   tableFields?: any[]
+  filters?: FilterConfig[] // Dynamic filters from config
+  onRecordClick?: (recordId: string) => void // Emit recordId on click
 }
 
 export default function CalendarView({ 
@@ -26,11 +31,16 @@ export default function CalendarView({
   dateFieldId, 
   fieldIds,
   searchQuery = "",
-  tableFields = []
+  tableFields = [],
+  filters = [],
+  onRecordClick
 }: CalendarViewProps) {
+  const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId)
+  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
+  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
 
   useEffect(() => {
     resolveTableId()
@@ -39,10 +49,17 @@ export default function CalendarView({
 
   useEffect(() => {
     if (resolvedTableId) {
-      loadRows()
+      loadTableInfo()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTableId])
+
+  useEffect(() => {
+    if (resolvedTableId && supabaseTableName) {
+      loadRows()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTableId, supabaseTableName, filters, searchQuery])
 
   async function resolveTableId() {
     // If tableId is provided, use it
@@ -85,18 +102,31 @@ export default function CalendarView({
     }
   }
 
+  async function loadTableInfo() {
+    if (!resolvedTableId) return
+    
+    const sanitizedTableId = resolvedTableId.split(':')[0]
+    if (!sanitizedTableId || sanitizedTableId.trim() === '') return
+
+    try {
+      const supabase = createClient()
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", sanitizedTableId)
+        .single()
+
+      if (table?.supabase_table) {
+        setSupabaseTableName(table.supabase_table)
+      }
+    } catch (error) {
+      console.error('Calendar: Error loading table info:', error)
+    }
+  }
+
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
-    if (!resolvedTableId) {
-      setRows([])
-      setLoading(false)
-      return
-    }
-    
-    // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
-    const sanitizedTableId = resolvedTableId.split(':')[0]
-    
-    if (!sanitizedTableId || sanitizedTableId.trim() === '') {
+    if (!resolvedTableId || !supabaseTableName) {
       setRows([])
       setLoading(false)
       return
@@ -104,16 +134,38 @@ export default function CalendarView({
     
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from("table_rows")
+      const supabase = createClient()
+      
+      // Build query with filters
+      let query = supabase
+        .from(supabaseTableName)
         .select("*")
-        .eq("table_id", sanitizedTableId)
+
+      // Apply filters using shared filter system
+      const normalizedFields = tableFields.map(f => ({ name: f.name || f.field_name || f.id, type: f.type || f.field_type }))
+      query = applyFiltersToQuery(query, filters, normalizedFields)
+
+      // Apply search query if provided
+      if (searchQuery && fieldIds.length > 0) {
+        // For search, we'll filter client-side after loading
+        // This is simpler than building complex OR queries
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Calendar: Error loading rows:', error)
         setRows([])
       } else {
-        setRows(data || [])
+        // Convert flat rows to TableRow format
+        const tableRows: TableRow[] = (data || []).map((row: any) => ({
+          id: row.id,
+          table_id: resolvedTableId,
+          data: row,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        }))
+        setRows(tableRows)
       }
     } catch (error) {
       console.error('Calendar: Exception loading rows:', error)
@@ -252,9 +304,33 @@ export default function CalendarView({
     )
   }
 
+  // Render filters above calendar
+  const renderFilters = () => {
+    if (!filters || filters.length === 0) return null
+
+    return (
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="text-xs font-semibold text-gray-600 mb-2">Filters</div>
+        <div className="flex flex-wrap gap-2">
+          {filters.map((filter, idx) => (
+            <div
+              key={idx}
+              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs"
+            >
+              <span className="font-medium">{filter.field}</span>
+              <span className="mx-1 text-gray-400">{filter.operator}</span>
+              <span className="text-gray-600">{String(filter.value || '')}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full h-full p-6 bg-gray-50">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        {renderFilters()}
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
@@ -263,11 +339,26 @@ export default function CalendarView({
           headerToolbar={{
             left: "prev,next today",
             center: "title",
-            right: "dayGridMonth,dayGridWeek,dayGridDay",
+            right: viewMode === 'month' ? "dayGridWeek,dayGridMonth" : "dayGridMonth,dayGridWeek",
+          }}
+          initialView={viewMode === 'month' ? "dayGridMonth" : "dayGridWeek"}
+          viewDidMount={(view) => {
+            // Update view mode when user changes view
+            if (view.view.type === 'dayGridMonth') {
+              setViewMode('month')
+            } else if (view.view.type === 'dayGridWeek') {
+              setViewMode('week')
+            }
           }}
           eventClick={(info) => {
-            // Event clicked - could navigate to record detail in future
-            // Silently handle for now
+            // Emit recordId and navigate to Record Review page
+            const recordId = info.event.id
+            if (recordId && onRecordClick) {
+              onRecordClick(recordId)
+            } else if (recordId && resolvedTableId) {
+              // Navigate to record review page
+              router.push(`/tables/${resolvedTableId}/records/${recordId}`)
+            }
           }}
           dateClick={(info) => {
             // Date clicked - could create new record in future

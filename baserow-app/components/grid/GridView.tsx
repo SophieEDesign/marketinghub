@@ -33,6 +33,7 @@ interface GridViewProps {
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
   isEditing?: boolean // When false, hide builder controls (add row, add field)
+  onRecordClick?: (recordId: string) => void // Emit recordId on row click
 }
 
 const ITEMS_PER_PAGE = 100
@@ -50,6 +51,7 @@ export default function GridView({
   onAddField,
   onEditField,
   isEditing = false,
+  onRecordClick,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -278,8 +280,13 @@ export default function GridView({
   }
 
   function handleRowClick(rowId: string) {
-    // Open record in global panel
-    openRecord(tableId, rowId, supabaseTableName)
+    // If onRecordClick callback provided, use it (for blocks)
+    if (onRecordClick) {
+      onRecordClick(rowId)
+    } else {
+      // Otherwise, use RecordPanel context (for views)
+      openRecord(tableId, rowId, supabaseTableName)
+    }
   }
 
   // Apply client-side search

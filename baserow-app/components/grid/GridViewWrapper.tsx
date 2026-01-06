@@ -44,6 +44,7 @@ interface GridViewWrapperProps {
   initialGroupBy?: string
   initialTableFields?: TableField[]
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
+  onRecordClick?: (recordId: string) => void // Emit recordId on row click
 }
 
 export default function GridViewWrapper({
@@ -56,6 +57,7 @@ export default function GridViewWrapper({
   initialGroupBy,
   initialTableFields = [],
   isEditing = false,
+  onRecordClick,
 }: GridViewWrapperProps) {
   const [filters, setFilters] = useState<Filter[]>(initialFilters)
   const [sorts, setSorts] = useState<Sort[]>(initialSorts)
@@ -359,6 +361,7 @@ export default function GridViewWrapper({
         onAddField={isEditing ? handleAddField : undefined}
         onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
+        onRecordClick={onRecordClick}
       />
       <FieldBuilderDrawer
         isOpen={fieldBuilderOpen}

@@ -2,14 +2,16 @@
 
 /**
  * Record Review View Component
- * Master-detail layout: Left column shows record list, right panel shows blocks for selected record
+ * Master-detail layout: Left column shows record list with search/filters, right panel shows blocks for selected record
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { Search, Filter } from 'lucide-react'
 import type { InterfacePage } from '@/lib/interface/page-types-only'
 import type { PageBlock } from '@/lib/interface/types'
 import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
+import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -23,6 +25,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [loadedBlocks, setLoadedBlocks] = useState<PageBlock[]>(blocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<FilterConfig[]>(config.filters || [])
   const { isEditing } = useBlockEditMode(page.id)
   
   const allowEditing = config.allow_editing || false
@@ -32,12 +36,65 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   // Get columns from config or data
   const columns = config.visible_columns || (data.length > 0 ? Object.keys(data[0]) : [])
 
-  // Auto-select first record if none selected
-  useEffect(() => {
-    if (!selectedRecordId && data.length > 0) {
-      setSelectedRecordId(data[0].id)
+  // Filter data based on search and filters
+  const filteredData = useMemo(() => {
+    let result = [...data]
+
+    // Apply search query
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase()
+      result = result.filter((record) => {
+        return columns.some((col: string) => {
+          const value = record[col]
+          if (value === null || value === undefined) return false
+          return String(value).toLowerCase().includes(searchLower)
+        })
+      })
     }
-  }, [data, selectedRecordId])
+
+    // Apply filters
+    if (filters.length > 0) {
+      result = result.filter((record) => {
+        return filters.every((filter) => {
+          const fieldValue = record[filter.field]
+          switch (filter.operator) {
+            case 'equal':
+              return fieldValue === filter.value
+            case 'not_equal':
+              return fieldValue !== filter.value
+            case 'contains':
+              return String(fieldValue || '').toLowerCase().includes(String(filter.value || '').toLowerCase())
+            case 'greater_than':
+              return Number(fieldValue) > Number(filter.value)
+            case 'less_than':
+              return Number(fieldValue) < Number(filter.value)
+            case 'is_empty':
+              return fieldValue === null || fieldValue === undefined || fieldValue === ''
+            case 'is_not_empty':
+              return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
+            default:
+              return true
+          }
+        })
+      })
+    }
+
+    return result
+  }, [data, searchQuery, filters, columns])
+
+  // Auto-select first record if none selected (use filtered data)
+  useEffect(() => {
+    if (!selectedRecordId && filteredData.length > 0) {
+      setSelectedRecordId(filteredData[0].id)
+    } else if (selectedRecordId && !filteredData.find(r => r.id === selectedRecordId)) {
+      // If selected record is filtered out, select first available
+      if (filteredData.length > 0) {
+        setSelectedRecordId(filteredData[0].id)
+      } else {
+        setSelectedRecordId(null)
+      }
+    }
+  }, [filteredData, selectedRecordId])
 
   // Load blocks for detail panel
   useEffect(() => {
@@ -93,16 +150,58 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   return (
     <div className="h-full flex">
       {/* Main list/grid view - Left Column */}
-      <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto' : 'w-full overflow-auto'}>
-        {data.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500 p-4">
-            <div className="text-center">
-              <p className="text-sm mb-2 font-medium">No records available</p>
-              <p className="text-xs text-gray-400">This table doesn&apos;t have any records yet.</p>
-            </div>
+      <div className={recordPanel === 'side' ? 'flex-1 border-r flex flex-col overflow-hidden' : 'w-full flex flex-col overflow-hidden'}>
+        {/* Search and Filter Bar */}
+        <div className="border-b bg-white p-3 space-y-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search records..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-        ) : (
-          <div className="h-full overflow-auto">
+          {filters.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter, idx) => (
+                <div
+                  key={idx}
+                  className="px-2 py-1 bg-gray-100 border border-gray-300 rounded text-xs flex items-center gap-1"
+                >
+                  <span className="font-medium">{filter.field}</span>
+                  <span className="text-gray-400">{filter.operator}</span>
+                  <span className="text-gray-600">{String(filter.value || '')}</span>
+                  <button
+                    onClick={() => setFilters(filters.filter((_, i) => i !== idx))}
+                    className="ml-1 text-gray-400 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Records List */}
+        <div className="flex-1 overflow-auto">
+          {filteredData.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center">
+                <p className="text-sm mb-2 font-medium">
+                  {data.length === 0 ? 'No records available' : 'No records match your search'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {data.length === 0 
+                    ? "This table doesn't have any records yet."
+                    : "Try adjusting your search or filters."
+                  }
+                </p>
+              </div>
+            </div>
+          ) : (
             <table className="w-full border-collapse">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -114,7 +213,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, idx) => {
+                {filteredData.map((row, idx) => {
                   const isSelected = row.id === selectedRecordId
                   return (
                     <tr
@@ -135,8 +234,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 })}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Detail panel - Right Column - Shows blocks for selected record */}

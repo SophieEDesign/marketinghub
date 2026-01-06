@@ -178,6 +178,13 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         })
         const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
         
+        // Convert block filters to FilterConfig format
+        const calendarFilters = activeFilters.map(f => ({
+          field: f.field_name,
+          operator: f.operator as any,
+          value: f.value,
+        }))
+        
         return (
           <CalendarView
             tableId={tableId!}
@@ -185,6 +192,13 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             dateFieldId={dateFieldId}
             fieldIds={fieldIds}
             tableFields={tableFields}
+            filters={calendarFilters}
+            onRecordClick={(recordId) => {
+              // Navigate to record review page
+              if (tableId) {
+                window.location.href = `/tables/${tableId}/records/${recordId}`
+              }
+            }}
           />
         )
       }
@@ -201,6 +215,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}
+            onRecordClick={(recordId) => {
+              // Navigate to record review page
+              if (tableId) {
+                window.location.href = `/tables/${tableId}/records/${recordId}`
+              }
+            }}
           />
         )
     }

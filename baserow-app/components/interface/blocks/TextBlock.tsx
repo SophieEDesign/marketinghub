@@ -144,10 +144,48 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   })
 
   // Sync editor content when block config changes externally (but not during user editing)
+  // MUST be before early returns (React Hooks rule)
   useEffect(() => {
     if (!editor || !isEditing) return
     
-    const newContent = getInitialContent()
+    // Get content from config directly (avoid calling getInitialContent which isn't in deps)
+    const contentVal = config?.content || config?.content_json || config?.text_content || config?.text || ""
+    
+    // Convert to TipTap JSON format
+    let newContent: any
+    if (contentVal && typeof contentVal === 'object') {
+      newContent = contentVal
+    } else if (typeof contentVal === 'string' && contentVal.trim() !== '') {
+      try {
+        const parsed = JSON.parse(contentVal)
+        if (parsed && typeof parsed === 'object' && parsed.type === 'doc') {
+          newContent = parsed
+        } else {
+          // Convert plain text to TipTap format
+          const lines = contentVal.split('\n').filter(line => line.trim() !== '')
+          newContent = {
+            type: 'doc',
+            content: lines.length > 0 ? lines.map((line: string) => ({
+              type: 'paragraph',
+              content: line ? [{ type: 'text', text: line }] : []
+            })) : []
+          }
+        }
+      } catch {
+        // Not JSON, convert plain text to TipTap format
+        const lines = contentVal.split('\n').filter(line => line.trim() !== '')
+        newContent = {
+          type: 'doc',
+          content: lines.length > 0 ? lines.map((line: string) => ({
+            type: 'paragraph',
+            content: line ? [{ type: 'text', text: line }] : []
+          })) : []
+        }
+      }
+    } else {
+      newContent = { type: 'doc', content: [] }
+    }
+    
     const currentContent = editor.getJSON()
     
     // Only update if content actually changed (avoid infinite loops and save loops)
@@ -161,7 +199,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editor.commands.setContent(newContent, false) // false = don't emit update event
       }
     }
-  }, [contentValue, editor, isEditing, isFocused])
+  }, [config?.content, config?.content_json, config?.text_content, config?.text, editor, isEditing, isFocused])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -327,18 +365,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
-  // Empty state - check if editor is empty
-  const isEmpty = !editor || (editor && editor.isEmpty)
-
-  if (!editor) {
-    return (
-      <div className="h-full w-full flex items-center justify-center text-gray-400">
-        Loading editor...
-      </div>
-    )
-  }
-  
   // Update editor editable state and placeholder when isEditing changes
+  // MUST be before early returns (React Hooks rule)
   useEffect(() => {
     if (editor) {
       editor.setEditable(isEditing)
@@ -353,6 +381,17 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
     }
   }, [editor, isEditing])
+
+  // Empty state - check if editor is empty
+  const isEmpty = !editor || (editor && editor.isEmpty)
+
+  if (!editor) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-gray-400">
+        Loading editor...
+      </div>
+    )
+  }
 
   return (
     <div 
