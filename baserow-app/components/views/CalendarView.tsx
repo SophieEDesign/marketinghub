@@ -185,7 +185,7 @@ export default function CalendarView({
         .select("*")
 
       // Apply filters using shared filter system
-      const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.field_name || f.id, type: f.type || f.field_type }))
+      const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.id, type: f.type }))
       query = applyFiltersToQuery(query, filters, normalizedFields)
 
       // Apply search query if provided
@@ -242,14 +242,13 @@ export default function CalendarView({
     // Try to find by name first, then by id
     return loadedTableFields.find(f => 
       f.name === dateFieldId || 
-      f.id === dateFieldId ||
-      f.field_name === dateFieldId
+      f.id === dateFieldId
     )
   }, [dateFieldId, loadedTableFields])
 
   const isValidDateField = useMemo(() => {
     if (!dateField) return false
-    const fieldType = dateField.type || dateField.field_type
+    const fieldType = dateField.type
     return fieldType === 'date' || fieldType === 'datetime' || fieldType === 'timestamp'
   }, [dateField])
 
