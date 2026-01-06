@@ -56,13 +56,7 @@ export default function TableSnapshotAppearanceSettings({
         />
       </div>
 
-      {/* Highlight Rules */}
-      <div className="space-y-2 border-t pt-4">
-        <Label>Highlight Rules</Label>
-        <p className="text-xs text-gray-500">
-          Conditional formatting rules coming soon
-        </p>
-      </div>
+      {/* Highlight Rules - Hidden until implemented */}
     </div>
   )
 }

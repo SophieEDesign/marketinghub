@@ -48,31 +48,8 @@ export default function AdvancedSettings({
         </div>
       </div>
 
-      {/* Visibility Rules */}
-      <div className="space-y-4">
-        <div>
-          <Label>Visibility Rules</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Control when this block is visible
-          </p>
-        </div>
-        <div className="text-sm text-gray-500">
-          Visibility rules coming soon
-        </div>
-      </div>
-
-      {/* Permissions */}
-      <div className="space-y-4">
-        <div>
-          <Label>Permissions</Label>
-          <p className="text-xs text-gray-500 mt-1">
-            Control who can see this block
-          </p>
-        </div>
-        <div className="text-sm text-gray-500">
-          Permission settings coming soon
-        </div>
-      </div>
+      {/* Visibility Rules - Hidden until implemented */}
+      {/* Permissions - Hidden until implemented */}
 
       {/* Block Actions */}
       {(onMoveToTop || onMoveToBottom) && (

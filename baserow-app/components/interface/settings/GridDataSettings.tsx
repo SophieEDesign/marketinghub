@@ -78,30 +78,8 @@ export default function GridDataSettings({
   onUpdate,
   onTableChange,
 }: GridDataSettingsProps) {
-  const [sqlViews, setSqlViews] = useState<Array<{ name: string; schema: string }>>([])
-  const [loadingSqlViews, setLoadingSqlViews] = useState(false)
-
-  useEffect(() => {
-    loadSqlViews()
-  }, [])
-
-  async function loadSqlViews() {
-    setLoadingSqlViews(true)
-    try {
-      // Try to get available SQL views
-      // Note: This requires a database function or we query information_schema
-      // For now, we'll use a placeholder - in production this would query actual SQL views
-      const response = await fetch('/api/sql-views')
-      if (response.ok) {
-        const data = await response.json()
-        setSqlViews(data.views || [])
-      }
-    } catch (error) {
-      console.error('Error loading SQL views:', error)
-    } finally {
-      setLoadingSqlViews(false)
-    }
-  }
+  // Removed SQL view loading - users select tables, not SQL views
+  // SQL views are internal and must never be selected by users
 
   // Determine compatible view types based on available fields
   const getCompatibleViewTypes = (): ViewType[] => {
@@ -118,103 +96,50 @@ export default function GridDataSettings({
 
   return (
     <div className="space-y-4">
-      {/* Source Selection: SQL View or Table */}
+      {/* Table Selection - Users select tables, not SQL views */}
       <div className="space-y-2">
-        <Label>Data Source</Label>
+        <Label>Table *</Label>
         <Select
-          value={config.source_type || 'table'}
-          onValueChange={(value) => onUpdate({ source_type: value as 'table' | 'sql_view' })}
+          value={config.table_id || ""}
+          onValueChange={onTableChange}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue placeholder="Select a table" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="table">Table</SelectItem>
-            <SelectItem value="sql_view">SQL View</SelectItem>
+            {tables.map((table) => (
+              <SelectItem key={table.id} value={table.id}>
+                {table.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        <p className="text-xs text-gray-500">
+          Grid blocks automatically use the page's table if not configured here.
+        </p>
       </div>
 
-      {/* SQL View Selection */}
-      {config.source_type === 'sql_view' && (
+      {/* View Selection (optional) */}
+      {config.table_id && views.length > 0 && (
         <div className="space-y-2">
-          <Label>SQL View *</Label>
-          {loadingSqlViews ? (
-            <div className="text-sm text-gray-500">Loading SQL views...</div>
-          ) : (
-            <Select
-              value={config.source_view || ""}
-              onValueChange={(value) => onUpdate({ source_view: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a SQL view" />
-              </SelectTrigger>
-              <SelectContent>
-                {sqlViews.length === 0 ? (
-                  <SelectItem value="__empty__" disabled>
-                    No SQL views available
-                  </SelectItem>
-                ) : (
-                  sqlViews.map((view) => (
-                    <SelectItem key={view.name} value={view.name}>
-                      {view.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          )}
-          <p className="text-xs text-gray-500">
-            SQL views contain pre-filtered and aggregated data
-          </p>
+          <Label>View (optional)</Label>
+          <Select
+            value={config.view_id || "__all__"}
+            onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="All records" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All records</SelectItem>
+              {views.map((view) => (
+                <SelectItem key={view.id} value={view.id}>
+                  {view.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
-
-      {/* Table Selection (if not using SQL view) */}
-      {config.source_type !== 'sql_view' && (
-        <>
-          <div className="space-y-2">
-            <Label>Table *</Label>
-            <Select
-              value={config.table_id || ""}
-              onValueChange={onTableChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a table" />
-              </SelectTrigger>
-              <SelectContent>
-                {tables.map((table) => (
-                  <SelectItem key={table.id} value={table.id}>
-                    {table.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* View Selection (optional) */}
-          {config.table_id && views.length > 0 && (
-            <div className="space-y-2">
-              <Label>View (optional)</Label>
-              <Select
-                value={config.view_id || "__all__"}
-                onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="All records" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">All records</SelectItem>
-                  {views.map((view) => (
-                    <SelectItem key={view.id} value={view.id}>
-                      {view.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </>
       )}
 
       {/* View Type Selection - Card Style */}
