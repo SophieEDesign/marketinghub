@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarPicker } from '@/components/ui/calendar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TableField } from '@/types/fields'
 
 interface CalendarViewProps {
@@ -39,6 +40,7 @@ export interface CalendarConfig {
   calendar_start_field: string | null
   calendar_end_field: string | null
   calendar_color_field: string | null
+  calendar_display_fields: string[] // Fields to display on calendar entries
   first_day_of_week: number
   show_weekends: boolean
   event_density: 'compact' | 'expanded'
@@ -66,6 +68,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
     calendar_start_field: null,
     calendar_end_field: null,
     calendar_color_field: null,
+    calendar_display_fields: [], // Fields to show on calendar entries
     first_day_of_week: 1, // Monday
     show_weekends: true,
     event_density: 'compact',
@@ -117,6 +120,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
           calendar_start_field: view.config.calendar_start_field || null,
           calendar_end_field: view.config.calendar_end_field || null,
           calendar_color_field: view.config.calendar_color_field || null,
+          calendar_display_fields: view.config.calendar_display_fields || [],
           first_day_of_week: view.config.first_day_of_week ?? 1,
           show_weekends: view.config.show_weekends ?? true,
           event_density: view.config.event_density || 'compact',
@@ -136,6 +140,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
             calendar_start_field: startField?.name || null,
             calendar_end_field: endField?.name || null,
             calendar_color_field: null,
+            calendar_display_fields: [], // Default: show only title
             first_day_of_week: 1,
             show_weekends: true,
             event_density: 'compact',
@@ -309,6 +314,23 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
     [tableId, config]
   )
 
+  const handleEventClick = useCallback(
+    async (event: CalendarEvent) => {
+      // Get table name for RecordPanel
+      try {
+        const { data: table } = await supabase.from('tables').select('name, supabase_table').eq('id', tableId).single()
+        if (table) {
+          // Open record in RecordPanel using window location
+          // For now, navigate to record page - later we can use RecordPanel context
+          window.location.href = `/data/${tableId}/rows/${event.id}`
+        }
+      } catch (error) {
+        console.error('Error opening record:', error)
+      }
+    },
+    [tableId]
+  )
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Loading calendar...</div>
   }
@@ -325,68 +347,122 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
     )
   }
 
+  // Calculate unscheduled events (events without dates)
+  const unscheduledCount = rows.filter((row) => {
+    const dateValue = config.calendar_date_field ? row[config.calendar_date_field] : null
+    const startValue = config.calendar_start_field ? row[config.calendar_start_field] : null
+    return !dateValue && !startValue
+  }).length
+
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-white">
+      {/* Breadcrumb */}
+      <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="text-sm text-gray-600">
+          <span className="text-gray-400">Planner</span>
+          <span className="mx-2">/</span>
+          <span className="font-medium text-gray-900">Content Calendar</span>
+        </div>
+      </div>
+
       {/* Toolbar */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-[200px] justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(currentDate, 'MMMM yyyy')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarPicker mode="single" selected={currentDate} onSelect={(date) => date && setCurrentDate(date)} />
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-                Today
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === 'month' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('month')}
-              >
-                Month
-              </Button>
-              <Button
-                variant={viewMode === 'agenda' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('agenda')}
-              >
-                Agenda
-              </Button>
-            </div>
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
+        <div className="flex items-center justify-between mb-3">
+          {/* Filters */}
+          <div className="flex items-center gap-3">
+            <Select value="all" onValueChange={() => {}}>
+              <SelectTrigger className="w-[140px] h-8 text-sm">
+                <SelectValue placeholder="Content Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value="all" onValueChange={() => {}}>
+              <SelectTrigger className="w-[120px] h-8 text-sm">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value="all" onValueChange={() => {}}>
+              <SelectTrigger className="w-[120px] h-8 text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+
+          {/* Right side actions */}
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search events..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 w-64"
+                className="pl-8 w-48 h-8 text-sm"
               />
             </div>
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} className="h-8">
               <Settings className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={() => setCreateModalOpen(true)}>
+            <Button size="sm" onClick={() => setCreateModalOpen(true)} className="h-8">
               <Plus className="mr-2 h-4 w-4" />
-              Add Event
+              Add content
             </Button>
+          </div>
+        </div>
+
+        {/* Calendar Navigation */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="h-8">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 w-[180px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(currentDate, 'MMMM yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarPicker mode="single" selected={currentDate} onSelect={(date) => date && setCurrentDate(date)} />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="h-8">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} className="h-8">
+              Today
+            </Button>
+            <Select value="month" onValueChange={() => {}}>
+              <SelectTrigger className="w-[100px] h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Month</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="day">Day</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant={viewMode === 'agenda' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode(viewMode === 'month' ? 'agenda' : 'month')}
+              className="h-8"
+            >
+              <span className="text-sm">List</span>
+            </Button>
+            {unscheduledCount > 0 && (
+              <Button variant="outline" size="sm" className="h-8 text-sm">
+                See contents ({unscheduledCount} unscheduled)
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -394,28 +470,24 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {viewMode === 'month' ? (
-          <>
-            <div className="flex-1 overflow-auto">
-              <MonthGrid
-                days={monthDays}
-                currentDate={currentDate}
-                events={events}
-                onDateClick={setSelectedDate}
-                onEventUpdate={handleEventUpdate}
-                config={config}
-              />
+          <div className="flex-1 overflow-auto">
+            <MonthGrid
+              days={monthDays}
+              currentDate={currentDate}
+              events={events}
+              onDateClick={setSelectedDate}
+              onEventUpdate={handleEventUpdate}
+              onEventClick={handleEventClick}
+              config={config}
+              tableFields={tableFields}
+            />
+            {/* Content count footer */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                {events.length} {events.length === 1 ? 'content' : 'contents'}
+              </div>
             </div>
-            <div className="w-80 border-l border-gray-200 bg-white">
-              <AgendaPanel
-                selectedDate={selectedDate}
-                events={selectedDateEvents}
-                onEventClick={(event) => {
-                  window.location.href = `/data/${tableId}/rows/${event.id}`
-                }}
-                onCreateEvent={() => setCreateModalOpen(true)}
-              />
-            </div>
-          </>
+          </div>
         ) : (
           <div className="flex-1 overflow-auto p-6">
             <AgendaPanel

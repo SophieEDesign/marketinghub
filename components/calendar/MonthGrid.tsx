@@ -5,6 +5,7 @@ import { format, isSameDay, isSameMonth, startOfDay, addDays, differenceInDays }
 import EventCard from './EventCard'
 import { cn } from '@/lib/utils'
 import type { CalendarEvent, CalendarConfig } from './CalendarView'
+import type { TableField } from '@/types/fields'
 
 interface MonthGridProps {
   days: Date[]
@@ -12,7 +13,9 @@ interface MonthGridProps {
   events: CalendarEvent[]
   onDateClick: (date: Date) => void
   onEventUpdate: (eventId: string, updates: { date?: Date; start_date?: Date; end_date?: Date }) => Promise<void>
+  onEventClick?: (event: CalendarEvent) => void
   config: CalendarConfig
+  tableFields: TableField[]
 }
 
 export default function MonthGrid({
@@ -21,7 +24,9 @@ export default function MonthGrid({
   events,
   onDateClick,
   onEventUpdate,
+  onEventClick,
   config,
+  tableFields,
 }: MonthGridProps) {
   const [draggingEvent, setDraggingEvent] = useState<string | null>(null)
   const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
@@ -120,7 +125,7 @@ export default function MonthGrid({
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Week day headers */}
-      <div className="grid grid-cols-7 border-b border-gray-200">
+      <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
         {adjustedWeekDays.map((day, idx) => {
           const isWeekend = idx >= 5 && !config.show_weekends
           if (isWeekend) return null
@@ -128,7 +133,7 @@ export default function MonthGrid({
             <div
               key={day}
               className={cn(
-                'p-2 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0',
+                'p-2 text-center text-xs font-medium text-gray-600 border-r border-gray-200 last:border-r-0 uppercase tracking-wide',
                 isWeekend && 'bg-gray-50'
               )}
             >
@@ -139,7 +144,7 @@ export default function MonthGrid({
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-auto">
+      <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-auto bg-white">
         {days.map((day, idx) => {
           const isCurrentMonth = isSameMonth(day, currentDate)
           const isToday = isSameDay(day, new Date())
@@ -153,9 +158,9 @@ export default function MonthGrid({
             <div
               key={day.toISOString()}
               className={cn(
-                'border-r border-b border-gray-200 p-1 min-h-[100px] cursor-pointer hover:bg-gray-50 transition-colors',
-                !isCurrentMonth && 'bg-gray-50/50',
-                isToday && 'bg-blue-50'
+                'border-r border-b border-gray-200 p-2 min-h-[120px] cursor-pointer hover:bg-gray-50/50 transition-colors',
+                !isCurrentMonth && 'bg-gray-50/30',
+                isToday && 'bg-blue-50/50'
               )}
               onClick={() => onDateClick(day)}
               onMouseUp={() => {
@@ -165,9 +170,9 @@ export default function MonthGrid({
             >
               <div
                 className={cn(
-                  'text-xs font-medium mb-1',
+                  'text-sm font-medium mb-2',
                   isCurrentMonth ? 'text-gray-900' : 'text-gray-400',
-                  isToday && 'text-blue-600 font-bold'
+                  isToday && 'text-blue-600 font-semibold'
                 )}
               >
                 {format(day, 'd')}
@@ -200,18 +205,38 @@ export default function MonthGrid({
                       >
                         <div
                           className={cn(
-                            'h-5 rounded text-xs px-1 text-white truncate flex items-center',
+                            'h-5 rounded text-xs px-1.5 py-0.5 text-white truncate flex items-center cursor-pointer hover:opacity-90',
                             isStart && 'rounded-l-none',
                             isEnd && 'rounded-r-none',
                             !isStart && !isEnd && 'rounded-none'
                           )}
                           style={{
-                            backgroundColor: event.color,
+                            backgroundColor: event.color || '#3b82f6',
                             width: isStart || isEnd ? '100%' : 'calc(100% + 1px)',
                             marginLeft: isStart ? '0' : '-1px',
                           }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEventClick?.(event)
+                          }}
+                          title={event.title}
                         >
-                          {(isStart || daysDiff === 0) && <span className="truncate">{event.title}</span>}
+                          {(isStart || daysDiff === 0) && (
+                            <span className="truncate">
+                              {config.calendar_display_fields.length > 0
+                                ? (() => {
+                                    const parts: string[] = [event.title]
+                                    config.calendar_display_fields.forEach((fieldName) => {
+                                      const value = event.rowData?.[fieldName]
+                                      if (value !== null && value !== undefined && value !== '') {
+                                        parts.push(String(value))
+                                      }
+                                    })
+                                    return parts.join(' • ')
+                                  })()
+                                : event.title}
+                            </span>
+                          )}
                         </div>
                         {isStart && (
                           <div
@@ -229,7 +254,7 @@ export default function MonthGrid({
                     )
                   })}
 
-                {/* Single-day events */}
+                {/* Single-day events - Display as small pills */}
                 {dayEvents
                   .filter((event) => {
                     if (event.start_date && event.end_date) {
@@ -244,11 +269,14 @@ export default function MonthGrid({
                       event={event}
                       onDragStart={(e) => handleDragStart(event.id, e)}
                       compact={config.event_density === 'compact'}
+                      onClick={() => onEventClick?.(event)}
+                      displayFields={config.calendar_display_fields}
+                      tableFields={tableFields}
                     />
                   ))}
-
+                
                 {dayEvents.length > (config.event_density === 'compact' ? 3 : 5) && (
-                  <div className="text-xs text-gray-500 px-1">
+                  <div className="text-xs text-gray-500 px-1.5 py-0.5">
                     +{dayEvents.length - (config.event_density === 'compact' ? 3 : 5)} more
                   </div>
                 )}

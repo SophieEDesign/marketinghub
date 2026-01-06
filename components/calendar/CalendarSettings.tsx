@@ -206,6 +206,52 @@ export default function CalendarSettings({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Display Fields */}
+          <div className="space-y-2">
+            <Label>Fields to Display on Calendar Entries</Label>
+            <p className="text-xs text-gray-500">
+              Choose which fields appear on each calendar entry (in addition to the title)
+            </p>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+              {tableFields
+                .filter((f) => f.type !== 'date' && f.type !== 'attachment')
+                .map((field) => {
+                  const isSelected = (localConfig.calendar_display_fields || []).includes(field.name)
+                  return (
+                    <label
+                      key={field.id}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          const currentFields = localConfig.calendar_display_fields || []
+                          if (e.target.checked) {
+                            setLocalConfig({
+                              ...localConfig,
+                              calendar_display_fields: [...currentFields, field.name],
+                            })
+                          } else {
+                            setLocalConfig({
+                              ...localConfig,
+                              calendar_display_fields: currentFields.filter((f) => f !== field.name),
+                            })
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700">{field.name}</span>
+                      <span className="text-xs text-gray-400">({field.type})</span>
+                    </label>
+                  )
+                })}
+            </div>
+            {tableFields.filter((f) => f.type !== 'date' && f.type !== 'attachment').length === 0 && (
+              <p className="text-xs text-gray-400 italic">No fields available to display</p>
+            )}
+          </div>
         </div>
 
         <SheetFooter>

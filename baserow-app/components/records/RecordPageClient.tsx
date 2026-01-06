@@ -82,25 +82,31 @@ export default function RecordPageClient({
         setFields(fieldsData as TableField[])
       }
 
-      // Load field groups
-      const { data: groupsData } = await supabase
-        .from("field_groups")
-        .select("name, fields")
-        .eq("table_id", tableId)
+      // Load field groups from table_fields (using group_name column)
+      // Field groups are stored as group_name on table_fields, not in a separate table
+      try {
+        const { data: fieldsWithGroups, error: groupsError } = await supabase
+          .from("table_fields")
+          .select("name, group_name")
+          .eq("table_id", tableId)
+          .not("group_name", "is", null)
 
-      if (groupsData) {
-        const groups: Record<string, string[]> = {}
-        groupsData.forEach((group) => {
-          if (group.fields && Array.isArray(group.fields)) {
-            group.fields.forEach((fieldName: string) => {
-              if (!groups[fieldName]) {
-                groups[fieldName] = []
+        if (!groupsError && fieldsWithGroups) {
+          const groups: Record<string, string[]> = {}
+          fieldsWithGroups.forEach((field: any) => {
+            if (field.group_name) {
+              if (!groups[field.group_name]) {
+                groups[field.group_name] = []
               }
-              groups[fieldName].push(group.name)
-            })
-          }
-        })
-        setFieldGroups(groups)
+              groups[field.group_name].push(field.name)
+            }
+          })
+          setFieldGroups(groups)
+        }
+      } catch (error) {
+        // Field groups may not be available - this is fine, continue without them
+        console.warn("Field groups not available:", error)
+        setFieldGroups({})
       }
     } catch (error: any) {
       console.error("Error loading record:", error)
