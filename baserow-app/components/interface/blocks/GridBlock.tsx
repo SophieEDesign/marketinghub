@@ -178,7 +178,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
         const dateFieldFromFields = visibleFields.find(f => {
           const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
-          return field && (field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+          return field && field.type === 'date'
         })
         const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
         
@@ -251,7 +251,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         const dateFieldFromConfig = config.timeline_date_field || config.start_date_field || config.calendar_date_field
         const dateFieldFromFields = visibleFields.find(f => {
           const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
-          return field && (field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+          return field && field.type === 'date'
         })
         const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
         
