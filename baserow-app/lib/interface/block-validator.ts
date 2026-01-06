@@ -71,6 +71,7 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     action: { action_type: 'navigate', label: '' },
     link_preview: { link_url: '' },
     tabs: { tabs: [] },
+    filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
   }
 
   return defaults[blockType] || {}

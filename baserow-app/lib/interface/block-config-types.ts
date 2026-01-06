@@ -233,6 +233,19 @@ export interface TabsBlockConfig extends BaseBlockConfig {
   }
 }
 
+// Filter Block Config
+export interface FilterBlockConfig extends BaseBlockConfig {
+  table_id?: string // Optional - can use page table_id
+  target_blocks?: 'all' | string[] // Which blocks to filter
+  allowed_fields?: string[] // Empty array means all fields allowed
+  allowed_operators?: string[] // Empty array means all operators allowed
+  filters?: Array<{
+    field: string
+    operator: string
+    value?: any
+  }>
+}
+
 /**
  * Discriminated Union of all block configs
  * Use this with block.type to get proper type narrowing
@@ -251,6 +264,7 @@ export type BlockConfigUnion =
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (TabsBlockConfig & { _type: 'tabs' })
+  | (FilterBlockConfig & { _type: 'filter' })
 
 /**
  * Type guard functions for runtime validation
@@ -290,6 +304,11 @@ export function isTabsBlockConfig(config: any): config is TabsBlockConfig {
 export function isTextBlockConfig(config: any): config is TextBlockConfig {
   // Text block is valid if it exists (no required fields)
   // But for meaningful rendering, content should be present
+  return config !== null && config !== undefined && typeof config === 'object'
+}
+
+export function isFilterBlockConfig(config: any): config is FilterBlockConfig {
+  // Filter block has no required fields - it can start empty
   return config !== null && config !== undefined && typeof config === 'object'
 }
 
@@ -387,6 +406,11 @@ export function validateBlockConfig(
         // Not an error - text blocks can start empty
         // But we'll note it for completeness
       }
+      break
+
+    case 'filter':
+      // Filter block has no required fields - it can start empty
+      // Filters can be added dynamically
       break
 
     // divider, button, link_preview have no required fields
