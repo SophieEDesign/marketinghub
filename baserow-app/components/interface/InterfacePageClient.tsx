@@ -210,6 +210,13 @@ export default function InterfacePageClient({
 
       supabaseTableName = table.supabase_table
 
+      // Ensure we have a valid table name before querying
+      if (!supabaseTableName) {
+        console.error("No table name found")
+        setData([])
+        return
+      }
+
       // Load data directly from the actual table
       const { data: tableData, error: tableDataError } = await supabase
         .from(supabaseTableName)
