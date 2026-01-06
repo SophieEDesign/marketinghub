@@ -24,6 +24,8 @@ import { BarChart3, LineChart as LineChartIcon, PieChart as PieChartIcon } from 
 interface ChartBlockProps {
   block: PageBlock
   isEditing?: boolean
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
 }
 
 interface ChartDataPoint {
@@ -32,10 +34,11 @@ interface ChartDataPoint {
   [key: string]: any
 }
 
-export default function ChartBlock({ block, isEditing = false }: ChartBlockProps) {
+export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null }: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
-  const tableId = config?.table_id
+  // Use page's tableId if block doesn't have one configured
+  const tableId = config?.table_id || pageTableId
   const chartType = config?.chart_type || "bar"
   const xAxis = config?.chart_x_axis
   const yAxis = config?.chart_y_axis
@@ -266,14 +269,28 @@ export default function ChartBlock({ block, isEditing = false }: ChartBlockProps
   }
 
   // Empty state
-  if (!tableId || !xAxis || !metric) {
+  if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
           <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="mb-1">{isEditing ? "Configure chart settings" : "No chart configuration"}</p>
+          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Select table, X-axis, and metric in settings</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+  
+  if (!xAxis || !metric) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <p className="mb-2">{isEditing ? "Configure chart settings" : "No chart configuration"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Select X-axis and metric fields in block settings.</p>
           )}
         </div>
       </div>

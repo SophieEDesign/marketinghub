@@ -107,10 +107,10 @@ export default function SortDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" aria-describedby="sort-dialog-description">
         <DialogHeader>
           <DialogTitle>Sort Records</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="sort-dialog-description">
             Configure how records are sorted in this view.
           </DialogDescription>
         </DialogHeader>

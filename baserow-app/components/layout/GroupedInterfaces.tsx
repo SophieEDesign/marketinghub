@@ -44,7 +44,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import NewPageModal from "@/components/interface/NewPageModal"
+import PageCreationWizard from "@/components/interface/PageCreationWizard"
 
 interface InterfacePage {
   id: string
@@ -865,7 +865,7 @@ export default function GroupedInterfaces({
         ) : null}
       </DragOverlay>
 
-      <NewPageModal
+      <PageCreationWizard
         open={newPageModalOpen}
         onOpenChange={(open) => {
           setNewPageModalOpen(open)

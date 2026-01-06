@@ -1,5 +1,13 @@
 "use client"
 
+/**
+ * @deprecated This component is deprecated. Use PageCreationWizard instead.
+ * This component mixes Interface creation with Page creation, which violates
+ * the product model: "Interfaces group pages. Pages render content. Creation flows must never mix the two."
+ * 
+ * Migration: Replace all usages of NewPageModal with PageCreationWizard.
+ */
+
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -242,10 +250,10 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby="new-page-modal-description">
         <DialogHeader>
           <DialogTitle>Create New Interface</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="new-page-modal-description">
             Choose a page type to get started with a pre-configured layout, or start from scratch.
           </DialogDescription>
         </DialogHeader>

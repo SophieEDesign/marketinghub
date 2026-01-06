@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronRight, Folder, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import SidebarItem from './SidebarItem'
-import Link from 'next/link'
+import PageCreationWizard from '../../baserow-app/components/interface/PageCreationWizard'
 
 interface InterfaceSectionProps {
   interfaceId: string
@@ -27,6 +27,7 @@ export default function InterfaceSection({
   isAdmin = false,
 }: InterfaceSectionProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed)
+  const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
 
   // Sort pages by order_index
   const sortedPages = [...pages].sort((a, b) => a.order_index - b.order_index)
@@ -60,19 +61,28 @@ export default function InterfaceSection({
             <div className="px-2 py-2 text-xs text-muted-foreground">
               <p className="mb-1">No pages yet</p>
               {isAdmin && (
-                <Link
-                  href="/settings?tab=pages"
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setNewPageWizardOpen(true)
+                  }}
                   className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <Plus className="h-3 w-3" />
                   Add Page
-                </Link>
+                </button>
               )}
             </div>
           )}
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Page Creation Wizard Modal */}
+      <PageCreationWizard
+        open={newPageWizardOpen}
+        onOpenChange={setNewPageWizardOpen}
+        defaultGroupId={interfaceId}
+      />
     </div>
   )
 }

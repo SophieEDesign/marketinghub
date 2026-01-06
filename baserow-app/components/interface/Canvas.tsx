@@ -31,6 +31,9 @@ interface CanvasProps {
   primaryTableId?: string | null
   layoutTemplate?: string | null
   interfaceDescription?: string | null
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
+  recordId?: string | null // Record ID for record review pages
 }
 
 export default function Canvas({
@@ -50,6 +53,9 @@ export default function Canvas({
   primaryTableId,
   layoutTemplate,
   interfaceDescription,
+  pageTableId = null,
+  pageId = null,
+  recordId = null,
 }: CanvasProps) {
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
@@ -395,6 +401,9 @@ export default function Canvas({
                 isEditing={isEditing && !block.config?.locked}
                 onUpdate={onBlockUpdate}
                 isLocked={block.config?.locked || false}
+                pageTableId={pageTableId}
+                pageId={pageId}
+                recordId={recordId}
               />
             </div>
             </div>

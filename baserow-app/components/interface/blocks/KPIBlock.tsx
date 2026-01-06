@@ -18,10 +18,11 @@ interface ComparisonData {
   trend: 'up' | 'down' | 'neutral'
 }
 
-export default function KPIBlock({ block, isEditing = false }: KPIBlockProps) {
+export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null }: KPIBlockProps) {
   const router = useRouter()
   const { config } = block
-  const tableId = config?.table_id
+  // Use page's tableId if block doesn't have one configured
+  const tableId = config?.table_id || pageTableId
   const field = config?.kpi_field
   const aggregate = config?.kpi_aggregate || "count"
   const label = config?.kpi_label || config?.title || "KPI"
@@ -104,9 +105,9 @@ export default function KPIBlock({ block, isEditing = false }: KPIBlockProps) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-1">{isEditing ? "Configure KPI settings" : "No data source configured"}</p>
+          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Select a table and field in settings</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
           )}
         </div>
       </div>

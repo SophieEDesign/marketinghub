@@ -134,10 +134,10 @@ export default function ActionBlock({ block, isEditing = false }: ActionBlockPro
       </div>
 
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent>
+        <DialogContent aria-describedby="action-block-confirmation-description">
           <DialogHeader>
             <DialogTitle>Confirm Action</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="action-block-confirmation-description">
               {confirmationMessage}
             </DialogDescription>
           </DialogHeader>

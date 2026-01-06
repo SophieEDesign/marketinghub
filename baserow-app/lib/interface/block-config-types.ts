@@ -119,12 +119,20 @@ export interface KPIBlockConfig extends BaseBlockConfig {
 }
 
 // Text Block Config
+// CRITICAL: This is the contract for TextBlock
+// - content: The text/markdown content to display (required for rendering)
+// - markdown: Whether to render as markdown (default: true)
+// - text_content: Legacy alias for content (for backward compatibility)
 export interface TextBlockConfig extends BaseBlockConfig {
+  // Primary content field - required for block to render meaningfully
   content?: string
+  // Legacy alias - maps to content
+  text_content?: string
+  // Whether to render markdown (default: true)
   markdown?: boolean
   appearance?: BaseBlockConfig['appearance'] & {
-    text_size?: string
-    text_align?: string
+    text_size?: 'sm' | 'md' | 'lg' | 'xl'
+    text_align?: 'left' | 'center' | 'right' | 'justify'
   }
 }
 
@@ -274,6 +282,12 @@ export function isTabsBlockConfig(config: any): config is TabsBlockConfig {
   return config && Array.isArray(config.tabs)
 }
 
+export function isTextBlockConfig(config: any): config is TextBlockConfig {
+  // Text block is valid if it exists (no required fields)
+  // But for meaningful rendering, content should be present
+  return config !== null && config !== undefined && typeof config === 'object'
+}
+
 /**
  * Validate block config based on block type
  * Returns validation errors if config is invalid
@@ -361,7 +375,16 @@ export function validateBlockConfig(
       }
       break
 
-    // Text, divider, button, link_preview have no required fields
+    case 'text':
+      // Text block has no required fields - it can render empty
+      // But warn if content is missing (block will be empty)
+      if (!config.content && !config.text_content) {
+        // Not an error - text blocks can start empty
+        // But we'll note it for completeness
+      }
+      break
+
+    // divider, button, link_preview have no required fields
   }
 
   return {

@@ -184,10 +184,10 @@ export default function ViewManagementDialog({
   if (currentAction === "rename") {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+        <DialogContent aria-describedby="rename-view-dialog-description">
           <DialogHeader>
             <DialogTitle>Rename View</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="rename-view-dialog-description">
               Enter a new name for this view.
             </DialogDescription>
           </DialogHeader>
@@ -216,10 +216,10 @@ export default function ViewManagementDialog({
   if (currentAction === "duplicate") {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+        <DialogContent aria-describedby="duplicate-view-dialog-description">
           <DialogHeader>
             <DialogTitle>Duplicate View</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="duplicate-view-dialog-description">
               Create a copy of this view with a new name.
             </DialogDescription>
           </DialogHeader>
@@ -249,10 +249,10 @@ export default function ViewManagementDialog({
   if (currentAction === "delete") {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-view-dialog-description">
           <DialogHeader>
             <DialogTitle>Delete View</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="delete-view-dialog-description">
               Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

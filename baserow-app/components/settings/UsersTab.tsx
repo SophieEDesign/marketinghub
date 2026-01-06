@@ -280,8 +280,8 @@ export default function UsersTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Users & Permissions</CardTitle>
-              <CardDescription>Manage workspace users and their access levels</CardDescription>
+              <CardTitle>Users</CardTitle>
+              <CardDescription>Who can access the workspace</CardDescription>
             </div>
             <Button onClick={() => setInviteDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -361,10 +361,10 @@ export default function UsersTab() {
 
       {/* Invite User Dialog */}
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="invite-user-dialog-description">
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="invite-user-dialog-description">
               Send an invitation to join the workspace
             </DialogDescription>
           </DialogHeader>
@@ -421,10 +421,10 @@ export default function UsersTab() {
 
       {/* Deactivate User Dialog */}
       <Dialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="deactivate-user-dialog-description">
           <DialogHeader>
             <DialogTitle>Deactivate User</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="deactivate-user-dialog-description">
               Are you sure you want to deactivate {userToDeactivate?.email}? They will no longer be able to access the workspace.
             </DialogDescription>
           </DialogHeader>

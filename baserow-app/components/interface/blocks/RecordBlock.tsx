@@ -9,12 +9,16 @@ import type { TableField } from "@/types/database"
 interface RecordBlockProps {
   block: PageBlock
   isEditing?: boolean
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
+  recordId?: string | null // Record ID for record review pages
 }
 
-export default function RecordBlock({ block, isEditing = false }: RecordBlockProps) {
+export default function RecordBlock({ block, isEditing = false, pageTableId = null, pageId = null, recordId: pageRecordId = null }: RecordBlockProps) {
   const { config } = block
-  const tableId = config?.table_id
-  const recordId = config?.record_id
+  // Use page's tableId and recordId if block doesn't have them configured
+  const tableId = config?.table_id || pageTableId
+  const recordId = config?.record_id || pageRecordId
   const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -52,10 +56,28 @@ export default function RecordBlock({ block, isEditing = false }: RecordBlockPro
     }
   }
 
-  if (!tableId || !recordId) {
+  if (!tableId) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        {isEditing ? "Select a table and record" : "No record selected"}
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+  
+  if (!recordId) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "No record selected" : "No record selected"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Select a record in Record Review, or configure a record ID in block settings.</p>
+          )}
+        </div>
       </div>
     )
   }

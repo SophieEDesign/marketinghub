@@ -22,6 +22,9 @@ interface BlockRendererProps {
   isEditing?: boolean
   onUpdate?: (blockId: string, config: Partial<PageBlock["config"]>) => void
   isLocked?: boolean
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
+  recordId?: string | null // Record ID for record review pages
 }
 
 export default function BlockRenderer({
@@ -29,12 +32,26 @@ export default function BlockRenderer({
   isEditing = false,
   onUpdate,
   isLocked = false,
+  pageTableId = null,
+  pageId = null,
+  recordId = null,
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
+  
+  // Merge page tableId into block config if block doesn't have one
+  // This ensures blocks automatically use the page's table
+  const mergedConfig = {
+    ...safeConfig,
+    // Use page tableId if block doesn't have one configured
+    table_id: safeConfig.table_id || pageTableId || undefined,
+    // Use page recordId for record blocks
+    record_id: safeConfig.record_id || recordId || undefined,
+  }
+  
   const safeBlock: PageBlock = {
     ...block,
-    config: safeConfig,
+    config: mergedConfig,
   }
 
   const handleUpdate = (updates: Partial<PageBlock["config"]>) => {
@@ -51,17 +68,21 @@ export default function BlockRenderer({
     
     switch (block.type) {
       case "grid":
-        return <GridBlock block={safeBlock} isEditing={canEdit} />
+        // Grid block automatically uses page's tableId if not configured
+        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
 
       case "form":
+        // Form block automatically uses page's tableId if not configured
         return (
           <FormBlock
             block={safeBlock}
             isEditing={canEdit}
+            pageTableId={pageTableId}
+            pageId={pageId}
             onSubmit={async (data) => {
               // Handle form submission
               const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
-              const tableId = safeConfig.table_id
+              const tableId = mergedConfig.table_id || pageTableId
               if (tableId) {
                 const { data: table } = await supabase
                   .from("tables")
@@ -78,16 +99,19 @@ export default function BlockRenderer({
         )
 
       case "record":
-        return <RecordBlock block={safeBlock} isEditing={canEdit} />
+        // Record block uses page's tableId and recordId
+        return <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} recordId={recordId} />
 
       case "chart":
-        return <ChartBlock block={safeBlock} isEditing={canEdit} />
+        // Chart block automatically uses page's tableId if not configured
+        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
 
       case "kpi":
-        return <KPIBlock block={safeBlock} isEditing={canEdit} />
+        // KPI block automatically uses page's tableId if not configured
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
 
       case "text":
-        return <TextBlock block={safeBlock} isEditing={canEdit} />
+        return <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
 
       case "table_snapshot":
         return <TableSnapshotBlock block={safeBlock} isEditing={canEdit} />

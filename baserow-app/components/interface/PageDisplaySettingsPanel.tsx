@@ -729,12 +729,12 @@ export default function PageDisplaySettingsPanel({
               {supportsGrouping && (
                 <div className="space-y-2">
                   <Label>Group By</Label>
-                  <Select value={groupBy} onValueChange={setGroupBy}>
+                  <Select value={groupBy || "__none__"} onValueChange={(value) => setGroupBy(value === "__none__" ? "" : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="No grouping" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No grouping</SelectItem>
+                      <SelectItem value="__none__">No grouping</SelectItem>
                       {tableFields
                         .filter((f) => ['single_select', 'multi_select'].includes(f.type))
                         .map((field) => (

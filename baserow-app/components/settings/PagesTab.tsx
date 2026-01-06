@@ -34,7 +34,7 @@ interface Page {
   type: 'interface' | 'grid' | 'kanban' | 'calendar' | 'form'
   tableId?: string | null
   tableName?: string
-  group_id?: string | null // Interface ID (references interface_groups)
+  group_id?: string | null // Interface ID (references interface_groups - Interface container)
   updated_at?: string
   created_at?: string
   page_type?: string // For interface_pages
@@ -371,7 +371,7 @@ export default function SettingsPagesTab() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Interface Pages</CardTitle>
-                <CardDescription>Manage pages within an interface. Pages are screens that live inside an Interface.</CardDescription>
+                <CardDescription>Manage the screens users interact with inside each Interface</CardDescription>
               </div>
               <div className="flex items-center gap-2">
                 <Button onClick={() => {
@@ -388,7 +388,7 @@ export default function SettingsPagesTab() {
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-sm mb-2">No pages yet.</p>
-              <p className="text-xs">Create your first page to get started. Pages are screens inside an Interface.</p>
+              <p className="text-xs">Create your first page to get started.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -416,7 +416,7 @@ export default function SettingsPagesTab() {
                     <div className="col-span-2 text-sm text-gray-600">
                       {page.group_id 
                         ? (interfaceGroups.find((g: { id: string; name: string }) => g.id === page.group_id)?.name || 'Unknown Interface')
-                        : 'Ungrouped Interface'}
+                        : 'Ungrouped'}
                     </div>
                     <div className="col-span-2 text-sm text-gray-500">
                       {formatDate(page.updated_at)}
@@ -477,10 +477,10 @@ export default function SettingsPagesTab() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-page-dialog-description">
           <DialogHeader>
             <DialogTitle>Delete Page</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="delete-page-dialog-description">
               Are you sure you want to delete &quot;{pageToDelete?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

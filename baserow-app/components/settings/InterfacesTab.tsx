@@ -474,7 +474,7 @@ export default function InterfacesTab() {
       )
 
       if (!ungroupedGroup) {
-        alert('Cannot find Ungrouped Interface. Pages will be moved to null group. Please refresh the page.')
+        alert('Cannot find Ungrouped Interface. Pages will be moved to null Interface. Please refresh the page.')
         // Continue with null group_id as fallback
       }
 
@@ -512,8 +512,8 @@ export default function InterfacesTab() {
       setGroupToDelete(null)
       await loadInterfaces()
     } catch (error: any) {
-      console.error('Error deleting interface group:', error)
-      alert(error.message || 'Failed to delete interface group')
+      console.error('Error deleting interface:', error)
+      alert(error.message || 'Failed to delete interface')
     } finally {
       setDeleting(false)
     }
@@ -535,7 +535,7 @@ export default function InterfacesTab() {
         <CardHeader>
           <CardTitle>Interface Access & Sharing</CardTitle>
           <CardDescription>
-            Manage Interfaces (containers) and their Pages. Interfaces group related pages together. To create or edit Pages, use the Pages tab.
+            Manage who can see which Interfaces. Interfaces are containers that hold Pages.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -633,18 +633,18 @@ export default function InterfacesTab() {
         />
       )}
 
-      {/* Delete Interface Group Confirmation Dialog */}
+      {/* Delete Interface Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-group-dialog-description">
           <DialogHeader>
-            <DialogTitle>Delete Interface Group</DialogTitle>
-            <DialogDescription>
+            <DialogTitle>Delete Interface</DialogTitle>
+            <DialogDescription id="delete-group-dialog-description">
               Are you sure you want to delete &quot;{groupToDelete?.name}&quot;? 
               {groupToDelete && groupToDelete.interfaces.length > 0 && (
                 <>
                   <br />
                   <br />
-                  This will move {groupToDelete.interfaces.length} {groupToDelete.interfaces.length === 1 ? 'page' : 'pages'} to the &quot;Ungrouped&quot; interface.
+                  This will move {groupToDelete.interfaces.length} {groupToDelete.interfaces.length === 1 ? 'page' : 'pages'} to the &quot;Ungrouped&quot; Interface.
                 </>
               )}
               <br />
@@ -657,7 +657,7 @@ export default function InterfacesTab() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={confirmDeleteGroup} disabled={deleting}>
-              {deleting ? 'Deleting...' : 'Delete Interface Group'}
+              {deleting ? 'Deleting...' : 'Delete Interface'}
             </Button>
           </DialogFooter>
         </DialogContent>

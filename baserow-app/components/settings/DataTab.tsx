@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Table2, ChevronRight, ChevronDown, Grid3x3, FileText, Calendar, Layout, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Plus, Table2, Trash2, Edit2, Check, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 
@@ -23,18 +23,9 @@ interface Table {
   created_at: string
 }
 
-interface View {
-  id: string
-  name: string
-  type: string
-  table_id: string
-}
-
 export default function SettingsDataTab() {
   const router = useRouter()
   const [tables, setTables] = useState<Table[]>([])
-  const [viewsByTable, setViewsByTable] = useState<Record<string, View[]>>({})
-  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tableToDelete, setTableToDelete] = useState<Table | null>(null)
@@ -61,24 +52,6 @@ export default function SettingsDataTab() {
       if (tablesError) throw tablesError
 
       setTables(tablesData || [])
-
-      // Load views for each table
-      const viewsMap: Record<string, View[]> = {}
-      await Promise.all(
-        (tablesData || []).map(async (table) => {
-          const { data: viewsData, error: viewsError } = await supabase
-            .from('views')
-            .select('id, name, type, table_id')
-            .eq('table_id', table.id)
-            .order('created_at', { ascending: true })
-
-          if (!viewsError && viewsData) {
-            viewsMap[table.id] = viewsData
-          }
-        })
-      )
-
-      setViewsByTable(viewsMap)
     } catch (error) {
       console.error('Error loading tables:', error)
     } finally {
@@ -148,41 +121,6 @@ export default function SettingsDataTab() {
     }
   }
 
-  async function handleNewView(tableId: string) {
-    const name = prompt("Enter view name:")
-    if (!name) return
-
-    const supabase = createClient()
-    const { data, error } = await supabase
-      .from("views")
-      .insert([{ 
-        table_id: tableId,
-        name,
-        type: "grid"
-      }])
-      .select()
-      .single()
-
-    if (error) {
-      console.error("Error creating view:", error)
-      alert("Failed to create view")
-    } else {
-      router.refresh()
-      loadTables()
-    }
-  }
-
-  function toggleTable(tableId: string) {
-    setExpandedTables(prev => {
-      const next = new Set(prev)
-      if (next.has(tableId)) {
-        next.delete(tableId)
-      } else {
-        next.add(tableId)
-      }
-      return next
-    })
-  }
 
   function handleDeleteClick(table: Table) {
     setTableToDelete(table)
@@ -263,20 +201,6 @@ export default function SettingsDataTab() {
     }
   }
 
-  function getViewIcon(type: string) {
-    switch (type) {
-      case "grid":
-        return <Grid3x3 className="h-3.5 w-3.5" />
-      case "form":
-        return <FileText className="h-3.5 w-3.5" />
-      case "kanban":
-        return <Layout className="h-3.5 w-3.5" />
-      case "calendar":
-        return <Calendar className="h-3.5 w-3.5" />
-      default:
-        return <Grid3x3 className="h-3.5 w-3.5" />
-    }
-  }
 
   if (loading) {
     return (
@@ -293,8 +217,8 @@ export default function SettingsDataTab() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Core Data</CardTitle>
-            <CardDescription>Manage your data tables and views</CardDescription>
+            <CardTitle>Data</CardTitle>
+            <CardDescription>Raw data management</CardDescription>
           </div>
           <Button onClick={handleNewTable}>
             <Plus className="h-4 w-4 mr-2" />
@@ -303,6 +227,11 @@ export default function SettingsDataTab() {
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800">
+            <strong>Admin / Power User Only:</strong> Changes here affect all Interfaces and Pages.
+          </p>
+        </div>
         {tables.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground border border-dashed rounded-lg">
             <p className="text-sm mb-2">No tables found</p>
@@ -310,120 +239,84 @@ export default function SettingsDataTab() {
           </div>
         ) : (
           <div className="space-y-1">
-            {tables.map((table) => {
-              const isExpanded = expandedTables.has(table.id)
-              const tableViews = viewsByTable[table.id] || []
-
-              return (
-                <div key={table.id} className="group border rounded-lg p-2 hover:bg-gray-50 relative">
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => toggleTable(table.id)}
-                      className="p-1 hover:bg-gray-100 rounded transition-colors mr-2"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-500" />
-                      )}
-                    </button>
-                    <Table2 className="h-4 w-4 text-gray-500 mr-2" />
-                    {editingTableId === table.id ? (
-                      <div className="flex-1 flex items-center gap-2">
-                        <Input
-                          value={editingTableName}
-                          onChange={(e) => setEditingTableName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveName()
-                            } else if (e.key === 'Escape') {
-                              handleCancelEdit()
-                            }
-                          }}
-                          className="h-7 text-sm"
-                          autoFocus
-                          disabled={savingName}
-                        />
-                        <button
-                          onClick={handleSaveName}
-                          disabled={savingName}
-                          className="p-1 hover:bg-green-100 rounded transition-all text-green-600 hover:text-green-700 disabled:opacity-50"
-                          title="Save"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          disabled={savingName}
-                          className="p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700 disabled:opacity-50"
-                          title="Cancel"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <Link
-                          href={`/tables/${table.id}`}
-                          className="flex-1 text-sm font-medium text-gray-700 hover:text-gray-900"
-                        >
-                          {table.name}
-                        </Link>
-                        <button
-                          onClick={(e) => handleEditClick(table, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700"
-                          title="Edit table name"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            handleDeleteClick(table)
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600 hover:text-red-700"
-                          title="Delete table"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {isExpanded && (
-                    <div className="ml-8 mt-2 space-y-1">
-                      {tableViews.map((view) => (
-                        <Link
-                          key={view.id}
-                          href={`/tables/${table.id}/views/${view.id}`}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100 text-sm"
-                        >
-                          {getViewIcon(view.type)}
-                          <span>{view.name}</span>
-                        </Link>
-                      ))}
+            {tables.map((table) => (
+              <div key={table.id} className="group border rounded-lg p-2 hover:bg-gray-50 relative">
+                <div className="flex items-center">
+                  <Table2 className="h-4 w-4 text-gray-500 mr-2" />
+                  {editingTableId === table.id ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <Input
+                        value={editingTableName}
+                        onChange={(e) => setEditingTableName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSaveName()
+                          } else if (e.key === 'Escape') {
+                            handleCancelEdit()
+                          }
+                        }}
+                        className="h-7 text-sm"
+                        autoFocus
+                        disabled={savingName}
+                      />
                       <button
-                        onClick={() => handleNewView(table.id)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                        onClick={handleSaveName}
+                        disabled={savingName}
+                        className="p-1 hover:bg-green-100 rounded transition-all text-green-600 hover:text-green-700 disabled:opacity-50"
+                        title="Save"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>New View</span>
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={savingName}
+                        className="p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700 disabled:opacity-50"
+                        title="Cancel"
+                      >
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/tables/${table.id}`}
+                        className="flex-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+                      >
+                        {table.name}
+                      </Link>
+                      <button
+                        onClick={(e) => handleEditClick(table, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700"
+                        title="Edit table name"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDeleteClick(table)
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all text-red-600 hover:text-red-700"
+                        title="Delete table"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
                   )}
                 </div>
-              )
-            })}
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-table-dialog-description">
           <DialogHeader>
             <DialogTitle>Delete Table</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="delete-table-dialog-description">
               Are you sure you want to delete &quot;{tableToDelete?.name}&quot;? This will permanently delete the table, all its data, views, and fields. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

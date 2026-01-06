@@ -20,6 +20,8 @@ interface InterfaceBuilderProps {
   onSave?: () => void
   onEditModeChange?: (isEditing: boolean) => void
   hideHeader?: boolean
+  pageTableId?: string | null // Table ID from the page
+  recordId?: string | null // Record ID for record review pages
 }
 
 export default function InterfaceBuilder({
@@ -29,6 +31,8 @@ export default function InterfaceBuilder({
   onSave,
   onEditModeChange,
   hideHeader = false,
+  pageTableId = null,
+  recordId = null,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -210,12 +214,37 @@ export default function InterfaceBuilder({
           throw new Error("Failed to update block")
         }
 
-        // Update local state optimistically
+        // Reload blocks from server to ensure consistency
+        // This ensures saved config is reflected correctly
+        const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`)
+        if (blocksResponse.ok) {
+          const blocksData = await blocksResponse.json()
+          const pageBlocks = (blocksData.blocks || []).map((block: any) => ({
+            id: block.id,
+            page_id: block.page_id || page.id,
+            type: block.type,
+            x: block.x || block.position_x || 0,
+            y: block.y || block.position_y || 0,
+            w: block.w || block.width || 4,
+            h: block.h || block.height || 4,
+            config: block.config || {},
+            order_index: block.order_index || 0,
+            created_at: block.created_at,
+            updated_at: block.updated_at,
+          }))
+          setBlocks(pageBlocks)
+        } else {
+          // Fallback: update local state optimistically if reload fails
+          setBlocks((prev) =>
+            prev.map((b) => (b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b))
+          )
+        }
+      } catch (error: any) {
+        console.error("Failed to update block:", error)
+        // Fallback: update local state optimistically on error
         setBlocks((prev) =>
           prev.map((b) => (b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b))
         )
-      } catch (error: any) {
-        console.error("Failed to update block:", error)
         toast({
           variant: "destructive",
           title: "Failed to save changes",
@@ -642,6 +671,9 @@ export default function InterfaceBuilder({
             primaryTableId={page.settings?.primary_table_id || null}
             layoutTemplate={(page.settings as any)?.layout_template || null}
             interfaceDescription={page.description || null}
+            pageTableId={pageTableId}
+            pageId={page.id}
+            recordId={recordId}
           />
         </div>
       </div>

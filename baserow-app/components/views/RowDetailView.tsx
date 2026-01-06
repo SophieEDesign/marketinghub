@@ -130,10 +130,10 @@ export default function RowDetailView({
   if (onClose) {
     return (
       <Dialog open={true} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="row-detail-view-description">
           <DialogHeader>
             <DialogTitle>Row Details</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="row-detail-view-description">
               View and edit the details of this record.
             </DialogDescription>
           </DialogHeader>

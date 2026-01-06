@@ -70,19 +70,38 @@ export default function SettingsPanel({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const previousConfigRef = useRef<string>("")
+  const isInitialLoadRef = useRef(true)
 
+  // Initialize config from block - only when block changes or panel opens
   useEffect(() => {
-    if (block) {
-      setConfig(block.config || {})
+    if (block && isOpen) {
+      const blockConfig = block.config || {}
+      setConfig(blockConfig)
+      // Store initial config as JSON for comparison
+      previousConfigRef.current = JSON.stringify(blockConfig)
+      isInitialLoadRef.current = true
     }
-  }, [block])
+  }, [block?.id, isOpen])
+
+  // Reset initial load flag after a short delay to allow initial render
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        isInitialLoadRef.current = false
+      }, 100)
+      return () => clearTimeout(timer)
+    } else {
+      isInitialLoadRef.current = true
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen && block) {
       loadData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, block, config.table_id])
+  }, [isOpen, block?.id, config.table_id])
 
   async function loadData() {
     const supabase = createClient()
@@ -112,14 +131,22 @@ export default function SettingsPanel({
     }
   }
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (configToSave: BlockConfig) => {
     if (!block) return
+    
+    // Prevent saving if config hasn't actually changed
+    const configToSaveJson = JSON.stringify(configToSave)
+    if (configToSaveJson === previousConfigRef.current) {
+      return
+    }
     
     setSaving(true)
     setSaved(false)
     try {
-      await onSave(block.id, config)
+      await onSave(block.id, configToSave)
       setSaved(true)
+      // Update previous config ref to prevent re-saving
+      previousConfigRef.current = configToSaveJson
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error("Failed to save block settings:", error)
@@ -127,18 +154,37 @@ export default function SettingsPanel({
     } finally {
       setSaving(false)
     }
-  }, [block, config, onSave])
+  }, [block, onSave])
 
-  // Auto-save on config change (debounced)
+  // Auto-save on config change (debounced) - ONLY if config actually changed
   useEffect(() => {
-    if (!block || !isOpen) return
+    // Skip autosave if:
+    // 1. Panel is closed
+    // 2. No block selected
+    // 3. Initial load (prevent saving on mount)
+    // 4. Config hasn't actually changed
+    if (!block || !isOpen || isInitialLoadRef.current) return
     
+    const currentConfigJson = JSON.stringify(config)
+    
+    // Only save if config actually changed from previous saved state
+    if (currentConfigJson === previousConfigRef.current) {
+      return
+    }
+    
+    // Clear existing timeout
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
     }
     
+    // Debounce save: wait 1500ms after last change
+    // Only save if still open and config still different
     saveTimeoutRef.current = setTimeout(() => {
-      handleSave()
+      // Double-check config hasn't changed back and panel is still open
+      const finalConfigJson = JSON.stringify(config)
+      if (finalConfigJson !== previousConfigRef.current && isOpen && block) {
+        handleSave(config)
+      }
     }, 1500)
 
     return () => {
@@ -236,7 +282,7 @@ export default function SettingsPanel({
             Close
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={() => handleSave(config)}
             disabled={saving}
             size="sm"
           >

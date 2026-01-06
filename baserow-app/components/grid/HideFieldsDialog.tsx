@@ -79,10 +79,10 @@ export default function HideFieldsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" aria-describedby="hide-fields-dialog-description">
         <DialogHeader>
           <DialogTitle>Hide Fields</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="hide-fields-dialog-description">
             Select fields to hide from this view. Hidden fields will not be displayed but data is preserved.
           </DialogDescription>
         </DialogHeader>

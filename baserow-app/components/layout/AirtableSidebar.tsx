@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
-import NewPageModal from "@/components/interface/NewPageModal"
+import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import GroupedInterfaces from "./GroupedInterfaces"
 import { 
   ChevronRight, 
@@ -321,7 +321,7 @@ export default function AirtableSidebar({
       </div>
 
       {/* New Page Modal */}
-      <NewPageModal open={newPageModalOpen} onOpenChange={setNewPageModalOpen} />
+      <PageCreationWizard open={newPageModalOpen} onOpenChange={setNewPageModalOpen} defaultGroupId={null} />
     </div>
   )
 }

@@ -10,11 +10,14 @@ import CalendarView from "@/components/views/CalendarView"
 interface GridBlockProps {
   block: PageBlock
   isEditing?: boolean
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
 }
 
-export default function GridBlock({ block, isEditing = false }: GridBlockProps) {
+export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null }: GridBlockProps) {
   const { config } = block
-  const tableId = config?.table_id
+  // Use page's tableId if block doesn't have one configured
+  const tableId = config?.table_id || pageTableId
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
   const [loading, setLoading] = useState(true)
@@ -88,8 +91,13 @@ export default function GridBlock({ block, isEditing = false }: GridBlockProps) 
 
   if (!tableId) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        {isEditing ? "Select a table to display" : "No table selected"}
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+          )}
+        </div>
       </div>
     )
   }

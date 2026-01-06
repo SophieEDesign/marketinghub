@@ -20,18 +20,23 @@ export default function TextDataSettings({
 }: TextDataSettingsProps) {
   return (
     <div className="space-y-4">
-      {/* Content */}
+      {/* Info Message */}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <p className="text-sm text-blue-800">
+          <strong>Tip:</strong> Text content is edited directly in the block. Click on the text block to edit inline.
+        </p>
+      </div>
+
+      {/* Content Preview (Read-only) */}
       <div className="space-y-2">
-        <Label>Content *</Label>
-        <Textarea
-          value={config.content || config.text_content || ""}
-          onChange={(e) => onUpdate({ content: e.target.value, text_content: e.target.value })}
-          placeholder="Enter text or markdown content..."
-          rows={10}
-          className="font-mono text-sm"
-        />
+        <Label>Content Preview</Label>
+        <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600 min-h-[100px] max-h-[200px] overflow-auto">
+          {config.content || config.text_content || (
+            <span className="text-gray-400 italic">No content yet. Click on the text block to add content.</span>
+          )}
+        </div>
         <p className="text-xs text-gray-500">
-          Supports markdown formatting
+          Supports markdown formatting. Edit content directly in the block.
         </p>
       </div>
 

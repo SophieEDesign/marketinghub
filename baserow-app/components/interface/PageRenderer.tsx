@@ -7,8 +7,9 @@
 
 import type { InterfacePage } from '@/lib/interface/page-types-only'
 import { PageType } from '@/lib/interface/page-types'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import { getPageTableId } from '@/lib/interface/page-table-utils'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
@@ -24,6 +25,7 @@ interface PageRendererProps {
   isLoading?: boolean
   onGridToggle?: () => void
   showGridToggle?: boolean
+  blocks?: any[] // Blocks for dashboard/overview/content pages
 }
 
 export default function PageRenderer({
@@ -32,9 +34,18 @@ export default function PageRenderer({
   isLoading = false,
   onGridToggle,
   showGridToggle = false,
+  blocks = [],
 }: PageRendererProps) {
   const config = page.config || {}
   const visualisation = config.visualisation || page.page_type
+  const [pageTableId, setPageTableId] = useState<string | null>(null)
+
+  // Extract tableId from page
+  useEffect(() => {
+    getPageTableId(page).then(tableId => {
+      setPageTableId(tableId)
+    })
+  }, [page])
 
   // Determine if grid toggle should be shown
   const shouldShowGridToggle = useMemo(() => {
@@ -58,12 +69,23 @@ export default function PageRenderer({
       case 'grid':
         // For list/grid views, we need to render using AirtableViewPage
         // This requires a view record, so we'll create a minimal one
+        if (!pageTableId) {
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center max-w-md">
+                <div className="text-sm mb-2">Grid view requires a table connection.</div>
+                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+              </div>
+            </div>
+          )
+        }
         return (
           <div className="h-full">
             <SimpleGridView
               data={data}
               config={config}
               pageId={page.id}
+              tableId={pageTableId}
             />
           </div>
         )
@@ -78,38 +100,28 @@ export default function PageRenderer({
       case 'kanban':
         return (
           <KanbanView
-            tableId={config.table_id || config.base_table || ''}
-            viewId={config.view_id || page.id}
+            tableId={pageTableId || config.table_id || config.base_table || ''}
+            viewId={page.saved_view_id || config.view_id || page.id}
             groupingFieldId={config.group_by || ''}
             fieldIds={config.card_fields || config.fields || []}
           />
         )
 
       case 'calendar':
-        // Get tableId from config, base_table, or from saved_view_id anchor
-        let calendarTableId = config.table_id || config.base_table || page.base_table || ''
-        
-        // If page has saved_view_id anchor, fetch the view's table_id
-        if (!calendarTableId && page.saved_view_id) {
-          // We'll need to fetch this in the component, but for now try to get it from config
-          // The CalendarView component will handle loading the view's table_id if needed
-          calendarTableId = config.table_id || ''
-        }
-        
-        // Don't render CalendarView for SQL-view backed pages (no tableId)
-        if (!calendarTableId && page.source_view && !page.saved_view_id) {
+        // Use page's tableId
+        if (!pageTableId) {
           return (
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
                 <div className="text-sm mb-2">Calendar view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page is SQL-view backed. Please configure it with a table anchor in Settings.</div>
+                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
               </div>
             </div>
           )
         }
         return (
           <CalendarView
-            tableId={calendarTableId}
+            tableId={pageTableId}
             viewId={page.saved_view_id || config.view_id || page.id}
             dateFieldId={config.start_date_field || config.calendar_date_field || ''}
             fieldIds={config.fields || []}
@@ -130,19 +142,37 @@ export default function PageRenderer({
         const formFieldIds = config.form_fields 
           ? config.form_fields.map((f: any) => typeof f === 'string' ? f : f.field_id || f.field_name)
           : config.fields || []
+        if (!pageTableId) {
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center max-w-md">
+                <div className="text-sm mb-2">Form requires a table connection.</div>
+                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+              </div>
+            </div>
+          )
+        }
         return (
           <FormView
-            tableId={config.table_id || page.base_table || ''}
-            viewId={config.view_id || page.id}
+            tableId={pageTableId}
+            viewId={page.saved_view_id || config.view_id || page.id}
             fieldIds={formFieldIds}
           />
         )
 
       case 'dashboard':
         return (
-          <div className="p-4">
-            <DashboardView page={page} data={data} config={config} />
-          </div>
+          <InterfaceBuilder
+            page={{ 
+              id: page.id, 
+              name: page.name,
+              settings: { layout_template: 'dashboard', primary_table_id: pageTableId }
+            } as any}
+            initialBlocks={blocks}
+            isViewer={true}
+            hideHeader={true}
+            pageTableId={pageTableId}
+          />
         )
 
       case 'overview':
@@ -151,11 +181,12 @@ export default function PageRenderer({
             page={{ 
               id: page.id, 
               name: page.name,
-              settings: { layout_template: 'overview' }
+              settings: { layout_template: 'overview', primary_table_id: pageTableId }
             } as any}
-            initialBlocks={[]}
-            isViewer={false}
+            initialBlocks={blocks}
+            isViewer={true}
             hideHeader={true}
+            pageTableId={pageTableId}
           />
         )
       
@@ -170,19 +201,32 @@ export default function PageRenderer({
                 settings: { layout_template: 'content' },
                 description: 'This is a content page. Add blocks to build your page.'
               } as any}
-              initialBlocks={[]}
-              isViewer={false}
+              initialBlocks={blocks}
+              isViewer={true}
               hideHeader={true}
+              pageTableId={null} // Content pages don't require tables
             />
           </div>
         )
 
       case 'record_review':
+        if (!pageTableId) {
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center max-w-md">
+                <div className="text-sm mb-2">Record Review requires a table connection.</div>
+                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+              </div>
+            </div>
+          )
+        }
         return (
           <RecordReviewView
             page={page}
             data={data}
             config={config}
+            blocks={blocks}
+            pageTableId={pageTableId}
           />
         )
 
@@ -283,7 +327,7 @@ function InvalidPageState({ page }: { page: InterfacePage }) {
 }
 
 // Simple grid view for SQL view data
-function SimpleGridView({ data, config, pageId }: { data: any[]; config: any; pageId: string }) {
+function SimpleGridView({ data, config, pageId, tableId }: { data: any[]; config: any; pageId: string; tableId: string | null }) {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">

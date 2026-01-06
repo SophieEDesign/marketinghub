@@ -27,17 +27,17 @@ export default function TextAppearanceSettings({
       <div className="space-y-2">
         <Label>Text Size</Label>
         <Select
-          value={appearance.text_size || "medium"}
-          onValueChange={(value) => onUpdate({ text_size: value })}
+          value={appearance.text_size || "md"}
+          onValueChange={(value) => onUpdate({ text_size: value as 'sm' | 'md' | 'lg' | 'xl' })}
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="small">Small</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="large">Large</SelectItem>
-            <SelectItem value="xlarge">Extra Large</SelectItem>
+            <SelectItem value="sm">Small</SelectItem>
+            <SelectItem value="md">Medium</SelectItem>
+            <SelectItem value="lg">Large</SelectItem>
+            <SelectItem value="xl">Extra Large</SelectItem>
           </SelectContent>
         </Select>
       </div>

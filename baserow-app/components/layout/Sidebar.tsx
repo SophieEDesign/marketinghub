@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Table, View } from "@/types/database"
+import PageCreationWizard from "@/components/interface/PageCreationWizard"
 
 interface InterfacePage {
   id: string
@@ -56,6 +57,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
+  const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
 
   const toggleTable = (tableId: string) => {
     const newExpanded = new Set(expandedTables)
@@ -236,12 +238,16 @@ export default function Sidebar({
             )}
             <div className="space-y-0.5">
             {!isCollapsed && (
-              <SidebarItem
-                href="/interface/new"
-                icon={Plus}
-                label="New Page"
-                active={isActive("/interface/new")}
-              />
+              <button
+                onClick={() => setNewPageWizardOpen(true)}
+                className="block w-full"
+              >
+                <SidebarItem
+                  icon={Plus}
+                  label="New Page"
+                  active={false}
+                />
+              </button>
             )}
               {interfacePages.map((page) => {
                 // Use /pages route for new system pages, /interface for old system pages
@@ -295,6 +301,13 @@ export default function Sidebar({
           />
         </div>
       </div>
+
+      {/* Page Creation Wizard Modal */}
+      <PageCreationWizard
+        open={newPageWizardOpen}
+        onOpenChange={setNewPageWizardOpen}
+        defaultGroupId={null}
+      />
     </div>
   )
 }

@@ -62,22 +62,17 @@ export default function InterfacePageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.config])
 
+  // Load blocks for dashboard/overview/content/record_review pages in BOTH edit and view mode
+  // CRITICAL: Blocks must load in view mode so they render correctly
   useEffect(() => {
-    // Load blocks for dashboard/overview/content pages when entering block edit mode
-    // Also load blocks immediately if we're already in edit mode (e.g., on page load)
-    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content')) {
-      loadBlocks()
+    if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+      // Load blocks if not already loaded
+      if (blocks.length === 0 && !blocksLoading) {
+        loadBlocks()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlockEditing, page?.id, page?.page_type])
-
-  // Load blocks when entering block edit mode (triggered by button click)
-  useEffect(() => {
-    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content') && blocks.length === 0) {
-      loadBlocks()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlockEditing])
+  }, [page?.id, page?.page_type])
 
   async function loadPage() {
     if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
@@ -163,6 +158,15 @@ export default function InterfacePageClient({
     }
   }
 
+  // Reload blocks when exiting edit mode to ensure view mode shows latest changes
+  useEffect(() => {
+    if (!isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+      // Reload blocks when exiting edit mode
+      loadBlocks()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBlockEditing, page?.id])
+
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)
   }
@@ -200,6 +204,7 @@ export default function InterfacePageClient({
 
   const isViewer = searchParams.get("view") === "true"
   const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content'
+  const isRecordReview = page?.page_type === 'record_review'
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
@@ -280,7 +285,7 @@ export default function InterfacePageClient({
                       // Enter block edit mode
                       enterBlockEdit()
                       // Ensure blocks are loaded immediately
-                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content')) {
+                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
                         await loadBlocks()
                       }
                     }}
@@ -360,6 +365,7 @@ export default function InterfacePageClient({
             isLoading={loading}
             onGridToggle={showGridToggle ? handleGridToggle : undefined}
             showGridToggle={showGridToggle}
+            blocks={(isDashboardOrOverview || page?.page_type === 'record_review') ? blocks : undefined}
           />
         )}
       </div>

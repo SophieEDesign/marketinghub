@@ -9,14 +9,20 @@ interface FormBlockProps {
   block: PageBlock
   isEditing?: boolean
   onSubmit?: (data: Record<string, any>) => void
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
 }
 
-export default function FormBlock({ block, isEditing = false, onSubmit }: FormBlockProps) {
+export default function FormBlock({ block, isEditing = false, onSubmit, pageTableId = null, pageId = null }: FormBlockProps) {
   const { config } = block
-  const tableId = config?.table_id
-  const [fields, setFields] = useState<FieldType[]>([])
+  // Use page's tableId if block doesn't have one configured
+  const tableId = config?.table_id || pageTableId
+  const formFieldsConfig = config?.form_fields || []
+  const [allFields, setAllFields] = useState<FieldType[]>([])
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState<string>('')
 
   useEffect(() => {
     if (tableId) {
@@ -46,43 +52,124 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
             errorMessage?.includes('relation') || 
             errorMessage?.includes('does not exist')) {
           console.warn('table_fields table may not exist, using empty fields array')
-          setFields([])
+          setAllFields([])
           return
         }
         throw error
       }
 
-      setFields((data || []) as FieldType[])
+      setAllFields((data || []) as FieldType[])
     } catch (error) {
       console.warn('Error loading fields for form block:', error)
-      setFields([])
+      setAllFields([])
     }
   }
 
+  // Get visible fields from config, sorted by order
+  const visibleFields = formFieldsConfig
+    .filter((ff: any) => ff.visible !== false)
+    .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+    .map((ff: any) => {
+      const field = allFields.find(f => f.id === ff.field_id || f.name === ff.field_name)
+      return field ? { ...field, formConfig: ff } : null
+    })
+    .filter(Boolean) as (FieldType & { formConfig: any })[]
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!tableId || !onSubmit) return
+    if (!tableId) return
+
+    // Validate required fields
+    const missingRequired = visibleFields
+      .filter(f => f.formConfig.required && !formData[f.name])
+      .map(f => f.name)
+
+    if (missingRequired.length > 0) {
+      setSubmitStatus('error')
+      setErrorMessage(`Please fill in required fields: ${missingRequired.join(', ')}`)
+      setTimeout(() => setSubmitStatus('idle'), 5000)
+      return
+    }
 
     setLoading(true)
+    setSubmitStatus('idle')
+    setErrorMessage('')
+
     try {
-      await onSubmit(formData)
+      const supabase = createClient()
+      
+      // Get table's supabase_table name
+      const { data: table } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
+
+      if (!table?.supabase_table) {
+        throw new Error("Table not found")
+      }
+
+      // Prepare data - only include fields that are in the form
+      const submitData: Record<string, any> = {}
+      visibleFields.forEach(field => {
+        const value = formData[field.name]
+        if (value !== undefined && value !== null && value !== '') {
+          submitData[field.name] = value
+        }
+      })
+
+      // Submit based on action type
+      const submitAction = config?.submit_action || 'create'
+      
+      if (submitAction === 'create') {
+        const { error } = await supabase
+          .from(table.supabase_table)
+          .insert([submitData])
+
+        if (error) throw error
+      } else if (submitAction === 'update' && config?.record_id) {
+        const { error } = await supabase
+          .from(table.supabase_table)
+          .update(submitData)
+          .eq('id', config.record_id)
+
+        if (error) throw error
+      }
+
+      // Success
+      setSubmitStatus('success')
       setFormData({})
-    } catch (error) {
+      
+      // Call custom onSubmit if provided
+      if (onSubmit) {
+        await onSubmit(submitData)
+      }
+
+      // Reset success message after 3 seconds
+      setTimeout(() => setSubmitStatus('idle'), 3000)
+    } catch (error: any) {
       console.error("Form submission error:", error)
+      setSubmitStatus('error')
+      setErrorMessage(error.message || "Failed to submit form. Please try again.")
+      setTimeout(() => setSubmitStatus('idle'), 5000)
     } finally {
       setLoading(false)
     }
   }
 
-  function renderField(field: FieldType) {
-    const value = formData[field.name] || ""
+  function renderField(field: FieldType & { formConfig: any }) {
+    const value = formData[field.name] ?? ""
+    const isRequired = field.formConfig?.required || false
 
     switch (field.type) {
       case "text":
       case "long_text":
         return (
           <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">{field.name}</label>
+            <label className="block text-sm font-medium mb-1">
+              {field.name}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
             {field.type === "long_text" ? (
               <textarea
                 value={value}
@@ -106,7 +193,10 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
       case "number":
         return (
           <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">{field.name}</label>
+            <label className="block text-sm font-medium mb-1">
+              {field.name}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
             <input
               type="number"
               value={value}
@@ -127,8 +217,12 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
                 onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
                 className="w-4 h-4"
                 disabled={isEditing}
+                required={isRequired}
               />
-              <span className="text-sm font-medium">{field.name}</span>
+              <span className="text-sm font-medium">
+                {field.name}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
+              </span>
             </label>
           </div>
         )
@@ -136,13 +230,17 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
       case "date":
         return (
           <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">{field.name}</label>
+            <label className="block text-sm font-medium mb-1">
+              {field.name}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
             <input
               type="datetime-local"
               value={value}
               onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               disabled={isEditing}
+              required={isRequired}
             />
           </div>
         )
@@ -150,23 +248,61 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
       default:
         return (
           <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">{field.name}</label>
+            <label className="block text-sm font-medium mb-1">
+              {field.name}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
             <input
               type="text"
               value={value}
               onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               disabled={isEditing}
+              required={isRequired}
             />
           </div>
         )
     }
   }
 
+  // Show setup state if table not selected or no fields configured
   if (!tableId) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-        {isEditing ? "Select a table for the form" : "No table selected"}
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Show setup state if no fields configured
+  if (formFieldsConfig.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">{isEditing ? "No fields configured" : "Form not configured"}</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Add fields in block settings</p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Show setup state if no visible fields
+  if (visibleFields.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">No visible fields</p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Enable fields in block settings</p>
+          )}
+        </div>
       </div>
     )
   }
@@ -174,12 +310,25 @@ export default function FormBlock({ block, isEditing = false, onSubmit }: FormBl
   return (
     <div className="h-full overflow-auto p-4">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {fields.map((field) => renderField(field))}
+        {visibleFields.map((field) => renderField(field))}
+        
+        {/* Status Messages */}
+        {submitStatus === 'success' && (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-800">
+            Form submitted successfully!
+          </div>
+        )}
+        {submitStatus === 'error' && errorMessage && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-800">
+            {errorMessage}
+          </div>
+        )}
+        
         {!isEditing && (
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {loading ? "Submitting..." : "Submit"}
           </button>

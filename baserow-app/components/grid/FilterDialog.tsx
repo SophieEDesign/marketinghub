@@ -164,10 +164,10 @@ export default function FilterDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl" aria-describedby="filter-dialog-description">
         <DialogHeader>
           <DialogTitle>Filter Records</DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="filter-dialog-description">
             Add filters to narrow down the records displayed in this view.
           </DialogDescription>
         </DialogHeader>

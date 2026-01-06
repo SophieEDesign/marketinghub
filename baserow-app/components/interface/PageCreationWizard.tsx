@@ -1,5 +1,7 @@
 "use client"
 
+// Interfaces group pages. Pages render content. Creation flows must never mix the two.
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -568,7 +570,19 @@ export default function PageCreationWizard({
         />
       </div>
       <div className="flex gap-2">
-        <Button variant="outline" onClick={() => setStep('anchor')} className="flex-1">
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            // For content pages, go back to purpose (skipped anchor step)
+            // For other pages, go back to anchor
+            if (pageType === 'content') {
+              setStep('purpose')
+            } else {
+              setStep('anchor')
+            }
+          }} 
+          className="flex-1"
+        >
           Back
         </Button>
         <Button onClick={handleCreate} disabled={creating || !pageName.trim() || !selectedInterfaceId} className="flex-1">
@@ -580,7 +594,7 @@ export default function PageCreationWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" aria-describedby="page-creation-wizard-description">
         <DialogHeader>
           <DialogTitle>
             {step === 'interface' && 'Select Interface'}
@@ -588,7 +602,7 @@ export default function PageCreationWizard({
             {step === 'anchor' && 'Configure Page'}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription id="page-creation-wizard-description">
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
             {step === 'anchor' && 'Set up the data source or layout'}

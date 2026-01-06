@@ -18,6 +18,8 @@ export default function SettingsWorkspaceTab() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [originalName, setOriginalName] = useState('Marketing Hub')
+  const [originalIcon, setOriginalIcon] = useState('📊')
 
   useEffect(() => {
     loadWorkspace()
@@ -39,12 +41,16 @@ export default function SettingsWorkspaceTab() {
         .maybeSingle()
 
       if (!error && data) {
-        setWorkspaceName(data.name || 'Marketing Hub')
-        setWorkspaceIcon(data.icon || '📊')
+        const name = data.name || 'Marketing Hub'
+        const icon = data.icon || '📊'
+        setWorkspaceName(name)
+        setWorkspaceIcon(icon)
+        setOriginalName(name)
+        setOriginalIcon(icon)
         setCreatedAt(data.created_at || '')
         
         // Generate slug from name
-        const slug = (data.name || 'Marketing Hub')
+        const slug = name
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-|-$/g, '')
@@ -108,6 +114,8 @@ export default function SettingsWorkspaceTab() {
         })
       } else {
         setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
+        setOriginalName(workspaceName.trim())
+        setOriginalIcon(workspaceIcon || '📊')
         setTimeout(() => setMessage(null), 3000)
       }
     } catch (error: any) {
@@ -128,67 +136,56 @@ export default function SettingsWorkspaceTab() {
     )
   }
 
+  const hasUnsavedChanges = workspaceName !== originalName || workspaceIcon !== originalIcon
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Workspace Settings</CardTitle>
-        <CardDescription>Configure your workspace preferences</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="workspace-name">Workspace Name</Label>
-          <Input
-            id="workspace-name"
-            value={workspaceName}
-            onChange={(e) => setWorkspaceName(e.target.value)}
-            placeholder="Enter workspace name"
-            className="max-w-md"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>Workspace Icon</Label>
-          <IconPicker
-            value={workspaceIcon}
-            onChange={setWorkspaceIcon}
-            placeholder="📊"
-            className="max-w-md"
-          />
-          <p className="text-xs text-muted-foreground">
-            Optional: Select an icon to represent your workspace
-          </p>
-        </div>
-
-        <div className="pt-4 border-t space-y-4">
+      <CardContent className="p-6 space-y-6">
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Workspace Slug</Label>
+            <Label htmlFor="workspace-name">Workspace Name</Label>
             <Input
-              value={workspaceSlug}
-              readOnly
-              className="max-w-md bg-gray-50"
+              id="workspace-name"
+              value={workspaceName}
+              onChange={(e) => setWorkspaceName(e.target.value)}
+              placeholder="Enter workspace name"
+              className="max-w-md"
             />
-            <p className="text-xs text-muted-foreground">
-              Read-only. Used for workspace URLs.
-            </p>
           </div>
 
-          {createdAt && (
-            <div className="space-y-2">
-              <Label>Created</Label>
-              <div className="text-sm text-muted-foreground">
-                {new Date(createdAt).toLocaleDateString()} at {new Date(createdAt).toLocaleTimeString()}
-              </div>
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label>Workspace Icon</Label>
+            <IconPicker
+              value={workspaceIcon}
+              onChange={setWorkspaceIcon}
+              placeholder="📊"
+              className="max-w-md"
+            />
+          </div>
+        </div>
 
-          {ownerEmail && (
-            <div className="space-y-2">
-              <Label>Owner</Label>
-              <div className="text-sm text-muted-foreground">
-                {ownerEmail}
-              </div>
+        <div className="pt-4 border-t">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Info</h3>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Workspace Slug</span>
+              <span className="font-mono text-muted-foreground">{workspaceSlug}</span>
             </div>
-          )}
+            {createdAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Created</span>
+                <span className="text-muted-foreground">
+                  {new Date(createdAt).toLocaleDateString()} at {new Date(createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+            )}
+            {ownerEmail && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Owner</span>
+                <span className="text-muted-foreground">{ownerEmail}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {message && (
@@ -203,12 +200,14 @@ export default function SettingsWorkspaceTab() {
           </div>
         )}
 
-        <div className="pt-4">
-          <Button onClick={handleSave} disabled={saving}>
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </div>
+        {hasUnsavedChanges && (
+          <div className="pt-2">
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
