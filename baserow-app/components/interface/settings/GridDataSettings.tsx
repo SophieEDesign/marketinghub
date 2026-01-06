@@ -420,7 +420,7 @@ export default function GridDataSettings({
                   onValueChange={(value) => {
                     const currentSorts = config.sorts || []
                     const updated = [...currentSorts]
-                    updated[index] = { ...updated[index], direction: value }
+                    updated[index] = { ...updated[index], direction: value as 'asc' | 'desc' }
                     onUpdate({ sorts: updated })
                   }}
                 >
