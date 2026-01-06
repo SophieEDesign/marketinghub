@@ -78,18 +78,33 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }
 
+  // Setup state: No table selected
+  if (!pageTableId) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-500 p-4">
+        <div className="text-center max-w-md">
+          <div className="text-sm mb-2 font-medium">Select a table to review records.</div>
+          <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex">
-      {/* Main list/grid view */}
+      {/* Main list/grid view - Left Column */}
       <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto' : 'w-full overflow-auto'}>
         {data.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            No records available
+          <div className="flex items-center justify-center h-full text-gray-500 p-4">
+            <div className="text-center">
+              <p className="text-sm mb-2 font-medium">No records available</p>
+              <p className="text-xs text-gray-400">This table doesn&apos;t have any records yet.</p>
+            </div>
           </div>
         ) : (
           <div className="h-full overflow-auto">
             <table className="w-full border-collapse">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   {columns.map((col: string) => (
                     <th key={col} className="border p-2 text-left font-semibold text-sm">
@@ -124,14 +139,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         )}
       </div>
 
-      {/* Detail panel - Shows blocks for selected record */}
+      {/* Detail panel - Right Column - Shows blocks for selected record */}
       {recordPanel !== 'none' && (
         <div className={recordPanel === 'side' ? 'w-1/2 border-l overflow-auto' : 'w-full border-t overflow-auto'}>
           {!selectedRecord ? (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
               <div className="text-center">
-                <p className="mb-2">No record selected</p>
-                <p className="text-xs text-gray-400">Click on a record in the list to view details</p>
+                <p className="mb-2 font-medium">Select a record to see details.</p>
+                <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
               </div>
             </div>
           ) : blocksLoading ? (
@@ -144,15 +159,17 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           ) : loadedBlocks.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
               <div className="text-center">
-                <p className="mb-2">{isEditing ? "No blocks configured" : "No detail view configured"}</p>
-                {isEditing && (
-                  <p className="text-xs text-gray-400">Add blocks to customize the detail panel</p>
+                <p className="mb-2 font-medium">{isEditing ? "No blocks configured" : "No detail view configured"}</p>
+                {isEditing ? (
+                  <p className="text-xs text-gray-400">Add blocks to design the record detail view.</p>
+                ) : (
+                  <p className="text-xs text-gray-400">Edit this page to add blocks and customize the detail view.</p>
                 )}
               </div>
             </div>
           ) : (
             <div className="h-full">
-              {/* Render blocks with record context */}
+              {/* Render blocks with record context - Layout does NOT reset when selecting new record */}
               <InterfaceBuilder
                 page={{
                   id: page.id,

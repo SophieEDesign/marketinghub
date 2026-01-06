@@ -33,35 +33,44 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const { config } = block
   
   // Get content from config - support both JSON (TipTap format) and plain text (legacy)
-  const contentValue = config?.content_json || config?.content || config?.text_content || config?.text || ""
+  // Priority: content (TipTap JSON) > content_json > text_content > text
+  const contentValue = config?.content || config?.content_json || config?.text_content || config?.text || ""
   
   // Convert plain text to TipTap JSON if needed
   const getInitialContent = () => {
+    // If content is already an object (TipTap JSON), use it directly
+    if (contentValue && typeof contentValue === 'object') {
+      return contentValue
+    }
+    
+    // If content is a string, check if it's JSON
     if (typeof contentValue === 'string' && contentValue.trim() !== '') {
-      // Check if it's already JSON
       try {
         const parsed = JSON.parse(contentValue)
-        if (parsed && typeof parsed === 'object') {
+        if (parsed && typeof parsed === 'object' && parsed.type === 'doc') {
           return parsed
         }
       } catch {
         // Not JSON, convert plain text to TipTap format
+        const lines = contentValue.split('\n').filter(line => line.trim() !== '')
+        if (lines.length === 0) {
+          return {
+            type: 'doc',
+            content: []
+          }
+        }
         return {
           type: 'doc',
-          content: [
-            {
-              type: 'paragraph',
-              content: contentValue.split('\n').map((line: string) => ({
-                type: 'text',
-                text: line
-              }))
-            }
-          ]
+          content: lines.map((line: string) => ({
+            type: 'paragraph',
+            content: line ? [{ type: 'text', text: line }] : []
+          }))
         }
       }
     }
-    // Empty or already JSON
-    return contentValue || {
+    
+    // Empty state
+    return {
       type: 'doc',
       content: []
     }
@@ -72,7 +81,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Initialize TipTap editor
+  // Initialize TipTap editor - always render, editable based on isEditing
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -91,7 +100,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       Color,
     ],
     content: getInitialContent(),
-    editable: isEditing,
+    editable: isEditing, // Only editable when in edit mode
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none',
+        'data-placeholder': isEditing ? 'Start typing…' : '',
+      },
+    },
     onFocus: () => {
       setIsFocused(true)
     },
@@ -99,8 +114,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       setIsFocused(false)
     },
     onUpdate: ({ editor }) => {
-      // Debounced save
-      if (!onUpdate) return
+      // Debounced save - only save when in edit mode
+      if (!onUpdate || !isEditing) return
 
       setSaveStatus("saving")
 
@@ -109,13 +124,14 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         clearTimeout(saveTimeoutRef.current)
       }
 
-      // Debounce save: wait 600ms after last change
+      // Debounce save: wait 1200ms (within 1000-1500ms range) after last change
       saveTimeoutRef.current = setTimeout(() => {
         const json = editor.getJSON()
+        // Save to config.content as primary field (TipTap JSON)
         onUpdate(block.id, {
-          content_json: json,
-          content: editor.getText(), // Also save plain text for compatibility
-          text_content: editor.getText(), // Legacy field
+          content: json, // Primary: TipTap JSON format
+          content_json: json, // Alias for compatibility
+          text_content: editor.getText(), // Plain text for search/preview
         })
         setSaveStatus("saved")
         
@@ -123,22 +139,29 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         setTimeout(() => {
           setSaveStatus("idle")
         }, 2000)
-      }, 600)
+      }, 1200)
     },
   })
 
-  // Sync editor content when block config changes externally
+  // Sync editor content when block config changes externally (but not during user editing)
   useEffect(() => {
-    if (!editor) return
+    if (!editor || !isEditing) return
     
     const newContent = getInitialContent()
     const currentContent = editor.getJSON()
     
-    // Only update if content actually changed (avoid infinite loops)
-    if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
-      editor.commands.setContent(newContent, false) // false = don't emit update event
+    // Only update if content actually changed (avoid infinite loops and save loops)
+    // Compare stringified versions to detect real changes
+    const currentStr = JSON.stringify(currentContent)
+    const newStr = JSON.stringify(newContent)
+    
+    if (currentStr !== newStr) {
+      // Only update if editor is not focused (to avoid interrupting user typing)
+      if (!isFocused) {
+        editor.commands.setContent(newContent, false) // false = don't emit update event
+      }
     }
-  }, [contentValue, editor])
+  }, [contentValue, editor, isEditing, isFocused])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -163,12 +186,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const textAlign = appearance.text_align || 'left'
   const textSize = appearance.text_size || 'md'
 
-  // Toolbar component
+  // Toolbar component - floating toolbar that appears on focus
   const Toolbar = () => {
     if (!editor || !isEditing || !isFocused) return null
 
     return (
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
         <Button
           variant="ghost"
           size="sm"
@@ -304,8 +327,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
-  // Empty state
-  const isEmpty = !editor || editor.isEmpty
+  // Empty state - check if editor is empty
+  const isEmpty = !editor || (editor && editor.isEmpty)
 
   if (!editor) {
     return (
@@ -314,56 +337,84 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       </div>
     )
   }
+  
+  // Update editor editable state and placeholder when isEditing changes
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(isEditing)
+      // Update placeholder attribute
+      const editorElement = editor.view.dom
+      if (editorElement) {
+        if (isEditing) {
+          editorElement.setAttribute('data-placeholder', 'Start typing…')
+        } else {
+          editorElement.removeAttribute('data-placeholder')
+        }
+      }
+    }
+  }, [editor, isEditing])
 
   return (
     <div 
       ref={containerRef}
-      className="h-full w-full overflow-auto flex flex-col relative"
+      className={cn(
+        "h-full w-full overflow-auto flex flex-col relative",
+        // Focus state: subtle border when focused in edit mode
+        isEditing && isFocused && "ring-2 ring-blue-500 ring-opacity-50 rounded-lg",
+        // Hover state in edit mode
+        isEditing && !isFocused && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all"
+      )}
       style={blockStyle}
       onClick={() => {
-        if (isEditing && !isFocused) {
+        // Click to focus when in edit mode
+        if (isEditing && !isFocused && editor) {
           editor.commands.focus()
         }
       }}
     >
-      {/* Toolbar - appears on focus */}
-      <Toolbar />
+      {/* Toolbar - appears on focus in edit mode */}
+      {isEditing && <Toolbar />}
       
-      {/* Save status indicator */}
+      {/* Save status indicator - only show in edit mode */}
       {isEditing && saveStatus !== "idle" && (
-        <div className="absolute top-2 right-2 text-xs text-gray-500 z-10">
+        <div className="absolute top-2 right-2 text-xs text-gray-500 z-10 bg-white px-2 py-1 rounded shadow-sm">
           {saveStatus === "saving" && "Saving..."}
           {saveStatus === "saved" && "✓ Saved"}
         </div>
       )}
 
-      {/* Editor content */}
+      {/* Editor content - always render, identical in edit and view mode */}
       <div 
         className={cn(
-          "flex-1 prose prose-sm max-w-none",
+          "flex-1 prose prose-sm max-w-none w-full",
           "prose-headings:font-semibold",
-          "prose-p:my-2",
-          "prose-ul:my-2",
-          "prose-ol:my-2",
+          "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
+          "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
+          "prose-ol:my-2 prose-ol:first:mt-0 prose-ol:last:mb-0",
           "prose-li:my-1",
           "prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline",
+          "prose-strong:font-semibold",
+          "prose-em:italic",
+          // Text alignment
           textAlign === 'center' && "text-center",
           textAlign === 'right' && "text-right",
           textAlign === 'justify' && "text-justify",
+          // Text size
           textSize === 'sm' && "prose-sm",
           textSize === 'md' && "prose-base",
           textSize === 'lg' && "prose-lg",
           textSize === 'xl' && "prose-xl",
-          // Empty state styling
-          isEmpty && isEditing && "flex items-center justify-center min-h-[200px]"
+          // Empty state styling - only in edit mode
+          isEmpty && isEditing && "flex items-center justify-center min-h-[100px]"
         )}
         style={{
           color: appearance.text_color || 'inherit',
         }}
       >
+        {/* Empty state placeholder - only show in edit mode when empty */}
         {isEmpty && isEditing ? (
-          <div className="text-gray-400 text-sm cursor-text">
-            Click to start writing...
+          <div className="text-gray-400 text-sm cursor-text select-none pointer-events-none">
+            Start typing…
           </div>
         ) : (
           <EditorContent editor={editor} />

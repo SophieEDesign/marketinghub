@@ -61,9 +61,21 @@
 /* TipTap Editor Styles */
 .ProseMirror {
   outline: none;
-  min-height: 200px;
+  min-height: 100px;
 }
 
+/* Ensure identical rendering in edit and view mode */
+.ProseMirror[contenteditable="true"],
+.ProseMirror[contenteditable="false"] {
+  /* Same styling for both modes */
+  cursor: text;
+}
+
+.ProseMirror[contenteditable="false"] {
+  cursor: default;
+}
+
+/* Placeholder styling */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;

@@ -96,6 +96,12 @@ export default function CalendarView({
     // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
     const sanitizedTableId = resolvedTableId.split(':')[0]
     
+    if (!sanitizedTableId || sanitizedTableId.trim() === '') {
+      setRows([])
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -104,13 +110,13 @@ export default function CalendarView({
         .eq("table_id", sanitizedTableId)
 
       if (error) {
-        // Silently handle error - will show empty calendar
+        console.error('Calendar: Error loading rows:', error)
         setRows([])
       } else {
         setRows(data || [])
       }
     } catch (error) {
-      // Silently handle error - will show empty calendar
+      console.error('Calendar: Exception loading rows:', error)
       setRows([])
     } finally {
       setLoading(false)
@@ -158,8 +164,11 @@ export default function CalendarView({
     try {
       return filteredRows
         .filter((row) => {
-          const dateValue = row.data?.[dateFieldId]
-          return dateValue && (typeof dateValue === 'string' || dateValue instanceof Date)
+          if (!row || !row.data) return false
+          const dateValue = row.data[dateFieldId]
+          if (!dateValue) return false
+          // Accept string dates, Date objects, or ISO strings
+          return typeof dateValue === 'string' || dateValue instanceof Date
         })
         .map((row) => {
           const dateValue = row.data[dateFieldId]
@@ -183,7 +192,7 @@ export default function CalendarView({
           }
         })
     } catch (error) {
-      // Silently handle errors in event generation
+      console.error('Calendar: Error generating events:', error)
       return []
     }
   }
@@ -192,25 +201,25 @@ export default function CalendarView({
     return <div className="p-4">Loading...</div>
   }
 
-  // Handle missing tableId gracefully
-  if (!resolvedTableId) {
+  // Handle missing tableId gracefully - show setup state
+  if (!resolvedTableId || resolvedTableId.trim() === '') {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-        <div className="text-sm mb-2 text-center">
+        <div className="text-sm mb-2 text-center font-medium">
           Calendar view requires a table connection.
         </div>
         <div className="text-xs text-gray-400 text-center">
-          Please configure a table in block settings.
+          This page isn&apos;t connected to a table. Please configure it in Settings.
         </div>
       </div>
     )
   }
 
-  // Handle missing or invalid date field
+  // Handle missing or invalid date field - show setup state
   if (!dateFieldId || !isValidDateField) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-        <div className="text-sm mb-2 text-center">
+        <div className="text-sm mb-2 text-center font-medium">
           Calendar view requires a date field.
         </div>
         <div className="text-xs text-gray-400 text-center">

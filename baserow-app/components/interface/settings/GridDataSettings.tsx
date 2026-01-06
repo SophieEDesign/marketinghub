@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch, X, Plus } from "lucide-react"
-import type { BlockConfig, ViewType } from "@/lib/interface/types"
+import type { BlockConfig, ViewType, BlockFilter } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import type { FieldType } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
@@ -319,7 +319,8 @@ export default function GridDataSettings({
                   onValueChange={(value) => {
                     const currentFilters = config.filters || []
                     const updated = [...currentFilters]
-                    updated[index] = { ...updated[index], operator: value }
+                    // Type assertion: value is guaranteed to be one of the valid operators from SelectItem
+                    updated[index] = { ...updated[index], operator: value as BlockFilter['operator'] }
                     onUpdate({ filters: updated })
                   }}
                 >

@@ -319,7 +319,8 @@ export default function InterfacePageClient({
         })
 
         if (!res.ok) {
-          throw new Error('Failed to save page title')
+          const errorData = await res.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save page title')
         }
 
         // Update local state
@@ -329,13 +330,18 @@ export default function InterfacePageClient({
         lastSavedTitleRef.current = newTitle.trim()
         setTitleValue(newTitle.trim())
         setTitleError(false)
-      } catch (error) {
+        
+        // Trigger sidebar refresh to update navigation
+        window.dispatchEvent(new CustomEvent('pages-updated'))
+      } catch (error: any) {
         console.error('Error saving page title:', error)
         setTitleError(true)
         // Revert to last saved title
         setTitleValue(lastSavedTitleRef.current)
+        // Show error to user
+        alert(error.message || 'Failed to save page title. Please try again.')
         // Clear error state after a moment
-        setTimeout(() => setTitleError(false), 2000)
+        setTimeout(() => setTitleError(false), 3000)
       } finally {
         setIsSavingTitle(false)
       }
@@ -344,7 +350,7 @@ export default function InterfacePageClient({
     if (immediate) {
       await doSave()
     } else {
-      // Debounce: wait 1000ms before saving
+      // Debounce: wait 1000ms (within 800-1200ms range) before saving
       saveTimeoutRef.current = setTimeout(doSave, 1000)
     }
   }, [page, isAdmin])
@@ -432,20 +438,20 @@ export default function InterfacePageClient({
     savePageTitle(value, false)
   }
 
-  const handleTitleBlur = () => {
-    // Save immediately on blur
+  const handleTitleBlur = async () => {
+    // Save immediately on blur - wait for save to complete
     if (titleValue.trim() !== lastSavedTitleRef.current) {
-      savePageTitle(titleValue.trim(), true)
+      await savePageTitle(titleValue.trim(), true)
     }
     setIsEditingTitle(false)
   }
 
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTitleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      // Save immediately on Enter
+      // Save immediately on Enter - wait for save to complete
       if (titleValue.trim() !== lastSavedTitleRef.current) {
-        savePageTitle(titleValue.trim(), true)
+        await savePageTitle(titleValue.trim(), true)
       }
       setIsEditingTitle(false)
       titleInputRef.current?.blur()
