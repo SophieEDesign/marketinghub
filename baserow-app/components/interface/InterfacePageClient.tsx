@@ -291,6 +291,73 @@ export default function InterfacePageClient({
     }
   }, [page, isGridMode])
 
+  // Save page title with debouncing - MUST be before early returns (React Hooks rule)
+  const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
+    if (!page || !isAdmin) return
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    const doSave = async () => {
+      // Don't save if title hasn't changed
+      if (newTitle.trim() === lastSavedTitleRef.current) {
+        setIsSavingTitle(false)
+        return
+      }
+
+      setIsSavingTitle(true)
+      setTitleError(false)
+
+      try {
+        const res = await fetch(`/api/interface-pages/${page.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newTitle.trim() }),
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to save page title')
+        }
+
+        // Update local state
+        const updatedPage = await res.json()
+        // API returns page directly (not wrapped in { page: ... })
+        setPage(updatedPage)
+        lastSavedTitleRef.current = newTitle.trim()
+        setTitleValue(newTitle.trim())
+        setTitleError(false)
+      } catch (error) {
+        console.error('Error saving page title:', error)
+        setTitleError(true)
+        // Revert to last saved title
+        setTitleValue(lastSavedTitleRef.current)
+        // Clear error state after a moment
+        setTimeout(() => setTitleError(false), 2000)
+      } finally {
+        setIsSavingTitle(false)
+      }
+    }
+
+    if (immediate) {
+      await doSave()
+    } else {
+      // Debounce: wait 1000ms before saving
+      saveTimeoutRef.current = setTimeout(doSave, 1000)
+    }
+  }, [page, isAdmin])
+
+  // Cleanup timeout on unmount - MUST be before early returns (React Hooks rule)
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+
   if (redirecting) {
     return <div className="h-screen flex items-center justify-center">Redirecting...</div>
   }
@@ -359,64 +426,6 @@ export default function InterfacePageClient({
     }
   }
 
-  // Save page title with debouncing
-  const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
-    if (!page || !isAdmin) return
-    
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-      saveTimeoutRef.current = null
-    }
-
-    const doSave = async () => {
-      // Don't save if title hasn't changed
-      if (newTitle.trim() === lastSavedTitleRef.current) {
-        setIsSavingTitle(false)
-        return
-      }
-
-      setIsSavingTitle(true)
-      setTitleError(false)
-
-      try {
-        const res = await fetch(`/api/interface-pages/${page.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: newTitle.trim() }),
-        })
-
-        if (!res.ok) {
-          throw new Error('Failed to save page title')
-        }
-
-        // Update local state
-        const updatedPage = await res.json()
-        // API returns page directly (not wrapped in { page: ... })
-        setPage(updatedPage)
-        lastSavedTitleRef.current = newTitle.trim()
-        setTitleValue(newTitle.trim())
-        setTitleError(false)
-      } catch (error) {
-        console.error('Error saving page title:', error)
-        setTitleError(true)
-        // Revert to last saved title
-        setTitleValue(lastSavedTitleRef.current)
-        // Clear error state after a moment
-        setTimeout(() => setTitleError(false), 2000)
-      } finally {
-        setIsSavingTitle(false)
-      }
-    }
-
-    if (immediate) {
-      await doSave()
-    } else {
-      // Debounce: wait 1000ms before saving
-      saveTimeoutRef.current = setTimeout(doSave, 1000)
-    }
-  }, [page, isAdmin])
-
   const handleTitleChange = (value: string) => {
     setTitleValue(value)
     // Debounced save
@@ -453,15 +462,6 @@ export default function InterfacePageClient({
     setIsEditingTitle(true)
     setTitleValue(page?.name || "")
   }
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [])
 
   return (
     <div className="h-screen flex flex-col">
