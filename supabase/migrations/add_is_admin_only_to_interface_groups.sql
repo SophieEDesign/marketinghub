@@ -22,3 +22,4 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_interface_groups_is_admin_only 
   ON public.interface_groups(is_admin_only);
 
+

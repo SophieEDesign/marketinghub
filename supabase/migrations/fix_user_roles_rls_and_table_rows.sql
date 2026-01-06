@@ -112,3 +112,4 @@ COMMENT ON POLICY "Users can update rows in their tables" ON public.table_rows I
 COMMENT ON POLICY "Users can delete rows in their tables" ON public.table_rows IS 
   'Users can delete rows in tables they have access to';
 
+

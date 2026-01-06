@@ -116,3 +116,4 @@ The `SidebarModeContext` is maintained for backward compatibility but now delega
 - Add editing history/audit trail
 - Add editing permissions per scope
 
+

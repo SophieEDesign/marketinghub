@@ -277,7 +277,7 @@ export default function FilterBlockSettings({
           <div className="space-y-2">
             {defaultFilters.length === 0 ? (
               <div className="border rounded-lg p-4 text-center text-sm text-gray-400">
-                No default filters set. Click "Add Filter" to create one.
+                No default filters set. Click &quot;Add Filter&quot; to create one.
               </div>
             ) : (
               defaultFilters.map((filter, index) => {

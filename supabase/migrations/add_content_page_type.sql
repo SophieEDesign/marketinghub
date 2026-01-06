@@ -13,3 +13,4 @@ ALTER TABLE interface_pages
 -- Add comment
 COMMENT ON COLUMN interface_pages.page_type IS 'Page visualization type. Content pages are block-based pages without data sources.';
 
+
