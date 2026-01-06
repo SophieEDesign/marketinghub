@@ -21,8 +21,8 @@ export default function SettingsWorkspaceTab() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [originalName, setOriginalName] = useState('Marketing Hub')
   const [originalIcon, setOriginalIcon] = useState('📊')
-  const [defaultPageId, setDefaultPageId] = useState<string>('')
-  const [originalDefaultPageId, setOriginalDefaultPageId] = useState<string>('')
+  const [defaultPageId, setDefaultPageId] = useState<string>('__none__')
+  const [originalDefaultPageId, setOriginalDefaultPageId] = useState<string>('__none__')
   const [interfacePages, setInterfacePages] = useState<Array<{ id: string; name: string }>>([])
   const [loadingPages, setLoadingPages] = useState(false)
 
@@ -85,6 +85,10 @@ export default function SettingsWorkspaceTab() {
         if (!settingsError && settings?.default_interface_id) {
           setDefaultPageId(settings.default_interface_id)
           setOriginalDefaultPageId(settings.default_interface_id)
+        } else if (!settingsError && !settings?.default_interface_id) {
+          // No default set, use "__none__" placeholder
+          setDefaultPageId("__none__")
+          setOriginalDefaultPageId("__none__")
         }
       } catch (error) {
         // Ignore errors if column doesn't exist yet
@@ -165,11 +169,14 @@ export default function SettingsWorkspaceTab() {
 
       // Save default page setting to workspace_settings
       try {
+        // Convert "__none__" to null for database storage
+        const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
+        
         const { error: settingsError } = await supabase
           .from('workspace_settings')
           .upsert({
             id: 'default',
-            default_interface_id: defaultPageId || null,
+            default_interface_id: defaultInterfaceId,
             updated_at: new Date().toISOString(),
           }, {
             onConflict: 'id'
@@ -245,15 +252,15 @@ export default function SettingsWorkspaceTab() {
           <div className="space-y-2">
             <Label htmlFor="default-page">Default Page at Login</Label>
             <Select
-              value={defaultPageId}
-              onValueChange={setDefaultPageId}
+              value={defaultPageId || "__none__"}
+              onValueChange={(value) => setDefaultPageId(value === "__none__" ? "__none__" : value)}
               disabled={loadingPages}
             >
               <SelectTrigger id="default-page" className="max-w-md">
                 <SelectValue placeholder={loadingPages ? "Loading pages..." : "Select a default page"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (use first available)</SelectItem>
+                <SelectItem value="__none__">None (use first available)</SelectItem>
                 {interfacePages.map((page) => (
                   <SelectItem key={page.id} value={page.id}>
                     {page.name}
