@@ -8,6 +8,8 @@ import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react"
 interface KPIBlockProps {
   block: PageBlock
   isEditing?: boolean
+  pageTableId?: string | null // Table ID from the page
+  pageId?: string | null // Page ID
 }
 
 interface ComparisonData {
