@@ -19,9 +19,12 @@ interface Sort {
   direction: string
 }
 
+import type { TableField } from "@/types/fields"
+
 interface ToolbarProps {
   viewId: string
   fields: Array<{ field_name: string }>
+  tableFields?: TableField[] // Optional: full field definitions for dropdown support
   filters: Filter[]
   sorts: Sort[]
   groupBy?: string
@@ -31,11 +34,15 @@ interface ToolbarProps {
   onSortCreate: (sort: Omit<Sort, "id">) => Promise<void>
   onSortDelete: (sortId: string) => Promise<void>
   onGroupByChange: (fieldName: string | null) => Promise<void>
+  showSearch?: boolean
+  showFilter?: boolean
+  showSort?: boolean
 }
 
 export default function Toolbar({
   viewId,
   fields,
+  tableFields,
   filters,
   sorts,
   groupBy,
@@ -45,6 +52,9 @@ export default function Toolbar({
   onSortCreate,
   onSortDelete,
   onGroupByChange,
+  showSearch = true,
+  showFilter = true,
+  showSort = true,
 }: ToolbarProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [showFilterEditor, setShowFilterEditor] = useState(false)
@@ -147,19 +157,22 @@ export default function Toolbar({
     <div className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="flex items-center gap-3 flex-wrap">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search rows..."
-            className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
+        {showSearch && (
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search rows..."
+              className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        )}
 
         {/* Filters */}
-        <div className="relative">
+        {showFilter && (
+          <div className="relative">
           <button
             onClick={handleAddFilter}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
@@ -185,6 +198,7 @@ export default function Toolbar({
               <FilterEditor
                 filter={editingFilter}
                 fields={fields}
+                tableFields={tableFields}
                 onSave={handleFilterSave}
                 onCancel={() => {
                   setShowFilterEditor(false)
@@ -227,10 +241,12 @@ export default function Toolbar({
               </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Sorts */}
-        <div className="relative">
+        {showSort && (
+          <div className="relative">
           <button
             onClick={handleAddSort}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
@@ -298,7 +314,8 @@ export default function Toolbar({
               </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Group By */}
         <div className="relative">

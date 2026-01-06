@@ -33,6 +33,7 @@ import ActionAppearanceSettings from "./settings/ActionAppearanceSettings"
 import LinkPreviewDataSettings from "./settings/LinkPreviewDataSettings"
 import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSettings"
 import GridDataSettings from "./settings/GridDataSettings"
+import GridAppearanceSettings from "./settings/GridAppearanceSettings"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 import RecordDataSettings from "./settings/RecordDataSettings"
@@ -474,6 +475,13 @@ export default function SettingsPanel({
         return (
           <>
             <TabsAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "grid":
+        return (
+          <>
+            <GridAppearanceSettings {...commonProps} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )

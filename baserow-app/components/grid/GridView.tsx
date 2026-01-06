@@ -36,6 +36,7 @@ interface GridViewProps {
   onEditField?: (fieldName: string) => void
   isEditing?: boolean // When false, hide builder controls (add row, add field)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
+  rowHeight?: string // Row height: 'compact', 'medium', 'comfortable'
 }
 
 const ITEMS_PER_PAGE = 100
@@ -55,6 +56,7 @@ export default function GridView({
   onEditField,
   isEditing = false,
   onRecordClick,
+  rowHeight = 'medium',
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -389,7 +391,7 @@ export default function GridView({
 
       {/* Grid Table */}
       <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto pb-3">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -465,10 +467,12 @@ export default function GridView({
                       </tr>
                       {/* Group rows */}
                       {!isCollapsed &&
-                        group.rows.map((row) => (
+                        group.rows.map((row) => {
+                          const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
+                          return (
                           <tr
                             key={row.id}
-                            className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
+                            className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${rowHeightClass}`}
                             onClick={() => handleRowClick(row.id)}
                           >
                             {visibleFields.map((field) => (
@@ -487,16 +491,19 @@ export default function GridView({
                               </td>
                             ))}
                           </tr>
-                        ))}
+                          )
+                        })}
                     </React.Fragment>
                   )
                 })
               ) : (
                 // Render ungrouped rows
-                filteredRows.map((row) => (
+                filteredRows.map((row) => {
+                  const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
+                  return (
                   <tr
                     key={row.id}
-                    className="border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer"
+                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${rowHeightClass}`}
                     onClick={() => handleRowClick(row.id)}
                   >
                     {visibleFields.map((field) => {
@@ -524,7 +531,8 @@ export default function GridView({
                       )
                     })}
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

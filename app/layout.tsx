@@ -3,7 +3,11 @@ import { Inter } from "next/font/google"
 import Sidebar from "@/components/navigation/Sidebar"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: 'swap', // Optimize font loading - use fallback font while loading
+  adjustFontFallback: true, // Improve font fallback behavior
+})
 
 export const metadata: Metadata = {
   title: "Marketing Hub",

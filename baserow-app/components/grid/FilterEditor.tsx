@@ -1,7 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { X } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import type { TableField } from "@/types/fields"
 
 interface Filter {
   id?: string
@@ -13,6 +21,7 @@ interface Filter {
 interface FilterEditorProps {
   filter: Filter | null
   fields: Array<{ field_name: string }>
+  tableFields?: TableField[] // Optional: full field definitions for dropdown support
   onSave: (filter: Filter) => void
   onCancel: () => void
 }
@@ -33,6 +42,7 @@ const OPERATORS = [
 export default function FilterEditor({
   filter,
   fields,
+  tableFields,
   onSave,
   onCancel,
 }: FilterEditorProps) {
@@ -41,6 +51,17 @@ export default function FilterEditor({
   const [value, setValue] = useState(filter?.value || "")
 
   const needsValue = !["is_empty", "is_not_empty"].includes(operator)
+
+  // Find the selected field's full definition
+  const selectedField = useMemo(() => {
+    return tableFields?.find(f => f.name === fieldName)
+  }, [tableFields, fieldName])
+
+  // Check if selected field is a select field with choices
+  const isSelectField = selectedField && 
+    (selectedField.type === "single_select" || selectedField.type === "multi_select") &&
+    selectedField.options?.choices &&
+    selectedField.options.choices.length > 0
 
   function handleSave() {
     if (!fieldName || !operator) return
@@ -108,20 +129,35 @@ export default function FilterEditor({
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Value
             </label>
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Enter value..."
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleSave()
-                } else if (e.key === "Escape") {
-                  onCancel()
-                }
-              }}
-            />
+            {isSelectField ? (
+              <Select value={value} onValueChange={setValue}>
+                <SelectTrigger className="w-full text-sm">
+                  <SelectValue placeholder="Select value..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedField.options?.choices?.map((choice: string) => (
+                    <SelectItem key={choice} value={choice}>
+                      {choice}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <input
+                type={selectedField?.type === "number" ? "number" : selectedField?.type === "date" ? "date" : "text"}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Enter value..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSave()
+                  } else if (e.key === "Escape") {
+                    onCancel()
+                  }
+                }}
+              />
+            )}
           </div>
         )}
 

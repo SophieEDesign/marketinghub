@@ -6,7 +6,7 @@ import { getDefaultInterface, getInterfaces } from "@/lib/interfaces"
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams?: { code?: string }
+  searchParams?: { code?: string; next?: string }
 }) {
   const supabase = await createClient()
   
@@ -15,7 +15,8 @@ export default async function HomePage({
     const { error } = await supabase.auth.exchangeCodeForSession(searchParams.code)
     if (error) {
       // If there's an error, redirect to login with error message
-      redirect(`/login?error=${encodeURIComponent(error.message)}`)
+      const nextParam = searchParams.next ? `&next=${encodeURIComponent(searchParams.next)}` : ''
+      redirect(`/login?error=${encodeURIComponent(error.message)}${nextParam}`)
     }
     // After successful confirmation, continue with normal flow
   }
@@ -23,7 +24,9 @@ export default async function HomePage({
   // Check authentication - redirect to login if not authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    redirect('/login')
+    // Preserve the next parameter if present
+    const nextParam = searchParams?.next ? `?next=${encodeURIComponent(searchParams.next)}` : ''
+    redirect(`/login${nextParam}`)
   }
   
   const admin = await isAdmin()

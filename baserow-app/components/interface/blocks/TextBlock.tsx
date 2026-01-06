@@ -84,11 +84,21 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const toolbarRef = useRef<HTMLDivElement>(null)
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Initialize TipTap editor - always render, editable based on isEditing
+  /**
+   * WYSIWYG Editor Implementation
+   * 
+   * This editor uses TipTap (ProseMirror) to provide true WYSIWYG editing:
+   * - Editor is ALWAYS rendered (both edit and view mode) for identical rendering
+   * - Content stored as ProseMirror JSON (doc format) in config.content
+   * - Editable only when isEditing=true (read-only in view mode)
+   * - Formatting toolbar appears on focus in edit mode
+   * - Keyboard shortcuts: Cmd/Ctrl+B (bold), Cmd/Ctrl+I (italic), Cmd/Ctrl+K (link)
+   * - Auto-saves on blur and debounced on update
+   * - Placeholder shown when empty and editable
+   */
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable default heading levels, we'll use custom ones
         heading: {
           levels: [1, 2, 3],
         },
@@ -108,7 +118,32 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px]',
         'data-placeholder': isEditing ? 'Start typing…' : '',
-        tabindex: isEditing ? '0' : '-1', // Make focusable in edit mode
+        tabindex: isEditing ? '0' : '-1',
+      },
+      // Keyboard shortcuts for formatting
+      handleKeyDown: (view, event) => {
+        // Cmd/Ctrl + B for bold
+        if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
+          event.preventDefault()
+          editor?.chain().focus().toggleBold().run()
+          return true
+        }
+        // Cmd/Ctrl + I for italic
+        if ((event.metaKey || event.ctrlKey) && event.key === 'i') {
+          event.preventDefault()
+          editor?.chain().focus().toggleItalic().run()
+          return true
+        }
+        // Cmd/Ctrl + K for link
+        if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+          event.preventDefault()
+          const url = window.prompt('Enter URL:')
+          if (url) {
+            editor?.chain().focus().setLink({ href: url }).run()
+          }
+          return true
+        }
+        return false
       },
     },
     onFocus: () => {
@@ -127,10 +162,36 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         return
       }
       
+      // Save on blur if in edit mode and content changed
+      if (isEditing && onUpdate && editor) {
+        const json = editor.getJSON()
+        const currentContent = config?.content || config?.content_json || config?.text_content || config?.text || ""
+        let currentJson: any
+        
+        try {
+          if (typeof currentContent === 'string') {
+            currentJson = JSON.parse(currentContent)
+          } else {
+            currentJson = currentContent
+          }
+        } catch {
+          currentJson = null
+        }
+        
+        // Only save if content actually changed
+        if (JSON.stringify(json) !== JSON.stringify(currentJson)) {
+          onUpdate(block.id, {
+            content: JSON.stringify(json),
+            content_json: json,
+            text_content: editor.getText(),
+          })
+        }
+      }
+      
       // Delay hiding toolbar to prevent flicker when clicking toolbar buttons
       blurTimeoutRef.current = setTimeout(() => {
         setIsFocused(false)
-      }, 150) // Small delay to allow toolbar clicks
+      }, 150)
     },
     onUpdate: ({ editor }) => {
       // Debounced save - only save when in edit mode
@@ -540,7 +601,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         </div>
       )}
 
-      {/* Editor content - always render, identical in edit and view mode */}
+      {/* Editor content - ALWAYS render (true WYSIWYG: same in edit and view mode) */}
       <div 
         className={cn(
           "flex-1 prose prose-sm max-w-none w-full min-h-[60px]",
@@ -563,36 +624,24 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           textSize === 'xl' && "prose-xl",
           // Empty state styling - only in edit mode
           isEmpty && isEditing && "flex items-center justify-center min-h-[100px]",
-          // Make editor clickable and focusable in edit mode
-          isEditing && "cursor-text"
+          // Cursor styling
+          isEditing && "cursor-text",
+          !isEditing && "cursor-default"
         )}
         style={{
           color: appearance.text_color || 'inherit',
         }}
         onClick={(e) => {
-          // Focus editor when clicking on content area
+          // Focus editor when clicking on content area (only in edit mode)
           if (isEditing && editor && !editor.isFocused) {
             e.stopPropagation()
             editor.commands.focus()
           }
         }}
       >
-        {/* Empty state placeholder - only show in edit mode when empty */}
-        {isEmpty && isEditing ? (
-          <div 
-            className="text-gray-400 text-sm cursor-text select-none pointer-events-none"
-            onClick={(e) => {
-              if (isEditing && editor) {
-                e.stopPropagation()
-                editor.commands.focus()
-              }
-            }}
-          >
-            Start typing…
-          </div>
-        ) : (
-          <EditorContent editor={editor} />
-        )}
+        {/* Always render EditorContent - TipTap handles empty state and placeholder via CSS */}
+        {/* Placeholder is shown via .ProseMirror[contenteditable="true"] p.is-editor-empty:first-child::before */}
+        <EditorContent editor={editor} />
       </div>
     </div>
   )

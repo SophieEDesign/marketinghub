@@ -91,6 +91,18 @@ export async function DELETE(
       )
     }
 
+    // 0. Disconnect pages from this table (set base_table to null) instead of deleting them
+    // This allows pages to be reconnected to a different table later
+    const { error: pagesDisconnectError } = await supabase
+      .from('interface_pages')
+      .update({ base_table: null })
+      .eq('base_table', params.tableId)
+
+    if (pagesDisconnectError) {
+      console.error('Error disconnecting pages from table:', pagesDisconnectError)
+      // Continue anyway - we'll try to clean up what we can
+    }
+
     // 1. Delete all views associated with this table
     const { error: viewsError } = await supabase
       .from('views')

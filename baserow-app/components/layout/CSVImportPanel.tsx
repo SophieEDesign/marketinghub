@@ -990,7 +990,7 @@ export default function CSVImportPanel({
           </div>
 
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto max-h-64">
+            <div className="overflow-x-auto max-h-64 pb-3">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>

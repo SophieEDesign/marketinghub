@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage, updateInterfacePage, deleteInterfacePage } from '@/lib/interface/pages'
 
 export async function GET(
@@ -47,13 +48,33 @@ export async function DELETE(
 ) {
   try {
     const { pageId } = await params
+    
+    // Verify user is authenticated
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
     await deleteInterfacePage(pageId)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error deleting interface page:', error)
+    
+    // Return appropriate status codes
+    const status = error.message?.includes('permission') || error.message?.includes('not found') 
+      ? 403 
+      : error.message?.includes('Authentication') 
+      ? 401 
+      : 500
+    
     return NextResponse.json(
       { error: error.message || 'Failed to delete page' },
-      { status: 500 }
+      { status }
     )
   }
 }

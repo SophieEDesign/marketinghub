@@ -233,7 +233,7 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       </div>
 
       <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto pb-3">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b bg-muted/50">

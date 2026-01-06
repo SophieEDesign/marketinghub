@@ -1046,7 +1046,7 @@ export default function CSVImportModal({
                   Review the data before importing. {parsedData.rows.length} rows will be imported.
                 </p>
                 <div className="border rounded-lg overflow-hidden w-full">
-                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full" style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}>
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full pb-3" style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}>
                     <table className="text-sm" style={{ minWidth: 'max-content' }}>
                       <thead className="bg-gray-50 border-b sticky top-0 z-10">
                         <tr>

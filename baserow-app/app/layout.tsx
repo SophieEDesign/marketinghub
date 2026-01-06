@@ -5,7 +5,11 @@ import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
 import DynamicTitle from "@/components/layout/DynamicTitle"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: 'swap', // Optimize font loading - use fallback font while loading
+  adjustFontFallback: true, // Improve font fallback behavior
+})
 
 export const metadata: Metadata = {
   title: {

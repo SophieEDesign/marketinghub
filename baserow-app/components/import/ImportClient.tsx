@@ -237,7 +237,7 @@ export default function ImportClient() {
             </div>
 
             {/* Preview Table */}
-            <div className="overflow-x-auto border rounded">
+            <div className="overflow-x-auto border rounded pb-3">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b">

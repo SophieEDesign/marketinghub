@@ -330,6 +330,39 @@ export default function GroupedInterfaces({
     }
   }
 
+  const handleDeletePage = async (pageId: string) => {
+    const page = pages.find(p => p.id === pageId)
+    if (!page) return
+
+    if (!confirm(`Are you sure you want to delete "${page.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/interface-pages/${pageId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to delete page')
+      }
+
+      // Remove from local state
+      setPages((prev) => prev.filter((p) => p.id !== pageId))
+      
+      // If we're on the deleted page, redirect to home
+      if (pathname.includes(`/pages/${pageId}`)) {
+        window.location.href = '/'
+      } else {
+        onRefresh?.()
+      }
+    } catch (error: any) {
+      console.error('Error deleting page:', error)
+      alert(error.message || 'Failed to delete page. Make sure you have permission to delete pages.')
+    }
+  }
+
   const handleCreateGroup = async () => {
     // Create with default name, then immediately edit
     const defaultName = "New Group"
@@ -499,12 +532,23 @@ export default function GroupedInterfaces({
       }
 
       try {
-        await fetch("/api/interfaces/reorder", {
+        const response = await fetch("/api/interfaces/reorder", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ interfaceUpdates: updates }),
         })
 
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+        }
+
+        const result = await response.json()
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to reorder interfaces')
+        }
+
+        // Update local state optimistically
         setPages((prev) =>
           prev.map((p) => {
             const update = updates.find((u) => u.id === p.id)
@@ -514,6 +558,8 @@ export default function GroupedInterfaces({
         onRefresh?.()
       } catch (error) {
         console.error("Failed to reorder interfaces:", error)
+        // Show error to user (you might want to add a toast notification here)
+        alert(`Failed to reorder interfaces: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
   }
@@ -746,6 +792,14 @@ export default function GroupedInterfaces({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleStartEditPage(page)}>
                 Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDeletePage(page.id)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

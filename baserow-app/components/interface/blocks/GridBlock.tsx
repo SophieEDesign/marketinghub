@@ -367,6 +367,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
                 window.location.href = `/tables/${tableId}/records/${recordId}`
               }
             }}
+            appearance={appearance}
           />
         )
     }

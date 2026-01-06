@@ -268,7 +268,7 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto pb-3">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">

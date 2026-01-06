@@ -75,8 +75,9 @@
   cursor: default;
 }
 
-/* Placeholder styling */
-.ProseMirror p.is-editor-empty:first-child::before {
+/* Placeholder styling - shows "Start typing…" when editor is empty and editable */
+/* TipTap StarterKit includes Placeholder extension which adds is-editor-empty class */
+.ProseMirror[contenteditable="true"] p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
   color: #9ca3af;
@@ -140,4 +141,26 @@
 
 .ProseMirror u {
   text-decoration: underline;
+}
+
+/* Grid scrollbar spacing - ensure horizontal scrollbar doesn't overlap content */
+.grid-scroll-container {
+  padding-bottom: 12px;
+}
+
+.grid-scroll-container::-webkit-scrollbar {
+  height: 12px;
+}
+
+.grid-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.grid-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+
+.grid-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

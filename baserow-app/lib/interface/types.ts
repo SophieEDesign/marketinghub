@@ -142,6 +142,11 @@ export interface BlockConfig {
     // Table snapshot specific
     row_height?: string
     show_headers?: boolean
+    // Grid block specific
+    show_toolbar?: boolean
+    show_search?: boolean
+    show_filter?: boolean
+    show_sort?: boolean
     // Text block specific
     text_size?: string
     text_align?: string

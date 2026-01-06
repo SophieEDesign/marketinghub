@@ -54,11 +54,13 @@ function LoginForm() {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        router.push("/")
+        // Check for redirect parameter
+        const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+        router.push(next)
       }
     }
     checkUser()
-  }, [router])
+  }, [router, searchParams])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,7 +76,9 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push("/")
+      // Check for redirect parameter (next or callbackUrl)
+      const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+      router.push(next)
       router.refresh()
     }
   }
@@ -93,7 +97,9 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push("/")
+      // Check for redirect parameter (next or callbackUrl)
+      const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+      router.push(next)
       router.refresh()
     }
   }

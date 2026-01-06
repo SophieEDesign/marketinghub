@@ -324,12 +324,28 @@ export async function deleteInterfacePage(pageId: string): Promise<void> {
     }
   }
   
-  const { error } = await supabase
+  const { error, data } = await supabase
     .from('interface_pages')
     .delete()
     .eq('id', pageId)
+    .select()
 
-  if (error) throw error
+  if (error) {
+    console.error('Error deleting interface page:', error)
+    // Provide more helpful error messages
+    if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      throw new Error('You do not have permission to delete this page. Please ensure you are logged in and have the necessary permissions.')
+    }
+    if (error.code === 'PGRST116' || error.message?.includes('0 rows')) {
+      throw new Error('Page not found or already deleted')
+    }
+    throw new Error(error.message || 'Failed to delete page')
+  }
+
+  // Check if page was actually deleted
+  if (!data || data.length === 0) {
+    throw new Error('Page not found or already deleted')
+  }
 }
 
 /**

@@ -28,6 +28,9 @@ export default async function WorkspaceShellWrapper({
   // Check authentication - redirect to login if not authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
+    // Note: For better redirect preservation, the login page should be accessed
+    // with ?next=/desired-path parameter. This component redirects to /login
+    // and the login page will handle the redirect after authentication.
     redirect('/login')
   }
   

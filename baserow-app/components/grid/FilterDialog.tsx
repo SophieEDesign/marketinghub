@@ -241,13 +241,34 @@ export default function FilterDialog({
                     <div>
                       <Label className="text-xs text-gray-600">Value</Label>
                       {filter.operator !== "is_empty" && filter.operator !== "is_not_empty" && (
-                        <Input
-                          type={field?.type === "number" ? "number" : field?.type === "date" ? "date" : "text"}
-                          value={filter.value || ""}
-                          onChange={(e) => updateFilter(index, { value: e.target.value })}
-                          className="h-8 text-sm"
-                          placeholder="Enter value"
-                        />
+                        <>
+                          {/* Show dropdown for single_select and multi_select fields */}
+                          {(field?.type === "single_select" || field?.type === "multi_select") && field?.options?.choices ? (
+                            <Select
+                              value={filter.value || ""}
+                              onValueChange={(value) => updateFilter(index, { value })}
+                            >
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue placeholder="Select value" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {field.options.choices.map((choice: string) => (
+                                  <SelectItem key={choice} value={choice}>
+                                    {choice}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              type={field?.type === "number" ? "number" : field?.type === "date" ? "date" : "text"}
+                              value={filter.value || ""}
+                              onChange={(e) => updateFilter(index, { value: e.target.value })}
+                              className="h-8 text-sm"
+                              placeholder="Enter value"
+                            />
+                          )}
+                        </>
                       )}
                       {(filter.operator === "is_empty" || filter.operator === "is_not_empty") && (
                         <div className="h-8 flex items-center text-xs text-gray-500">

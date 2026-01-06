@@ -65,6 +65,8 @@ export default function Canvas({
   const previousBlockIdsRef = useRef<string>("")
   const isInitializedRef = useRef(false)
   const layoutHydratedRef = useRef(false)
+  const isResizingRef = useRef(false)
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   /**
    * Hydrates react-grid-layout from Supabase on page load
@@ -78,8 +80,14 @@ export default function Canvas({
    * - Parent component re-renders
    * - Block config updates (but positions unchanged)
    * - Other state changes in parent
+   * - During active resize/drag operations
    */
   useEffect(() => {
+    // Don't reset layout if user is currently resizing/dragging
+    if (isResizingRef.current) {
+      return
+    }
+
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
     
@@ -109,6 +117,14 @@ export default function Canvas({
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
+      // Mark that we're resizing/dragging
+      isResizingRef.current = true
+      
+      // Clear any existing timeout
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
+      
       // Update local layout state immediately for responsive UI
       setLayout(newLayout)
       
@@ -123,9 +139,38 @@ export default function Canvas({
         }))
         onLayoutChange(layoutItems)
       }
+      
+      // Reset resize flag after resize/drag completes (no more layout changes for 300ms)
+      // This allows the layout to persist and prevents useEffect from resetting it during resize
+      resizeTimeoutRef.current = setTimeout(() => {
+        isResizingRef.current = false
+        resizeTimeoutRef.current = null
+      }, 300)
     },
     [onLayoutChange]
   )
+
+  // Reset resize flag when edit mode changes (user exits edit mode)
+  useEffect(() => {
+    if (!isEditing) {
+      // Clear any pending resize timeout
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+        resizeTimeoutRef.current = null
+      }
+      // Reset resize flag when exiting edit mode
+      isResizingRef.current = false
+    }
+  }, [isEditing])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Empty state: Show template-specific guidance
   if (blocks.length === 0) {

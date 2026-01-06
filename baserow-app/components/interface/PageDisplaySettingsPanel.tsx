@@ -180,27 +180,43 @@ export default function PageDisplaySettingsPanel({
         // Load filters - need to map field_id to field name
         // Only load if we have a saved_view_id
         if (page.saved_view_id) {
-          const { data: filtersData } = await supabase
+          const { data: filtersData, error: filtersError } = await supabase
             .from('view_filters')
             .select('*')
             .eq('view_id', page.saved_view_id)
         
-          // Map field_id to field name
-          const filtersWithNames = (filtersData || []).map((f: any) => {
-            let fieldName = f.field_name
-            if (!fieldName && f.field_id) {
-              // Look up field name from field_id
-              const field = fields.find((tf) => tf.id === f.field_id)
-              fieldName = field?.name || f.field_id
-            }
-            return {
-              id: f.id,
-              field_name: fieldName || '',
-              operator: f.operator || f.filter_type || 'equal',
-              value: f.value || '',
-            }
-          })
-          setFilters(filtersWithNames)
+          if (filtersError) {
+            console.warn('Error loading view filters:', filtersError)
+            setFilters([])
+          } else {
+            // Map field_id to field name
+            // Validate that filter IDs are valid UUIDs - filter out any invalid ones
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+            const filtersWithNames = (filtersData || [])
+              .filter((f: any) => {
+                // Only include filters with valid UUID IDs
+                if (f.id && !uuidRegex.test(f.id)) {
+                  console.warn(`Filter has invalid ID format: ${f.id}. Skipping.`)
+                  return false
+                }
+                return true
+              })
+              .map((f: any) => {
+                let fieldName = f.field_name
+                if (!fieldName && f.field_id) {
+                  // Look up field name from field_id
+                  const field = fields.find((tf) => tf.id === f.field_id)
+                  fieldName = field?.name || f.field_id
+                }
+                return {
+                  id: f.id || undefined, // Only include ID if it's a valid UUID
+                  field_name: fieldName || '',
+                  operator: f.operator || f.filter_type || 'equal',
+                  value: f.value || '',
+                }
+              })
+            setFilters(filtersWithNames)
+          }
         } else {
           // No view, so no filters from view
           setFilters([])
@@ -459,33 +475,64 @@ export default function PageDisplaySettingsPanel({
       // Update view filters and sorts if saved_view_id exists
       if (viewId) {
         // Delete existing filters and sorts
-        await supabase
-          .from('view_filters')
-          .delete()
-          .eq('view_id', viewId)
+        // Use try-catch to handle any errors gracefully
+        try {
+          const { error: deleteFiltersError } = await supabase
+            .from('view_filters')
+            .delete()
+            .eq('view_id', viewId)
 
-        await supabase
-          .from('view_sorts')
-          .delete()
-          .eq('view_id', viewId)
+          if (deleteFiltersError) {
+            console.error('Error deleting view filters:', deleteFiltersError)
+            // Continue anyway - we'll try to insert new ones
+          }
+        } catch (error) {
+          console.error('Error deleting view filters:', error)
+        }
+
+        try {
+          const { error: deleteSortsError } = await supabase
+            .from('view_sorts')
+            .delete()
+            .eq('view_id', viewId)
+
+          if (deleteSortsError) {
+            console.error('Error deleting view sorts:', deleteSortsError)
+            // Continue anyway
+          }
+        } catch (error) {
+          console.error('Error deleting view sorts:', error)
+        }
 
         // Insert new filters - map field names to field IDs
+        // Use field_name instead of field_id to match the schema
         if (filters.length > 0) {
-          const filtersToInsert = await Promise.all(
-            filters.map(async (f) => {
-              // Find field ID from field name
-              const field = tableFields.find((tf) => tf.name === f.field_name)
+          const filtersToInsert = filters
+            .filter(f => f.field_name && f.operator) // Only include valid filters
+            .map((f) => {
               return {
                 view_id: viewId,
-                field_id: field?.id || f.field_name, // Fallback to name if ID not found
-                filter_type: f.operator,
-                value: f.value,
+                field_name: f.field_name,
+                operator: f.operator,
+                value: f.value || null,
               }
             })
-          )
-          await supabase
-            .from('view_filters')
-            .insert(filtersToInsert)
+
+          if (filtersToInsert.length > 0) {
+            try {
+              const { error: insertFiltersError } = await supabase
+                .from('view_filters')
+                .insert(filtersToInsert)
+
+              if (insertFiltersError) {
+                console.error('Error inserting view filters:', insertFiltersError)
+                throw new Error(`Failed to save filters: ${insertFiltersError.message}`)
+              }
+            } catch (error: any) {
+              console.error('Error inserting view filters:', error)
+              throw error
+            }
+          }
         }
 
         // Insert new sorts - map field names to field IDs

@@ -47,6 +47,13 @@ interface GridViewWrapperProps {
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
+  appearance?: {
+    show_toolbar?: boolean
+    show_search?: boolean
+    show_filter?: boolean
+    show_sort?: boolean
+    row_height?: string
+  }
 }
 
 export default function GridViewWrapper({
@@ -61,6 +68,7 @@ export default function GridViewWrapper({
   initialTableFields = [],
   isEditing = false,
   onRecordClick,
+  appearance = {},
 }: GridViewWrapperProps) {
   const [filters, setFilters] = useState<Filter[]>(initialFilters)
   const [sorts, setSorts] = useState<Sort[]>(initialSorts)
@@ -108,6 +116,20 @@ export default function GridViewWrapper({
 
   async function handleFilterDelete(filterId: string) {
     try {
+      // Validate that filterId is a valid UUID format
+      // UUIDs are 36 characters: 8-4-4-4-12 (e.g., "550e8400-e29b-41d4-a716-446655440000")
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const isValidUUID = uuidRegex.test(filterId)
+
+      if (!isValidUUID) {
+        // If it's not a valid UUID, it's likely a temporary or block-level filter
+        // Just remove it from local state without database deletion
+        console.warn(`Filter ID "${filterId}" is not a valid UUID. Removing from local state only.`)
+        setFilters((prev) => prev.filter((f) => f.id !== filterId))
+        return
+      }
+
+      // Valid UUID - attempt database deletion
       const { error } = await supabase
         .from("view_filters")
         .delete()
@@ -115,13 +137,17 @@ export default function GridViewWrapper({
 
       if (error) {
         console.error("Error deleting filter:", error)
-        throw error
+        // Don't throw - just remove from local state to prevent UI issues
+        // The filter might not exist in the database (e.g., temporary filter)
+        setFilters((prev) => prev.filter((f) => f.id !== filterId))
+        return
       }
 
       setFilters((prev) => prev.filter((f) => f.id !== filterId))
     } catch (error) {
       console.error("Error deleting filter:", error)
-      throw error
+      // Don't throw - just remove from local state to prevent UI issues
+      setFilters((prev) => prev.filter((f) => f.id !== filterId))
     }
   }
 
@@ -217,6 +243,20 @@ export default function GridViewWrapper({
 
   async function handleSortDelete(sortId: string) {
     try {
+      // Validate that sortId is a valid UUID format
+      // UUIDs are 36 characters: 8-4-4-4-12 (e.g., "550e8400-e29b-41d4-a716-446655440000")
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const isValidUUID = uuidRegex.test(sortId)
+
+      if (!isValidUUID) {
+        // If it's not a valid UUID, it's likely a temporary or block-level sort
+        // Just remove it from local state without database deletion
+        console.warn(`Sort ID "${sortId}" is not a valid UUID. Removing from local state only.`)
+        setSorts((prev) => prev.filter((s) => s.id !== sortId))
+        return
+      }
+
+      // Valid UUID - attempt database deletion
       const { error } = await supabase
         .from("view_sorts")
         .delete()
@@ -230,7 +270,8 @@ export default function GridViewWrapper({
       setSorts((prev) => prev.filter((s) => s.id !== sortId))
     } catch (error) {
       console.error("Error deleting sort:", error)
-      throw error
+      // Don't throw - just remove from local state to prevent UI issues
+      setSorts((prev) => prev.filter((s) => s.id !== sortId))
     }
   }
 
@@ -353,13 +394,21 @@ export default function GridViewWrapper({
     }))
   }, [standardizedFilters, filters])
 
+  // Determine toolbar visibility based on appearance settings
+  // Default: show toolbar in edit mode, respect appearance settings in view mode
+  const showToolbar = appearance.show_toolbar !== false && (isEditing || appearance.show_toolbar === true)
+  const showSearch = appearance.show_search !== false && showToolbar
+  const showFilter = appearance.show_filter !== false && showToolbar
+  const showSort = appearance.show_sort !== false && showToolbar
+
   return (
     <div className="w-full">
-      {/* Only show toolbar in edit mode - interfaces should look clean in view mode */}
-      {isEditing && (
+      {/* Show toolbar based on appearance settings */}
+      {showToolbar && (
         <Toolbar
           viewId={viewId}
           fields={viewFields}
+          tableFields={fields}
           filters={filters}
           sorts={sorts}
           groupBy={groupBy}
@@ -369,6 +418,9 @@ export default function GridViewWrapper({
           onSortCreate={handleSortCreate}
           onSortDelete={handleSortDelete}
           onGroupByChange={handleGroupByChange}
+          showSearch={showSearch}
+          showFilter={showFilter}
+          showSort={showSort}
         />
       )}
       <GridView
@@ -386,6 +438,7 @@ export default function GridViewWrapper({
         onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
         onRecordClick={onRecordClick}
+        rowHeight={appearance.row_height || 'medium'}
       />
       <FieldBuilderDrawer
         isOpen={fieldBuilderOpen}
