@@ -94,17 +94,37 @@ export async function POST(request: NextRequest) {
       
       // Handle invalid API key error
       const errorMessage = inviteError.message || ''
+      const errorCode = (inviteError as any)?.code || (inviteError as any)?.status || ''
+      
+      // Check for authentication/authorization errors
       if (
         errorMessage.includes('Invalid API key') ||
         errorMessage.includes('JWT') ||
         (errorMessage.includes('invalid') && errorMessage.includes('key')) ||
         errorMessage.includes('unauthorized') ||
-        errorMessage.includes('401')
+        errorMessage.includes('401') ||
+        errorCode === '401' ||
+        errorCode === 'PGRST301' ||
+        errorMessage.includes('service_role')
       ) {
+        // Log the actual error for debugging (server-side only)
+        console.error('Supabase API error details:', {
+          message: errorMessage,
+          code: errorCode,
+          error: inviteError
+        })
+        
         return NextResponse.json(
           { 
             error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
-            details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 4) Redeploy your application.'
+            details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Ensure the key matches your Supabase project URL, 4) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 5) Redeploy your application. If the key is correct, verify it matches the project URL in NEXT_PUBLIC_SUPABASE_URL.',
+            debug: process.env.NODE_ENV === 'development' ? {
+              hasKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+              keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
+              supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+              errorMessage,
+              errorCode
+            } : undefined
           },
           { status: 500 }
         )

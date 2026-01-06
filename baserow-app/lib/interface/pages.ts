@@ -254,10 +254,21 @@ export async function updateInterfacePage(
   }
 
   // Prepare update with updated_at timestamp
-  const updateData = {
-    ...updates,
+  // CRITICAL: Only include fields that are explicitly being updated
+  // Never send undefined/null for config unless explicitly clearing it
+  const updateData: Record<string, any> = {
     updated_at: new Date().toISOString(),
   }
+  
+  // Only include fields that are in updates (defensive merge)
+  if (updates.name !== undefined) updateData.name = updates.name
+  if (updates.page_type !== undefined) updateData.page_type = updates.page_type
+  if (updates.source_view !== undefined) updateData.source_view = updates.source_view
+  if (updates.base_table !== undefined) updateData.base_table = updates.base_table
+  if (updates.group_id !== undefined) updateData.group_id = updates.group_id
+  if (updates.order_index !== undefined) updateData.order_index = updates.order_index
+  // CRITICAL: Only update config if explicitly provided (preserve existing config otherwise)
+  if (updates.config !== undefined) updateData.config = updates.config
 
   const { data, error } = await supabase
     .from('interface_pages')

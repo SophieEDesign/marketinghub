@@ -1,18 +1,64 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Search, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { createClient } from "@/lib/supabase/client"
 
 interface TopbarProps {
   title?: string
 }
 
-export default function Topbar({ title = "Marketing Hub" }: TopbarProps) {
+export default function Topbar({ title }: TopbarProps) {
+  const [workspaceName, setWorkspaceName] = useState<string>("Marketing Hub")
+  const [workspaceIcon, setWorkspaceIcon] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadWorkspace() {
+      try {
+        const supabase = createClient()
+        
+        // Fetch workspace name and icon from workspaces table
+        const { data, error } = await supabase
+          .from('workspaces')
+          .select('name, icon')
+          .limit(1)
+          .maybeSingle()
+
+        if (!error && data) {
+          if (data.name) {
+            setWorkspaceName(data.name)
+          }
+          if (data.icon) {
+            setWorkspaceIcon(data.icon)
+          }
+        }
+      } catch (error) {
+        console.warn('Could not load workspace name and icon:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadWorkspace()
+  }, [])
+
+  // Use provided title if available, otherwise use workspace name
+  const displayTitle = title || workspaceName
+
   return (
     <div className="h-14 border-b bg-white flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1">
-        <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+        {workspaceIcon && (
+          <span className="text-xl" role="img" aria-label="Workspace icon">
+            {workspaceIcon}
+          </span>
+        )}
+        <h1 className="text-lg font-semibold text-gray-900">
+          {loading ? "Loading..." : displayTitle}
+        </h1>
       </div>
       
       <div className="flex items-center gap-3">

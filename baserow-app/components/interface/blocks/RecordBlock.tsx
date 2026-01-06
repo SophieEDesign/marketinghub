@@ -16,9 +16,11 @@ interface RecordBlockProps {
 
 export default function RecordBlock({ block, isEditing = false, pageTableId = null, pageId = null, recordId: pageRecordId = null }: RecordBlockProps) {
   const { config } = block
-  // Record block MUST have table_id and record_id configured - no fallback to page context
+  // Record block MUST have table_id configured
+  // record_id can come from config OR from page context (for record review pages)
   const tableId = config?.table_id
-  const recordId = config?.record_id
+  // Use config record_id first, fallback to page context recordId prop
+  const recordId = config?.record_id || pageRecordId
   const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -27,7 +29,10 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     if (tableId) {
       loadTableName()
     }
-    // Open record panel when recordId is set
+  }, [tableId])
+
+  // Open record panel when recordId changes (for record review pages)
+  useEffect(() => {
     if (tableId && recordId && tableName) {
       openRecord(tableId, recordId, tableName)
     }

@@ -184,7 +184,32 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
           return field && field.type === 'date'
         })
-        const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
+        
+        // Resolve dateFieldId - prefer field name over ID since data uses field names as keys
+        let dateFieldId = ''
+        if (dateFieldFromConfig) {
+          // If config has a field ID/name, find the actual field to get its name
+          const configField = tableFields.find(tf => tf.name === dateFieldFromConfig || tf.id === dateFieldFromConfig)
+          dateFieldId = configField?.name || dateFieldFromConfig
+        } else if (dateFieldFromFields?.field_name) {
+          dateFieldId = dateFieldFromFields.field_name
+        }
+        
+        console.log('GridBlock: Calendar view config', {
+          dateFieldFromConfig,
+          dateFieldFromFields: dateFieldFromFields?.field_name,
+          resolvedDateFieldId: dateFieldId,
+          tableId,
+          tableFieldsCount: tableFields.length
+        })
+        
+        // Deployment safety: Warn if critical config is missing
+        if (!tableId && !isEditing) {
+          console.warn('Calendar block is missing table_id - cannot load data')
+        }
+        if (!dateFieldId && !isEditing) {
+          console.warn('Calendar block is missing date field - cannot render events')
+        }
         
         if (!dateFieldId) {
           return (

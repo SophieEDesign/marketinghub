@@ -269,7 +269,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           ) : (
             <div className="h-full">
               {/* Render blocks with record context - Layout does NOT reset when selecting new record */}
+              {/* Key includes recordId to force re-render when record changes */}
               <InterfaceBuilder
+                key={`record-${selectedRecordId || 'none'}`}
                 page={{
                   id: page.id,
                   name: page.name,

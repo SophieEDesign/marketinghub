@@ -37,13 +37,21 @@ export default function CalendarView({
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [resolvedTableId, setResolvedTableId] = useState<string>(tableId)
+  // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
+  const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
 
   useEffect(() => {
-    resolveTableId()
+    // If tableId prop changes, update resolvedTableId immediately
+    if (tableId && tableId.trim() !== '') {
+      console.log('Calendar: tableId prop changed, updating resolvedTableId:', tableId)
+      setResolvedTableId(tableId)
+    } else {
+      // Only try to resolve from viewId if tableId is not provided
+      resolveTableId()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, viewId])
 
@@ -74,13 +82,15 @@ export default function CalendarView({
   }, [resolvedTableId, supabaseTableName, filters, searchQuery, loadedTableFields])
 
   async function resolveTableId() {
-    // If tableId is provided, use it
-    if (tableId) {
+    // CRITICAL: tableId prop MUST come from block config (not page fallback)
+    // If tableId is provided, use it directly
+    if (tableId && tableId.trim() !== '') {
+      console.log('Calendar: Using tableId from prop:', tableId)
       setResolvedTableId(tableId)
       return
     }
 
-    // If no tableId but we have viewId, fetch the view's table_id
+    // If no tableId but we have viewId, fetch the view's table_id (fallback for legacy pages)
     if (!tableId && viewId) {
       try {
         const supabase = createClient()
@@ -91,25 +101,27 @@ export default function CalendarView({
           .single()
 
         if (error) {
-          // Silently handle error - will show setup state
+          console.warn('Calendar: Could not resolve tableId from view:', error)
           setResolvedTableId("")
           setLoading(false)
           return
         }
 
         if (view?.table_id) {
+          console.log('Calendar: Resolved tableId from view:', view.table_id)
           setResolvedTableId(view.table_id)
         } else {
-          // View exists but has no table_id - show setup state
+          console.warn('Calendar: View has no table_id')
           setResolvedTableId("")
           setLoading(false)
         }
       } catch (error) {
-        // Silently handle error - will show setup state
+        console.error('Calendar: Error resolving tableId:', error)
         setResolvedTableId("")
         setLoading(false)
       }
     } else {
+      console.warn('Calendar: No tableId provided and no viewId fallback')
       setResolvedTableId("")
       setLoading(false)
     }
@@ -170,6 +182,7 @@ export default function CalendarView({
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
     if (!resolvedTableId || !supabaseTableName) {
+      console.log('Calendar: Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
       setRows([])
       setLoading(false)
       return
@@ -178,6 +191,13 @@ export default function CalendarView({
     setLoading(true)
     try {
       const supabase = createClient()
+      
+      console.log('Calendar: Loading rows from table', {
+        tableId: resolvedTableId,
+        supabaseTableName,
+        filtersCount: filters.length,
+        fieldIdsCount: fieldIds.length
+      })
       
       // Build query with filters
       let query = supabase
@@ -197,9 +217,15 @@ export default function CalendarView({
       const { data, error } = await query
 
       if (error) {
-        console.error('Calendar: Error loading rows:', error)
+        console.error('Calendar: Error loading rows:', error, {
+          tableId: resolvedTableId,
+          supabaseTableName,
+          errorCode: (error as any).code,
+          errorMessage: error.message
+        })
         setRows([])
       } else {
+        console.log('Calendar: Loaded', data?.length || 0, 'rows from', supabaseTableName)
         // Convert flat rows to TableRow format
         const tableRows: TableRow[] = (data || []).map((row: any) => ({
           id: row.id,
@@ -209,6 +235,11 @@ export default function CalendarView({
           updated_at: row.updated_at,
         }))
         setRows(tableRows)
+        
+        // Log sample row structure for debugging
+        if (tableRows.length > 0) {
+          console.log('Calendar: Sample row data keys:', Object.keys(tableRows[0].data).slice(0, 10))
+        }
       }
     } catch (error) {
       console.error('Calendar: Exception loading rows:', error)
@@ -254,33 +285,66 @@ export default function CalendarView({
 
   function getEvents(): EventInput[] {
     if (!dateFieldId || !isValidDateField) {
-      console.log('Calendar: Cannot generate events - dateFieldId:', dateFieldId, 'isValidDateField:', isValidDateField)
+      console.log('Calendar: Cannot generate events - dateFieldId:', dateFieldId, 'isValidDateField:', isValidDateField, 'dateField:', dateField)
       return []
     }
     
     if (!filteredRows || filteredRows.length === 0) {
-      console.log('Calendar: No rows to generate events from')
+      console.log('Calendar: No rows to generate events from. Total rows:', rows.length, 'Filtered rows:', filteredRows?.length)
       return []
     }
     
     try {
+      // Find the actual field name to use (could be name or id)
+      const actualFieldName = dateField?.name || dateFieldId
+      
+      console.log('Calendar: Generating events with dateFieldId:', dateFieldId, 'actualFieldName:', actualFieldName, 'rows:', filteredRows.length)
+      
       const events = filteredRows
         .filter((row) => {
-          if (!row || !row.data) return false
-          const dateValue = row.data[dateFieldId]
-          if (!dateValue) return false
+          if (!row || !row.data) {
+            console.log('Calendar: Skipping row - missing data', row)
+            return false
+          }
+          
+          // Try both the field name and the field ID
+          const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
+          
+          if (!dateValue) {
+            // Log first few rows to debug
+            if (filteredRows.indexOf(row) < 3) {
+              console.log('Calendar: Row missing date value', {
+                rowId: row.id,
+                actualFieldName,
+                dateFieldId,
+                availableFields: Object.keys(row.data).slice(0, 5)
+              })
+            }
+            return false
+          }
+          
           // Accept string dates, Date objects, or ISO strings
           return typeof dateValue === 'string' || dateValue instanceof Date
         })
         .map((row) => {
-          const dateValue = row.data[dateFieldId]
+          const actualFieldName = dateField?.name || dateFieldId
+          const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
+          
           // Use first non-date field as title, or fallback to row ID
           const titleField = (Array.isArray(fieldIds) ? fieldIds : [])
-            .filter((fid) => fid !== dateFieldId)
+            .filter((fid) => {
+              // Compare both by name and id
+              const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
+              return field && (field.name !== actualFieldName && field.id !== dateFieldId)
+            })
             .slice(0, 1)[0]
           
-          const title = titleField 
-            ? String(row.data[titleField] || "Untitled")
+          // Find the actual field name for title
+          const titleFieldObj = loadedTableFields.find(f => f.name === titleField || f.id === titleField)
+          const titleFieldName = titleFieldObj?.name || titleField
+          
+          const title = titleFieldName 
+            ? String(row.data[titleFieldName] || row.data[titleField] || "Untitled")
             : `Event ${row.id.substring(0, 8)}`
 
           return {
@@ -295,6 +359,9 @@ export default function CalendarView({
         })
       
       console.log('Calendar: Generated', events.length, 'events from', filteredRows.length, 'rows')
+      if (events.length === 0 && filteredRows.length > 0) {
+        console.warn('Calendar: No events generated despite having rows. Sample row data keys:', filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : 'no data')
+      }
       return events
     } catch (error) {
       console.error('Calendar: Error generating events:', error)

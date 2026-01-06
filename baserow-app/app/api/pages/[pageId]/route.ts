@@ -153,9 +153,11 @@ export async function PATCH(
     
     if (settings !== undefined) {
       // Merge settings into existing config
-      const existingConfig = (existing?.config as ViewConfig) || {}
+      // IMPORTANT: Preserve ALL existing config properties (blocks, calendar config, etc.)
+      // Only update the settings object, don't overwrite other config properties
+      const existingConfig = (existing?.config as any) || {}
       updates.config = {
-        ...existingConfig,
+        ...existingConfig, // Preserve all existing config (blocks, calendar_date_field, etc.)
         settings: {
           ...existingConfig.settings,
           ...settings,

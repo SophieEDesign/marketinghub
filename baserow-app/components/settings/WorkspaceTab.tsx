@@ -99,10 +99,11 @@ export default function SettingsWorkspaceTab() {
             setOriginalDefaultPageId("__none__")
           }
         } else if (settings?.default_interface_id) {
+          // A specific page is set as default
           setDefaultPageId(settings.default_interface_id)
           setOriginalDefaultPageId(settings.default_interface_id)
         } else {
-          // No default set, use "__none__" placeholder
+          // No default set (null or undefined), use "__none__" placeholder for "None (use first available)"
           setDefaultPageId("__none__")
           setOriginalDefaultPageId("__none__")
         }
@@ -198,6 +199,7 @@ export default function SettingsWorkspaceTab() {
       }
 
       // Save default page setting to workspace_settings
+      let defaultPageSaveSuccess = false
       try {
         // Convert "__none__" to null for database storage
         const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
@@ -216,54 +218,84 @@ export default function SettingsWorkspaceTab() {
         }
 
         // Use upsert to avoid 409 conflicts - handles both insert and update
-        const { error: upsertError } = await supabase
-          .from('workspace_settings')
-          .upsert({
-            id: existingSettings?.id || 'default',
-            default_interface_id: defaultInterfaceId,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id'
-          })
-
-        if (upsertError) {
-          // Check if it's a column doesn't exist error
-          if (upsertError.code === 'PGRST116' || 
-              upsertError.code === '42703' ||
-              upsertError.message?.includes('column') ||
-              upsertError.message?.includes('does not exist')) {
-            console.warn('default_interface_id column may not exist yet:', upsertError)
-          } else if (upsertError.code === '23505' || upsertError.code === '409') {
-            // Unique constraint violation - try update instead
-            if (existingSettings) {
-              const { error: updateError } = await supabase
-                .from('workspace_settings')
-                .update({
-                  default_interface_id: defaultInterfaceId,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', existingSettings.id)
-              
-              if (updateError && updateError.code !== 'PGRST116' && updateError.code !== '42703') {
-                console.error('Error updating default page setting:', updateError)
-              }
+        // If no existing settings, we need to insert with a new UUID or let DB generate it
+        // But first try to get the first row (there should only be one)
+        if (!existingSettings) {
+          // Try to get any existing row first
+          const { data: anySettings } = await supabase
+            .from('workspace_settings')
+            .select('id')
+            .limit(1)
+            .maybeSingle()
+          
+          if (anySettings) {
+            // Update existing row
+            const { error: updateError } = await supabase
+              .from('workspace_settings')
+              .update({
+                default_interface_id: defaultInterfaceId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', anySettings.id)
+            
+            if (updateError) {
+              throw updateError
+            } else {
+              defaultPageSaveSuccess = true
             }
           } else {
-            console.error('Error updating default page setting:', upsertError)
+            // No row exists, insert new one (let DB generate UUID)
+            const { error: insertError } = await supabase
+              .from('workspace_settings')
+              .insert({
+                default_interface_id: defaultInterfaceId,
+              })
+            
+            if (insertError) {
+              throw insertError
+            } else {
+              defaultPageSaveSuccess = true
+            }
+          }
+        } else {
+          // Update existing row
+          const { error: updateError } = await supabase
+            .from('workspace_settings')
+            .update({
+              default_interface_id: defaultInterfaceId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingSettings.id)
+          
+          if (updateError) {
+            throw updateError
+          } else {
+            defaultPageSaveSuccess = true
           }
         }
       } catch (settingsError: any) {
-        // Ignore errors if column doesn't exist yet
-        if (settingsError?.code !== 'PGRST116' && settingsError?.code !== '42P01' && settingsError?.code !== '42703') {
+        // Only ignore errors if column doesn't exist yet
+        if (settingsError?.code === 'PGRST116' || settingsError?.code === '42P01' || settingsError?.code === '42703' ||
+            settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist')) {
+          // Column doesn't exist - this is okay, treat as success
+          defaultPageSaveSuccess = true
+        } else {
           console.warn('Error saving default page setting:', settingsError)
+          // Don't throw - we'll still save workspace name/icon, but note the issue
+          if (settingsError?.message) {
+            setMessage({ type: 'error', text: `Workspace saved, but default page setting failed: ${settingsError.message}` })
+          }
         }
       }
 
-      setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
-      setOriginalName(workspaceName.trim())
-      setOriginalIcon(workspaceIcon || '📊')
-      setOriginalDefaultPageId(defaultPageId)
-      setTimeout(() => setMessage(null), 3000)
+      // Only reload if save was successful (or if we didn't try to save default page)
+      // Reload workspace settings to ensure we have the latest values from database
+      await loadWorkspace()
+      
+      if (!message) {
+        setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
+        setTimeout(() => setMessage(null), 3000)
+      }
     } catch (error: any) {
       console.error('Error saving workspace:', error)
       setMessage({ type: 'error', text: error.message || 'Failed to save workspace settings' })

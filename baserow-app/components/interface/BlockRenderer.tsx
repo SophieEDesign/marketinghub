@@ -69,9 +69,19 @@ export default function BlockRenderer({
     // Check if config is complete enough to render
     const isComplete = isBlockConfigComplete(block.type, safeConfig)
     
+    // Deployment safety: Warn (don't crash) if required config is missing
+    if (!isComplete && !isEditing) {
+      // In view mode, log warning but still attempt to render
+      console.warn(`Block ${block.id} (${block.type}) has incomplete config:`, safeConfig)
+    }
+    
     switch (block.type) {
       case "grid":
         // Grid block MUST have table_id configured - no fallback
+        // Deployment safety: Warn if table_id is missing
+        if (!safeConfig.table_id && !isEditing) {
+          console.warn(`Grid block ${block.id} is missing table_id - block will show setup state`)
+        }
         return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
 
       case "form":

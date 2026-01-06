@@ -156,18 +156,31 @@ export default function InterfacePageSettingsDrawer({
 
     setSaving(true)
     try {
-      // When user selects a table, we store it as base_table
-      // SQL views are created automatically behind the scenes
+      // Build updates object - only include fields that are actually being changed
+      // CRITICAL: Never send null for base_table unless user explicitly cleared it
+      // Preserve existing base_table if user hasn't changed the selection
+      const updates: Record<string, any> = {
+        name: name.trim(),
+        group_id: interfaceId, // Required - no null option
+        is_admin_only: isAdminOnly,
+      }
+      
+      // Only update base_table if it has changed from the original value
+      // Compare current selection (sourceTable) to original (page.base_table)
+      const originalBaseTable = page.base_table || ''
+      const currentSelection = sourceTable || baseTable || ''
+      
+      if (currentSelection !== originalBaseTable) {
+        // User has changed the selection - update it
+        // If currentSelection is empty string, send null to clear it
+        updates.base_table = currentSelection || null
+      }
+      // If unchanged, don't include base_table in updates (preserves existing value)
+      
       const res = await fetch(`/api/interface-pages/${pageId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          base_table: sourceTable || baseTable || null,
-          // source_view will be auto-generated from base_table if needed
-          group_id: interfaceId, // Required - no null option
-          is_admin_only: isAdminOnly,
-        }),
+        body: JSON.stringify(updates),
       })
 
       if (!res.ok) {
