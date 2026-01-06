@@ -103,19 +103,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     col.toLowerCase() === 'id'
   ) || columns[0] // Fallback to first column
   
-  // Group records by status
-  const groupedRecords = useMemo(() => {
-    const groups: Record<string, any[]> = {}
-    filteredData.forEach((record) => {
-      const status = record[statusField] || 'No Status'
-      if (!groups[status]) {
-        groups[status] = []
-      }
-      groups[status].push(record)
-    })
-    return groups
-  }, [filteredData, statusField])
-
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
     let result = [...data]
@@ -161,6 +148,19 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
 
     return result
   }, [data, searchQuery, filters, columns])
+
+  // Group records by status
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, any[]> = {}
+    filteredData.forEach((record) => {
+      const status = record[statusField] || 'No Status'
+      if (!groups[status]) {
+        groups[status] = []
+      }
+      groups[status].push(record)
+    })
+    return groups
+  }, [filteredData, statusField])
 
   // Auto-select first record if none selected (use filtered data)
   useEffect(() => {

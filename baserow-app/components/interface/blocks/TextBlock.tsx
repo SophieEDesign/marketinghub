@@ -78,6 +78,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   const [isFocused, setIsFocused] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const [toolbarPosition, setToolbarPosition] = useState<'top' | 'bottom'>('top')
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -105,8 +106,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     editable: isEditing, // Only editable when in edit mode
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none',
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px]',
         'data-placeholder': isEditing ? 'Start typing…' : '',
+        tabindex: isEditing ? '0' : '-1', // Make focusable in edit mode
       },
     },
     onFocus: () => {
@@ -218,6 +220,36 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [config?.content, config?.content_json, config?.text_content, config?.text, editor, isEditing, isFocused])
 
+  // Calculate toolbar position (above or below) based on available space
+  useEffect(() => {
+    if (!isEditing || !containerRef.current || !toolbarRef.current) return
+
+    const checkPosition = () => {
+      if (!containerRef.current || !toolbarRef.current) return
+      
+      const containerRect = containerRef.current.getBoundingClientRect()
+      const toolbarHeight = 40 // Approximate toolbar height
+      const spaceAbove = containerRect.top
+      const spaceBelow = window.innerHeight - containerRect.bottom
+
+      // If not enough space above but enough below, position toolbar below
+      if (spaceAbove < toolbarHeight + 20 && spaceBelow > toolbarHeight + 20) {
+        setToolbarPosition('bottom')
+      } else {
+        setToolbarPosition('top')
+      }
+    }
+
+    checkPosition()
+    window.addEventListener('scroll', checkPosition, true)
+    window.addEventListener('resize', checkPosition)
+
+    return () => {
+      window.removeEventListener('scroll', checkPosition, true)
+      window.removeEventListener('resize', checkPosition)
+    }
+  }, [isEditing, isFocused])
+
   // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
@@ -244,17 +276,40 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const textAlign = appearance.text_align || 'left'
   const textSize = appearance.text_size || 'md'
 
-  // Toolbar component - floating toolbar that appears on focus
+  // Toolbar component - floating toolbar that appears when editing
   const Toolbar = () => {
-    if (!editor || !isEditing || !isFocused) return null
+    if (!editor || !isEditing) return null
+    
+    // Always show toolbar when in edit mode (not just when focused)
+    // This makes it easier to discover and use
 
     return (
       <div 
         ref={toolbarRef}
-        className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[100] transition-all duration-200",
+          toolbarPosition === 'top' 
+            ? cn(
+                "top-0",
+                isFocused 
+                  ? "-translate-y-[calc(100%+8px)] opacity-100 scale-100" 
+                  : "-translate-y-[calc(100%+4px)] opacity-70 scale-95 hover:opacity-100 hover:scale-100"
+              )
+            : cn(
+                "bottom-0",
+                isFocused 
+                  ? "translate-y-[calc(100%+8px)] opacity-100 scale-100" 
+                  : "translate-y-[calc(100%+4px)] opacity-70 scale-95 hover:opacity-100 hover:scale-100"
+              )
+        )}
+        style={{
+          marginTop: toolbarPosition === 'top' ? '-8px' : '0',
+          marginBottom: toolbarPosition === 'bottom' ? '-8px' : '0',
+        }}
         onMouseDown={(e) => {
           // Prevent blur when clicking toolbar
           e.preventDefault()
+          e.stopPropagation()
         }}
         onClick={(e) => {
           // Keep editor focused when clicking toolbar buttons
@@ -404,13 +459,19 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   useEffect(() => {
     if (editor) {
       editor.setEditable(isEditing)
-      // Update placeholder attribute
+      // Update placeholder attribute and tabindex
       const editorElement = editor.view.dom
       if (editorElement) {
         if (isEditing) {
           editorElement.setAttribute('data-placeholder', 'Start typing…')
+          editorElement.setAttribute('tabindex', '0')
+          // Make sure editor is focusable
+          if (editorElement instanceof HTMLElement) {
+            editorElement.style.cursor = 'text'
+          }
         } else {
           editorElement.removeAttribute('data-placeholder')
+          editorElement.setAttribute('tabindex', '-1')
         }
       }
     }
@@ -438,10 +499,33 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         isEditing && !isFocused && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all"
       )}
       style={blockStyle}
-      onClick={() => {
+      onClick={(e) => {
         // Click to focus when in edit mode
-        if (isEditing && !isFocused && editor) {
+        // Don't focus if clicking on toolbar or other interactive elements
+        const target = e.target as HTMLElement
+        if (
+          isEditing && 
+          !isFocused && 
+          editor &&
+          !target.closest('button') &&
+          !target.closest('[role="button"]') &&
+          !target.closest('.ProseMirror-focused')
+        ) {
           editor.commands.focus()
+        }
+      }}
+      onMouseDown={(e) => {
+        // Focus editor on mousedown (before click) for better UX
+        if (isEditing && editor && !editor.isFocused) {
+          const target = e.target as HTMLElement
+          // Only focus if clicking on the editor content area, not on buttons or toolbar
+          if (
+            !target.closest('button') &&
+            !target.closest('[role="button"]') &&
+            containerRef.current?.contains(target)
+          ) {
+            editor.commands.focus()
+          }
         }
       }}
     >
@@ -459,7 +543,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor content - always render, identical in edit and view mode */}
       <div 
         className={cn(
-          "flex-1 prose prose-sm max-w-none w-full",
+          "flex-1 prose prose-sm max-w-none w-full min-h-[60px]",
           "prose-headings:font-semibold",
           "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
           "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
@@ -478,15 +562,32 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           textSize === 'lg' && "prose-lg",
           textSize === 'xl' && "prose-xl",
           // Empty state styling - only in edit mode
-          isEmpty && isEditing && "flex items-center justify-center min-h-[100px]"
+          isEmpty && isEditing && "flex items-center justify-center min-h-[100px]",
+          // Make editor clickable and focusable in edit mode
+          isEditing && "cursor-text"
         )}
         style={{
           color: appearance.text_color || 'inherit',
         }}
+        onClick={(e) => {
+          // Focus editor when clicking on content area
+          if (isEditing && editor && !editor.isFocused) {
+            e.stopPropagation()
+            editor.commands.focus()
+          }
+        }}
       >
         {/* Empty state placeholder - only show in edit mode when empty */}
         {isEmpty && isEditing ? (
-          <div className="text-gray-400 text-sm cursor-text select-none pointer-events-none">
+          <div 
+            className="text-gray-400 text-sm cursor-text select-none pointer-events-none"
+            onClick={(e) => {
+              if (isEditing && editor) {
+                e.stopPropagation()
+                editor.commands.focus()
+              }
+            }}
+          >
             Start typing…
           </div>
         ) : (
