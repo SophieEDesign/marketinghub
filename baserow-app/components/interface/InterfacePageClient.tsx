@@ -291,8 +291,8 @@ export default function InterfacePageClient({
       const filters = filtersRes.data || []
       const sorts = sortsRes.data || []
 
-      // Build query
-      let query = supabase
+      // Build query - use 'any' type to avoid deep type inference issues
+      let query: any = supabase
         .from(table.supabase_table)
         .select('*')
         .limit(1000)
