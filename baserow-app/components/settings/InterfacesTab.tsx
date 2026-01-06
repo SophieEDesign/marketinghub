@@ -34,6 +34,7 @@ interface Interface {
 interface InterfaceGroup {
   id: string
   name: string
+  is_admin_only?: boolean
   interfaces: Interface[]
 }
 
@@ -108,7 +109,7 @@ export default function InterfacesTab() {
     try {
       const { data, error } = await supabase
         .from('interface_groups')
-        .select('id, name, order_index, is_system')
+        .select('id, name, order_index, is_system, is_admin_only')
         .order('order_index', { ascending: true })
       
       if (!error && data) {
@@ -120,11 +121,11 @@ export default function InterfacesTab() {
           // Column doesn't exist - fetch without it
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('interface_groups')
-            .select('id, name, order_index')
+            .select('id, name, order_index, is_admin_only')
             .order('order_index', { ascending: true })
           
           if (!fallbackError && fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false }))
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only || false }))
           } else if (fallbackError) {
             console.error('Error loading interface_groups (fallback):', fallbackError)
           }
@@ -134,11 +135,11 @@ export default function InterfacesTab() {
           // Try without is_system as fallback
           const { data: fallbackData } = await supabase
             .from('interface_groups')
-            .select('id, name, order_index')
+            .select('id, name, order_index, is_admin_only')
             .order('order_index', { ascending: true })
           
           if (fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false }))
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only || false }))
           }
         }
       }
@@ -153,6 +154,7 @@ export default function InterfacesTab() {
         id: g.id,
         name: g.name,
         order_index: g.order_index || 0,
+        is_admin_only: g.is_admin_only || false,
       }))
 
     // Group pages by group_id
@@ -184,6 +186,7 @@ export default function InterfacesTab() {
     const grouped: InterfaceGroup[] = allGroups.map(group => ({
       id: group.id,
       name: group.name,
+      is_admin_only: group.is_admin_only || false,
       interfaces: pagesByGroup.get(group.id) || [],
     }))
 
@@ -295,6 +298,25 @@ export default function InterfacesTab() {
     }
 
     setGroups(grouped)
+  }
+
+  async function handleToggleInterfaceAccess(groupId: string, isAdminOnly: boolean) {
+    try {
+      const supabase = createClient()
+      
+      // Update interface_groups table
+      const { error } = await supabase
+        .from('interface_groups')
+        .update({ is_admin_only: !isAdminOnly })
+        .eq('id', groupId)
+
+      if (error) throw error
+
+      loadInterfaces()
+    } catch (error: any) {
+      console.error('Error updating interface access:', error)
+      alert(error.message || 'Failed to update interface access')
+    }
   }
 
   async function handleToggleAccess(interfaceId: string, isAdminOnly: boolean) {
@@ -553,7 +575,7 @@ export default function InterfacesTab() {
                 <div key={group.id} className="space-y-3">
                   {/* Interface Header */}
                   <div className="flex items-center justify-between p-3 bg-gray-50 border rounded-lg">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1">
                       <Folder className="h-5 w-5 text-gray-500" />
                       <h3 className="text-base font-semibold text-gray-900">
                         {group.name}
@@ -562,14 +584,23 @@ export default function InterfacesTab() {
                         {group.interfaces.length} {group.interfaces.length === 1 ? 'page' : 'pages'}
                       </Badge>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteGroup(group)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Admin only</span>
+                        <Switch
+                          checked={group.is_admin_only || false}
+                          onCheckedChange={() => handleToggleInterfaceAccess(group.id, group.is_admin_only || false)}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteGroup(group)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   
                   {/* Pages under this Interface */}

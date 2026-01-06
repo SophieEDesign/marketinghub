@@ -16,6 +16,8 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { sanitizeFieldName } from "@/lib/fields/validation"
+import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
+import ImportSummaryModal from "@/components/import/ImportSummaryModal"
 
 interface CSVImportPanelProps {
   tableId: string
@@ -44,6 +46,14 @@ export default function CSVImportPanel({
   const [newFields, setNewFields] = useState<Record<string, FieldType>>({})
   const [importedCount, setImportedCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [showSummary, setShowSummary] = useState(false)
+  const [importSummary, setImportSummary] = useState<{
+    totalRows: number
+    importedRows: number
+    skippedRows: number
+    primaryKeyField: string
+    skippedDetails: Array<{ row: Record<string, any>; reason: string; value: any }>
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load table fields
@@ -659,15 +669,69 @@ export default function CSVImportPanel({
         )
       }
 
+      // Duplicate Detection
+      // Identify first column as primary key field
+      const firstColumn = csvHeaders[0]
+      if (!firstColumn) {
+        throw new Error('CSV file has no columns')
+      }
+
+      const primaryKeyField = fieldMappings[firstColumn] || createdFieldNames[firstColumn]
+      if (!primaryKeyField) {
+        throw new Error(
+          `The first column "${firstColumn}" must be mapped to a field for duplicate detection. ` +
+          `Please map this column to an existing field or create a new field for it.`
+        )
+      }
+
+      setStep("importing")
+      setError(null)
+      // Note: CSVImportPanel doesn't have a progress state, so we'll just proceed
+
+      // Extract and normalize primary key values from CSV
+      const csvPrimaryKeyValues = rowsToInsert.map(row => {
+        const value = row[primaryKeyField]
+        return normalizeValue(value)
+      })
+
+      // Check for duplicates in database
+      const duplicates = await checkDuplicates(
+        supabase,
+        supabaseTableName,
+        primaryKeyField,
+        csvPrimaryKeyValues
+      )
+
+      // Filter out duplicate rows
+      const { rowsToInsert: filteredRows, skippedRows } = filterDuplicateRows(
+        rowsToInsert,
+        primaryKeyField,
+        duplicates
+      )
+
+      if (filteredRows.length === 0) {
+        // All rows are duplicates or have empty keys
+        setImportSummary({
+          totalRows: allRows.length,
+          importedRows: 0,
+          skippedRows: skippedRows.length,
+          primaryKeyField,
+          skippedDetails: skippedRows,
+        })
+        setShowSummary(true)
+        setStep("complete")
+        return
+      }
+
       // Insert in batches
       const batchSize = 100
       let imported = 0
-      console.log(`Starting batch insert: ${rowsToInsert.length} rows in ${Math.ceil(rowsToInsert.length / batchSize)} batches`)
+      console.log(`Starting batch insert: ${filteredRows.length} rows in ${Math.ceil(filteredRows.length / batchSize)} batches (${skippedRows.length} skipped)`)
       console.log(`Supabase table: ${supabaseTableName}`)
-      console.log(`First row sample:`, rowsToInsert[0])
+      console.log(`First row sample:`, filteredRows[0])
       
-      for (let i = 0; i < rowsToInsert.length; i += batchSize) {
-        const batch = rowsToInsert.slice(i, i + batchSize)
+      for (let i = 0; i < filteredRows.length; i += batchSize) {
+        const batch = filteredRows.slice(i, i + batchSize)
         const batchNum = Math.floor(i / batchSize) + 1
         const totalBatches = Math.ceil(rowsToInsert.length / batchSize)
         
@@ -729,11 +793,20 @@ export default function CSVImportPanel({
 
         imported += batch.length
         setImportedCount(imported)
-        console.log(`✅ Successfully imported batch ${batchNum}/${totalBatches}: ${batch.length} rows (total: ${imported}/${rowsToInsert.length})`)
+        console.log(`✅ Successfully imported batch ${batchNum}/${totalBatches}: ${batch.length} rows (total: ${imported}/${filteredRows.length})`)
       }
 
       // Only set complete if we actually imported something
       if (imported > 0) {
+        // Show import summary
+        setImportSummary({
+          totalRows: allRows.length,
+          importedRows: imported,
+          skippedRows: skippedRows.length,
+          primaryKeyField,
+          skippedDetails: skippedRows,
+        })
+        setShowSummary(true)
         setStep("complete")
         onImportComplete()
       } else {
@@ -1017,6 +1090,21 @@ export default function CSVImportPanel({
               Import Another File
             </Button>
         </div>
+      )}
+
+      {/* Import Summary Modal */}
+      {importSummary && (
+        <ImportSummaryModal
+          open={showSummary}
+          onOpenChange={(open) => {
+            setShowSummary(open)
+          }}
+          totalRows={importSummary.totalRows}
+          importedRows={importSummary.importedRows}
+          skippedRows={importSummary.skippedRows}
+          primaryKeyField={importSummary.primaryKeyField}
+          skippedDetails={importSummary.skippedDetails}
+        />
       )}
     </div>
   )

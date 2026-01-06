@@ -3,11 +3,15 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
+import DynamicTitle from "@/components/layout/DynamicTitle"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Baserow App",
+  title: {
+    default: "Baserow App",
+    template: "%s | Baserow App",
+  },
   description: "A Baserow-style interface built with Next.js and Supabase",
   icons: {
     icon: [
@@ -24,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <DynamicTitle />
         {children}
         <Toaster />
         <CommandPaletteProvider />

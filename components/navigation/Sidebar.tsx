@@ -34,24 +34,25 @@ export default async function Sidebar() {
   }>> = new Map()
   
   try {
-    // Load interface groups (interfaces) - try with is_system first, fallback if column doesn't exist
+    // Load interface groups (interfaces) - try with is_system and is_admin_only first, fallback if columns don't exist
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, is_system')
+      .select('id, name, order_index, collapsed, is_system, is_admin_only')
       .order('order_index', { ascending: true })
     
     const { data: groupsData, error: groupsError } = await groupsQuery
     
-    // If is_system column doesn't exist, try without it
-    if (groupsError && (groupsError.code === '42703' || groupsError.message?.includes('column "is_system" does not exist'))) {
+    // If columns don't exist, try without them
+    if (groupsError && (groupsError.code === '42703' || groupsError.message?.includes('column'))) {
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('interface_groups')
-        .select('id, name, order_index, collapsed')
+        .select('id, name, order_index, collapsed, is_admin_only')
         .order('order_index', { ascending: true })
       
       if (!fallbackError && fallbackData) {
         interfaceGroups = fallbackData
           .filter(g => g.name !== 'Ungrouped') // Filter out "Ungrouped" by name if is_system doesn't exist
+          .filter(g => userIsAdmin || !g.is_admin_only) // Filter admin-only interfaces for non-admins
           .map(g => ({
             id: g.id,
             name: g.name,
@@ -62,9 +63,10 @@ export default async function Sidebar() {
         console.error('Error loading interface groups:', fallbackError)
       }
     } else if (!groupsError && groupsData) {
-      // Filter out system groups (like "Ungrouped") from display
+      // Filter out system groups (like "Ungrouped") and admin-only interfaces for non-admins
       interfaceGroups = groupsData
         .filter(g => !g.is_system)
+        .filter(g => userIsAdmin || !g.is_admin_only) // Filter admin-only interfaces for non-admins
         .map(g => ({
           id: g.id,
           name: g.name,

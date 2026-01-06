@@ -25,6 +25,8 @@ import { FIELD_TYPES } from "@/types/fields"
 import { parseCSV, type ParsedCSV } from "@/lib/import/csvParser"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { RESERVED_WORDS } from "@/types/fields"
+import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
+import ImportSummaryModal from "@/components/import/ImportSummaryModal"
 
 /**
  * Sanitize field name and handle reserved words
@@ -71,6 +73,14 @@ export default function CSVImportModal({
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
   const [importedCount, setImportedCount] = useState(0)
+  const [showSummary, setShowSummary] = useState(false)
+  const [importSummary, setImportSummary] = useState<{
+    totalRows: number
+    importedRows: number
+    skippedRows: number
+    primaryKeyField: string
+    skippedDetails: Array<{ row: Record<string, any>; reason: string; value: any }>
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadTableFields = useCallback(async () => {
@@ -560,7 +570,7 @@ export default function CSVImportModal({
       // Phase 3: Prepare rows for insertion
       setProgress('Preparing rows for insertion...')
 
-      const rowsToInsert = parsedData.rows
+      const preparedRows = parsedData.rows
         .map((csvRow) => {
           const mappedRow: Record<string, any> = {}
           
@@ -601,7 +611,7 @@ export default function CSVImportModal({
         })
         .filter(row => Object.keys(row).length > 0)
 
-      if (rowsToInsert.length === 0) {
+      if (preparedRows.length === 0) {
         throw new Error(
           `No valid rows to import. ` +
           `Total CSV rows: ${parsedData.rows.length}, ` +
@@ -610,8 +620,61 @@ export default function CSVImportModal({
         )
       }
 
+      // Phase 3.5: Duplicate Detection
+      // Identify first column as primary key field
+      const firstColumn = parsedData.columns[0]
+      if (!firstColumn) {
+        throw new Error('CSV file has no columns')
+      }
+
+      const primaryKeyField = columnMappings[firstColumn.name]
+      if (!primaryKeyField) {
+        throw new Error(
+          `The first column "${firstColumn.name}" must be mapped to a field for duplicate detection. ` +
+          `Please map this column to an existing field or create a new field for it.`
+        )
+      }
+
+      setProgress('Checking for duplicates...')
+
+      // Extract and normalize primary key values from CSV
+      const csvPrimaryKeyValues = preparedRows.map(row => {
+        const value = row[primaryKeyField]
+        return normalizeValue(value)
+      })
+
+      // Check for duplicates in database
+      const duplicates = await checkDuplicates(
+        supabase,
+        supabaseTableName,
+        primaryKeyField,
+        csvPrimaryKeyValues
+      )
+
+      // Filter out duplicate rows
+      const { rowsToInsert, skippedRows } = filterDuplicateRows(
+        preparedRows,
+        primaryKeyField,
+        duplicates
+      )
+
+      if (rowsToInsert.length === 0) {
+        // All rows are duplicates or have empty keys
+        setImportSummary({
+          totalRows: parsedData.rows.length,
+          importedRows: 0,
+          skippedRows: skippedRows.length,
+          primaryKeyField,
+          skippedDetails: skippedRows,
+        })
+        setShowSummary(true)
+        setStatus('success')
+        setProgress('')
+        return
+      }
+
       // Phase 4: Insert rows in batches
-      setProgress(`Inserting ${rowsToInsert.length} rows...`)
+      setProgress(`Inserting ${rowsToInsert.length} rows (${skippedRows.length} skipped)...`)
 
       const batchSize = 100
       let totalImported = 0
@@ -668,16 +731,21 @@ export default function CSVImportModal({
       setProgress(`Successfully imported ${totalImported} rows`)
       setImportedCount(totalImported)
 
+      // Show import summary
+      setImportSummary({
+        totalRows: parsedData.rows.length,
+        importedRows: totalImported,
+        skippedRows: skippedRows.length,
+        primaryKeyField,
+        skippedDetails: skippedRows,
+      })
+      setShowSummary(true)
+
       // Refresh grid immediately
       onImportComplete()
       
       // Refresh the page to show new data
       router.refresh()
-
-      // Close modal after short delay
-      setTimeout(() => {
-        onOpenChange(false)
-      }, 2000)
 
     } catch (err) {
       console.error("Error importing CSV:", err)
@@ -1088,8 +1156,8 @@ export default function CSVImportModal({
             </div>
           )}
 
-          {/* Success */}
-          {status === 'success' && (
+          {/* Success - Summary modal will show instead */}
+          {status === 'success' && !showSummary && (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <div className="rounded-full bg-green-100 p-3">
                 <CheckCircle className="h-8 w-8 text-green-600" />
@@ -1102,6 +1170,25 @@ export default function CSVImportModal({
           )}
         </div>
       </DialogContent>
+
+      {/* Import Summary Modal */}
+      {importSummary && (
+        <ImportSummaryModal
+          open={showSummary}
+          onOpenChange={(open) => {
+            setShowSummary(open)
+            if (!open) {
+              // Close main modal when summary closes
+              onOpenChange(false)
+            }
+          }}
+          totalRows={importSummary.totalRows}
+          importedRows={importSummary.importedRows}
+          skippedRows={importSummary.skippedRows}
+          primaryKeyField={importSummary.primaryKeyField}
+          skippedDetails={importSummary.skippedDetails}
+        />
+      )}
     </Dialog>
   )
 }

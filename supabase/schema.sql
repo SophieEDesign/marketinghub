@@ -52,10 +52,15 @@ CREATE TABLE IF NOT EXISTS public.workspace_settings (
   logo_url text,
   primary_color text,
   accent_color text,
+  default_interface_id uuid REFERENCES public.views(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT workspace_settings_pkey PRIMARY KEY (id)
 );
+
+-- Index for default_interface_id lookups
+CREATE INDEX IF NOT EXISTS idx_workspace_settings_default_interface 
+  ON public.workspace_settings(default_interface_id);
 
 -- ============================================================================
 -- Table System

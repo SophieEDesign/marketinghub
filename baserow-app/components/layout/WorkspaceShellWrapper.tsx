@@ -55,13 +55,16 @@ export default async function WorkspaceShellWrapper({
     })
   )
 
+  // Check if user is admin for filtering
+  const admin = await isAdmin()
+  
   // Fetch interface groups
   let interfaceGroups: any[] = []
   try {
-    // Try to select is_system, but handle gracefully if column doesn't exist
+    // Try to select is_system and is_admin_only, but handle gracefully if columns don't exist
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, workspace_id')
+      .select('id, name, order_index, collapsed, workspace_id, is_admin_only')
       .order('order_index', { ascending: true })
     
     const { data: groupsData, error: groupsError } = await groupsQuery
@@ -71,18 +74,24 @@ export default async function WorkspaceShellWrapper({
       try {
         const { data: groupsWithSystem } = await supabase
           .from('interface_groups')
-          .select('id, name, order_index, collapsed, workspace_id, is_system')
+          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only')
           .order('order_index', { ascending: true })
         
         if (groupsWithSystem) {
+          // Filter admin-only interfaces for non-admins
           interfaceGroups = groupsWithSystem
+            .filter((g: any) => admin || !g.is_admin_only)
         } else {
-          // Add default is_system = false if column doesn't exist
-          interfaceGroups = groupsData.map((g: any) => ({ ...g, is_system: false }))
+          // Add default is_system = false if column doesn't exist, filter admin-only
+          interfaceGroups = groupsData
+            .map((g: any) => ({ ...g, is_system: false }))
+            .filter((g: any) => admin || !g.is_admin_only)
         }
       } catch (systemError: any) {
-        // Column doesn't exist - add default value
-        interfaceGroups = groupsData.map((g: any) => ({ ...g, is_system: false }))
+        // Column doesn't exist - add default value, filter admin-only
+        interfaceGroups = groupsData
+          .map((g: any) => ({ ...g, is_system: false }))
+          .filter((g: any) => admin || !g.is_admin_only)
       }
     } else if (groupsError) {
       // If table doesn't exist (42P01) or RLS error, just return empty array
@@ -221,22 +230,43 @@ export default async function WorkspaceShellWrapper({
     console.error('Error loading automations:', error)
   }
 
+  // Get workspace name for title
+  let workspaceName: string | null = null
+  try {
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('name')
+      .eq('id', 'default')
+      .maybeSingle()
+    
+    if (workspace?.name) {
+      workspaceName = workspace.name
+    }
+  } catch (error) {
+    // Workspace table might not exist - ignore
+  }
+
+  // Determine final title: page title > workspace name > default
+  const finalTitle = title || workspaceName || "Baserow App"
+
   return (
     <BrandingProvider settings={brandingSettings}>
       <EditModeProvider>
         <SidebarModeProvider>
-          <WorkspaceShell
-            title={title}
-            tables={tables}
-            views={viewsByTable}
-            interfacePages={interfacePages as any}
-            interfaceGroups={interfaceGroups}
-            dashboards={dashboards}
-            userRole={userRole}
-            hideTopbar={hideTopbar}
-          >
-            {children}
-          </WorkspaceShell>
+          <div data-page-title={finalTitle}>
+            <WorkspaceShell
+              title={title}
+              tables={tables}
+              views={viewsByTable}
+              interfacePages={interfacePages as any}
+              interfaceGroups={interfaceGroups}
+              dashboards={dashboards}
+              userRole={userRole}
+              hideTopbar={hideTopbar}
+            >
+              {children}
+            </WorkspaceShell>
+          </div>
         </SidebarModeProvider>
       </EditModeProvider>
     </BrandingProvider>

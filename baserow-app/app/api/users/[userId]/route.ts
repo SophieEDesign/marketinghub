@@ -7,7 +7,7 @@ import { isAdmin } from '@/lib/roles'
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     // Security: Only admins can update user information
@@ -19,6 +19,7 @@ export async function PATCH(
       )
     }
 
+    const { userId } = await params
     const body = await request.json()
     const { email, name } = body
 
@@ -47,6 +48,18 @@ export async function PATCH(
       adminClient = createAdminClient()
     } catch (error: any) {
       console.error('Error creating admin client:', error)
+      
+      // Check if it's a missing service role key error
+      if (error.message?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+        return NextResponse.json(
+          { 
+            error: 'Server configuration error: Service role key not configured. Please set SUPABASE_SERVICE_ROLE_KEY environment variable.',
+            details: 'Contact your administrator to configure user management.'
+          },
+          { status: 500 }
+        )
+      }
+      
       return NextResponse.json(
         { error: error.message || 'Failed to initialize admin client' },
         { status: 500 }
@@ -65,7 +78,26 @@ export async function PATCH(
 
     if (name !== undefined) {
       // Get current user metadata to preserve other fields
-      const { data: currentUser } = await adminClient.auth.admin.getUserById(params.userId)
+      const { data: currentUser, error: getUserError } = await adminClient.auth.admin.getUserById(userId)
+      
+      if (getUserError) {
+        console.error('Error fetching current user:', getUserError)
+        // Handle invalid API key error specifically
+        if (getUserError.message?.includes('Invalid API key') || getUserError.message?.includes('JWT')) {
+          return NextResponse.json(
+            { 
+              error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
+              details: 'Contact your administrator to configure user management.'
+            },
+            { status: 500 }
+          )
+        }
+        return NextResponse.json(
+          { error: getUserError.message || 'Failed to fetch user information' },
+          { status: 500 }
+        )
+      }
+      
       const currentMetadata = currentUser?.user?.user_metadata || {}
       
       updateData.user_metadata = {
@@ -77,12 +109,24 @@ export async function PATCH(
 
     // Update user
     const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(
-      params.userId,
+      userId,
       updateData
     )
 
     if (updateError) {
       console.error('Error updating user:', updateError)
+      
+      // Handle invalid API key error specifically
+      if (updateError.message?.includes('Invalid API key') || updateError.message?.includes('JWT')) {
+        return NextResponse.json(
+          { 
+            error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
+            details: 'Contact your administrator to configure user management.'
+          },
+          { status: 500 }
+        )
+      }
+      
       return NextResponse.json(
         { error: updateError.message || 'Failed to update user' },
         { status: 500 }

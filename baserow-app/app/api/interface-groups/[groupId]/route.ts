@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const { groupId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -18,17 +19,18 @@ export async function PATCH(
     // }
     
     const body = await request.json()
-    const { name, order_index, collapsed } = body
+    const { name, order_index, collapsed, is_admin_only } = body
 
     const updates: any = {}
     if (name !== undefined) updates.name = name.trim()
     if (order_index !== undefined) updates.order_index = order_index
     if (collapsed !== undefined) updates.collapsed = collapsed
+    if (is_admin_only !== undefined) updates.is_admin_only = is_admin_only
 
     const { data: group, error } = await supabase
       .from('interface_groups')
       .update(updates)
-      .eq('id', params.groupId)
+      .eq('id', groupId)
       .select()
       .single()
 
@@ -54,9 +56,10 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const { groupId } = await params
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
@@ -79,20 +82,20 @@ export async function DELETE(
     await supabase
       .from('interface_pages')
       .update({ group_id: targetGroupId })
-      .eq('group_id', params.groupId)
+      .eq('group_id', groupId)
 
     // Also move views table entries (for backward compatibility)
     await supabase
       .from('views')
       .update({ group_id: targetGroupId })
-      .eq('group_id', params.groupId)
+      .eq('group_id', groupId)
       .eq('type', 'interface')
 
     // Delete the group
     const { error } = await supabase
       .from('interface_groups')
       .delete()
-      .eq('id', params.groupId)
+      .eq('id', groupId)
 
     if (error) {
       return NextResponse.json(

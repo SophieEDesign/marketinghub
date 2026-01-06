@@ -82,17 +82,37 @@ export default function SettingsWorkspaceTab() {
           .select('default_interface_id')
           .maybeSingle()
 
-        if (!settingsError && settings?.default_interface_id) {
+        if (settingsError) {
+          // Check if it's a column doesn't exist error - ignore these gracefully
+          if (settingsError.code === 'PGRST116' || 
+              settingsError.code === '42P01' || 
+              settingsError.code === '42703' ||
+              settingsError.message?.includes('column') ||
+              settingsError.message?.includes('does not exist')) {
+            // Column doesn't exist yet - use default
+            setDefaultPageId("__none__")
+            setOriginalDefaultPageId("__none__")
+          } else {
+            // Other errors - log but don't fail
+            console.warn('Error loading default page setting:', settingsError)
+            setDefaultPageId("__none__")
+            setOriginalDefaultPageId("__none__")
+          }
+        } else if (settings?.default_interface_id) {
           setDefaultPageId(settings.default_interface_id)
           setOriginalDefaultPageId(settings.default_interface_id)
-        } else if (!settingsError && !settings?.default_interface_id) {
+        } else {
           // No default set, use "__none__" placeholder
           setDefaultPageId("__none__")
           setOriginalDefaultPageId("__none__")
         }
-      } catch (error) {
+      } catch (error: any) {
         // Ignore errors if column doesn't exist yet
-        console.warn('Error loading default page setting:', error)
+        if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
+          console.warn('Error loading default page setting:', error)
+        }
+        setDefaultPageId("__none__")
+        setOriginalDefaultPageId("__none__")
       }
     } catch (error) {
       console.error('Error loading workspace:', error)
@@ -182,31 +202,66 @@ export default function SettingsWorkspaceTab() {
         // Convert "__none__" to null for database storage
         const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
         
-        const { error: settingsError } = await supabase
+        // First, try to get existing workspace_settings row
+        const { data: existingSettings, error: fetchError } = await supabase
           .from('workspace_settings')
-          .upsert({
-            id: 'default',
-            default_interface_id: defaultInterfaceId,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'id'
-          })
+          .select('id')
+          .maybeSingle()
 
-        if (settingsError) {
-          // Check if it's a column doesn't exist error
-          if (settingsError.code === 'PGRST116' || 
-              settingsError.code === '42703' ||
-              settingsError.message?.includes('column') ||
-              settingsError.message?.includes('does not exist')) {
-            console.warn('default_interface_id column may not exist yet:', settingsError)
-            // Don't fail the whole save, just warn
-          } else {
-            console.error('Error saving default page setting:', settingsError)
+        if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== '42P01' && fetchError.code !== '42703') {
+          // Only log non-column-missing errors
+          if (!fetchError.message?.includes('column') && !fetchError.message?.includes('does not exist')) {
+            console.error('Error fetching workspace settings:', fetchError)
+          }
+        }
+
+        if (existingSettings) {
+          // Update existing row
+          const { error: updateError } = await supabase
+            .from('workspace_settings')
+            .update({
+              default_interface_id: defaultInterfaceId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingSettings.id)
+
+          if (updateError) {
+            // Check if it's a column doesn't exist error
+            if (updateError.code === 'PGRST116' || 
+                updateError.code === '42703' ||
+                updateError.message?.includes('column') ||
+                updateError.message?.includes('does not exist')) {
+              console.warn('default_interface_id column may not exist yet:', updateError)
+            } else {
+              console.error('Error updating default page setting:', updateError)
+            }
+          }
+        } else {
+          // Create new row if none exists
+          const { error: insertError } = await supabase
+            .from('workspace_settings')
+            .insert({
+              default_interface_id: defaultInterfaceId,
+              updated_at: new Date().toISOString(),
+            })
+
+          if (insertError) {
+            // Check if it's a column doesn't exist error
+            if (insertError.code === 'PGRST116' || 
+                insertError.code === '42703' ||
+                insertError.message?.includes('column') ||
+                insertError.message?.includes('does not exist')) {
+              console.warn('default_interface_id column may not exist yet:', insertError)
+            } else {
+              console.error('Error creating default page setting:', insertError)
+            }
           }
         }
       } catch (settingsError: any) {
         // Ignore errors if column doesn't exist yet
-        console.warn('Error saving default page setting:', settingsError)
+        if (settingsError?.code !== 'PGRST116' && settingsError?.code !== '42P01' && settingsError?.code !== '42703') {
+          console.warn('Error saving default page setting:', settingsError)
+        }
       }
 
       setMessage({ type: 'success', text: 'Workspace settings saved successfully' })

@@ -7,6 +7,7 @@ export interface WorkspaceSettings {
   logo_url: string | null
   primary_color: string | null
   accent_color: string | null
+  default_interface_id?: string | null
   created_at: string
   updated_at?: string
 }
