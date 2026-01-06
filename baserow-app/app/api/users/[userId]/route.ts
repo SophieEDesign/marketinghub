@@ -54,7 +54,7 @@ export async function PATCH(
         return NextResponse.json(
           { 
             error: 'Server configuration error: Service role key not configured. Please set SUPABASE_SERVICE_ROLE_KEY environment variable.',
-            details: 'Contact your administrator to configure user management.'
+            details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 4) Redeploy your application.'
           },
           { status: 500 }
         )
@@ -83,11 +83,18 @@ export async function PATCH(
       if (getUserError) {
         console.error('Error fetching current user:', getUserError)
         // Handle invalid API key error specifically
-        if (getUserError.message?.includes('Invalid API key') || getUserError.message?.includes('JWT')) {
+        const errorMessage = getUserError.message || ''
+        if (
+          errorMessage.includes('Invalid API key') ||
+          errorMessage.includes('JWT') ||
+          (errorMessage.includes('invalid') && errorMessage.includes('key')) ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('401')
+        ) {
           return NextResponse.json(
             { 
               error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
-              details: 'Contact your administrator to configure user management.'
+              details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 4) Redeploy your application.'
             },
             { status: 500 }
           )
@@ -117,11 +124,18 @@ export async function PATCH(
       console.error('Error updating user:', updateError)
       
       // Handle invalid API key error specifically
-      if (updateError.message?.includes('Invalid API key') || updateError.message?.includes('JWT')) {
+      const errorMessage = updateError.message || ''
+      if (
+        errorMessage.includes('Invalid API key') ||
+        errorMessage.includes('JWT') ||
+        (errorMessage.includes('invalid') && errorMessage.includes('key')) ||
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('401')
+      ) {
         return NextResponse.json(
           { 
             error: 'Server configuration error: Invalid service role key. Please verify SUPABASE_SERVICE_ROLE_KEY is correct.',
-            details: 'Contact your administrator to configure user management.'
+            details: 'To fix this: 1) Go to your Supabase project → Settings → API, 2) Copy the "service_role" key (NOT the anon key), 3) Add it to Vercel project settings → Environment Variables as SUPABASE_SERVICE_ROLE_KEY, 4) Redeploy your application.'
           },
           { status: 500 }
         )

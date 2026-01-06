@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
 import Toolbar from "./Toolbar"
@@ -63,6 +64,15 @@ export default function GridViewWrapper({
   const [fields, setFields] = useState<TableField[]>(initialTableFields)
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
+
+  // Sync filters and sorts when initial props change (e.g., from block config)
+  useEffect(() => {
+    setFilters(initialFilters)
+  }, [initialFilters.length, initialFilters.map(f => `${f.field_name}-${f.operator}-${f.value}`).join(',')])
+
+  useEffect(() => {
+    setSorts(initialSorts)
+  }, [initialSorts.length, initialSorts.map(s => `${s.field_name}-${s.direction}`).join(',')])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {

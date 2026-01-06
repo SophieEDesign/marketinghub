@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Edit2, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -48,6 +48,15 @@ export default function InterfacePageClient({
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [formSettingsOpen, setFormSettingsOpen] = useState(false)
   
+  // Inline title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [titleValue, setTitleValue] = useState("")
+  const [titleError, setTitleError] = useState(false)
+  const [isSavingTitle, setIsSavingTitle] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSavedTitleRef = useRef<string>("")
+  
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
 
@@ -57,6 +66,22 @@ export default function InterfacePageClient({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageId])
+
+  // Initialize title value when page loads
+  useEffect(() => {
+    if (page?.name) {
+      setTitleValue(page.name)
+      lastSavedTitleRef.current = page.name
+    }
+  }, [page?.name])
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus()
+      titleInputRef.current.select()
+    }
+  }, [isEditingTitle])
 
   useEffect(() => {
     if (page && page.source_view) {
@@ -334,17 +359,149 @@ export default function InterfacePageClient({
     }
   }
 
+  // Save page title with debouncing
+  const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
+    if (!page || !isAdmin) return
+    
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    const doSave = async () => {
+      // Don't save if title hasn't changed
+      if (newTitle.trim() === lastSavedTitleRef.current) {
+        setIsSavingTitle(false)
+        return
+      }
+
+      setIsSavingTitle(true)
+      setTitleError(false)
+
+      try {
+        const res = await fetch(`/api/interface-pages/${page.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newTitle.trim() }),
+        })
+
+        if (!res.ok) {
+          throw new Error('Failed to save page title')
+        }
+
+        // Update local state
+        const updatedPage = await res.json()
+        // API returns page directly (not wrapped in { page: ... })
+        setPage(updatedPage)
+        lastSavedTitleRef.current = newTitle.trim()
+        setTitleValue(newTitle.trim())
+        setTitleError(false)
+      } catch (error) {
+        console.error('Error saving page title:', error)
+        setTitleError(true)
+        // Revert to last saved title
+        setTitleValue(lastSavedTitleRef.current)
+        // Clear error state after a moment
+        setTimeout(() => setTitleError(false), 2000)
+      } finally {
+        setIsSavingTitle(false)
+      }
+    }
+
+    if (immediate) {
+      await doSave()
+    } else {
+      // Debounce: wait 1000ms before saving
+      saveTimeoutRef.current = setTimeout(doSave, 1000)
+    }
+  }, [page, isAdmin])
+
+  const handleTitleChange = (value: string) => {
+    setTitleValue(value)
+    // Debounced save
+    savePageTitle(value, false)
+  }
+
+  const handleTitleBlur = () => {
+    // Save immediately on blur
+    if (titleValue.trim() !== lastSavedTitleRef.current) {
+      savePageTitle(titleValue.trim(), true)
+    }
+    setIsEditingTitle(false)
+  }
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Save immediately on Enter
+      if (titleValue.trim() !== lastSavedTitleRef.current) {
+        savePageTitle(titleValue.trim(), true)
+      }
+      setIsEditingTitle(false)
+      titleInputRef.current?.blur()
+    } else if (e.key === 'Escape') {
+      // Revert to last saved title
+      setTitleValue(lastSavedTitleRef.current)
+      setIsEditingTitle(false)
+      setTitleError(false)
+      titleInputRef.current?.blur()
+    }
+  }
+
+  const handleStartEditTitle = () => {
+    setIsEditingTitle(true)
+    setTitleValue(page?.name || "")
+  }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Edit Button - Admin Only */}
       {!isViewer && page && isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">{page.name}</h1>
-            {page.updated_at && (
-              <span className="text-xs text-gray-500" suppressHydrationWarning>
-                Updated {new Date(page.updated_at).toLocaleDateString()}
-              </span>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <input
+                  ref={titleInputRef}
+                  type="text"
+                  value={titleValue}
+                  onChange={(e) => handleTitleChange(e.target.value)}
+                  onBlur={handleTitleBlur}
+                  onKeyDown={handleTitleKeyDown}
+                  className={`flex-1 text-lg font-semibold border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 ${
+                    titleError ? 'bg-red-50 ring-2 ring-red-500' : ''
+                  }`}
+                  disabled={isSavingTitle}
+                />
+                {isSavingTitle && (
+                  <span className="text-xs text-gray-400">Saving...</span>
+                )}
+              </div>
+            ) : (
+              <>
+                <h1 
+                  className="text-lg font-semibold cursor-text hover:text-blue-600 transition-colors flex-1 min-w-0 truncate"
+                  onClick={handleStartEditTitle}
+                  title="Click to edit page title"
+                >
+                  {page.name}
+                </h1>
+                {page.updated_at && (
+                  <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
+                    Updated {new Date(page.updated_at).toLocaleDateString()}
+                  </span>
+                )}
+              </>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -401,10 +558,10 @@ export default function InterfacePageClient({
       {/* Header without Edit Button - Non-admin */}
       {!isViewer && page && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">{page.name}</h1>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
             {page.updated_at && (
-              <span className="text-xs text-gray-500" suppressHydrationWarning>
+              <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
                 Updated {new Date(page.updated_at).toLocaleDateString()}
               </span>
             )}

@@ -61,7 +61,7 @@ export default function CalendarView({
           .single()
 
         if (error) {
-          console.error("Error loading view:", error)
+          // Silently handle error - will show setup state
           setResolvedTableId("")
           setLoading(false)
           return
@@ -70,12 +70,12 @@ export default function CalendarView({
         if (view?.table_id) {
           setResolvedTableId(view.table_id)
         } else {
-          console.warn("CalendarView: View does not have a table_id")
+          // View exists but has no table_id - show setup state
           setResolvedTableId("")
           setLoading(false)
         }
       } catch (error) {
-        console.error("Error resolving tableId from view:", error)
+        // Silently handle error - will show setup state
         setResolvedTableId("")
         setLoading(false)
       }
@@ -88,7 +88,6 @@ export default function CalendarView({
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
     if (!resolvedTableId) {
-      console.warn("CalendarView: tableId is required for table-backed pages. This page may be SQL-view backed.")
       setRows([])
       setLoading(false)
       return
@@ -98,18 +97,24 @@ export default function CalendarView({
     const sanitizedTableId = resolvedTableId.split(':')[0]
     
     setLoading(true)
-    const { data, error } = await supabase
-      .from("table_rows")
-      .select("*")
-      .eq("table_id", sanitizedTableId)
+    try {
+      const { data, error } = await supabase
+        .from("table_rows")
+        .select("*")
+        .eq("table_id", sanitizedTableId)
 
-    if (error) {
-      console.error("Error loading rows:", error)
+      if (error) {
+        // Silently handle error - will show empty calendar
+        setRows([])
+      } else {
+        setRows(data || [])
+      }
+    } catch (error) {
+      // Silently handle error - will show empty calendar
       setRows([])
-    } else {
-      setRows(data || [])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   // Filter rows by search query
@@ -130,42 +135,89 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
-  function getEvents(): EventInput[] {
-    return filteredRows
-      .filter((row) => row.data[dateFieldId])
-      .map((row) => {
-        const dateValue = row.data[dateFieldId]
-        const title = (Array.isArray(fieldIds) ? fieldIds : [])
-          .filter((fid) => fid !== dateFieldId)
-          .slice(0, 1)
-          .map((fid) => String(row.data[fid] || "Untitled"))
-          .join(" ")
+  // Find date field in tableFields to validate it exists and is a date type
+  const dateField = useMemo(() => {
+    if (!dateFieldId || !tableFields.length) return null
+    // Try to find by name first, then by id
+    return tableFields.find(f => 
+      f.name === dateFieldId || 
+      f.id === dateFieldId ||
+      f.field_name === dateFieldId
+    )
+  }, [dateFieldId, tableFields])
 
-        return {
-          id: row.id,
-          title: title || "Untitled",
-          start: dateValue,
-          extendedProps: {
-            rowId: row.id,
-            rowData: row.data,
-          },
-        }
-      })
+  const isValidDateField = useMemo(() => {
+    if (!dateField) return false
+    const fieldType = dateField.type || dateField.field_type
+    return fieldType === 'date' || fieldType === 'datetime' || fieldType === 'timestamp'
+  }, [dateField])
+
+  function getEvents(): EventInput[] {
+    if (!dateFieldId || !isValidDateField) return []
+    
+    try {
+      return filteredRows
+        .filter((row) => {
+          const dateValue = row.data?.[dateFieldId]
+          return dateValue && (typeof dateValue === 'string' || dateValue instanceof Date)
+        })
+        .map((row) => {
+          const dateValue = row.data[dateFieldId]
+          // Use first non-date field as title, or fallback to row ID
+          const titleField = (Array.isArray(fieldIds) ? fieldIds : [])
+            .filter((fid) => fid !== dateFieldId)
+            .slice(0, 1)[0]
+          
+          const title = titleField 
+            ? String(row.data[titleField] || "Untitled")
+            : `Event ${row.id.substring(0, 8)}`
+
+          return {
+            id: row.id,
+            title: title || "Untitled",
+            start: dateValue,
+            extendedProps: {
+              rowId: row.id,
+              rowData: row.data,
+            },
+          }
+        })
+    } catch (error) {
+      // Silently handle errors in event generation
+      return []
+    }
   }
 
   if (loading) {
     return <div className="p-4">Loading...</div>
   }
 
-  // Handle missing tableId gracefully (SQL-view backed pages)
+  // Handle missing tableId gracefully
   if (!resolvedTableId) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
         <div className="text-sm mb-2 text-center">
-          Calendar view requires a table connection. This page appears to be SQL-view backed.
+          Calendar view requires a table connection.
         </div>
         <div className="text-xs text-gray-400 text-center">
-          Please configure this page with a table anchor in Settings.
+          Please configure a table in block settings.
+        </div>
+      </div>
+    )
+  }
+
+  // Handle missing or invalid date field
+  if (!dateFieldId || !isValidDateField) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center">
+          Calendar view requires a date field.
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          {!dateFieldId 
+            ? "Please select a date field in block settings."
+            : `The selected field "${dateFieldId}" is not a date field. Please select a date field in block settings.`
+          }
         </div>
       </div>
     )
@@ -205,10 +257,12 @@ export default function CalendarView({
             right: "dayGridMonth,dayGridWeek,dayGridDay",
           }}
           eventClick={(info) => {
-            console.log("Event clicked:", info.event.extendedProps)
+            // Event clicked - could navigate to record detail in future
+            // Silently handle for now
           }}
           dateClick={(info) => {
-            console.log("Date clicked:", info.dateStr)
+            // Date clicked - could create new record in future
+            // Silently handle for now
           }}
         />
       </div>

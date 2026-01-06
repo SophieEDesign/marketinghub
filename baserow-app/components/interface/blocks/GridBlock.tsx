@@ -4,8 +4,9 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
-import KanbanView from "@/components/views/KanbanView"
 import CalendarView from "@/components/views/CalendarView"
+// TODO: Kanban, Timeline, Gallery - not yet implemented
+// import KanbanView from "@/components/views/KanbanView"
 
 interface GridBlockProps {
   block: PageBlock
@@ -165,21 +166,18 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   // Render based on view type
   const renderView = () => {
     const fieldIds = visibleFields.map(f => f.field_name)
-    const groupingFieldId = config.group_by || visibleFields[0]?.field_name || ''
-    const dateFieldId = visibleFields.find(f => f.field_name.toLowerCase().includes('date'))?.field_name || visibleFields[0]?.field_name || ''
-
+    
     switch (viewType) {
-      case 'kanban':
-        return (
-          <KanbanView
-            tableId={tableId!}
-            viewId={viewId || ''}
-            groupingFieldId={groupingFieldId}
-            fieldIds={fieldIds}
-            tableFields={tableFields}
-          />
-        )
-      case 'calendar':
+      case 'calendar': {
+        // Calendar requires a valid date field
+        // Try to find a date field from config or visible fields
+        const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
+        const dateFieldFromFields = visibleFields.find(f => {
+          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+          return field && (field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+        })
+        const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
+        
         return (
           <CalendarView
             tableId={tableId!}
@@ -189,20 +187,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             tableFields={tableFields}
           />
         )
-      case 'gallery':
-        // Gallery view - similar to grid but card-based
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <p className="text-gray-500">Gallery view coming soon</p>
-          </div>
-        )
-      case 'timeline':
-        // Timeline view
-        return (
-          <div className="space-y-4">
-            <p className="text-gray-500">Timeline view coming soon</p>
-          </div>
-        )
+      }
       case 'grid':
       default:
         return (

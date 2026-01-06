@@ -10,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch } from "lucide-react"
+import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch, X, Plus } from "lucide-react"
 import type { BlockConfig, ViewType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import type { FieldType } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -33,6 +35,7 @@ interface ViewTypeOption {
   requiredFields: FieldType[] // Field types required for this view
 }
 
+// Only show Grid and Calendar - others are not yet functional
 const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
   {
     type: 'grid',
@@ -42,33 +45,34 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     requiredFields: [],
   },
   {
-    type: 'kanban',
-    label: 'Kanban',
-    icon: Columns,
-    description: 'Board view with columns',
-    requiredFields: [], // Needs a grouping field but not required at config time
-  },
-  {
     type: 'calendar',
     label: 'Calendar',
     icon: Calendar,
     description: 'Month/week calendar view',
     requiredFields: ['date'] as FieldType[],
   },
-  {
-    type: 'gallery',
-    label: 'Gallery',
-    icon: ImageIcon,
-    description: 'Card-based visual layout',
-    requiredFields: [],
-  },
-  {
-    type: 'timeline',
-    label: 'Timeline',
-    icon: GitBranch,
-    description: 'Chronological timeline view',
-    requiredFields: ['date'] as FieldType[],
-  },
+  // TODO: Kanban, Timeline, Gallery - not yet implemented
+  // {
+  //   type: 'kanban',
+  //   label: 'Kanban',
+  //   icon: Columns,
+  //   description: 'Board view with columns',
+  //   requiredFields: [],
+  // },
+  // {
+  //   type: 'gallery',
+  //   label: 'Gallery',
+  //   icon: ImageIcon,
+  //   description: 'Card-based visual layout',
+  //   requiredFields: [],
+  // },
+  // {
+  //   type: 'timeline',
+  //   label: 'Timeline',
+  //   icon: GitBranch,
+  //   description: 'Chronological timeline view',
+  //   requiredFields: ['date'] as FieldType[],
+  // },
 ]
 
 export default function GridDataSettings({
@@ -188,11 +192,9 @@ export default function GridDataSettings({
             )
           })}
         </div>
-        {compatibleTypes.length < VIEW_TYPE_OPTIONS.length && (
-          <p className="text-xs text-gray-500">
-            Some view types require date fields. Add date fields to enable them.
-          </p>
-        )}
+        <p className="text-xs text-gray-500">
+          Grid is fully supported. Calendar support is in progress.
+        </p>
       </div>
 
       {/* Visible Fields - Required */}
@@ -265,46 +267,222 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Filters (optional) */}
-      {config.table_id && fields.length > 0 && (
+      {/* Filters (optional) - Only for Grid view */}
+      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
-          <Label>Filters (optional)</Label>
+          <div className="flex items-center justify-between">
+            <Label>Filters (optional)</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const currentFilters = config.filters || []
+                onUpdate({
+                  filters: [
+                    ...currentFilters,
+                    { field: fields[0]?.name || '', operator: 'equal', value: '' }
+                  ]
+                })
+              }}
+              className="h-7 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Filter
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {(config.filters || []).map((filter: any, index: number) => (
+              <div key={index} className="flex gap-2 items-start p-2 border rounded-md">
+                <Select
+                  value={filter.field || ''}
+                  onValueChange={(value) => {
+                    const currentFilters = config.filters || []
+                    const updated = [...currentFilters]
+                    updated[index] = { ...updated[index], field: value }
+                    onUpdate({ filters: updated })
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1">
+                    <SelectValue placeholder="Field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fields.map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={filter.operator || 'equal'}
+                  onValueChange={(value) => {
+                    const currentFilters = config.filters || []
+                    const updated = [...currentFilters]
+                    updated[index] = { ...updated[index], operator: value }
+                    onUpdate({ filters: updated })
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="equal">Equals</SelectItem>
+                    <SelectItem value="contains">Contains</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={filter.value || ''}
+                  onChange={(e) => {
+                    const currentFilters = config.filters || []
+                    const updated = [...currentFilters]
+                    updated[index] = { ...updated[index], value: e.target.value }
+                    onUpdate({ filters: updated })
+                  }}
+                  placeholder="Value"
+                  className="h-8 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const currentFilters = config.filters || []
+                    onUpdate({ filters: currentFilters.filter((_: any, i: number) => i !== index) })
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            {(!config.filters || config.filters.length === 0) && (
+              <p className="text-xs text-gray-400 italic">No filters configured</p>
+            )}
+          </div>
           <p className="text-xs text-gray-500">
-            Configure filters in the grid view after adding the block.
+            Filter rows by field values. Supports equals and contains operators.
           </p>
         </div>
       )}
 
-      {/* Sorts (optional) */}
-      {config.table_id && fields.length > 0 && (
+      {/* Sorts (optional) - Only for Grid view */}
+      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
-          <Label>Sorts (optional)</Label>
+          <div className="flex items-center justify-between">
+            <Label>Sort (optional)</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const currentSorts = config.sorts || []
+                // Only allow one sort for now
+                if (currentSorts.length === 0) {
+                  onUpdate({
+                    sorts: [{ field: fields[0]?.name || '', direction: 'asc' }]
+                  })
+                }
+              }}
+              disabled={(config.sorts || []).length > 0}
+              className="h-7 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Sort
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {(config.sorts || []).slice(0, 1).map((sort: any, index: number) => (
+              <div key={index} className="flex gap-2 items-center p-2 border rounded-md">
+                <Select
+                  value={sort.field || ''}
+                  onValueChange={(value) => {
+                    const currentSorts = config.sorts || []
+                    const updated = [...currentSorts]
+                    updated[index] = { ...updated[index], field: value }
+                    onUpdate({ sorts: updated })
+                  }}
+                >
+                  <SelectTrigger className="h-8 flex-1">
+                    <SelectValue placeholder="Field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fields.map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={sort.direction || 'asc'}
+                  onValueChange={(value) => {
+                    const currentSorts = config.sorts || []
+                    const updated = [...currentSorts]
+                    updated[index] = { ...updated[index], direction: value }
+                    onUpdate({ sorts: updated })
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                    <SelectItem value="desc">Descending</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onUpdate({ sorts: [] })
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+            {(!config.sorts || config.sorts.length === 0) && (
+              <p className="text-xs text-gray-400 italic">No sort configured</p>
+            )}
+          </div>
           <p className="text-xs text-gray-500">
-            Configure sorting in the grid view after adding the block.
+            Sort rows by a single field in ascending or descending order.
           </p>
         </div>
       )}
 
-      {/* Group By (for Kanban) */}
-      {currentViewType === 'kanban' && config.table_id && (
+      {/* Date Field (for Calendar) */}
+      {currentViewType === 'calendar' && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
-          <Label>Group By Field</Label>
+          <Label>Date Field *</Label>
           <Select
-            value={config.group_by || "__none__"}
-            onValueChange={(value) => onUpdate({ group_by: value === "__none__" ? undefined : value })}
+            value={config.calendar_date_field || config.start_date_field || ""}
+            onValueChange={(value) => onUpdate({ calendar_date_field: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select a field" />
+              <SelectValue placeholder="Select a date field" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
-              {fields.map((field) => (
-                <SelectItem key={field.id} value={field.name}>
-                  {field.name}
-                </SelectItem>
-              ))}
+              {fields
+                .filter(field => field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+                .map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {field.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
+          {fields.filter(f => f.type === 'date' || f.type === 'datetime' || f.type === 'timestamp').length === 0 && (
+            <p className="text-xs text-amber-600">
+              No date fields found. Please add a date field to the table.
+            </p>
+          )}
+          <p className="text-xs text-gray-500">
+            Select the date field to display events on the calendar.
+          </p>
         </div>
       )}
     </div>
