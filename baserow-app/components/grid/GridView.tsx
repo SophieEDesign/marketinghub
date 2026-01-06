@@ -8,6 +8,7 @@ import Cell from "./Cell"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 
 interface GridViewProps {
   tableId: string
@@ -23,6 +24,7 @@ interface GridViewProps {
     operator: string
     value?: string
   }>
+  filters?: FilterConfig[] // Standardized FilterConfig format (takes precedence over viewFilters)
   viewSorts?: Array<{
     field_name: string
     direction: string
@@ -44,6 +46,7 @@ export default function GridView({
   supabaseTableName,
   viewFields,
   viewFilters = [],
+  filters = [], // Standardized filters (preferred)
   viewSorts = [],
   searchTerm = "",
   groupBy,
@@ -74,7 +77,7 @@ export default function GridView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, viewFilters, viewSorts, tableFields])
+  }, [supabaseTableName, filters, viewFilters, viewSorts, tableFields])
 
   async function loadRows() {
     if (!supabaseTableName) {
@@ -86,41 +89,20 @@ export default function GridView({
     try {
       let query = supabase.from(supabaseTableName).select("*")
 
-      // Apply filters at query level
-      for (const filter of viewFilters) {
-        const fieldValue = filter.value
-        switch (filter.operator) {
-          case "equal":
-            query = query.eq(filter.field_name, fieldValue)
-            break
-          case "not_equal":
-            query = query.neq(filter.field_name, fieldValue)
-            break
-          case "contains":
-            query = query.ilike(filter.field_name, `%${fieldValue}%`)
-            break
-          case "not_contains":
-            query = query.not(filter.field_name, "ilike", `%${fieldValue}%`)
-            break
-          case "is_empty":
-            query = query.or(`${filter.field_name}.is.null,${filter.field_name}.eq.`)
-            break
-          case "is_not_empty":
-            query = query.not(filter.field_name, "is", null)
-            break
-          case "greater_than":
-            query = query.gt(filter.field_name, fieldValue)
-            break
-          case "less_than":
-            query = query.lt(filter.field_name, fieldValue)
-            break
-          case "greater_than_or_equal":
-            query = query.gte(filter.field_name, fieldValue)
-            break
-          case "less_than_or_equal":
-            query = query.lte(filter.field_name, fieldValue)
-            break
-        }
+      // Use standardized filters if provided, otherwise fall back to viewFilters format
+      if (filters.length > 0) {
+        // Convert tableFields to format expected by applyFiltersToQuery
+        const normalizedFields = tableFields.map(f => ({ name: f.name, type: f.type }))
+        query = applyFiltersToQuery(query, filters, normalizedFields)
+      } else if (viewFilters.length > 0) {
+        // Legacy: Convert viewFilters format to FilterConfig format
+        const legacyFilters: FilterConfig[] = viewFilters.map(f => ({
+          field: f.field_name,
+          operator: f.operator as FilterConfig['operator'],
+          value: f.value,
+        }))
+        const normalizedFields = tableFields.map(f => ({ name: f.name, type: f.type }))
+        query = applyFiltersToQuery(query, legacyFilters, normalizedFields)
       }
 
       // Apply sorting at query level

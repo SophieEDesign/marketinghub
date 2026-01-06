@@ -15,7 +15,9 @@ import TableSnapshotBlock from "./blocks/TableSnapshotBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import TabsBlock from "./blocks/TabsBlock"
+import FilterBlock from "./blocks/FilterBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
+import type { FilterConfig } from "@/lib/interface/filters"
 
 interface BlockRendererProps {
   block: PageBlock
@@ -25,6 +27,7 @@ interface BlockRendererProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
 }
 
 export default function BlockRenderer({
@@ -35,6 +38,7 @@ export default function BlockRenderer({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  filters = [],
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -68,7 +72,7 @@ export default function BlockRenderer({
     switch (block.type) {
       case "grid":
         // Grid block MUST have table_id configured - no fallback
-        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} />
+        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
 
       case "form":
         // Form block MUST have table_id configured - no fallback
@@ -98,16 +102,20 @@ export default function BlockRenderer({
         )
 
       case "record":
-        // Record block uses page's tableId and recordId
-        return <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} recordId={recordId} />
+        // Record block MUST have table_id and record_id configured - no fallback
+        return <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} recordId={null} />
 
       case "chart":
-        // Chart block automatically uses page's tableId if not configured
-        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
+        // Chart block MUST have table_id configured - no fallback
+        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
 
       case "kpi":
-        // KPI block automatically uses page's tableId if not configured
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
+        // KPI block MUST have table_id configured - no fallback
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+
+      case "filter":
+        // Filter block emits filter state via context
+        return <FilterBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} onUpdate={onUpdate} />
 
       case "text":
         return <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
+import { FilterStateProvider } from "@/lib/interface/filter-state"
 import Canvas from "./Canvas"
 import FloatingBlockPicker from "./FloatingBlockPicker"
 import SettingsPanel from "./SettingsPanel"
@@ -665,28 +666,30 @@ export default function InterfaceBuilder({
 
         {/* Canvas */}
         <div className="flex-1 overflow-auto p-4">
-          <Canvas
-            blocks={blocks}
-            isEditing={effectiveIsEditing}
-            onLayoutChange={handleLayoutChange}
-            onBlockUpdate={handleBlockUpdate}
-            onBlockClick={setSelectedBlockId}
-            onBlockSettingsClick={(blockId) => {
-              setSelectedBlockId(blockId)
-              setSettingsPanelOpen(true)
-            }}
-            onBlockDelete={handleDeleteBlock}
-            onBlockDuplicate={handleDuplicateBlock}
-            onAddBlock={handleAddBlock}
-            selectedBlockId={selectedBlockId}
-            layoutSettings={page.settings?.layout}
-            primaryTableId={page.settings?.primary_table_id || null}
-            layoutTemplate={(page.settings as any)?.layout_template || null}
-            interfaceDescription={page.description || null}
-            pageTableId={pageTableId}
-            pageId={page.id}
-            recordId={recordId}
-          />
+          <FilterStateProvider>
+            <Canvas
+              blocks={blocks}
+              isEditing={effectiveIsEditing}
+              onLayoutChange={handleLayoutChange}
+              onBlockUpdate={handleBlockUpdate}
+              onBlockClick={setSelectedBlockId}
+              onBlockSettingsClick={(blockId) => {
+                setSelectedBlockId(blockId)
+                setSettingsPanelOpen(true)
+              }}
+              onBlockDelete={handleDeleteBlock}
+              onBlockDuplicate={handleDuplicateBlock}
+              onAddBlock={handleAddBlock}
+              selectedBlockId={selectedBlockId}
+              layoutSettings={page.settings?.layout}
+              primaryTableId={page.settings?.primary_table_id || null}
+              layoutTemplate={(page.settings as any)?.layout_template || null}
+              interfaceDescription={page.description || null}
+              pageTableId={pageTableId}
+              pageId={page.id}
+              recordId={recordId}
+            />
+          </FilterStateProvider>
         </div>
       </div>
 

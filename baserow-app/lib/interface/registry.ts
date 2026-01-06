@@ -198,6 +198,24 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       url: '',
     },
   },
+  filter: {
+    type: 'filter',
+    label: 'Filter',
+    icon: 'Filter',
+    defaultWidth: 12,
+    defaultHeight: 4,
+    minWidth: 4,
+    minHeight: 3,
+    maxHeight: 8,
+    defaultConfig: {
+      title: 'Filters',
+      table_id: '',
+      target_blocks: 'all',
+      allowed_fields: [],
+      allowed_operators: [],
+      filters: [],
+    },
+  },
 }
 
 export function getBlockDefinition(type: BlockType): BlockDefinition {

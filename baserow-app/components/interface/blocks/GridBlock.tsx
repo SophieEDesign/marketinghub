@@ -1,21 +1,23 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
 import CalendarView from "@/components/views/CalendarView"
-// TODO: Kanban, Timeline, Gallery - not yet implemented
-// import KanbanView from "@/components/views/KanbanView"
+import KanbanView from "@/components/views/KanbanView"
+import TimelineView from "@/components/views/TimelineView"
+import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 
 interface GridBlockProps {
   block: PageBlock
   isEditing?: boolean
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
+  filters?: FilterConfig[] // Page-level or filter block filters
 }
 
-export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null }: GridBlockProps) {
+export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: GridBlockProps) {
   const { config } = block
   // Grid block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
@@ -23,8 +25,13 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   const viewType: ViewType = config?.view_type || 'grid'
   // Visible fields from config (required)
   const visibleFieldsConfig = config?.visible_fields || []
-  const filtersConfig = config?.filters || []
+  const blockBaseFilters = config?.filters || []
   const sortsConfig = config?.sorts || []
+  
+  // Merge filters with proper precedence: block base filters + filter block filters
+  const allFilters = useMemo(() => {
+    return mergeFilters(blockBaseFilters, filters, [])
+  }, [blockBaseFilters, filters])
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string } | null>(null)
   const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
@@ -127,15 +134,13 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
     : viewFields.filter(f => f.visible)
 
-  // Use config filters/sorts if provided, otherwise use view filters/sorts
-  const activeFilters = filtersConfig.length > 0
-    ? filtersConfig.map((f: any) => ({
-        id: f.field || '',
-        field_name: f.field || '',
-        operator: f.operator || 'eq',
-        value: f.value,
-      }))
-    : viewFilters
+  // Convert merged filters to legacy format for GridViewWrapper (backward compatibility)
+  const activeFilters = allFilters.map((f, idx) => ({
+    id: f.field || `filter-${idx}`,
+    field_name: f.field,
+    operator: f.operator,
+    value: f.value,
+  }))
 
   const activeSorts = sortsConfig.length > 0
     ? sortsConfig.map((s: any) => ({
@@ -170,7 +175,6 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     switch (viewType) {
       case 'calendar': {
         // Calendar requires a valid date field
-        // Try to find a date field from config or visible fields
         const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
         const dateFieldFromFields = visibleFields.find(f => {
           const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
@@ -178,12 +182,18 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         })
         const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
         
-        // Convert block filters to FilterConfig format
-        const calendarFilters = activeFilters.map(f => ({
-          field: f.field_name,
-          operator: f.operator as any,
-          value: f.value,
-        }))
+        if (!dateFieldId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Calendar view requires a date field." : "No date field configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a date field in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
         
         return (
           <CalendarView
@@ -192,9 +202,8 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             dateFieldId={dateFieldId}
             fieldIds={fieldIds}
             tableFields={tableFields}
-            filters={calendarFilters}
+            filters={allFilters}
             onRecordClick={(recordId) => {
-              // Navigate to record review page
               if (tableId) {
                 window.location.href = `/tables/${tableId}/records/${recordId}`
               }
@@ -202,6 +211,89 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           />
         )
       }
+      
+      case 'kanban': {
+        // Kanban requires a grouping field (typically a select/single_select field)
+        const groupByFieldFromConfig = config.group_by_field || config.kanban_group_field
+        const groupByFieldFromFields = visibleFields.find(f => {
+          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+          return field && (field.type === 'select' || field.type === 'single_select')
+        })
+        const groupByFieldId = groupByFieldFromConfig || groupByFieldFromFields?.field_name || ''
+        
+        if (!groupByFieldId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Kanban view requires a grouping field." : "No grouping field configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a select field for grouping in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
+        
+        return (
+          <KanbanView
+            tableId={tableId!}
+            viewId={viewId || ''}
+            groupingFieldId={groupByFieldId}
+            fieldIds={fieldIds}
+            searchQuery=""
+            tableFields={tableFields}
+          />
+        )
+      }
+      
+      case 'timeline': {
+        // Timeline requires a date field
+        const dateFieldFromConfig = config.timeline_date_field || config.start_date_field || config.calendar_date_field
+        const dateFieldFromFields = visibleFields.find(f => {
+          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+          return field && (field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+        })
+        const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
+        
+        if (!dateFieldId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Timeline view requires a date field." : "No date field configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a date field in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
+        
+        return (
+          <TimelineView
+            tableId={tableId!}
+            viewId={viewId || ''}
+            dateFieldId={dateFieldId}
+            fieldIds={fieldIds}
+            searchQuery=""
+            tableFields={tableFields}
+          />
+        )
+      }
+      
+      case 'gallery': {
+        // Gallery view - show unsupported state for now
+        return (
+          <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+            <div className="text-center">
+              <p className="mb-2">Gallery view is not yet available</p>
+              {isEditing && (
+                <p className="text-xs text-gray-400">Gallery view will be available in a future update.</p>
+              )}
+            </div>
+          </div>
+        )
+      }
+      
       case 'grid':
       default:
         return (
@@ -211,12 +303,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             supabaseTableName={table.supabase_table}
             viewFields={visibleFields}
             initialFilters={activeFilters}
+            filters={allFilters}
             initialSorts={activeSorts}
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}
             onRecordClick={(recordId) => {
-              // Navigate to record review page
               if (tableId) {
                 window.location.href = `/tables/${tableId}/records/${recordId}`
               }

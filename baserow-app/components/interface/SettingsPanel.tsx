@@ -41,6 +41,7 @@ import ImageAppearanceSettings from "./settings/ImageAppearanceSettings"
 import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
 import TabsDataSettings from "./settings/TabsDataSettings"
 import TabsAppearanceSettings from "./settings/TabsAppearanceSettings"
+import FilterBlockSettings from "./settings/FilterBlockSettings"
 import AdvancedSettings from "./settings/AdvancedSettings"
 import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
 
@@ -69,6 +70,7 @@ export default function SettingsPanel({
   const [config, setConfig] = useState<BlockConfig>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const previousConfigRef = useRef<string>("")
   const isInitialLoadRef = useRef(true)
@@ -134,6 +136,18 @@ export default function SettingsPanel({
   const handleSave = useCallback(async (configToSave: BlockConfig) => {
     if (!block) return
     
+    // Validate config before saving
+    const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
+    const validation = validateBlockConfig(block.type, configToSave)
+    
+    if (!validation.valid) {
+      setValidationErrors(validation.errors)
+      return // Don't save invalid configs
+    }
+    
+    // Clear validation errors if config is valid
+    setValidationErrors([])
+    
     // Prevent saving if config hasn't actually changed
     const configToSaveJson = JSON.stringify(configToSave)
     if (configToSaveJson === previousConfigRef.current) {
@@ -156,14 +170,28 @@ export default function SettingsPanel({
     }
   }, [block, onSave])
 
-  // Auto-save on config change (debounced) - ONLY if config actually changed
+  // Validate config on change (for UI feedback)
+  useEffect(() => {
+    if (!block || !isOpen) return
+    
+    const validateConfig = async () => {
+      const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
+      const validation = validateBlockConfig(block.type, config)
+      setValidationErrors(validation.errors)
+    }
+    
+    validateConfig()
+  }, [config, block, isOpen])
+
+  // Auto-save on config change (debounced) - ONLY if config actually changed and is valid
   useEffect(() => {
     // Skip autosave if:
     // 1. Panel is closed
     // 2. No block selected
     // 3. Initial load (prevent saving on mount)
     // 4. Config hasn't actually changed
-    if (!block || !isOpen || isInitialLoadRef.current) return
+    // 5. Config has validation errors
+    if (!block || !isOpen || isInitialLoadRef.current || validationErrors.length > 0) return
     
     const currentConfigJson = JSON.stringify(config)
     
@@ -178,11 +206,11 @@ export default function SettingsPanel({
     }
     
     // Debounce save: wait 1500ms after last change
-    // Only save if still open and config still different
+    // Only save if still open and config still different and valid
     saveTimeoutRef.current = setTimeout(() => {
       // Double-check config hasn't changed back and panel is still open
       const finalConfigJson = JSON.stringify(config)
-      if (finalConfigJson !== previousConfigRef.current && isOpen && block) {
+      if (finalConfigJson !== previousConfigRef.current && isOpen && block && validationErrors.length === 0) {
         handleSave(config)
       }
     }, 1500)
@@ -192,7 +220,7 @@ export default function SettingsPanel({
         clearTimeout(saveTimeoutRef.current)
       }
     }
-  }, [config, block, isOpen, handleSave])
+  }, [config, block, isOpen, handleSave, validationErrors])
 
   if (!isOpen || !block) return null
 
@@ -236,6 +264,18 @@ export default function SettingsPanel({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Validation Errors */}
+          {validationErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-sm font-semibold text-red-800 mb-1">Configuration Errors</p>
+              <ul className="text-xs text-red-700 list-disc list-inside space-y-1">
+                {validationErrors.map((error, idx) => (
+                  <li key={idx}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
           <TabsContent value="data" className="mt-0 space-y-6">
             {renderDataSettings()}
           </TabsContent>
@@ -338,7 +378,7 @@ export default function SettingsPanel({
         return <ImageDataSettings {...commonProps} />
       case "tabs":
         // Tabs need access to all blocks for assignment
-        // Note: In a real implementation, pass blocks from InterfaceBuilder
+        // Note: In a real implementation, pass blocks from parent context
         return (
           <TabsDataSettings
             config={config}
@@ -346,6 +386,8 @@ export default function SettingsPanel({
             onUpdate={updateConfig}
           />
         )
+      case "filter":
+        return <FilterBlockSettings {...commonProps} allBlocks={[]} />
       default:
         return (
           <div className="text-sm text-gray-500">

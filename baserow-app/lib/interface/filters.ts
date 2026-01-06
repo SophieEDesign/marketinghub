@@ -8,7 +8,7 @@ import type { BlockFilter } from './types'
 
 export interface FilterConfig {
   field: string
-  operator: 'equal' | 'not_equal' | 'contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'greater_than_or_equal' | 'less_than_or_equal' | 'date_range'
+  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'greater_than_or_equal' | 'less_than_or_equal' | 'date_range'
   value: any
   // For date_range operator
   value2?: any
@@ -69,6 +69,9 @@ export function applyFiltersToQuery(
       case 'contains':
         query = query.ilike(fieldName, `%${fieldValue}%`)
         break
+      case 'not_contains':
+        query = query.not(fieldName, 'ilike', `%${fieldValue}%`)
+        break
       case 'greater_than':
         query = query.gt(fieldName, fieldValue)
         break
@@ -125,27 +128,56 @@ export function applySearchToFilters(
 }
 
 /**
- * Merges page-level filters with block-level filters
- * Block filters override page filters for the same field
+ * Merges filters with proper precedence:
+ * 1. Block base filters (always applied, cannot be overridden)
+ * 2. Filter block state (narrows results, additive)
+ * 3. Temporary UI filters (if any)
+ * 
+ * All filters are combined with AND logic - they narrow results together
  */
 export function mergeFilters(
-  pageFilters: FilterConfig[] = [],
-  blockFilters: BlockFilter[] = []
+  blockBaseFilters: BlockFilter[] = [],
+  filterBlockFilters: FilterConfig[] = [],
+  temporaryFilters: FilterConfig[] = []
 ): FilterConfig[] {
-  const merged: FilterConfig[] = [...pageFilters]
+  const merged: FilterConfig[] = []
   
-  // Add block filters, overriding page filters for same field
-  for (const blockFilter of blockFilters) {
+  // 1. Block base filters (always applied first)
+  for (const blockFilter of blockBaseFilters) {
     const normalized = normalizeFilter(blockFilter)
-    const existingIndex = merged.findIndex(f => f.field === normalized.field)
-    
-    if (existingIndex >= 0) {
-      merged[existingIndex] = normalized
-    } else {
-      merged.push(normalized)
+    merged.push(normalized)
+  }
+  
+  // 2. Filter block filters (additive, narrows results)
+  for (const filterBlockFilter of filterBlockFilters) {
+    // Filter blocks can add filters but cannot override base filters
+    // If same field exists in base filters, skip (base filters take precedence)
+    const baseFilterExists = merged.some(f => f.field === filterBlockFilter.field)
+    if (!baseFilterExists) {
+      merged.push(filterBlockFilter)
+    }
+  }
+  
+  // 3. Temporary UI filters (additive, narrows results further)
+  for (const tempFilter of temporaryFilters) {
+    const baseFilterExists = merged.some(f => f.field === tempFilter.field)
+    if (!baseFilterExists) {
+      merged.push(tempFilter)
     }
   }
   
   return merged
+}
+
+/**
+ * Legacy function for backward compatibility
+ * Merges page-level filters with block-level filters
+ * @deprecated Use mergeFilters with proper precedence instead
+ */
+export function mergePageAndBlockFilters(
+  pageFilters: FilterConfig[] = [],
+  blockFilters: BlockFilter[] = []
+): FilterConfig[] {
+  return mergeFilters(blockFilters, pageFilters, [])
 }
 

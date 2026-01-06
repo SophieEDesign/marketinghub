@@ -12,6 +12,7 @@ export type BlockType =
   | 'table_snapshot'
   | 'action'
   | 'link_preview'
+  | 'filter'
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'
@@ -107,6 +108,10 @@ export interface BlockConfig {
   submit_action?: 'create' | 'update' | 'custom'
   detail_fields?: string[]
   allow_editing?: boolean
+  // Filter block
+  target_blocks?: 'all' | string[]
+  allowed_fields?: string[]
+  allowed_operators?: string[]
   // Appearance settings
   appearance?: {
     title?: string

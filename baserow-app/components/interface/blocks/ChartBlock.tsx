@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import {
   BarChart,
   Bar,
@@ -39,8 +39,8 @@ interface ChartDataPoint {
 export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
-  // Use page's tableId if block doesn't have one configured
-  const tableId = config?.table_id || pageTableId
+  // Chart block MUST have table_id configured - no fallback to page table
+  const tableId = config?.table_id
   const chartType = config?.chart_type || "bar"
   const xAxis = config?.chart_x_axis
   const yAxis = config?.chart_y_axis
@@ -54,21 +54,14 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const [error, setError] = useState<string | null>(null)
   const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
   
-  // Merge page filters with block filters
-  const blockFilters = config?.filters || []
+  // Apply filters with proper precedence:
+  // 1. Block base filters (config.filters) - always applied
+  // 2. Filter block filters (filters prop) - narrows results
+  const blockBaseFilters = config?.filters || []
+  const filterBlockFilters = filters || []
   const allFilters = useMemo(() => {
-    // Merge filters - block filters override page filters for same field
-    const merged: FilterConfig[] = [...filters]
-    for (const blockFilter of blockFilters) {
-      const existingIndex = merged.findIndex(f => f.field === blockFilter.field)
-      if (existingIndex >= 0) {
-        merged[existingIndex] = blockFilter as FilterConfig
-      } else {
-        merged.push(blockFilter as FilterConfig)
-      }
-    }
-    return merged
-  }, [filters, blockFilters])
+    return mergeFilters(blockBaseFilters, filterBlockFilters, [])
+  }, [blockBaseFilters, filterBlockFilters])
 
   useEffect(() => {
     if (tableId) {
@@ -318,15 +311,15 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     }
   }
 
-  // Empty state
+  // Empty state - block requires table_id in config
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
           <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
           )}
         </div>
       </div>

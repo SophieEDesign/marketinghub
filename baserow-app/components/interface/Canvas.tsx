@@ -7,6 +7,8 @@ import "react-resizable/css/styles.css"
 import BlockRenderer from "./BlockRenderer"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
+import { useFilterState } from "@/lib/interface/filter-state"
+import type { FilterConfig } from "@/lib/interface/filters"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -57,6 +59,8 @@ export default function Canvas({
   pageId = null,
   recordId = null,
 }: CanvasProps) {
+  // Get filters from filter blocks for this block
+  const { getFiltersForBlock } = useFilterState()
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
   const isInitializedRef = useRef(false)
@@ -404,6 +408,7 @@ export default function Canvas({
                 pageTableId={pageTableId}
                 pageId={pageId}
                 recordId={recordId}
+                filters={getFiltersForBlock(block.id)}
               />
             </div>
             </div>

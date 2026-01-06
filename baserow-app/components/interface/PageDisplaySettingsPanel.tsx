@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, X, ArrowUp, ArrowDown } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
-import { getPageTypeDefinition } from "@/lib/interface/page-types"
+import { getPageTypeDefinition, validatePageAnchor } from "@/lib/interface/page-types"
 
 interface PageDisplaySettingsPanelProps {
   page: InterfacePage | null
@@ -296,6 +296,22 @@ export default function PageDisplaySettingsPanel({
   // Auto-save function - called whenever settings change
   const saveSettings = useCallback(async () => {
     if (!page) return
+
+    // Validate page settings before saving
+    const validation = validatePageAnchor(
+      page.page_type,
+      page.saved_view_id,
+      page.dashboard_layout_id,
+      page.form_config_id,
+      page.record_config_id
+    )
+    
+    if (!validation.valid) {
+      console.error('Cannot save invalid page:', validation.error)
+      // Don't save invalid pages - show error instead
+      alert(`Cannot save page: ${validation.error}`)
+      return
+    }
 
     try {
       const supabase = createClient()

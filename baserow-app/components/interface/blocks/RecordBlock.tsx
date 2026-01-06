@@ -16,9 +16,9 @@ interface RecordBlockProps {
 
 export default function RecordBlock({ block, isEditing = false, pageTableId = null, pageId = null, recordId: pageRecordId = null }: RecordBlockProps) {
   const { config } = block
-  // Use page's tableId and recordId if block doesn't have them configured
-  const tableId = config?.table_id || pageTableId
-  const recordId = config?.record_id || pageRecordId
+  // Record block MUST have table_id and record_id configured - no fallback to page context
+  const tableId = config?.table_id
+  const recordId = config?.record_id
   const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -60,9 +60,9 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
           )}
         </div>
       </div>
@@ -73,9 +73,9 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-2">{isEditing ? "No record selected" : "No record selected"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a record ID." : "No record selected"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Select a record in Record Review, or configure a record ID in block settings.</p>
+            <p className="text-xs text-gray-400">Configure the record ID in block settings.</p>
           )}
         </div>
       </div>
