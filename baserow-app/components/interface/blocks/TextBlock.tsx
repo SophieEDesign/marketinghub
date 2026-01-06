@@ -119,7 +119,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
             className="flex-1 min-h-[200px] font-mono text-sm resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 bg-transparent"
             style={{
               color: appearance.text_color || appearance.title_color || 'inherit',
-              textAlign: appearance.text_align || 'left',
+              textAlign: (appearance.text_align || 'left') as 'left' | 'center' | 'right' | 'justify',
               fontSize: appearance.text_size === 'sm' ? '0.875rem' :
                         appearance.text_size === 'lg' ? '1.125rem' :
                         appearance.text_size === 'xl' ? '1.25rem' :
