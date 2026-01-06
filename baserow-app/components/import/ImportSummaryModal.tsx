@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Download, CheckCircle, XCircle, AlertCircle } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+// Using simple state-based collapsible instead of Radix UI to avoid dependency
 
 interface ImportSummaryModalProps {
   open: boolean
@@ -128,26 +128,25 @@ export default function ImportSummaryModal({
           {/* Skipped Rows Details */}
           {skippedRows > 0 && (
             <div className="space-y-2">
-              <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between"
-                    type="button"
-                  >
-                    <span>
-                      View Skipped Rows ({skippedRows})
-                      {duplicateCount > 0 && ` • ${duplicateCount} duplicates`}
-                      {emptyKeyCount > 0 && ` • ${emptyKeyCount} empty keys`}
-                    </span>
-                    {showDetails ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
+              <Button
+                variant="outline"
+                className="w-full justify-between"
+                type="button"
+                onClick={() => setShowDetails(!showDetails)}
+              >
+                <span>
+                  View Skipped Rows ({skippedRows})
+                  {duplicateCount > 0 && ` • ${duplicateCount} duplicates`}
+                  {emptyKeyCount > 0 && ` • ${emptyKeyCount} empty keys`}
+                </span>
+                {showDetails ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+              {showDetails && (
+                <div className="mt-2">
                   <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
                     <div className="space-y-3">
                       {/* Duplicates */}
@@ -220,8 +219,8 @@ export default function ImportSummaryModal({
                       </Button>
                     </div>
                   )}
-                </CollapsibleContent>
-              </Collapsible>
+                </div>
+              )}
             </div>
           )}
 
