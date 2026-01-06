@@ -39,13 +39,12 @@ export default function BlockRenderer({
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
   
-  // Merge page tableId into block config if block doesn't have one
-  // This ensures blocks automatically use the page's table
+  // Merge page context into block config
+  // Grid and Form blocks MUST have table_id configured - no fallback
+  // Record blocks can use page recordId
   const mergedConfig = {
     ...safeConfig,
-    // Use page tableId if block doesn't have one configured
-    table_id: safeConfig.table_id || pageTableId || undefined,
-    // Use page recordId for record blocks
+    // Only merge recordId for record blocks (not table_id for grid/form)
     record_id: safeConfig.record_id || recordId || undefined,
   }
   
@@ -68,21 +67,21 @@ export default function BlockRenderer({
     
     switch (block.type) {
       case "grid":
-        // Grid block automatically uses page's tableId if not configured
-        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} />
+        // Grid block MUST have table_id configured - no fallback
+        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} />
 
       case "form":
-        // Form block automatically uses page's tableId if not configured
+        // Form block MUST have table_id configured - no fallback
         return (
           <FormBlock
             block={safeBlock}
             isEditing={canEdit}
-            pageTableId={pageTableId}
+            pageTableId={null}
             pageId={pageId}
             onSubmit={async (data) => {
               // Handle form submission
               const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
-              const tableId = mergedConfig.table_id || pageTableId
+              const tableId = mergedConfig.table_id
               if (tableId) {
                 const { data: table } = await supabase
                   .from("tables")

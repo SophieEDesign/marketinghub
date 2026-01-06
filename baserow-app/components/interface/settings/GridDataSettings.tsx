@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Select,
   SelectContent,
@@ -115,7 +116,7 @@ export default function GridDataSettings({
           </SelectContent>
         </Select>
         <p className="text-xs text-gray-500">
-          Grid blocks automatically use the page&apos;s table if not configured here.
+          Grid blocks require a table connection. Select a table to configure visible fields.
         </p>
       </div>
 
@@ -193,6 +194,96 @@ export default function GridDataSettings({
           </p>
         )}
       </div>
+
+      {/* Visible Fields - Required */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Visible Fields *</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Select all fields
+                  const allFieldNames = fields.map(f => f.name)
+                  onUpdate({ visible_fields: allFieldNames })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select All
+              </button>
+              <span className="text-xs text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Select none
+                  onUpdate({ visible_fields: [] })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select None
+              </button>
+            </div>
+          </div>
+          <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2">
+            {fields.map((field) => {
+              const visibleFields = config.visible_fields || []
+              const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
+              return (
+                <label
+                  key={field.id}
+                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                >
+                  <Checkbox
+                    checked={isVisible}
+                    onCheckedChange={(checked) => {
+                      const currentFields = config.visible_fields || []
+                      if (checked) {
+                        // Add field if not already present
+                        if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
+                          onUpdate({ visible_fields: [...currentFields, field.name] })
+                        }
+                      } else {
+                        // Remove field
+                        onUpdate({
+                          visible_fields: currentFields.filter(
+                            (f: string) => f !== field.name && f !== field.id
+                          ),
+                        })
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{field.name}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{field.type}</span>
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-xs text-gray-500">
+            Select which fields to display in the grid. At least one field must be selected.
+          </p>
+        </div>
+      )}
+
+      {/* Filters (optional) */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <Label>Filters (optional)</Label>
+          <p className="text-xs text-gray-500">
+            Configure filters in the grid view after adding the block.
+          </p>
+        </div>
+      )}
+
+      {/* Sorts (optional) */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <Label>Sorts (optional)</Label>
+          <p className="text-xs text-gray-500">
+            Configure sorting in the grid view after adding the block.
+          </p>
+        </div>
+      )}
 
       {/* Group By (for Kanban) */}
       {currentViewType === 'kanban' && config.table_id && (

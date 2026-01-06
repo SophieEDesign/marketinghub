@@ -59,6 +59,12 @@ export default function UsersTab() {
   const [interfaces, setInterfaces] = useState<Array<{ id: string; name: string }>>([])
   const [inviting, setInviting] = useState(false)
 
+  // Edit form state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editEmail, setEditEmail] = useState('')
+  const [editName, setEditName] = useState('')
+  const [updating, setUpdating] = useState(false)
+
   useEffect(() => {
     loadUsers()
     loadInterfaces()
@@ -218,6 +224,58 @@ export default function UsersTab() {
     }
   }
 
+  async function handleEdit(user: User) {
+    setEditingUser(user)
+    setEditEmail(user.email)
+    setEditName(user.name || '')
+    setEditDialogOpen(true)
+  }
+
+  async function handleUpdateUser() {
+    if (!editingUser) return
+
+    // Validate email format if changed
+    if (editEmail !== editingUser.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(editEmail.trim())) {
+        alert('Please enter a valid email address')
+        return
+      }
+    }
+
+    setUpdating(true)
+    try {
+      const response = await fetch(`/api/users/${editingUser.user_id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: editEmail.trim() !== editingUser.email ? editEmail.trim() : undefined,
+          name: editName.trim() !== (editingUser.name || '') ? editName.trim() : undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update user')
+      }
+
+      // Success - close dialog and reload users
+      setEditDialogOpen(false)
+      setEditingUser(null)
+      setEditEmail('')
+      setEditName('')
+      loadUsers()
+    } catch (error: any) {
+      console.error('Error updating user:', error)
+      alert(error.message || 'Failed to update user')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   async function handleDeactivate() {
     if (!userToDeactivate) return
 
@@ -338,17 +396,28 @@ export default function UsersTab() {
                         {formatLastActive(user.last_active)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setUserToDeactivate(user)
-                            setDeactivateDialogOpen(true)
-                          }}
-                          disabled={!user.is_active}
-                        >
-                          <UserX className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEdit(user)}
+                            title="Edit user"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setUserToDeactivate(user)
+                              setDeactivateDialogOpen(true)
+                            }}
+                            disabled={!user.is_active}
+                            title="Deactivate user"
+                          >
+                            <UserX className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -414,6 +483,53 @@ export default function UsersTab() {
             </Button>
             <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
               {inviting ? 'Inviting...' : 'Send Invitation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent aria-describedby="edit-user-dialog-description">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription id="edit-user-dialog-description">
+              Update user email and name
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email *</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                placeholder="user@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Full name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setEditDialogOpen(false)
+              setEditingUser(null)
+              setEditEmail('')
+              setEditName('')
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateUser} disabled={updating || !editEmail.trim()}>
+              {updating ? 'Updating...' : 'Update User'}
             </Button>
           </DialogFooter>
         </DialogContent>

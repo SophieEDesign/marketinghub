@@ -274,9 +274,9 @@ export default function Canvas({
           {blocks.map((block) => (
             <div
               key={block.id}
-              className={`relative group ${
+              className={`relative ${
                 isEditing
-                  ? `bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
+                  ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
                       selectedBlockId === block.id
                         ? "ring-2 ring-blue-500 border-blue-500"
                         : ""
@@ -384,8 +384,8 @@ export default function Canvas({
               </>
             )}
 
-            {/* Lock Indicator */}
-            {block.config?.locked && (
+            {/* Lock Indicator - Only show in edit mode */}
+            {isEditing && block.config?.locked && (
               <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-xs text-yellow-800">
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

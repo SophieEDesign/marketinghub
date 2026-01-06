@@ -58,155 +58,74 @@
   }
 }
 
-/* React Quill WYSIWYG Editor Styles */
-.ql-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  font-size: 14px;
-}
-
-.ql-editor {
-  flex: 1;
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
   min-height: 200px;
 }
 
-.ql-toolbar {
-  border-top: 1px solid rgb(229 231 235);
-  border-left: 1px solid rgb(229 231 235);
-  border-right: 1px solid rgb(229 231 235);
-  border-bottom: none;
-  border-radius: 0.375rem 0.375rem 0 0;
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
 }
 
-.ql-container {
-  border-bottom: 1px solid rgb(229 231 235);
-  border-left: 1px solid rgb(229 231 235);
-  border-right: 1px solid rgb(229 231 235);
-  border-top: none;
-  border-radius: 0 0 0.375rem 0.375rem;
+.ProseMirror p {
+  margin: 0.5rem 0;
 }
 
-.ql-editor.ql-blank::before {
-  color: rgb(156 163 175);
-  font-style: normal;
-}
-
-/* React Grid Layout - View Mode Styles */
-.layout.view-mode .react-grid-item {
-  transition: none !important;
-}
-
-.layout.view-mode .react-grid-item > .react-resizable-handle {
-  display: none !important;
-}
-
-.layout.view-mode .react-grid-item.react-grid-placeholder {
-  display: none !important;
-}
-
-/* Hide resize handles in view mode */
-.layout.view-mode .react-resizable-handle {
-  display: none !important;
-}
-
-/* Ensure blocks look clean in view mode */
-.layout.view-mode .react-grid-item {
-  border: none !important;
-  box-shadow: none !important;
-}
-
-/* Text Block Content Styles - Proper heading and text formatting */
-.text-block-content h1 {
-  font-size: 2.25rem;
-  font-weight: 800;
-  line-height: 2.5rem;
-  margin-top: 0;
-  margin-bottom: 0.75rem;
-  color: hsl(var(--foreground));
-}
-
-.text-block-content h2 {
-  font-size: 1.875rem;
+.ProseMirror h1 {
+  font-size: 2em;
   font-weight: 700;
-  line-height: 2.25rem;
-  margin-top: 0;
-  margin-bottom: 0.75rem;
-  color: hsl(var(--foreground));
+  margin: 1rem 0;
 }
 
-.text-block-content h3 {
-  font-size: 1.5rem;
+.ProseMirror h2 {
+  font-size: 1.5em;
   font-weight: 600;
-  line-height: 2rem;
-  margin-top: 0;
-  margin-bottom: 0.75rem;
-  color: hsl(var(--foreground));
+  margin: 0.875rem 0;
 }
 
-.text-block-content p {
-  margin-bottom: 1rem;
-  color: hsl(var(--foreground));
+.ProseMirror h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.75rem 0;
 }
 
-.text-block-content ul,
-.text-block-content ol {
-  margin-bottom: 1rem;
+.ProseMirror ul,
+.ProseMirror ol {
   padding-left: 1.5rem;
-  color: hsl(var(--foreground));
+  margin: 0.5rem 0;
 }
 
-.text-block-content ul {
-  list-style-type: disc;
+.ProseMirror li {
+  margin: 0.25rem 0;
 }
 
-.text-block-content ol {
-  list-style-type: decimal;
-}
-
-.text-block-content li {
-  margin-bottom: 0.5rem;
-}
-
-.text-block-content a {
-  color: hsl(var(--primary));
+.ProseMirror a {
+  color: #2563eb;
   text-decoration: underline;
+  cursor: pointer;
 }
 
-.text-block-content a:hover {
-  text-decoration: none;
+.ProseMirror a:hover {
+  color: #1e40af;
 }
 
-.text-block-content strong {
+.ProseMirror strong {
   font-weight: 700;
 }
 
-.text-block-content em {
+.ProseMirror em {
   font-style: italic;
 }
 
-/* Grid View Horizontal Scrollbar Styles */
-.grid-scroll-container {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e0 #f7fafc;
+.ProseMirror s {
+  text-decoration: line-through;
 }
 
-.grid-scroll-container::-webkit-scrollbar {
-  height: 12px;
-  width: 12px;
-}
-
-.grid-scroll-container::-webkit-scrollbar-track {
-  background: #f7fafc;
-  border-radius: 6px;
-}
-
-.grid-scroll-container::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 6px;
-  border: 2px solid #f7fafc;
-}
-
-.grid-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
+.ProseMirror u {
+  text-decoration: underline;
 }

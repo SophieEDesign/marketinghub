@@ -1,11 +1,27 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
+import { useEditor, EditorContent } from "@tiptap/react"
+import StarterKit from "@tiptap/starter-kit"
+import Link from "@tiptap/extension-link"
+import TextStyle from "@tiptap/extension-text-style"
+import Color from "@tiptap/extension-color"
 import type { PageBlock } from "@/lib/interface/types"
-import { FileText } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
+import { 
+  Bold, 
+  Italic, 
+  Underline, 
+  Strikethrough,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Link as LinkIcon,
+  RemoveFormatting
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface TextBlockProps {
   block: PageBlock
@@ -15,46 +31,114 @@ interface TextBlockProps {
 
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
-  const content = config?.content || config?.text_content || config?.text || ""
-  const markdown = config?.markdown !== false // Default to markdown enabled
-
-  // Local state for inline editing
-  const [localContent, setLocalContent] = useState(content)
-  const [isFocused, setIsFocused] = useState(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // Sync local content when block config changes (from external updates)
-  useEffect(() => {
-    const newContent = config?.content || config?.text_content || config?.text || ""
-    if (newContent !== localContent && !isFocused) {
-      setLocalContent(newContent)
+  
+  // Get content from config - support both JSON (TipTap format) and plain text (legacy)
+  const contentValue = config?.content_json || config?.content || config?.text_content || config?.text || ""
+  
+  // Convert plain text to TipTap JSON if needed
+  const getInitialContent = () => {
+    if (typeof contentValue === 'string' && contentValue.trim() !== '') {
+      // Check if it's already JSON
+      try {
+        const parsed = JSON.parse(contentValue)
+        if (parsed && typeof parsed === 'object') {
+          return parsed
+        }
+      } catch {
+        // Not JSON, convert plain text to TipTap format
+        return {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: contentValue.split('\n').map((line: string) => ({
+                type: 'text',
+                text: line
+              }))
+            }
+          ]
+        }
+      }
     }
-  }, [config?.content, config?.text_content, config?.text])
-
-  // Debounced save function
-  const saveContent = useCallback((newContent: string) => {
-    if (!onUpdate) return
-
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
+    // Empty or already JSON
+    return contentValue || {
+      type: 'doc',
+      content: []
     }
-
-    // Debounce save: wait 800ms after last change
-    saveTimeoutRef.current = setTimeout(() => {
-      onUpdate(block.id, {
-        content: newContent,
-        text_content: newContent, // Also update legacy field for compatibility
-      })
-    }, 800)
-  }, [block.id, onUpdate])
-
-  // Handle content change
-  const handleContentChange = (newContent: string) => {
-    setLocalContent(newContent)
-    saveContent(newContent)
   }
+
+  const [isFocused, setIsFocused] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Initialize TipTap editor
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        // Disable default heading levels, we'll use custom ones
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          class: 'text-blue-600 underline hover:text-blue-800',
+        },
+      }),
+      TextStyle,
+      Color,
+    ],
+    content: getInitialContent(),
+    editable: isEditing,
+    onFocus: () => {
+      setIsFocused(true)
+    },
+    onBlur: () => {
+      setIsFocused(false)
+    },
+    onUpdate: ({ editor }) => {
+      // Debounced save
+      if (!onUpdate) return
+
+      setSaveStatus("saving")
+
+      // Clear existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+
+      // Debounce save: wait 600ms after last change
+      saveTimeoutRef.current = setTimeout(() => {
+        const json = editor.getJSON()
+        onUpdate(block.id, {
+          content_json: json,
+          content: editor.getText(), // Also save plain text for compatibility
+          text_content: editor.getText(), // Legacy field
+        })
+        setSaveStatus("saved")
+        
+        // Reset to idle after showing "saved" for 2 seconds
+        setTimeout(() => {
+          setSaveStatus("idle")
+        }, 2000)
+      }, 600)
+    },
+  })
+
+  // Sync editor content when block config changes externally
+  useEffect(() => {
+    if (!editor) return
+    
+    const newContent = getInitialContent()
+    const currentContent = editor.getJSON()
+    
+    // Only update if content actually changed (avoid infinite loops)
+    if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
+      editor.commands.setContent(newContent, false) // false = don't emit update event
+    }
+  }, [contentValue, editor])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -66,107 +150,225 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [])
 
   // Apply appearance settings
-  const appearance = config.appearance || {}
+  const appearance = config?.appearance || {}
   const blockStyle: React.CSSProperties = {
     backgroundColor: appearance.background_color,
     borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : undefined,
     borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
-    color: appearance.text_color || appearance.title_color,
+    color: appearance.text_color,
   }
 
-  const title = appearance.title || config.title
-  const showTitle = appearance.show_title !== false && title
+  const textAlign = appearance.text_align || 'left'
+  const textSize = appearance.text_size || 'md'
 
-  // Empty state - only show in edit mode when not focused
-  if (!localContent && isEditing && !isFocused) {
+  // Toolbar component
+  const Toolbar = () => {
+    if (!editor || !isEditing || !isFocused) return null
+
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4" style={blockStyle}>
-        <div className="text-center">
-          <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="mb-1">Click to add text content</p>
-          <p className="text-xs text-gray-400">Supports markdown formatting</p>
-        </div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('bold') && "bg-gray-100"
+          )}
+          title="Bold"
+        >
+          <Bold className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('italic') && "bg-gray-100"
+          )}
+          title="Italic"
+        >
+          <Italic className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('strike') && "bg-gray-100"
+          )}
+          title="Strikethrough"
+        >
+          <Strikethrough className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('heading', { level: 1 }) && "bg-gray-100"
+          )}
+          title="Heading 1"
+        >
+          <Heading1 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('heading', { level: 2 }) && "bg-gray-100"
+          )}
+          title="Heading 2"
+        >
+          <Heading2 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('heading', { level: 3 }) && "bg-gray-100"
+          )}
+          title="Heading 3"
+        >
+          <Heading3 className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('bulletList') && "bg-gray-100"
+          )}
+          title="Bullet List"
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('orderedList') && "bg-gray-100"
+          )}
+          title="Numbered List"
+        >
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const url = window.prompt('Enter URL:')
+            if (url) {
+              editor.chain().focus().setLink({ href: url }).run()
+            }
+          }}
+          className={cn(
+            "h-8 w-8 p-0",
+            editor.isActive('link') && "bg-gray-100"
+          )}
+          title="Add Link"
+        >
+          <LinkIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().unsetLink().run()}
+          disabled={!editor.isActive('link')}
+          title="Remove Link"
+        >
+          <RemoveFormatting className="h-4 w-4" />
+        </Button>
+      </div>
+    )
+  }
+
+  // Empty state
+  const isEmpty = !editor || editor.isEmpty
+
+  if (!editor) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-gray-400">
+        Loading editor...
       </div>
     )
   }
 
   return (
-    <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>
-      {showTitle && (
-        <div
-          className="mb-4 pb-2 border-b"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <h3 className="text-lg font-semibold">{title}</h3>
-        </div>
-      )}
+    <div 
+      ref={containerRef}
+      className="h-full w-full overflow-auto flex flex-col relative"
+      style={blockStyle}
+      onClick={() => {
+        if (isEditing && !isFocused) {
+          editor.commands.focus()
+        }
+      }}
+    >
+      {/* Toolbar - appears on focus */}
+      <Toolbar />
       
-      {isEditing ? (
-        // Inline editing mode
-        <div className="flex-1 flex flex-col">
-          <Textarea
-            ref={textareaRef}
-            value={localContent}
-            onChange={(e) => handleContentChange(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Enter text or markdown content..."
-            className="flex-1 min-h-[200px] font-mono text-sm resize-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0 bg-transparent"
-            style={{
-              color: appearance.text_color || appearance.title_color || 'inherit',
-              textAlign: (appearance.text_align || 'left') as 'left' | 'center' | 'right' | 'justify',
-              fontSize: appearance.text_size === 'sm' ? '0.875rem' :
-                        appearance.text_size === 'lg' ? '1.125rem' :
-                        appearance.text_size === 'xl' ? '1.25rem' :
-                        '1rem',
-            }}
-          />
-          {markdown && localContent && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">Preview:</p>
-              <div 
-                className="prose prose-sm max-w-none"
-                style={{
-                  textAlign: (appearance.text_align || 'left') as 'left' | 'center' | 'right' | 'justify',
-                  fontSize: appearance.text_size === 'small' ? '0.875rem' :
-                            appearance.text_size === 'large' ? '1.125rem' :
-                            appearance.text_size === 'xlarge' ? '1.25rem' :
-                            '1rem',
-                }}
-              >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {localContent}
-                </ReactMarkdown>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        // View mode - render content
-        <div 
-          className="flex-1 overflow-auto prose prose-sm max-w-none"
-          style={{
-            textAlign: (appearance.text_align || 'left') as 'left' | 'center' | 'right' | 'justify',
-            fontSize: appearance.text_size === 'small' ? '0.875rem' :
-                      appearance.text_size === 'large' ? '1.125rem' :
-                      appearance.text_size === 'xlarge' ? '1.25rem' :
-                      '1rem',
-          }}
-        >
-          {markdown && localContent ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {localContent}
-            </ReactMarkdown>
-          ) : (
-            <div className="whitespace-pre-wrap">{localContent}</div>
-          )}
+      {/* Save status indicator */}
+      {isEditing && saveStatus !== "idle" && (
+        <div className="absolute top-2 right-2 text-xs text-gray-500 z-10">
+          {saveStatus === "saving" && "Saving..."}
+          {saveStatus === "saved" && "✓ Saved"}
         </div>
       )}
+
+      {/* Editor content */}
+      <div 
+        className={cn(
+          "flex-1 prose prose-sm max-w-none",
+          "prose-headings:font-semibold",
+          "prose-p:my-2",
+          "prose-ul:my-2",
+          "prose-ol:my-2",
+          "prose-li:my-1",
+          "prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline",
+          textAlign === 'center' && "text-center",
+          textAlign === 'right' && "text-right",
+          textAlign === 'justify' && "text-justify",
+          textSize === 'sm' && "prose-sm",
+          textSize === 'md' && "prose-base",
+          textSize === 'lg' && "prose-lg",
+          textSize === 'xl' && "prose-xl",
+          // Empty state styling
+          isEmpty && isEditing && "flex items-center justify-center min-h-[200px]"
+        )}
+        style={{
+          color: appearance.text_color || 'inherit',
+        }}
+      >
+        {isEmpty && isEditing ? (
+          <div className="text-gray-400 text-sm cursor-text">
+            Click to start writing...
+          </div>
+        ) : (
+          <EditorContent editor={editor} />
+        )}
+      </div>
     </div>
   )
 }

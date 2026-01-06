@@ -106,18 +106,28 @@ export default function SettingsWorkspaceTab() {
     try {
       const supabase = createClient()
       
-      // Load interface pages from views table where type='interface'
-      const { data, error } = await supabase
-        .from('views')
+      // Load interface pages from interface_pages table (new system)
+      const { data: interfacePagesData, error: interfacePagesError } = await supabase
+        .from('interface_pages')
         .select('id, name')
-        .eq('type', 'interface')
         .order('name', { ascending: true })
 
-      if (!error && data) {
-        setInterfacePages(data)
+      if (!interfacePagesError && interfacePagesData) {
+        setInterfacePages(interfacePagesData)
       } else {
-        console.error('Error loading interface pages:', error)
-        setInterfacePages([])
+        // Fallback to old views table for backward compatibility
+        const { data: viewsData, error: viewsError } = await supabase
+          .from('views')
+          .select('id, name')
+          .eq('type', 'interface')
+          .order('name', { ascending: true })
+
+        if (!viewsError && viewsData) {
+          setInterfacePages(viewsData)
+        } else {
+          console.error('Error loading interface pages:', interfacePagesError || viewsError)
+          setInterfacePages([])
+        }
       }
     } catch (error) {
       console.error('Error loading interface pages:', error)

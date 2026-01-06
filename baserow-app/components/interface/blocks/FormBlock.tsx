@@ -15,8 +15,8 @@ interface FormBlockProps {
 
 export default function FormBlock({ block, isEditing = false, onSubmit, pageTableId = null, pageId = null }: FormBlockProps) {
   const { config } = block
-  // Use page's tableId if block doesn't have one configured
-  const tableId = config?.table_id || pageTableId
+  // Form block MUST have table_id configured - no fallback to page table
+  const tableId = config?.table_id
   const formFieldsConfig = config?.form_fields || []
   const [allFields, setAllFields] = useState<FieldType[]>([])
   const [formData, setFormData] = useState<Record<string, any>>({})
@@ -265,14 +265,14 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
     }
   }
 
-  // Show setup state if table not selected or no fields configured
+  // Show setup state if table not selected
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
           )}
         </div>
       </div>

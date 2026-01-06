@@ -139,21 +139,45 @@ export default function FormDataSettings({
           <div className="flex items-center justify-between">
             <Label>Form Fields</Label>
             {availableFields.length > 0 && (
-              <Select
-                value=""
-                onValueChange={addField}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Add field" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableFields.map((field) => (
-                    <SelectItem key={field.id} value={field.id}>
-                      {field.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Add all available fields
+                    availableFields.forEach(field => addField(field.id))
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select All
+                </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Remove all fields
+                    formFields.forEach(field => removeField(field.field_id))
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline disabled:text-gray-400 disabled:cursor-not-allowed"
+                  disabled={formFields.length === 0}
+                >
+                  Select None
+                </button>
+                <Select
+                  value=""
+                  onValueChange={addField}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Add field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableFields.map((field) => (
+                      <SelectItem key={field.id} value={field.id}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
 

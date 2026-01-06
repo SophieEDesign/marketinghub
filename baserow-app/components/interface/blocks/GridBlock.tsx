@@ -16,10 +16,14 @@ interface GridBlockProps {
 
 export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null }: GridBlockProps) {
   const { config } = block
-  // Use page's tableId if block doesn't have one configured
-  const tableId = config?.table_id || pageTableId
+  // Grid block MUST have table_id configured - no fallback to page table
+  const tableId = config?.table_id
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
+  // Visible fields from config (required)
+  const visibleFieldsConfig = config?.visible_fields || []
+  const filtersConfig = config?.filters || []
+  const sortsConfig = config?.sorts || []
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string } | null>(null)
   const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
@@ -31,56 +35,68 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   useEffect(() => {
     if (tableId) {
       loadData()
+    } else {
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, viewId, viewType])
+  }, [tableId, viewId, viewType, visibleFieldsConfig])
 
   async function loadData() {
-    if (!tableId || !viewId) return
+    if (!tableId) return
 
     setLoading(true)
     try {
       const supabase = createClient()
 
-      // Use Promise.allSettled to handle missing tables gracefully
-      const [tableRes, viewFieldsRes, viewFiltersRes, viewSortsRes, tableFieldsRes, viewRes] = await Promise.allSettled([
+      // Load table and table_fields (required for schema)
+      const [tableRes, tableFieldsRes] = await Promise.allSettled([
         supabase.from("tables").select("supabase_table").eq("id", tableId).maybeSingle(),
-        supabase
-          .from("view_fields")
-          .select("field_name, visible, position")
-          .eq("view_id", viewId)
-          .order("position", { ascending: true }),
-        supabase
-          .from("view_filters")
-          .select("id, field_name, operator, value")
-          .eq("view_id", viewId),
-        supabase
-          .from("view_sorts")
-          .select("id, field_name, direction")
-          .eq("view_id", viewId),
         supabase
           .from("table_fields")
           .select("*")
           .eq("table_id", tableId)
           .order("position", { ascending: true }),
-        supabase.from("views").select("config").eq("id", viewId).maybeSingle(),
       ])
 
-      if (tableRes.status === 'fulfilled') {
-        if (tableRes.value.error) {
-          // Handle 406 or other errors gracefully
-          console.warn('Error loading table:', tableRes.value.error)
-        } else if (tableRes.value.data) {
-          setTable(tableRes.value.data)
-        }
+      if (tableRes.status === 'fulfilled' && tableRes.value.data) {
+        setTable(tableRes.value.data)
       }
-      if (viewFieldsRes.status === 'fulfilled' && !viewFieldsRes.value.error && viewFieldsRes.value.data) setViewFields(viewFieldsRes.value.data)
-      if (viewFiltersRes.status === 'fulfilled' && !viewFiltersRes.value.error && viewFiltersRes.value.data) setViewFilters(viewFiltersRes.value.data)
-      if (viewSortsRes.status === 'fulfilled' && !viewSortsRes.value.error && viewSortsRes.value.data) setViewSorts(viewSortsRes.value.data)
-      if (tableFieldsRes.status === 'fulfilled' && !tableFieldsRes.value.error && tableFieldsRes.value.data) setTableFields(tableFieldsRes.value.data)
-      if (viewRes.status === 'fulfilled' && !viewRes.value.error && viewRes.value.data?.config) {
-        const config = viewRes.value.data.config as { groupBy?: string }
-        setGroupBy(config.groupBy)
+      if (tableFieldsRes.status === 'fulfilled' && tableFieldsRes.value.data) {
+        setTableFields(tableFieldsRes.value.data)
+      }
+
+      // Load view-specific data if view_id is provided
+      if (viewId) {
+        const [viewFieldsRes, viewFiltersRes, viewSortsRes, viewRes] = await Promise.allSettled([
+          supabase
+            .from("view_fields")
+            .select("field_name, visible, position")
+            .eq("view_id", viewId)
+            .order("position", { ascending: true }),
+          supabase
+            .from("view_filters")
+            .select("id, field_name, operator, value")
+            .eq("view_id", viewId),
+          supabase
+            .from("view_sorts")
+            .select("id, field_name, direction")
+            .eq("view_id", viewId),
+          supabase.from("views").select("config").eq("id", viewId).maybeSingle(),
+        ])
+
+        if (viewFieldsRes.status === 'fulfilled' && viewFieldsRes.value.data) {
+          setViewFields(viewFieldsRes.value.data)
+        }
+        if (viewFiltersRes.status === 'fulfilled' && viewFiltersRes.value.data) {
+          setViewFilters(viewFiltersRes.value.data)
+        }
+        if (viewSortsRes.status === 'fulfilled' && viewSortsRes.value.data) {
+          setViewSorts(viewSortsRes.value.data)
+        }
+        if (viewRes.status === 'fulfilled' && viewRes.value.data?.config) {
+          const viewConfig = viewRes.value.data.config as { groupBy?: string }
+          setGroupBy(viewConfig.groupBy)
+        }
       }
     } catch (error) {
       console.error("Error loading grid data:", error)
@@ -93,14 +109,40 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-2">{isEditing ? "This block isn't connected to a table yet." : "No table connection"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a table connection." : "No table connection"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Configure the table in block settings, or ensure the page has a table connection.</p>
+            <p className="text-xs text-gray-400">Configure the table in block settings.</p>
           )}
         </div>
       </div>
     )
   }
+
+  // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
+  const visibleFields = visibleFieldsConfig.length > 0
+    ? visibleFieldsConfig.map((fieldName: string) => {
+        const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+        return field ? { field_name: field.name, visible: true, position: 0 } : null
+      }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
+    : viewFields.filter(f => f.visible)
+
+  // Use config filters/sorts if provided, otherwise use view filters/sorts
+  const activeFilters = filtersConfig.length > 0
+    ? filtersConfig.map((f: any) => ({
+        id: f.field || '',
+        field_name: f.field || '',
+        operator: f.operator || 'eq',
+        value: f.value,
+      }))
+    : viewFilters
+
+  const activeSorts = sortsConfig.length > 0
+    ? sortsConfig.map((s: any) => ({
+        id: s.field || '',
+        field_name: s.field || '',
+        direction: s.direction || 'asc',
+      }))
+    : viewSorts
 
   if (loading || !table) {
     return (
@@ -122,9 +164,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   // Render based on view type
   const renderView = () => {
-    const fieldIds = viewFields.map(f => f.field_name)
-    const groupingFieldId = config.group_by || viewFields[0]?.field_name || ''
-    const dateFieldId = viewFields.find(f => f.field_name.toLowerCase().includes('date'))?.field_name || viewFields[0]?.field_name || ''
+    const fieldIds = visibleFields.map(f => f.field_name)
+    const groupingFieldId = config.group_by || visibleFields[0]?.field_name || ''
+    const dateFieldId = visibleFields.find(f => f.field_name.toLowerCase().includes('date'))?.field_name || visibleFields[0]?.field_name || ''
 
     switch (viewType) {
       case 'kanban':
@@ -168,9 +210,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             tableId={tableId!}
             viewId={viewId || ''}
             supabaseTableName={table.supabase_table}
-            viewFields={viewFields}
-            initialFilters={viewFilters}
-            initialSorts={viewSorts}
+            viewFields={visibleFields}
+            initialFilters={activeFilters}
+            initialSorts={activeSorts}
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}

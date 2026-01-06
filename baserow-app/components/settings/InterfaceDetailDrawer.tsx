@@ -56,7 +56,6 @@ export default function InterfaceDetailDrawer({
   const [description, setDescription] = useState('')
   const [group, setGroup] = useState<string>(iface.group_id || '')
   const [isAdminOnly, setIsAdminOnly] = useState(iface.is_admin_only)
-  const [isDefault, setIsDefault] = useState(iface.is_default || false)
   const [views, setViews] = useState<View[]>([])
   const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
@@ -74,7 +73,6 @@ export default function InterfaceDetailDrawer({
   useEffect(() => {
     setName(iface.name)
     setIsAdminOnly(iface.is_admin_only)
-    setIsDefault(iface.is_default || false)
     setGroup(iface.group_id || '')
   }, [iface])
 
@@ -220,7 +218,6 @@ export default function InterfaceDetailDrawer({
   useEffect(() => {
     setName(iface.name)
     setIsAdminOnly(iface.is_admin_only)
-    setIsDefault(iface.is_default || false)
     setGroup(iface.group_id || '')
   }, [iface])
 
@@ -272,37 +269,6 @@ export default function InterfaceDetailDrawer({
         if (updateError) throw updateError
       }
 
-      // Update default interface
-      if (isDefault) {
-        const { data: existing } = await supabase
-          .from('workspace_settings')
-          .select('id')
-          .maybeSingle()
-
-        if (existing) {
-          await supabase
-            .from('workspace_settings')
-            .update({ default_interface_id: iface.id })
-            .eq('id', existing.id)
-        } else {
-          await supabase
-            .from('workspace_settings')
-            .insert({ default_interface_id: iface.id })
-        }
-      } else if (iface.is_default) {
-        // Remove default if unchecked
-        const { data: existing } = await supabase
-          .from('workspace_settings')
-          .select('id, default_interface_id')
-          .maybeSingle()
-
-        if (existing && existing.default_interface_id === iface.id) {
-          await supabase
-            .from('workspace_settings')
-            .update({ default_interface_id: null })
-            .eq('id', existing.id)
-        }
-      }
 
       onUpdate()
       onOpenChange(false)
@@ -405,19 +371,6 @@ export default function InterfaceDetailDrawer({
               </select>
             </div>
 
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div>
-                <Label htmlFor="default">Set as default interface</Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Users will be redirected here on login
-                </p>
-              </div>
-              <Switch
-                id="default"
-                checked={isDefault}
-                onCheckedChange={setIsDefault}
-              />
-            </div>
           </TabsContent>
 
           <TabsContent value="views" className="space-y-4 mt-4">

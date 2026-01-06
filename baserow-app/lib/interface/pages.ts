@@ -216,25 +216,41 @@ export async function updateInterfacePage(
 ): Promise<InterfacePage> {
   const supabase = await createClient()
   
-  // If page_type is being updated, validate
-  if (updates.page_type) {
-    const page = await getInterfacePage(pageId)
-    if (page) {
-      const validation = validatePageConfig(
-        updates.page_type,
-        updates.source_view ?? page.source_view,
-        updates.base_table ?? page.base_table
-      )
-      if (!validation.valid) {
-        throw new Error(validation.error)
-      }
-    }
-  }
-
   // First check if page exists
   const existingPage = await getInterfacePage(pageId)
   if (!existingPage) {
     throw new Error('Page not found')
+  }
+
+  // Ensure interface_id (group_id) is always set - cannot be null
+  if (updates.group_id === null || updates.group_id === undefined) {
+    // If trying to clear group_id, keep existing value
+    if (existingPage.group_id) {
+      // Keep existing group_id
+    } else {
+      throw new Error('Page must have an interface (group_id) assigned')
+    }
+  }
+
+  // If page_type is being updated, validate
+  if (updates.page_type) {
+    const validation = validatePageConfig(
+      updates.page_type,
+      updates.source_view ?? existingPage.source_view,
+      updates.base_table ?? existingPage.base_table
+    )
+    if (!validation.valid) {
+      throw new Error(validation.error)
+    }
+  }
+
+  // Validate that data-backed pages have table_id (base_table)
+  const pageType = updates.page_type ?? existingPage.page_type
+  const baseTable = updates.base_table ?? existingPage.base_table
+  const definition = getPageTypeDefinition(pageType)
+  
+  if (definition.requiresBaseTable && !baseTable) {
+    throw new Error(`${definition.label} page type requires a table connection (base_table)`)
   }
 
   // Prepare update with updated_at timestamp

@@ -30,13 +30,14 @@ interface BaseBlockConfig {
 
 // Grid Block Config
 export interface GridBlockConfig extends BaseBlockConfig {
-  table_id?: string
-  view_id?: string
+  table_id?: string // Required - no fallback to page table
+  view_id?: string // Optional - for view-specific settings
   view_type?: ViewType
   source_type?: 'table' | 'sql_view'
   source_view?: string
   group_by?: string
-  fields?: string[]
+  fields?: string[] // Legacy - use visible_fields instead
+  visible_fields?: string[] // Required - array of field names to display
   filters?: Array<{
     field: string
     operator: string
@@ -124,11 +125,15 @@ export interface KPIBlockConfig extends BaseBlockConfig {
 // - markdown: Whether to render as markdown (default: true)
 // - text_content: Legacy alias for content (for backward compatibility)
 export interface TextBlockConfig extends BaseBlockConfig {
-  // Primary content field - required for block to render meaningfully
+  // Primary content field - TipTap JSON format (preferred)
+  content_json?: any
+  // Plain text content - extracted from JSON for compatibility/search
   content?: string
   // Legacy alias - maps to content
   text_content?: string
-  // Whether to render markdown (default: true)
+  // Legacy text field
+  text?: string
+  // Whether to render markdown (deprecated - TipTap handles formatting natively)
   markdown?: boolean
   appearance?: BaseBlockConfig['appearance'] & {
     text_size?: 'sm' | 'md' | 'lg' | 'xl'

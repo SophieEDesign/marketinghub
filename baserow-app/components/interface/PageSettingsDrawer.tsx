@@ -66,7 +66,6 @@ export default function PageSettingsDrawer({
   const [groupId, setGroupId] = useState<string | null>(null)
   const [defaultView, setDefaultView] = useState<string | null>(null)
   const [hideViewSwitcher, setHideViewSwitcher] = useState(false)
-  const [isDefault, setIsDefault] = useState(false)
   const [groups, setGroups] = useState<InterfaceGroup[]>([])
   const [views, setViews] = useState<View[]>([])
   const [saving, setSaving] = useState(false)
@@ -78,36 +77,9 @@ export default function PageSettingsDrawer({
     if (open) {
       loadGroups()
       loadViews()
-      loadDefaultStatus()
     }
   }, [open, page.id])
 
-  async function loadDefaultStatus() {
-    try {
-      const supabase = createClient()
-      const { data: workspaceSettings, error } = await supabase
-        .from('workspace_settings')
-        .select('default_interface_id')
-        .maybeSingle()
-      
-      // Handle errors gracefully - column might not exist (400), RLS might block (403), or table might not exist
-      if (!error && workspaceSettings) {
-        setIsDefault(workspaceSettings.default_interface_id === page.id)
-      } else {
-        setIsDefault(false)
-        // Only log non-400 errors (400 means column/table doesn't exist, which is fine)
-        if (error && error.code !== 'PGRST116' && error.code !== '42P01' && !error.message?.includes('column') && !error.message?.includes('does not exist')) {
-          console.warn('Error loading default status:', error)
-        }
-      }
-    } catch (error: any) {
-      setIsDefault(false)
-      // Don't log 400 errors as they're expected if the column doesn't exist
-      if (error?.status !== 400 && error?.code !== 'PGRST116' && error?.code !== '42P01') {
-        console.warn('Error loading default status:', error)
-      }
-    }
-  }
 
   useEffect(() => {
     setName(page.name)
@@ -180,56 +152,6 @@ export default function PageSettingsDrawer({
         throw new Error(error.error || "Failed to update interface")
       }
 
-      // Update default interface setting
-      try {
-        const supabase = createClient()
-        const { data: existing, error: fetchError } = await supabase
-          .from('workspace_settings')
-          .select('id')
-          .maybeSingle()
-
-        // Handle case where table/column doesn't exist or RLS blocks access
-        if (fetchError) {
-          console.warn('Could not access workspace_settings:', fetchError)
-          // Don't fail the save - just skip default interface update
-        } else if (isDefault) {
-          if (existing) {
-            const { error: updateError } = await supabase
-              .from('workspace_settings')
-              .update({ default_interface_id: page.id })
-              .eq('id', existing.id)
-            
-            if (updateError) console.warn('Could not update default interface:', updateError)
-          } else {
-            const { error: insertError } = await supabase
-              .from('workspace_settings')
-              .insert({ default_interface_id: page.id })
-            
-            if (insertError) console.warn('Could not insert default interface:', insertError)
-          }
-        } else {
-          // Remove default if unchecked
-          if (existing) {
-            const { data: currentSettings, error: currentError } = await supabase
-              .from('workspace_settings')
-              .select('default_interface_id')
-              .eq('id', existing.id)
-              .single()
-            
-            if (!currentError && currentSettings?.default_interface_id === page.id) {
-              const { error: updateError } = await supabase
-                .from('workspace_settings')
-                .update({ default_interface_id: null })
-                .eq('id', existing.id)
-              
-              if (updateError) console.warn('Could not remove default interface:', updateError)
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('Error updating default interface setting:', error)
-        // Don't fail the save - just skip default interface update
-      }
 
       // Trigger sidebar refresh
       window.dispatchEvent(new CustomEvent('pages-updated'))
@@ -377,23 +299,6 @@ export default function PageSettingsDrawer({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="set-as-default"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="set-as-default" className="text-sm font-normal cursor-pointer">
-                  Set as default landing page
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Users will be redirected to this interface when they log in
-              </p>
-            </div>
 
             <div className="space-y-2">
               <div className="flex items-center space-x-2">

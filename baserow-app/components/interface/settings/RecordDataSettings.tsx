@@ -165,7 +165,33 @@ export default function RecordDataSettings({
       {/* Field Visibility */}
       {config.table_id && (
         <div className="space-y-2">
-          <Label>Visible Fields</Label>
+          <div className="flex items-center justify-between">
+            <Label>Visible Fields</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Select all fields
+                  const allFieldNames = fields.map(f => f.name)
+                  onUpdate({ detail_fields: allFieldNames })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select All
+              </button>
+              <span className="text-xs text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Select none
+                  onUpdate({ detail_fields: [] })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select None
+              </button>
+            </div>
+          </div>
           <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
             {fields.length === 0 ? (
               <div className="text-sm text-gray-500 text-center py-2">
