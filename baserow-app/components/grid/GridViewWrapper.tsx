@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
@@ -333,6 +333,20 @@ export default function GridViewWrapper({
     window.location.reload()
   }
 
+  // Convert filters state to FilterConfig[] format for GridView
+  // Use standardizedFilters if provided, otherwise convert filters state
+  const gridViewFilters = useMemo<FilterConfig[]>(() => {
+    if (standardizedFilters && standardizedFilters.length > 0) {
+      return standardizedFilters
+    }
+    // Convert Filter[] to FilterConfig[]
+    return filters.map(f => ({
+      field: f.field_name,
+      operator: f.operator as FilterConfig['operator'],
+      value: f.value,
+    }))
+  }, [standardizedFilters, filters])
+
   return (
     <div className="w-full">
       {/* Only show toolbar in edit mode - interfaces should look clean in view mode */}
@@ -357,7 +371,7 @@ export default function GridViewWrapper({
         supabaseTableName={supabaseTableName}
         viewFields={viewFields}
         viewFilters={initialFilters}
-        filters={filters}
+        filters={gridViewFilters}
         viewSorts={sorts}
         searchTerm={searchTerm}
         groupBy={groupBy}
