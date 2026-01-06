@@ -468,7 +468,7 @@ export default function GridDataSettings({
             </SelectTrigger>
             <SelectContent>
               {fields
-                .filter(field => field.type === 'date' || field.type === 'datetime' || field.type === 'timestamp')
+                .filter(field => field.type === 'date')
                 .map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}
@@ -476,7 +476,7 @@ export default function GridDataSettings({
                 ))}
             </SelectContent>
           </Select>
-          {fields.filter(f => f.type === 'date' || f.type === 'datetime' || f.type === 'timestamp').length === 0 && (
+          {fields.filter(f => f.type === 'date').length === 0 && (
             <p className="text-xs text-amber-600">
               No date fields found. Please add a date field to the table.
             </p>
