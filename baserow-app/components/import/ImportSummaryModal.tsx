@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronUp, Download, CheckCircle, XCircle, AlertCircle } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface ImportSummaryModalProps {
   open: boolean
