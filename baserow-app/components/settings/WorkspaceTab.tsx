@@ -215,46 +215,41 @@ export default function SettingsWorkspaceTab() {
           }
         }
 
-        if (existingSettings) {
-          // Update existing row
-          const { error: updateError } = await supabase
-            .from('workspace_settings')
-            .update({
-              default_interface_id: defaultInterfaceId,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingSettings.id)
+        // Use upsert to avoid 409 conflicts - handles both insert and update
+        const { error: upsertError } = await supabase
+          .from('workspace_settings')
+          .upsert({
+            id: existingSettings?.id || 'default',
+            default_interface_id: defaultInterfaceId,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'id'
+          })
 
-          if (updateError) {
-            // Check if it's a column doesn't exist error
-            if (updateError.code === 'PGRST116' || 
-                updateError.code === '42703' ||
-                updateError.message?.includes('column') ||
-                updateError.message?.includes('does not exist')) {
-              console.warn('default_interface_id column may not exist yet:', updateError)
-            } else {
-              console.error('Error updating default page setting:', updateError)
+        if (upsertError) {
+          // Check if it's a column doesn't exist error
+          if (upsertError.code === 'PGRST116' || 
+              upsertError.code === '42703' ||
+              upsertError.message?.includes('column') ||
+              upsertError.message?.includes('does not exist')) {
+            console.warn('default_interface_id column may not exist yet:', upsertError)
+          } else if (upsertError.code === '23505' || upsertError.code === '409') {
+            // Unique constraint violation - try update instead
+            if (existingSettings) {
+              const { error: updateError } = await supabase
+                .from('workspace_settings')
+                .update({
+                  default_interface_id: defaultInterfaceId,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingSettings.id)
+              
+              if (updateError && updateError.code !== 'PGRST116' && updateError.code !== '42703') {
+                console.error('Error updating default page setting:', updateError)
+              }
             }
-          }
-        } else {
-          // Create new row if none exists
-          const { error: insertError } = await supabase
-            .from('workspace_settings')
-            .insert({
-              default_interface_id: defaultInterfaceId,
-              updated_at: new Date().toISOString(),
-            })
-
-          if (insertError) {
-            // Check if it's a column doesn't exist error
-            if (insertError.code === 'PGRST116' || 
-                insertError.code === '42703' ||
-                insertError.message?.includes('column') ||
-                insertError.message?.includes('does not exist')) {
-              console.warn('default_interface_id column may not exist yet:', insertError)
-            } else {
-              console.error('Error creating default page setting:', insertError)
-            }
+          } else {
+            console.error('Error updating default page setting:', upsertError)
           }
         }
       } catch (settingsError: any) {

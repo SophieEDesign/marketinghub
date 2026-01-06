@@ -17,17 +17,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update each interface's group_id and order_index
+    // Update each interface page's group_id and order_index
+    // Interface pages are stored in interface_pages table, not views
     await Promise.all(
       interfaceUpdates.map((update: { id: string; group_id: string | null; order_index: number }) =>
         supabase
-          .from('views')
+          .from('interface_pages')
           .update({
             group_id: update.group_id,
             order_index: update.order_index,
           })
           .eq('id', update.id)
-          .eq('type', 'interface')
       )
     )
 

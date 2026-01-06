@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   Sheet,
@@ -72,6 +72,8 @@ export default function PageSettingsDrawer({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
+  const previousPageIdRef = useRef<string | null>(null)
+  const isInitialMountRef = useRef(true)
 
   useEffect(() => {
     if (open) {
@@ -80,20 +82,36 @@ export default function PageSettingsDrawer({
     }
   }, [open, page.id])
 
-
+  // Only update form state when drawer opens or page ID changes
+  // This prevents flickering when page object reference changes but content is the same
   useEffect(() => {
-    setName(page.name)
-    setDescription(page.description || "")
-    // Extract icon from settings if it exists
-    const pageIcon = page.settings?.icon || ""
-    setIcon(pageIcon)
-    setIsAdminOnly(page.is_admin_only || false)
-    // Load group_id and other settings from page
-    // Note: These might be in the page object or need to be fetched
-    setGroupId((page as any).group_id || null)
-    setDefaultView((page as any).default_view || null)
-    setHideViewSwitcher((page as any).hide_view_switcher || false)
-  }, [page])
+    const pageIdChanged = previousPageIdRef.current !== page.id
+    
+    // On initial mount or when drawer opens, always sync state
+    if (isInitialMountRef.current || (open && pageIdChanged)) {
+      setName(page.name)
+      setDescription(page.description || "")
+      // Extract icon from settings if it exists
+      const pageIcon = page.settings?.icon || ""
+      setIcon(pageIcon)
+      setIsAdminOnly(page.is_admin_only || false)
+      // Load group_id and other settings from page
+      // Note: These might be in the page object or need to be fetched
+      setGroupId((page as any).group_id || null)
+      setDefaultView((page as any).default_view || null)
+      setHideViewSwitcher((page as any).hide_view_switcher || false)
+      
+      previousPageIdRef.current = page.id
+      isInitialMountRef.current = false
+    }
+  }, [open, page.id, page.name, page.description, page.settings?.icon, page.is_admin_only, (page as any).group_id, (page as any).default_view, (page as any).hide_view_switcher])
+  
+  // Reset refs when drawer closes
+  useEffect(() => {
+    if (!open) {
+      isInitialMountRef.current = true
+    }
+  }, [open])
 
   async function loadGroups() {
     try {

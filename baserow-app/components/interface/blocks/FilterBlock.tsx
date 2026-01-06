@@ -64,7 +64,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
 
   // Current filter state (stored in config.filters as BlockFilter[], used as FilterConfig[])
   const [filters, setFilters] = useState<FilterConfig[]>(() => convertToFilterConfigs(config?.filters))
-  const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
+  const [tableFields, setTableFields] = useState<Array<{ name: string; type: string; options?: any }>>([])
   const [loading, setLoading] = useState(false)
 
   // Load table fields if table_id is configured
@@ -148,12 +148,12 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
       const supabase = createClient()
       const { data: fields } = await supabase
         .from("table_fields")
-        .select("name, type")
+        .select("name, type, options")
         .eq("table_id", tableId)
         .order("position", { ascending: true })
       
       if (fields) {
-        setTableFields(fields.map(f => ({ name: f.name, type: f.type })))
+        setTableFields(fields.map(f => ({ name: f.name, type: f.type, options: f.options })))
       }
     } catch (error) {
       console.error("Error loading table fields:", error)
@@ -333,13 +333,47 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
                     </SelectContent>
                   </Select>
 
-                  {/* Value Input (hidden for is_empty/is_not_empty) */}
+                  {/* Value Input/Select (hidden for is_empty/is_not_empty) */}
                   {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' ? (
-                    <Input
-                      value={filter.value || ''}
-                      onChange={(e) => updateFilter(index, { value: e.target.value })}
-                      placeholder="Value"
-                    />
+                    (() => {
+                      const selectedField = tableFields.find(f => f.name === filter.field)
+                      const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'select'
+                      const selectOptions = selectedField?.options?.choices || selectedField?.options || []
+                      
+                      // Render Select dropdown for single_select fields with options
+                      if (isSelectField && Array.isArray(selectOptions) && selectOptions.length > 0) {
+                        return (
+                          <Select
+                            value={filter.value || ''}
+                            onValueChange={(value) => updateFilter(index, { value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select value" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {selectOptions.map((option: string | { value: string; label: string }, idx: number) => {
+                                const optionValue = typeof option === 'string' ? option : option.value
+                                const optionLabel = typeof option === 'string' ? option : option.label
+                                return (
+                                  <SelectItem key={idx} value={optionValue}>
+                                    {optionLabel}
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                        )
+                      }
+                      
+                      // Render regular Input for other field types
+                      return (
+                        <Input
+                          value={filter.value || ''}
+                          onChange={(e) => updateFilter(index, { value: e.target.value })}
+                          placeholder="Value"
+                        />
+                      )
+                    })()
                   ) : (
                     <div className="flex items-center text-sm text-gray-500">
                       No value needed

@@ -158,22 +158,82 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
     )
   }
 
-  // In edit mode, show placeholder - settings are in SettingsPanel
+  // In edit mode, show image preview with overlay indicator
+  const alignmentClass: Record<string, string> = {
+    left: "justify-start",
+    center: "justify-center",
+    right: "justify-end",
+  }
+  const alignment = alignmentClass[imageAlignment as string] || "justify-center"
+
+  // Determine width class based on image size setting
+  let widthClass = "w-auto max-w-full"
+  if (imageSize === "full" || imageSize === "w-full") {
+    widthClass = "w-full"
+  } else if (imageSize === "small") {
+    widthClass = "w-auto max-w-[200px]"
+  } else if (imageSize === "medium") {
+    widthClass = "w-auto max-w-[400px]"
+  } else if (imageSize === "large") {
+    widthClass = "w-auto max-w-[600px]"
+  }
+
+  // Determine object-fit based on image size setting
+  const objectFit = imageSize === "cover" ? "object-cover" : "object-contain"
+
+  // Apply max width if specified
+  const maxWidthStyle = maxWidth ? { maxWidth: `${maxWidth}px` } : {}
+
+  if (!imageUrl) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-gray-400 min-h-[100px]" onClick={(e) => e.stopPropagation()}>
+        <div className="text-center">
+          <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+          <p className="text-xs">No image configured</p>
+          <p className="text-xs text-gray-500 mt-1">Click settings to upload</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="h-full flex items-center justify-center text-gray-400" onClick={(e) => e.stopPropagation()}>
-      {imageUrl ? (
-        <div className="text-center">
-          <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-          <p className="text-xs">Image configured</p>
-          <p className="text-xs text-gray-500">Click settings to edit</p>
-        </div>
-      ) : (
-        <div className="text-center">
-          <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-          <p className="text-xs">No image</p>
-          <p className="text-xs text-gray-500">Click settings to upload</p>
-        </div>
-      )}
+    <div className={`h-full w-full p-4 flex items-center ${alignment} min-h-[100px] relative group`} onClick={(e) => e.stopPropagation()}>
+      {/* Edit mode overlay indicator */}
+      <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-1 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        Edit Mode
+      </div>
+      
+      {/* Image preview */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={imageUrl}
+        alt={imageAlt || ""}
+        className={`${widthClass} max-h-full ${objectFit} rounded-md`}
+        style={maxWidthStyle}
+        onError={(e) => {
+          const img = e.currentTarget
+          img.style.display = "none"
+          const parent = img.parentElement
+          if (parent) {
+            const errorDiv = document.createElement("div")
+            errorDiv.className = "text-gray-400 text-sm text-center"
+            errorDiv.innerHTML = `
+              <div class="mb-2">
+                <svg class="h-8 w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>Failed to load image</div>
+              <div class="text-xs mt-1">URL: ${imageUrl.substring(0, 50)}${imageUrl.length > 50 ? '...' : ''}</div>
+            `
+            parent.appendChild(errorDiv)
+          }
+        }}
+        onLoad={() => {
+          // Image loaded successfully
+          console.log('Image loaded successfully:', imageUrl)
+        }}
+      />
     </div>
   )
 }

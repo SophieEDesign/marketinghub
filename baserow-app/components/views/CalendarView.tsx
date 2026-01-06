@@ -40,6 +40,7 @@ export default function CalendarView({
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId)
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
 
   useEffect(() => {
     resolveTableId()
@@ -54,11 +55,23 @@ export default function CalendarView({
   }, [resolvedTableId])
 
   useEffect(() => {
-    if (resolvedTableId && supabaseTableName) {
+    if (resolvedTableId) {
+      // Load table fields if not provided
+      if (!tableFields || tableFields.length === 0) {
+        loadTableFields()
+      } else {
+        setLoadedTableFields(tableFields)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedTableId, tableFields])
+
+  useEffect(() => {
+    if (resolvedTableId && supabaseTableName && loadedTableFields.length > 0) {
       loadRows()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTableId, supabaseTableName, filters, searchQuery])
+  }, [resolvedTableId, supabaseTableName, filters, searchQuery, loadedTableFields])
 
   async function resolveTableId() {
     // If tableId is provided, use it
@@ -124,6 +137,33 @@ export default function CalendarView({
     }
   }
 
+  async function loadTableFields() {
+    if (!resolvedTableId) return
+    
+    const sanitizedTableId = resolvedTableId.split(':')[0]
+    if (!sanitizedTableId || sanitizedTableId.trim() === '') return
+
+    try {
+      const supabase = createClient()
+      const { data: fields } = await supabase
+        .from("table_fields")
+        .select("id, name, type, options")
+        .eq("table_id", sanitizedTableId)
+        .order("position", { ascending: true })
+
+      if (fields) {
+        setLoadedTableFields(fields.map(f => ({ 
+          name: f.name, 
+          type: f.type,
+          id: f.id,
+          options: f.options 
+        })))
+      }
+    } catch (error) {
+      console.error('Calendar: Error loading table fields:', error)
+    }
+  }
+
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
     if (!resolvedTableId || !supabaseTableName) {
@@ -142,7 +182,7 @@ export default function CalendarView({
         .select("*")
 
       // Apply filters using shared filter system
-      const normalizedFields = tableFields.map(f => ({ name: f.name || f.field_name || f.id, type: f.type || f.field_type }))
+      const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.field_name || f.id, type: f.type || f.field_type }))
       query = applyFiltersToQuery(query, filters, normalizedFields)
 
       // Apply search query if provided
@@ -177,7 +217,7 @@ export default function CalendarView({
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
-    if (!searchQuery || !tableFields.length) return rows
+    if (!searchQuery || !loadedTableFields.length) return rows
     
     // Convert TableRow format to flat format for search
     const flatRows = rows.map((row) => ({
@@ -186,23 +226,23 @@ export default function CalendarView({
     }))
     
     // Filter using search helper
-    const filtered = filterRowsBySearch(flatRows, tableFields, searchQuery, fieldIds)
+    const filtered = filterRowsBySearch(flatRows, loadedTableFields, searchQuery, fieldIds)
     const filteredIds = new Set(filtered.map((r) => r._rowId))
     
     // Map back to TableRow format
     return rows.filter((row) => filteredIds.has(row.id))
-  }, [rows, tableFields, searchQuery, fieldIds])
+  }, [rows, loadedTableFields, searchQuery, fieldIds])
 
-  // Find date field in tableFields to validate it exists and is a date type
+  // Find date field in loadedTableFields to validate it exists and is a date type
   const dateField = useMemo(() => {
-    if (!dateFieldId || !tableFields.length) return null
+    if (!dateFieldId || !loadedTableFields.length) return null
     // Try to find by name first, then by id
-    return tableFields.find(f => 
+    return loadedTableFields.find(f => 
       f.name === dateFieldId || 
       f.id === dateFieldId ||
       f.field_name === dateFieldId
     )
-  }, [dateFieldId, tableFields])
+  }, [dateFieldId, loadedTableFields])
 
   const isValidDateField = useMemo(() => {
     if (!dateField) return false
@@ -211,10 +251,18 @@ export default function CalendarView({
   }, [dateField])
 
   function getEvents(): EventInput[] {
-    if (!dateFieldId || !isValidDateField) return []
+    if (!dateFieldId || !isValidDateField) {
+      console.log('Calendar: Cannot generate events - dateFieldId:', dateFieldId, 'isValidDateField:', isValidDateField)
+      return []
+    }
+    
+    if (!filteredRows || filteredRows.length === 0) {
+      console.log('Calendar: No rows to generate events from')
+      return []
+    }
     
     try {
-      return filteredRows
+      const events = filteredRows
         .filter((row) => {
           if (!row || !row.data) return false
           const dateValue = row.data[dateFieldId]
@@ -243,6 +291,9 @@ export default function CalendarView({
             },
           }
         })
+      
+      console.log('Calendar: Generated', events.length, 'events from', filteredRows.length, 'rows')
+      return events
     } catch (error) {
       console.error('Calendar: Error generating events:', error)
       return []
@@ -285,7 +336,7 @@ export default function CalendarView({
   }
 
   // Empty state for search
-  if (searchQuery && filteredRows.length === 0) {
+  if (searchQuery && filteredRows.length === 0 && rows.length > 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500">
         <div className="text-sm mb-2">No records match your search</div>
@@ -300,6 +351,23 @@ export default function CalendarView({
         >
           Clear search
         </button>
+      </div>
+    )
+  }
+
+  // Empty state for no data
+  if (!loading && rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center font-medium">
+          No records found
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          {filters.length > 0 
+            ? "Try adjusting your filters to see more records."
+            : "Add records to this table to see them in the calendar."
+          }
+        </div>
       </div>
     )
   }

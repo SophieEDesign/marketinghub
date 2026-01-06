@@ -259,7 +259,10 @@ export default function UsersTab() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update user')
+        // Show detailed error message if available
+        const errorMessage = data.error || 'Failed to update user'
+        const errorDetails = data.details ? `\n\n${data.details}` : ''
+        throw new Error(errorMessage + errorDetails)
       }
 
       // Success - close dialog and reload users
@@ -270,7 +273,9 @@ export default function UsersTab() {
       loadUsers()
     } catch (error: any) {
       console.error('Error updating user:', error)
-      alert(error.message || 'Failed to update user')
+      // Show detailed error message including configuration instructions
+      const errorMessage = error.message || 'Failed to update user'
+      alert(errorMessage)
     } finally {
       setUpdating(false)
     }

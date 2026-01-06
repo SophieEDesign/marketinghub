@@ -19,7 +19,7 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Plus, X, ArrowUp, ArrowDown } from "lucide-react"
+import { Plus, X, ArrowUp, ArrowDown, Save } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getPageTypeDefinition, validatePageAnchor } from "@/lib/interface/page-types"
@@ -413,10 +413,11 @@ export default function PageDisplaySettingsPanel({
       }
 
       onUpdate()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving settings:', error)
+      alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, onUpdate])
 
   // Auto-save on changes with debounce (skip initial load)
   useEffect(() => {
@@ -863,6 +864,13 @@ export default function PageDisplaySettingsPanel({
           </Tabs>
         )}
 
+        {/* Save Button */}
+        <div className="mt-6 pt-4 border-t flex justify-end">
+          <Button onClick={() => saveSettings()} className="min-w-[100px]">
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   )

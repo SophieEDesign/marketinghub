@@ -25,8 +25,11 @@ export default function CalendarView({
 }: CalendarViewProps) {
   const [selectedRow, setSelectedRow] = useState<Record<string, any> | null>(null)
 
+  // Ensure visibleFields is always an array
+  const safeVisibleFields = Array.isArray(visibleFields) ? visibleFields : []
+
   // Find date field (first field that might be a date)
-  const dateField = visibleFields[0]?.field_name || ''
+  const dateField = safeVisibleFields[0]?.field_name || ''
 
   function getEvents(): EventInput[] {
     if (!dateField) return []
@@ -35,8 +38,8 @@ export default function CalendarView({
       .filter((row) => row[dateField])
       .map((row) => {
         const dateValue = row[dateField]
-        const title = visibleFields
-          .filter((f) => f.field_name !== dateField)
+        const title = safeVisibleFields
+          .filter((f) => f && f.field_name !== dateField)
           .slice(0, 1)
           .map((f) => String(row[f.field_name] || 'Untitled'))
           .join(' ')
@@ -83,7 +86,7 @@ export default function CalendarView({
         <RowDetail
           row={selectedRow}
           tableId={tableId}
-          visibleFields={visibleFields}
+          visibleFields={safeVisibleFields}
           onClose={() => setSelectedRow(null)}
         />
       )}

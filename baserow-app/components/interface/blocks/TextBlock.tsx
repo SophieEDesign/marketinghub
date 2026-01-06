@@ -80,6 +80,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Initialize TipTap editor - always render, editable based on isEditing
   const editor = useEditor({
@@ -108,10 +110,25 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       },
     },
     onFocus: () => {
+      // Clear any pending blur timeout
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current)
+        blurTimeoutRef.current = null
+      }
       setIsFocused(true)
     },
-    onBlur: () => {
-      setIsFocused(false)
+    onBlur: ({ event }) => {
+      // Check if blur is caused by clicking on toolbar
+      const relatedTarget = (event as FocusEvent).relatedTarget as HTMLElement
+      if (toolbarRef.current && toolbarRef.current.contains(relatedTarget)) {
+        // Don't hide toolbar if clicking on it
+        return
+      }
+      
+      // Delay hiding toolbar to prevent flicker when clicking toolbar buttons
+      blurTimeoutRef.current = setTimeout(() => {
+        setIsFocused(false)
+      }, 150) // Small delay to allow toolbar clicks
     },
     onUpdate: ({ editor }) => {
       // Debounced save - only save when in edit mode
@@ -201,11 +218,14 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [config?.content, config?.content_json, config?.text_content, config?.text, editor, isEditing, isFocused])
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
+      }
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current)
       }
     }
   }, [])
@@ -229,7 +249,21 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     if (!editor || !isEditing || !isFocused) return null
 
     return (
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+      <div 
+        ref={toolbarRef}
+        className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full mb-2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+        onMouseDown={(e) => {
+          // Prevent blur when clicking toolbar
+          e.preventDefault()
+        }}
+        onClick={(e) => {
+          // Keep editor focused when clicking toolbar buttons
+          e.stopPropagation()
+          if (editor && !editor.isFocused) {
+            editor.commands.focus()
+          }
+        }}
+      >
         <Button
           variant="ghost"
           size="sm"

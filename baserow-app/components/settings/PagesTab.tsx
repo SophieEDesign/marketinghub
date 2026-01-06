@@ -4,7 +4,26 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Copy, Trash2, FileText, Grid, Calendar, Columns, FileEdit, Settings } from 'lucide-react'
+import { Plus, Edit, Copy, Trash2, FileText, Grid, Calendar, Columns, FileEdit, Settings, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  useDroppable,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   Dialog,
   DialogContent,
@@ -59,6 +78,15 @@ export default function SettingsPagesTab() {
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
   const [selectedPageForSettings, setSelectedPageForSettings] = useState<string | null>(null)
   const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
+  
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadPages()
@@ -354,6 +382,275 @@ export default function SettingsPagesTab() {
     }
   }
 
+  // Group pages by interface
+  const pagesByGroup = pages.reduce((acc, page) => {
+    const groupId = page.group_id || 'ungrouped'
+    if (!acc[groupId]) {
+      acc[groupId] = []
+    }
+    acc[groupId].push(page)
+    return acc
+  }, {} as Record<string, Page[]>)
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Only handle page dragging
+    if (!activeId.startsWith('page-')) return
+
+    const pageId = activeId.replace('page-', '')
+    const activePage = pages.find((p) => p.id === pageId)
+    if (!activePage) return
+
+    let targetGroupId: string | null = null
+
+    // Determine target group
+    if (overId.startsWith('group-')) {
+      targetGroupId = overId.replace('group-', '')
+    } else if (overId.startsWith('page-')) {
+      const targetPageId = overId.replace('page-', '')
+      const targetPage = pages.find((p) => p.id === targetPageId)
+      targetGroupId = targetPage?.group_id || null
+    } else if (overId === 'ungrouped') {
+      targetGroupId = null
+    }
+
+    // If dropping on same group, just reorder
+    if (activePage.group_id === targetGroupId) {
+      const groupPages = (targetGroupId ? pagesByGroup[targetGroupId] || [] : pagesByGroup['ungrouped'] || [])
+        .filter((p) => p.id !== pageId)
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+
+      let insertIndex = groupPages.length
+      if (overId.startsWith('page-')) {
+        const targetPageId = overId.replace('page-', '')
+        const targetIndex = groupPages.findIndex((p) => p.id === targetPageId)
+        if (targetIndex !== -1) {
+          insertIndex = targetIndex
+        }
+      }
+
+      const updates: Array<{ id: string; group_id: string | null; order_index: number }> = []
+
+      // Update pages before insertion point
+      for (let i = 0; i < insertIndex; i++) {
+        updates.push({
+          id: groupPages[i].id,
+          group_id: targetGroupId,
+          order_index: i,
+        })
+      }
+
+      // Insert the moved page
+      updates.push({
+        id: pageId,
+        group_id: targetGroupId,
+        order_index: insertIndex,
+      })
+
+      // Update pages after insertion point
+      for (let i = insertIndex; i < groupPages.length; i++) {
+        updates.push({
+          id: groupPages[i].id,
+          group_id: targetGroupId,
+          order_index: i + 1,
+        })
+      }
+
+      try {
+        await fetch('/api/interfaces/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interfaceUpdates: updates }),
+        })
+
+        await loadPages()
+        window.dispatchEvent(new CustomEvent('pages-updated'))
+      } catch (error) {
+        console.error('Failed to reorder pages:', error)
+        alert('Failed to reorder pages. Please try again.')
+      }
+    } else {
+      // Moving to different group
+      const targetPages = (targetGroupId ? pagesByGroup[targetGroupId] || [] : pagesByGroup['ungrouped'] || [])
+        .filter((p) => p.id !== pageId)
+        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+
+      let insertIndex = targetPages.length
+      if (overId.startsWith('page-')) {
+        const targetPageId = overId.replace('page-', '')
+        const targetIndex = targetPages.findIndex((p) => p.id === targetPageId)
+        if (targetIndex !== -1) {
+          insertIndex = targetIndex
+        }
+      }
+
+      const updates: Array<{ id: string; group_id: string | null; order_index: number }> = []
+
+      // Update pages before insertion point
+      for (let i = 0; i < insertIndex; i++) {
+        updates.push({
+          id: targetPages[i].id,
+          group_id: targetGroupId,
+          order_index: i,
+        })
+      }
+
+      // Insert the moved page
+      updates.push({
+        id: pageId,
+        group_id: targetGroupId,
+        order_index: insertIndex,
+      })
+
+      // Update pages after insertion point
+      for (let i = insertIndex; i < targetPages.length; i++) {
+        updates.push({
+          id: targetPages[i].id,
+          group_id: targetGroupId,
+          order_index: i + 1,
+        })
+      }
+
+      // Update pages in old group
+      const oldGroupPages = (activePage.group_id
+        ? pagesByGroup[activePage.group_id] || []
+        : pagesByGroup['ungrouped'] || []).filter((p) => p.id !== pageId)
+
+      oldGroupPages.forEach((p, i) => {
+        updates.push({
+          id: p.id,
+          group_id: activePage.group_id ?? null,
+          order_index: i,
+        })
+      })
+
+      try {
+        await fetch('/api/interfaces/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interfaceUpdates: updates }),
+        })
+
+        await loadPages()
+        window.dispatchEvent(new CustomEvent('pages-updated'))
+      } catch (error) {
+        console.error('Failed to move page:', error)
+        alert('Failed to move page. Please try again.')
+      }
+    }
+  }
+
+  // Sortable Page Component
+  function SortablePage({ page }: { page: Page }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: `page-${page.id}`,
+    })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    const Icon = getPageTypeIcon(page)
+
+    return (
+      <div ref={setNodeRef} style={style} className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 rounded-md transition-colors border-b">
+        <div className="col-span-4 flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="h-4 w-4 text-gray-400" />
+          </button>
+          <Icon className="h-4 w-4 text-gray-400" />
+          <span className="font-medium">{page.name}</span>
+        </div>
+        <div className="col-span-2 text-sm text-gray-600">
+          {getPageTypeLabel(page)}
+        </div>
+        <div className="col-span-2 text-sm text-gray-600">
+          {page.group_id
+            ? (interfaceGroups.find((g: { id: string; name: string }) => g.id === page.group_id)?.name || 'Unknown Interface')
+            : 'Ungrouped'}
+        </div>
+        <div className="col-span-2 text-sm text-gray-500">
+          {formatDate(page.updated_at)}
+        </div>
+        <div className="col-span-2 flex items-center justify-end gap-1">
+          {page.is_interface_page && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePageSettings(page)}
+              title="Page Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(page)}
+            title="Edit"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDuplicate(page)}
+            title="Duplicate"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPageToDelete(page)
+              setDeleteDialogOpen(true)
+            }}
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Droppable Group Component
+  function DroppableGroup({ groupId, groupName, children }: { groupId: string | null; groupName: string; children: React.ReactNode }) {
+    const { setNodeRef, isOver } = useDroppable({
+      id: groupId ? `group-${groupId}` : 'ungrouped',
+    })
+
+    return (
+      <div
+        ref={setNodeRef}
+        className={isOver ? 'bg-blue-50 rounded-md p-2' : ''}
+      >
+        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-4">
+          {groupName}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <Card>
@@ -391,79 +688,55 @@ export default function SettingsPagesTab() {
               <p className="text-xs">Create your first page to get started.</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
-                <div className="col-span-4">Name</div>
-                <div className="col-span-2">Type</div>
-                <div className="col-span-2">Interface</div>
-                <div className="col-span-2">Last Updated</div>
-                <div className="col-span-2 text-right">Actions</div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="space-y-4">
+                <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
+                  <div className="col-span-4">Name</div>
+                  <div className="col-span-2">Type</div>
+                  <div className="col-span-2">Interface</div>
+                  <div className="col-span-2">Last Updated</div>
+                  <div className="col-span-2 text-right">Actions</div>
+                </div>
+                <SortableContext items={[...interfaceGroups.map((g) => `group-${g.id}`), ...pages.map((p) => `page-${p.id}`), 'ungrouped']} strategy={verticalListSortingStrategy}>
+                  {/* Render pages grouped by interface */}
+                  {interfaceGroups.map((group) => {
+                    const groupPages = (pagesByGroup[group.id] || []).sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                    if (groupPages.length === 0) return null
+                    return (
+                      <DroppableGroup key={group.id} groupId={group.id} groupName={group.name}>
+                        {groupPages.map((page) => (
+                          <SortablePage key={page.id} page={page} />
+                        ))}
+                      </DroppableGroup>
+                    )
+                  })}
+                  {/* Render ungrouped pages */}
+                  {(pagesByGroup['ungrouped'] || []).length > 0 && (
+                    <DroppableGroup groupId={null} groupName="Ungrouped">
+                      {(pagesByGroup['ungrouped'] || [])
+                        .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
+                        .map((page) => (
+                          <SortablePage key={page.id} page={page} />
+                        ))}
+                    </DroppableGroup>
+                  )}
+                </SortableContext>
+                <DragOverlay>
+                  {activeId ? (
+                    <div className="bg-white border border-gray-200 rounded shadow-lg p-2">
+                      <span className="text-sm text-gray-700">
+                        {pages.find((p) => `page-${p.id}` === activeId)?.name}
+                      </span>
+                    </div>
+                  ) : null}
+                </DragOverlay>
               </div>
-              {pages.map((page) => {
-                const Icon = getPageTypeIcon(page)
-                return (
-                  <div
-                    key={page.id}
-                    className="grid grid-cols-12 gap-4 px-4 py-3 items-center hover:bg-gray-50 rounded-md transition-colors border-b"
-                  >
-                    <div className="col-span-4 flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">{page.name}</span>
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-600">
-                      {getPageTypeLabel(page)}
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-600">
-                      {page.group_id 
-                        ? (interfaceGroups.find((g: { id: string; name: string }) => g.id === page.group_id)?.name || 'Unknown Interface')
-                        : 'Ungrouped'}
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-500">
-                      {formatDate(page.updated_at)}
-                    </div>
-                    <div className="col-span-2 flex items-center justify-end gap-1">
-                      {page.is_interface_page && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handlePageSettings(page)}
-                          title="Page Settings"
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(page)}
-                        title="Edit"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDuplicate(page)}
-                        title="Duplicate"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setPageToDelete(page)
-                          setDeleteDialogOpen(true)
-                        }}
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            </DndContext>
           )}
         </CardContent>
       </Card>

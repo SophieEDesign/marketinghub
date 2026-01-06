@@ -846,6 +846,21 @@ export default function GroupedInterfaces({
           {sortedGroups.map((group) => (
             <SortableGroup key={group.id} group={group} />
           ))}
+          {/* Render uncategorized pages if any exist */}
+          {uncategorizedPages.length > 0 && (
+            <UncategorizedDroppable>
+              <div className="px-2 py-1">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 px-2">
+                  Ungrouped
+                </div>
+                <div className="ml-4 space-y-0.5">
+                  {uncategorizedPages.map((page) => (
+                    <SortablePage key={page.id} page={page} />
+                  ))}
+                </div>
+              </div>
+            </UncategorizedDroppable>
+          )}
         </SortableContext>
       </div>
 
