@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
+import type { Table, TableField } from "@/types/database"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 
@@ -27,17 +28,6 @@ interface FormPageSettingsPanelProps {
   isOpen: boolean
   onClose: () => void
   onUpdate: () => void
-}
-
-interface Table {
-  id: string
-  name: string
-}
-
-interface TableField {
-  id: string
-  name: string
-  type: string
 }
 
 export default function FormPageSettingsPanel({
@@ -74,9 +64,9 @@ export default function FormPageSettingsPanel({
       // Load tables
       const { data: tablesData } = await supabase
         .from('tables')
-        .select('id, name')
+        .select('id, name, supabase_table, created_at')
         .order('name')
-      setTables(tablesData || [])
+      setTables((tablesData || []) as Table[])
 
       // Load page config
       const pageConfig = page.config || {}
@@ -111,7 +101,7 @@ export default function FormPageSettingsPanel({
       const supabase = createClient()
       const { data: fieldsData } = await supabase
         .from('table_fields')
-        .select('id, name, type')
+        .select('id, name, type, position, table_id, created_at')
         .eq('table_id', tableId)
         .order('position', { ascending: true })
       return (fieldsData || []) as TableField[]
