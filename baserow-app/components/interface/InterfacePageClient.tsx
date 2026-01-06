@@ -89,8 +89,8 @@ export default function InterfacePageClient({
     } else if (page && page.page_type === 'record_review') {
       // Load table data for record_review pages (check both saved_view_id and base_table)
       loadRecordReviewData()
-    } else if (page && page.saved_view_id && (page.page_type === 'list' || page.page_type === 'grid')) {
-      // Load table data for list/grid view pages
+    } else if (page && page.saved_view_id && page.page_type === 'list') {
+      // Load table data for list view pages
       loadListViewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
