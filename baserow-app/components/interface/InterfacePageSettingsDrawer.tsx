@@ -68,6 +68,7 @@ export default function InterfacePageSettingsDrawer({
 
   useEffect(() => {
     if (isOpen && pageId) {
+      setLoading(true)
       loadPage()
       loadInterfaces()
       loadTables()
@@ -199,21 +200,7 @@ export default function InterfacePageSettingsDrawer({
     }
   }
 
-  if (loading) {
-    return (
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent>
-          <div className="p-4">Loading...</div>
-        </SheetContent>
-      </Sheet>
-    )
-  }
-
-  if (!page) {
-    return null
-  }
-
-  const pageTypeDef = PAGE_TYPE_DEFINITIONS[page.page_type as keyof typeof PAGE_TYPE_DEFINITIONS]
+  const pageTypeDef = page ? PAGE_TYPE_DEFINITIONS[page.page_type as keyof typeof PAGE_TYPE_DEFINITIONS] : null
 
   return (
     <>
@@ -225,6 +212,12 @@ export default function InterfacePageSettingsDrawer({
               Configure page settings and data source
             </SheetDescription>
           </SheetHeader>
+
+          {loading ? (
+            <div className="p-4">Loading...</div>
+          ) : !page ? (
+            <div className="p-4 text-red-600">Page not found</div>
+          ) : (
 
           <div className="mt-6 space-y-6">
             {/* Basic Settings */}
@@ -242,7 +235,7 @@ export default function InterfacePageSettingsDrawer({
               <div className="space-y-2">
                 <Label>Page Type</Label>
                 <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                  {pageTypeDef?.label || pageType} - {pageTypeDef?.description}
+                  {pageTypeDef?.label || pageType} - {pageTypeDef?.description || ''}
                 </div>
                 <p className="text-xs text-gray-500">
                   Page type cannot be changed after creation
@@ -250,7 +243,7 @@ export default function InterfacePageSettingsDrawer({
               </div>
 
               {/* Source Table (for pages that need data) */}
-              {(pageTypeDef?.requiresSourceView || pageTypeDef?.requiresBaseTable) && (
+              {pageTypeDef && (pageTypeDef.requiresSourceView || pageTypeDef.requiresBaseTable) && (
                 <div className="space-y-2">
                   <Label htmlFor="sourceTable">Source Table *</Label>
                   <Select
@@ -339,15 +332,16 @@ export default function InterfacePageSettingsDrawer({
               </div>
             </div>
           </div>
+          )}
         </SheetContent>
       </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent aria-describedby="delete-dialog-description">
           <DialogHeader>
             <DialogTitle>Delete Page</DialogTitle>
-            <DialogDescription>
+            <DialogDescription id="delete-dialog-description">
               Are you sure you want to delete &quot;{name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

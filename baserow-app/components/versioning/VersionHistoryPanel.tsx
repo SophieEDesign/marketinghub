@@ -114,14 +114,15 @@ export default function VersionHistoryPanel({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Version History</DialogTitle>
-          <DialogDescription>
-            View and restore previous versions of this {entityType}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col" aria-describedby="version-history-description">
+          <DialogHeader>
+            <DialogTitle>Version History</DialogTitle>
+            <DialogDescription id="version-history-description">
+              View and restore previous versions of this {entityType}
+            </DialogDescription>
+          </DialogHeader>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -205,14 +206,15 @@ export default function VersionHistoryPanel({
           </ScrollArea>
         )}
       </DialogContent>
+      </Dialog>
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog - Separate from main dialog to avoid nesting */}
       {previewVersion && (
         <Dialog open={!!previewVersion} onOpenChange={() => setPreviewVersion(null)}>
-          <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh]" aria-describedby="preview-version-description">
             <DialogHeader>
               <DialogTitle>Preview Version {previewVersion.version_number}</DialogTitle>
-              <DialogDescription>
+              <DialogDescription id="preview-version-description">
                 {formatDate(previewVersion.created_at)} • {previewVersion.reason.replace("_", " ")}
               </DialogDescription>
             </DialogHeader>
@@ -236,7 +238,7 @@ export default function VersionHistoryPanel({
           </DialogContent>
         </Dialog>
       )}
-    </Dialog>
+    </>
   )
 }
 
