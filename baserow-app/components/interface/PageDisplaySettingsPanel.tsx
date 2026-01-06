@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -617,6 +618,9 @@ export default function PageDisplaySettingsPanel({
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Page Settings</SheetTitle>
+            <SheetDescription>
+              Configure settings for this content page
+            </SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
@@ -678,6 +682,9 @@ export default function PageDisplaySettingsPanel({
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Page Display Settings</SheetTitle>
+          <SheetDescription>
+            Configure data source, filters, sorting, and display options for this page
+          </SheetDescription>
         </SheetHeader>
 
         {loading ? (

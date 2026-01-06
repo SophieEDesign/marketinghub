@@ -37,6 +37,7 @@ export default function SettingsDataTab() {
   const [savingName, setSavingName] = useState(false)
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [tableToImport, setTableToImport] = useState<Table | null>(null)
+  const [selectTableDialogOpen, setSelectTableDialogOpen] = useState(false)
 
   useEffect(() => {
     loadTables()
@@ -218,6 +219,20 @@ export default function SettingsDataTab() {
     router.refresh()
   }
 
+  function handleImportCSVClick() {
+    if (tables.length === 0) {
+      alert('No tables available. Please create a table first.')
+      return
+    }
+    setSelectTableDialogOpen(true)
+  }
+
+  function handleSelectTableForImport(table: Table) {
+    setTableToImport(table)
+    setSelectTableDialogOpen(false)
+    setImportModalOpen(true)
+  }
+
 
   if (loading) {
     return (
@@ -237,10 +252,16 @@ export default function SettingsDataTab() {
             <CardTitle>Data</CardTitle>
             <CardDescription>Raw data management</CardDescription>
           </div>
-          <Button onClick={handleNewTable}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Table
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleImportCSVClick} disabled={tables.length === 0}>
+              <Upload className="h-4 w-4 mr-2" />
+              Import CSV
+            </Button>
+            <Button onClick={handleNewTable}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Table
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -350,6 +371,43 @@ export default function SettingsDataTab() {
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Select Table Dialog */}
+      <Dialog open={selectTableDialogOpen} onOpenChange={setSelectTableDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Table to Import CSV</DialogTitle>
+            <DialogDescription>
+              Choose which table you want to import CSV data into.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {tables.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No tables available. Create a table first.
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {tables.map((table) => (
+                  <button
+                    key={table.id}
+                    onClick={() => handleSelectTableForImport(table)}
+                    className="w-full text-left p-3 border rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  >
+                    <Table2 className="h-4 w-4 text-gray-500" />
+                    <span className="font-medium">{table.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectTableDialogOpen(false)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

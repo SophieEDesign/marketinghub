@@ -195,7 +195,30 @@ export async function getDefaultInterface(): Promise<Interface | null> {
   }
   
   if (workspaceSettings?.default_interface_id) {
-    // Try views table first (current system)
+    // Try interface_pages table first (current system - matches foreign key)
+    const { data: defaultPage, error: pageError } = await supabase
+      .from('interface_pages')
+      .select('*')
+      .eq('id', workspaceSettings.default_interface_id)
+      .maybeSingle()
+    
+    if (!pageError && defaultPage) {
+      // Check admin-only restriction
+      if (userIsAdmin || !defaultPage.is_admin_only) {
+        return {
+          id: defaultPage.id,
+          name: defaultPage.name,
+          description: null,
+          category_id: defaultPage.group_id,
+          icon: null,
+          is_default: true,
+          created_at: defaultPage.created_at,
+          updated_at: defaultPage.updated_at || defaultPage.created_at,
+        } as Interface
+      }
+    }
+    
+    // Fallback: try views table (old system)
     const { data: defaultView, error: viewError } = await supabase
       .from('views')
       .select('*')
@@ -219,7 +242,7 @@ export async function getDefaultInterface(): Promise<Interface | null> {
       }
     }
     
-    // Fallback: try interfaces table (new system)
+    // Fallback: try interfaces table (alternative new system)
     const { data: defaultInterface, error } = await supabase
       .from('interfaces')
       .select('*')

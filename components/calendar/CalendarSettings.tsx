@@ -62,16 +62,16 @@ export default function CalendarSettings({
           <div className="space-y-2">
             <Label>Date Field</Label>
             <Select
-              value={localConfig.calendar_date_field || ''}
+              value={localConfig.calendar_date_field || '__none__'}
               onValueChange={(value) =>
-                setLocalConfig({ ...localConfig, calendar_date_field: value || null })
+                setLocalConfig({ ...localConfig, calendar_date_field: value === '__none__' ? null : value })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select date field" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {dateFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}
@@ -86,16 +86,16 @@ export default function CalendarSettings({
           <div className="space-y-2">
             <Label>Start Date Field</Label>
             <Select
-              value={localConfig.calendar_start_field || ''}
+              value={localConfig.calendar_start_field || '__none__'}
               onValueChange={(value) =>
-                setLocalConfig({ ...localConfig, calendar_start_field: value || null })
+                setLocalConfig({ ...localConfig, calendar_start_field: value === '__none__' ? null : value })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select start date field" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {dateFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}
@@ -108,16 +108,16 @@ export default function CalendarSettings({
           <div className="space-y-2">
             <Label>End Date Field</Label>
             <Select
-              value={localConfig.calendar_end_field || ''}
+              value={localConfig.calendar_end_field || '__none__'}
               onValueChange={(value) =>
-                setLocalConfig({ ...localConfig, calendar_end_field: value || null })
+                setLocalConfig({ ...localConfig, calendar_end_field: value === '__none__' ? null : value })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select end date field" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {dateFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}
@@ -132,16 +132,16 @@ export default function CalendarSettings({
           <div className="space-y-2">
             <Label>Color Field (Optional)</Label>
             <Select
-              value={localConfig.calendar_color_field || ''}
+              value={localConfig.calendar_color_field || '__none__'}
               onValueChange={(value) =>
-                setLocalConfig({ ...localConfig, calendar_color_field: value || null })
+                setLocalConfig({ ...localConfig, calendar_color_field: value === '__none__' ? null : value })
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select color field" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {selectFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}

@@ -323,8 +323,8 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
                 {/* Value Dropdown/Input */}
                 {hasSelectOptions ? (
                   <Select
-                    value={filter.value || ''}
-                    onValueChange={(value) => updateFilter(index, { value, operator: 'equal' })}
+                    value={filter.value || '__all__'}
+                    onValueChange={(value) => updateFilter(index, { value: value === '__all__' ? '' : value, operator: 'equal' })}
                   >
                     <SelectTrigger className={`h-8 px-3 text-sm border-gray-300 bg-white hover:bg-gray-50 shadow-sm ${
                       filter.value ? 'min-w-[140px]' : 'min-w-[120px]'
@@ -334,7 +334,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All {filter.field}</SelectItem>
+                      <SelectItem value="__all__">All {filter.field}</SelectItem>
                       {selectOptions.map((option: string | { value: string; label: string }, idx: number) => {
                         const optionValue = typeof option === 'string' ? option : option.value
                         const optionLabel = typeof option === 'string' ? option : option.label

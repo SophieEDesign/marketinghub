@@ -157,15 +157,21 @@ export default function GridViewWrapper({
           
           const nextOrderIndex = sortsWithoutOrder ? sortsWithoutOrder.length : 0
           
+          // Try to insert with order_index first, fallback without if column doesn't exist
+          const insertData: any = {
+            view_id: viewId,
+            field_name: sort.field_name,
+            direction: sort.direction,
+          }
+          
+          // Only include order_index if we can determine it (column might not exist yet)
+          if (nextOrderIndex >= 0) {
+            insertData.order_index = nextOrderIndex
+          }
+          
           const { data, error } = await supabase
             .from("view_sorts")
-            .insert([
-              {
-                view_id: viewId,
-                field_name: sort.field_name,
-                direction: sort.direction,
-              },
-            ])
+            .insert([insertData])
             .select()
             .single()
 

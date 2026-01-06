@@ -201,9 +201,14 @@ CREATE TABLE IF NOT EXISTS public.view_sorts (
   view_id uuid,
   field_name text NOT NULL,
   direction text NOT NULL CHECK (direction = ANY (ARRAY['asc'::text, 'desc'::text])),
+  order_index integer NOT NULL DEFAULT 0,
   CONSTRAINT view_sorts_pkey PRIMARY KEY (id),
   CONSTRAINT view_sorts_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id)
 );
+
+-- Index for ordering sorts within a view
+CREATE INDEX IF NOT EXISTS idx_view_sorts_order_index 
+ON public.view_sorts(view_id, order_index);
 
 -- View Tabs: Tab organization for views
 CREATE TABLE IF NOT EXISTS public.view_tabs (

@@ -54,7 +54,20 @@ export async function loadViewSorts(viewId: string) {
     .select('*')
     .eq('view_id', viewId)
 
-  if (error) throw error
+  if (error) {
+    // If order_index column doesn't exist yet, return empty array
+    // This allows the page to load before migration is run
+    if (error.code === '42703' || error.message?.includes('order_index')) {
+      return []
+    }
+    throw error
+  }
+  
+  // Sort client-side if order_index exists in the data
+  if (data && data.length > 0 && 'order_index' in data[0]) {
+    return (data || []).sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0)) as ViewSort[]
+  }
+  
   return (data || []) as ViewSort[]
 }
 
@@ -157,10 +170,11 @@ export async function duplicateView(viewId: string) {
   // Copy sorts
   if (sorts.length > 0) {
     await supabase.from('view_sorts').insert(
-      sorts.map((s) => ({
+      sorts.map((s, index) => ({
         view_id: newView.id,
         field_name: s.field_name,
         direction: s.direction,
+        order_index: (s as any).order_index ?? index,
       }))
     )
   }
