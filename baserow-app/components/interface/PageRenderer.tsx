@@ -98,9 +98,21 @@ export default function PageRenderer({
         )
 
       case 'kanban':
+        // Kanban view requires a tableId
+        const kanbanTableId = pageTableId || config.table_id || config.base_table || ''
+        if (!kanbanTableId) {
+          return (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center max-w-md">
+                <div className="text-sm mb-2">Kanban view requires a table connection.</div>
+                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
+              </div>
+            </div>
+          )
+        }
         return (
           <KanbanView
-            tableId={pageTableId || config.table_id || config.base_table || ''}
+            tableId={kanbanTableId}
             viewId={page.saved_view_id || config.view_id || page.id}
             groupingFieldId={config.group_by || ''}
             fieldIds={config.card_fields || config.fields || []}

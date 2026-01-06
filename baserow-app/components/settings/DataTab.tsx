@@ -313,10 +313,10 @@ export default function SettingsDataTab() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent aria-describedby="delete-table-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Table</DialogTitle>
-            <DialogDescription id="delete-table-dialog-description">
+            <DialogDescription>
               Are you sure you want to delete &quot;{tableToDelete?.name}&quot;? This will permanently delete the table, all its data, views, and fields. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

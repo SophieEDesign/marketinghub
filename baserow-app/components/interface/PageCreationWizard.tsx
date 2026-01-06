@@ -594,7 +594,7 @@ export default function PageCreationWizard({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]" aria-describedby="page-creation-wizard-description">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
             {step === 'interface' && 'Select Interface'}
@@ -602,7 +602,7 @@ export default function PageCreationWizard({
             {step === 'anchor' && 'Configure Page'}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
-          <DialogDescription id="page-creation-wizard-description">
+          <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
             {step === 'anchor' && 'Set up the data source or layout'}

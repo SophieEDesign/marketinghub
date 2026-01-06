@@ -751,10 +751,10 @@ export default function SettingsPagesTab() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent aria-describedby="delete-page-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Page</DialogTitle>
-            <DialogDescription id="delete-page-dialog-description">
+            <DialogDescription>
               Are you sure you want to delete &quot;{pageToDelete?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

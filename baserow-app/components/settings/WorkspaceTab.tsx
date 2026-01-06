@@ -128,30 +128,51 @@ export default function SettingsWorkspaceTab() {
       const supabase = createClient()
       
       // Load interface pages from interface_pages table (new system)
+      // Don't filter by is_admin_only here - workspace settings should show all pages
       const { data: interfacePagesData, error: interfacePagesError } = await supabase
         .from('interface_pages')
         .select('id, name')
         .order('name', { ascending: true })
 
-      if (!interfacePagesError && interfacePagesData) {
-        setInterfacePages(interfacePagesData)
-      } else {
-        // Fallback to old views table for backward compatibility
-        const { data: viewsData, error: viewsError } = await supabase
-          .from('views')
-          .select('id, name')
-          .eq('type', 'interface')
-          .order('name', { ascending: true })
-
-        if (!viewsError && viewsData) {
-          setInterfacePages(viewsData)
+      if (interfacePagesError) {
+        console.error('Error loading interface pages from interface_pages table:', interfacePagesError)
+        // Check if it's a table doesn't exist error
+        if (interfacePagesError.code === '42P01' || interfacePagesError.code === 'PGRST116' || 
+            interfacePagesError.message?.includes('relation') || 
+            interfacePagesError.message?.includes('does not exist')) {
+          console.warn('interface_pages table does not exist, falling back to views table')
         } else {
-          console.error('Error loading interface pages:', interfacePagesError || viewsError)
-          setInterfacePages([])
+          // For other errors (like RLS), still try fallback
+          console.warn('Error loading from interface_pages, trying fallback:', interfacePagesError.message)
         }
       }
+
+      if (!interfacePagesError && interfacePagesData) {
+        console.log('Loaded', interfacePagesData.length, 'interface pages from interface_pages table')
+        setInterfacePages(interfacePagesData)
+        setLoadingPages(false)
+        return
+      }
+
+      // Fallback to old views table for backward compatibility
+      const { data: viewsData, error: viewsError } = await supabase
+        .from('views')
+        .select('id, name')
+        .eq('type', 'interface')
+        .order('name', { ascending: true })
+
+      if (viewsError) {
+        console.error('Error loading interface pages from views table:', viewsError)
+        setInterfacePages([])
+      } else if (viewsData) {
+        console.log('Loaded', viewsData.length, 'interface pages from views table (fallback)')
+        setInterfacePages(viewsData)
+      } else {
+        console.warn('No interface pages found in either table')
+        setInterfacePages([])
+      }
     } catch (error) {
-      console.error('Error loading interface pages:', error)
+      console.error('Exception loading interface pages:', error)
       setInterfacePages([])
     } finally {
       setLoadingPages(false)
@@ -279,6 +300,13 @@ export default function SettingsWorkspaceTab() {
             settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist')) {
           // Column doesn't exist - this is okay, treat as success
           defaultPageSaveSuccess = true
+        } else if (settingsError?.code === '23503') {
+          // Foreign key constraint violation - the page ID doesn't exist in interface_pages
+          console.error('Foreign key constraint violation - page ID not found:', settingsError)
+          setMessage({ 
+            type: 'error', 
+            text: `Workspace saved, but default page setting failed: The selected page no longer exists. Please select a different page.` 
+          })
         } else {
           console.warn('Error saving default page setting:', settingsError)
           // Don't throw - we'll still save workspace name/icon, but note the issue
@@ -349,20 +377,31 @@ export default function SettingsWorkspaceTab() {
               disabled={loadingPages}
             >
               <SelectTrigger id="default-page" className="max-w-md">
-                <SelectValue placeholder={loadingPages ? "Loading pages..." : "Select a default page"} />
+                <SelectValue placeholder={loadingPages ? "Loading pages..." : interfacePages.length === 0 ? "No pages available" : "Select a default page"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">None (use first available)</SelectItem>
-                {interfacePages.map((page) => (
-                  <SelectItem key={page.id} value={page.id}>
-                    {page.name}
+                {interfacePages.length === 0 ? (
+                  <SelectItem value="__no_pages__" disabled>
+                    No pages available
                   </SelectItem>
-                ))}
+                ) : (
+                  interfacePages.map((page) => (
+                    <SelectItem key={page.id} value={page.id}>
+                      {page.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               The page users will be redirected to after logging in
             </p>
+            {!loadingPages && interfacePages.length === 0 && (
+              <p className="text-xs text-amber-600">
+                No interface pages found. Create pages in the Pages tab to set a default page.
+              </p>
+            )}
           </div>
         </div>
 

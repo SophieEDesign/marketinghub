@@ -94,10 +94,10 @@ export default function GroupDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md" aria-describedby="group-dialog-description">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Group Records</DialogTitle>
-          <DialogDescription id="group-dialog-description">
+          <DialogDescription>
             Select a field to group records by. Records with the same value will be grouped together.
           </DialogDescription>
         </DialogHeader>

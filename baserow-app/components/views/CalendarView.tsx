@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
@@ -42,6 +42,12 @@ export default function CalendarView({
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
+  
+  // Use refs to track previous values and prevent infinite loops
+  const prevTableFieldsRef = useRef<string>('')
+  const prevFiltersRef = useRef<string>('')
+  const prevLoadedFieldsKeyRef = useRef<string>('')
+  const isLoadingRef = useRef(false)
 
   useEffect(() => {
     // If tableId prop changes, update resolvedTableId immediately
@@ -62,24 +68,67 @@ export default function CalendarView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTableId])
 
+  // Memoize tableFields to prevent unnecessary re-renders
+  const tableFieldsKey = useMemo(() => {
+    return JSON.stringify(tableFields?.map(f => ({ id: f.id, name: f.name, type: f.type })) || [])
+  }, [tableFields])
+
   useEffect(() => {
     if (resolvedTableId) {
       // Load table fields if not provided
       if (!tableFields || tableFields.length === 0) {
         loadTableFields()
       } else {
-        setLoadedTableFields(tableFields)
+        // Only update if fields actually changed
+        if (prevTableFieldsRef.current !== tableFieldsKey) {
+          setLoadedTableFields(tableFields)
+          prevTableFieldsRef.current = tableFieldsKey
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTableId, tableFields])
+  }, [resolvedTableId, tableFieldsKey])
+
+  // Memoize filters to prevent unnecessary re-renders
+  const filtersKey = useMemo(() => {
+    return JSON.stringify(filters || [])
+  }, [filters])
+
+  // Memoize loadedTableFields key to prevent unnecessary re-renders
+  const loadedTableFieldsKey = useMemo(() => {
+    return JSON.stringify(loadedTableFields.map(f => ({ id: f.id, name: f.name, type: f.type })))
+  }, [loadedTableFields])
 
   useEffect(() => {
-    if (resolvedTableId && supabaseTableName && loadedTableFields.length > 0) {
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      return
+    }
+    
+    // Early return if prerequisites aren't met
+    if (!resolvedTableId || !supabaseTableName || loadedTableFields.length === 0) {
+      return
+    }
+    
+    // Update the ref with current key before checking
+    const currentFieldsKey = loadedTableFieldsKey
+    if (prevLoadedFieldsKeyRef.current !== currentFieldsKey) {
+      prevLoadedFieldsKeyRef.current = currentFieldsKey
+    }
+    
+    // Only reload if filters, searchQuery, or loadedTableFields actually changed
+    const currentFiltersKey = filtersKey
+    const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}`
+    
+    // Only call loadRows if the combined key actually changed
+    // This prevents infinite loops when props are recreated but content is the same
+    if (prevFiltersRef.current !== combinedKey && combinedKey !== '') {
+      prevFiltersRef.current = combinedKey
       loadRows()
     }
+    // Use loadedTableFieldsKey to track actual content changes, not just length
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTableId, supabaseTableName, filters, searchQuery, loadedTableFields])
+  }, [resolvedTableId, supabaseTableName, filtersKey, searchQuery, loadedTableFieldsKey])
 
   async function resolveTableId() {
     // CRITICAL: tableId prop MUST come from block config (not page fallback)
@@ -185,19 +234,29 @@ export default function CalendarView({
       console.log('Calendar: Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
       setRows([])
       setLoading(false)
+      isLoadingRef.current = false
       return
     }
     
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      return
+    }
+    
+    isLoadingRef.current = true
     setLoading(true)
     try {
       const supabase = createClient()
       
-      console.log('Calendar: Loading rows from table', {
-        tableId: resolvedTableId,
-        supabaseTableName,
-        filtersCount: filters.length,
-        fieldIdsCount: fieldIds.length
-      })
+      // Only log when actually loading (not on every render check)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Calendar: Loading rows from table', {
+          tableId: resolvedTableId,
+          supabaseTableName,
+          filtersCount: filters.length,
+          fieldIdsCount: fieldIds.length
+        })
+      }
       
       // Build query with filters
       let query = supabase
@@ -225,7 +284,6 @@ export default function CalendarView({
         })
         setRows([])
       } else {
-        console.log('Calendar: Loaded', data?.length || 0, 'rows from', supabaseTableName)
         // Convert flat rows to TableRow format
         const tableRows: TableRow[] = (data || []).map((row: any) => ({
           id: row.id,
@@ -236,9 +294,12 @@ export default function CalendarView({
         }))
         setRows(tableRows)
         
-        // Log sample row structure for debugging
-        if (tableRows.length > 0) {
-          console.log('Calendar: Sample row data keys:', Object.keys(tableRows[0].data).slice(0, 10))
+        // Only log in development and only once per actual load
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Loaded', data?.length || 0, 'rows from', supabaseTableName)
+          if (tableRows.length > 0) {
+            console.log('Calendar: Sample row data keys:', Object.keys(tableRows[0].data).slice(0, 10))
+          }
         }
       }
     } catch (error) {
@@ -246,6 +307,7 @@ export default function CalendarView({
       setRows([])
     } finally {
       setLoading(false)
+      isLoadingRef.current = false
     }
   }
 

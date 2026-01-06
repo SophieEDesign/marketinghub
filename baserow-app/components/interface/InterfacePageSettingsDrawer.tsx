@@ -362,10 +362,10 @@ export default function InterfacePageSettingsDrawer({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent aria-describedby="delete-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Page</DialogTitle>
-            <DialogDescription id="delete-dialog-description">
+            <DialogDescription>
               Are you sure you want to delete &quot;{name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

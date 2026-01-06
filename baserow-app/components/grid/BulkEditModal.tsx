@@ -274,10 +274,10 @@ export default function BulkEditModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="bulk-edit-dialog-description">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Edit {selectedCount} Records</DialogTitle>
-          <DialogDescription id="bulk-edit-dialog-description">
+          <DialogDescription>
             Update multiple records at once. Only the selected field will be changed.
           </DialogDescription>
         </DialogHeader>

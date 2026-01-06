@@ -93,10 +93,10 @@ export default function ColumnManagementDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md" aria-describedby="column-management-dialog-description">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Manage Columns</DialogTitle>
-          <DialogDescription id="column-management-dialog-description">
+          <DialogDescription>
             Configure column settings and visibility for this view.
           </DialogDescription>
         </DialogHeader>

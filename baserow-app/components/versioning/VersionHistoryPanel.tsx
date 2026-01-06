@@ -116,10 +116,10 @@ export default function VersionHistoryPanel({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col" aria-describedby="version-history-description">
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Version History</DialogTitle>
-            <DialogDescription id="version-history-description">
+            <DialogDescription>
               View and restore previous versions of this {entityType}
             </DialogDescription>
           </DialogHeader>
@@ -211,10 +211,10 @@ export default function VersionHistoryPanel({
       {/* Preview Dialog - Separate from main dialog to avoid nesting */}
       {previewVersion && (
         <Dialog open={!!previewVersion} onOpenChange={() => setPreviewVersion(null)}>
-          <DialogContent className="sm:max-w-[600px] max-h-[80vh]" aria-describedby="preview-version-description">
+          <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Preview Version {previewVersion.version_number}</DialogTitle>
-              <DialogDescription id="preview-version-description">
+              <DialogDescription>
                 {formatDate(previewVersion.created_at)} • {previewVersion.reason.replace("_", " ")}
               </DialogDescription>
             </DialogHeader>

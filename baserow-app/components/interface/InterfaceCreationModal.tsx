@@ -104,10 +104,10 @@ export default function InterfaceCreationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]" aria-describedby="interface-creation-description">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create New Interface</DialogTitle>
-          <DialogDescription id="interface-creation-description">
+          <DialogDescription>
             Interfaces are containers that group related pages together. They help organize your workspace.
           </DialogDescription>
         </DialogHeader>

@@ -242,7 +242,20 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }
       
       case 'kanban': {
-        // Kanban requires a grouping field (typically a select/single_select field)
+        // Kanban requires a tableId and a grouping field (typically a select/single_select field)
+        if (!tableId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Kanban view requires a table connection." : "No table configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a table in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
+        
         const groupByFieldFromConfig = config.group_by_field || config.kanban_group_field
         const groupByFieldFromFields = visibleFields.find(f => {
           const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
@@ -265,7 +278,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         return (
           <KanbanView
-            tableId={tableId!}
+            tableId={tableId}
             viewId={viewId || ''}
             groupingFieldId={groupByFieldId}
             fieldIds={fieldIds}

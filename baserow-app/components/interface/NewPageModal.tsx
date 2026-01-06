@@ -250,10 +250,10 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" aria-describedby="new-page-modal-description">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Interface</DialogTitle>
-          <DialogDescription id="new-page-modal-description">
+          <DialogDescription>
             Choose a page type to get started with a pre-configured layout, or start from scratch.
           </DialogDescription>
         </DialogHeader>

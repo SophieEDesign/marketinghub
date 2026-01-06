@@ -345,10 +345,10 @@ export default function RecordPageClient({
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent aria-describedby="delete-record-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Record</DialogTitle>
-            <DialogDescription id="delete-record-dialog-description">
+            <DialogDescription>
               Are you sure you want to delete this record? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>

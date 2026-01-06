@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // Note: This requires service role or admin access
     const users = []
     
-    // Use admin client to get user emails
+    // Use admin client to get user emails and pending invitations
     const { createAdminClient } = await import('@/lib/supabase/admin')
     let adminClient
     try {
@@ -38,7 +38,58 @@ export async function GET(request: NextRequest) {
       console.warn('Admin client not available, using profile data only')
     }
 
-    for (const profile of profiles || []) {
+    // Get profile user IDs to check which users have profiles
+    // Ensure profiles is an array (defensive check)
+    const profilesArray = Array.isArray(profiles) ? profiles : []
+    const profileUserIds = new Set(profilesArray.map(p => p.user_id))
+
+    // If admin client is available, also load pending invitations (users without profiles)
+    if (adminClient) {
+      try {
+        // List all users from auth.users
+        const { data: authUsersData, error: listError } = await adminClient.auth.admin.listUsers()
+        
+        // Ensure users is an array (defensive check)
+        const authUsers = Array.isArray(authUsersData?.users) ? authUsersData.users : []
+        
+        if (!listError && authUsers.length > 0) {
+          // Find users who have been invited but don't have profiles yet
+          for (const authUser of authUsers) {
+            // Skip if user already has a profile (will be handled below)
+            if (profileUserIds.has(authUser.id)) {
+              continue
+            }
+
+            // Check if user was invited (has invited_at but hasn't signed in)
+            const isInvited = authUser.invited_at && !authUser.last_sign_in_at
+            const isPending = isInvited || (!authUser.confirmed_at && authUser.email)
+
+            if (isPending && authUser.email) {
+              // This is a pending invitation - user hasn't accepted yet
+              const role = (authUser.user_metadata?.role || 'member') as 'admin' | 'member'
+              
+              users.push({
+                id: `pending-${authUser.id}`, // Use a temporary ID since no profile exists
+                user_id: authUser.id,
+                email: authUser.email,
+                name: authUser.user_metadata?.name || authUser.user_metadata?.full_name || null,
+                role: role,
+                is_active: false, // Pending invitations are not active
+                is_pending: true, // Mark as pending invitation
+                last_active: null,
+                created_at: authUser.created_at || new Date().toISOString(),
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not load pending invitations:', error)
+      }
+    }
+
+    // Load users with profiles (accepted invitations)
+    // Ensure profiles is an array (defensive check)
+    for (const profile of profilesArray) {
       try {
         let email = `User ${profile.user_id.substring(0, 8)}...`
         let name = null
@@ -88,7 +139,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ users })
+    // Ensure users is always an array before returning
+    const usersArray = Array.isArray(users) ? users : []
+    return NextResponse.json({ users: usersArray })
   } catch (error: any) {
     console.error('Error loading users:', error)
     return NextResponse.json(

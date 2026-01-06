@@ -42,6 +42,7 @@ interface User {
   is_active: boolean
   last_active: string | null
   created_at: string
+  is_pending?: boolean // True for users who have been invited but haven't accepted yet
 }
 
 export default function UsersTab() {
@@ -107,8 +108,10 @@ export default function UsersTab() {
       // Load user data via API route (server-side has access to auth.users)
       const response = await fetch('/api/users')
       if (response.ok) {
-        const { users: usersData } = await response.json()
-        setUsers(usersData || [])
+        const data = await response.json()
+        // Ensure users is always an array (defensive check)
+        const usersData = Array.isArray(data?.users) ? data.users : []
+        setUsers(usersData)
         return
       }
 
@@ -372,60 +375,80 @@ export default function UsersTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">
-                        {user.name || '—'}
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={user.role || 'member'}
-                          onValueChange={(value) => handleRoleChange(user, value as 'admin' | 'member')}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="member">Member</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                          {user.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatLastActive(user.last_active)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(user)}
-                            title="Edit user"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setUserToDeactivate(user)
-                              setDeactivateDialogOpen(true)
-                            }}
-                            disabled={!user.is_active}
-                            title="Deactivate user"
-                          >
-                            <UserX className="h-4 w-4" />
-                          </Button>
-                        </div>
+                  {Array.isArray(users) && users.length > 0 ? (
+                    users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          {user.name || '—'}
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          {user.is_pending ? (
+                            <Badge variant="outline">
+                              {user.role === 'admin' ? 'Admin' : 'Member'}
+                            </Badge>
+                          ) : (
+                            <Select
+                              value={user.role || 'member'}
+                              onValueChange={(value) => handleRoleChange(user, value as 'admin' | 'member')}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="member">Member</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {user.is_pending ? (
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                              Pending
+                            </Badge>
+                          ) : (
+                            <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                              {user.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatLastActive(user.last_active)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(user)}
+                              title="Edit user"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setUserToDeactivate(user)
+                                setDeactivateDialogOpen(true)
+                              }}
+                              disabled={!user.is_active}
+                              title="Deactivate user"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No users found
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -435,10 +458,10 @@ export default function UsersTab() {
 
       {/* Invite User Dialog */}
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent aria-describedby="invite-user-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
-            <DialogDescription id="invite-user-dialog-description">
+            <DialogDescription>
               Send an invitation to join the workspace
             </DialogDescription>
           </DialogHeader>
@@ -495,10 +518,10 @@ export default function UsersTab() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent aria-describedby="edit-user-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription id="edit-user-dialog-description">
+            <DialogDescription>
               Update user email and name
             </DialogDescription>
           </DialogHeader>
@@ -542,10 +565,10 @@ export default function UsersTab() {
 
       {/* Deactivate User Dialog */}
       <Dialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
-        <DialogContent aria-describedby="deactivate-user-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Deactivate User</DialogTitle>
-            <DialogDescription id="deactivate-user-dialog-description">
+            <DialogDescription>
               Are you sure you want to deactivate {userToDeactivate?.email}? They will no longer be able to access the workspace.
             </DialogDescription>
           </DialogHeader>

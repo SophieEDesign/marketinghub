@@ -382,10 +382,10 @@ export default function PageSettingsDrawer({
       </Sheet>
 
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent aria-describedby="delete-interface-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Interface?</DialogTitle>
-            <DialogDescription id="delete-interface-dialog-description">
+            <DialogDescription>
               This will permanently delete the interface &quot;<strong>{page.name}</strong>&quot; and all its blocks.
               <br />
               <br />

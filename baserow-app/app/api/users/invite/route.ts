@@ -138,10 +138,9 @@ export async function POST(request: NextRequest) {
 
     // Note: Profile will be created automatically when user accepts invitation
     // via the auth callback route, which reads role from user_metadata
-    // If user already exists, we can create profile now
+    // If user already exists, we can create profile now using admin client to bypass RLS
     if (inviteData?.user?.id) {
-      const supabase = await createClient()
-      const { error: profileError } = await supabase
+      const { error: profileError } = await adminClient
         .from('profiles')
         .upsert({
           user_id: inviteData.user.id,

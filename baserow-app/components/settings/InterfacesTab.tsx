@@ -666,10 +666,10 @@ export default function InterfacesTab() {
 
       {/* Delete Interface Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent aria-describedby="delete-group-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Interface</DialogTitle>
-            <DialogDescription id="delete-group-dialog-description">
+            <DialogDescription>
               Are you sure you want to delete &quot;{groupToDelete?.name}&quot;? 
               {groupToDelete && groupToDelete.interfaces.length > 0 && (
                 <>

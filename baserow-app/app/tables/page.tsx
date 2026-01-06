@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus } from "lucide-react"
+import { Plus, Upload } from "lucide-react"
 import { getTables } from "@/lib/crud/tables"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import type { Table } from "@/types/database"
@@ -21,12 +21,20 @@ export default async function TablesPage() {
                 Manage your data tables and views
               </p>
             </div>
-            <Button asChild>
-              <Link href="/tables/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Table
-              </Link>
-            </Button>
+            <div className="flex gap-2">
+              <Button asChild variant="outline">
+                <Link href="/import">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import CSV
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href="/tables/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Table
+                </Link>
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

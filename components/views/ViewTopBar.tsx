@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -136,6 +137,9 @@ export default function ViewTopBar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename View</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this view.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -170,12 +174,10 @@ export default function ViewTopBar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete View</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-600">
+            <DialogDescription>
               Are you sure you want to delete &quot;{viewName}&quot;? This action cannot be undone.
-            </p>
-          </div>
+            </DialogDescription>
+          </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>
               Cancel

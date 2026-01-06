@@ -774,10 +774,10 @@ export default function CSVImportModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden" aria-describedby="csv-import-modal-description">
+      <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Import CSV to {tableName}</DialogTitle>
-          <DialogDescription id="csv-import-modal-description">
+          <DialogDescription>
             Import data from a CSV file. New fields will be created with auto-detected types (text, number, date, checkbox).
           </DialogDescription>
         </DialogHeader>

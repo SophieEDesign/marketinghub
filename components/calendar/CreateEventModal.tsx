@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -105,6 +106,9 @@ export default function CreateEventModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create New Event</DialogTitle>
+          <DialogDescription>
+            Create a new event in the calendar.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">

@@ -307,10 +307,10 @@ export default function InterfaceViewTabs({
 
       {/* Add View Tab Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent aria-describedby="add-view-tab-dialog-description">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Add View Tab</DialogTitle>
-            <DialogDescription id="add-view-tab-dialog-description">
+            <DialogDescription>
               Link a table view (Grid, Calendar, Form, etc.) to this interface as a tab
             </DialogDescription>
           </DialogHeader>

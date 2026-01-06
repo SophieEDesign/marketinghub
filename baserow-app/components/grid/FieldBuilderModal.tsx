@@ -209,10 +209,10 @@ export default function FieldBuilderModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="field-builder-dialog-description">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Field" : "Add Field"}</DialogTitle>
-          <DialogDescription id="field-builder-dialog-description">
+          <DialogDescription>
             {isEdit ? "Update the field properties below." : "Create a new field for this table."}
           </DialogDescription>
         </DialogHeader>
