@@ -23,10 +23,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   const tableId = config?.table_id
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
-  // Visible fields from config (required)
-  const visibleFieldsConfig = config?.visible_fields || []
-  const blockBaseFilters = config?.filters || []
-  const sortsConfig = config?.sorts || []
+  // Visible fields from config (required) - ensure it's always an array
+  const visibleFieldsConfig = Array.isArray(config?.visible_fields) 
+    ? config.visible_fields 
+    : (config?.visible_fields ? [config.visible_fields] : [])
+  const blockBaseFilters = Array.isArray(config?.filters) ? config.filters : []
+  const sortsConfig = Array.isArray(config?.sorts) ? config.sorts : []
   
   // Merge filters with proper precedence: block base filters + filter block filters
   const allFilters = useMemo(() => {
@@ -127,12 +129,14 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   }
 
   // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
+  // Ensure all values are arrays to prevent runtime errors
+  const safeViewFields = Array.isArray(viewFields) ? viewFields : []
   const visibleFields = visibleFieldsConfig.length > 0
     ? visibleFieldsConfig.map((fieldName: string) => {
         const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
         return field ? { field_name: field.name, visible: true, position: 0 } : null
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
-    : viewFields.filter(f => f.visible)
+    : safeViewFields.filter(f => f && f.visible)
 
   // Convert merged filters to legacy format for GridViewWrapper (backward compatibility)
   const activeFilters = allFilters.map((f, idx) => ({

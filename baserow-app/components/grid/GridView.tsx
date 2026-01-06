@@ -63,8 +63,10 @@ export default function GridView({
   const [tableError, setTableError] = useState<string | null>(null)
 
   // Get visible fields ordered by order_index (from table_fields) or position
-  const visibleFields = viewFields
-    .filter((f) => f.visible)
+  // Ensure viewFields is always an array to prevent runtime errors
+  const safeViewFields = Array.isArray(viewFields) ? viewFields : []
+  const visibleFields = safeViewFields
+    .filter((f) => f && f.visible)
     .map((vf) => {
       const tableField = tableFields.find((tf) => tf.name === vf.field_name)
       return {

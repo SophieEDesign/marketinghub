@@ -369,10 +369,10 @@ export default function GridViewWrapper({
         tableId={tableId}
         viewId={viewId}
         supabaseTableName={supabaseTableName}
-        viewFields={viewFields}
-        viewFilters={initialFilters}
+        viewFields={Array.isArray(viewFields) ? viewFields : []}
+        viewFilters={Array.isArray(initialFilters) ? initialFilters : []}
         filters={gridViewFilters}
-        viewSorts={sorts}
+        viewSorts={Array.isArray(sorts) ? sorts : []}
         searchTerm={searchTerm}
         groupBy={groupBy}
         tableFields={fields}
