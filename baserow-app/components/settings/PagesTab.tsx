@@ -54,6 +54,7 @@ interface Page {
   tableId?: string | null
   tableName?: string
   group_id?: string | null // Interface ID (references interface_groups - Interface container)
+  order_index?: number // Order index for sorting pages within groups
   updated_at?: string
   created_at?: string
   page_type?: string // For interface_pages
