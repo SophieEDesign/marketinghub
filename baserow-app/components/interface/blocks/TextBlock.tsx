@@ -127,10 +127,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       // Debounce save: wait 1200ms (within 1000-1500ms range) after last change
       saveTimeoutRef.current = setTimeout(() => {
         const json = editor.getJSON()
-        // Save to config.content as primary field (TipTap JSON)
+        // Save to config.content as primary field (TipTap JSON as string)
         onUpdate(block.id, {
-          content: json, // Primary: TipTap JSON format
-          content_json: json, // Alias for compatibility
+          content: JSON.stringify(json), // Primary: TipTap JSON format (stringified)
+          content_json: json, // Alias for compatibility (object format)
           text_content: editor.getText(), // Plain text for search/preview
         })
         setSaveStatus("saved")

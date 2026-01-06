@@ -11,7 +11,7 @@
  * - Filters narrow results, never override base filters
  */
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
@@ -52,7 +52,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
   const allowedOperators = config?.allowed_operators || OPERATORS.map(op => op.value)
   
   // Convert BlockFilter[] from config to FilterConfig[] for internal use
-  const convertToFilterConfigs = (blockFilters: BlockFilter[] | FilterConfig[] | undefined): FilterConfig[] => {
+  const convertToFilterConfigs = useCallback((blockFilters: BlockFilter[] | FilterConfig[] | undefined): FilterConfig[] => {
     if (!blockFilters || blockFilters.length === 0) return []
     // If already FilterConfig[], return as-is
     return blockFilters.map(f => ({
@@ -60,20 +60,35 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
       operator: f.operator as FilterConfig['operator'],
       value: f.value,
     }))
-  }
+  }, [])
 
   // Current filter state (stored in config.filters as BlockFilter[], used as FilterConfig[])
-  const [filters, setFilters] = useState<FilterConfig[]>(convertToFilterConfigs(config?.filters))
+  const [filters, setFilters] = useState<FilterConfig[]>(() => convertToFilterConfigs(config?.filters))
   const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
   const [loading, setLoading] = useState(false)
 
   // Load table fields if table_id is configured
   const tableId = config?.table_id || pageTableId
 
+  // Sync filters when config changes externally
+  useEffect(() => {
+    const configFilters = convertToFilterConfigs(config?.filters)
+    setFilters(prev => {
+      // Only update if config actually changed (prevent unnecessary re-renders)
+      const prevStr = JSON.stringify(prev)
+      const configStr = JSON.stringify(configFilters)
+      if (prevStr !== configStr) {
+        return configFilters
+      }
+      return prev
+    })
+  }, [config?.filters, convertToFilterConfigs])
+
   useEffect(() => {
     if (tableId) {
       loadTableFields()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
 
   // Emit filter state to context whenever filters change
@@ -92,7 +107,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
 
   // Convert FilterConfig[] to BlockFilter[] for saving to config
   // BlockFilter supports fewer operators, so we filter out unsupported ones
-  const convertToBlockFilters = (filterConfigs: FilterConfig[]): BlockFilter[] => {
+  const convertToBlockFilters = useCallback((filterConfigs: FilterConfig[]): BlockFilter[] => {
     const supportedOperators: BlockFilter['operator'][] = [
       'equal',
       'not_equal',
@@ -110,11 +125,11 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
         operator: f.operator as BlockFilter['operator'],
         value: f.value,
       }))
-  }
+  }, [])
 
   // Persist filters to config when they change (debounced)
   useEffect(() => {
-    if (!onUpdate || filters.length === 0 && !config?.filters) return
+    if (!onUpdate) return
     
     const timeoutId = setTimeout(() => {
       // Convert FilterConfig[] to BlockFilter[] for saving
@@ -123,7 +138,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
     }, 1000) // Debounce saves
     
     return () => clearTimeout(timeoutId)
-  }, [filters, block.id, onUpdate, config?.filters])
+  }, [filters, block.id, onUpdate, convertToBlockFilters])
 
   async function loadTableFields() {
     if (!tableId) return
@@ -160,8 +175,27 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
     return OPERATORS.filter(op => allowedOperators.includes(op.value))
   }, [allowedOperators])
 
+  // Clean up invalid filters (fields/operators that no longer exist)
+  useEffect(() => {
+    if (availableFields.length === 0 || availableOperators.length === 0) return
+    
+    const validFieldNames = new Set<string>(availableFields.map(f => f.name))
+    const validOperators = new Set<string>(availableOperators.map(op => op.value))
+    
+    setFilters(prev => {
+      const cleaned = prev.filter(f => 
+        validFieldNames.has(f.field) && validOperators.has(f.operator)
+      )
+      // Only update if filters were actually removed
+      if (cleaned.length !== prev.length) {
+        return cleaned
+      }
+      return prev
+    })
+  }, [availableFields, availableOperators])
+
   function addFilter() {
-    if (availableFields.length === 0) return
+    if (availableFields.length === 0 || availableOperators.length === 0) return
     
     setFilters(prev => [...prev, {
       field: availableFields[0].name,
@@ -267,7 +301,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
                 <div className="flex-1 grid grid-cols-3 gap-2">
                   {/* Field Select */}
                   <Select
-                    value={filter.field}
+                    value={availableFields.some(f => f.name === filter.field) ? filter.field : availableFields[0]?.name || ''}
                     onValueChange={(value) => updateFilter(index, { field: value })}
                   >
                     <SelectTrigger>
@@ -284,7 +318,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
 
                   {/* Operator Select */}
                   <Select
-                    value={filter.operator}
+                    value={availableOperators.some(op => op.value === filter.operator) ? filter.operator : availableOperators[0]?.value || 'equal'}
                     onValueChange={(value) => updateFilter(index, { operator: value as FilterConfig['operator'] })}
                   >
                     <SelectTrigger>
