@@ -74,7 +74,7 @@ export default function PageRenderer({
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
                 <div className="text-sm mb-2">Grid view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
               </div>
             </div>
           )
@@ -114,7 +114,7 @@ export default function PageRenderer({
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
                 <div className="text-sm mb-2">Calendar view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
               </div>
             </div>
           )
@@ -147,7 +147,7 @@ export default function PageRenderer({
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
                 <div className="text-sm mb-2">Form requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
               </div>
             </div>
           )
@@ -215,7 +215,7 @@ export default function PageRenderer({
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center max-w-md">
                 <div className="text-sm mb-2">Record Review requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn't connected to a table. Please configure it in Settings.</div>
+                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
               </div>
             </div>
           )

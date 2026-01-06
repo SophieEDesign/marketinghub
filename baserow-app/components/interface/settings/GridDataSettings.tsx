@@ -115,7 +115,7 @@ export default function GridDataSettings({
           </SelectContent>
         </Select>
         <p className="text-xs text-gray-500">
-          Grid blocks automatically use the page's table if not configured here.
+          Grid blocks automatically use the page&apos;s table if not configured here.
         </p>
       </div>
 
