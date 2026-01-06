@@ -13,7 +13,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { PageBlock } from "@/lib/interface/types"
+import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import { type FilterConfig } from "@/lib/interface/filters"
 import { Filter, X, Plus } from "lucide-react"
@@ -51,8 +51,19 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
   const allowedFields = config?.allowed_fields || []
   const allowedOperators = config?.allowed_operators || OPERATORS.map(op => op.value)
   
-  // Current filter state (stored in config.filters)
-  const [filters, setFilters] = useState<FilterConfig[]>(config?.filters || [])
+  // Convert BlockFilter[] from config to FilterConfig[] for internal use
+  const convertToFilterConfigs = (blockFilters: BlockFilter[] | FilterConfig[] | undefined): FilterConfig[] => {
+    if (!blockFilters || blockFilters.length === 0) return []
+    // If already FilterConfig[], return as-is
+    return blockFilters.map(f => ({
+      field: f.field,
+      operator: f.operator as FilterConfig['operator'],
+      value: f.value,
+    }))
+  }
+
+  // Current filter state (stored in config.filters as BlockFilter[], used as FilterConfig[])
+  const [filters, setFilters] = useState<FilterConfig[]>(convertToFilterConfigs(config?.filters))
   const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
   const [loading, setLoading] = useState(false)
 
@@ -79,12 +90,36 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
     }
   }, [block.id, filters, targetBlocks, updateFilterBlock, removeFilterBlock])
 
+  // Convert FilterConfig[] to BlockFilter[] for saving to config
+  // BlockFilter supports fewer operators, so we filter out unsupported ones
+  const convertToBlockFilters = (filterConfigs: FilterConfig[]): BlockFilter[] => {
+    const supportedOperators: BlockFilter['operator'][] = [
+      'equal',
+      'not_equal',
+      'contains',
+      'greater_than',
+      'less_than',
+      'is_empty',
+      'is_not_empty',
+    ]
+    
+    return filterConfigs
+      .filter(f => supportedOperators.includes(f.operator as BlockFilter['operator']))
+      .map(f => ({
+        field: f.field,
+        operator: f.operator as BlockFilter['operator'],
+        value: f.value,
+      }))
+  }
+
   // Persist filters to config when they change (debounced)
   useEffect(() => {
     if (!onUpdate || filters.length === 0 && !config?.filters) return
     
     const timeoutId = setTimeout(() => {
-      onUpdate(block.id, { filters })
+      // Convert FilterConfig[] to BlockFilter[] for saving
+      const blockFilters = convertToBlockFilters(filters)
+      onUpdate(block.id, { filters: blockFilters })
     }, 1000) // Debounce saves
     
     return () => clearTimeout(timeoutId)
