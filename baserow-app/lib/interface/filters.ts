@@ -41,7 +41,7 @@ export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfi
 export function applyFiltersToQuery(
   query: any,
   filters: FilterConfig[],
-  tableFields: Array<{ name: string; type: string }> = []
+  tableFields: Array<{ name: string; type: string; id?: string }> = []
 ): any {
   if (!filters || filters.length === 0) return query
 
@@ -49,7 +49,7 @@ export function applyFiltersToQuery(
     if (!filter.field || filter.operator === undefined) continue
 
     // Validate field exists in table schema
-    const field = tableFields.find(f => f.name === filter.field || f.id === filter.field)
+    const field = tableFields.find(f => f.name === filter.field || (f.id && f.id === filter.field))
     if (!field && tableFields.length > 0) {
       // Field doesn't exist - skip this filter
       console.warn(`Filter field "${filter.field}" not found in table schema`)
