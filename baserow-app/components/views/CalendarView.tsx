@@ -70,6 +70,7 @@ export default function CalendarView({
     // If no tableId but we have viewId, fetch the view's table_id
     if (!tableId && viewId) {
       try {
+        const supabase = createClient()
         const { data: view, error } = await supabase
           .from("views")
           .select("table_id")
