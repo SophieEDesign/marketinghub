@@ -289,10 +289,14 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
           
           // Get display label for selected value
           const selectedValueLabel = filter.value && hasSelectOptions
-            ? (selectOptions.find((opt: string | { value: string; label: string }) => {
-                const optVal = typeof opt === 'string' ? opt : opt.value
-                return optVal === filter.value
-              }) as { label?: string } | string)?.label || filter.value
+            ? (() => {
+                const foundOpt = selectOptions.find((opt: string | { value: string; label: string }) => {
+                  const optVal = typeof opt === 'string' ? opt : opt.value
+                  return optVal === filter.value
+                })
+                if (!foundOpt) return filter.value
+                return typeof foundOpt === 'string' ? foundOpt : (foundOpt.label || foundOpt.value || filter.value)
+              })()
             : filter.value
           
           return (
