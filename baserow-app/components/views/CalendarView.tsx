@@ -333,7 +333,6 @@ export default function CalendarView({
         {renderFilters()}
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
           events={getEvents()}
           editable={true}
           headerToolbar={{
