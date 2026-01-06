@@ -209,7 +209,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         console.log('GridBlock: Calendar view config', {
           dateFieldFromConfig,
-          dateFieldFromFields: dateFieldFromFields?.field_name,
+          dateFieldFromFields: dateFieldFromFields?.viewField?.field_name || dateFieldFromFields?.field?.name,
           resolvedDateFieldId: dateFieldId,
           tableId,
           tableFieldsCount: tableFields.length
