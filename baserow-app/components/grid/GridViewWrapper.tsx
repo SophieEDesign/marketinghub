@@ -46,7 +46,7 @@ interface GridViewWrapperProps {
   initialTableFields?: TableField[]
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
-  filters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
+  standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
 }
 
 export default function GridViewWrapper({
@@ -55,7 +55,7 @@ export default function GridViewWrapper({
   supabaseTableName,
   viewFields,
   initialFilters,
-  filters,
+  standardizedFilters,
   initialSorts,
   initialGroupBy,
   initialTableFields = [],

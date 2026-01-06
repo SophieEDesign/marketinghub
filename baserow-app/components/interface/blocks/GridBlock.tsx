@@ -303,7 +303,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             supabaseTableName={table.supabase_table}
             viewFields={visibleFields}
             initialFilters={activeFilters}
-            filters={allFilters}
+            standardizedFilters={allFilters}
             initialSorts={activeSorts}
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
