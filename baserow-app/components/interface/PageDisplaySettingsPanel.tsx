@@ -94,7 +94,7 @@ export default function PageDisplaySettingsPanel({
     }
     
     // Check if page supports grouping (for kanban/list pages)
-    const supportsGroupingCheck = supportsGrouping
+    const supportsGroupingCheck = ['list', 'kanban'].includes(page.page_type || '')
 
     // Reset state when panel opens/closes to prevent glitching
     if (!isOpen) {
@@ -152,38 +152,38 @@ export default function PageDisplaySettingsPanel({
         setSelectedTableId(tableIdToUse)
         const fields = await loadTableFieldsSync(tableIdToUse)
         setTableFields(fields)
-          
-          // Load grouping field from config or grid_view_settings for kanban/list pages
-          if (supportsGroupingCheck) {
-            const groupByFromConfig = page.config?.group_by || ''
-            if (groupByFromConfig) {
-              setGroupBy(groupByFromConfig)
-            } else {
-              // Try loading from grid_view_settings
-              try {
-                const { data: gridSettings } = await supabase
-                  .from('grid_view_settings')
-                  .select('group_by_field')
-                  .eq('view_id', page.saved_view_id)
-                  .maybeSingle()
-                
-                if (gridSettings?.group_by_field) {
-                  setGroupBy(gridSettings.group_by_field)
-                }
-              } catch (error) {
-                // grid_view_settings might not exist, ignore
+        
+        // Load grouping field from config or grid_view_settings for kanban/list pages
+        if (supportsGroupingCheck) {
+          const groupByFromConfig = page.config?.group_by || ''
+          if (groupByFromConfig) {
+            setGroupBy(groupByFromConfig)
+          } else {
+            // Try loading from grid_view_settings
+            try {
+              const { data: gridSettings } = await supabase
+                .from('grid_view_settings')
+                .select('group_by_field')
+                .eq('view_id', page.saved_view_id)
+                .maybeSingle()
+              
+              if (gridSettings?.group_by_field) {
+                setGroupBy(gridSettings.group_by_field)
               }
+            } catch (error) {
+              // grid_view_settings might not exist, ignore
             }
           }
+        }
 
-          // Load filters - need to map field_id to field name
-          // Only load if we have a saved_view_id
-          if (page.saved_view_id) {
-            const { data: filtersData } = await supabase
-              .from('view_filters')
-              .select('*')
-              .eq('view_id', page.saved_view_id)
-          
+        // Load filters - need to map field_id to field name
+        // Only load if we have a saved_view_id
+        if (page.saved_view_id) {
+          const { data: filtersData } = await supabase
+            .from('view_filters')
+            .select('*')
+            .eq('view_id', page.saved_view_id)
+        
           // Map field_id to field name
           const filtersWithNames = (filtersData || []).map((f: any) => {
             let fieldName = f.field_name
@@ -200,21 +200,21 @@ export default function PageDisplaySettingsPanel({
             }
           })
           setFilters(filtersWithNames)
-          } else {
-            // No view, so no filters from view
-            setFilters([])
-          }
+        } else {
+          // No view, so no filters from view
+          setFilters([])
+        }
 
-          // Load sorts - need to map field_id to field name
-          // Handle errors gracefully (view might not exist or table might not exist)
-          // Only load if we have a saved_view_id
-          if (page.saved_view_id) {
-            try {
-              const { data: sortsData, error: sortsError } = await supabase
-                .from('view_sorts')
-                .select('*')
-                .eq('view_id', page.saved_view_id)
-            
+        // Load sorts - need to map field_id to field name
+        // Handle errors gracefully (view might not exist or table might not exist)
+        // Only load if we have a saved_view_id
+        if (page.saved_view_id) {
+          try {
+            const { data: sortsData, error: sortsError } = await supabase
+              .from('view_sorts')
+              .select('*')
+              .eq('view_id', page.saved_view_id)
+          
             if (sortsError) {
               // If order_index column doesn't exist, try without ordering
               if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
@@ -261,26 +261,26 @@ export default function PageDisplaySettingsPanel({
               })
               setSorts(sortsWithNames)
             }
-            } catch (error) {
-              console.warn('Error loading view sorts:', error)
-              setSorts([])
-            }
-          } else {
-            // No view, so no sorts from view
+          } catch (error) {
+            console.warn('Error loading view sorts:', error)
             setSorts([])
           }
+        } else {
+          // No view, so no sorts from view
+          setSorts([])
+        }
 
-          // Load grouping from grid_view_settings
-          // Handle errors gracefully (table might not exist)
-          // Only load if we have a saved_view_id
-          if (page.saved_view_id) {
-            try {
-              const { data: gridSettings, error: gridError } = await supabase
-                .from('grid_view_settings')
-                .select('group_by_field')
-                .eq('view_id', page.saved_view_id)
-                .maybeSingle()
-            
+        // Load grouping from grid_view_settings
+        // Handle errors gracefully (table might not exist)
+        // Only load if we have a saved_view_id
+        if (page.saved_view_id) {
+          try {
+            const { data: gridSettings, error: gridError } = await supabase
+              .from('grid_view_settings')
+              .select('group_by_field')
+              .eq('view_id', page.saved_view_id)
+              .maybeSingle()
+          
             if (gridError) {
               // If table doesn't exist, skip silently
               if (gridError.code === 'PGRST205' || gridError.code === '42P01') {
@@ -288,12 +288,11 @@ export default function PageDisplaySettingsPanel({
               } else {
                 console.warn('Error loading grid_view_settings:', gridError)
               }
-              } else if (gridSettings?.group_by_field) {
-                setGroupBy(gridSettings.group_by_field)
-              }
-            } catch (error) {
-              console.warn('Error loading grid_view_settings:', error)
+            } else if (gridSettings?.group_by_field) {
+              setGroupBy(gridSettings.group_by_field)
             }
+          } catch (error) {
+            console.warn('Error loading grid_view_settings:', error)
           }
         }
       }
@@ -313,7 +312,7 @@ export default function PageDisplaySettingsPanel({
       }
       
       // Load grouping field from config or grid_view_settings
-      if (supportsGrouping) {
+      if (supportsGroupingCheck) {
         const groupByFromConfig = config.group_by || ''
         if (groupByFromConfig) {
           setGroupBy(groupByFromConfig)
