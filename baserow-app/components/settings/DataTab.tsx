@@ -13,14 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Plus, Table2, Trash2, Edit2, Check, X } from 'lucide-react'
+import { Plus, Table2, Trash2, Edit2, Check, X, Upload } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
+import CSVImportModal from '@/components/layout/CSVImportModal'
 
 interface Table {
   id: string
   name: string
   created_at: string
+  supabase_table: string
 }
 
 export default function SettingsDataTab() {
@@ -33,6 +35,8 @@ export default function SettingsDataTab() {
   const [editingTableId, setEditingTableId] = useState<string | null>(null)
   const [editingTableName, setEditingTableName] = useState<string>('')
   const [savingName, setSavingName] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [tableToImport, setTableToImport] = useState<Table | null>(null)
 
   useEffect(() => {
     loadTables()
@@ -46,7 +50,7 @@ export default function SettingsDataTab() {
       // Load all tables
       const { data: tablesData, error: tablesError } = await supabase
         .from('tables')
-        .select('id, name, created_at')
+        .select('id, name, created_at, supabase_table')
         .order('created_at', { ascending: false })
 
       if (tablesError) throw tablesError
@@ -201,6 +205,19 @@ export default function SettingsDataTab() {
     }
   }
 
+  function handleImportClick(table: Table, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setTableToImport(table)
+    setImportModalOpen(true)
+  }
+
+  function handleImportComplete() {
+    setImportModalOpen(false)
+    setTableToImport(null)
+    router.refresh()
+  }
+
 
   if (loading) {
     return (
@@ -285,6 +302,13 @@ export default function SettingsDataTab() {
                         {table.name}
                       </Link>
                       <button
+                        onClick={(e) => handleImportClick(table, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 rounded transition-all text-blue-600 hover:text-blue-700"
+                        title="Import CSV"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={(e) => handleEditClick(table, e)}
                         className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-all text-gray-600 hover:text-gray-700"
                         title="Edit table name"
@@ -330,6 +354,18 @@ export default function SettingsDataTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* CSV Import Modal */}
+      {tableToImport && (
+        <CSVImportModal
+          open={importModalOpen}
+          onOpenChange={setImportModalOpen}
+          tableId={tableToImport.id}
+          tableName={tableToImport.name}
+          supabaseTableName={tableToImport.supabase_table}
+          onImportComplete={handleImportComplete}
+        />
+      )}
     </Card>
   )
 }

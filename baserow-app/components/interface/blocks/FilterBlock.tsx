@@ -269,7 +269,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
     <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>
       {showTitle && (
         <div
-          className="mb-4 pb-2 border-b"
+          className="mb-3 pb-2 border-b"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
@@ -279,139 +279,122 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
         </div>
       )}
       
-      <div className="flex-1 space-y-3">
-        {filters.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <Filter className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-            <p className="text-sm mb-2">No filters applied</p>
-            <Button
-              onClick={addFilter}
-              variant="outline"
-              size="sm"
-              className="mt-2"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Filter
-            </Button>
-          </div>
-        ) : (
-          <>
-            {filters.map((filter, index) => (
-              <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex-1 grid grid-cols-3 gap-2">
-                  {/* Field Select */}
+      {/* Airtable-style horizontal filter dropdowns */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        {filters.map((filter, index) => {
+          const selectedField = tableFields.find(f => f.name === filter.field)
+          const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'select'
+          const selectOptions = selectedField?.options?.choices || selectedField?.options || []
+          const hasSelectOptions = isSelectField && Array.isArray(selectOptions) && selectOptions.length > 0
+          
+          // Get display label for selected value
+          const selectedValueLabel = filter.value && hasSelectOptions
+            ? (selectOptions.find((opt: string | { value: string; label: string }) => {
+                const optVal = typeof opt === 'string' ? opt : opt.value
+                return optVal === filter.value
+              }) as { label?: string } | string)?.label || filter.value
+            : filter.value
+          
+          return (
+            <div key={index} className="flex items-center gap-1.5 group relative">
+              {/* Single integrated dropdown showing field name and value */}
+              <div className="flex items-center gap-1.5">
+                {/* Field Name Dropdown */}
+                <Select
+                  value={availableFields.some(f => f.name === filter.field) ? filter.field : availableFields[0]?.name || ''}
+                  onValueChange={(value) => updateFilter(index, { field: value, value: '', operator: 'equal' })}
+                >
+                  <SelectTrigger className="h-8 px-3 text-sm border-gray-300 bg-white hover:bg-gray-50 shadow-sm">
+                    <SelectValue placeholder="Field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableFields.map(field => (
+                      <SelectItem key={field.name} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Value Dropdown/Input */}
+                {hasSelectOptions ? (
                   <Select
-                    value={availableFields.some(f => f.name === filter.field) ? filter.field : availableFields[0]?.name || ''}
-                    onValueChange={(value) => updateFilter(index, { field: value })}
+                    value={filter.value || ''}
+                    onValueChange={(value) => updateFilter(index, { value, operator: 'equal' })}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Field" />
+                    <SelectTrigger className={`h-8 px-3 text-sm border-gray-300 bg-white hover:bg-gray-50 shadow-sm ${
+                      filter.value ? 'min-w-[140px]' : 'min-w-[120px]'
+                    }`}>
+                      <SelectValue placeholder={`All ${filter.field}`}>
+                        {selectedValueLabel || `All ${filter.field}`}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {availableFields.map(field => (
-                        <SelectItem key={field.name} value={field.name}>
-                          {field.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Operator Select */}
-                  <Select
-                    value={availableOperators.some(op => op.value === filter.operator) ? filter.operator : availableOperators[0]?.value || 'equal'}
-                    onValueChange={(value) => updateFilter(index, { operator: value as FilterConfig['operator'] })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Operator" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableOperators.map(op => (
-                        <SelectItem key={op.value} value={op.value}>
-                          {op.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Value Input/Select (hidden for is_empty/is_not_empty) */}
-                  {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' ? (
-                    (() => {
-                      const selectedField = tableFields.find(f => f.name === filter.field)
-                      const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'select'
-                      const selectOptions = selectedField?.options?.choices || selectedField?.options || []
-                      
-                      // Render Select dropdown for single_select fields with options
-                      if (isSelectField && Array.isArray(selectOptions) && selectOptions.length > 0) {
+                      <SelectItem value="">All {filter.field}</SelectItem>
+                      {selectOptions.map((option: string | { value: string; label: string }, idx: number) => {
+                        const optionValue = typeof option === 'string' ? option : option.value
+                        const optionLabel = typeof option === 'string' ? option : option.label
                         return (
-                          <Select
-                            value={filter.value || ''}
-                            onValueChange={(value) => updateFilter(index, { value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select value" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {selectOptions.map((option: string | { value: string; label: string }, idx: number) => {
-                                const optionValue = typeof option === 'string' ? option : option.value
-                                const optionLabel = typeof option === 'string' ? option : option.label
-                                return (
-                                  <SelectItem key={idx} value={optionValue}>
-                                    {optionLabel}
-                                  </SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
+                          <SelectItem key={idx} value={optionValue}>
+                            {optionLabel}
+                          </SelectItem>
                         )
-                      }
-                      
-                      // Render regular Input for other field types
-                      return (
-                        <Input
-                          value={filter.value || ''}
-                          onChange={(e) => updateFilter(index, { value: e.target.value })}
-                          placeholder="Value"
-                        />
-                      )
-                    })()
-                  ) : (
-                    <div className="flex items-center text-sm text-gray-500">
-                      No value needed
-                    </div>
-                  )}
-                </div>
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' ? (
+                  <Input
+                    value={filter.value || ''}
+                    onChange={(e) => updateFilter(index, { value: e.target.value })}
+                    placeholder={`Filter ${filter.field}`}
+                    className="h-8 min-w-[140px] text-sm border-gray-300 shadow-sm"
+                  />
+                ) : null}
+              </div>
 
-                {/* Remove Button */}
+              {/* Remove Button - visible on hover or always in edit mode */}
+              {isEditing && (
                 <Button
                   onClick={() => removeFilter(index)}
                   variant="ghost"
                   size="sm"
-                  className="text-gray-400 hover:text-red-600"
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove filter"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </Button>
-              </div>
-            ))}
+              )}
+            </div>
+          )
+        })}
 
-            {/* Add Filter Button */}
-            {isEditing && (
-              <Button
-                onClick={addFilter}
-                variant="outline"
-                size="sm"
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Filter
-              </Button>
-            )}
-          </>
+        {/* Add Filter Button */}
+        {isEditing && (
+          <Button
+            onClick={addFilter}
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-sm border-gray-300 bg-white hover:bg-gray-50 text-gray-600 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Filter
+          </Button>
         )}
       </div>
 
+      {/* Empty State */}
+      {filters.length === 0 && !isEditing && (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8">
+          <div className="text-center">
+            <Filter className="h-6 w-6 mx-auto mb-2 text-gray-300" />
+            <p>No filters applied</p>
+          </div>
+        </div>
+      )}
+
       {/* Target Blocks Info */}
       {targetBlocks !== 'all' && (
-        <div className="mt-4 pt-3 border-t text-xs text-gray-500">
+        <div className="mt-3 pt-2 border-t text-xs text-gray-500">
           Targeting {Array.isArray(targetBlocks) ? targetBlocks.length : 0} block(s)
         </div>
       )}

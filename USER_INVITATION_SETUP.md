@@ -74,6 +74,9 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 - **Check:** Email address is correct
 - **Check:** Supabase project email limits (free tier has limits)
 
+### Invitation email going to spam
+- **Solution:** See "Preventing Spam" section below
+
 ### Profile not created after accepting invitation
 - **Check:** `profiles` table exists and has correct schema
 - **Check:** RLS policies allow profile creation
@@ -88,6 +91,111 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 - ⚠️ Never commit service role key to git
 - ⚠️ Never use service role key in client-side code
 
+## Preventing Spam
+
+If invitation emails are going to spam, follow these steps to improve deliverability:
+
+### 1. Customize Email Template
+
+Improve the email template to make it more professional and less spammy:
+
+1. Go to Supabase Dashboard → Authentication → Email Templates
+2. Select "Invite user" template
+3. Customize with:
+   - **Professional subject line:** e.g., "You've been invited to [Your App Name]"
+   - **Clear sender name:** Use your company/app name
+   - **Personalized content:** Include who invited them and why
+   - **Professional formatting:** Use proper HTML structure
+
+**Example improved template:**
+```
+Subject: You've been invited to join [Your App Name]
+
+Hi there,
+
+You've been invited to join [Your App Name] by [Admin Name].
+
+Click the link below to accept your invitation and create your account:
+
+[Accept the invite]
+
+This invitation will expire in 24 hours.
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+Best regards,
+[Your App Name] Team
+```
+
+### 2. Use Custom SMTP (Recommended for Production)
+
+Supabase's default email service can be flagged as spam. For better deliverability:
+
+1. **Set up SMTP provider** (Gmail, SendGrid, Mailgun, AWS SES, etc.)
+2. Go to Supabase Dashboard → Authentication → Settings → SMTP Settings
+3. Configure:
+   - **SMTP Host:** Your provider's SMTP server
+   - **SMTP Port:** Usually 587 (TLS) or 465 (SSL)
+   - **SMTP User:** Your email/username
+   - **SMTP Password:** Your SMTP password or API key
+   - **Sender Email:** Use a verified domain email (e.g., `noreply@yourdomain.com`)
+   - **Sender Name:** Your app/company name
+
+**Popular SMTP Providers:**
+- **SendGrid:** Good deliverability, free tier available
+- **Mailgun:** Developer-friendly, free tier available
+- **AWS SES:** Cost-effective, requires AWS account
+- **Gmail/Google Workspace:** Simple setup, but limited for bulk emails
+
+### 3. Set Production URL
+
+**Important:** Make sure `NEXT_PUBLIC_APP_URL` is set to your production domain, not `localhost`:
+
+```bash
+# Production
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+
+# NOT
+NEXT_PUBLIC_APP_URL=http://localhost:3000  # ❌ This looks suspicious
+```
+
+Emails with `localhost` URLs are more likely to be flagged as spam.
+
+### 4. Email Authentication (SPF/DKIM)
+
+For custom domains, set up email authentication:
+
+1. **SPF Record:** Add to your domain's DNS
+   ```
+   v=spf1 include:your-smtp-provider.com ~all
+   ```
+
+2. **DKIM:** Configure with your SMTP provider
+   - Most providers (SendGrid, Mailgun) provide DKIM keys
+   - Add the provided DNS records to your domain
+
+3. **DMARC:** Optional but recommended
+   ```
+   v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com
+   ```
+
+### 5. Best Practices
+
+- ✅ Use a professional sender email (`noreply@yourdomain.com`)
+- ✅ Include clear, professional content
+- ✅ Avoid spam trigger words ("free", "urgent", excessive exclamation marks)
+- ✅ Include an unsubscribe option (if required by law)
+- ✅ Test emails with multiple providers (Gmail, Outlook, etc.)
+- ✅ Monitor email deliverability rates
+- ✅ Warm up your sending domain/IP gradually
+
+### 6. Quick Fix for Testing
+
+For immediate testing while setting up SMTP:
+- Ask users to check spam folder
+- Mark as "Not Spam" to train filters
+- Add sender to contacts/whitelist
+
 ## Testing
 
 1. Ensure you're logged in as admin
@@ -97,4 +205,6 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 5. Check email inbox (and spam folder)
 6. Click invitation link
 7. Verify user appears in Users list with correct role
+
+**Note:** For production, always use a custom SMTP provider and production URL to avoid spam issues.
 

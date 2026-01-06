@@ -73,6 +73,8 @@ export default function PageDisplaySettingsPanel({
   const [density, setDensity] = useState<string>("medium")
   const [readOnly, setReadOnly] = useState<boolean>(false)
   const [defaultFocus, setDefaultFocus] = useState<string>("first")
+  const [startDateField, setStartDateField] = useState<string>("")
+  const [endDateField, setEndDateField] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
@@ -90,6 +92,9 @@ export default function PageDisplaySettingsPanel({
     if (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content') {
       return
     }
+    
+    // Check if page supports grouping (for kanban/list pages)
+    const supportsGroupingCheck = supportsGrouping
 
     // Reset state when panel opens/closes to prevent glitching
     if (!isOpen) {
@@ -103,6 +108,8 @@ export default function PageDisplaySettingsPanel({
       setDensity("medium")
       setReadOnly(false)
       setDefaultFocus("first")
+      setStartDateField("")
+      setEndDateField("")
       setIsInitialLoad(true)
       return
     }
@@ -119,6 +126,9 @@ export default function PageDisplaySettingsPanel({
       setTables(tablesData || [])
 
       // Load page's saved view and its data
+      // For calendar and record_review pages, also check base_table if no saved_view_id
+      let tableIdToUse: string | null = null
+      
       if (page.saved_view_id) {
         const { data: view } = await supabase
           .from('views')
@@ -127,15 +137,52 @@ export default function PageDisplaySettingsPanel({
           .single()
 
         if (view?.table_id) {
-          setSelectedTableId(view.table_id)
-          const fields = await loadTableFieldsSync(view.table_id)
-          setTableFields(fields)
+          tableIdToUse = view.table_id
+        }
+      } else if ((page.page_type === 'calendar' || page.page_type === 'record_review') && (page as any).base_table) {
+        // For calendar and record_review pages without a view, use base_table
+        // Check if base_table is a UUID (table ID) or needs lookup
+        const baseTable = (page as any).base_table
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(baseTable)) {
+          tableIdToUse = baseTable
+        }
+      }
+
+      if (tableIdToUse) {
+        setSelectedTableId(tableIdToUse)
+        const fields = await loadTableFieldsSync(tableIdToUse)
+        setTableFields(fields)
+          
+          // Load grouping field from config or grid_view_settings for kanban/list pages
+          if (supportsGroupingCheck) {
+            const groupByFromConfig = page.config?.group_by || ''
+            if (groupByFromConfig) {
+              setGroupBy(groupByFromConfig)
+            } else {
+              // Try loading from grid_view_settings
+              try {
+                const { data: gridSettings } = await supabase
+                  .from('grid_view_settings')
+                  .select('group_by_field')
+                  .eq('view_id', page.saved_view_id)
+                  .maybeSingle()
+                
+                if (gridSettings?.group_by_field) {
+                  setGroupBy(gridSettings.group_by_field)
+                }
+              } catch (error) {
+                // grid_view_settings might not exist, ignore
+              }
+            }
+          }
 
           // Load filters - need to map field_id to field name
-          const { data: filtersData } = await supabase
-            .from('view_filters')
-            .select('*')
-            .eq('view_id', page.saved_view_id)
+          // Only load if we have a saved_view_id
+          if (page.saved_view_id) {
+            const { data: filtersData } = await supabase
+              .from('view_filters')
+              .select('*')
+              .eq('view_id', page.saved_view_id)
           
           // Map field_id to field name
           const filtersWithNames = (filtersData || []).map((f: any) => {
@@ -153,14 +200,20 @@ export default function PageDisplaySettingsPanel({
             }
           })
           setFilters(filtersWithNames)
+          } else {
+            // No view, so no filters from view
+            setFilters([])
+          }
 
           // Load sorts - need to map field_id to field name
           // Handle errors gracefully (view might not exist or table might not exist)
-          try {
-            const { data: sortsData, error: sortsError } = await supabase
-              .from('view_sorts')
-              .select('*')
-              .eq('view_id', page.saved_view_id)
+          // Only load if we have a saved_view_id
+          if (page.saved_view_id) {
+            try {
+              const { data: sortsData, error: sortsError } = await supabase
+                .from('view_sorts')
+                .select('*')
+                .eq('view_id', page.saved_view_id)
             
             if (sortsError) {
               // If order_index column doesn't exist, try without ordering
@@ -208,19 +261,25 @@ export default function PageDisplaySettingsPanel({
               })
               setSorts(sortsWithNames)
             }
-          } catch (error) {
-            console.warn('Error loading view sorts:', error)
+            } catch (error) {
+              console.warn('Error loading view sorts:', error)
+              setSorts([])
+            }
+          } else {
+            // No view, so no sorts from view
             setSorts([])
           }
 
           // Load grouping from grid_view_settings
           // Handle errors gracefully (table might not exist)
-          try {
-            const { data: gridSettings, error: gridError } = await supabase
-              .from('grid_view_settings')
-              .select('group_by_field')
-              .eq('view_id', page.saved_view_id)
-              .maybeSingle()
+          // Only load if we have a saved_view_id
+          if (page.saved_view_id) {
+            try {
+              const { data: gridSettings, error: gridError } = await supabase
+                .from('grid_view_settings')
+                .select('group_by_field')
+                .eq('view_id', page.saved_view_id)
+                .maybeSingle()
             
             if (gridError) {
               // If table doesn't exist, skip silently
@@ -229,11 +288,12 @@ export default function PageDisplaySettingsPanel({
               } else {
                 console.warn('Error loading grid_view_settings:', gridError)
               }
-            } else if (gridSettings?.group_by_field) {
-              setGroupBy(gridSettings.group_by_field)
+              } else if (gridSettings?.group_by_field) {
+                setGroupBy(gridSettings.group_by_field)
+              }
+            } catch (error) {
+              console.warn('Error loading grid_view_settings:', error)
             }
-          } catch (error) {
-            console.warn('Error loading grid_view_settings:', error)
           }
         }
       }
@@ -245,6 +305,20 @@ export default function PageDisplaySettingsPanel({
       setDensity(config.row_height || 'medium')
       setReadOnly(config.read_only || false)
       setDefaultFocus(config.default_focus || 'first')
+      
+      // Load calendar date fields from config
+      if (page.page_type === 'calendar') {
+        setStartDateField(config.start_date_field || config.calendar_date_field || '')
+        setEndDateField(config.end_date_field || config.calendar_end_field || '')
+      }
+      
+      // Load grouping field from config or grid_view_settings
+      if (supportsGrouping) {
+        const groupByFromConfig = config.group_by || ''
+        if (groupByFromConfig) {
+          setGroupBy(groupByFromConfig)
+        }
+      }
       
       // Mark initial load as complete
       setIsInitialLoad(false)
@@ -293,28 +367,60 @@ export default function PageDisplaySettingsPanel({
     }
   }, [selectedTableId])
 
+  // Determine if page supports grouping (needed before saveSettings callback)
+  const supportsGrouping = ['list', 'kanban'].includes(page?.page_type || '')
+
   // Auto-save function - called whenever settings change
   const saveSettings = useCallback(async () => {
     if (!page) return
 
-    // Validate page settings before saving
-    const validation = validatePageAnchor(
-      page.page_type,
-      page.saved_view_id,
-      page.dashboard_layout_id,
-      page.form_config_id,
-      page.record_config_id
-    )
-    
-    if (!validation.valid) {
-      console.error('Cannot save invalid page:', validation.error)
-      // Don't save invalid pages - show error instead
-      alert(`Cannot save page: ${validation.error}`)
-      return
-    }
-
     try {
       const supabase = createClient()
+
+      // If a table is selected but no view exists, create one
+      let viewId = page.saved_view_id
+      if (selectedTableId && !viewId) {
+        // Create a new view for this page
+        const { data: newView, error: viewError } = await supabase
+          .from('views')
+          .insert({
+            table_id: selectedTableId,
+            name: `${page.name} View`,
+            type: page.page_type === 'kanban' ? 'kanban' : page.page_type === 'calendar' ? 'calendar' : 'grid',
+          })
+          .select()
+          .single()
+
+        if (viewError) {
+          console.error('Error creating view:', viewError)
+          alert('Failed to create view. Please try again.')
+          return
+        }
+
+        viewId = newView.id
+
+        // Update page with new view ID
+        await supabase
+          .from('interface_pages')
+          .update({ saved_view_id: viewId })
+          .eq('id', page.id)
+      }
+
+      // If table changed, update the view's table_id
+      if (selectedTableId && viewId) {
+        const { data: existingView } = await supabase
+          .from('views')
+          .select('table_id')
+          .eq('id', viewId)
+          .single()
+
+        if (existingView?.table_id !== selectedTableId) {
+          await supabase
+            .from('views')
+            .update({ table_id: selectedTableId })
+            .eq('id', viewId)
+        }
+      }
 
       // Update page config
       const config = {
@@ -324,6 +430,25 @@ export default function PageDisplaySettingsPanel({
         row_height: density,
         read_only: readOnly,
         default_focus: defaultFocus,
+        // Store grouping field for kanban/list pages
+        ...(supportsGrouping && groupBy ? { group_by: groupBy } : {}),
+        // Store calendar date fields for calendar pages
+        ...(page.page_type === 'calendar' ? {
+          start_date_field: startDateField || undefined,
+          end_date_field: endDateField || undefined,
+          // Also set calendar_date_field for backward compatibility
+          calendar_date_field: startDateField || undefined,
+          calendar_start_field: startDateField || undefined,
+          calendar_end_field: endDateField || undefined,
+        } : {}),
+      }
+      
+      // Also update base_table if table is selected (for calendar pages)
+      if (selectedTableId && page.page_type === 'calendar') {
+        await supabase
+          .from('interface_pages')
+          .update({ base_table: selectedTableId })
+          .eq('id', page.id)
       }
 
       await supabase
@@ -332,17 +457,17 @@ export default function PageDisplaySettingsPanel({
         .eq('id', page.id)
 
       // Update view filters and sorts if saved_view_id exists
-      if (page.saved_view_id) {
+      if (viewId) {
         // Delete existing filters and sorts
         await supabase
           .from('view_filters')
           .delete()
-          .eq('view_id', page.saved_view_id)
+          .eq('view_id', viewId)
 
         await supabase
           .from('view_sorts')
           .delete()
-          .eq('view_id', page.saved_view_id)
+          .eq('view_id', viewId)
 
         // Insert new filters - map field names to field IDs
         if (filters.length > 0) {
@@ -351,7 +476,7 @@ export default function PageDisplaySettingsPanel({
               // Find field ID from field name
               const field = tableFields.find((tf) => tf.name === f.field_name)
               return {
-                view_id: page.saved_view_id,
+                view_id: viewId,
                 field_id: field?.id || f.field_name, // Fallback to name if ID not found
                 filter_type: f.operator,
                 value: f.value,
@@ -370,7 +495,7 @@ export default function PageDisplaySettingsPanel({
               // Find field ID from field name
               const field = tableFields.find((tf) => tf.name === s.field_name)
               return {
-                view_id: page.saved_view_id,
+                view_id: viewId,
                 field_id: field?.id || s.field_name, // Fallback to name if ID not found
                 order_direction: s.direction,
                 order_index: s.order_index,
@@ -382,33 +507,33 @@ export default function PageDisplaySettingsPanel({
             .insert(sortsToInsert)
         }
 
-        // Update grouping in grid_view_settings
-        if (groupBy) {
+        // Update grouping in grid_view_settings (for kanban/list pages)
+        if (supportsGrouping && groupBy) {
           const { data: existing } = await supabase
             .from('grid_view_settings')
             .select('id')
-            .eq('view_id', page.saved_view_id)
-            .single()
+            .eq('view_id', viewId)
+            .maybeSingle()
 
           if (existing) {
             await supabase
               .from('grid_view_settings')
               .update({ group_by_field: groupBy })
-              .eq('view_id', page.saved_view_id)
+              .eq('view_id', viewId)
           } else {
             await supabase
               .from('grid_view_settings')
               .insert({
-                view_id: page.saved_view_id,
+                view_id: viewId,
                 group_by_field: groupBy,
               })
           }
-        } else {
+        } else if (supportsGrouping && !groupBy && viewId) {
           // Remove grouping if cleared
           await supabase
             .from('grid_view_settings')
             .update({ group_by_field: null })
-            .eq('view_id', page.saved_view_id)
+            .eq('view_id', viewId)
         }
       }
 
@@ -417,7 +542,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, onUpdate])
 
   // Auto-save on changes with debounce (skip initial load)
   useEffect(() => {
@@ -428,7 +553,7 @@ export default function PageDisplaySettingsPanel({
     }, 500) // 500ms debounce
 
     return () => clearTimeout(timeoutId)
-  }, [isOpen, page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, saveSettings, isInitialLoad, loading])
+  }, [isOpen, page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, startDateField, endDateField, selectedTableId, saveSettings, isInitialLoad, loading])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -484,8 +609,7 @@ export default function PageDisplaySettingsPanel({
   if (!page) return null
 
   const pageDefinition = getPageTypeDefinition(page.page_type)
-  const isDataBacked = pageDefinition.requiresSourceView
-  const supportsGrouping = ['list', 'kanban'].includes(page.page_type)
+  const isDataBacked = pageDefinition.requiresSourceView || pageDefinition.requiresBaseTable
   
   // Content pages don't show data settings - they're block-based only
   if (page.page_type === 'content') {
@@ -518,6 +642,7 @@ export default function PageDisplaySettingsPanel({
     )
   }
 
+  // Show settings panel for data-backed pages (requiresSourceView or requiresBaseTable)
   if (!isDataBacked) {
     return null
   }
@@ -783,6 +908,63 @@ export default function PageDisplaySettingsPanel({
                     </SelectContent>
                   </Select>
                 </div>
+              )}
+
+              {/* Calendar Date Fields */}
+              {page.page_type === 'calendar' && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Start Date Field</Label>
+                    <Select 
+                      value={startDateField || "__none__"} 
+                      onValueChange={(value) => setStartDateField(value === "__none__" ? "" : value)}
+                      disabled={!selectedTableId || tableFields.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select start date field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {tableFields
+                          .filter((f) => f.type === 'date')
+                          .map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Select the date field to use for calendar events. Required for calendar view.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>End Date Field (Optional)</Label>
+                    <Select 
+                      value={endDateField || "__none__"} 
+                      onValueChange={(value) => setEndDateField(value === "__none__" ? "" : value)}
+                      disabled={!selectedTableId || tableFields.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select end date field (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {tableFields
+                          .filter((f) => f.type === 'date')
+                          .map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500">
+                      Optional: Select an end date field for multi-day events. Leave empty for single-day events.
+                    </p>
+                  </div>
+                </>
               )}
             </TabsContent>
 

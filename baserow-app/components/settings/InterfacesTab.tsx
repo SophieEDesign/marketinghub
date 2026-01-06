@@ -16,6 +16,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Interface {
   id: string
@@ -46,6 +64,15 @@ export default function InterfacesTab() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [groupToDelete, setGroupToDelete] = useState<InterfaceGroup | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadInterfaces()
@@ -455,6 +482,277 @@ export default function InterfacesTab() {
     setDrawerOpen(true)
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string)
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Handle interface group reordering
+    if (activeId.startsWith('group-') && overId.startsWith('group-')) {
+      const activeGroupId = activeId.replace('group-', '')
+      const overGroupId = overId.replace('group-', '')
+
+      const activeIndex = groups.findIndex(g => g.id === activeGroupId)
+      const overIndex = groups.findIndex(g => g.id === overGroupId)
+
+      if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) return
+
+      const newGroups = [...groups]
+      const [removed] = newGroups.splice(activeIndex, 1)
+      newGroups.splice(overIndex, 0, removed)
+
+      // Update order_index for all groups
+      const groupIds = newGroups.map(g => g.id)
+
+      try {
+        await fetch('/api/interface-groups/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupIds }),
+        })
+
+        await loadInterfaces()
+      } catch (error) {
+        console.error('Failed to reorder interface groups:', error)
+        alert('Failed to reorder interfaces. Please try again.')
+      }
+      return
+    }
+
+    // Handle page reordering within or between groups
+    if (activeId.startsWith('page-')) {
+      const pageId = activeId.replace('page-', '')
+      const activePage = groups
+        .flatMap(g => g.interfaces)
+        .find(p => p.id === pageId)
+
+      if (!activePage) return
+
+      let targetGroupId: string | null = null
+
+      // Determine target group
+      if (overId.startsWith('group-')) {
+        targetGroupId = overId.replace('group-', '')
+      } else if (overId.startsWith('page-')) {
+        const targetPageId = overId.replace('page-', '')
+        const targetPage = groups
+          .flatMap(g => g.interfaces)
+          .find(p => p.id === targetPageId)
+        targetGroupId = targetPage?.group_id || null
+      }
+
+      // Get all pages in target group (excluding the active page)
+      const targetGroup = groups.find(g => g.id === targetGroupId)
+      const targetPages = (targetGroup?.interfaces || [])
+        .filter(p => p.id !== pageId)
+        .sort((a, b) => a.order_index - b.order_index)
+
+      // Find insertion index
+      let insertIndex = targetPages.length
+      if (overId.startsWith('page-')) {
+        const targetPageId = overId.replace('page-', '')
+        const targetIndex = targetPages.findIndex(p => p.id === targetPageId)
+        if (targetIndex !== -1) {
+          insertIndex = targetIndex
+        }
+      }
+
+      // Build updates: reorder all pages in target group
+      const updates: Array<{ id: string; group_id: string | null; order_index: number }> = []
+
+      // Update pages before insertion point
+      for (let i = 0; i < insertIndex; i++) {
+        updates.push({
+          id: targetPages[i].id,
+          group_id: targetGroupId,
+          order_index: i,
+        })
+      }
+
+      // Insert the moved page
+      updates.push({
+        id: pageId,
+        group_id: targetGroupId,
+        order_index: insertIndex,
+      })
+
+      // Update pages after insertion point
+      for (let i = insertIndex; i < targetPages.length; i++) {
+        updates.push({
+          id: targetPages[i].id,
+          group_id: targetGroupId,
+          order_index: i + 1,
+        })
+      }
+
+      // If moving to different group, update pages in old group
+      if (activePage.group_id !== targetGroupId) {
+        const oldGroup = groups.find(g => g.id === activePage.group_id)
+        const oldPages = (oldGroup?.interfaces || [])
+          .filter(p => p.id !== pageId)
+          .sort((a, b) => a.order_index - b.order_index)
+
+        oldPages.forEach((p, i) => {
+          updates.push({
+            id: p.id,
+            group_id: activePage.group_id,
+            order_index: i,
+          })
+        })
+      }
+
+      try {
+        await fetch('/api/interfaces/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ interfaceUpdates: updates }),
+        })
+
+        await loadInterfaces()
+      } catch (error) {
+        console.error('Failed to reorder pages:', error)
+        alert('Failed to reorder pages. Please try again.')
+      }
+    }
+  }
+
+  // Sortable Group Component
+  function SortableGroup({ group }: { group: InterfaceGroup }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: `group-${group.id}`,
+    })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+      <div ref={setNodeRef} style={style} className="space-y-3">
+        {/* Interface Header */}
+        <div className="flex items-center justify-between p-3 bg-gray-50 border rounded-lg">
+          <div className="flex items-center gap-3 flex-1">
+            <button
+              {...attributes}
+              {...listeners}
+              className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing"
+            >
+              <GripVertical className="h-5 w-5 text-gray-500" />
+            </button>
+            <Folder className="h-5 w-5 text-gray-500" />
+            <h3 className="text-base font-semibold text-gray-900">
+              {group.name}
+            </h3>
+            <Badge variant="outline" className="text-xs">
+              {group.interfaces.length} {group.interfaces.length === 1 ? 'page' : 'pages'}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Admin only</span>
+              <Switch
+                checked={group.is_admin_only || false}
+                onCheckedChange={() => handleToggleInterfaceAccess(group.id, group.is_admin_only || false)}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteGroup(group)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Pages under this Interface */}
+        {group.interfaces.length > 0 ? (
+          <div className="space-y-2 pl-6">
+            <SortableContext
+              items={group.interfaces.map(p => `page-${p.id}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              {group.interfaces.map((page) => (
+                <SortablePage key={page.id} page={page} />
+              ))}
+            </SortableContext>
+          </div>
+        ) : (
+          <div className="pl-6 py-2 text-sm text-muted-foreground italic">
+            No pages in this interface yet
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Sortable Page Component
+  function SortablePage({ page }: { page: Interface }) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: `page-${page.id}`,
+    })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <button
+            {...attributes}
+            {...listeners}
+            className="p-1 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleOpenDetail(page)}
+                className="font-medium text-gray-900 hover:text-blue-600 text-left"
+              >
+                {page.name}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Admin only</span>
+            <Switch
+              checked={page.is_admin_only}
+              onCheckedChange={() => handleToggleAccess(page.id, page.is_admin_only)}
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleOpenDetail(page)}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   async function handleDeleteGroup(group: InterfaceGroup) {
     setGroupToDelete(group)
     setDeleteDialogOpen(true)
@@ -570,87 +868,46 @@ export default function InterfacesTab() {
               </p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {groups.map((group) => (
-                <div key={group.id} className="space-y-3">
-                  {/* Interface Header */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 border rounded-lg">
-                    <div className="flex items-center gap-3 flex-1">
-                      <Folder className="h-5 w-5 text-gray-500" />
-                      <h3 className="text-base font-semibold text-gray-900">
-                        {group.name}
-                      </h3>
-                      <Badge variant="outline" className="text-xs">
-                        {group.interfaces.length} {group.interfaces.length === 1 ? 'page' : 'pages'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Admin only</span>
-                        <Switch
-                          checked={group.is_admin_only || false}
-                          onCheckedChange={() => handleToggleInterfaceAccess(group.id, group.is_admin_only || false)}
-                        />
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteGroup(group)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  {/* Pages under this Interface */}
-                  {group.interfaces.length > 0 ? (
-                    <div className="space-y-2 pl-6">
-                      {group.interfaces.map((page) => (
-                        <div
-                          key={page.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleOpenDetail(page)}
-                                  className="font-medium text-gray-900 hover:text-blue-600 text-left"
-                                >
-                                  {page.name}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">Admin only</span>
-                              <Switch
-                                checked={page.is_admin_only}
-                                onCheckedChange={() => handleToggleAccess(page.id, page.is_admin_only)}
-                              />
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenDetail(page)}
-                            >
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="pl-6 py-2 text-sm text-muted-foreground italic">
-                      No pages in this interface yet
-                    </div>
-                  )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={[
+                  ...groups.map(g => `group-${g.id}`),
+                  ...groups.flatMap(g => g.interfaces.map(p => `page-${p.id}`)),
+                ]}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-6">
+                  {groups.map((group) => (
+                    <SortableGroup key={group.id} group={group} />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+              <DragOverlay>
+                {activeId ? (
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                    {activeId.startsWith('group-') ? (
+                      <div className="flex items-center gap-3">
+                        <Folder className="h-5 w-5 text-gray-500" />
+                        <span className="text-base font-semibold text-gray-900">
+                          {groups.find(g => `group-${g.id}` === activeId)?.name}
+                        </span>
+                      </div>
+                    ) : activeId.startsWith('page-') ? (
+                      <span className="text-sm text-gray-700">
+                        {groups
+                          .flatMap(g => g.interfaces)
+                          .find(p => `page-${p.id}` === activeId)?.name}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </CardContent>
       </Card>

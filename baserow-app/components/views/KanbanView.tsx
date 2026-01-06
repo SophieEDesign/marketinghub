@@ -46,16 +46,44 @@ export default function KanbanView({
     const sanitizedTableId = tableId.split(':')[0]
     
     setLoading(true)
-    const { data, error } = await supabase
-      .from("table_rows")
-      .select("*")
-      .eq("table_id", sanitizedTableId)
-      .order("created_at", { ascending: false })
+    try {
+      // First, get the table to find its supabase_table name
+      const { data: table, error: tableError } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", sanitizedTableId)
+        .single()
 
-    if (error) {
-      console.error("Error loading rows:", error)
-    } else {
-      setRows(data || [])
+      if (tableError || !table) {
+        console.error("Error loading table:", tableError)
+        setRows([])
+        setLoading(false)
+        return
+      }
+
+      // Load rows from the actual table (not table_rows)
+      const { data, error } = await supabase
+        .from(table.supabase_table)
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading rows:", error)
+        setRows([])
+      } else {
+        // Convert flat rows to TableRow format for compatibility
+        const tableRows = (data || []).map((row: any) => ({
+          id: row.id,
+          table_id: sanitizedTableId,
+          data: row,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        }))
+        setRows(tableRows)
+      }
+    } catch (error) {
+      console.error("Error loading kanban rows:", error)
+      setRows([])
     }
     setLoading(false)
   }

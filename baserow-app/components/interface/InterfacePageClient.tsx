@@ -86,12 +86,15 @@ export default function InterfacePageClient({
   useEffect(() => {
     if (page && page.source_view) {
       loadSqlViewData()
-    } else if (page && page.page_type === 'record_review' && page.saved_view_id) {
-      // Load table data for record_review pages
+    } else if (page && page.page_type === 'record_review') {
+      // Load table data for record_review pages (check both saved_view_id and base_table)
       loadRecordReviewData()
+    } else if (page && page.saved_view_id && (page.page_type === 'list' || page.page_type === 'grid')) {
+      // Load table data for list/grid view pages
+      loadListViewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config])
+  }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config, page?.base_table])
 
   // Load blocks for dashboard/overview/content/record_review pages in BOTH edit and view mode
   // CRITICAL: Blocks must load in view mode so they render correctly
@@ -158,11 +161,88 @@ export default function InterfacePageClient({
   }
 
   async function loadRecordReviewData() {
+    if (!page) return
+
+    try {
+      const supabase = createClient()
+      let tableId: string | null = null
+      let supabaseTableName: string | null = null
+
+      // First, try to get table ID from saved_view_id
+      if (page.saved_view_id) {
+        const { data: view, error: viewError } = await supabase
+          .from('views')
+          .select('table_id')
+          .eq('id', page.saved_view_id)
+          .single()
+
+        if (!viewError && view?.table_id) {
+          tableId = view.table_id
+        }
+      }
+
+      // Fallback to base_table if no view
+      if (!tableId && page.base_table) {
+        // Check if base_table is a UUID (table ID) or needs lookup
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(page.base_table)) {
+          tableId = page.base_table
+        }
+      }
+
+      if (!tableId) {
+        console.error("No table ID found for record review page")
+        setData([])
+        return
+      }
+
+      // Get table name
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', tableId)
+        .single()
+
+      if (tableError || !table?.supabase_table) {
+        console.error("Error loading table:", tableError)
+        setData([])
+        return
+      }
+
+      supabaseTableName = table.supabase_table
+
+      // Load data directly from the actual table
+      const { data: tableData, error: tableDataError } = await supabase
+        .from(supabaseTableName)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1000)
+
+      if (tableDataError) {
+        console.error("Error loading table data:", tableDataError)
+        setData([])
+        return
+      }
+
+      // Ensure each record has an id field
+      const records = (tableData || []).map((record: any) => ({
+        ...record,
+        id: record.id || record.record_id || crypto.randomUUID(), // Ensure id exists
+      }))
+
+      setData(records)
+    } catch (error) {
+      console.error("Error loading record review data:", error)
+      setData([])
+    }
+  }
+
+  async function loadListViewData() {
     if (!page?.saved_view_id) return
 
     try {
-      // Get table ID from the view
       const supabase = createClient()
+      
+      // Get view with table_id
       const { data: view, error: viewError } = await supabase
         .from('views')
         .select('table_id')
@@ -188,39 +268,84 @@ export default function InterfacePageClient({
         return
       }
 
-      // Load rows from table_rows or the actual table
-      // Try table_rows first (if it exists)
-      const { data: rowsData, error: rowsError } = await supabase
-        .from('table_rows')
-        .select('*')
-        .eq('table_id', view.table_id)
-        .order('created_at', { ascending: false })
-        .limit(100)
-
-      if (!rowsError && rowsData) {
-        // Convert table_rows format to flat format for RecordReviewView
-        const flatData = rowsData.map((row: any) => ({
-          id: row.id,
-          ...row.data,
-        }))
-        setData(flatData)
-      } else {
-        // Fallback: try loading from the actual table
-        const { data: tableData, error: tableDataError } = await supabase
-          .from(table.supabase_table)
+      // Load view filters and sorts
+      const [filtersRes, sortsRes] = await Promise.all([
+        supabase
+          .from('view_filters')
           .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100)
+          .eq('view_id', page.saved_view_id),
+        supabase
+          .from('view_sorts')
+          .select('*')
+          .eq('view_id', page.saved_view_id)
+          .order('order_index', { ascending: true }),
+      ])
 
-        if (!tableDataError && tableData) {
-          setData(tableData || [])
-        } else {
-          console.error("Error loading table data:", tableDataError)
-          setData([])
+      const filters = filtersRes.data || []
+      const sorts = sortsRes.data || []
+
+      // Build query
+      let query = supabase
+        .from(table.supabase_table)
+        .select('*')
+        .limit(1000)
+
+      // Apply filters
+      for (const filter of filters) {
+        const fieldName = filter.field_name || filter.field_id
+        if (!fieldName || !filter.operator) continue
+
+        switch (filter.operator) {
+          case 'equal':
+            query = query.eq(fieldName, filter.value)
+            break
+          case 'not_equal':
+            query = query.neq(fieldName, filter.value)
+            break
+          case 'contains':
+            query = query.ilike(fieldName, `%${filter.value}%`)
+            break
+          case 'not_contains':
+            query = query.not('ilike', fieldName, `%${filter.value}%`)
+            break
+          case 'is_empty':
+            query = query.is(fieldName, null)
+            break
+          case 'is_not_empty':
+            query = query.not('is', fieldName, null)
+            break
+          case 'greater_than':
+            query = query.gt(fieldName, filter.value)
+            break
+          case 'less_than':
+            query = query.lt(fieldName, filter.value)
+            break
         }
       }
+
+      // Apply sorts
+      if (sorts.length > 0) {
+        for (const sort of sorts) {
+          const fieldName = sort.field_name || sort.field_id
+          if (!fieldName) continue
+          const ascending = sort.direction === 'asc' || sort.order_direction === 'asc'
+          query = query.order(fieldName, { ascending })
+        }
+      } else {
+        // Default sort by created_at descending
+        query = query.order('created_at', { ascending: false })
+      }
+
+      const { data: tableData, error: tableDataError } = await query
+
+      if (tableDataError) {
+        console.error("Error loading table data:", tableDataError)
+        setData([])
+      } else {
+        setData(tableData || [])
+      }
     } catch (error) {
-      console.error("Error loading record review data:", error)
+      console.error("Error loading list view data:", error)
       setData([])
     }
   }
@@ -550,7 +675,14 @@ export default function InterfacePageClient({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setDisplaySettingsOpen(true)}
+                  onClick={() => {
+                    // Open appropriate settings panel based on page type
+                    if (page.page_type === 'form') {
+                      setFormSettingsOpen(true)
+                    } else {
+                      setDisplaySettingsOpen(true)
+                    }
+                  }}
                   title="Page Settings"
                 >
                   <Settings className="h-4 w-4" />
@@ -614,7 +746,7 @@ export default function InterfacePageClient({
         )}
       </div>
 
-      {/* Page Display Settings Panel - Only for pages with saved_view_id, not dashboard pages */}
+      {/* Page Display Settings Panel - Only for pages with saved_view_id or base_table, not dashboard/overview/content pages */}
       {page && page.page_type !== 'dashboard' && page.page_type !== 'overview' && page.page_type !== 'content' && (
         <PageDisplaySettingsPanel
           page={page}

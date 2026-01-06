@@ -180,10 +180,22 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       case 'calendar': {
         // Calendar requires a valid date field
         const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
-        const dateFieldFromFields = visibleFields.find(f => {
-          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
-          return field && field.type === 'date'
+        
+        // Find date fields, prioritizing event date fields over timestamp fields
+        const allDateFields = visibleFields
+          .map(f => {
+            const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+            return field && field.type === 'date' ? { field, viewField: f } : null
+          })
+          .filter(Boolean) as Array<{ field: any; viewField: any }>
+        
+        // Prioritize fields with names like 'date', 'date_to', 'date_due' over 'created', 'created_at', 'updated_at'
+        const preferredDateField = allDateFields.find(({ field }) => {
+          const name = field.name.toLowerCase()
+          return name.includes('date') && !name.includes('created') && !name.includes('updated')
         })
+        
+        const dateFieldFromFields = preferredDateField || allDateFields[0]
         
         // Resolve dateFieldId - prefer field name over ID since data uses field names as keys
         let dateFieldId = ''
@@ -191,8 +203,8 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           // If config has a field ID/name, find the actual field to get its name
           const configField = tableFields.find(tf => tf.name === dateFieldFromConfig || tf.id === dateFieldFromConfig)
           dateFieldId = configField?.name || dateFieldFromConfig
-        } else if (dateFieldFromFields?.field_name) {
-          dateFieldId = dateFieldFromFields.field_name
+        } else if (dateFieldFromFields?.viewField?.field_name) {
+          dateFieldId = dateFieldFromFields.viewField.field_name
         }
         
         console.log('GridBlock: Calendar view config', {

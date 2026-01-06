@@ -4,11 +4,18 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { format } from "date-fns"
 import type { EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -42,6 +49,10 @@ export default function CalendarView({
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
+  
+  // Date range filter state
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
   
   // Use refs to track previous values and prevent infinite loops
   const prevTableFieldsRef = useRef<string>('')
@@ -90,9 +101,28 @@ export default function CalendarView({
   }, [resolvedTableId, tableFieldsKey])
 
   // Memoize filters to prevent unnecessary re-renders
+  // Include date range filters in the key
   const filtersKey = useMemo(() => {
-    return JSON.stringify(filters || [])
-  }, [filters])
+    const dateRangeKey = dateFrom || dateTo ? `${dateFrom?.toISOString()}|${dateTo?.toISOString()}` : ''
+    return JSON.stringify(filters || []) + dateRangeKey
+  }, [filters, dateFrom, dateTo])
+  
+  // Build combined filters including date range
+  const combinedFilters = useMemo(() => {
+    const allFilters: FilterConfig[] = [...(filters || [])]
+    
+    // Add date range filter if dates are set
+    if (dateFieldId && (dateFrom || dateTo)) {
+      allFilters.push({
+        field: dateFieldId,
+        operator: 'date_range',
+        value: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
+        value2: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
+      })
+    }
+    
+    return allFilters
+  }, [filters, dateFieldId, dateFrom, dateTo])
 
   // Memoize loadedTableFields key to prevent unnecessary re-renders
   const loadedTableFieldsKey = useMemo(() => {
@@ -116,7 +146,7 @@ export default function CalendarView({
       prevLoadedFieldsKeyRef.current = currentFieldsKey
     }
     
-    // Only reload if filters, searchQuery, or loadedTableFields actually changed
+    // Only reload if filters (including date range), searchQuery, or loadedTableFields actually changed
     const currentFiltersKey = filtersKey
     const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}`
     
@@ -263,9 +293,9 @@ export default function CalendarView({
         .from(supabaseTableName)
         .select("*")
 
-      // Apply filters using shared filter system
+      // Apply filters using shared filter system (includes date range filters)
       const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.id, type: f.type }))
-      query = applyFiltersToQuery(query, filters, normalizedFields)
+      query = applyFiltersToQuery(query, combinedFilters, normalizedFields)
 
       // Apply search query if provided
       if (searchQuery && fieldIds.length > 0) {
@@ -360,37 +390,49 @@ export default function CalendarView({
       // Find the actual field name to use (could be name or id)
       const actualFieldName = dateField?.name || dateFieldId
       
-      console.log('Calendar: Generating events with dateFieldId:', dateFieldId, 'actualFieldName:', actualFieldName, 'rows:', filteredRows.length)
+      // Only log in development and when there might be issues
+      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0 && !dateFieldId) {
+        console.warn('Calendar: No date field configured, cannot generate events')
+      }
       
       const events = filteredRows
         .filter((row) => {
           if (!row || !row.data) {
-            console.log('Calendar: Skipping row - missing data', row)
             return false
           }
           
           // Try both the field name and the field ID
           const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
           
-          if (!dateValue) {
-            // Log first few rows to debug
-            if (filteredRows.indexOf(row) < 3) {
-              console.log('Calendar: Row missing date value', {
-                rowId: row.id,
-                actualFieldName,
-                dateFieldId,
-                availableFields: Object.keys(row.data).slice(0, 5)
-              })
-            }
+          // Skip if no date value
+          if (!dateValue || dateValue === null || dateValue === undefined) {
             return false
           }
           
-          // Accept string dates, Date objects, or ISO strings
-          return typeof dateValue === 'string' || dateValue instanceof Date
+          // Try to parse the date value
+          try {
+            const parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
+            // Check if date is valid
+            return !isNaN(parsedDate.getTime())
+          } catch {
+            return false
+          }
         })
         .map((row) => {
           const actualFieldName = dateField?.name || dateFieldId
           const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
+          
+          // Parse date value
+          let parsedDate: Date
+          try {
+            parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
+            if (isNaN(parsedDate.getTime())) {
+              // Fallback to current date if parsing fails
+              parsedDate = new Date()
+            }
+          } catch {
+            parsedDate = new Date()
+          }
           
           // Use first non-date field as title, or fallback to row ID
           const titleField = (Array.isArray(fieldIds) ? fieldIds : [])
@@ -412,7 +454,7 @@ export default function CalendarView({
           return {
             id: row.id,
             title: title || "Untitled",
-            start: dateValue,
+            start: parsedDate,
             extendedProps: {
               rowId: row.id,
               rowData: row.data,
@@ -420,9 +462,9 @@ export default function CalendarView({
           }
         })
       
-      console.log('Calendar: Generated', events.length, 'events from', filteredRows.length, 'rows')
-      if (events.length === 0 && filteredRows.length > 0) {
-        console.warn('Calendar: No events generated despite having rows. Sample row data keys:', filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : 'no data')
+      // Only log warnings when no events are generated but rows exist
+      if (events.length === 0 && filteredRows.length > 0 && process.env.NODE_ENV === 'development') {
+        console.warn('Calendar: No events generated from', filteredRows.length, 'rows. Check date field configuration.')
       }
       return events
     } catch (error) {
@@ -503,25 +545,127 @@ export default function CalendarView({
     )
   }
 
-  // Render filters above calendar
+  // Render date range filters and other filters above calendar
   const renderFilters = () => {
-    if (!filters || filters.length === 0) return null
-
+    const hasOtherFilters = filters && filters.length > 0
+    
     return (
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="text-xs font-semibold text-gray-600 mb-2">Filters</div>
-        <div className="flex flex-wrap gap-2">
-          {filters.map((filter, idx) => (
-            <div
-              key={idx}
-              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs"
-            >
-              <span className="font-medium">{filter.field}</span>
-              <span className="mx-1 text-gray-400">{filter.operator}</span>
-              <span className="text-gray-600">{String(filter.value || '')}</span>
+      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+        {/* Date Range Filters - Always show if dateFieldId is available */}
+        {dateFieldId && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-gray-600">Date Range</div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="date-from" className="text-xs text-gray-600 whitespace-nowrap">
+                  From:
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-from"
+                      variant="outline"
+                      size="sm"
+                      className="w-[140px] justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {dateFrom && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setDateFrom(undefined)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Label htmlFor="date-to" className="text-xs text-gray-600 whitespace-nowrap">
+                  To:
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-to"
+                      variant="outline"
+                      size="sm"
+                      className="w-[140px] justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      disabled={(date) => dateFrom ? date < dateFrom : false}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {dateTo && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setDateTo(undefined)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              
+              {(dateFrom || dateTo) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setDateFrom(undefined)
+                    setDateTo(undefined)
+                  }}
+                >
+                  Clear range
+                </Button>
+              )}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+        
+        {/* Other Filters */}
+        {hasOtherFilters && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold text-gray-600">Other Filters</div>
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter, idx) => (
+                <div
+                  key={idx}
+                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs"
+                >
+                  <span className="font-medium">{filter.field}</span>
+                  <span className="mx-1 text-gray-400">{filter.operator}</span>
+                  <span className="text-gray-600">{String(filter.value || '')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     )
   }

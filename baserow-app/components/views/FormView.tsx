@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Save } from "lucide-react"
 import type { TableRow } from "@/types/database"
+import type { TableField } from "@/types/fields"
 
 interface FormViewProps {
   tableId: string
@@ -17,72 +19,153 @@ interface FormViewProps {
 
 export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewProps) {
   const [formData, setFormData] = useState<Record<string, any>>({})
-  const [loading, setLoading] = useState(false)
+  const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [supabaseTableName, setSupabaseTableName] = useState<string>("")
 
   useEffect(() => {
-    if (rowId) {
+    loadTableData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId])
+
+  useEffect(() => {
+    if (rowId && supabaseTableName) {
       loadRow()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowId])
+  }, [rowId, supabaseTableName])
+
+  async function loadTableData() {
+    if (!tableId) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    try {
+      // Load table to get supabase_table name
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', tableId)
+        .single()
+
+      if (tableError || !table) {
+        console.error("Error loading table:", tableError)
+        setLoading(false)
+        return
+      }
+
+      setSupabaseTableName(table.supabase_table)
+
+      // Load table fields
+      const { data: fieldsData, error: fieldsError } = await supabase
+        .from('table_fields')
+        .select('*')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+
+      if (fieldsError) {
+        console.error("Error loading table fields:", fieldsError)
+        setTableFields([])
+      } else {
+        setTableFields((fieldsData || []) as TableField[])
+      }
+    } catch (error) {
+      console.error("Error loading table data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function loadRow() {
-    if (!rowId) return
+    if (!rowId || !supabaseTableName) return
+    
     setLoading(true)
-    const { data, error } = await supabase
-      .from("table_rows")
-      .select("*")
-      .eq("id", rowId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from(supabaseTableName)
+        .select("*")
+        .eq("id", rowId)
+        .single()
 
-    if (data) {
-      setFormData(data.data || {})
+      if (error) {
+        console.error("Error loading row:", error)
+      } else if (data) {
+        setFormData(data)
+      }
+    } catch (error) {
+      console.error("Error loading row:", error)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   async function handleSave() {
+    if (!supabaseTableName) return
+
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      if (rowId) {
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .update(formData)
+          .eq("id", rowId)
 
-    if (rowId) {
-      const { error } = await supabase
-        .from("table_rows")
-        .update({
-          data: formData,
-          updated_at: new Date().toISOString(),
-          updated_by: user?.id,
-        })
-        .eq("id", rowId)
-
-      if (error) {
-        console.error("Error updating row:", error)
-      }
-    } else {
-      const { error } = await supabase.from("table_rows").insert([
-        {
-          table_id: tableId,
-          data: formData,
-          created_by: user?.id,
-        },
-      ])
-
-      if (error) {
-        console.error("Error creating row:", error)
+        if (error) {
+          console.error("Error updating row:", error)
+          alert("Failed to update record. Please try again.")
+        } else {
+          alert("Record updated successfully!")
+        }
       } else {
-        setFormData({})
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .insert([formData])
+
+        if (error) {
+          console.error("Error creating row:", error)
+          alert("Failed to create record. Please try again.")
+        } else {
+          alert("Record created successfully!")
+          setFormData({})
+        }
       }
+    } catch (error) {
+      console.error("Error saving:", error)
+      alert("Failed to save record. Please try again.")
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
-  function handleFieldChange(fieldId: string, value: any) {
-    setFormData((prev) => ({ ...prev, [fieldId]: value }))
+  function handleFieldChange(fieldName: string, value: any) {
+    setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
+
+  // Get visible fields - use fieldIds if provided, otherwise show all fields
+  const visibleFields = fieldIds.length > 0
+    ? tableFields.filter(f => fieldIds.includes(f.id) || fieldIds.includes(f.name))
+    : tableFields
 
   if (loading) {
-    return <div className="p-4">Loading...</div>
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50 p-6">
+        <div className="text-gray-500">Loading form...</div>
+      </div>
+    )
+  }
+
+  if (!supabaseTableName || tableFields.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-50 p-6">
+        <div className="text-center max-w-md">
+          <div className="text-sm mb-2 text-gray-600">Form requires a table connection.</div>
+          <div className="text-xs text-gray-400">Please configure the form in Settings.</div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -94,23 +177,47 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 p-6 bg-white">
-          {fieldIds.map((fieldId) => (
-            <div key={fieldId} className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                {fieldId}
-              </label>
-              <Input
-                value={formData[fieldId] || ""}
-                onChange={(e) => handleFieldChange(fieldId, e.target.value)}
-                placeholder={`Enter ${fieldId}`}
-                className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-              />
+          {visibleFields.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              No fields configured. Please add fields in Settings.
             </div>
-          ))}
+          ) : (
+            visibleFields.map((field) => {
+              const value = formData[field.name] || ""
+              const isRequired = field.required || false
+
+              return (
+                <div key={field.id} className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    {field.name}
+                    {isRequired && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {field.type === "long_text" ? (
+                    <Textarea
+                      value={value}
+                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                      placeholder={`Enter ${field.name}`}
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 min-h-[100px]"
+                      required={isRequired}
+                    />
+                  ) : (
+                    <Input
+                      type={field.type === "number" ? "number" : field.type === "email" ? "email" : "text"}
+                      value={value}
+                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                      placeholder={`Enter ${field.name}`}
+                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      required={isRequired}
+                    />
+                  )}
+                </div>
+              )
+            })
+          )}
           <div className="flex justify-end pt-4 border-t border-gray-200">
             <Button 
               onClick={handleSave} 
-              disabled={saving}
+              disabled={saving || visibleFields.length === 0}
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
               <Save className="mr-2 h-4 w-4" />

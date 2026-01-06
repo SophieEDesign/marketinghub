@@ -10,6 +10,7 @@ import { PageType } from '@/lib/interface/page-types'
 import { useMemo, useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
+import { createClient } from '@/lib/supabase/client'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
@@ -18,6 +19,7 @@ const CalendarView = dynamic(() => import('@/components/views/CalendarView'), { 
 const FormView = dynamic(() => import('@/components/views/FormView'), { ssr: false })
 const InterfaceBuilder = dynamic(() => import('@/components/interface/InterfaceBuilder'), { ssr: false })
 const RecordReviewView = dynamic(() => import('@/components/interface/RecordReviewView'), { ssr: false })
+const GridView = dynamic(() => import('@/components/grid/GridView'), { ssr: false })
 
 interface PageRendererProps {
   page: InterfacePage
@@ -67,8 +69,8 @@ export default function PageRenderer({
     switch (visualisation) {
       case 'list':
       case 'grid':
-        // For list/grid views, we need to render using AirtableViewPage
-        // This requires a view record, so we'll create a minimal one
+        // For list/grid views, use GridView component if we have a saved_view_id
+        // Otherwise fall back to SimpleGridView for SQL view data
         if (!pageTableId) {
           return (
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
@@ -79,6 +81,22 @@ export default function PageRenderer({
             </div>
           )
         }
+        
+        // If we have a saved_view_id, use the proper GridView component
+        if (page.saved_view_id) {
+          return (
+            <div className="h-full">
+              <ListViewGrid
+                page={page}
+                tableId={pageTableId}
+                viewId={page.saved_view_id}
+                config={config}
+              />
+            </div>
+          )
+        }
+        
+        // Otherwise use SimpleGridView for SQL view data
         return (
           <div className="h-full">
             <SimpleGridView
@@ -151,9 +169,11 @@ export default function PageRenderer({
 
       case 'form':
         // FormView expects fieldIds as array of strings, not form_fields config
+        // Get field IDs from config.form_fields or config.fields
         const formFieldIds = config.form_fields 
           ? config.form_fields.map((f: any) => typeof f === 'string' ? f : f.field_id || f.field_name)
           : config.fields || []
+        
         if (!pageTableId) {
           return (
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
@@ -164,9 +184,13 @@ export default function PageRenderer({
             </div>
           )
         }
+        
+        // Use form_config_id or base_table for tableId, fallback to pageTableId
+        const formTableId = page.form_config_id || page.base_table || pageTableId
+        
         return (
           <FormView
-            tableId={pageTableId}
+            tableId={formTableId}
             viewId={page.saved_view_id || config.view_id || page.id}
             fieldIds={formFieldIds}
           />
@@ -335,6 +359,134 @@ function InvalidPageState({ page }: { page: InterfacePage }) {
         </a>
       </div>
     </div>
+  )
+}
+
+// List view grid component that loads view data
+function ListViewGrid({ page, tableId, viewId, config }: { page: InterfacePage; tableId: string | null; viewId: string; config: any }) {
+  const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
+  const [tableFields, setTableFields] = useState<any[]>([])
+  const [viewFilters, setViewFilters] = useState<any[]>([])
+  const [viewSorts, setViewSorts] = useState<any[]>([])
+  const [supabaseTableName, setSupabaseTableName] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [groupBy, setGroupBy] = useState<string>('')
+
+  useEffect(() => {
+    loadViewData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewId, tableId])
+
+  async function loadViewData() {
+    if (!tableId || !viewId) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const supabase = createClient()
+
+      // Load table to get supabase_table name
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', tableId)
+        .single()
+
+      if (tableError || !table) {
+        console.error('Error loading table:', tableError)
+        setLoading(false)
+        return
+      }
+
+      setSupabaseTableName(table.supabase_table)
+
+      // Load view fields
+      const { data: fieldsData } = await supabase
+        .from('view_fields')
+        .select('field_name, visible, position')
+        .eq('view_id', viewId)
+        .order('position', { ascending: true })
+
+      setViewFields(fieldsData || [])
+
+      // Load table fields
+      const { data: tableFieldsData } = await supabase
+        .from('table_fields')
+        .select('*')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+
+      setTableFields(tableFieldsData || [])
+
+      // Load filters
+      const { data: filtersData } = await supabase
+        .from('view_filters')
+        .select('*')
+        .eq('view_id', viewId)
+
+      setViewFilters(filtersData || [])
+
+      // Load sorts
+      const { data: sortsData } = await supabase
+        .from('view_sorts')
+        .select('*')
+        .eq('view_id', viewId)
+        .order('order_index', { ascending: true })
+
+      setViewSorts(sortsData || [])
+
+      // Load group by from config or grid_view_settings
+      const groupByFromConfig = config?.group_by || ''
+      if (groupByFromConfig) {
+        setGroupBy(groupByFromConfig)
+      } else {
+        const { data: gridSettings } = await supabase
+          .from('grid_view_settings')
+          .select('group_by_field')
+          .eq('view_id', viewId)
+          .maybeSingle()
+
+        if (gridSettings?.group_by_field) {
+          setGroupBy(gridSettings.group_by_field)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading view data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        Loading...
+      </div>
+    )
+  }
+
+  if (!supabaseTableName || !tableId) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        Table not found
+      </div>
+    )
+  }
+
+  return (
+    <GridView
+      tableId={tableId}
+      viewId={viewId}
+      supabaseTableName={supabaseTableName}
+      viewFields={viewFields}
+      viewFilters={viewFilters}
+      viewSorts={viewSorts}
+      groupBy={groupBy}
+      tableFields={tableFields}
+      isEditing={false}
+    />
   )
 }
 

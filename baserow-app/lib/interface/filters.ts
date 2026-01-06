@@ -92,9 +92,25 @@ export function applyFiltersToQuery(
         break
       case 'date_range':
         if (filter.value && filter.value2) {
-          query = query.gte(fieldName, filter.value).lte(fieldName, filter.value2)
+          // For date ranges, ensure we're comparing dates properly
+          // If values are date strings (YYYY-MM-DD), add time to make range inclusive
+          const startDate = filter.value instanceof Date 
+            ? filter.value.toISOString().split('T')[0] 
+            : filter.value
+          const endDate = filter.value2 instanceof Date 
+            ? filter.value2.toISOString().split('T')[0] 
+            : filter.value2
+          query = query.gte(fieldName, startDate).lte(fieldName, endDate)
         } else if (filter.value) {
-          query = query.gte(fieldName, filter.value)
+          const startDate = filter.value instanceof Date 
+            ? filter.value.toISOString().split('T')[0] 
+            : filter.value
+          query = query.gte(fieldName, startDate)
+        } else if (filter.value2) {
+          const endDate = filter.value2 instanceof Date 
+            ? filter.value2.toISOString().split('T')[0] 
+            : filter.value2
+          query = query.lte(fieldName, endDate)
         }
         break
       default:
