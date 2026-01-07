@@ -39,11 +39,11 @@ export function getAppearanceClasses(appearance?: AppearanceConfig): string {
       classes.push('border border-gray-200 bg-white')
       break
     case 'none':
+      // No border classes needed
+      break
     default:
-      // Only add border if not already set by card
-      if (appearance.border !== 'card') {
-        classes.push('border-0')
-      }
+      // If border is undefined or not set, don't add border classes
+      break
   }
 
   // Corner radius
