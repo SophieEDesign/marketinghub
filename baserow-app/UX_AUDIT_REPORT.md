@@ -1,6 +1,6 @@
 # Airtable Parity & UX Friction Audit Report
 
-**Date:** 2025-01-XX  
+**Date:** 2025-01-XX (Last Updated: 2025-01-XX)  
 **Scope:** Marketing Hub Interface System  
 **Goal:** Identify UX friction points and invalid states that prevent Airtable-level clarity
 
@@ -9,6 +9,53 @@
 ## Executive Summary
 
 The system has **functional architecture** but **critical UX gaps** that make pages feel unusable. The primary issue is that **pages can exist in invalid states** (no data source, no configuration) with **no clear path to fix them**. Unlike Airtable, which forces configuration decisions upfront, this system allows creation of "dead" pages that cannot be meaningfully used or edited.
+
+**Status:** Some improvements have been implemented (see Recent Improvements section), but many critical issues remain unresolved.
+
+---
+
+## 0️⃣ Recent Improvements
+
+### ✅ Implemented Fixes
+
+#### **Page Anchors System**
+- **Status:** ✅ Implemented
+- **Location:** `add_page_anchors.sql` migration, `lib/interface/page-types.ts`
+- **Impact:** Every page must have exactly one anchor (saved_view_id, dashboard_layout_id, form_config_id, or record_config_id)
+- **Result:** Prevents completely anchorless pages, but pages can still be created with invalid/missing anchors
+
+#### **Page Creation Wizard**
+- **Status:** ✅ Partially Implemented
+- **Location:** `components/interface/PageCreationWizard.tsx`
+- **Impact:** Multi-step wizard forces anchor selection during creation
+- **Limitation:** Not all creation flows use the wizard (Settings → Pages tab still uses old flow)
+- **Result:** New pages created via wizard have anchors, but old creation flow still allows invalid pages
+
+#### **Calendar Page Fixes**
+- **Status:** ✅ Fixed
+- **Location:** `components/interface/blocks/GridBlock.tsx`
+- **Impact:** Calendar pages now properly resolve tableId from pageTableId fallback
+- **Result:** Calendar pages can now load table and fields correctly
+
+#### **Default Page Redirect**
+- **Status:** ✅ Fixed
+- **Location:** `lib/interfaces.ts`, `app/page.tsx`
+- **Impact:** Login redirect now respects user default page → workspace default page → first accessible page priority
+- **Result:** Users land on their configured default page after login
+
+#### **Layout Save Hardening**
+- **Status:** ✅ Implemented
+- **Location:** `components/interface/InterfaceBuilder.tsx`
+- **Impact:** Layout saves are blocked unless user actually modified the layout
+- **Result:** Prevents automatic saves on mount/hydration, makes regressions obvious
+
+### ⚠️ Still Outstanding
+
+Most critical issues from the original audit remain unresolved:
+- Pages can still be created without required configuration (via Settings → Pages tab)
+- Edit Page still shows alerts for most page types
+- Empty states still lack actionable guidance
+- Page settings still hidden in Settings panel
 
 ---
 
@@ -21,7 +68,7 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 
 ### Actual Behavior
 
-#### **Problem 1: Pages Created Without Required Configuration**
+#### **Problem 1: Pages Created Without Required Configuration** ⚠️ PARTIALLY ADDRESSED
 **When I create a new page via Settings → Pages tab, I only provide a name, but I expected to configure the data source immediately.**
 
 - **Location:** `SettingsPagesTab.tsx` → `handleCreatePage()`
@@ -29,8 +76,9 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 - **Result:** Page lands with no data source, shows "No data available" or blank state
 - **Friction:** User must navigate to Settings → Pages → find page → click Settings icon → configure source view
 - **Airtable Comparison:** Airtable forces you to select a table/view during creation
+- **Status:** PageCreationWizard exists but Settings → Pages tab still uses old creation flow
 
-#### **Problem 2: No Page Type Selection During Creation**
+#### **Problem 2: No Page Type Selection During Creation** ⚠️ PARTIALLY ADDRESSED
 **When I create a new page, I expected to choose List/Dashboard/Kanban/etc., but I only see "Interface Page" option.**
 
 - **Location:** `SettingsPagesTab.tsx` → New Page modal
@@ -38,6 +86,7 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 - **Result:** All pages created as generic "interface" type, must configure later
 - **Friction:** User doesn't know what the page is for until they configure it
 - **Airtable Comparison:** Airtable shows page type cards (List, Gallery, Kanban, etc.) during creation
+- **Status:** PageCreationWizard includes page type selection, but Settings → Pages tab doesn't use it
 
 #### **Problem 3: Creation Flow Redirects to Empty Page**
 **When I create a page, I land on a blank page with no guidance, but I expected to see setup instructions or configuration prompts.**
@@ -54,7 +103,7 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 
 ### Page Types That Cannot Be Meaningfully Edited
 
-#### **Problem 4: List/Gallery/Kanban/Calendar/Timeline Pages Are View-Only**
+#### **Problem 4: List/Gallery/Kanban/Calendar/Timeline Pages Are View-Only** ✅ IMPROVED
 **When I click "Edit Page" on a List/Gallery/Kanban page, I see an alert saying block editing isn't available, but I expected to configure the view settings.**
 
 - **Location:** `InterfacePageClient.tsx` → `handleEditClick()`
@@ -62,6 +111,7 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 - **Result:** Other page types show alert: "Block editing is currently only available for Dashboard and Overview page types."
 - **Friction:** User cannot edit these pages at all from the page itself
 - **Airtable Comparison:** Airtable allows editing view settings (filters, grouping, sorting) for all page types
+- **Status:** Calendar pages now properly load table/fields (fixed), but editing UI still not available for these page types
 
 #### **Problem 5: Form Pages Cannot Be Configured After Creation**
 **When I create a Form page, I expected to configure fields, but I can only set base_table in Settings, not the form fields themselves.**
@@ -94,10 +144,10 @@ The system has **functional architecture** but **critical UX gaps** that make pa
 - ❌ No clear purpose vs Dashboard
 - ❌ Can be created without any configuration
 
-#### **Blank Pages**
-- ❌ Show "Blank page" text with no guidance
-- ❌ No way to configure or add content
-- ❌ True dead end
+#### **Blank Pages** ✅ REMOVED
+- ✅ Blank page type removed from system (migrated to `overview`)
+- ✅ Database constraint prevents blank pages
+- ⚠️ However, pages can still exist without proper anchors (invalid state)
 
 ---
 
@@ -290,10 +340,26 @@ The system has **functional architecture** but **critical UX gaps**. The primary
 
 **Key Insight:** Airtable's UX success comes from **forcing configuration decisions** and **preventing invalid states**. Our system's failure comes from **allowing invalid states** and **delaying configuration decisions**.
 
-**Next Steps:** This audit identifies problems only. Fixes should:
-1. Force configuration during page creation
-2. Provide contextual editing for all page types
-3. Replace dead-end empty states with setup guidance
-4. Make page settings accessible from the page itself
-5. Prevent creation of pages without required configuration
+**Progress Made:**
+- ✅ Page anchors system implemented (prevents completely anchorless pages)
+- ✅ PageCreationWizard exists (but not used everywhere)
+- ✅ Calendar pages fixed (table/fields loading)
+- ✅ Default page redirect fixed
+- ✅ Layout save hardening added
+- ✅ Blank page type removed
+
+**Remaining Critical Issues:**
+1. ⚠️ Settings → Pages tab still allows creation without configuration
+2. ⚠️ Edit Page still shows alerts for most page types (no contextual editing UI)
+3. ⚠️ Empty states still lack actionable guidance
+4. ⚠️ Page settings still hidden in Settings panel
+5. ⚠️ Pages can still exist with invalid/missing anchors
+
+**Next Steps:** 
+1. Migrate all page creation flows to use PageCreationWizard
+2. Provide contextual editing UI for all page types (not just dashboard/overview)
+3. Replace dead-end empty states with setup guidance and action buttons
+4. Make page settings accessible from the page itself (not just Settings panel)
+5. Add validation to prevent pages with invalid anchors
+6. Add migration to fix existing pages with invalid states
 

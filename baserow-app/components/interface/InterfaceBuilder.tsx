@@ -111,6 +111,15 @@ export default function InterfaceBuilder({
       // Only save in edit mode - view mode must never mutate layout
       if (!effectiveIsEditing) return
 
+      // CRITICAL: Never save layout unless user actually modified it
+      // This prevents regressions from automatic saves on mount/hydration
+      if (!layoutModifiedByUserRef.current) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug("[Layout] Save blocked: no user modification")
+        }
+        return
+      }
+
       setSaveStatus("saving")
       try {
         const response = await fetch(`/api/pages/${page.id}/blocks`, {

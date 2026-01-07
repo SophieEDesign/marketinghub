@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import { resolveLandingPage } from "@/lib/interfaces"
+import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 
 export default async function HomePage({
   searchParams,
@@ -40,13 +41,28 @@ export default async function HomePage({
       redirect(`/pages/${pageId}`)
     }
     
-    // No accessible pages found - redirect based on role
+    // No accessible pages found - show empty state instead of redirecting
+    // Redirecting to "/" creates a loop, so we render an empty state here
     if (admin) {
       redirect("/settings?tab=pages")
     } else {
-      // Members can't access settings, show empty state
-      // This should rarely happen, but handle gracefully
-      redirect("/")
+      // Members can't access settings - show empty state page
+      // Return empty state component instead of redirecting to avoid loop
+      return (
+        <WorkspaceShellWrapper title="Welcome">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+            <div className="max-w-md text-center space-y-4">
+              <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
+              <p className="text-gray-600">
+                No pages are available yet. Please contact an administrator to create pages.
+              </p>
+              <p className="text-sm text-gray-500">
+                If you're an administrator, you can create pages in Settings.
+              </p>
+            </div>
+          </div>
+        </WorkspaceShellWrapper>
+      )
     }
   } catch (error) {
     // Error resolving landing page - fallback to old system
@@ -77,11 +93,26 @@ export default async function HomePage({
         redirect(`/pages/${firstInterface.id}`)
       }
     } catch (fallbackError) {
-      // Last resort fallback
+      // Last resort fallback - show empty state instead of redirecting
       if (admin) {
         redirect("/settings?tab=pages")
       } else {
-        redirect("/")
+        // Show empty state instead of redirecting to avoid loop
+        return (
+          <WorkspaceShellWrapper title="Welcome">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+              <div className="max-w-md text-center space-y-4">
+                <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
+                <p className="text-gray-600">
+                  No pages are available yet. Please contact an administrator to create pages.
+                </p>
+                <p className="text-sm text-gray-500">
+                  If you're an administrator, you can create pages in Settings.
+                </p>
+              </div>
+            </div>
+          </WorkspaceShellWrapper>
+        )
       }
     }
   }
