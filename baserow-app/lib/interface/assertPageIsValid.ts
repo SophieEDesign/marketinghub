@@ -85,7 +85,10 @@ export function assertPageIsValid(
     page.record_config_id,
   ].filter(Boolean).length
 
-  if (anchorCount === 0 && page.page_type !== 'content') {
+  // Content pages don't require anchors initially
+  // Check page_type as string to avoid TypeScript narrowing issues
+  const isContentPage = String(page.page_type) === 'content'
+  if (anchorCount === 0 && !isContentPage) {
     const reason = 'Page must have exactly one anchor'
     if (isDev) {
       console.warn(`[PageGuard] Page ${page.id} (${page.name}) is invalid: ${reason}`)
