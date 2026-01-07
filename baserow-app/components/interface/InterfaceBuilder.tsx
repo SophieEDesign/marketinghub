@@ -57,14 +57,22 @@ export default function InterfaceBuilder({
   // Sync initialBlocks to blocks state when they change (important for async loading)
   useEffect(() => {
     // Create a stable key from initialBlocks to detect actual changes
-    const blocksKey = JSON.stringify(initialBlocks?.map(b => ({ id: b.id, type: b.type, x: b.x, y: b.y, w: b.w, h: b.h })) || []));
+    const blocksArray = initialBlocks?.map(b => ({
+      id: b.id,
+      type: b.type,
+      x: b.x,
+      y: b.y,
+      w: b.w,
+      h: b.h
+    })) || []
+    const blocksKey = JSON.stringify(blocksArray)
     
     // Only update if blocks actually changed
     if (prevInitialBlocksRef.current === blocksKey) {
-      return;
+      return
     }
     
-    prevInitialBlocksRef.current = blocksKey;
+    prevInitialBlocksRef.current = blocksKey
     
     if (initialBlocks && initialBlocks.length > 0) {
       setBlocks(initialBlocks)
