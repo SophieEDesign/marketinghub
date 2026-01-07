@@ -151,7 +151,6 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
           }}
           onLoad={() => {
             // Image loaded successfully
-            console.log('Image loaded successfully:', imageUrl)
           }}
         />
       </div>
@@ -231,7 +230,6 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
         }}
         onLoad={() => {
           // Image loaded successfully
-          console.log('Image loaded successfully:', imageUrl)
         }}
       />
     </div>

@@ -58,6 +58,7 @@ export async function saveBlockLayout(
           updated_at: new Date().toISOString(),
         })
         .eq('id', update.id)
+        .select('id') // Select to verify update succeeded
 
       // Ensure we're only updating blocks that belong to this page
       if (isInterfacePage) {
@@ -66,10 +67,14 @@ export async function saveBlockLayout(
         query = query.eq('view_id', pageId)
       }
 
-      // Execute the query and check for errors
-      const { error } = await query
+      // Execute the query and check for errors and verify update succeeded
+      const { data, error } = await query
       if (error) {
         throw new Error(`Failed to update block ${update.id}: ${error.message}`)
+      }
+      // Verify the update actually happened (RLS might silently fail)
+      if (!data || data.length === 0) {
+        throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
       }
     })
   )

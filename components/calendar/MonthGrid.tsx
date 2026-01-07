@@ -7,6 +7,42 @@ import { cn } from '@/lib/utils'
 import type { CalendarEvent, CalendarConfig } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
+// Helper function to format display text (same logic as EventCard)
+function formatDisplayText(event: CalendarEvent, displayFields: string[], tableFields: TableField[]): string {
+  if (displayFields.length === 0) {
+    return event.title
+  }
+
+  const parts: string[] = [event.title]
+  
+  displayFields.forEach((fieldName) => {
+    const value = event.rowData?.[fieldName]
+    if (value !== null && value !== undefined && value !== '') {
+      const field = tableFields.find(f => f.name === fieldName)
+      let displayValue = String(value)
+      
+      // Format based on field type
+      if (field?.type === 'date' && value) {
+        try {
+          displayValue = format(new Date(value), 'MMM d')
+        } catch {
+          displayValue = String(value)
+        }
+      } else if (field?.type === 'checkbox') {
+        displayValue = value ? '✓' : ''
+      } else if (field?.type === 'number' || field?.type === 'currency') {
+        displayValue = String(value)
+      }
+      
+      if (displayValue) {
+        parts.push(displayValue)
+      }
+    }
+  })
+  
+  return parts.join(' • ')
+}
+
 interface MonthGridProps {
   days: Date[]
   currentDate: Date
@@ -219,22 +255,11 @@ export default function MonthGrid({
                             e.stopPropagation()
                             onEventClick?.(event)
                           }}
-                          title={event.title}
+                          title={formatDisplayText(event, config.calendar_display_fields, tableFields)}
                         >
                           {(isStart || daysDiff === 0) && (
                             <span className="truncate">
-                              {config.calendar_display_fields.length > 0
-                                ? (() => {
-                                    const parts: string[] = [event.title]
-                                    config.calendar_display_fields.forEach((fieldName) => {
-                                      const value = event.rowData?.[fieldName]
-                                      if (value !== null && value !== undefined && value !== '') {
-                                        parts.push(String(value))
-                                      }
-                                    })
-                                    return parts.join(' • ')
-                                  })()
-                                : event.title}
+                              {formatDisplayText(event, config.calendar_display_fields, tableFields)}
                             </span>
                           )}
                         </div>

@@ -5,15 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import EventCard from './EventCard'
 import type { CalendarEvent } from './CalendarView'
+import type { TableField } from '@/types/fields'
 
 interface AgendaPanelProps {
   selectedDate: Date | null
   events: CalendarEvent[]
   onEventClick: (event: CalendarEvent) => void
   onCreateEvent: () => void
+  displayFields?: string[]
+  tableFields?: TableField[]
 }
 
-export default function AgendaPanel({ selectedDate, events, onEventClick, onCreateEvent }: AgendaPanelProps) {
+export default function AgendaPanel({ selectedDate, events, onEventClick, onCreateEvent, displayFields = [], tableFields = [] }: AgendaPanelProps) {
   const groupedEvents = events.reduce((acc, event) => {
     const dateKey = event.start_date
       ? format(event.start_date, 'yyyy-MM-dd')
@@ -68,7 +71,13 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                         onClick={() => onEventClick(event)}
                         className="cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
                       >
-                        <EventCard event={event} onDragStart={() => {}} onClick={() => onEventClick(event)} />
+                        <EventCard 
+                          event={event} 
+                          onDragStart={() => {}} 
+                          onClick={() => onEventClick(event)}
+                          displayFields={displayFields}
+                          tableFields={tableFields}
+                        />
                         {event.start_date && event.end_date && (
                           <p className="text-xs text-gray-500 mt-1">
                             {format(event.start_date, 'HH:mm')} - {format(event.end_date, 'HH:mm')}

@@ -90,31 +90,89 @@ export default function SelectCell({
   const displayValue = value || placeholder
   const isPlaceholder = !value
   
+  // Normalize value for color lookup (trim whitespace, handle null/undefined)
+  const normalizedValue = value ? String(value).trim() : null
+  
   // Get color for the selected value
   const getColorForChoice = (choice: string | null): { bg: string; text: string } => {
-    if (!choice || !choiceColors?.[choice]) {
+    if (!choice || !choiceColors) {
       return { bg: 'bg-blue-100', text: 'text-blue-800' }
     }
     
-    const hexColor = choiceColors[choice]
+    // Try exact match first
+    let hexColor = choiceColors[choice]
+    
+    // If no exact match, try case-insensitive match
+    if (!hexColor && choiceColors) {
+      const matchingKey = Object.keys(choiceColors).find(
+        key => key.toLowerCase() === choice.toLowerCase()
+      )
+      if (matchingKey) {
+        hexColor = choiceColors[matchingKey]
+      }
+    }
+    
+    if (!hexColor) {
+      return { bg: 'bg-blue-100', text: 'text-blue-800' }
+    }
+    
+    // Ensure hex color is valid format
+    if (!hexColor.startsWith('#')) {
+      hexColor = `#${hexColor}`
+    }
+    
     // Convert hex to RGB for better contrast calculation
-    const r = parseInt(hexColor.slice(1, 3), 16)
-    const g = parseInt(hexColor.slice(3, 5), 16)
-    const b = parseInt(hexColor.slice(5, 7), 16)
-    
-    // Calculate luminance to determine if we need light or dark text
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    
-    return {
-      bg: '', // Will use inline style
-      text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
+    try {
+      const r = parseInt(hexColor.slice(1, 3), 16)
+      const g = parseInt(hexColor.slice(3, 5), 16)
+      const b = parseInt(hexColor.slice(5, 7), 16)
+      
+      if (isNaN(r) || isNaN(g) || isNaN(b)) {
+        return { bg: 'bg-blue-100', text: 'text-blue-800' }
+      }
+      
+      // Calculate luminance to determine if we need light or dark text
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+      
+      return {
+        bg: '', // Will use inline style
+        text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
+      }
+    } catch (error) {
+      console.warn('Error parsing color:', hexColor, error)
+      return { bg: 'bg-blue-100', text: 'text-blue-800' }
     }
   }
   
-  const colorStyle = value && choiceColors?.[value] 
-    ? { backgroundColor: choiceColors[value] }
+  // Find the matching color key (with fallback to case-insensitive)
+  const getColorKey = (val: string | null): string | null => {
+    if (!val || !choiceColors) return null
+    
+    const normalized = String(val).trim()
+    
+    // Try exact match first
+    if (choiceColors[normalized]) {
+      return normalized
+    }
+    
+    // Try case-insensitive match
+    const matchingKey = Object.keys(choiceColors).find(
+      key => key.toLowerCase() === normalized.toLowerCase()
+    )
+    
+    return matchingKey || null
+  }
+  
+  const colorKey = getColorKey(normalizedValue)
+  const colorValue = colorKey && choiceColors?.[colorKey]
+  const colorStyle = colorValue
+    ? { 
+        backgroundColor: colorValue.startsWith('#') 
+          ? colorValue 
+          : `#${colorValue}` 
+      }
     : undefined
-  const textColor = value ? getColorForChoice(value).text : ''
+  const textColor = normalizedValue ? getColorForChoice(normalizedValue).text : ''
 
   return (
     <div

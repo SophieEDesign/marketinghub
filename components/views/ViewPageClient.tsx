@@ -23,6 +23,7 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import dynamic from 'next/dynamic'
@@ -142,6 +143,9 @@ export default function ViewPageClient({
             <SheetTitle className="text-lg font-semibold text-gray-900">
               Design: {tableName}
             </SheetTitle>
+            <SheetDescription>
+              Manage fields and import data for this table
+            </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="fields" className="mt-4">
             <TabsList className="grid w-full grid-cols-2">

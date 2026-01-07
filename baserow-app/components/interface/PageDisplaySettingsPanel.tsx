@@ -20,10 +20,11 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import { Plus, X, ArrowUp, ArrowDown, Save } from "lucide-react"
+import { Plus, X, ArrowUp, ArrowDown, Save, Edit2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getPageTypeDefinition, validatePageAnchor } from "@/lib/interface/page-types"
+import RecordPanelEditor from "./RecordPanelEditor"
 
 interface PageDisplaySettingsPanelProps {
   page: InterfacePage | null
@@ -80,6 +81,7 @@ export default function PageDisplaySettingsPanel({
   const [previewFields, setPreviewFields] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [panelEditorOpen, setPanelEditorOpen] = useState(false)
 
   // Load initial data
   useEffect(() => {
@@ -539,6 +541,7 @@ export default function PageDisplaySettingsPanel({
   })
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
@@ -961,6 +964,25 @@ export default function PageDisplaySettingsPanel({
                 </div>
               )}
 
+              {/* Edit Panel Layout - Record Review pages only */}
+              {page.page_type === 'record_review' && (
+                <div className="space-y-2">
+                  <Label>Record Panel Layout</Label>
+                  <div className="text-sm text-gray-500 mb-2">
+                    Configure which fields and blocks appear in the record detail panel. Drag items to reorder them.
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setPanelEditorOpen(true)}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit Panel Layout
+                  </Button>
+                </div>
+              )}
+
               {/* Density */}
               <div className="space-y-2">
                 <Label>Density</Label>
@@ -1015,7 +1037,23 @@ export default function PageDisplaySettingsPanel({
           </Button>
         </div>
       </SheetContent>
-    </Sheet>
+      </Sheet>
+
+      {/* Record Panel Editor */}
+      {page && page.page_type === 'record_review' && (
+        <RecordPanelEditor
+          page={page}
+          isOpen={panelEditorOpen}
+          onClose={() => setPanelEditorOpen(false)}
+          onSave={() => {
+            // Reload page data after saving
+            if (onUpdate) {
+              onUpdate()
+            }
+          }}
+        />
+      )}
+    </>
   )
 }
 

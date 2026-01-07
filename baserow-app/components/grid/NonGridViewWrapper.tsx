@@ -153,6 +153,7 @@ export default function NonGridViewWrapper({
           tableName={tableInfo.name}
           supabaseTableName={tableInfo.supabase_table}
           onFieldsUpdated={handleFieldsUpdated}
+          hideViewsTab={true}
         />
       )}
     </div>

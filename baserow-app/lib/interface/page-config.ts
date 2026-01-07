@@ -40,6 +40,13 @@ export interface PageConfig {
   detail_fields?: string[]
   preview_fields?: string[] // Fields to show in the left preview panel
   allow_editing?: boolean
+  panel_layout?: Array<{
+    id: string
+    type: 'field' | 'block'
+    fieldName?: string
+    blockType?: string
+    blockConfig?: any
+  }> // Layout for record detail panel (fields and blocks)
   
   // General
   [key: string]: any

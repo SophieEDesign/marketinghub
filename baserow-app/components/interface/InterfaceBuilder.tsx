@@ -217,8 +217,13 @@ export default function InterfaceBuilder({
         // Otherwise fall back to currentLayout from blocks state
         const layoutToSave = pendingLayout || currentLayout
         await saveLayout(layoutToSave)
+        // Small delay to ensure database transaction is committed before reload
+        // This prevents race condition where blocks reload before save completes
+        await new Promise(resolve => setTimeout(resolve, 100))
       } catch (error) {
         console.error("Failed to save layout on exit:", error)
+        // Don't exit edit mode if save failed - user should see the error
+        return
       } finally {
         setIsSaving(false)
       }

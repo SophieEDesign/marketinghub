@@ -363,6 +363,7 @@ export default function AirtableViewPage({
             onEditField={handleEditField}
             groupBy={groupBy || undefined}
             userRole="editor"
+            disableRecordPanel={true}
           />
         ) : view.type === "kanban" ? (
           <AirtableKanbanView
@@ -401,6 +402,7 @@ export default function AirtableViewPage({
           loadFields()
           loadViewFields()
         }}
+        hideViewsTab={true}
       />
     </div>
   )

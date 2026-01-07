@@ -20,6 +20,7 @@ interface DesignSidebarProps {
   tableName: string
   supabaseTableName: string
   onFieldsUpdated: () => void
+  hideViewsTab?: boolean // If true, hide the Views tab
 }
 
 export default function DesignSidebar({
@@ -29,6 +30,7 @@ export default function DesignSidebar({
   tableName,
   supabaseTableName,
   onFieldsUpdated,
+  hideViewsTab = false,
 }: DesignSidebarProps) {
   const [activeTab, setActiveTab] = useState("fields")
 
@@ -36,6 +38,10 @@ export default function DesignSidebar({
   const handleFieldsUpdated = useCallback(() => {
     onFieldsUpdated()
   }, [onFieldsUpdated])
+
+  // Calculate number of tabs for grid layout
+  const tabCount = hideViewsTab ? 3 : 4
+  const gridCols = hideViewsTab ? "grid-cols-3" : "grid-cols-4"
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -47,9 +53,11 @@ export default function DesignSidebar({
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className={`grid w-full ${gridCols}`}>
             <TabsTrigger value="fields" className="text-xs">Fields</TabsTrigger>
-            <TabsTrigger value="views" className="text-xs">Views</TabsTrigger>
+            {!hideViewsTab && (
+              <TabsTrigger value="views" className="text-xs">Views</TabsTrigger>
+            )}
             <TabsTrigger value="permissions" className="text-xs">Permissions</TabsTrigger>
             <TabsTrigger value="import" className="text-xs">Import</TabsTrigger>
           </TabsList>
@@ -62,12 +70,14 @@ export default function DesignSidebar({
             />
           </TabsContent>
 
-          <TabsContent value="views" className="mt-4">
-            <ViewsTab
-              tableId={tableId}
-              tableName={tableName}
-            />
-          </TabsContent>
+          {!hideViewsTab && (
+            <TabsContent value="views" className="mt-4">
+              <ViewsTab
+                tableId={tableId}
+                tableName={tableName}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="permissions" className="mt-4">
             <PermissionsTab

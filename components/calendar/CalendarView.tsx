@@ -497,6 +497,8 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
                 setSelectedRecordId(event.id)
               }}
               onCreateEvent={() => setCreateModalOpen(true)}
+              displayFields={config.calendar_display_fields}
+              tableFields={tableFields}
             />
           </div>
         )}

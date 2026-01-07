@@ -38,6 +38,7 @@ interface AirtableGridViewProps {
   onEditField?: (fieldName: string) => void
   groupBy?: string
   userRole?: "admin" | "editor" | "viewer" | null
+  disableRecordPanel?: boolean // If true, clicking rows won't open record panel
 }
 
 const ROW_HEIGHT_SHORT = 32
@@ -59,13 +60,14 @@ export default function AirtableGridView({
   onEditField,
   groupBy,
   userRole = "editor",
+  disableRecordPanel = false,
 }: AirtableGridViewProps) {
   const { openRecord } = useRecordPanel()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
 
   // Load tableId from tableName if not provided
   useEffect(() => {
-    if (!tableIdState && tableName) {
+    if (!tableIdState && tableName && !disableRecordPanel) {
       const loadTableId = async () => {
         try {
           const supabase = createClient()
@@ -83,13 +85,13 @@ export default function AirtableGridView({
       }
       loadTableId()
     }
-  }, [tableIdState, tableName])
+  }, [tableIdState, tableName, disableRecordPanel])
 
   const handleRowClick = useCallback((rowId: string) => {
-    if (tableIdState && tableName) {
+    if (!disableRecordPanel && tableIdState && tableName) {
       openRecord(tableIdState, rowId, tableName)
     }
-  }, [tableIdState, tableName, openRecord])
+  }, [tableIdState, tableName, openRecord, disableRecordPanel])
   const ROW_HEIGHT =
     rowHeight === 'short' ? ROW_HEIGHT_SHORT : rowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
 
@@ -640,14 +642,16 @@ export default function AirtableGridView({
               return (
                 <div
                   key={row.id}
-                  className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${
+                  className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                    disableRecordPanel ? '' : 'cursor-pointer'
+                  } ${
                     isEven ? 'bg-white' : 'bg-gray-50/50'
                   } ${isSelected ? 'bg-blue-100' : ''}`}
                   style={{ minHeight: ROW_HEIGHT, height: hasWrapText ? 'auto' : ROW_HEIGHT }}
                   onClick={(e) => {
                     // Don't open panel if clicking checkbox or cell editor
                     const target = e.target as HTMLElement
-                    if (!target.closest('input[type="checkbox"]') && !target.closest('.cell-editor')) {
+                    if (!disableRecordPanel && !target.closest('input[type="checkbox"]') && !target.closest('.cell-editor')) {
                       handleRowClick(row.id)
                     }
                   }}
