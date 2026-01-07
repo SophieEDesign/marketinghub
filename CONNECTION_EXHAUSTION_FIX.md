@@ -195,3 +195,15 @@ if (viewId && (!providedFilters || !providedSorts || !providedVisibleFields)) {
 - Cache TTL of 5 minutes balances freshness with performance
 - Guardrails are dev-only warnings that won't affect production performance
 
+## Future Enhancements
+
+### Cache Invalidation on Schema Changes
+Currently, field mutations (create/update/delete) do not invalidate the view metadata cache. This means:
+- New fields won't appear until cache expires (5 minutes) or page refresh
+- Consider adding `clearViewMetaCache(tableId)` to field mutation endpoints in the future
+
+### Auth-Aware Caching
+✅ **Already handled correctly** - Supabase client uses cookies, which naturally partition cache per user session. No changes needed.
+
+See `PRE_DEPLOY_CHECKLIST.md` for detailed testing procedures and future enhancement options.
+

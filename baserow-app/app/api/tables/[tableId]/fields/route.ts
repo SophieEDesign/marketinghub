@@ -218,6 +218,10 @@ export async function POST(
       await supabase.from('view_fields').insert(viewFields)
     }
 
+    // TODO (Future Enhancement): Invalidate view metadata cache when fields change
+    // import { clearViewMetaCache } from '@/hooks/useViewMeta'
+    // clearViewMetaCache(undefined, params.tableId) // Clear all views for this table
+
     return NextResponse.json({ field: fieldData })
   } catch (error: any) {
     const errorResponse = createErrorResponse(error, 'Failed to create field', 500)
@@ -455,6 +459,10 @@ export async function PATCH(
       return NextResponse.json(errorResponse, { status: 500 })
     }
 
+    // TODO (Future Enhancement): Invalidate view metadata cache when fields change
+    // import { clearViewMetaCache } from '@/hooks/useViewMeta'
+    // clearViewMetaCache(undefined, params.tableId) // Clear all views for this table
+
     return NextResponse.json({
       field: updatedField,
       warning: isDestructive ? 'Type change may result in data loss' : undefined,
@@ -571,6 +579,10 @@ export async function DELETE(
       const errorResponse = createErrorResponse(deleteError, 'Failed to delete field', 500)
       return NextResponse.json(errorResponse, { status: 500 })
     }
+
+    // TODO (Future Enhancement): Invalidate view metadata cache when fields change
+    // import { clearViewMetaCache } from '@/hooks/useViewMeta'
+    // clearViewMetaCache(undefined, params.tableId) // Clear all views for this table
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

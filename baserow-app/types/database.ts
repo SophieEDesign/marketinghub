@@ -72,19 +72,19 @@ export interface ViewField {
 export interface ViewFilter {
   id: string
   view_id: string
-  field_id: string
-  filter_type: FilterType
+  field_name: string
+  operator: FilterType
   value?: string
-  created_at: string
+  created_at?: string
 }
 
 export interface ViewSort {
   id: string
   view_id: string
-  field_id: string
-  order_direction: SortDirection
-  order_index: number
-  created_at: string
+  field_name: string
+  direction: SortDirection
+  order_index?: number
+  created_at?: string
 }
 
 export interface ViewBlock {
