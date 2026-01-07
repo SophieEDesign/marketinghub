@@ -114,6 +114,19 @@ export interface BlockConfig {
   allowed_operators?: string[]
   // Appearance settings
   appearance?: {
+    // Airtable-style appearance (new)
+    background?: 'none' | 'subtle' | 'tinted' | 'emphasised'
+    border?: 'none' | 'outline' | 'card'
+    radius?: 'square' | 'rounded'
+    shadow?: 'none' | 'subtle' | 'card'
+    padding?: 'compact' | 'normal' | 'spacious' | number // New style or legacy numeric
+    margin?: 'none' | 'small' | 'normal' | 'large'
+    accent?: 'none' | 'grey' | 'blue' | 'green' | 'yellow' | 'red' | 'purple'
+    showTitle?: boolean
+    titleSize?: 'small' | 'medium' | 'large'
+    titleAlign?: 'left' | 'center'
+    showDivider?: boolean
+    // Legacy appearance (for backward compatibility)
     title?: string
     title_color?: string
     text_color?: string // General text color
@@ -121,7 +134,6 @@ export interface BlockConfig {
     border_color?: string
     border_width?: number
     border_radius?: number
-    padding?: number
     show_title?: boolean
     header_background?: string
     header_text_color?: string

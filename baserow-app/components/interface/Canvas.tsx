@@ -5,6 +5,7 @@ import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
 import BlockRenderer from "./BlockRenderer"
+import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
@@ -445,16 +446,21 @@ export default function Canvas({
 
             {/* Block Content */}
             <div className={`h-full w-full ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}>
-              <BlockRenderer
+              <BlockAppearanceWrapper 
                 block={block}
-                isEditing={isEditing && !block.config?.locked}
-                onUpdate={onBlockUpdate}
-                isLocked={block.config?.locked || false}
-                pageTableId={pageTableId}
-                pageId={pageId}
-                recordId={recordId}
-                filters={getFiltersForBlock(block.id)}
-              />
+                className={isEditing ? "pointer-events-auto" : ""}
+              >
+                <BlockRenderer
+                  block={block}
+                  isEditing={isEditing && !block.config?.locked}
+                  onUpdate={onBlockUpdate}
+                  isLocked={block.config?.locked || false}
+                  pageTableId={pageTableId}
+                  pageId={pageId}
+                  recordId={recordId}
+                  filters={getFiltersForBlock(block.id)}
+                />
+              </BlockAppearanceWrapper>
             </div>
             </div>
           ))}
