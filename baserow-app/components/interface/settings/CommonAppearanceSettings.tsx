@@ -125,7 +125,13 @@ export default function CommonAppearanceSettings({
         <div className="space-y-2">
           <Label>Padding</Label>
           <Select
-            value={appearance.padding || 'normal'}
+            value={
+              typeof appearance.padding === 'string' 
+                ? appearance.padding 
+                : appearance.padding === undefined 
+                ? 'normal' 
+                : 'normal' // Default to 'normal' if it's a number (legacy)
+            }
             onValueChange={(value) =>
               onUpdate({ padding: value as 'compact' | 'normal' | 'spacious' })
             }
