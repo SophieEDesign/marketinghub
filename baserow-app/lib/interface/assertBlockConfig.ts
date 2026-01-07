@@ -54,8 +54,8 @@ export function assertBlockConfig(
 
   switch (blockType) {
     case 'grid':
-    case 'calendar':
-      // Grid and Calendar blocks MUST have table_id configured - no fallback
+      // Grid blocks MUST have table_id configured - no fallback
+      // Calendar views are grid blocks with view_type: 'calendar'
       if (!config.table_id && !config.source_view) {
         missingFields.push('table_id or source_view')
         const reason = `${blockType} block requires table_id or source_view`
@@ -69,12 +69,12 @@ export function assertBlockConfig(
           showSetupUI: true,
         }
       }
-      // Calendar also needs date field
-      if (blockType === 'calendar' && !hasDateField && !config.date_field) {
+      // Calendar views (grid blocks with view_type: 'calendar') also need date field
+      if (config.view_type === 'calendar' && !hasDateField && !config.date_field) {
         missingFields.push('date_field')
-        const reason = 'Calendar block requires a date field'
+        const reason = 'Calendar view (grid block) requires a date field'
         if (isDev) {
-          console.warn(`[BlockGuard] Calendar block is missing date field`)
+          console.warn(`[BlockGuard] Calendar view block is missing date field`)
         }
         return {
           valid: false,
