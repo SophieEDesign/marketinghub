@@ -156,7 +156,7 @@ export default function RecordModal({
     }
     
     if (field.type === 'checkbox') {
-      return value === 'true' || value === true
+      return value === 'true' || value === 'on'
     }
     
     if (field.type === 'date' && value) {
