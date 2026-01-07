@@ -23,7 +23,6 @@ import {
 import type { TableField } from "@/types/fields"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import type { BlockType, PageBlock } from "@/lib/interface/types"
-import { createBlock } from "@/lib/pages/saveBlocks"
 
 interface RecordPanelEditorProps {
   page: InterfacePage
@@ -98,19 +97,27 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
         ? Math.max(...blocks.map(b => b.y + b.h))
         : 0
 
-      // Create a text block with field reference in config
-      await createBlock(
-        page.id,
-        'text',
-        0, // x
-        maxY, // y - place below existing blocks
-        12, // w - full width
-        2, // h
-        {
-          field_name: selectedField,
-          content: `{{${selectedField}}}`,
-        }
-      )
+      // Create a text block with field reference in config via API
+      const res = await fetch(`/api/pages/${page.id}/blocks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'text',
+          x: 0,
+          y: maxY,
+          w: 12,
+          h: 2,
+          config: {
+            field_name: selectedField,
+            content: `{{${selectedField}}}`,
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to add field block')
+      }
 
       toast({
         title: "Field block added",
@@ -159,15 +166,24 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
 
       const size = defaultSizes[selectedBlockType] || { w: 12, h: 2 }
 
-      await createBlock(
-        page.id,
-        selectedBlockType,
-        0, // x
-        maxY, // y
-        size.w,
-        size.h,
-        {}
-      )
+      // Create block via API
+      const res = await fetch(`/api/pages/${page.id}/blocks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: selectedBlockType,
+          x: 0,
+          y: maxY,
+          w: size.w,
+          h: size.h,
+          config: {},
+        }),
+      })
+
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to add block')
+      }
 
       toast({
         title: "Block added",
