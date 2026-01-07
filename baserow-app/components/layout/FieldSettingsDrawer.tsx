@@ -54,6 +54,8 @@ export default function FieldSettingsDrawer({
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTables, setLoadingTables] = useState(false)
   const [typeChangeWarning, setTypeChangeWarning] = useState<string | null>(null)
+  const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [loadingLookupFields, setLoadingLookupFields] = useState(false)
 
   // Load tables for link_to_table fields
   useEffect(() => {
@@ -61,6 +63,16 @@ export default function FieldSettingsDrawer({
       loadTables()
     }
   }, [open, type])
+
+  // Load fields from lookup table when lookup_table_id or linked_table_id changes
+  useEffect(() => {
+    const tableId = type === 'lookup' ? options.lookup_table_id : options.linked_table_id
+    if (open && (type === 'link_to_table' || type === 'lookup') && tableId) {
+      loadLookupTableFields(tableId)
+    } else {
+      setLookupTableFields([])
+    }
+  }, [open, type, options.lookup_table_id, options.linked_table_id])
 
   async function loadTables() {
     setLoadingTables(true)
@@ -78,6 +90,27 @@ export default function FieldSettingsDrawer({
       console.error('Error loading tables:', error)
     } finally {
       setLoadingTables(false)
+    }
+  }
+
+  async function loadLookupTableFields(tableId: string) {
+    setLoadingLookupFields(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('table_fields')
+        .select('id, name, type')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+
+      if (!error && data) {
+        setLookupTableFields(data)
+      }
+    } catch (error) {
+      console.error('Error loading lookup table fields:', error)
+      setLookupTableFields([])
+    } finally {
+      setLoadingLookupFields(false)
     }
   }
 
@@ -379,32 +412,175 @@ export default function FieldSettingsDrawer({
           )}
 
           {type === 'link_to_table' && (
-            <div className="space-y-2">
-              <Label htmlFor="linked-table">Linked Table</Label>
-              <Select
-                value={options.linked_table_id || undefined}
-                onValueChange={(tableId) =>
-                  setOptions({ ...options, linked_table_id: tableId || undefined })
-                }
-              >
-                <SelectTrigger id="linked-table">
-                  <SelectValue placeholder="Select a table" />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingTables ? (
-                    <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
-                  ) : (
-                    tables
-                      .filter(t => t.id !== tableId) // Don't allow linking to self
-                      .map((table) => (
-                        <SelectItem key={table.id} value={table.id}>
-                          {table.name}
-                        </SelectItem>
-                      ))
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="linked-table">Linked Table</Label>
+                <Select
+                  value={options.linked_table_id || undefined}
+                  onValueChange={(tableId) =>
+                    setOptions({ 
+                      ...options, 
+                      linked_table_id: tableId || undefined,
+                      // Reset display fields when table changes
+                      primary_label_field: undefined,
+                      secondary_label_fields: undefined,
+                    })
+                  }
+                >
+                  <SelectTrigger id="linked-table">
+                    <SelectValue placeholder="Select a table" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingTables ? (
+                      <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
+                    ) : (
+                      tables
+                        .filter(t => t.id !== tableId) // Don't allow linking to self
+                        .map((table) => (
+                          <SelectItem key={table.id} value={table.id}>
+                            {table.name}
+                          </SelectItem>
+                        ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              {options.linked_table_id && (
+                <div className="space-y-3 border-t pt-4">
+                  <Label>Display Configuration</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="link-primary-label-field" className="text-sm font-normal">
+                      Primary Label Field <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={options.primary_label_field || 'name'}
+                      onValueChange={(fieldName) =>
+                        setOptions({ ...options, primary_label_field: fieldName })
+                      }
+                    >
+                      <SelectTrigger id="link-primary-label-field">
+                        <SelectValue placeholder="Select field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lookupTableFields
+                          .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
+                          .map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Field used as the main label in relationship picker
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="link-secondary-label-fields" className="text-sm font-normal">
+                      Secondary Label Fields (optional, max 2)
+                    </Label>
+                    <div className="space-y-2">
+                      {[0, 1].map((idx) => {
+                        const currentValue = (options.secondary_label_fields || [])[idx]
+                        return (
+                          <Select
+                            key={idx}
+                            value={currentValue || ''}
+                            onValueChange={(fieldName) => {
+                              const current = options.secondary_label_fields || []
+                              const updated = [...current]
+                              updated[idx] = fieldName
+                              setOptions({ 
+                                ...options, 
+                                secondary_label_fields: updated.filter(Boolean)
+                              })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {lookupTableFields
+                                .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
+                                .map((field) => (
+                                  <SelectItem key={field.id} value={field.name}>
+                                    {field.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Additional context shown below the primary label
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="link-relationship-type" className="text-sm font-normal">
+                      Relationship Type
+                    </Label>
+                    <Select
+                      value={options.relationship_type || 'one-to-many'}
+                      onValueChange={(relType) =>
+                        setOptions({ ...options, relationship_type: relType as any })
+                      }
+                    >
+                      <SelectTrigger id="link-relationship-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="one-to-one">One to One</SelectItem>
+                        <SelectItem value="one-to-many">One to Many</SelectItem>
+                        <SelectItem value="many-to-many">Many to Many</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(options.relationship_type === 'one-to-many' || options.relationship_type === 'many-to-many') && (
+                    <div className="space-y-2">
+                      <Label htmlFor="link-max-selections" className="text-sm font-normal">
+                        Max Selections (optional)
+                      </Label>
+                      <Input
+                        id="link-max-selections"
+                        type="number"
+                        min="1"
+                        value={options.max_selections || ''}
+                        onChange={(e) =>
+                          setOptions({ 
+                            ...options, 
+                            max_selections: e.target.value ? parseInt(e.target.value) : undefined 
+                          })
+                        }
+                        placeholder="No limit"
+                      />
+                    </div>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="link-allow-create" className="text-sm font-normal">
+                        Allow Creating New Records
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Users can create new related records from the relationship field
+                      </p>
+                    </div>
+                    <Switch
+                      id="link-allow-create"
+                      checked={options.allow_create || false}
+                      onCheckedChange={(checked) =>
+                        setOptions({ ...options, allow_create: checked })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {type === 'lookup' && (
@@ -414,7 +590,13 @@ export default function FieldSettingsDrawer({
                 <Select
                   value={options.lookup_table_id || undefined}
                   onValueChange={(tableId) =>
-                    setOptions({ ...options, lookup_table_id: tableId || undefined })
+                    setOptions({ 
+                      ...options, 
+                      lookup_table_id: tableId || undefined,
+                      // Reset display fields when table changes
+                      primary_label_field: undefined,
+                      secondary_label_fields: undefined,
+                    })
                   }
                 >
                   <SelectTrigger id="lookup-table">
@@ -436,22 +618,167 @@ export default function FieldSettingsDrawer({
                 </Select>
               </div>
               {options.lookup_table_id && (
-                <div className="space-y-2">
-                  <Label htmlFor="lookup-field">Lookup Field</Label>
-                  <Select
-                    value={options.lookup_field_id || undefined}
-                    onValueChange={(fieldId) =>
-                      setOptions({ ...options, lookup_field_id: fieldId || undefined })
-                    }
-                  >
-                    <SelectTrigger id="lookup-field">
-                      <SelectValue placeholder="Select a field" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* TODO: Load fields from lookup table */}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="lookup-field">Lookup Field</Label>
+                    <Select
+                      value={options.lookup_field_id || undefined}
+                      onValueChange={(fieldId) =>
+                        setOptions({ ...options, lookup_field_id: fieldId || undefined })
+                      }
+                    >
+                      <SelectTrigger id="lookup-field">
+                        <SelectValue placeholder="Select a field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadingLookupFields ? (
+                          <SelectItem value="__loading__" disabled>Loading fields...</SelectItem>
+                        ) : (
+                          lookupTableFields.map((field) => (
+                            <SelectItem key={field.id} value={field.id}>
+                              {field.name} ({field.type})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {/* Display Configuration */}
+                  <div className="space-y-3 border-t pt-4">
+                    <Label>Display Configuration</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="primary-label-field" className="text-sm font-normal">
+                        Primary Label Field <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={options.primary_label_field || 'name'}
+                        onValueChange={(fieldName) =>
+                          setOptions({ ...options, primary_label_field: fieldName })
+                        }
+                      >
+                        <SelectTrigger id="primary-label-field">
+                          <SelectValue placeholder="Select field" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lookupTableFields
+                            .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
+                            .map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Field used as the main label in lookup results
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="secondary-label-fields" className="text-sm font-normal">
+                        Secondary Label Fields (optional, max 2)
+                      </Label>
+                      <div className="space-y-2">
+                        {[0, 1].map((idx) => {
+                          const currentValue = (options.secondary_label_fields || [])[idx]
+                          return (
+                            <Select
+                              key={idx}
+                              value={currentValue || ''}
+                              onValueChange={(fieldName) => {
+                                const current = options.secondary_label_fields || []
+                                const updated = [...current]
+                                updated[idx] = fieldName
+                                setOptions({ 
+                                  ...options, 
+                                  secondary_label_fields: updated.filter(Boolean)
+                                })
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">None</SelectItem>
+                                {lookupTableFields
+                                  .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
+                                  .map((field) => (
+                                    <SelectItem key={field.id} value={field.name}>
+                                      {field.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          )
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Additional context shown below the primary label
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="relationship-type" className="text-sm font-normal">
+                        Relationship Type
+                      </Label>
+                      <Select
+                        value={options.relationship_type || 'one-to-many'}
+                        onValueChange={(relType) =>
+                          setOptions({ ...options, relationship_type: relType as any })
+                        }
+                      >
+                        <SelectTrigger id="relationship-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="one-to-one">One to One</SelectItem>
+                          <SelectItem value="one-to-many">One to Many</SelectItem>
+                          <SelectItem value="many-to-many">Many to Many</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {(options.relationship_type === 'one-to-many' || options.relationship_type === 'many-to-many') && (
+                      <div className="space-y-2">
+                        <Label htmlFor="max-selections" className="text-sm font-normal">
+                          Max Selections (optional)
+                        </Label>
+                        <Input
+                          id="max-selections"
+                          type="number"
+                          min="1"
+                          value={options.max_selections || ''}
+                          onChange={(e) =>
+                            setOptions({ 
+                              ...options, 
+                              max_selections: e.target.value ? parseInt(e.target.value) : undefined 
+                            })
+                          }
+                          placeholder="No limit"
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="allow-create" className="text-sm font-normal">
+                          Allow Creating New Records
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Users can create new related records from the lookup field
+                        </p>
+                      </div>
+                      <Switch
+                        id="allow-create"
+                        checked={options.allow_create || false}
+                        onCheckedChange={(checked) =>
+                          setOptions({ ...options, allow_create: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
               )}
             </>
           )}

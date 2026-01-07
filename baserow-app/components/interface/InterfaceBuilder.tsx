@@ -208,10 +208,15 @@ export default function InterfaceBuilder({
       h: block.h,
     }))
 
-    if (currentLayout.length > 0 && pendingLayout) {
+    // Always save layout when exiting edit mode
+    // Use pendingLayout if available (has latest changes), otherwise use currentLayout
+    if (currentLayout.length > 0) {
       setIsSaving(true)
       try {
-        await saveLayout(pendingLayout)
+        // Use pendingLayout if it exists (has the latest drag/resize changes)
+        // Otherwise fall back to currentLayout from blocks state
+        const layoutToSave = pendingLayout || currentLayout
+        await saveLayout(layoutToSave)
       } catch (error) {
         console.error("Failed to save layout on exit:", error)
       } finally {
@@ -257,12 +262,12 @@ export default function InterfaceBuilder({
             id: block.id,
             page_id: block.page_id || page.id,
             type: block.type,
-            x: block.x || block.position_x || 0,
-            y: block.y || block.position_y || 0,
-            w: block.w || block.width || 4,
-            h: block.h || block.height || 4,
+            x: block.x ?? block.position_x ?? 0,
+            y: block.y ?? block.position_y ?? 0,
+            w: block.w ?? block.width ?? 4,
+            h: block.h ?? block.height ?? 4,
             config: block.config || {},
-            order_index: block.order_index || 0,
+            order_index: block.order_index ?? 0,
             created_at: block.created_at,
             updated_at: block.updated_at,
           }))

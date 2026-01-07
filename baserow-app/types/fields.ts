@@ -56,6 +56,13 @@ export interface FieldOptions {
   lookup_field_id?: string
   lookup_result_field_id?: string
   
+  // Lookup field display configuration
+  primary_label_field?: string // Required field name for primary label
+  secondary_label_fields?: string[] // Optional, max 2 field names for secondary context
+  relationship_type?: 'one-to-one' | 'one-to-many' | 'many-to-many'
+  max_selections?: number // For multi-select lookups
+  allow_create?: boolean // Allow creating new related records
+  
   // For read-only (stored in options since not in schema)
   read_only?: boolean
 }

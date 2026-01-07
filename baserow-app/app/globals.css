@@ -58,21 +58,29 @@
   }
 }
 
-/* TipTap Editor Styles */
+/* TipTap Editor Styles - REAL EDITOR (not a renderer) */
 .ProseMirror {
   outline: none;
   min-height: 100px;
+  width: 100%;
 }
 
-/* Ensure identical rendering in edit and view mode */
-.ProseMirror[contenteditable="true"],
-.ProseMirror[contenteditable="false"] {
-  /* Same styling for both modes */
+/* Editable mode: shows caret, accepts input */
+.ProseMirror[contenteditable="true"] {
   cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
+/* Read-only mode: no caret, no editing */
 .ProseMirror[contenteditable="false"] {
   cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 /* Placeholder styling - shows "Start typing…" when editor is empty and editable */

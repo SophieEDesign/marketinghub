@@ -49,16 +49,17 @@ export async function GET(
     }
 
     // Convert view_blocks to PageBlock format
+    // Ensure width/height are never null (default to 4 if null, which matches database default)
     const blocks = (data || []).map((block: any) => ({
       id: block.id,
       page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
       type: block.type,
-      x: block.position_x,
-      y: block.position_y,
-      w: block.width,
-      h: block.height,
+      x: block.position_x ?? 0,
+      y: block.position_y ?? 0,
+      w: block.width ?? 4,
+      h: block.height ?? 4,
       config: block.config || {},
-      order_index: block.order_index,
+      order_index: block.order_index ?? 0,
       created_at: block.created_at,
       updated_at: block.updated_at,
     }))

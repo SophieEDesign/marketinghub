@@ -5,6 +5,7 @@ import { Link2, Plus, X, Calculator } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
+import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 
 interface InlineFieldEditorProps {
   field: TableField
@@ -85,10 +86,92 @@ export default function InlineFieldEditor({
   const isVirtual = field.type === "formula" || field.type === "lookup"
   const isReadOnly = isVirtual || field.options?.read_only
 
-  // Linked records
-  if (field.type === "link_to_table") {
-    const linkedTableId = field.options?.linked_table_id
-    const linkedRecords = Array.isArray(value) ? value : value ? [value] : []
+  // Linked records and lookup fields - use LookupFieldPicker
+  if (field.type === "link_to_table" || field.type === "lookup") {
+    const linkedTableId = field.type === "link_to_table" 
+      ? field.options?.linked_table_id 
+      : field.options?.lookup_table_id
+
+    // Build lookup config from field options
+    const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
+      lookupTableId: linkedTableId,
+      primaryLabelField: field.options?.primary_label_field || 'name',
+      secondaryLabelFields: field.options?.secondary_label_fields || [],
+      relationshipType: field.options?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
+      maxSelections: field.options?.max_selections,
+      required: field.required,
+      allowCreate: field.options?.allow_create,
+    } : undefined
+
+    // Handle create new record
+    const handleCreateRecord = async (tableId: string): Promise<string | null> => {
+      try {
+        const supabase = createClient()
+        
+        // Get table info
+        const { data: table } = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", tableId)
+          .single()
+
+        if (!table) return null
+
+        // Get fields to create a minimal record
+        const { data: fields } = await supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("position", { ascending: true })
+          .limit(5) // Just get first few fields
+
+        // Create minimal record with default values
+        const newRecord: Record<string, any> = {}
+        fields?.forEach(f => {
+          if (f.default_value !== null && f.default_value !== undefined) {
+            newRecord[f.name] = f.default_value
+          }
+        })
+
+        const { data, error } = await supabase
+          .from(table.supabase_table)
+          .insert([newRecord])
+          .select()
+          .single()
+
+        if (error) {
+          console.error("Error creating record:", error)
+          toast({
+            title: "Failed to create record",
+            description: error.message || "Please try again",
+            variant: "destructive",
+          })
+          return null
+        }
+
+        return data?.id || null
+      } catch (error: any) {
+        console.error("Error in handleCreateRecord:", error)
+        return null
+      }
+    }
+
+    if (isReadOnly && field.type === "lookup") {
+      // Lookup fields are read-only, show display value
+      return (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+            {field.name}
+            <span title="Lookup field (read-only)">
+              <Calculator className="h-3 w-3 text-gray-400" />
+            </span>
+          </label>
+          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
+            {value !== null && value !== undefined ? String(value) : "—"}
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div className="space-y-2">
@@ -100,42 +183,22 @@ export default function InlineFieldEditor({
             </span>
           )}
         </label>
-        <div className="space-y-2">
-          {linkedRecords.map((recordId: string, index: number) => (
-            <div
-              key={index}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors group"
-            >
-              <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              <button
-                onClick={() => linkedTableId && onLinkedRecordClick(linkedTableId, recordId)}
-                className="flex-1 text-left text-sm text-gray-900 hover:text-blue-600"
-              >
-                {recordId.substring(0, 8)}...
-              </button>
-              {!isReadOnly && (
-                <button
-                  onClick={() => {
-                    const newRecords = linkedRecords.filter((_, i) => i !== index)
-                    onChange(newRecords.length === 1 ? newRecords[0] : newRecords)
-                  }}
-                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-all"
-                >
-                  <X className="h-3 w-3 text-red-600" />
-                </button>
-              )}
-            </div>
-          ))}
-          {!isReadOnly && linkedTableId && (
-            <button
-              onClick={() => onAddLinkedRecord(field)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-dashed border-gray-300 rounded-md transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add linked record
-            </button>
-          )}
-        </div>
+        {lookupConfig ? (
+          <LookupFieldPicker
+            field={field}
+            value={value}
+            onChange={onChange}
+            config={lookupConfig}
+            disabled={isReadOnly}
+            placeholder={`Select ${field.name}...`}
+            onRecordClick={onLinkedRecordClick}
+            onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
+          />
+        ) : (
+          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
+            Configure lookup table in field settings
+          </div>
+        )}
       </div>
     )
   }

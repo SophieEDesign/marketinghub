@@ -16,6 +16,7 @@ import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Filter, Plus, X } from "lucide-react"
+import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 
 interface FilterBlockSettingsProps {
   config: BlockConfig
@@ -329,6 +330,35 @@ export default function FilterBlockSettings({
                       {/* Value Input/Select */}
                       {needsValue ? (
                         (() => {
+                          // Check if this is a lookup or link_to_table field
+                          const isLookupField = selectedField?.type === 'link_to_table' || selectedField?.type === 'lookup'
+                          const linkedTableId = selectedField?.type === 'link_to_table'
+                            ? (selectedField.options as any)?.linked_table_id
+                            : (selectedField?.type === 'lookup' ? (selectedField.options as any)?.lookup_table_id : null)
+
+                          if (isLookupField && linkedTableId) {
+                            const lookupConfig: LookupFieldConfig = {
+                              lookupTableId: linkedTableId,
+                              primaryLabelField: (selectedField.options as any)?.primary_label_field || 'name',
+                              secondaryLabelFields: (selectedField.options as any)?.secondary_label_fields || [],
+                              relationshipType: (selectedField.options as any)?.relationship_type || (selectedField.type === 'link_to_table' ? 'one-to-many' : 'one-to-one'),
+                              maxSelections: (selectedField.options as any)?.max_selections,
+                            }
+
+                            return (
+                              <LookupFieldPicker
+                                field={selectedField as any}
+                                value={filter.value || null}
+                                onChange={(value) => {
+                                  const stringValue = Array.isArray(value) ? value.join(',') : (value || '')
+                                  updateDefaultFilter(index, { value: stringValue })
+                                }}
+                                config={lookupConfig}
+                                placeholder="Select value..."
+                              />
+                            )
+                          }
+
                           // Check for select field options (same pattern as FilterBlock)
                           const selectOptions = fieldOptions?.choices || fieldOptions || []
                           const hasSelectOptions = isSelectField && Array.isArray(selectOptions) && selectOptions.length > 0

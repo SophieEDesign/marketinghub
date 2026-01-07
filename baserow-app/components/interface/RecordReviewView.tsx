@@ -40,7 +40,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   
   const allowEditing = config.allow_editing || false
   const recordPanel = config.record_panel || 'side'
-  const selectedRecord = data.find(record => record.id === selectedRecordId)
   const [showComments, setShowComments] = useState(true)
 
   // Get columns from config or data - ensure it's always an array
@@ -148,6 +147,16 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
 
     return result
   }, [data, searchQuery, filters, columns])
+
+  // Find selected record from filtered data (or fallback to full data if not in filtered)
+  const selectedRecord = useMemo(() => {
+    if (!selectedRecordId) return null
+    // First try to find in filtered data (what's actually displayed)
+    const filtered = filteredData.find(record => record.id === selectedRecordId)
+    if (filtered) return filtered
+    // Fallback to full data if record exists but is filtered out
+    return data.find(record => record.id === selectedRecordId) || null
+  }, [selectedRecordId, filteredData, data])
 
   // Group records by status
   const groupedRecords = useMemo(() => {

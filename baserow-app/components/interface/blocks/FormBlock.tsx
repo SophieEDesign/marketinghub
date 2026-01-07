@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField as FieldType } from "@/types/database"
+import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import { useToast } from "@/components/ui/use-toast"
 
 interface FormBlockProps {
   block: PageBlock
@@ -15,6 +17,7 @@ interface FormBlockProps {
 
 export default function FormBlock({ block, isEditing = false, onSubmit, pageTableId = null, pageId = null }: FormBlockProps) {
   const { config } = block
+  const { toast } = useToast()
   // Form block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
   const formFieldsConfig = config?.form_fields || []
@@ -244,6 +247,112 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
             />
           </div>
         )
+
+      case "link_to_table":
+      case "lookup": {
+        const linkedTableId = field.type === "link_to_table" 
+          ? (field.options as any)?.linked_table_id 
+          : (field.options as any)?.lookup_table_id
+
+        const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
+          lookupTableId: linkedTableId,
+          primaryLabelField: (field.options as any)?.primary_label_field || 'name',
+          secondaryLabelFields: (field.options as any)?.secondary_label_fields || [],
+          relationshipType: (field.options as any)?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
+          maxSelections: (field.options as any)?.max_selections,
+          required: isRequired,
+          allowCreate: (field.options as any)?.allow_create,
+        } : undefined
+
+        // Handle create new record
+        const handleCreateRecord = async (tableId: string): Promise<string | null> => {
+          try {
+            const supabase = createClient()
+            
+            const { data: table } = await supabase
+              .from("tables")
+              .select("supabase_table")
+              .eq("id", tableId)
+              .single()
+
+            if (!table) return null
+
+            const { data: fields } = await supabase
+              .from("table_fields")
+              .select("*")
+              .eq("table_id", tableId)
+              .order("position", { ascending: true })
+              .limit(5)
+
+            const newRecord: Record<string, any> = {}
+            fields?.forEach(f => {
+              if (f.default_value !== null && f.default_value !== undefined) {
+                newRecord[f.name] = f.default_value
+              }
+            })
+
+            const { data, error } = await supabase
+              .from(table.supabase_table)
+              .insert([newRecord])
+              .select()
+              .single()
+
+            if (error) {
+              console.error("Error creating record:", error)
+              toast({
+                title: "Failed to create record",
+                description: error.message || "Please try again",
+                variant: "destructive",
+              })
+              return null
+            }
+
+            return data?.id || null
+          } catch (error: any) {
+            console.error("Error in handleCreateRecord:", error)
+            return null
+          }
+        }
+
+        if (field.type === "lookup") {
+          // Lookup fields are read-only in forms
+          return (
+            <div key={field.id} className="mb-4">
+              <label className="block text-sm font-medium mb-1">
+                {field.name}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 italic">
+                {value !== null && value !== undefined ? String(value) : "—"}
+              </div>
+            </div>
+          )
+        }
+
+        return (
+          <div key={field.id} className="mb-4">
+            <label className="block text-sm font-medium mb-1">
+              {field.name}
+              {isRequired && <span className="text-red-500 ml-1">*</span>}
+            </label>
+            {lookupConfig ? (
+              <LookupFieldPicker
+                field={field as any}
+                value={value}
+                onChange={(newValue) => setFormData({ ...formData, [field.name]: newValue })}
+                config={lookupConfig}
+                disabled={isEditing}
+                placeholder={`Select ${field.name}...`}
+                onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
+              />
+            ) : (
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
+                Configure lookup table in field settings
+              </div>
+            )}
+          </div>
+        )
+      }
 
       default:
         return (

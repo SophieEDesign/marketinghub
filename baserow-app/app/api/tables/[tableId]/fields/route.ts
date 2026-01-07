@@ -161,6 +161,34 @@ export async function POST(
     // 2. Add column to physical table (if not virtual)
     if (type !== 'formula' && type !== 'lookup') {
       try {
+        // First, verify the table exists before executing SQL
+        const { error: tableCheckError } = await supabase
+          .from(table.supabase_table)
+          .select('id')
+          .limit(1)
+        
+        if (tableCheckError) {
+          const isTableNotFound = 
+            tableCheckError.code === '42P01' || 
+            tableCheckError.code === 'PGRST116' ||
+            tableCheckError.message?.includes('does not exist') ||
+            tableCheckError.message?.includes('relation')
+          
+          if (isTableNotFound) {
+            // Rollback: Delete metadata
+            await supabase.from('table_fields').delete().eq('id', fieldData.id)
+            
+            return NextResponse.json(
+              { 
+                error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
+                error_code: 'TABLE_NOT_FOUND',
+                table_name: table.supabase_table
+              },
+              { status: 404 }
+            )
+          }
+        }
+        
         const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, options)
         
         const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
@@ -170,6 +198,25 @@ export async function POST(
         if (sqlError) {
           // Rollback: Delete metadata
           await supabase.from('table_fields').delete().eq('id', fieldData.id)
+          
+          // Check if it's a table not found error
+          const isTableNotFound = 
+            sqlError.code === '42P01' ||
+            sqlError.message?.includes('Table not found') ||
+            sqlError.message?.includes('does not exist') ||
+            sqlError.message?.includes('relation')
+          
+          if (isTableNotFound) {
+            return NextResponse.json(
+              { 
+                error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
+                error_code: 'TABLE_NOT_FOUND',
+                table_name: table.supabase_table,
+                details: sqlError.message
+              },
+              { status: 404 }
+            )
+          }
           
           return NextResponse.json(
             { error: `Failed to create column: ${sqlError.message}` },
@@ -383,6 +430,33 @@ export async function PATCH(
     if (required !== undefined) updates.required = required
     if (default_value !== undefined) updates.default_value = default_value
 
+    // Verify table exists before executing SQL operations
+    if (sqlOperations.length > 0) {
+      const { error: tableCheckError } = await supabase
+        .from(table.supabase_table)
+        .select('id')
+        .limit(1)
+      
+      if (tableCheckError) {
+        const isTableNotFound = 
+          tableCheckError.code === '42P01' || 
+          tableCheckError.code === 'PGRST116' ||
+          tableCheckError.message?.includes('does not exist') ||
+          tableCheckError.message?.includes('relation')
+        
+        if (isTableNotFound) {
+          return NextResponse.json(
+            { 
+              error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
+              error_code: 'TABLE_NOT_FOUND',
+              table_name: table.supabase_table
+            },
+            { status: 404 }
+          )
+        }
+      }
+    }
+
     // Execute SQL operations
     for (const sql of sqlOperations) {
       const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
@@ -391,6 +465,26 @@ export async function PATCH(
 
       if (sqlError) {
         console.error('SQL execution error:', sqlError)
+        
+        // Check if it's a table not found error
+        const isTableNotFound = 
+          sqlError.code === '42P01' ||
+          sqlError.message?.includes('Table not found') ||
+          sqlError.message?.includes('does not exist') ||
+          sqlError.message?.includes('relation')
+        
+        if (isTableNotFound) {
+          return NextResponse.json(
+            { 
+              error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
+              error_code: 'TABLE_NOT_FOUND',
+              table_name: table.supabase_table,
+              details: sqlError.message
+            },
+            { status: 404 }
+          )
+        }
+        
         return NextResponse.json(
           { error: `Failed to update column: ${sqlError.message}` },
           { status: 500 }
@@ -491,14 +585,37 @@ export async function DELETE(
 
     // Delete SQL column if not virtual
     if (field.type !== 'formula' && field.type !== 'lookup') {
-      const sql = generateDropColumnSQL(table.supabase_table, field.name)
-      const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
-        sql_text: sql
-      })
+      // Verify table exists before executing SQL
+      const { error: tableCheckError } = await supabase
+        .from(table.supabase_table)
+        .select('id')
+        .limit(1)
+      
+      if (tableCheckError) {
+        const isTableNotFound = 
+          tableCheckError.code === '42P01' || 
+          tableCheckError.code === 'PGRST116' ||
+          tableCheckError.message?.includes('does not exist') ||
+          tableCheckError.message?.includes('relation')
+        
+        if (isTableNotFound) {
+          // Table doesn't exist - continue with metadata cleanup only
+          console.warn(`Table "${table.supabase_table}" does not exist, skipping column drop`)
+        } else {
+          // Other error - log but continue with metadata cleanup
+          console.error('Error checking table existence:', tableCheckError)
+        }
+      } else {
+        // Table exists - proceed with dropping column
+        const sql = generateDropColumnSQL(table.supabase_table, field.name)
+        const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
+          sql_text: sql
+        })
 
-      if (sqlError) {
-        console.error('Error dropping column:', sqlError)
-        // Continue anyway - metadata cleanup is more important
+        if (sqlError) {
+          console.error('Error dropping column:', sqlError)
+          // Continue anyway - metadata cleanup is more important
+        }
       }
     }
 

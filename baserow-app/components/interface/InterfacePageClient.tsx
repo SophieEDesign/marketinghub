@@ -367,16 +367,17 @@ export default function InterfacePageClient({
       
       const data = await res.json()
       // Convert view_blocks format to PageBlock format
+      // Ensure width/height are never null (default to 4 if null, which matches database default)
       const pageBlocks = (data.blocks || []).map((block: any) => ({
         id: block.id,
         page_id: block.page_id || page.id,
         type: block.type,
-        x: block.x || block.position_x || 0,
-        y: block.y || block.position_y || 0,
-        w: block.w || block.width || 4,
-        h: block.h || block.height || 4,
+        x: block.x ?? block.position_x ?? 0,
+        y: block.y ?? block.position_y ?? 0,
+        w: block.w ?? block.width ?? 4,
+        h: block.h ?? block.height ?? 4,
         config: block.config || {},
-        order_index: block.order_index || 0,
+        order_index: block.order_index ?? 0,
         created_at: block.created_at,
         updated_at: block.updated_at,
       }))
