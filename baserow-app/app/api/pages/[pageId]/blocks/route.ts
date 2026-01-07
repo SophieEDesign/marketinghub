@@ -126,13 +126,18 @@ export async function PATCH(
             console.warn(`Block ${update.id} config validation warnings:`, validation.errors)
           }
 
-          return supabase
+          // Execute the update query and check for errors
+          const { error } = await supabase
             .from('view_blocks')
             .update({
               config: normalizedConfig,
               updated_at: new Date().toISOString(),
             })
             .eq('id', update.id)
+          
+          if (error) {
+            throw new Error(`Failed to update block ${update.id}: ${error.message}`)
+          }
         })
       )
     }

@@ -7,6 +7,7 @@ import MonthGrid from './MonthGrid'
 import AgendaPanel from './AgendaPanel'
 import CreateEventModal from './CreateEventModal'
 import CalendarSettings from './CalendarSettings'
+import RecordModal from './RecordModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Settings, Search, Plus } from 'lucide-react'
@@ -75,6 +76,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
   })
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'month' | 'agenda'>('month')
 
@@ -90,7 +92,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       processEvents()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, config.calendar_date_field, config.calendar_start_field, config.calendar_end_field, config.calendar_color_field, tableFields, searchQuery])
+  }, [rows, config.calendar_date_field, config.calendar_start_field, config.calendar_end_field, config.calendar_color_field, config.calendar_display_fields, config.show_weekends, config.first_day_of_week, config.event_density, tableFields, searchQuery])
 
   async function loadFields() {
     try {
@@ -165,6 +167,9 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         .eq('id', viewId)
 
       if (error) throw error
+      
+      // Reload config to ensure consistency and trigger re-render
+      await loadConfig()
     } catch (error) {
       console.error('Error saving config:', error)
     }
@@ -315,20 +320,11 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
   )
 
   const handleEventClick = useCallback(
-    async (event: CalendarEvent) => {
-      // Get table name for RecordPanel
-      try {
-        const { data: table } = await supabase.from('tables').select('name, supabase_table').eq('id', tableId).single()
-        if (table) {
-          // Open record in RecordPanel using window location
-          // For now, navigate to record page - later we can use RecordPanel context
-          window.location.href = `/data/${tableId}/rows/${event.id}`
-        }
-      } catch (error) {
-        console.error('Error opening record:', error)
-      }
+    (event: CalendarEvent) => {
+      // Open record in modal instead of navigating away
+      setSelectedRecordId(event.id)
     },
-    [tableId]
+    []
   )
 
   if (loading) {
@@ -498,7 +494,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
                 return dateA.getTime() - dateB.getTime()
               })}
               onEventClick={(event) => {
-                window.location.href = `/data/${tableId}/rows/${event.id}`
+                setSelectedRecordId(event.id)
               }}
               onCreateEvent={() => setCreateModalOpen(true)}
             />
@@ -526,6 +522,18 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         config={config}
         tableFields={tableFields}
         onSave={saveConfig}
+      />
+
+      <RecordModal
+        open={selectedRecordId !== null}
+        onClose={() => setSelectedRecordId(null)}
+        tableId={tableId}
+        recordId={selectedRecordId}
+        tableFields={tableFields}
+        onSave={() => {
+          // Reload events after save
+          processEvents()
+        }}
       />
     </div>
   )

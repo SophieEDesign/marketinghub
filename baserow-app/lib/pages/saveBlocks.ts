@@ -66,7 +66,11 @@ export async function saveBlockLayout(
         query = query.eq('view_id', pageId)
       }
 
-      return query
+      // Execute the query and check for errors
+      const { error } = await query
+      if (error) {
+        throw new Error(`Failed to update block ${update.id}: ${error.message}`)
+      }
     })
   )
 }
@@ -94,13 +98,18 @@ export async function saveBlockConfig(
     ...config,
   }
 
-  await supabase
+  // Execute the update query and check for errors
+  const { error } = await supabase
     .from('view_blocks')
     .update({
       config: updatedConfig,
       updated_at: new Date().toISOString(),
     })
     .eq('id', blockId)
+  
+  if (error) {
+    throw new Error(`Failed to update block config: ${error.message}`)
+  }
 }
 
 export async function createBlock(

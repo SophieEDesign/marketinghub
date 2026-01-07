@@ -159,6 +159,8 @@ After these changes:
 2. `lib/data.ts` - Refactored to accept metadata as parameters
 3. `baserow-app/components/interface/blocks/GridBlock.tsx` - Uses cached hook
 4. `baserow-app/components/views/GridView.tsx` - Uses cached hook
+5. `baserow-app/types/database.ts` - Fixed ViewFilter and ViewSort types to match database schema
+6. `baserow-app/app/api/tables/[tableId]/fields/route.ts` - Added TODO comments for cache invalidation
 
 ## Guardrails Added
 
@@ -206,4 +208,22 @@ Currently, field mutations (create/update/delete) do not invalidate the view met
 ✅ **Already handled correctly** - Supabase client uses cookies, which naturally partition cache per user session. No changes needed.
 
 See `PRE_DEPLOY_CHECKLIST.md` for detailed testing procedures and future enhancement options.
+
+## Type Fixes Applied
+
+### ViewFilter and ViewSort Type Corrections
+
+**Issue:** TypeScript build error - `ViewFilter` type didn't match actual database schema.
+
+**Root Cause:** Database uses `field_name` and `operator`, but TypeScript types used `field_id` and `filter_type`.
+
+**Fix Applied:**
+- Updated `ViewFilter` interface: `field_id` → `field_name`, `filter_type` → `operator`
+- Updated `ViewSort` interface: `field_id` → `field_name`, `order_direction` → `direction`
+- Made `created_at` and `order_index` optional to match actual database structure
+
+**Files Changed:**
+- `baserow-app/types/database.ts` - Type definitions updated to match database schema
+
+**Result:** Build now succeeds, types match actual database structure and code usage.
 

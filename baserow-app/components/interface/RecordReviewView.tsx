@@ -89,14 +89,36 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return fieldIdOrName
   }
   
-  // Get status field (look for common status field names)
+  // Get preview fields from config, or fallback to auto-detection
+  const previewFields = useMemo(() => {
+    if (config.preview_fields && Array.isArray(config.preview_fields) && config.preview_fields.length > 0) {
+      // Use configured preview fields
+      return config.preview_fields
+    }
+    // Fallback: auto-detect name and status fields
+    const nameField = columns.find((col: string) => 
+      col.toLowerCase().includes('name') || 
+      col.toLowerCase().includes('title') ||
+      col.toLowerCase() === 'id'
+    ) || columns[0]
+    
+    const statusField = columns.find((col: string) => 
+      col.toLowerCase().includes('status') || 
+      col.toLowerCase() === 'state' ||
+      col.toLowerCase() === 'stage'
+    )
+    
+    return statusField ? [nameField, statusField] : [nameField]
+  }, [config.preview_fields, columns])
+  
+  // Get status field for grouping (still needed for grouping logic)
   const statusField = columns.find((col: string) => 
     col.toLowerCase().includes('status') || 
     col.toLowerCase() === 'state' ||
     col.toLowerCase() === 'stage'
   ) || columns[0] // Fallback to first column
   
-  // Get name/title field (look for common name field names)
+  // Get name/title field (for fallback display)
   const nameField = columns.find((col: string) => 
     col.toLowerCase().includes('name') || 
     col.toLowerCase().includes('title') ||
@@ -347,8 +369,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   <div className="space-y-1">
                     {records.map((record) => {
                       const isSelected = record.id === selectedRecordId
-                      const recordName = record[nameField] || record.id || 'Untitled'
-                      const recordStatus = record[statusField] || 'No Status'
                       
                       return (
                         <div
@@ -361,16 +381,50 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                               : 'hover:bg-gray-50 border border-transparent'
                           )}
                         >
-                          <div className="font-medium text-sm text-gray-900 mb-1">
-                            {String(recordName).substring(0, 50)}
-                            {String(recordName).length > 50 ? '...' : ''}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge className={cn('text-xs', getStatusColor(recordStatus))}>
-                              {recordStatus}
-                            </Badge>
-                            <span className="text-xs text-gray-400">—</span>
-                          </div>
+                          {/* Render configured preview fields */}
+                          {previewFields.length > 0 ? (
+                            <div className="space-y-1">
+                              {previewFields.map((fieldIdOrName: string, idx: number) => {
+                                const fieldValue = record[fieldIdOrName]
+                                const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
+                                const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
+                                                      fieldIdOrName.toLowerCase() === 'state' ||
+                                                      fieldIdOrName.toLowerCase() === 'stage'
+                                
+                                return (
+                                  <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-sm text-gray-900' : 'text-xs text-gray-600'}>
+                                    {isStatusField && fieldValue ? (
+                                      <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
+                                        {String(fieldValue)}
+                                      </Badge>
+                                    ) : (
+                                      <span>
+                                        {idx === 0 ? fieldDisplayName + ': ' : ''}
+                                        {fieldValue !== null && fieldValue !== undefined 
+                                          ? String(fieldValue).substring(0, idx === 0 ? 50 : 30)
+                                          : '—'}
+                                        {fieldValue !== null && fieldValue !== undefined && String(fieldValue).length > (idx === 0 ? 50 : 30) ? '...' : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            // Fallback: show name and status if no preview fields configured
+                            <>
+                              <div className="font-medium text-sm text-gray-900 mb-1">
+                                {String(record[nameField] || record.id || 'Untitled').substring(0, 50)}
+                                {String(record[nameField] || record.id || 'Untitled').length > 50 ? '...' : ''}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge className={cn('text-xs', getStatusColor(String(record[statusField] || 'No Status')))}>
+                                  {record[statusField] || 'No Status'}
+                                </Badge>
+                                <span className="text-xs text-gray-400">—</span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       )
                     })}

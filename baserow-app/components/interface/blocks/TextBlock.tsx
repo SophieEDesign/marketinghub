@@ -587,7 +587,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         // Hover state in edit mode
         isEditing && !isFocused && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all"
       )}
-      style={blockStyle}
+      style={{
+        ...blockStyle,
+        minHeight: '100px', // Ensure minimum height so editor is visible
+      }}
       onClick={(e) => {
         // Click to focus when in edit mode
         // Don't focus if clicking on toolbar or other interactive elements
@@ -635,24 +638,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* When isEditing=false: read-only, displays content */}
       <div 
         className={cn(
-          "flex-1 prose prose-sm max-w-none w-full min-h-[60px]",
-          "prose-headings:font-semibold",
-          "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
-          "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
-          "prose-ol:my-2 prose-ol:first:mt-0 prose-ol:last:mb-0",
-          "prose-li:my-1",
-          "prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline",
-          "prose-strong:font-semibold",
-          "prose-em:italic",
-          // Text alignment
-          textAlign === 'center' && "text-center",
-          textAlign === 'right' && "text-right",
-          textAlign === 'justify' && "text-justify",
-          // Text size
-          textSize === 'sm' && "prose-sm",
-          textSize === 'md' && "prose-base",
-          textSize === 'lg' && "prose-lg",
-          textSize === 'xl' && "prose-xl",
+          "flex-1 w-full",
           // Empty state styling - only in edit mode
           isEmpty && isEditing && "flex items-center justify-center min-h-[100px]",
           // Cursor styling - CRITICAL for UX
@@ -684,7 +670,30 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         {/* EditorContent mounts the TipTap editor DOM */}
         {/* When editable: shows caret, accepts input, formats text */}
         {/* When read-only: displays content without editing capability */}
-        <EditorContent editor={editor} />
+        <div 
+          className={cn(
+            "prose prose-sm max-w-none w-full min-h-[60px]",
+            "prose-headings:font-semibold",
+            "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
+            "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
+            "prose-ol:my-2 prose-ol:first:mt-0 prose-ol:last:mb-0",
+            "prose-li:my-1",
+            "prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline",
+            "prose-strong:font-semibold",
+            "prose-em:italic",
+            // Text alignment
+            textAlign === 'center' && "text-center",
+            textAlign === 'right' && "text-right",
+            textAlign === 'justify' && "text-justify",
+            // Text size
+            textSize === 'sm' && "prose-sm",
+            textSize === 'md' && "prose-base",
+            textSize === 'lg' && "prose-lg",
+            textSize === 'xl' && "prose-xl",
+          )}
+        >
+          <EditorContent editor={editor} />
+        </div>
       </div>
     </div>
   )

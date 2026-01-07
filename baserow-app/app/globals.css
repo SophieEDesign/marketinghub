@@ -61,8 +61,31 @@
 /* TipTap Editor Styles - REAL EDITOR (not a renderer) */
 .ProseMirror {
   outline: none;
-  min-height: 100px;
+  min-height: 60px;
   width: 100%;
+  padding: 0.5rem;
+  box-sizing: border-box;
+  display: block;
+  position: relative;
+}
+
+/* Ensure editor is visible and has proper spacing */
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Empty editor state - show placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* Ensure ProseMirror content is visible */
+.ProseMirror > * {
+  display: block;
 }
 
 /* Editable mode: shows caret, accepts input */

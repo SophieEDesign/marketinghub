@@ -77,6 +77,7 @@ export default function PageDisplaySettingsPanel({
   const [startDateField, setStartDateField] = useState<string>("")
   const [endDateField, setEndDateField] = useState<string>("")
   const [calendarDisplayFields, setCalendarDisplayFields] = useState<string[]>([])
+  const [previewFields, setPreviewFields] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
@@ -113,6 +114,7 @@ export default function PageDisplaySettingsPanel({
       setStartDateField("")
       setEndDateField("")
       setCalendarDisplayFields([])
+      setPreviewFields([])
       setIsInitialLoad(true)
       return
     }
@@ -205,6 +207,12 @@ export default function PageDisplaySettingsPanel({
         // Load calendar display fields
         const displayFields = config.calendar_display_fields || []
         setCalendarDisplayFields(Array.isArray(displayFields) ? displayFields : [])
+      }
+      
+      // Load preview fields for record_review pages
+      if (page.page_type === 'record_review') {
+        const previewFieldsFromConfig = config.preview_fields || []
+        setPreviewFields(Array.isArray(previewFieldsFromConfig) ? previewFieldsFromConfig : [])
       }
       
       // Load grouping field from config or grid_view_settings
@@ -324,6 +332,10 @@ export default function PageDisplaySettingsPanel({
           calendar_end_field: endDateField || undefined,
           calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
         } : {}),
+        // Store preview fields for record_review pages
+        ...(page.page_type === 'record_review' ? {
+          preview_fields: previewFields.length > 0 ? previewFields : undefined,
+        } : {}),
         // Store view type for the block
         view_type: page.page_type === 'list' ? 'grid' : page.page_type,
       }
@@ -360,6 +372,9 @@ export default function PageDisplaySettingsPanel({
                 calendar_end_field: endDateField,
                 calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
               } : {}),
+              ...(page.page_type === 'record_review' ? {
+                preview_fields: previewFields.length > 0 ? previewFields : undefined,
+              } : {}),
             }
           })
           .eq('id', gridBlock.id)
@@ -386,6 +401,9 @@ export default function PageDisplaySettingsPanel({
                 calendar_end_field: endDateField,
                 calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
               } : {}),
+              ...(page.page_type === 'record_review' ? {
+                preview_fields: previewFields.length > 0 ? previewFields : undefined,
+              } : {}),
             },
             order_index: 0,
           })
@@ -396,7 +414,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -900,6 +918,48 @@ export default function PageDisplaySettingsPanel({
                   onCheckedChange={setRecordPreview}
                 />
               </div>
+
+              {/* Preview Fields - Record Review pages only */}
+              {page.page_type === 'record_review' && (
+                <div className="space-y-2">
+                  <Label>Preview Fields</Label>
+                  <div className="text-sm text-gray-500 mb-2">
+                    Select which fields to display in the left preview panel. Leave empty to use default (name and status).
+                  </div>
+                  {selectedTableId && tableFields.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                      {tableFields.map((field) => {
+                        const isSelected = previewFields.includes(field.name)
+                        return (
+                          <label
+                            key={field.id}
+                            className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setPreviewFields([...previewFields, field.name])
+                                } else {
+                                  setPreviewFields(previewFields.filter((f) => f !== field.name))
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">{field.name}</span>
+                            <span className="text-xs text-gray-400">({field.type})</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400 p-3 bg-gray-50 rounded-md">
+                      Select a data source to configure preview fields.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Density */}
               <div className="space-y-2">

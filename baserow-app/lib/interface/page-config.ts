@@ -38,6 +38,7 @@ export interface PageConfig {
   
   // Record review specific
   detail_fields?: string[]
+  preview_fields?: string[] // Fields to show in the left preview panel
   allow_editing?: boolean
   
   // General
@@ -99,6 +100,7 @@ export function getDefaultPageConfig(pageType: string): PageConfig {
       record_panel: 'side',
       allow_editing: false,
       detail_fields: [],
+      preview_fields: [], // Default: empty array means use name/status fields
     },
     blank: {
       visualisation: 'blank',
