@@ -27,9 +27,10 @@ interface RecordReviewViewProps {
   config: any
   blocks?: PageBlock[]
   pageTableId: string | null // Table ID from the page
+  isLoading?: boolean // Loading state for data
 }
 
-export default function RecordReviewView({ page, data, config, blocks = [], pageTableId }: RecordReviewViewProps) {
+export default function RecordReviewView({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [loadedBlocks, setLoadedBlocks] = useState<PageBlock[]>(blocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
@@ -310,7 +311,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
 
         {/* Records List - Grouped by Status */}
         <div className="flex-1 overflow-auto">
-          {filteredData.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+              <div className="text-center">
+                <p className="text-sm mb-2 font-medium">Loading records...</p>
+                <p className="text-xs text-gray-400">Please wait while we fetch the data.</p>
+              </div>
+            </div>
+          ) : filteredData.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500 p-4">
               <div className="text-center">
                 <p className="text-sm mb-2 font-medium">

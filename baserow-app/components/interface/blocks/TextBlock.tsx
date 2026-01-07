@@ -95,6 +95,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
    * ✓ Click → caret appears → type directly → saves automatically
    * ✓ Toolbar with formatting controls (Bold, Italic, Headings, Lists, Links)
    * ✓ Auto-saves on blur and debounced on update
+   * ✓ View mode: text selectable for copy/paste, cursor is default (not text caret)
+   * ✓ Editor instance persists across block reordering (keyed by block.id)
+   * 
+   * EDITOR UNMOUNT SAFETY:
+   * - TipTap's useEditor hook creates editor instance once on mount
+   * - Editor instance persists until component unmounts
+   * - Blocks are keyed by block.id in Canvas, so React preserves component instances
+   * - When blocks are reordered, same component instance is reused (editor preserved)
+   * - Editor is only destroyed when block is actually deleted/removed
    * 
    * This is a REAL editor instance, not a renderer.
    * If you cannot type into this block, the implementation is wrong.
@@ -544,13 +553,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editorElement.style.userSelect = 'text'
         editorElement.style.webkitUserSelect = 'text'
       } else {
-        // VIEW MODE: Editor is read-only
+        // VIEW MODE: Editor is read-only but text should be selectable for copy/paste
         editorElement.removeAttribute('data-placeholder')
         editorElement.setAttribute('tabindex', '-1')
         // TipTap sets contenteditable="false" automatically when editable=false
-        editorElement.style.cursor = 'default'
-        editorElement.style.userSelect = 'none'
-        editorElement.style.webkitUserSelect = 'none'
+        editorElement.style.cursor = 'default' // Default cursor (not text caret)
+        // CRITICAL: Allow text selection in view mode for copy/paste
+        // Only cursor differs (default vs text), selection should work
+        editorElement.style.userSelect = 'text'
+        editorElement.style.webkitUserSelect = 'text'
       }
     }
   }, [editor, isEditing])

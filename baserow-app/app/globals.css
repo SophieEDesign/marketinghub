@@ -74,13 +74,13 @@
   -ms-user-select: text;
 }
 
-/* Read-only mode: no caret, no editing */
+/* Read-only mode: no caret, no editing, but text is selectable for copy/paste */
 .ProseMirror[contenteditable="false"] {
-  cursor: default;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
+  cursor: default; /* Default cursor (not text caret) */
+  user-select: text; /* Allow selection for copy/paste */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 }
 
 /* Placeholder styling - shows "Start typing…" when editor is empty and editable */

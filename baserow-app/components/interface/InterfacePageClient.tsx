@@ -47,6 +47,7 @@ export default function InterfacePageClient({
   const [redirecting, setRedirecting] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [formSettingsOpen, setFormSettingsOpen] = useState(false)
+  const [dataLoading, setDataLoading] = useState(false)
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -56,6 +57,13 @@ export default function InterfacePageClient({
   const titleInputRef = useRef<HTMLInputElement>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSavedTitleRef = useRef<string>("")
+  
+  // Track previous values to prevent unnecessary data reloads
+  const prevSourceViewRef = useRef<string | null>(null)
+  const prevSavedViewIdRef = useRef<string | null>(null)
+  const prevPageTypeRef = useRef<string | null>(null)
+  const prevBaseTableRef = useRef<string | null>(null)
+  const dataLoadingRef = useRef<boolean>(false)
   
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
@@ -84,13 +92,41 @@ export default function InterfacePageClient({
   }, [isEditingTitle])
 
   useEffect(() => {
-    if (page && page.source_view) {
+    if (!page) return
+    
+    const sourceView = page.source_view || null
+    const savedViewId = page.saved_view_id || null
+    const pageType = page.page_type || null
+    const baseTable = page.base_table || null
+    
+    // Check if anything actually changed
+    const sourceViewChanged = prevSourceViewRef.current !== sourceView
+    const savedViewIdChanged = prevSavedViewIdRef.current !== savedViewId
+    const pageTypeChanged = prevPageTypeRef.current !== pageType
+    const baseTableChanged = prevBaseTableRef.current !== baseTable
+    
+    // Only proceed if something changed and we're not already loading
+    if (!sourceViewChanged && !savedViewIdChanged && !pageTypeChanged && !baseTableChanged) {
+      return
+    }
+    
+    // Update refs
+    prevSourceViewRef.current = sourceView
+    prevSavedViewIdRef.current = savedViewId
+    prevPageTypeRef.current = pageType
+    prevBaseTableRef.current = baseTable
+    
+    // Prevent concurrent loads
+    if (dataLoadingRef.current) return
+    
+    if (sourceView) {
       loadSqlViewData()
-    } else if (page && page.page_type === 'record_review') {
+    } else if (pageType === 'record_review') {
       // Load table data for record_review pages (check both saved_view_id and base_table)
       loadRecordReviewData()
-    } else if (page && page.saved_view_id && page.page_type === 'list') {
-      // Load table data for list view pages
+    } else if (savedViewId && pageType === 'list') {
+      // NOTE: List view pages use GridBlock which loads its own data
+      // This data loading is kept for backward compatibility but may not be used
       loadListViewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,6 +176,11 @@ export default function InterfacePageClient({
 
   async function loadSqlViewData() {
     if (!page?.source_view) return
+    
+    // Prevent concurrent calls
+    if (dataLoadingRef.current) return
+    dataLoadingRef.current = true
+    setDataLoading(true)
 
     try {
       const res = await fetch(`/api/sql-views/${encodeURIComponent(page.source_view)}`, {
@@ -157,11 +198,19 @@ export default function InterfacePageClient({
     } catch (error) {
       console.error("Error loading SQL view data:", error)
       setData([])
+    } finally {
+      dataLoadingRef.current = false
+      setDataLoading(false)
     }
   }
 
   async function loadRecordReviewData() {
     if (!page) return
+    
+    // Prevent concurrent calls
+    if (dataLoadingRef.current) return
+    dataLoadingRef.current = true
+    setDataLoading(true)
 
     try {
       const supabase = createClient()
@@ -192,6 +241,8 @@ export default function InterfacePageClient({
       if (!tableId) {
         console.error("No table ID found for record review page")
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -205,6 +256,8 @@ export default function InterfacePageClient({
       if (tableError || !table?.supabase_table) {
         console.error("Error loading table:", tableError)
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -214,6 +267,8 @@ export default function InterfacePageClient({
       if (!supabaseTableName) {
         console.error("No table name found")
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -227,6 +282,8 @@ export default function InterfacePageClient({
       if (tableDataError) {
         console.error("Error loading table data:", tableDataError)
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -240,11 +297,19 @@ export default function InterfacePageClient({
     } catch (error) {
       console.error("Error loading record review data:", error)
       setData([])
+    } finally {
+      dataLoadingRef.current = false
+      setDataLoading(false)
     }
   }
 
   async function loadListViewData() {
     if (!page?.saved_view_id) return
+    
+    // Prevent concurrent calls
+    if (dataLoadingRef.current) return
+    dataLoadingRef.current = true
+    setDataLoading(true)
 
     try {
       const supabase = createClient()
@@ -259,6 +324,8 @@ export default function InterfacePageClient({
       if (viewError || !view?.table_id) {
         console.error("Error loading view:", viewError)
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -272,6 +339,8 @@ export default function InterfacePageClient({
       if (tableError || !table?.supabase_table) {
         console.error("Error loading table:", tableError)
         setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
         return
       }
 
@@ -354,6 +423,9 @@ export default function InterfacePageClient({
     } catch (error) {
       console.error("Error loading list view data:", error)
       setData([])
+    } finally {
+      dataLoadingRef.current = false
+      setDataLoading(false)
     }
   }
 
@@ -749,7 +821,7 @@ export default function InterfacePageClient({
           <PageRenderer
             page={pageWithConfig}
             data={data}
-            isLoading={loading}
+            isLoading={loading || dataLoading}
             onGridToggle={showGridToggle ? handleGridToggle : undefined}
             showGridToggle={showGridToggle}
             blocks={(isDashboardOrOverview || page?.page_type === 'record_review' || page?.page_type === 'content') ? blocks : undefined}

@@ -229,6 +229,7 @@ export default function PageRenderer({
             config={config}
             blocks={blocks}
             pageTableId={pageTableId}
+            isLoading={isLoading}
           />
         )
 
