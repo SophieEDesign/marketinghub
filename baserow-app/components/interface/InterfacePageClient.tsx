@@ -94,6 +94,10 @@ export default function InterfacePageClient({
   useEffect(() => {
     if (!page) return
     
+    // CRITICAL: Only skip reload if we already have data AND inputs haven't changed
+    // This prevents the race condition where guards fire before data is committed
+    const hasData = Array.isArray(data) && data.length > 0
+    
     const sourceView = page.source_view || null
     const savedViewId = page.saved_view_id || null
     const pageType = page.page_type || null
@@ -105,8 +109,9 @@ export default function InterfacePageClient({
     const pageTypeChanged = prevPageTypeRef.current !== pageType
     const baseTableChanged = prevBaseTableRef.current !== baseTable
     
-    // Only proceed if something changed and we're not already loading
-    if (!sourceViewChanged && !savedViewIdChanged && !pageTypeChanged && !baseTableChanged) {
+    // Only skip reload if we have data AND nothing changed
+    // If we don't have data, we MUST load regardless of refs matching
+    if (hasData && !sourceViewChanged && !savedViewIdChanged && !pageTypeChanged && !baseTableChanged) {
       return
     }
     

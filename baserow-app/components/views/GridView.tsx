@@ -34,6 +34,10 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   }, [viewId])
 
   useEffect(() => {
+    // CRITICAL: Only skip reload if we already have data AND inputs haven't changed
+    // This prevents the race condition where guards fire before data is committed
+    const hasData = Array.isArray(rows) && rows.length > 0
+    
     // Create stable keys for comparison
     const filtersKey = JSON.stringify(filters)
     const sortsKey = JSON.stringify(sorts)
@@ -44,7 +48,9 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
     const tableIdChanged = prevTableIdRef.current !== tableId
     const pageChanged = prevPageRef.current !== page
     
-    if (!filtersChanged && !sortsChanged && !tableIdChanged && !pageChanged) {
+    // Only skip reload if we have data AND nothing changed
+    // If we don't have data, we MUST load regardless of refs matching
+    if (hasData && !filtersChanged && !sortsChanged && !tableIdChanged && !pageChanged) {
       return // No actual change, skip loading
     }
     
