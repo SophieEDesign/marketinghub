@@ -141,11 +141,34 @@ export default function PageRenderer({
           : config.fields || []
         
         if (!pageTableId) {
+          // Show setup UI instead of dead-end message
           return (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+            <div className="flex items-center justify-center h-full p-4">
               <div className="text-center max-w-md">
-                <div className="text-sm mb-2">Form requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
+                <div className="flex justify-center mb-4">
+                  <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Connect a table
+                </h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  Form pages need a table connection. Select a table to configure form fields.
+                </p>
+                <button
+                  onClick={() => {
+                    // Trigger settings panel open via custom event
+                    window.dispatchEvent(new CustomEvent('open-page-settings'))
+                  }}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Connect Table
+                </button>
               </div>
             </div>
           )
@@ -213,11 +236,34 @@ export default function PageRenderer({
 
       case 'record_review':
         if (!pageTableId) {
+          // Show setup UI instead of dead-end message
           return (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+            <div className="flex items-center justify-center h-full p-4">
               <div className="text-center max-w-md">
-                <div className="text-sm mb-2">Record Review requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
+                <div className="flex justify-center mb-4">
+                  <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Connect a table
+                </h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  Record review pages need a table connection. Select a table to configure the detail panel.
+                </p>
+                <button
+                  onClick={() => {
+                    // Trigger settings panel open via custom event
+                    window.dispatchEvent(new CustomEvent('open-page-settings'))
+                  }}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Connect Table
+                </button>
               </div>
             </div>
           )
@@ -309,21 +355,32 @@ function DashboardView({ page, data, config }: { page: InterfacePage; data: any[
 
 function InvalidPageState({ page }: { page: InterfacePage }) {
   return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center max-w-md p-8">
-        <div className="text-4xl mb-4">⚠️</div>
+    <div className="flex items-center justify-center h-full p-4">
+      <div className="text-center max-w-md">
+        <div className="flex justify-center mb-4">
+          <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
           Page Configuration Required
         </h3>
-        <p className="text-sm text-gray-500 mb-4">
-          This page is missing required configuration. Please configure it in Settings.
+        <p className="text-sm text-gray-500 mb-6">
+          This page is missing required configuration. Configure it to get started.
         </p>
-        <a
-          href="/settings?tab=pages"
-          className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+        <button
+          onClick={() => {
+            // Trigger settings panel open via custom event
+            window.dispatchEvent(new CustomEvent('open-page-settings'))
+          }}
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
         >
-          Go to Settings
-        </a>
+          <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Configure Page
+        </button>
       </div>
     </div>
   )
@@ -460,9 +517,35 @@ function ListViewGrid({ page, tableId, viewId, config }: { page: InterfacePage; 
 // Simple grid view for SQL view data
 function SimpleGridView({ data, config, pageId, tableId }: { data: any[]; config: any; pageId: string; tableId: string | null }) {
   if (!data || data.length === 0) {
+    // Show setup UI instead of dead-end "No data available"
     return (
-      <div className="flex items-center justify-center h-full text-gray-500">
-        No data available
+      <div className="flex items-center justify-center h-full p-4">
+        <div className="text-center max-w-md">
+          <div className="flex justify-center mb-4">
+            <svg className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            No data available
+          </h3>
+          <p className="text-sm text-gray-500 mb-6">
+            This page is connected but has no data. Check your filters or add data to the table.
+          </p>
+          <button
+            onClick={() => {
+              // Trigger settings panel open via custom event
+              window.dispatchEvent(new CustomEvent('open-page-settings'))
+            }}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+          >
+            <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Configure Filters
+          </button>
+        </div>
       </div>
     )
   }

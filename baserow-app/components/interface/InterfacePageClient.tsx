@@ -75,6 +75,21 @@ export default function InterfacePageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageId])
 
+  // Listen for custom event to open settings panel
+  useEffect(() => {
+    const handleOpenSettings = () => {
+      if (page?.page_type === 'form') {
+        setFormSettingsOpen(true)
+      } else {
+        setDisplaySettingsOpen(true)
+      }
+    }
+    window.addEventListener('open-page-settings', handleOpenSettings)
+    return () => {
+      window.removeEventListener('open-page-settings', handleOpenSettings)
+    }
+  }, [page?.page_type])
+
   // Initialize title value when page loads
   useEffect(() => {
     if (page?.name) {
@@ -598,24 +613,29 @@ export default function InterfacePageClient({
   const pageAnchor = page ? getPageAnchor(page) : null
   const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
 
-  // Edit page behavior based on anchor type
+  // Edit page behavior based on anchor type - NEVER show alerts, always open contextual editor
   const handleEditClick = () => {
     if (!page) return
     
-    // If page doesn't have anchor, redirect to setup
+    // If page doesn't have anchor, open settings instead of redirecting
     if (!pageHasAnchor) {
-      router.push(`/settings?tab=pages&page=${page.id}&action=configure`)
+      // Open appropriate settings panel based on page type
+      if (page.page_type === 'form') {
+        setFormSettingsOpen(true)
+      } else {
+        setDisplaySettingsOpen(true)
+      }
       return
     }
 
-    // Open appropriate editor based on anchor type
+    // Open appropriate editor based on anchor type - NO ALERTS, always open editor
     switch (pageAnchor) {
       case 'dashboard':
-        // For dashboard pages, enter block editing mode
+        // For dashboard/overview/content pages, enter block editing mode
         enterBlockEdit()
         break
       case 'saved_view':
-        // Open page display settings panel for data-backed pages
+        // For list/gallery/kanban/calendar/timeline pages, open view settings
         setDisplaySettingsOpen(true)
         break
       case 'form':
@@ -632,8 +652,21 @@ export default function InterfacePageClient({
         }
         break
       default:
-        // Fallback: try to open settings
-        router.push(`/settings?tab=pages&page=${page.id}&action=configure`)
+        // Fallback: open settings panel (never redirect or alert)
+        if (page.page_type === 'form') {
+          setFormSettingsOpen(true)
+        } else {
+          setDisplaySettingsOpen(true)
+        }
+    }
+  }
+  
+  // Handler to open page settings drawer
+  const handleOpenPageSettings = () => {
+    if (page?.page_type === 'form') {
+      setFormSettingsOpen(true)
+    } else {
+      setDisplaySettingsOpen(true)
     }
   }
 
@@ -763,14 +796,7 @@ export default function InterfacePageClient({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    // Open appropriate settings panel based on page type
-                    if (page.page_type === 'form') {
-                      setFormSettingsOpen(true)
-                    } else {
-                      setDisplaySettingsOpen(true)
-                    }
-                  }}
+                  onClick={handleOpenPageSettings}
                   title="Page Settings"
                 >
                   <Settings className="h-4 w-4" />
@@ -781,11 +807,17 @@ export default function InterfacePageClient({
         </div>
       )}
       
-      {/* Header without Edit Button - Non-admin */}
+      {/* Header without Edit Button - Non-admin with View Only badge */}
       {!isViewer && page && !isAdmin && (
         <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <h1 className="text-lg font-semibold flex-1 min-w-0 truncate">{page.name}</h1>
+            <span 
+              className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded flex-shrink-0"
+              title="Ask an admin to edit this page"
+            >
+              View only
+            </span>
             {page.updated_at && (
               <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
                 Updated {new Date(page.updated_at).toLocaleDateString()}
@@ -799,7 +831,11 @@ export default function InterfacePageClient({
       <div className="flex-1 overflow-hidden">
         {/* Show setup state if page doesn't have anchor */}
         {page && !pageHasAnchor ? (
-          <PageSetupState page={page} isAdmin={isAdmin} />
+          <PageSetupState 
+            page={page} 
+            isAdmin={isAdmin} 
+            onOpenSettings={handleOpenPageSettings}
+          />
         ) : isDashboardOrOverview && isBlockEditing ? (
           // For dashboard/overview in block edit mode, use InterfaceBuilder
           blocksLoading ? (
