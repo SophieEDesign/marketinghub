@@ -128,8 +128,6 @@ export default function RecordModal({
         return 'url'
       case 'date':
         return 'date'
-      case 'datetime':
-        return 'datetime-local'
       case 'checkbox':
         return 'checkbox'
       default:
@@ -149,15 +147,6 @@ export default function RecordModal({
       }
     }
     
-    if (field.type === 'datetime' && value) {
-      try {
-        const date = new Date(value)
-        return date.toISOString().slice(0, 16)
-      } catch {
-        return String(value)
-      }
-    }
-    
     return String(value)
   }
 
@@ -171,10 +160,6 @@ export default function RecordModal({
     }
     
     if (field.type === 'date' && value) {
-      return new Date(value).toISOString()
-    }
-    
-    if (field.type === 'datetime' && value) {
       return new Date(value).toISOString()
     }
     
