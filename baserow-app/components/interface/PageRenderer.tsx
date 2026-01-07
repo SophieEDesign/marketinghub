@@ -101,22 +101,21 @@ export default function PageRenderer({
       )
     }
 
-    // Pre-deployment guard: Validate page before rendering
-    // Only warn in dev mode, don't block rendering - show setup UI instead
-    const pageValidity = assertPageIsValid(page, {
-      hasBlocks: blocks.length > 0,
-      hasTableId: !!pageTableId,
-      hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
-    })
-
-    // Show setup UI if page is invalid, but only for critical issues (missing anchors)
-    // Don't block rendering for missing data - let the page components handle that
-    if (!pageValidity.valid && pageValidity.missingAnchor) {
-      return <InvalidPageState page={page} reason={pageValidity.reason} />
+    // Pre-deployment guard: Validate page before rendering (diagnostics only)
+    // NEVER block rendering - always render the page
+    // Pages will show their own setup UI if needed
+    if (process.env.NODE_ENV === 'development') {
+      const pageValidity = assertPageIsValid(page, {
+        hasBlocks: blocks.length > 0,
+        hasTableId: !!pageTableId,
+        hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
+      })
+      
+      if (!pageValidity.valid) {
+        // Log warning but continue rendering
+        console.warn(`[PageGuard] Page ${page.id} validation issue (rendering anyway):`, pageValidity.reason)
+      }
     }
-
-    // For other validation issues, log warning but continue rendering
-    // The page components will show their own setup states
 
     switch (visualisation) {
       case 'list':

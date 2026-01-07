@@ -829,13 +829,18 @@ export default function InterfacePageClient({
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        {/* Show setup state if page doesn't have anchor */}
-        {page && !pageHasAnchor ? (
-          <PageSetupState 
-            page={page} 
-            isAdmin={isAdmin} 
-            onOpenSettings={handleOpenPageSettings}
-          />
+        {/* Show loading state */}
+        {loading && !page ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-gray-500">Loading page...</div>
+          </div>
+        ) : !page ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
+              <p className="text-sm text-gray-500">The page you're looking for doesn't exist.</p>
+            </div>
+          </div>
         ) : isDashboardOrOverview && isBlockEditing ? (
           // For dashboard/overview in block edit mode, use InterfaceBuilder
           blocksLoading ? (
