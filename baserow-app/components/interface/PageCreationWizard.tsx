@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType } from "@/lib/interface/page-types"
+import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isCollectionPage, isRecordReviewPage } from "@/lib/interface/page-types"
 import { Database, LayoutDashboard, FileText, FileCheck, BookOpen } from "lucide-react"
 
 interface PageCreationWizardProps {
@@ -167,7 +167,9 @@ export default function PageCreationWizard({
         break
       case 'record':
         setPageType('record_review')
-        break
+        // Record Review pages skip view type selection - go to anchor step for table selection
+        setStep('anchor')
+        return
       case 'content':
         setPageType('content')
         // Skip anchor step for content pages - go directly to name
@@ -237,15 +239,14 @@ export default function PageCreationWizard({
       } else {
         switch (requiredAnchor) {
         case 'saved_view':
-          // For saved_view anchor, create a view first
-          // Map page_type to view type
+          // For collection pages (view-based), create a view with the selected view type
+          // Map page_type to view type (only for collection pages)
           const viewTypeMap: Record<string, 'grid' | 'gallery' | 'kanban' | 'calendar' | 'timeline'> = {
             'list': 'grid',
             'gallery': 'gallery',
             'kanban': 'kanban',
             'calendar': 'calendar',
             'timeline': 'timeline',
-            'record_review': 'grid', // record_review uses grid view
           }
           const viewType = viewTypeMap[pageType] || 'grid'
           
@@ -281,16 +282,16 @@ export default function PageCreationWizard({
           form_config_id = tableId && tableId.trim() ? tableId.trim() : null
           break
         case 'record':
-          // Record review pages use saved_view anchor (not record anchor)
-          // This case should not be hit since record_review maps to 'saved_view' anchor
-          // But keeping it for safety - create a view
+          // Record Review pages: Create a grid view for the underlying data display
+          // But do NOT store view_type - Record Review pages are record-based, not view-based
+          // The view is just for data access, not for view type selection
           const { data: recordView, error: recordViewError } = await supabase
             .from('views')
             .insert([
               {
                 table_id: tableId,
                 name: `${pageName.trim()} View`,
-                type: 'grid',
+                type: 'grid', // Always grid for Record Review - fixed layout
                 config: {},
                 access_level: 'authenticated',
                 owner_id: user?.id,
@@ -304,6 +305,7 @@ export default function PageCreationWizard({
           }
 
           saved_view_id = recordView.id
+          // Do NOT set view_type - Record Review pages don't have view types
           break
         }
       }
@@ -447,29 +449,64 @@ export default function PageCreationWizard({
 
   const renderAnchorStep = () => {
     const requiredAnchor = pageType ? getRequiredAnchorType(pageType as PageType) : null
+    const isRecordPage = pageType ? isRecordReviewPage(pageType as PageType) : false
+    const isCollection = pageType ? isCollectionPage(pageType as PageType) : false
 
-    if (requiredAnchor === 'saved_view' || requiredAnchor === 'record') {
+    // Record Review pages: Only show table selection, no view type selection
+    if (isRecordPage) {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Page Type</Label>
+            <Label>Select Table *</Label>
+            <p className="text-sm text-gray-500 mb-2">
+              This page will show a single record at a time. Select the table that contains the records you want to review.
+            </p>
+            <Select value={tableId} onValueChange={setTableId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a table" />
+              </SelectTrigger>
+              <SelectContent>
+                {tables.map((table) => (
+                  <SelectItem key={table.id} value={table.id}>
+                    {table.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {tables.length === 0 && (
+              <p className="text-sm text-gray-500">No tables available. Create a table first in Settings → Data.</p>
+            )}
+          </div>
+          <Button
+            onClick={handleAnchorConfigured}
+            disabled={!tableId}
+            className="w-full"
+          >
+            Continue
+          </Button>
+        </div>
+      )
+    }
+
+    // Collection pages (view-based): Show view type selection + table selection
+    if (requiredAnchor === 'saved_view' && isCollection) {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>View Type</Label>
+            <p className="text-sm text-gray-500 mb-2">
+              Choose how you want to display your data
+            </p>
             <Select value={pageType} onValueChange={(value) => setPageType(value as PageType)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {requiredAnchor === 'saved_view' && (
-                  <>
-                    <SelectItem value="list">List</SelectItem>
-                    <SelectItem value="gallery">Gallery</SelectItem>
-                    <SelectItem value="kanban">Kanban</SelectItem>
-                    <SelectItem value="calendar">Calendar</SelectItem>
-                    <SelectItem value="timeline">Timeline</SelectItem>
-                  </>
-                )}
-                {requiredAnchor === 'record' && (
-                  <SelectItem value="record_review">Record Review</SelectItem>
-                )}
+                <SelectItem value="list">List</SelectItem>
+                <SelectItem value="gallery">Gallery</SelectItem>
+                <SelectItem value="kanban">Kanban</SelectItem>
+                <SelectItem value="calendar">Calendar</SelectItem>
+                <SelectItem value="timeline">Timeline</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -599,13 +636,13 @@ export default function PageCreationWizard({
           <DialogTitle>
             {step === 'interface' && 'Select Interface'}
             {step === 'purpose' && 'Create New Page'}
-            {step === 'anchor' && 'Configure Page'}
+            {step === 'anchor' && (isRecordReviewPage(pageType as PageType) ? 'Create Record Page' : isCollectionPage(pageType as PageType) ? 'Create Collection Page' : 'Configure Page')}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
           <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
-            {step === 'anchor' && 'Set up the data source or layout'}
+            {step === 'anchor' && (isRecordReviewPage(pageType as PageType) ? 'Select the table that contains the records you want to review' : isCollectionPage(pageType as PageType) ? 'Choose how you want to display your data' : 'Set up the data source or layout')}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>

@@ -67,7 +67,7 @@ export default function BlockAppearanceWrapper({
     : undefined
 
   return (
-    <div className={cn(containerClasses, accentBorder, className, "h-full w-full flex flex-col")}>
+    <div className={cn(containerClasses, accentBorder, className, "w-full flex flex-col min-h-0")}>
       {/* Header with title */}
       {showTitle && (
         <>
@@ -92,9 +92,9 @@ export default function BlockAppearanceWrapper({
         </>
       )}
 
-      {/* Block content with padding */}
+      {/* Block content with padding - use min-h-0 to allow flex children to shrink */}
       <div 
-        className={cn("flex-1 overflow-auto", contentPadding)}
+        className={cn("flex-1 min-h-0", contentPadding)}
         style={legacyPaddingStyle}
       >
         {children}

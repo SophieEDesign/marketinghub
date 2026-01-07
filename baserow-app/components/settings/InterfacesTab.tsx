@@ -174,35 +174,67 @@ export default function InterfacesTab() {
       console.error('Exception loading interface groups:', error)
     }
 
-    // Filter out system groups (like "Ungrouped") from display
+    // Find the "Ungrouped" system group (for ungrouped pages)
+    const ungroupedGroup = (groupsData || []).find(g => g.is_system && g.name === 'Ungrouped')
+    
+    // Include all groups (including system groups like "Ungrouped") for settings display
     const allGroups = (groupsData || [])
-      .filter(g => !g.is_system)
       .map(g => ({
         id: g.id,
         name: g.name,
         order_index: g.order_index || 0,
         is_admin_only: g.is_admin_only || false,
+        is_system: g.is_system || false,
       }))
 
-    // Group pages by group_id
+    // Group pages by group_id, including ungrouped pages
     const pagesByGroup = new Map<string, any[]>()
+    const ungroupedPages: any[] = []
+    
     pagesData.forEach((page) => {
       const groupId = page.group_id
+      const pageData = {
+        id: page.id,
+        name: page.name,
+        type: 'interface' as const,
+        group_id: groupId,
+        order_index: page.order_index || 0,
+        is_admin_only: page.is_admin_only || false,
+        created_at: page.created_at,
+      }
+      
       if (groupId) {
         if (!pagesByGroup.has(groupId)) {
           pagesByGroup.set(groupId, [])
         }
-        pagesByGroup.get(groupId)!.push({
-          id: page.id,
-          name: page.name,
-          type: 'interface',
-          group_id: groupId,
-          order_index: page.order_index || 0,
-          is_admin_only: page.is_admin_only || false,
-          created_at: page.created_at,
-        })
+        pagesByGroup.get(groupId)!.push(pageData)
+      } else {
+        // Collect ungrouped pages (no group_id)
+        ungroupedPages.push(pageData)
       }
     })
+    
+    // If we have ungrouped pages, ensure "Ungrouped" group exists in allGroups
+    if (ungroupedPages.length > 0) {
+      if (ungroupedGroup) {
+        // Use existing "Ungrouped" group
+        if (!pagesByGroup.has(ungroupedGroup.id)) {
+          pagesByGroup.set(ungroupedGroup.id, [])
+        }
+        pagesByGroup.get(ungroupedGroup.id)!.push(...ungroupedPages)
+      } else {
+        // Create virtual "Ungrouped" group for display
+        const virtualUngroupedGroup = {
+          id: 'ungrouped-system-virtual',
+          name: 'Ungrouped',
+          order_index: 9999,
+          is_admin_only: false,
+          is_system: true,
+        }
+        allGroups.push(virtualUngroupedGroup)
+        pagesByGroup.set(virtualUngroupedGroup.id, ungroupedPages)
+      }
+    }
 
     // Sort pages within each group by order_index
     pagesByGroup.forEach((pages) => {

@@ -102,10 +102,10 @@ export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
   record_review: {
     type: 'record_review',
     label: 'Record Review',
-    description: 'Record switching with detail panel',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
+    description: 'Single record view with detail panel - record-based, not view-based',
+    requiresSourceView: false, // Record Review pages are block-driven, not view-driven
+    requiresBaseTable: true, // Requires table but not a specific view type
+    supportsGridToggle: false, // Fixed layout mode
     allowsInlineEditing: false,
   },
   content: {
@@ -149,6 +149,22 @@ export function validatePageConfig(
 }
 
 /**
+ * Check if a page type is a collection page (view-based)
+ * Collection pages support selectable view types: List, Gallery, Kanban, Calendar, Timeline
+ */
+export function isCollectionPage(pageType: PageType): boolean {
+  return ['list', 'gallery', 'kanban', 'calendar', 'timeline'].includes(pageType)
+}
+
+/**
+ * Check if a page type is a record review page (record-based)
+ * Record Review pages are block-driven, not view-driven, and have fixed layout mode
+ */
+export function isRecordReviewPage(pageType: PageType): boolean {
+  return pageType === 'record_review'
+}
+
+/**
  * Get the required anchor type for a page type
  */
 export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashboard' | 'form' | 'record' | null {
@@ -158,8 +174,9 @@ export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashb
     case 'kanban':
     case 'calendar':
     case 'timeline':
-    case 'record_review':
       return 'saved_view'
+    case 'record_review':
+      return 'record' // Record Review pages use record anchor, not saved_view
     case 'dashboard':
     case 'overview':
     case 'content':
@@ -211,8 +228,10 @@ export function validatePageAnchor(
       }
       break
     case 'record':
-      if (!recordConfigId) {
-        return { valid: false, error: `${pageType} pages require record configuration` }
+      // Record Review pages require base_table but not a specific view_type
+      // They use saved_view_id for the underlying grid view, but don't expose view type selection
+      if (!savedViewId) {
+        return { valid: false, error: `${pageType} pages require a saved view` }
       }
       break
   }

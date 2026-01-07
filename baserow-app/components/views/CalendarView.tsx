@@ -58,16 +58,33 @@ export default function CalendarView({
   const prevTableFieldsRef = useRef<string>('')
   const prevFiltersRef = useRef<string>('')
   const prevLoadedFieldsKeyRef = useRef<string>('')
+  const prevTableIdRef = useRef<string>('')
+  const prevViewIdRef = useRef<string>('')
   const isLoadingRef = useRef(false)
 
   useEffect(() => {
+    // Only update if tableId or viewId actually changed (not just reference)
+    const tableIdChanged = prevTableIdRef.current !== tableId
+    const viewIdChanged = prevViewIdRef.current !== viewId
+    
+    if (!tableIdChanged && !viewIdChanged) {
+      return // No actual change, skip update
+    }
+    
+    // Update refs
+    prevTableIdRef.current = tableId || ''
+    prevViewIdRef.current = viewId || ''
+    
     // If tableId prop changes, update resolvedTableId immediately
     if (tableId && tableId.trim() !== '') {
-      console.log('Calendar: tableId prop changed, updating resolvedTableId:', tableId)
-      setResolvedTableId(tableId)
+      if (tableIdChanged) {
+        setResolvedTableId(tableId)
+      }
     } else {
       // Only try to resolve from viewId if tableId is not provided
-      resolveTableId()
+      if (viewIdChanged) {
+        resolveTableId()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, viewId])

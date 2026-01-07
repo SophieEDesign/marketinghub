@@ -445,21 +445,23 @@ export default function Canvas({
             )}
 
             {/* Block Content */}
-            <div className={`h-full w-full ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}>
+            <div className={`h-full w-full min-h-0 ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}>
               <BlockAppearanceWrapper 
                 block={block}
                 className={isEditing ? "pointer-events-auto" : ""}
               >
-                <BlockRenderer
-                  block={block}
-                  isEditing={isEditing && !block.config?.locked}
-                  onUpdate={onBlockUpdate}
-                  isLocked={block.config?.locked || false}
-                  pageTableId={pageTableId}
-                  pageId={pageId}
-                  recordId={recordId}
-                  filters={getFiltersForBlock(block.id)}
-                />
+                <div className="h-full w-full">
+                  <BlockRenderer
+                    block={block}
+                    isEditing={isEditing && !block.config?.locked}
+                    onUpdate={onBlockUpdate}
+                    isLocked={block.config?.locked || false}
+                    pageTableId={pageTableId}
+                    pageId={pageId}
+                    recordId={recordId}
+                    filters={getFiltersForBlock(block.id)}
+                  />
+                </div>
               </BlockAppearanceWrapper>
             </div>
             </div>

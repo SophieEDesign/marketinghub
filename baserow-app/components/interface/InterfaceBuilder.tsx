@@ -51,8 +51,21 @@ export default function InterfaceBuilder({
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
 
+  // Track previous initialBlocks to prevent unnecessary updates
+  const prevInitialBlocksRef = useRef<string>('')
+  
   // Sync initialBlocks to blocks state when they change (important for async loading)
   useEffect(() => {
+    // Create a stable key from initialBlocks to detect actual changes
+    const blocksKey = JSON.stringify(initialBlocks?.map(b => ({ id: b.id, type: b.type, x: b.x, y: b.y, w: b.w, h: b.h })) || []))
+    
+    // Only update if blocks actually changed
+    if (prevInitialBlocksRef.current === blocksKey) {
+      return
+    }
+    
+    prevInitialBlocksRef.current = blocksKey
+    
     if (initialBlocks && initialBlocks.length > 0) {
       setBlocks(initialBlocks)
     } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0) {

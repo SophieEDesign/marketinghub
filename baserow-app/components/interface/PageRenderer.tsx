@@ -7,7 +7,7 @@
 
 import type { InterfacePage } from '@/lib/interface/page-types-only'
 import { PageType } from '@/lib/interface/page-types'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
 import { createClient } from '@/lib/supabase/client'
@@ -41,13 +41,40 @@ export default function PageRenderer({
   const config = page.config || {}
   const visualisation = config.visualisation || page.page_type
   const [pageTableId, setPageTableId] = useState<string | null>(null)
+  const prevPageIdRef = useRef<string>('')
+  const prevBaseTableRef = useRef<string | null>(null)
+  const prevSavedViewIdRef = useRef<string | null>(null)
 
-  // Extract tableId from page
+  // Extract tableId from page - only update when relevant page properties change
   useEffect(() => {
+    const pageId = page?.id || ''
+    const baseTable = page?.base_table || null
+    const savedViewId = page?.saved_view_id || null
+    
+    // Only run if page properties actually changed
+    if (
+      prevPageIdRef.current === pageId &&
+      prevBaseTableRef.current === baseTable &&
+      prevSavedViewIdRef.current === savedViewId
+    ) {
+      return
+    }
+    
+    // Update refs
+    prevPageIdRef.current = pageId
+    prevBaseTableRef.current = baseTable
+    prevSavedViewIdRef.current = savedViewId
+    
     getPageTableId(page).then(tableId => {
-      setPageTableId(tableId)
+      setPageTableId(prev => {
+        // Only update if value actually changed
+        if (prev !== tableId) {
+          return tableId
+        }
+        return prev
+      })
     })
-  }, [page])
+  }, [page?.id, page?.base_table, page?.saved_view_id])
 
   // Determine if grid toggle should be shown
   const shouldShowGridToggle = useMemo(() => {

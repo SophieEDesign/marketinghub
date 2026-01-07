@@ -1022,22 +1022,34 @@ export default function PageDisplaySettingsPanel({
             </TabsContent>
 
             <TabsContent value="layout" className="mt-6 space-y-6">
-              {/* Layout Selector */}
-              <div className="space-y-2">
-                <Label>Layout</Label>
-                <Select value={layout} onValueChange={setLayout}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {layoutOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Layout Selector - Hidden for Record Review pages (fixed layout) */}
+              {page.page_type !== 'record_review' && (
+                <div className="space-y-2">
+                  <Label>Layout</Label>
+                  <Select value={layout} onValueChange={setLayout}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {layoutOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {/* Record Review pages have fixed layout - show info message */}
+              {page.page_type === 'record_review' && (
+                <div className="space-y-2">
+                  <Label>Layout</Label>
+                  <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
+                    Record Review pages use a fixed layout mode. This page shows one record at a time with a detail panel.
+                  </div>
+                </div>
+              )}
 
               {/* Record Preview */}
               <div className="flex items-center justify-between">
