@@ -19,6 +19,9 @@ import FilterBlock from "./blocks/FilterBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 
+// Module-level Set to track warned blocks across all component instances
+const warnedBlocks = new Set<string>()
+
 interface BlockRendererProps {
   block: PageBlock
   isEditing?: boolean
@@ -70,9 +73,12 @@ export default function BlockRenderer({
     const isComplete = isBlockConfigComplete(block.type, safeConfig)
     
     // Deployment safety: Warn (don't crash) if required config is missing
-    if (!isComplete && !isEditing) {
+    // Only warn once per block to avoid console spam
+    // Image blocks are always valid (can be empty), so skip warning for them
+    if (!isComplete && !isEditing && block.type !== 'image' && !warnedBlocks.has(block.id)) {
       // In view mode, log warning but still attempt to render
       console.warn(`Block ${block.id} (${block.type}) has incomplete config:`, safeConfig)
+      warnedBlocks.add(block.id)
     }
     
     switch (block.type) {

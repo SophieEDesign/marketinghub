@@ -10,6 +10,7 @@ interface MultiSelectCellProps {
   onSave: (value: string[]) => Promise<void>
   placeholder?: string
   choices?: string[]
+  choiceColors?: Record<string, string>
 }
 
 export default function MultiSelectCell({
@@ -19,6 +20,7 @@ export default function MultiSelectCell({
   onSave,
   placeholder = '—',
   choices = [],
+  choiceColors,
 }: MultiSelectCellProps) {
   const [editing, setEditing] = useState(false)
   const [selectedValues, setSelectedValues] = useState<string[]>(value || [])
@@ -85,6 +87,25 @@ export default function MultiSelectCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, selectedValues, value])
 
+  // Helper to get color styling for a choice
+  const getColorForChoice = (choice: string): { bg: string; text: string; style?: React.CSSProperties } => {
+    if (!choiceColors?.[choice]) {
+      return { bg: 'bg-blue-100', text: 'text-blue-800' }
+    }
+    
+    const hexColor = choiceColors[choice]
+    const r = parseInt(hexColor.slice(1, 3), 16)
+    const g = parseInt(hexColor.slice(3, 5), 16)
+    const b = parseInt(hexColor.slice(5, 7), 16)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    
+    return {
+      bg: '',
+      text: luminance > 0.5 ? 'text-gray-900' : 'text-white',
+      style: { backgroundColor: hexColor }
+    }
+  }
+
   if (editing && editable) {
     return (
       <div
@@ -92,20 +113,24 @@ export default function MultiSelectCell({
         onKeyDown={handleKeyDown}
         className="w-full min-h-[32px] px-2 py-1 flex flex-wrap gap-1 text-sm bg-white border border-blue-500 rounded focus-within:ring-2 focus-within:ring-blue-500"
       >
-        {selectedValues.map((val) => (
-          <span
-            key={val}
-            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium"
-          >
-            {val}
-            <button
-              onClick={(e) => handleRemove(val, e)}
-              className="hover:bg-blue-200 rounded p-0.5"
+        {selectedValues.map((val) => {
+          const colorInfo = getColorForChoice(val)
+          return (
+            <span
+              key={val}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${colorInfo.text}`}
+              style={colorInfo.style}
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
+              {val}
+              <button
+                onClick={(e) => handleRemove(val, e)}
+                className={`rounded p-0.5 ${colorInfo.text} hover:opacity-80`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )
+        })}
         <div className="flex flex-wrap gap-1">
           {choices
             .filter((choice) => !selectedValues.includes(choice))
@@ -135,14 +160,18 @@ export default function MultiSelectCell({
       {isEmpty ? (
         <span className="text-gray-400">{placeholder}</span>
       ) : (
-        displayValues.map((val) => (
-          <span
-            key={val}
-            className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium"
-          >
-            {val}
-          </span>
-        ))
+        displayValues.map((val) => {
+          const colorInfo = getColorForChoice(val)
+          return (
+            <span
+              key={val}
+              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorInfo.text}`}
+              style={colorInfo.style}
+            >
+              {val}
+            </span>
+          )
+        })
       )}
     </div>
   )

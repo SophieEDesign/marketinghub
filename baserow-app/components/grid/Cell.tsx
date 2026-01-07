@@ -135,18 +135,76 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
         </select>
       )
     }
-  }
-  
-  if (fieldType === "multi_select" && fieldOptions?.choices) {
-    // Multi-select is more complex - for now, show as comma-separated
-    const displayValue = Array.isArray(value) ? value.join(", ") : value
+    
+    // Display with color coding
+    const choiceColor = fieldOptions.choiceColors?.[value as string]
+    const getTextColor = (hexColor?: string) => {
+      if (!hexColor) return 'text-blue-800'
+      const r = parseInt(hexColor.slice(1, 3), 16)
+      const g = parseInt(hexColor.slice(3, 5), 16)
+      const b = parseInt(hexColor.slice(5, 7), 16)
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+      return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+    }
+    
     return (
       <div
         onClick={handleStartEdit}
         className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
         title="Click to edit"
       >
-        {displayValue || <span className="text-gray-400 italic text-sm">Empty</span>}
+        {value ? (
+          <span 
+            className={`px-2 py-0.5 rounded text-xs font-medium ${getTextColor(choiceColor)}`}
+            style={choiceColor ? { backgroundColor: choiceColor } : undefined}
+          >
+            {value}
+          </span>
+        ) : (
+          <span className="text-gray-400 italic text-sm">Empty</span>
+        )}
+      </div>
+    )
+  }
+  
+  if (fieldType === "multi_select" && fieldOptions?.choices) {
+    const getColorForChoice = (choice: string) => {
+      const hexColor = fieldOptions.choiceColors?.[choice]
+      if (!hexColor) return { bg: 'bg-blue-100', text: 'text-blue-800' }
+      const r = parseInt(hexColor.slice(1, 3), 16)
+      const g = parseInt(hexColor.slice(3, 5), 16)
+      const b = parseInt(hexColor.slice(5, 7), 16)
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+      return {
+        style: { backgroundColor: hexColor },
+        text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
+      }
+    }
+    
+    const displayValues = Array.isArray(value) ? value : []
+    
+    return (
+      <div
+        onClick={handleStartEdit}
+        className="min-h-[32px] flex items-center flex-wrap gap-1 px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+        title="Click to edit"
+      >
+        {displayValues.length === 0 ? (
+          <span className="text-gray-400 italic text-sm">Empty</span>
+        ) : (
+          displayValues.map((val: string) => {
+            const colorInfo = getColorForChoice(val)
+            return (
+              <span
+                key={val}
+                className={`px-2 py-0.5 rounded text-xs font-medium ${colorInfo.text}`}
+                style={colorInfo.style}
+              >
+                {val}
+              </span>
+            )
+          })
+        )}
       </div>
     )
   }

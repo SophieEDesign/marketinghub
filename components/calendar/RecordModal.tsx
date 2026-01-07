@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Save, X } from 'lucide-react'
-import { supabase } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -48,6 +48,7 @@ export default function RecordModal({
 
   async function loadTableInfo() {
     try {
+      const supabase = createClient()
       const { data: table } = await supabase
         .from('tables')
         .select('supabase_table')
@@ -67,6 +68,7 @@ export default function RecordModal({
 
     setLoading(true)
     try {
+      const supabase = createClient()
       const { data, error } = await supabase
         .from(supabaseTableName)
         .select('*')
@@ -90,6 +92,7 @@ export default function RecordModal({
 
     setSaving(true)
     try {
+      const supabase = createClient()
       const { error } = await supabase
         .from(supabaseTableName)
         .update(formData)

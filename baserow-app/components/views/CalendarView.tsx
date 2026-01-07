@@ -19,6 +19,7 @@ import { format } from "date-fns"
 import type { EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import RecordModal from "@/components/calendar/RecordModal"
 
 interface CalendarViewProps {
   tableId: string
@@ -49,6 +50,19 @@ export default function CalendarView({
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
+  
+  // View config state - calendar settings from view config
+  const [viewConfig, setViewConfig] = useState<{
+    calendar_date_field?: string | null
+    calendar_start_field?: string | null
+    calendar_end_field?: string | null
+    calendar_color_field?: string | null
+    calendar_display_fields?: string[]
+    first_day_of_week?: number
+    show_weekends?: boolean
+    event_density?: 'compact' | 'expanded'
+  } | null>(null)
   
   // Date range filter state
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
@@ -95,6 +109,37 @@ export default function CalendarView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTableId])
+
+  // Load view config when viewId changes
+  useEffect(() => {
+    if (viewId) {
+      loadViewConfig()
+    }
+  }, [viewId])
+
+  async function loadViewConfig() {
+    if (!viewId) return
+    
+    try {
+      const supabase = createClient()
+      const { data: view } = await supabase
+        .from('views')
+        .select('config, table_id')
+        .eq('id', viewId)
+        .single()
+
+      if (view?.config) {
+        setViewConfig(view.config as any)
+      }
+      
+      // If tableId wasn't provided but view has table_id, use it
+      if (!tableId && view?.table_id) {
+        setResolvedTableId(view.table_id)
+      }
+    } catch (error) {
+      console.error('Calendar: Error loading view config:', error)
+    }
+  }
 
   // Memoize tableFields to prevent unnecessary re-renders
   const tableFieldsKey = useMemo(() => {
@@ -376,15 +421,27 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
 
+  // Resolve date field from view config or fallback to dateFieldId prop
+  const resolvedDateFieldId = useMemo(() => {
+    // Priority: view config calendar_date_field > view config calendar_start_field > dateFieldId prop
+    if (viewConfig?.calendar_date_field) {
+      return viewConfig.calendar_date_field
+    }
+    if (viewConfig?.calendar_start_field) {
+      return viewConfig.calendar_start_field
+    }
+    return dateFieldId
+  }, [viewConfig, dateFieldId])
+
   // Find date field in loadedTableFields to validate it exists and is a date type
   const dateField = useMemo(() => {
-    if (!dateFieldId || !loadedTableFields.length) return null
+    if (!resolvedDateFieldId || !loadedTableFields.length) return null
     // Try to find by name first, then by id
     return loadedTableFields.find(f => 
-      f.name === dateFieldId || 
-      f.id === dateFieldId
+      f.name === resolvedDateFieldId || 
+      f.id === resolvedDateFieldId
     )
-  }, [dateFieldId, loadedTableFields])
+  }, [resolvedDateFieldId, loadedTableFields])
 
   const isValidDateField = useMemo(() => {
     if (!dateField) return false
@@ -392,9 +449,30 @@ export default function CalendarView({
     return fieldType === 'date'
   }, [dateField])
 
+  // Get start and end fields from view config
+  const startField = useMemo(() => {
+    if (!viewConfig?.calendar_start_field || !loadedTableFields.length) return null
+    return loadedTableFields.find(f => 
+      f.name === viewConfig.calendar_start_field || 
+      f.id === viewConfig.calendar_start_field
+    )
+  }, [viewConfig, loadedTableFields])
+
+  const endField = useMemo(() => {
+    if (!viewConfig?.calendar_end_field || !loadedTableFields.length) return null
+    return loadedTableFields.find(f => 
+      f.name === viewConfig.calendar_end_field || 
+      f.id === viewConfig.calendar_end_field
+    )
+  }, [viewConfig, loadedTableFields])
+
   function getEvents(): EventInput[] {
-    if (!dateFieldId || !isValidDateField) {
-      console.log('Calendar: Cannot generate events - dateFieldId:', dateFieldId, 'isValidDateField:', isValidDateField, 'dateField:', dateField)
+    // Use resolved date field from config or fallback
+    const effectiveDateField = dateField
+    const effectiveDateFieldId = resolvedDateFieldId
+    
+    if (!effectiveDateFieldId || !isValidDateField) {
+      console.log('Calendar: Cannot generate events - resolvedDateFieldId:', resolvedDateFieldId, 'isValidDateField:', isValidDateField, 'dateField:', dateField)
       return []
     }
     
@@ -405,10 +483,12 @@ export default function CalendarView({
     
     try {
       // Find the actual field name to use (could be name or id)
-      const actualFieldName = dateField?.name || dateFieldId
+      const actualFieldName = effectiveDateField?.name || effectiveDateFieldId
+      const actualStartFieldName = startField?.name || viewConfig?.calendar_start_field
+      const actualEndFieldName = endField?.name || viewConfig?.calendar_end_field
       
       // Only log in development and when there might be issues
-      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0 && !dateFieldId) {
+      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0 && !effectiveDateFieldId) {
         console.warn('Calendar: No date field configured, cannot generate events')
       }
       
@@ -418,8 +498,10 @@ export default function CalendarView({
             return false
           }
           
-          // Try both the field name and the field ID
-          const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
+          // Check for date value - prefer start field if configured, otherwise use date field
+          const dateValue = actualStartFieldName 
+            ? (row.data[actualStartFieldName] || row.data[viewConfig?.calendar_start_field])
+            : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
           
           // Skip if no date value
           if (!dateValue || dateValue === null || dateValue === undefined) {
@@ -436,42 +518,68 @@ export default function CalendarView({
           }
         })
         .map((row) => {
-          const actualFieldName = dateField?.name || dateFieldId
-          const dateValue = row.data[actualFieldName] || row.data[dateFieldId]
+          // Get date values - support both single date field and start/end fields
+          const dateValue = actualStartFieldName 
+            ? (row.data[actualStartFieldName] || row.data[viewConfig?.calendar_start_field])
+            : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
           
-          // Parse date value
-          let parsedDate: Date
+          const endDateValue = actualEndFieldName 
+            ? (row.data[actualEndFieldName] || row.data[viewConfig?.calendar_end_field])
+            : null
+          
+          // Parse date values
+          let parsedStartDate: Date
+          let parsedEndDate: Date | null = null
+          
           try {
-            parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
-            if (isNaN(parsedDate.getTime())) {
-              // Fallback to current date if parsing fails
-              parsedDate = new Date()
+            parsedStartDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
+            if (isNaN(parsedStartDate.getTime())) {
+              parsedStartDate = new Date()
+            }
+            
+            if (endDateValue) {
+              parsedEndDate = endDateValue instanceof Date ? endDateValue : new Date(endDateValue)
+              if (isNaN(parsedEndDate.getTime())) {
+                parsedEndDate = parsedStartDate
+              }
             }
           } catch {
-            parsedDate = new Date()
+            parsedStartDate = new Date()
+            parsedEndDate = null
           }
           
-          // Use first non-date field as title, or fallback to row ID
-          const titleField = (Array.isArray(fieldIds) ? fieldIds : [])
+          // Use visible fields (fieldIds) to determine title - prefer first text field
+          const visibleFieldsForTitle = (Array.isArray(fieldIds) ? fieldIds : [])
             .filter((fid) => {
-              // Compare both by name and id
               const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
-              return field && (field.name !== actualFieldName && field.id !== dateFieldId)
+              // Exclude date fields from title
+              return field && 
+                field.type !== 'date' && 
+                field.name !== actualFieldName && 
+                field.name !== actualStartFieldName &&
+                field.name !== actualEndFieldName &&
+                field.id !== effectiveDateFieldId
             })
-            .slice(0, 1)[0]
+          
+          // Find first text field for title, or use first visible field
+          const titleFieldId = visibleFieldsForTitle.find((fid) => {
+            const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
+            return field && (field.type === 'text' || field.type === 'long_text')
+          }) || visibleFieldsForTitle[0]
           
           // Find the actual field name for title
-          const titleFieldObj = loadedTableFields.find(f => f.name === titleField || f.id === titleField)
-          const titleFieldName = titleFieldObj?.name || titleField
+          const titleFieldObj = loadedTableFields.find(f => f.name === titleFieldId || f.id === titleFieldId)
+          const titleFieldName = titleFieldObj?.name || titleFieldId
           
           const title = titleFieldName 
-            ? String(row.data[titleFieldName] || row.data[titleField] || "Untitled")
+            ? String(row.data[titleFieldName] || row.data[titleFieldId] || "Untitled")
             : `Event ${row.id.substring(0, 8)}`
 
           return {
             id: row.id,
             title: title || "Untitled",
-            start: parsedDate,
+            start: parsedStartDate,
+            end: parsedEndDate || undefined,
             extendedProps: {
               rowId: row.id,
               rowData: row.data,
@@ -710,13 +818,10 @@ export default function CalendarView({
             }
           }}
           eventClick={(info) => {
-            // Emit recordId and navigate to Record Review page
+            // Open record in modal instead of navigating
             const recordId = info.event.id
-            if (recordId && onRecordClick) {
-              onRecordClick(recordId)
-            } else if (recordId && resolvedTableId) {
-              // Navigate to record review page
-              router.push(`/tables/${resolvedTableId}/records/${recordId}`)
+            if (recordId) {
+              setSelectedRecordId(recordId)
             }
           }}
           dateClick={(info) => {
@@ -725,6 +830,23 @@ export default function CalendarView({
           }}
         />
       </div>
+
+      {/* Record Modal */}
+      {resolvedTableId && (
+        <RecordModal
+          open={selectedRecordId !== null}
+          onClose={() => setSelectedRecordId(null)}
+          tableId={resolvedTableId}
+          recordId={selectedRecordId}
+          tableFields={loadedTableFields}
+          onSave={() => {
+            // Reload rows after save
+            if (resolvedTableId && supabaseTableName) {
+              loadRows()
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

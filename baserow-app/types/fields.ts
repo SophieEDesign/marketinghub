@@ -34,6 +34,7 @@ export interface TableField {
 export interface FieldOptions {
   // For select fields
   choices?: string[]
+  choiceColors?: Record<string, string> // Map of choice value to hex color
   
   // For number/currency/percent
   precision?: number

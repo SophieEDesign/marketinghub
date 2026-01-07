@@ -86,6 +86,11 @@ export function isBlockConfigComplete(
 ): boolean {
   if (!config) return false
 
+  // Image blocks are always valid - they can be empty (show upload prompt)
+  if (blockType === 'image') {
+    return true
+  }
+
   const validation = validateBlockConfig(blockType, config)
   return validation.valid
 }

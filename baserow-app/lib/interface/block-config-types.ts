@@ -286,7 +286,9 @@ export function isKPIBlockConfig(config: any): config is KPIBlockConfig {
 }
 
 export function isImageBlockConfig(config: any): config is ImageBlockConfig {
-  return config && typeof config.image_url === 'string'
+  // Image blocks can be empty (no image_url) - they'll show upload prompt
+  // Config is valid if it exists and image_url (if present) is a string
+  return config && (config.image_url === undefined || typeof config.image_url === 'string')
 }
 
 export function isActionBlockConfig(config: any): config is ActionBlockConfig {
@@ -361,8 +363,10 @@ export function validateBlockConfig(
       break
 
     case 'image':
-      if (!config.image_url) {
-        errors.push('Image block requires image_url')
+      // Image blocks can be empty (no image_url) - they'll show upload prompt
+      // Only validate if image_url is provided (must be a valid string)
+      if (config.image_url && typeof config.image_url !== 'string') {
+        errors.push('Image block image_url must be a string')
       }
       break
 

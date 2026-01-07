@@ -210,9 +210,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     
     switch (viewType) {
       case 'calendar': {
-        // Calendar requires a valid date field
-        const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
-        
+        // Calendar will load its own config from the view, but we can provide a fallback dateFieldId
         // Find ALL date fields in the table (not just visibleFields) to ensure we can find the configured field
         const allDateFieldsInTable = tableFields
           .filter(field => field.type === 'date')
@@ -226,13 +224,16 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         const defaultDateField = preferredDateField || allDateFieldsInTable[0]
         
-        // Resolve dateFieldId - prefer field name over ID since data uses field names as keys
+        // Resolve dateFieldId as fallback - prefer field name over ID since data uses field names as keys
+        // The CalendarView component will load the view config and use that instead
         let dateFieldId = ''
-        let resolvedField = null
+        
+        // Check block config first
+        const dateFieldFromConfig = config.calendar_date_field || config.start_date_field
         
         if (dateFieldFromConfig) {
           // If config has a field ID/name, find the actual field to validate it exists and is a date field
-          resolvedField = tableFields.find(tf => 
+          const resolvedField = tableFields.find(tf => 
             (tf.name === dateFieldFromConfig || tf.id === dateFieldFromConfig) && tf.type === 'date'
           )
           if (resolvedField) {
@@ -242,31 +243,11 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         // If config field not found or invalid, try to use a default date field
         if (!dateFieldId && defaultDateField) {
-          resolvedField = defaultDateField.field
-          dateFieldId = resolvedField.name
+          dateFieldId = defaultDateField.field.name
         }
         
-        // Only warn once if dateFieldId is still missing (not in editing mode to reduce console spam)
-        if (!dateFieldId && !isEditing && process.env.NODE_ENV === 'development') {
-          console.warn('Calendar block is missing date field - cannot render events', {
-            dateFieldFromConfig,
-            availableDateFields: allDateFieldsInTable.map(({ field }) => field.name),
-            tableFieldsCount: tableFields.length
-          })
-        }
-        
-        if (!dateFieldId) {
-          return (
-            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="mb-2">{isEditing ? "Calendar view requires a date field." : "No date field configured"}</p>
-                {isEditing && (
-                  <p className="text-xs text-gray-400">Configure a date field in block settings.</p>
-                )}
-              </div>
-            </div>
-          )
-        }
+        // CalendarView will load view config and use that, so we don't need to error here
+        // Just pass the fallback dateFieldId in case view config doesn't have one
         
         return (
           <CalendarView
@@ -276,11 +257,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             fieldIds={fieldIds}
             tableFields={tableFields}
             filters={allFilters}
-            onRecordClick={(recordId) => {
-              if (tableId) {
-                window.location.href = `/tables/${tableId}/records/${recordId}`
-              }
-            }}
+            // onRecordClick is handled internally by CalendarView using modal
           />
         )
       }

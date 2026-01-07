@@ -277,14 +277,26 @@ export default function InlineFieldEditor({
             className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer min-h-[38px] flex items-center flex-wrap gap-2"
           >
             {selectedValues.length > 0 ? (
-              selectedValues.map((val: string) => (
-                <span
-                  key={val}
-                  className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium"
-                >
-                  {val}
-                </span>
-              ))
+              selectedValues.map((val: string) => {
+                const choiceColor = field.options?.choiceColors?.[val]
+                const getTextColor = (hexColor?: string) => {
+                  if (!hexColor) return 'text-blue-800'
+                  const r = parseInt(hexColor.slice(1, 3), 16)
+                  const g = parseInt(hexColor.slice(3, 5), 16)
+                  const b = parseInt(hexColor.slice(5, 7), 16)
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                  return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+                }
+                return (
+                  <span
+                    key={val}
+                    className={`px-2 py-1 rounded text-xs font-medium ${getTextColor(choiceColor)}`}
+                    style={choiceColor ? { backgroundColor: choiceColor } : undefined}
+                  >
+                    {val}
+                  </span>
+                )
+              })
             ) : (
               <span className="text-sm text-gray-400">Click to select...</span>
             )}

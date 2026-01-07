@@ -66,6 +66,7 @@ export function CellFactory({
         <SelectCell
           {...commonProps}
           choices={field.options?.choices || []}
+          choiceColors={field.options?.choiceColors}
         />
       )
 
@@ -74,6 +75,7 @@ export function CellFactory({
         <MultiSelectCell
           {...commonProps}
           choices={field.options?.choices || []}
+          choiceColors={field.options?.choiceColors}
         />
       )
 

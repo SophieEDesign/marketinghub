@@ -116,31 +116,70 @@ export default function FieldBuilderModal({
           <div className="space-y-2">
             <Label>Choices</Label>
             <div className="space-y-2">
-              {(options.choices || [""]).map((choice, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    type="text"
-                    value={choice}
-                    onChange={(e) => {
-                      const newChoices = [...(options.choices || [])]
-                      newChoices[index] = e.target.value
-                      setOptions({ ...options, choices: newChoices })
-                    }}
-                    placeholder="Option name"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const newChoices = (options.choices || []).filter((_, i) => i !== index)
-                      setOptions({ ...options, choices: newChoices })
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+              {(options.choices || [""]).map((choice, index) => {
+                const choiceColor = options.choiceColors?.[choice] || '#3b82f6'
+                return (
+                  <div key={index} className="flex gap-2 items-center">
+                    <Input
+                      type="text"
+                      value={choice}
+                      onChange={(e) => {
+                        const newChoices = [...(options.choices || [])]
+                        const oldChoice = newChoices[index]
+                        newChoices[index] = e.target.value
+                        // Preserve color when renaming choice
+                        const newChoiceColors = { ...(options.choiceColors || {}) }
+                        if (oldChoice && oldChoice !== e.target.value) {
+                          if (newChoiceColors[oldChoice]) {
+                            newChoiceColors[e.target.value] = newChoiceColors[oldChoice]
+                            delete newChoiceColors[oldChoice]
+                          }
+                        }
+                        setOptions({ 
+                          ...options, 
+                          choices: newChoices,
+                          choiceColors: newChoiceColors
+                        })
+                      }}
+                      placeholder="Option name"
+                      className="flex-1"
+                    />
+                    <input
+                      type="color"
+                      value={choiceColor}
+                      onChange={(e) => {
+                        const newChoiceColors = { ...(options.choiceColors || {}) }
+                        if (choice) {
+                          newChoiceColors[choice] = e.target.value
+                        }
+                        setOptions({ ...options, choiceColors: newChoiceColors })
+                      }}
+                      className="h-10 w-10 rounded border border-gray-300 cursor-pointer"
+                      title="Choose color for this option"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newChoices = (options.choices || []).filter((_, i) => i !== index)
+                        const newChoiceColors = { ...(options.choiceColors || {}) }
+                        // Remove color for deleted choice
+                        if (choice) {
+                          delete newChoiceColors[choice]
+                        }
+                        setOptions({ 
+                          ...options, 
+                          choices: newChoices,
+                          choiceColors: newChoiceColors
+                        })
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              })}
               <Button
                 type="button"
                 variant="outline"

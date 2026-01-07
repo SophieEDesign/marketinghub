@@ -10,6 +10,7 @@ interface SelectCellProps {
   onSave: (value: string | null) => Promise<void>
   placeholder?: string
   choices?: string[]
+  choiceColors?: Record<string, string>
 }
 
 export default function SelectCell({
@@ -19,6 +20,7 @@ export default function SelectCell({
   onSave,
   placeholder = '—',
   choices = [],
+  choiceColors,
 }: SelectCellProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
@@ -87,6 +89,32 @@ export default function SelectCell({
 
   const displayValue = value || placeholder
   const isPlaceholder = !value
+  
+  // Get color for the selected value
+  const getColorForChoice = (choice: string | null): { bg: string; text: string } => {
+    if (!choice || !choiceColors?.[choice]) {
+      return { bg: 'bg-blue-100', text: 'text-blue-800' }
+    }
+    
+    const hexColor = choiceColors[choice]
+    // Convert hex to RGB for better contrast calculation
+    const r = parseInt(hexColor.slice(1, 3), 16)
+    const g = parseInt(hexColor.slice(3, 5), 16)
+    const b = parseInt(hexColor.slice(5, 7), 16)
+    
+    // Calculate luminance to determine if we need light or dark text
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    
+    return {
+      bg: '', // Will use inline style
+      text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
+    }
+  }
+  
+  const colorStyle = value && choiceColors?.[value] 
+    ? { backgroundColor: choiceColors[value] }
+    : undefined
+  const textColor = value ? getColorForChoice(value).text : ''
 
   return (
     <div
@@ -94,7 +122,10 @@ export default function SelectCell({
       className="w-full h-full px-2 flex items-center gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group"
     >
       {value && (
-        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+        <span 
+          className={`px-2 py-0.5 rounded text-xs font-medium ${textColor}`}
+          style={colorStyle}
+        >
           {value}
         </span>
       )}
