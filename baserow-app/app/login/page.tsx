@@ -56,7 +56,8 @@ function LoginForm() {
       if (user) {
         // Check for redirect parameter
         const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
-        router.push(next)
+        // Use window.location for full page reload to ensure proper redirect
+        window.location.href = next
       }
     }
     checkUser()
@@ -76,10 +77,23 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
+      // Wait a moment for session to be established
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Verify session is established
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setError('Session not established. Please try again.')
+        setLoading(false)
+        return
+      }
+
       // Check for redirect parameter (next or callbackUrl)
       const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
-      router.push(next)
-      router.refresh()
+      
+      // Use window.location for full page reload to ensure cookies are sent
+      // This ensures the server-side home page can read the session properly
+      window.location.href = next
     }
   }
 
@@ -97,10 +111,19 @@ function LoginForm() {
       setError(error.message)
       setLoading(false)
     } else {
-      // Check for redirect parameter (next or callbackUrl)
-      const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
-      router.push(next)
-      router.refresh()
+      // For sign up, user may need to confirm email first
+      // Check if session was created immediately
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        // Session created - redirect
+        const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+        window.location.href = next
+      } else {
+        // Email confirmation required
+        setError('Please check your email to confirm your account before signing in.')
+        setLoading(false)
+      }
     }
   }
 

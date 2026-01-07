@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import type { TableRow, ViewFilter, ViewSort } from "@/types/database"
+import { useViewMeta } from "@/hooks/useViewMeta"
 
 interface GridViewProps {
   tableId: string
@@ -19,19 +20,20 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
-  const [filters, setFilters] = useState<ViewFilter[]>([])
-  const [sorts, setSorts] = useState<ViewSort[]>([])
+  
+  // Use cached metadata hook (serialized, no parallel requests)
+  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
+  
+  // Extract filters and sorts from cached metadata
+  const filters = viewMeta?.filters || []
+  const sorts = viewMeta?.sorts || []
   
   // Track previous values to prevent infinite loops
   const prevFiltersRef = useRef<string>('')
   const prevSortsRef = useRef<string>('')
   const prevTableIdRef = useRef<string>('')
   const prevPageRef = useRef<number>(1)
-
-  useEffect(() => {
-    loadViewConfig()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewId])
+  const loadingRowsRef = useRef(false)
 
   useEffect(() => {
     // CRITICAL: Only skip reload if we already have data AND inputs haven't changed
@@ -54,6 +56,11 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       return // No actual change, skip loading
     }
     
+    // Prevent concurrent row loads
+    if (loadingRowsRef.current) {
+      return
+    }
+    
     // Update refs
     prevFiltersRef.current = filtersKey
     prevSortsRef.current = sortsKey
@@ -64,74 +71,6 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, page, filters, sorts])
 
-  async function loadViewConfig() {
-    try {
-      // Check if view exists first (for SQL-view backed pages)
-      const { data: viewExists } = await supabase
-        .from("views")
-        .select("id")
-        .eq("id", viewId)
-        .maybeSingle()
-
-      if (!viewExists) {
-        // View doesn't exist - likely SQL-view backed page, skip loading config
-        console.warn("View does not exist. Skipping view config load for SQL-view backed pages.")
-        setFilters([])
-        setSorts([])
-        return
-      }
-
-      const { data: viewFilters, error: filtersError } = await supabase
-        .from("view_filters")
-        .select("*")
-        .eq("view_id", viewId)
-
-      if (filtersError) {
-        console.warn("Error loading view filters:", filtersError)
-      } else if (viewFilters) {
-        setFilters(viewFilters)
-      }
-
-      // Try to load view sorts - handle case where order_index column doesn't exist
-      const { data: viewSorts, error: sortsError } = await supabase
-        .from("view_sorts")
-        .select("*")
-        .eq("view_id", viewId)
-
-      if (sortsError) {
-        // Handle different error cases
-        if (sortsError.code === 'PGRST116' || sortsError.code === '42P01') {
-          // Table doesn't exist or no rows
-          console.warn("view_sorts table doesn't exist or view has no sorts")
-          setSorts([])
-        } else if (sortsError.code === '42703' || sortsError.message?.includes('order_index')) {
-          // If order_index column doesn't exist, try without ordering
-          const { data: sortsWithoutOrder } = await supabase
-            .from("view_sorts")
-            .select("*")
-            .eq("view_id", viewId)
-          
-          if (sortsWithoutOrder) {
-            setSorts(sortsWithoutOrder)
-          }
-        } else {
-          console.warn("Error loading view sorts:", sortsError)
-          setSorts([])
-        }
-      } else if (viewSorts) {
-        // Sort client-side if order_index exists
-        const sorted = [...viewSorts].sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-        setSorts(sorted)
-      } else {
-        setSorts([])
-      }
-    } catch (error) {
-      console.error("Error loading view config:", error)
-      setFilters([])
-      setSorts([])
-    }
-  }
-
   async function loadRows() {
     if (!tableId) {
       console.warn("GridView: tableId is required")
@@ -140,9 +79,15 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       return
     }
 
+    // Prevent concurrent loads
+    if (loadingRowsRef.current) {
+      return
+    }
+
     // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
     const sanitizedTableId = tableId.split(':')[0]
 
+    loadingRowsRef.current = true
     setLoading(true)
     try {
       let query = supabase
@@ -155,7 +100,7 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       if (sorts.length > 0) {
         const firstSort = sorts[0]
         query = query.order("created_at", {
-          ascending: firstSort.order_direction === "asc",
+          ascending: firstSort.direction === "asc",
         })
       } else {
         query = query.order("created_at", { ascending: false })
@@ -170,16 +115,25 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
           setRows([])
         } else {
           console.error("Error loading rows:", error)
-          setRows([])
+          // CRITICAL: Do NOT retry automatically on network failure
+          // Keep existing rows if available
+          if (rows.length === 0) {
+            setRows([])
+          }
         }
       } else {
         setRows(data || [])
       }
     } catch (error) {
       console.error("Error loading rows:", error)
-      setRows([])
+      // CRITICAL: Do NOT retry automatically on network failure
+      // Keep existing rows if available
+      if (rows.length === 0) {
+        setRows([])
+      }
     } finally {
       setLoading(false)
+      loadingRowsRef.current = false
     }
   }
 
@@ -230,7 +184,8 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
     }
   }
 
-  if (loading) {
+  // Show loading if metadata or rows are loading
+  if (metaLoading || loading) {
     return <div className="p-4">Loading...</div>
   }
 

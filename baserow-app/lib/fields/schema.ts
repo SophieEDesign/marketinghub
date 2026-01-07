@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { isTableNotFoundError } from '@/lib/api/error-handling'
 import type { TableField } from '@/types/fields'
 
 /**
@@ -15,21 +16,9 @@ export async function getTableFields(tableId: string): Promise<TableField[]> {
     .order('position', { ascending: true })
 
   if (error) {
-    // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array
-    // Also check for HTTP status codes (404) and common error messages
-    const errorCode = error.code || ''
-    const errorMessage = error.message || ''
-    const errorDetails = error.details || ''
-    
-    if (errorCode === '42P01' || 
-        errorCode === 'PGRST116' || 
-        errorCode === '404' ||
-        errorMessage?.includes('relation') || 
-        errorMessage?.includes('does not exist') ||
-        errorMessage?.includes('table_fields') ||
-        errorDetails?.includes('relation') ||
-        errorDetails?.includes('does not exist')) {
-      console.warn(`table_fields table may not exist (code: ${errorCode}), returning empty array`)
+    // If table doesn't exist, return empty array (graceful degradation)
+    if (isTableNotFoundError(error)) {
+      console.warn(`table_fields table may not exist (code: ${error.code}), returning empty array`)
       return []
     }
     throw error

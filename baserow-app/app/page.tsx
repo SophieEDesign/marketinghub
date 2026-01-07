@@ -40,6 +40,10 @@ export default async function HomePage({
   } catch (error) {
     // Fallback to old system
     console.warn('Error loading default interface, falling back to views table:', error)
+    // Log error details for debugging
+    if (error instanceof Error) {
+      console.warn('Error details:', error.message, error.stack)
+    }
   }
 
   // If no default, get first accessible interface

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { addFavorite, removeFavorite, getFavorites, isFavorited } from '@/lib/recents/recents'
+import { addFavorite, removeFavorite, getFavorites } from '@/lib/recents/recents'
+import { createErrorResponse } from '@/lib/api/error-handling'
+import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 
 /**
  * POST /api/favorites - Add a favorite
@@ -19,11 +21,8 @@ export async function POST(request: NextRequest) {
     const favorite = await addFavorite(entity_type, entity_id)
     return NextResponse.json(favorite)
   } catch (error: any) {
-    console.error('Error adding favorite:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to add favorite' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to add favorite', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
@@ -45,16 +44,14 @@ export async function DELETE(request: NextRequest) {
     await removeFavorite(entity_type, entity_id)
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Error removing favorite:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to remove favorite' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to remove favorite', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
 /**
  * GET /api/favorites - Get favorites
+ * Cached for 1 minute with stale-while-revalidate
  */
 export async function GET(request: NextRequest) {
   try {
@@ -63,13 +60,15 @@ export async function GET(request: NextRequest) {
     const entity_type = searchParams.get('entity_type') as any
 
     const items = await getFavorites(limit, entity_type)
-    return NextResponse.json({ items })
-  } catch (error: any) {
-    console.error('Error getting favorites:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get favorites' },
-      { status: 500 }
+    // Cache favorites for 1 minute (they change infrequently)
+    return cachedJsonResponse(
+      { items },
+      CACHE_DURATIONS.SHORT,
+      CACHE_DURATIONS.SHORT
     )
+  } catch (error: any) {
+    const errorResponse = createErrorResponse(error, 'Failed to get favorites', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 

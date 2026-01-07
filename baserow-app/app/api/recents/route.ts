@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordRecentItem, getRecentItems } from '@/lib/recents/recents'
+import { createErrorResponse } from '@/lib/api/error-handling'
+import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 
 /**
  * POST /api/recents - Record a recent item
@@ -19,16 +21,14 @@ export async function POST(request: NextRequest) {
     await recordRecentItem(entity_type, entity_id)
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Error recording recent item:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to record recent item' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to record recent item', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
 /**
  * GET /api/recents - Get recent items
+ * Cached for 30 seconds (recents change frequently)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -37,13 +37,15 @@ export async function GET(request: NextRequest) {
     const entity_type = searchParams.get('entity_type') as any
 
     const items = await getRecentItems(limit, entity_type)
-    return NextResponse.json({ items })
-  } catch (error: any) {
-    console.error('Error getting recent items:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get recent items' },
-      { status: 500 }
+    // Cache recents for 30 seconds (they change frequently)
+    return cachedJsonResponse(
+      { items },
+      CACHE_DURATIONS.SHORT,
+      CACHE_DURATIONS.SHORT
     )
+  } catch (error: any) {
+    const errorResponse = createErrorResponse(error, 'Failed to get recent items', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 

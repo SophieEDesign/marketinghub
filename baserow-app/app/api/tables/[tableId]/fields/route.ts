@@ -8,9 +8,10 @@ import {
   generateChangeColumnTypeSQL,
   generateDropColumnSQL,
   isDestructiveTypeChange,
-  mapFieldTypeToPostgres,
 } from '@/lib/fields/sqlGenerator'
 import { getTableFields } from '@/lib/fields/schema'
+import { isTableNotFoundError, createErrorResponse } from '@/lib/api/error-handling'
+import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 
 // GET: Get all fields for a table
@@ -21,32 +22,22 @@ export async function GET(
   try {
     const fields = await getTableFields(params.tableId)
     
-    // If no fields exist, return empty array (table_fields table might not exist yet)
-    return NextResponse.json({ fields: fields || [] })
-  } catch (error: any) {
-    // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array
-    // Also handle HTTP status codes and various error formats
-    const errorCode = error.code || error.status || ''
-    const errorMessage = error.message || ''
-    const errorDetails = error.details || ''
-    
-    if (errorCode === '42P01' || 
-        errorCode === 'PGRST116' || 
-        errorCode === '404' ||
-        errorCode === 404 ||
-        errorMessage?.includes('relation') || 
-        errorMessage?.includes('does not exist') ||
-        errorMessage?.includes('table_fields') ||
-        errorDetails?.includes('relation') ||
-        errorDetails?.includes('does not exist')) {
-      console.warn(`table_fields table may not exist for table ${params.tableId} (code: ${errorCode}), returning empty fields array`)
-      return NextResponse.json({ fields: [] })
-    }
-    console.error('Error fetching fields:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch fields' },
-      { status: 500 }
+    // Cache fields for 5 minutes (they don't change frequently)
+    // Use stale-while-revalidate for better UX
+    return cachedJsonResponse(
+      { fields: fields || [] },
+      CACHE_DURATIONS.MEDIUM,
+      CACHE_DURATIONS.MEDIUM
     )
+  } catch (error: any) {
+    // If table doesn't exist, return empty array (graceful degradation)
+    if (isTableNotFoundError(error)) {
+      console.warn(`table_fields table may not exist for table ${params.tableId}, returning empty fields array`)
+      return cachedJsonResponse({ fields: [] }, CACHE_DURATIONS.SHORT)
+    }
+    
+    const errorResponse = createErrorResponse(error, 'Failed to fetch fields', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
@@ -137,11 +128,7 @@ export async function POST(
 
     if (fieldError) {
       // If table_fields doesn't exist, provide helpful error
-      // Supabase returns PGRST116 for missing tables, 42P01 for PostgreSQL errors
-      if (fieldError.code === '42P01' || fieldError.code === 'PGRST116' || 
-          fieldError.message?.includes('relation') || 
-          fieldError.message?.includes('does not exist') ||
-          fieldError.message?.includes('table_fields')) {
+      if (isTableNotFoundError(fieldError)) {
         return NextResponse.json(
           { 
             error: 'table_fields table does not exist. Please run the migration create_table_fields.sql in Supabase.',
@@ -151,11 +138,8 @@ export async function POST(
           { status: 500 }
         )
       }
-      console.error('Error creating field metadata:', fieldError)
-      return NextResponse.json(
-        { error: `Failed to create field: ${fieldError.message}` },
-        { status: 500 }
-      )
+      const errorResponse = createErrorResponse(fieldError, 'Failed to create field', 500)
+      return NextResponse.json(errorResponse, { status: 500 })
     }
 
     // 2. Add column to physical table (if not virtual)
@@ -168,13 +152,7 @@ export async function POST(
           .limit(1)
         
         if (tableCheckError) {
-          const isTableNotFound = 
-            tableCheckError.code === '42P01' || 
-            tableCheckError.code === 'PGRST116' ||
-            tableCheckError.message?.includes('does not exist') ||
-            tableCheckError.message?.includes('relation')
-          
-          if (isTableNotFound) {
+          if (isTableNotFoundError(tableCheckError)) {
             // Rollback: Delete metadata
             await supabase.from('table_fields').delete().eq('id', fieldData.id)
             
@@ -199,14 +177,7 @@ export async function POST(
           // Rollback: Delete metadata
           await supabase.from('table_fields').delete().eq('id', fieldData.id)
           
-          // Check if it's a table not found error
-          const isTableNotFound = 
-            sqlError.code === '42P01' ||
-            sqlError.message?.includes('Table not found') ||
-            sqlError.message?.includes('does not exist') ||
-            sqlError.message?.includes('relation')
-          
-          if (isTableNotFound) {
+          if (isTableNotFoundError(sqlError)) {
             return NextResponse.json(
               { 
                 error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
@@ -218,19 +189,15 @@ export async function POST(
             )
           }
           
-          return NextResponse.json(
-            { error: `Failed to create column: ${sqlError.message}` },
-            { status: 500 }
-          )
+          const errorResponse = createErrorResponse(sqlError, 'Failed to create column', 500)
+          return NextResponse.json(errorResponse, { status: 500 })
         }
       } catch (sqlErr: any) {
         // Rollback: Delete metadata
         await supabase.from('table_fields').delete().eq('id', fieldData.id)
         
-        return NextResponse.json(
-          { error: `Failed to create column: ${sqlErr.message}` },
-          { status: 500 }
-        )
+        const errorResponse = createErrorResponse(sqlErr, 'Failed to create column', 500)
+        return NextResponse.json(errorResponse, { status: 500 })
       }
     }
 
@@ -241,7 +208,7 @@ export async function POST(
       .eq('table_id', params.tableId)
 
     if (views && views.length > 0) {
-      const viewFields = views.map(view => ({
+      const viewFields = views.map((view: { id: string }) => ({
         view_id: view.id,
         field_name: finalSanitizedName,
         visible: true,
@@ -253,11 +220,8 @@ export async function POST(
 
     return NextResponse.json({ field: fieldData })
   } catch (error: any) {
-    console.error('Error creating field:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to create field' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to create field', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
@@ -438,13 +402,7 @@ export async function PATCH(
         .limit(1)
       
       if (tableCheckError) {
-        const isTableNotFound = 
-          tableCheckError.code === '42P01' || 
-          tableCheckError.code === 'PGRST116' ||
-          tableCheckError.message?.includes('does not exist') ||
-          tableCheckError.message?.includes('relation')
-        
-        if (isTableNotFound) {
+        if (isTableNotFoundError(tableCheckError)) {
           return NextResponse.json(
             { 
               error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
@@ -464,16 +422,7 @@ export async function PATCH(
       })
 
       if (sqlError) {
-        console.error('SQL execution error:', sqlError)
-        
-        // Check if it's a table not found error
-        const isTableNotFound = 
-          sqlError.code === '42P01' ||
-          sqlError.message?.includes('Table not found') ||
-          sqlError.message?.includes('does not exist') ||
-          sqlError.message?.includes('relation')
-        
-        if (isTableNotFound) {
+        if (isTableNotFoundError(sqlError)) {
           return NextResponse.json(
             { 
               error: `Table "${table.supabase_table}" does not exist. Please create the table first or verify the table name in Settings.`,
@@ -485,10 +434,8 @@ export async function PATCH(
           )
         }
         
-        return NextResponse.json(
-          { error: `Failed to update column: ${sqlError.message}` },
-          { status: 500 }
-        )
+        const errorResponse = createErrorResponse(sqlError, 'Failed to update column', 500)
+        return NextResponse.json(errorResponse, { status: 500 })
       }
     }
 
@@ -504,10 +451,8 @@ export async function PATCH(
       .single()
 
     if (updateError) {
-      return NextResponse.json(
-        { error: `Failed to update field: ${updateError.message}` },
-        { status: 500 }
-      )
+      const errorResponse = createErrorResponse(updateError, 'Failed to update field', 500)
+      return NextResponse.json(errorResponse, { status: 500 })
     }
 
     return NextResponse.json({
@@ -515,11 +460,8 @@ export async function PATCH(
       warning: isDestructive ? 'Type change may result in data loss' : undefined,
     })
   } catch (error: any) {
-    console.error('Error updating field:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update field' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to update field', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
 
@@ -592,13 +534,7 @@ export async function DELETE(
         .limit(1)
       
       if (tableCheckError) {
-        const isTableNotFound = 
-          tableCheckError.code === '42P01' || 
-          tableCheckError.code === 'PGRST116' ||
-          tableCheckError.message?.includes('does not exist') ||
-          tableCheckError.message?.includes('relation')
-        
-        if (isTableNotFound) {
+        if (isTableNotFoundError(tableCheckError)) {
           // Table doesn't exist - continue with metadata cleanup only
           console.warn(`Table "${table.supabase_table}" does not exist, skipping column drop`)
         } else {
@@ -632,18 +568,13 @@ export async function DELETE(
       .eq('id', fieldId)
 
     if (deleteError) {
-      return NextResponse.json(
-        { error: `Failed to delete field: ${deleteError.message}` },
-        { status: 500 }
-      )
+      const errorResponse = createErrorResponse(deleteError, 'Failed to delete field', 500)
+      return NextResponse.json(errorResponse, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Error deleting field:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete field' },
-      { status: 500 }
-    )
+    const errorResponse = createErrorResponse(error, 'Failed to delete field', 500)
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }

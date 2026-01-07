@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, ViewType } from "@/lib/interface/types"
 import GridViewWrapper from "@/components/grid/GridViewWrapper"
@@ -8,6 +8,7 @@ import CalendarView from "@/components/views/CalendarView"
 import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
 import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import { useViewMeta } from "@/hooks/useViewMeta"
 
 interface GridBlockProps {
   block: PageBlock
@@ -36,84 +37,115 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   }, [blockBaseFilters, filters])
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string } | null>(null)
-  const [viewFields, setViewFields] = useState<Array<{ field_name: string; visible: boolean; position: number }>>([])
-  const [viewFilters, setViewFilters] = useState<Array<{ id: string; field_name: string; operator: string; value?: string }>>([])
-  const [viewSorts, setViewSorts] = useState<Array<{ id: string; field_name: string; direction: string }>>([])
   const [tableFields, setTableFields] = useState<any[]>([])
   const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
+  
+  // Use cached metadata hook (serialized, no parallel requests)
+  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
+  
+  // Convert cached metadata to component state format
+  const viewFields = useMemo(() => {
+    if (!viewMeta?.fields) return []
+    return viewMeta.fields.map(f => ({
+      field_name: f.field_name,
+      visible: f.visible,
+      position: f.position,
+    }))
+  }, [viewMeta?.fields])
+  
+  const viewFilters = useMemo(() => {
+    if (!viewMeta?.filters) return []
+    return viewMeta.filters.map(f => ({
+      id: f.id || '',
+      field_name: f.field_name,
+      operator: f.operator,
+      value: f.value,
+    }))
+  }, [viewMeta?.filters])
+  
+  const viewSorts = useMemo(() => {
+    if (!viewMeta?.sorts) return []
+    return viewMeta.sorts.map(s => ({
+      id: s.id || '',
+      field_name: s.field_name,
+      direction: s.direction,
+    }))
+  }, [viewMeta?.sorts])
+
+  // Track loading state to prevent concurrent loads
+  const loadingRef = useRef(false)
+  const tableIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (tableId) {
-      loadData()
-    } else {
+    if (!tableId) {
       setLoading(false)
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, viewId, viewType, visibleFieldsConfig])
 
-  async function loadData() {
-    if (!tableId) return
+    // Skip if already loading the same table
+    if (loadingRef.current && tableIdRef.current === tableId) {
+      return
+    }
 
+    loadingRef.current = true
+    tableIdRef.current = tableId
     setLoading(true)
-    try {
-      const supabase = createClient()
 
-      // Load table and table_fields (required for schema)
-      const [tableRes, tableFieldsRes] = await Promise.allSettled([
-        supabase.from("tables").select("supabase_table").eq("id", tableId).maybeSingle(),
-        supabase
+    async function loadTableData() {
+      try {
+        const supabase = createClient()
+
+        // CRITICAL: Serialize table and table_fields requests (no parallel Promise.all)
+        // Load table first
+        const tableRes = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", tableId)
+          .maybeSingle()
+
+        if (tableRes.data) {
+          setTable(tableRes.data)
+        }
+
+        // Then load table_fields
+        const tableFieldsRes = await supabase
           .from("table_fields")
           .select("*")
           .eq("table_id", tableId)
-          .order("position", { ascending: true }),
-      ])
+          .order("position", { ascending: true })
 
-      if (tableRes.status === 'fulfilled' && tableRes.value.data) {
-        setTable(tableRes.value.data)
-      }
-      if (tableFieldsRes.status === 'fulfilled' && tableFieldsRes.value.data) {
-        setTableFields(tableFieldsRes.value.data)
-      }
+        if (tableFieldsRes.data) {
+          setTableFields(tableFieldsRes.data)
+        }
 
-      // Load view-specific data if view_id is provided
-      if (viewId) {
-        const [viewFieldsRes, viewFiltersRes, viewSortsRes, viewRes] = await Promise.allSettled([
-          supabase
-            .from("view_fields")
-            .select("field_name, visible, position")
-            .eq("view_id", viewId)
-            .order("position", { ascending: true }),
-          supabase
-            .from("view_filters")
-            .select("id, field_name, operator, value")
-            .eq("view_id", viewId),
-          supabase
-            .from("view_sorts")
-            .select("id, field_name, direction")
-            .eq("view_id", viewId),
-          supabase.from("views").select("config").eq("id", viewId).maybeSingle(),
-        ])
+        // Load view config if viewId provided (separate from metadata)
+        if (viewId) {
+          const viewRes = await supabase
+            .from("views")
+            .select("config")
+            .eq("id", viewId)
+            .maybeSingle()
 
-        if (viewFieldsRes.status === 'fulfilled' && viewFieldsRes.value.data) {
-          setViewFields(viewFieldsRes.value.data)
+          if (viewRes.data?.config) {
+            const viewConfig = viewRes.data.config as { groupBy?: string }
+            setGroupBy(viewConfig.groupBy)
+          }
         }
-        if (viewFiltersRes.status === 'fulfilled' && viewFiltersRes.value.data) {
-          setViewFilters(viewFiltersRes.value.data)
-        }
-        if (viewSortsRes.status === 'fulfilled' && viewSortsRes.value.data) {
-          setViewSorts(viewSortsRes.value.data)
-        }
-        if (viewRes.status === 'fulfilled' && viewRes.value.data?.config) {
-          const viewConfig = viewRes.value.data.config as { groupBy?: string }
-          setGroupBy(viewConfig.groupBy)
-        }
+      } catch (error) {
+        console.error("Error loading table data:", error)
+        // CRITICAL: Do NOT retry automatically on network failure
+        // Keep existing data if available
+      } finally {
+        setLoading(false)
+        loadingRef.current = false
       }
-    } catch (error) {
-      console.error("Error loading grid data:", error)
-    } finally {
-      setLoading(false)
     }
-  }
+
+    loadTableData()
+  }, [tableId, viewId])
+
+  // Combine loading states
+  const isLoading = loading || metaLoading
 
   if (!tableId) {
     return (
@@ -154,7 +186,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }))
     : viewSorts
 
-  if (loading || !table) {
+  if (isLoading || !table) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
         Loading...

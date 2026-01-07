@@ -6,11 +6,15 @@ export interface LoadRowsOptions {
   viewId?: string
   limit?: number
   offset?: number
+  // CRITICAL: Pass metadata to avoid reloading it (prevents connection exhaustion)
+  filters?: ViewFilter[]
+  sorts?: ViewSort[]
+  visibleFields?: ViewField[]
 }
 
 export async function loadRows(options: LoadRowsOptions) {
   const supabase = await createServerSupabaseClient()
-  const { tableId, viewId, limit = 50, offset = 0 } = options
+  const { tableId, viewId, limit = 50, offset = 0, filters: providedFilters, sorts: providedSorts, visibleFields: providedVisibleFields } = options
 
   // Load table to get supabase_table name
   const { data: table, error: tableError } = await supabase
@@ -23,32 +27,55 @@ export async function loadRows(options: LoadRowsOptions) {
     throw new Error(`Table not found: ${tableId}`)
   }
 
-  // Load filters and sorts if viewId provided
-  let filters: ViewFilter[] = []
-  let sorts: ViewSort[] = []
-  let visibleFields: ViewField[] = []
+  // Use provided metadata if available, otherwise load it (but serialize to avoid parallel requests)
+  let filters: ViewFilter[] = providedFilters || []
+  let sorts: ViewSort[] = providedSorts || []
+  let visibleFields: ViewField[] = providedVisibleFields || []
 
-  if (viewId) {
-    const [filtersRes, sortsRes, fieldsRes] = await Promise.all([
-      supabase
-        .from('view_filters')
-        .select('*')
-        .eq('view_id', viewId),
-      supabase
-        .from('view_sorts')
-        .select('*')
-        .eq('view_id', viewId),
-      supabase
-        .from('view_fields')
-        .select('*')
-        .eq('view_id', viewId)
-        .eq('visible', true)
-        .order('position', { ascending: true }),
-    ])
+  // 🧯 Guardrail 2: Hard rule — rows must NEVER trigger metadata loads
+  // Warn if viewId is provided but metadata is missing (should be supplied by useViewMeta)
+  if (viewId && (!providedFilters || !providedSorts || !providedVisibleFields)) {
+    console.warn(
+      '[loadRows] Metadata missing for viewId — this should be supplied by useViewMeta hook. ' +
+      'Loading metadata inline (this can cause connection exhaustion). ' +
+      `viewId: ${viewId}, tableId: ${tableId}`
+    )
+  }
 
-    filters = filtersRes.data || []
-    sorts = sortsRes.data || []
-    visibleFields = fieldsRes.data || []
+  // Only load metadata if not provided AND viewId is present
+  if (viewId && (!providedFilters || !providedSorts || !providedVisibleFields)) {
+    // CRITICAL: Serialize requests instead of Promise.all to avoid connection exhaustion
+    // Load filters first
+    const filtersRes = await supabase
+      .from('view_filters')
+      .select('*')
+      .eq('view_id', viewId)
+    
+    if (!providedFilters) {
+      filters = filtersRes.data || []
+    }
+
+    // Then load sorts
+    const sortsRes = await supabase
+      .from('view_sorts')
+      .select('*')
+      .eq('view_id', viewId)
+    
+    if (!providedSorts) {
+      sorts = sortsRes.data || []
+    }
+
+    // Finally load fields
+    const fieldsRes = await supabase
+      .from('view_fields')
+      .select('*')
+      .eq('view_id', viewId)
+      .eq('visible', true)
+      .order('position', { ascending: true })
+    
+    if (!providedVisibleFields) {
+      visibleFields = fieldsRes.data || []
+    }
   }
 
   // Build query for actual Supabase table
