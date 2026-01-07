@@ -838,7 +838,7 @@ export default function InterfacePageClient({
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Page not found</h2>
-              <p className="text-sm text-gray-500">The page you're looking for doesn't exist.</p>
+              <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
             </div>
           </div>
         ) : isDashboardOrOverview && isBlockEditing ? (
