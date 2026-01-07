@@ -64,6 +64,7 @@ export default function Canvas({
   const { getFiltersForBlock } = useFilterState()
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
+  const previousIsEditingRef = useRef<boolean>(isEditing)
   const isInitializedRef = useRef(false)
   const layoutHydratedRef = useRef(false)
   const isResizingRef = useRef(false)
@@ -72,10 +73,13 @@ export default function Canvas({
   /**
    * Hydrates react-grid-layout from Supabase on page load
    * 
-   * CRITICAL: Only syncs from blocks prop ONCE on initial mount.
-   * After that, layout state is managed locally and only updates via:
+   * CRITICAL: Only syncs from blocks prop when:
+   * 1. First load (not yet initialized)
+   * 2. Block IDs changed (block added or removed)
+   * 3. Entering edit mode (to ensure fresh layout from database)
+   * 
+   * After hydration, layout state is managed locally and only updates via:
    * - User drag/resize (handleLayoutChange)
-   * - Block add/remove (block IDs change)
    * 
    * This prevents layout resets when:
    * - Parent component re-renders
@@ -91,14 +95,21 @@ export default function Canvas({
 
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
+    const wasEditing = previousIsEditingRef.current
+    const nowEditing = isEditing
+    
+    // Detect if we're entering edit mode (transitioning from false to true)
+    const enteringEditMode = !wasEditing && nowEditing
     
     // Only hydrate layout from blocks prop if:
     // 1. First load (not yet initialized)
     // 2. Block IDs changed (block added or removed)
+    // 3. Entering edit mode (blocks were reloaded, need to rehydrate from saved layout)
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
-    if (!layoutHydratedRef.current || blockIdsChanged) {
+    if (!layoutHydratedRef.current || blockIdsChanged || enteringEditMode) {
       // Convert blocks to layout format - use saved positions from Supabase
+      // CRITICAL: Always use saved x/y/w/h from blocks prop, never defaults unless missing
       const newLayout: Layout[] = blocks.map((block) => ({
         i: block.id,
         x: block.x ?? 0,
@@ -110,11 +121,12 @@ export default function Canvas({
       }))
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
+      previousIsEditingRef.current = nowEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
     }
     // If block IDs haven't changed and already hydrated, preserve current layout state
-  }, [blocks])
+  }, [blocks, isEditing])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {

@@ -466,6 +466,15 @@ export default function CalendarView({
     )
   }, [viewConfig, loadedTableFields])
 
+  // Get color field from view config
+  const colorField = useMemo(() => {
+    if (!viewConfig?.calendar_color_field || !loadedTableFields.length) return null
+    return loadedTableFields.find(f => 
+      f.name === viewConfig.calendar_color_field || 
+      f.id === viewConfig.calendar_color_field
+    )
+  }, [viewConfig, loadedTableFields])
+
   function getEvents(): EventInput[] {
     // Use resolved date field from config or fallback
     const effectiveDateField = dateField
@@ -575,11 +584,54 @@ export default function CalendarView({
             ? String(row.data[titleFieldName] || row.data[titleFieldId] || "Untitled")
             : `Event ${row.id.substring(0, 8)}`
 
+          // Get color from color field if configured
+          let eventColor: string | undefined = undefined
+          if (colorField && viewConfig?.calendar_color_field) {
+            const colorFieldName = colorField.name || viewConfig.calendar_color_field
+            const colorValue = row.data[colorFieldName]
+            
+            // If color field is a select field, use choiceColors from options
+            if (colorValue && colorField.options?.choiceColors) {
+              // Normalize the value for lookup (trim whitespace, handle case)
+              const normalizedValue = String(colorValue).trim()
+              const choiceColors = colorField.options.choiceColors
+              
+              // Try exact match first
+              if (choiceColors[normalizedValue]) {
+                eventColor = choiceColors[normalizedValue]
+              } else {
+                // Try case-insensitive match
+                const matchingKey = Object.keys(choiceColors).find(
+                  key => key.toLowerCase() === normalizedValue.toLowerCase()
+                )
+                if (matchingKey) {
+                  eventColor = choiceColors[matchingKey]
+                }
+              }
+              
+              // Ensure hex color format
+              if (eventColor && !eventColor.startsWith('#')) {
+                eventColor = `#${eventColor}`
+              }
+            }
+          }
+
           return {
             id: row.id,
             title: title || "Untitled",
             start: parsedStartDate,
             end: parsedEndDate || undefined,
+            backgroundColor: eventColor,
+            borderColor: eventColor,
+            textColor: eventColor ? (() => {
+              // Calculate text color based on background luminance
+              if (!eventColor.startsWith('#')) return '#000000'
+              const r = parseInt(eventColor.slice(1, 3), 16)
+              const g = parseInt(eventColor.slice(3, 5), 16)
+              const b = parseInt(eventColor.slice(5, 7), 16)
+              const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+              return luminance > 0.5 ? '#000000' : '#ffffff'
+            })() : undefined,
             extendedProps: {
               rowId: row.id,
               rowData: row.data,

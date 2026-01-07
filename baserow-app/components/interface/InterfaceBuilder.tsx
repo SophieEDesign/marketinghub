@@ -142,6 +142,9 @@ export default function InterfaceBuilder({
     [page.id, effectiveIsEditing, toast]
   )
 
+  // Track if layout has been modified by user (not just initialized)
+  const layoutModifiedByUserRef = useRef(false)
+
   /**
    * Handles layout changes from react-grid-layout
    * 
@@ -149,11 +152,17 @@ export default function InterfaceBuilder({
    * Updates local state immediately for responsive UI, then debounces save to Supabase.
    * 
    * Debounce delay: 500ms - prevents hammering the API during rapid drag/resize operations.
+   * 
+   * CRITICAL: Only saves if layout was actually modified by user interaction.
+   * Prevents saving on mount/hydration when layout is just being initialized from saved state.
    */
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
+
+      // Mark that layout has been modified by user
+      layoutModifiedByUserRef.current = true
 
       // Update local state immediately for responsive UI
       // This gives instant feedback while dragging/resizing
@@ -190,12 +199,29 @@ export default function InterfaceBuilder({
     [effectiveIsEditing, saveLayout]
   )
 
+  // Reset layout modified flag when exiting edit mode
+  useEffect(() => {
+    if (!effectiveIsEditing) {
+      layoutModifiedByUserRef.current = false
+    }
+  }, [effectiveIsEditing])
+
   // Save layout immediately when exiting edit mode
   const handleExitEditMode = useCallback(async () => {
     // Clear any pending debounced save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
       saveTimeoutRef.current = null
+    }
+
+    // Only save if layout was actually modified by user
+    // Prevents unnecessary saves when just entering/exiting edit mode without changes
+    if (!layoutModifiedByUserRef.current && !pendingLayout) {
+      // No changes made, just exit
+      exitBlockEdit()
+      setSelectedBlockId(null)
+      setSettingsPanelOpen(false)
+      return
     }
 
     // Get current layout from blocks state and save before exiting edit mode
@@ -208,7 +234,7 @@ export default function InterfaceBuilder({
       h: block.h,
     }))
 
-    // Always save layout when exiting edit mode
+    // Save layout when exiting edit mode if there are changes
     // Use pendingLayout if available (has latest changes), otherwise use currentLayout
     if (currentLayout.length > 0) {
       setIsSaving(true)
@@ -229,6 +255,9 @@ export default function InterfaceBuilder({
       }
     }
 
+    // Reset modification flag after save
+    layoutModifiedByUserRef.current = false
+
     exitBlockEdit()
     setSelectedBlockId(null)
     setSettingsPanelOpen(false)
@@ -246,6 +275,15 @@ export default function InterfaceBuilder({
   const handleBlockUpdate = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
       try {
+        // DEV: Debug log for content_json persistence
+        if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
+          console.log(`[TextBlock Save] Block ${blockId}: Saving content_json`, {
+            hasContent: !!(config as any).content_json,
+            contentType: typeof (config as any).content_json,
+            contentKeys: (config as any).content_json?.type === 'doc' ? Object.keys((config as any).content_json) : 'not-doc',
+          })
+        }
+
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -258,9 +296,34 @@ export default function InterfaceBuilder({
           throw new Error("Failed to update block")
         }
 
-        // Reload blocks from server to ensure consistency
+        const responseData = await response.json()
+
+        // CRITICAL: Use returned blocks if available (more efficient and ensures consistency)
+        // The API now returns updated blocks with the latest config including content_json
+        if (responseData.blocks && responseData.blocks.length > 0) {
+          const updatedBlock = responseData.blocks.find((b: PageBlock) => b.id === blockId)
+          if (updatedBlock) {
+            // DEV: Debug log for returned content_json
+            if (process.env.NODE_ENV === 'development' && updatedBlock.config?.content_json) {
+              console.log(`[TextBlock Save] Block ${blockId}: Received updated block with content_json`, {
+                hasContent: !!updatedBlock.config.content_json,
+                contentType: typeof updatedBlock.config.content_json,
+              })
+            }
+
+            // Update the specific block in state with the returned data
+            setBlocks((prev) =>
+              prev.map((b) => (b.id === blockId ? updatedBlock : b))
+            )
+            return // Success - no need to refetch
+          }
+        }
+
+        // Fallback: Reload blocks from server if returned blocks not available
         // This ensures saved config is reflected correctly
-        const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`)
+        const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
+          cache: 'no-store', // Ensure fresh data
+        })
         if (blocksResponse.ok) {
           const blocksData = await blocksResponse.json()
           const pageBlocks = (blocksData.blocks || []).map((block: any) => ({

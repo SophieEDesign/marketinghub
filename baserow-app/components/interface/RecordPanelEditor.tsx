@@ -259,26 +259,30 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
                 Display a field value from the record
               </div>
               <div className="flex gap-2">
-                <Select value={selectedField} onValueChange={setSelectedField}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a field" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableFields.length > 0 ? (
-                      availableFields.map((field) => (
-                        <SelectItem key={field.id} value={field.name}>
-                          {field.name} ({field.type})
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>No available fields</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddFieldBlock} disabled={!selectedField || loading}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add
-                </Button>
+                {availableFields.length > 0 ? (
+                  <>
+                    <Select value={selectedField} onValueChange={setSelectedField}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select a field" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name} ({field.type})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={handleAddFieldBlock} disabled={!selectedField || loading}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex-1 text-sm text-gray-500 py-2 px-3 border border-gray-200 rounded-md bg-gray-50">
+                    No available fields (all fields are already used)
+                  </div>
+                )}
               </div>
             </div>
           )}

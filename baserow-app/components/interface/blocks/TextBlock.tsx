@@ -44,6 +44,17 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // DEV: Debug log for content_json on render
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[TextBlock Render] Block ${block.id}:`, {
+      hasContentJson: !!config?.content_json,
+      contentJsonType: typeof config?.content_json,
+      isDoc: config?.content_json?.type === 'doc',
+      contentLength: config?.content_json?.content?.length || 0,
+      isEditing,
+    })
+  }
+  
   // CRITICAL: Read content ONLY from config.content_json
   // No fallbacks, no other sources
   const contentJson = config?.content_json || null

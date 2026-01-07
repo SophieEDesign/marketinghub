@@ -64,7 +64,18 @@ export async function GET(
       updated_at: block.updated_at,
     }))
 
-    return NextResponse.json({ blocks })
+    // CRITICAL: Disable caching to prevent stale data
+    // Add cache-busting headers to ensure fresh data on every request
+    return NextResponse.json(
+      { blocks },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      }
+    )
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to load blocks' },
@@ -91,6 +102,7 @@ export async function PATCH(
     }
 
     // Update individual blocks if provided
+    const updatedBlocks: PageBlock[] = []
     if (blockUpdates && Array.isArray(blockUpdates)) {
       const supabase = await createClient()
       
@@ -99,7 +111,7 @@ export async function PATCH(
           // Get current block to determine type
           const { data: currentBlock } = await supabase
             .from('view_blocks')
-            .select('type, config')
+            .select('type, config, position_x, position_y, width, height, order_index, page_id, view_id, created_at, updated_at')
             .eq('id', update.id)
             .single()
 
@@ -109,12 +121,14 @@ export async function PATCH(
 
           // Use the provided config - SettingsPanel always passes full config
           // Merge with existing to handle any edge cases, but new config takes precedence
+          // CRITICAL: This merge ensures partial updates (like content_json) are preserved
           const configToNormalize = {
             ...(currentBlock.config || {}),
             ...(update.config || {}),
           }
 
           // Validate and normalize config
+          // CRITICAL: normalizeBlockConfig now preserves content_json for text blocks
           const normalizedConfig = normalizeBlockConfig(
             currentBlock.type as BlockType,
             configToNormalize
@@ -127,22 +141,46 @@ export async function PATCH(
           }
 
           // Execute the update query and check for errors
-          const { error } = await supabase
+          const { data: updatedBlock, error } = await supabase
             .from('view_blocks')
             .update({
               config: normalizedConfig,
               updated_at: new Date().toISOString(),
             })
             .eq('id', update.id)
+            .select('*')
+            .single()
           
           if (error) {
             throw new Error(`Failed to update block ${update.id}: ${error.message}`)
           }
+
+          if (!updatedBlock) {
+            throw new Error(`Block ${update.id} update succeeded but no data returned`)
+          }
+
+          // Convert to PageBlock format and add to results
+          updatedBlocks.push({
+            id: updatedBlock.id,
+            page_id: updatedBlock.page_id || updatedBlock.view_id,
+            type: updatedBlock.type,
+            x: updatedBlock.position_x ?? 0,
+            y: updatedBlock.position_y ?? 0,
+            w: updatedBlock.width ?? 4,
+            h: updatedBlock.height ?? 4,
+            config: updatedBlock.config || {},
+            order_index: updatedBlock.order_index ?? 0,
+            created_at: updatedBlock.created_at,
+            updated_at: updatedBlock.updated_at,
+          })
         })
       )
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      blocks: updatedBlocks.length > 0 ? updatedBlocks : undefined
+    })
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to save blocks' },

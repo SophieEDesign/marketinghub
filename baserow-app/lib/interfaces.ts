@@ -153,113 +153,252 @@ async function getInterfacesFromViews(): Promise<Interface[]> {
 }
 
 /**
+ * Validate that a page exists and user has access to it
+ */
+async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise<{ valid: boolean; reason?: string }> {
+  const supabase = await createClient()
+  
+  // Try interface_pages table first (current system)
+  const { data: page, error: pageError } = await supabase
+    .from('interface_pages')
+    .select('id, is_admin_only')
+    .eq('id', pageId)
+    .maybeSingle()
+  
+  if (!pageError && page) {
+    // Check admin-only restriction
+    if (!userIsAdmin && page.is_admin_only) {
+      return { valid: false, reason: 'Page is admin-only and user is not admin' }
+    }
+    return { valid: true }
+  }
+  
+  // Fallback: try views table (old system)
+  const { data: view, error: viewError } = await supabase
+    .from('views')
+    .select('id, is_admin_only')
+    .eq('id', pageId)
+    .eq('type', 'interface')
+    .maybeSingle()
+  
+  if (!viewError && view) {
+    // Check admin-only restriction
+    if (!userIsAdmin && view.is_admin_only) {
+      return { valid: false, reason: 'Page is admin-only and user is not admin' }
+    }
+    return { valid: true }
+  }
+  
+  // Page doesn't exist
+  return { valid: false, reason: 'Page not found' }
+}
+
+/**
+ * Get accessible interface pages (filtered by permissions)
+ * Queries interface_pages table directly with proper permission filtering
+ */
+async function getAccessibleInterfacePages(): Promise<Interface[]> {
+  const supabase = await createClient()
+  const userIsAdmin = await isAdmin()
+  
+  // Query interface_pages table (current system)
+  let pagesQuery = supabase
+    .from('interface_pages')
+    .select('id, name, group_id, created_at, updated_at, is_admin_only')
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: false })
+  
+  // Filter out admin-only pages for non-admin users
+  if (!userIsAdmin) {
+    pagesQuery = pagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+  }
+  
+  const { data: pagesData, error: pagesError } = await pagesQuery
+  
+  if (!pagesError && pagesData && pagesData.length > 0) {
+    return pagesData.map(page => ({
+      id: page.id,
+      name: page.name,
+      description: null,
+      category_id: page.group_id,
+      icon: null,
+      is_default: false,
+      created_at: page.created_at,
+      updated_at: page.updated_at || page.created_at,
+    }))
+  }
+  
+  // Fallback to getInterfaces() which handles views table and interfaces table
+  return await getInterfaces()
+}
+
+/**
+ * Resolve landing page with priority order:
+ * 1. User default page (if exists and user has access)
+ * 2. Workspace default page (if exists and user has access)
+ * 3. First accessible interface page
+ */
+export async function resolveLandingPage(): Promise<{ pageId: string | null; reason: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return { pageId: null, reason: 'User not authenticated' }
+  }
+  
+  const userIsAdmin = await isAdmin()
+  const isDev = process.env.NODE_ENV === 'development'
+  
+  // Priority 1: Check user default page (if field exists in profiles)
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('default_page_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    
+    if (!profileError && profile && (profile as any).default_page_id) {
+      const userDefaultPageId = (profile as any).default_page_id
+      const validation = await validatePageAccess(userDefaultPageId, userIsAdmin)
+      
+      if (validation.valid) {
+        if (isDev) {
+          console.log('[Landing Page] Using user default page:', userDefaultPageId)
+        }
+        return { pageId: userDefaultPageId, reason: 'user_default' }
+      } else {
+        if (isDev) {
+          console.warn('[Landing Page] User default page invalid:', userDefaultPageId, validation.reason)
+        }
+      }
+    }
+  } catch (error: any) {
+    // Silently handle if column doesn't exist (expected if migration hasn't run)
+    if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703' && 
+        !error?.message?.includes('column') && !error?.message?.includes('does not exist')) {
+      if (isDev) {
+        console.warn('[Landing Page] Error checking user default page:', error)
+      }
+    }
+  }
+  
+  // Priority 2: Check workspace default page
+  try {
+    const { data: workspaceSettings, error: settingsError } = await supabase
+      .from('workspace_settings')
+      .select('default_interface_id')
+      .maybeSingle()
+    
+    if (!settingsError && workspaceSettings?.default_interface_id) {
+      const workspaceDefaultPageId = workspaceSettings.default_interface_id
+      const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
+      
+      if (validation.valid) {
+        if (isDev) {
+          console.log('[Landing Page] Using workspace default page:', workspaceDefaultPageId)
+        }
+        return { pageId: workspaceDefaultPageId, reason: 'workspace_default' }
+      } else {
+        if (isDev) {
+          console.warn('[Landing Page] Workspace default page invalid:', workspaceDefaultPageId, validation.reason)
+        }
+      }
+    }
+  } catch (error: any) {
+    // Silently handle if column doesn't exist
+    if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703' && 
+        !error?.message?.includes('column') && !error?.message?.includes('does not exist')) {
+      if (isDev) {
+        console.warn('[Landing Page] Error checking workspace default page:', error)
+      }
+    }
+  }
+  
+  // Priority 3: Get first accessible interface page
+  const accessiblePages = await getAccessibleInterfacePages()
+  if (accessiblePages.length > 0) {
+    if (isDev) {
+      console.log('[Landing Page] Using first accessible page:', accessiblePages[0].id, '(fallback)')
+    }
+    return { pageId: accessiblePages[0].id, reason: 'first_accessible' }
+  }
+  
+  if (isDev) {
+    console.warn('[Landing Page] No accessible pages found')
+  }
+  return { pageId: null, reason: 'no_accessible_pages' }
+}
+
+/**
  * Get default interface (for redirect on login)
+ * @deprecated Use resolveLandingPage() instead for better control and logging
  */
 export async function getDefaultInterface(): Promise<Interface | null> {
   const supabase = await createClient()
   const userRole = await getUserRole()
   const userIsAdmin = await isAdmin()
   
-  // First, try to get default interface from workspace_settings
-  // Silently handle errors if column doesn't exist
-  let workspaceSettings: { default_interface_id?: string | null } | null = null
-  try {
-    const { data, error: settingsError } = await supabase
-      .from('workspace_settings')
-      .select('default_interface_id')
-      .maybeSingle()
-
-    if (settingsError) {
-      // Check for specific error codes that indicate column/table doesn't exist
-      if (settingsError.code === 'PGRST116' || 
-          settingsError.code === '42P01' || 
-          settingsError.code === '42703' ||
-          settingsError.message?.includes('column') ||
-          settingsError.message?.includes('does not exist') ||
-          settingsError.message?.includes('relation')) {
-        // Column or table doesn't exist - this is fine, just skip
-        workspaceSettings = null
-      } else {
-        // Other errors - log but don't fail
-        console.warn('Error loading workspace settings:', settingsError)
-      }
-    } else {
-      workspaceSettings = data
-    }
-  } catch (error: any) {
-    // Ignore errors if column doesn't exist (PGRST116 = column not found, 42P01 = relation doesn't exist)
-    // These are expected in some setups where the migration hasn't been run
-    if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
-      console.warn('Error loading workspace settings:', error)
-    }
+  // Use new resolution logic
+  const { pageId } = await resolveLandingPage()
+  
+  if (!pageId) {
+    return null
   }
   
-  if (workspaceSettings?.default_interface_id) {
-    // Try interface_pages table first (current system - matches foreign key)
-    const { data: defaultPage, error: pageError } = await supabase
-      .from('interface_pages')
-      .select('*')
-      .eq('id', workspaceSettings.default_interface_id)
-      .maybeSingle()
-    
-    if (!pageError && defaultPage) {
-      // Check admin-only restriction
-      if (userIsAdmin || !defaultPage.is_admin_only) {
-        return {
-          id: defaultPage.id,
-          name: defaultPage.name,
-          description: null,
-          category_id: defaultPage.group_id,
-          icon: null,
-          is_default: true,
-          created_at: defaultPage.created_at,
-          updated_at: defaultPage.updated_at || defaultPage.created_at,
-        } as Interface
-      }
-    }
-    
-    // Fallback: try views table (old system)
-    const { data: defaultView, error: viewError } = await supabase
-      .from('views')
-      .select('*')
-      .eq('id', workspaceSettings.default_interface_id)
-      .eq('type', 'interface')
-      .maybeSingle()
-    
-    if (!viewError && defaultView) {
-      // Check admin-only restriction
-      if (userIsAdmin || !defaultView.is_admin_only) {
-        return {
-          id: defaultView.id,
-          name: defaultView.name,
-          description: null,
-          category_id: defaultView.group_id,
-          icon: defaultView.config?.settings?.icon || null,
-          is_default: true,
-          created_at: defaultView.created_at,
-          updated_at: defaultView.updated_at || defaultView.created_at,
-        } as Interface
-      }
-    }
-    
-    // Fallback: try interfaces table (alternative new system)
-    const { data: defaultInterface, error } = await supabase
-      .from('interfaces')
-      .select('*')
-      .eq('id', workspaceSettings.default_interface_id)
-      .maybeSingle()
-    
-    if (!error && defaultInterface) {
-      // Check if user can access it
-      if (userIsAdmin || await canAccessInterface(defaultInterface.id)) {
-        return defaultInterface as Interface
-      }
-    }
+  // Convert pageId to Interface format
+  // Try interface_pages table first (current system)
+  const { data: defaultPage, error: pageError } = await supabase
+    .from('interface_pages')
+    .select('*')
+    .eq('id', pageId)
+    .maybeSingle()
+  
+  if (!pageError && defaultPage) {
+    return {
+      id: defaultPage.id,
+      name: defaultPage.name,
+      description: null,
+      category_id: defaultPage.group_id,
+      icon: null,
+      is_default: true,
+      created_at: defaultPage.created_at,
+      updated_at: defaultPage.updated_at || defaultPage.created_at,
+    } as Interface
   }
   
-  // Fallback: get first accessible interface
-  const interfaces = await getInterfaces()
-  return interfaces.length > 0 ? interfaces[0] : null
+  // Fallback: try views table (old system)
+  const { data: defaultView, error: viewError } = await supabase
+    .from('views')
+    .select('*')
+    .eq('id', pageId)
+    .eq('type', 'interface')
+    .maybeSingle()
+  
+  if (!viewError && defaultView) {
+    return {
+      id: defaultView.id,
+      name: defaultView.name,
+      description: null,
+      category_id: defaultView.group_id,
+      icon: defaultView.config?.settings?.icon || null,
+      is_default: true,
+      created_at: defaultView.created_at,
+      updated_at: defaultView.updated_at || defaultView.created_at,
+    } as Interface
+  }
+  
+  // Fallback: try interfaces table (alternative new system)
+  const { data: defaultInterface, error } = await supabase
+    .from('interfaces')
+    .select('*')
+    .eq('id', pageId)
+    .maybeSingle()
+  
+  if (!error && defaultInterface) {
+    return defaultInterface as Interface
+  }
+  
+  return null
 }
 
 /**

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
-import { getDefaultInterface, getInterfaces } from "@/lib/interfaces"
+import { resolveLandingPage } from "@/lib/interfaces"
 
 export default async function HomePage({
   searchParams,
@@ -31,54 +31,58 @@ export default async function HomePage({
   
   const admin = await isAdmin()
 
-  // Try to get default interface using new system
+  // Resolve landing page with priority order and validation
   try {
-    const defaultInterface = await getDefaultInterface()
-    if (defaultInterface) {
-      redirect(`/pages/${defaultInterface.id}`)
-    }
-  } catch (error) {
-    // Fallback to old system
-    console.warn('Error loading default interface, falling back to views table:', error)
-    // Log error details for debugging
-    if (error instanceof Error) {
-      console.warn('Error details:', error.message, error.stack)
-    }
-  }
-
-  // If no default, get first accessible interface
-  try {
-    const interfaces = await getInterfaces()
-    if (interfaces.length > 0) {
-      redirect(`/pages/${interfaces[0].id}`)
-    }
-  } catch (error) {
-    // Fallback to old system
-    console.warn('Error loading interfaces, falling back to views table:', error)
+    const { pageId, reason } = await resolveLandingPage()
     
-    let firstQuery = supabase
-      .from("views")
-      .select("id")
-      .eq("type", "interface")
-      .order("order_index", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(1)
-
-    if (!admin) {
-      firstQuery = firstQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+    if (pageId) {
+      // Redirect to resolved page
+      redirect(`/pages/${pageId}`)
     }
-
-    const { data: firstInterface } = await firstQuery.maybeSingle()
-    if (firstInterface) {
-      redirect(`/pages/${firstInterface.id}`)
+    
+    // No accessible pages found - redirect based on role
+    if (admin) {
+      redirect("/settings?tab=pages")
+    } else {
+      // Members can't access settings, show empty state
+      // This should rarely happen, but handle gracefully
+      redirect("/")
     }
-  }
+  } catch (error) {
+    // Error resolving landing page - fallback to old system
+    const isDev = process.env.NODE_ENV === 'development'
+    if (isDev) {
+      console.warn('[Landing Page] Error resolving landing page, falling back:', error)
+      if (error instanceof Error) {
+        console.warn('[Landing Page] Error details:', error.message, error.stack)
+      }
+    }
+    
+    // Fallback: try to get first accessible interface from views table
+    try {
+      let firstQuery = supabase
+        .from("views")
+        .select("id")
+        .eq("type", "interface")
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(1)
 
-  // If no interfaces exist, redirect based on role
-  if (admin) {
-    redirect("/settings?tab=pages")
-  } else {
-    // Members can't access settings, show empty state
-    redirect("/")
+      if (!admin) {
+        firstQuery = firstQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+      }
+
+      const { data: firstInterface } = await firstQuery.maybeSingle()
+      if (firstInterface) {
+        redirect(`/pages/${firstInterface.id}`)
+      }
+    } catch (fallbackError) {
+      // Last resort fallback
+      if (admin) {
+        redirect("/settings?tab=pages")
+      } else {
+        redirect("/")
+      }
+    }
   }
 }

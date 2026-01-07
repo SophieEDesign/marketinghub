@@ -64,16 +64,18 @@ export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
 
   // Convert view_blocks to PageBlock format
   // Maps database columns (position_x, position_y, width, height) to PageBlock (x, y, w, h)
+  // CRITICAL: Use saved values from database, only fallback to defaults if null/undefined
+  // This ensures saved layout is the single source of truth
   return (data || []).map((block: any) => ({
     id: block.id,
     page_id: block.view_id, // Map view_id to page_id for compatibility
     type: block.type,
-    x: block.position_x, // Restore saved X position
-    y: block.position_y, // Restore saved Y position
-    w: block.width,       // Restore saved width
-    h: block.height,      // Restore saved height
+    x: block.position_x ?? 0, // Restore saved X position, default to 0 if null
+    y: block.position_y ?? 0, // Restore saved Y position, default to 0 if null
+    w: block.width ?? 4,      // Restore saved width, default to 4 if null (matches DB default)
+    h: block.height ?? 4,      // Restore saved height, default to 4 if null (matches DB default)
     config: block.config || {},
-    order_index: block.order_index,
+    order_index: block.order_index ?? 0,
     created_at: block.created_at,
     updated_at: block.updated_at,
   })) as PageBlock[]

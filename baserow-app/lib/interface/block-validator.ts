@@ -25,6 +25,7 @@ export function getConfigValue<T>(
 /**
  * Validate and normalize block config
  * Returns a safe config object that won't crash the renderer
+ * CRITICAL: Preserves content_json for text blocks to prevent data loss
  */
 export function normalizeBlockConfig(
   blockType: BlockType,
@@ -41,13 +42,27 @@ export function normalizeBlockConfig(
     safeConfig = {}
   }
 
+  // CRITICAL: For text blocks, preserve content_json even if validation fails
+  // This ensures saved content is never lost during normalization
+  const preservedContentJson = blockType === 'text' && (safeConfig as any).content_json
+
   // Run validation
   const validation = validateBlockConfig(blockType, safeConfig)
 
   // If invalid, return minimal safe config
   // Silently normalize invalid configs - this is expected for new/incomplete blocks
   if (!validation.valid) {
-    return getDefaultConfigForType(blockType)
+    const defaultConfig = getDefaultConfigForType(blockType)
+    // Preserve content_json for text blocks even when using default config
+    if (blockType === 'text' && preservedContentJson !== undefined) {
+      return { ...defaultConfig, content_json: preservedContentJson }
+    }
+    return defaultConfig
+  }
+
+  // Ensure content_json is preserved for text blocks
+  if (blockType === 'text' && preservedContentJson !== undefined) {
+    return { ...safeConfig, content_json: preservedContentJson }
   }
 
   return safeConfig

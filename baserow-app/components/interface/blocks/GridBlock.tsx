@@ -20,8 +20,9 @@ interface GridBlockProps {
 
 export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: GridBlockProps) {
   const { config } = block
-  // Grid block MUST have table_id configured - no fallback to page table
-  const tableId = config?.table_id
+  // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
+  // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
+  const tableId = config?.table_id || pageTableId || config?.base_table || null
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
   // Visible fields from config (required) - ensure it's always an array
@@ -210,6 +211,20 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     
     switch (viewType) {
       case 'calendar': {
+        // Calendar requires tableId - if missing, show error or let CalendarView handle it
+        if (!tableId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Calendar view requires a table connection." : "No table configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a table in block settings.</p>
+                )}
+              </div>
+            </div>
+          )
+        }
+        
         // Calendar will load its own config from the view, but we can provide a fallback dateFieldId
         // Find ALL date fields in the table (not just visibleFields) to ensure we can find the configured field
         const allDateFieldsInTable = tableFields
@@ -248,10 +263,11 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         // CalendarView will load view config and use that, so we don't need to error here
         // Just pass the fallback dateFieldId in case view config doesn't have one
+        // Pass tableId as string (not null) since we've validated it above
         
         return (
           <CalendarView
-            tableId={tableId!}
+            tableId={tableId}
             viewId={viewId || ''}
             dateFieldId={dateFieldId}
             fieldIds={fieldIds}
