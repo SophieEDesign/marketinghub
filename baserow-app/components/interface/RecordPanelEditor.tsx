@@ -54,7 +54,7 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
       const supabase = createClient()
       const { data, error } = await supabase
         .from('table_fields')
-        .select('id, name, type, position')
+        .select('id, table_id, name, type, position, created_at')
         .eq('table_id', page.base_table)
         .order('position', { ascending: true })
 
