@@ -148,23 +148,18 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
         : 0
 
       // Get default size for block type
-      const defaultSizes: Record<BlockType, { w: number; h: number }> = {
+      const defaultSizes: Partial<Record<BlockType, { w: number; h: number }>> = {
         text: { w: 12, h: 2 },
         image: { w: 6, h: 4 },
-        html: { w: 12, h: 3 },
         chart: { w: 6, h: 4 },
         grid: { w: 12, h: 6 },
         form: { w: 12, h: 4 },
         kpi: { w: 4, h: 2 },
-        stat: { w: 4, h: 2 },
-        table: { w: 12, h: 6 },
-        embed: { w: 12, h: 4 },
-        automation: { w: 12, h: 3 },
         divider: { w: 12, h: 1 },
         record: { w: 12, h: 6 },
       }
 
-      const size = defaultSizes[selectedBlockType] || { w: 12, h: 2 }
+      const size = (defaultSizes[selectedBlockType] as { w: number; h: number } | undefined) || { w: 12, h: 2 }
 
       // Create block via API
       const res = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -242,7 +237,6 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
   const blockTypes: { value: BlockType; label: string; icon: any }[] = [
     { value: 'text', label: 'Text', icon: Type },
     { value: 'image', label: 'Image', icon: Image },
-    { value: 'html', label: 'HTML', icon: FileText },
     { value: 'chart', label: 'Chart', icon: BarChart3 },
   ]
 
@@ -380,7 +374,7 @@ export default function RecordPanelEditor({ page, isOpen, onClose, onSave }: Rec
           {/* Info */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
             <p className="text-sm text-blue-800">
-              <strong>Tip:</strong> After adding blocks, click "Done" and enter edit mode to drag and position them, just like content pages.
+              <strong>Tip:</strong> After adding blocks, click &quot;Done&quot; and enter edit mode to drag and position them, just like content pages.
             </p>
           </div>
 
