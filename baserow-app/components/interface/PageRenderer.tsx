@@ -12,6 +12,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
 import { createClient } from '@/lib/supabase/client'
+import GridView from '@/components/grid/GridView'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })

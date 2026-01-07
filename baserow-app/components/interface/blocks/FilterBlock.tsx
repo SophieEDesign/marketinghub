@@ -283,7 +283,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
       <div className="flex items-center gap-2.5 flex-wrap">
         {filters.map((filter, index) => {
           const selectedField = tableFields.find(f => f.name === filter.field)
-          const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'select'
+          const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'multi_select' || selectedField?.type === 'select'
           const selectOptions = selectedField?.options?.choices || selectedField?.options || []
           const hasSelectOptions = isSelectField && Array.isArray(selectOptions) && selectOptions.length > 0
           

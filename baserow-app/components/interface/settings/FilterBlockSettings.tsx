@@ -67,7 +67,7 @@ export default function FilterBlockSettings({
     const optionsMap = new Map()
     
     for (const field of fields) {
-      if (field.type === 'single_select') {
+      if (field.type === 'single_select' || field.type === 'multi_select') {
         // Field options can be in options.choices or options directly
         const fieldOptions = (field as any).options
         if (fieldOptions) {
@@ -283,7 +283,7 @@ export default function FilterBlockSettings({
               defaultFilters.map((filter, index) => {
                 const selectedField = fields.find(f => f.name === filter.field)
                 const fieldOptions = fieldsWithOptions.get(filter.field)
-                const isSelectField = selectedField?.type === 'single_select'
+                const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'multi_select'
                 const needsValue = filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty'
                 
                 return (
