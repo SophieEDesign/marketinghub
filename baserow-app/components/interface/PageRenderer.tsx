@@ -102,30 +102,21 @@ export default function PageRenderer({
     }
 
     // Pre-deployment guard: Validate page before rendering
+    // Only warn in dev mode, don't block rendering - show setup UI instead
     const pageValidity = assertPageIsValid(page, {
       hasBlocks: blocks.length > 0,
       hasTableId: !!pageTableId,
       hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
     })
 
-    // Show setup UI if page is invalid
-    if (shouldShowSetupUI(page, {
-      hasBlocks: blocks.length > 0,
-      hasTableId: !!pageTableId,
-      hasDateField: !!config.date_field || !!config.start_date_field,
-    })) {
+    // Show setup UI if page is invalid, but only for critical issues (missing anchors)
+    // Don't block rendering for missing data - let the page components handle that
+    if (!pageValidity.valid && pageValidity.missingAnchor) {
       return <InvalidPageState page={page} reason={pageValidity.reason} />
     }
 
-    // Check data wiring for pages that require it
-    if (shouldShowSetupUIForDataWiring(
-      !!pageTableId,
-      !!page.saved_view_id,
-      !!config.fields && config.fields.length > 0,
-      page.page_type
-    )) {
-      return <InvalidPageState page={page} reason="Missing required data configuration" />
-    }
+    // For other validation issues, log warning but continue rendering
+    // The page components will show their own setup states
 
     switch (visualisation) {
       case 'list':

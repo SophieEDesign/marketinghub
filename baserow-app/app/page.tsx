@@ -41,6 +41,19 @@ export default async function HomePage({
       redirect(`/pages/${pageId}`)
     }
     
+    // Fallback: Try to get first page directly from interface_pages table
+    const { data: firstPage } = await supabase
+      .from('interface_pages')
+      .select('id')
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    
+    if (firstPage?.id) {
+      redirect(`/pages/${firstPage.id}`)
+    }
+    
     // No accessible pages found - show empty state instead of redirecting
     // Redirecting to "/" creates a loop, so we render an empty state here
     if (admin) {

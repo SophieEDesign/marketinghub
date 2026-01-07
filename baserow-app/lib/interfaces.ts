@@ -323,6 +323,28 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     return { pageId: accessiblePages[0].id, reason: 'first_accessible' }
   }
   
+  // Priority 4: Fallback to any page from interface_pages table (even if admin-only)
+  // This ensures we always have a default page if any pages exist
+  try {
+    const { data: anyPages } = await supabase
+      .from('interface_pages')
+      .select('id')
+      .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(1)
+    
+    if (anyPages && anyPages.length > 0) {
+      if (isDev) {
+        console.log('[Landing Page] Using first page (any):', anyPages[0].id, '(final fallback)')
+      }
+      return { pageId: anyPages[0].id, reason: 'first_page_fallback' }
+    }
+  } catch (error: any) {
+    if (isDev) {
+      console.warn('[Landing Page] Error in final fallback:', error)
+    }
+  }
+  
   if (isDev) {
     console.warn('[Landing Page] No accessible pages found')
   }
