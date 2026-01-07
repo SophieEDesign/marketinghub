@@ -7,6 +7,7 @@
 
 import type { InterfacePage } from '@/lib/interface/page-types-only'
 import { PageType } from '@/lib/interface/page-types'
+import type { ViewType } from '@/lib/interface/types'
 import { useMemo, useState, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
@@ -14,12 +15,10 @@ import { createClient } from '@/lib/supabase/client'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
-const KanbanView = dynamic(() => import('@/components/views/KanbanView'), { ssr: false })
-const CalendarView = dynamic(() => import('@/components/views/CalendarView'), { ssr: false })
 const FormView = dynamic(() => import('@/components/views/FormView'), { ssr: false })
 const InterfaceBuilder = dynamic(() => import('@/components/interface/InterfaceBuilder'), { ssr: false })
 const RecordReviewView = dynamic(() => import('@/components/interface/RecordReviewView'), { ssr: false })
-const GridView = dynamic(() => import('@/components/grid/GridView'), { ssr: false })
+const PageViewBlockWrapper = dynamic(() => import('./PageViewBlockWrapper'), { ssr: false })
 
 interface PageRendererProps {
   page: InterfacePage
@@ -39,7 +38,11 @@ export default function PageRenderer({
   blocks = [],
 }: PageRendererProps) {
   const config = page.config || {}
-  const visualisation = config.visualisation || page.page_type
+  // For Record Review pages, always use 'record_review' as visualisation (ignore config)
+  // Record Review pages are record-based, not view-based, so they shouldn't use view types
+  const visualisation = page.page_type === 'record_review' 
+    ? 'record_review' 
+    : (config.visualisation || page.page_type)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   const prevPageIdRef = useRef<string>('')
   const prevBaseTableRef = useRef<string | null>(null)
@@ -77,7 +80,9 @@ export default function PageRenderer({
   }, [page?.id, page?.base_table, page?.saved_view_id])
 
   // Determine if grid toggle should be shown
+  // Record Review pages NEVER show grid toggle (fixed layout)
   const shouldShowGridToggle = useMemo(() => {
+    if (page.page_type === 'record_review') return false // Record Review pages have fixed layout
     if (showGridToggle !== undefined) return showGridToggle
     const definition = require('@/lib/interface/page-types').PAGE_TYPE_DEFINITIONS[page.page_type]
     return definition?.supportsGridToggle ?? false
@@ -96,102 +101,35 @@ export default function PageRenderer({
     switch (visualisation) {
       case 'list':
       case 'grid':
-        // For list/grid views, use GridView component if we have a saved_view_id
-        // Otherwise fall back to SimpleGridView for SQL view data
-        if (!pageTableId) {
-          return (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
-              <div className="text-center max-w-md">
-                <div className="text-sm mb-2">Grid view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
-              </div>
-            </div>
-          )
-        }
-        
-        // If we have a saved_view_id, use the proper GridView component
-        if (page.saved_view_id) {
-          return (
-            <div className="h-full">
-              <ListViewGrid
-                page={page}
-                tableId={pageTableId}
-                viewId={page.saved_view_id}
-                config={config}
-              />
-            </div>
-          )
-        }
-        
-        // Otherwise use SimpleGridView for SQL view data
+      case 'kanban':
+      case 'calendar':
+      case 'timeline':
+        // For data page views, use GridBlock to ensure unified rendering
+        // This ensures they share the same renderer, settings schema, and data logic as blocks
         return (
-          <div className="h-full">
-            <SimpleGridView
-              data={data}
-              config={config}
-              pageId={page.id}
-              tableId={pageTableId}
-            />
-          </div>
+          <PageViewBlockWrapper
+            page={page}
+            pageTableId={pageTableId}
+            viewType={visualisation as ViewType}
+            config={config}
+            filters={[]}
+          />
         )
 
       case 'gallery':
+        // Gallery views use InterfaceBuilder with blocks
         return (
-          <div className="p-4">
-            <GalleryView data={data} config={config} />
-          </div>
-        )
-
-      case 'kanban':
-        // Kanban view requires a tableId
-        const kanbanTableId = pageTableId || config.table_id || config.base_table || ''
-        if (!kanbanTableId) {
-          return (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
-              <div className="text-center max-w-md">
-                <div className="text-sm mb-2">Kanban view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
-              </div>
-            </div>
-          )
-        }
-        return (
-          <KanbanView
-            tableId={kanbanTableId}
-            viewId={page.saved_view_id || config.view_id || page.id}
-            groupingFieldId={config.group_by || ''}
-            fieldIds={config.card_fields || config.fields || []}
+          <InterfaceBuilder
+            page={{ 
+              id: page.id, 
+              name: page.name,
+              settings: { layout_template: 'gallery', primary_table_id: pageTableId }
+            } as any}
+            initialBlocks={blocks}
+            isViewer={true}
+            hideHeader={true}
+            pageTableId={pageTableId}
           />
-        )
-
-      case 'calendar':
-        // Use page's tableId
-        if (!pageTableId) {
-          return (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
-              <div className="text-center max-w-md">
-                <div className="text-sm mb-2">Calendar view requires a table connection.</div>
-                <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
-              </div>
-            </div>
-          )
-        }
-        return (
-          <CalendarView
-            tableId={pageTableId}
-            viewId={page.saved_view_id || config.view_id || page.id}
-            dateFieldId={config.start_date_field || config.calendar_date_field || ''}
-            fieldIds={config.fields || []}
-            searchQuery={config.search_query || ''}
-            tableFields={config.table_fields || []}
-          />
-        )
-
-      case 'timeline':
-        return (
-          <div className="p-4">
-            <TimelineView data={data} config={config} />
-          </div>
         )
 
       case 'form':

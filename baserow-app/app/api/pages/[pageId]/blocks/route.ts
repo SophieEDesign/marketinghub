@@ -106,8 +106,9 @@ export async function PATCH(
             throw new Error(`Block ${update.id} not found`)
           }
 
-          // Merge configs - new config overrides existing
-          const mergedConfig = {
+          // Use the provided config - SettingsPanel always passes full config
+          // Merge with existing to handle any edge cases, but new config takes precedence
+          const configToNormalize = {
             ...(currentBlock.config || {}),
             ...(update.config || {}),
           }
@@ -115,7 +116,7 @@ export async function PATCH(
           // Validate and normalize config
           const normalizedConfig = normalizeBlockConfig(
             currentBlock.type as BlockType,
-            mergedConfig
+            configToNormalize
           )
 
           // Validate config (warn but don't fail - use normalized config)

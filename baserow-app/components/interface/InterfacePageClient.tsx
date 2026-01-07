@@ -405,8 +405,11 @@ export default function InterfacePageClient({
   }
 
   // Determine if grid toggle should be shown
+  // Record Review pages NEVER show grid toggle (fixed layout, record-based)
   const showGridToggle = useMemo(() => {
     if (!page) return false
+    // Record Review pages are record-based, not view-based - no grid toggle
+    if (page.page_type === 'record_review') return false
     const definition = getPageTypeDefinition(page.page_type)
     return definition.supportsGridToggle && page.page_type !== 'dashboard' && page.page_type !== 'overview'
   }, [page])

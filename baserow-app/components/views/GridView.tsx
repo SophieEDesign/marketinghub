@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +21,12 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<ViewFilter[]>([])
   const [sorts, setSorts] = useState<ViewSort[]>([])
+  
+  // Track previous values to prevent infinite loops
+  const prevFiltersRef = useRef<string>('')
+  const prevSortsRef = useRef<string>('')
+  const prevTableIdRef = useRef<string>('')
+  const prevPageRef = useRef<number>(1)
 
   useEffect(() => {
     loadViewConfig()
@@ -28,6 +34,26 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
   }, [viewId])
 
   useEffect(() => {
+    // Create stable keys for comparison
+    const filtersKey = JSON.stringify(filters)
+    const sortsKey = JSON.stringify(sorts)
+    
+    // Only load rows if something actually changed
+    const filtersChanged = prevFiltersRef.current !== filtersKey
+    const sortsChanged = prevSortsRef.current !== sortsKey
+    const tableIdChanged = prevTableIdRef.current !== tableId
+    const pageChanged = prevPageRef.current !== page
+    
+    if (!filtersChanged && !sortsChanged && !tableIdChanged && !pageChanged) {
+      return // No actual change, skip loading
+    }
+    
+    // Update refs
+    prevFiltersRef.current = filtersKey
+    prevSortsRef.current = sortsKey
+    prevTableIdRef.current = tableId
+    prevPageRef.current = page
+    
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, page, filters, sorts])

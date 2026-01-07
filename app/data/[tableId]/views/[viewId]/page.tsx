@@ -4,10 +4,7 @@ import { checkViewAccess } from '@/lib/permissions'
 import { isAdmin } from '@/lib/roles'
 import { loadView, loadViewFields, loadViewTabs } from '@/lib/views'
 import { loadViewBlocks } from '@/lib/blocks'
-import { loadRows } from '@/lib/data'
-import GridView from '@/components/views/GridView'
-import KanbanView from '@/components/views/KanbanView'
-import CalendarView from '@/components/calendar/CalendarView'
+import ViewBlockWrapper from './ViewBlockWrapper'
 import FormView from '@/components/views/FormView'
 import InterfacePage from '@/components/views/InterfacePage'
 import ViewPageClient from '@/components/views/ViewPageClient'
@@ -74,16 +71,7 @@ export default async function ViewPage({
   const blocks = await loadViewBlocks(params.viewId)
   const tabs = view.type === 'page' ? await loadViewTabs(params.viewId) : []
 
-  // Load data for non-page views
-  let rowsData = null
-  if (view.type !== 'gallery' && view.type !== 'page') {
-    rowsData = await loadRows({
-      tableId: params.tableId,
-      viewId: params.viewId,
-    })
-  }
-
-  // For interface pages, use full-width layout
+  // For interface pages (page type), use full-width layout with blocks
   if (view.type === 'page') {
     return (
       <ViewPageClient
@@ -103,6 +91,48 @@ export default async function ViewPage({
     )
   }
 
+  // For gallery views, use InterfacePage with blocks
+  if (view.type === 'gallery') {
+    return (
+      <ViewPageClient
+        tableId={params.tableId}
+        tableName={table.name}
+        supabaseTableName={table.supabase_table}
+        viewId={params.viewId}
+        viewName={view.name}
+        viewType={view.type}
+      >
+        <InterfacePage
+          viewId={params.viewId}
+          blocks={blocks}
+          tabs={tabs}
+        />
+      </ViewPageClient>
+    )
+  }
+
+  // For form views, use FormView (not a data view, so doesn't use blocks)
+  if (view.type === 'form') {
+    return (
+      <ViewPageClient
+        tableId={params.tableId}
+        tableName={table.name}
+        supabaseTableName={table.supabase_table}
+        viewId={params.viewId}
+        viewName={view.name}
+        viewType={view.type}
+      >
+        <FormView
+          tableId={params.tableId}
+          viewId={params.viewId}
+          visibleFields={viewFields}
+        />
+      </ViewPageClient>
+    )
+  }
+
+  // For data page views (grid, kanban, calendar, timeline), use GridBlock
+  // This ensures they share the same renderer, settings schema, and data logic as blocks
   return (
     <ViewPageClient
       tableId={params.tableId}
@@ -112,54 +142,14 @@ export default async function ViewPage({
       viewName={view.name}
       viewType={view.type}
     >
-    <div className="container mx-auto p-6">
-      <div className="space-y-6">
-        {view.type === 'grid' && rowsData && (
-          <GridView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-            filters={rowsData.filters}
-            sorts={rowsData.sorts}
-          />
-        )}
-
-        {view.type === 'kanban' && rowsData && (
-          <KanbanView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-          />
-        )}
-
-        {view.type === 'calendar' && rowsData && (
-          <CalendarView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            rows={rowsData.rows}
-            visibleFields={rowsData.visibleFields}
-          />
-        )}
-
-        {view.type === 'form' && (
-          <FormView
-            tableId={params.tableId}
-            viewId={params.viewId}
-            visibleFields={viewFields}
-          />
-        )}
-
-        {view.type === 'gallery' && (
-          <InterfacePage
-            viewId={params.viewId}
-            blocks={blocks}
-            tabs={tabs}
-          />
-        )}
+      <div className="h-full w-full">
+        <ViewBlockWrapper
+          tableId={params.tableId}
+          viewId={params.viewId}
+          viewType={view.type as 'grid' | 'kanban' | 'calendar' | 'timeline'}
+          viewConfig={view.config || {}}
+        />
       </div>
-    </div>
     </ViewPageClient>
   )
 }

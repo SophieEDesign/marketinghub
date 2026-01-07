@@ -127,7 +127,7 @@ export default function PageDisplaySettingsPanel({
       setTables(tablesData || [])
 
       // Load page's saved view and its data
-      // For calendar and record_review pages, also check base_table if no saved_view_id
+      // For list, calendar, and record_review pages, check base_table if no saved_view_id
       let tableIdToUse: string | null = null
       
       if (page.saved_view_id) {
@@ -140,9 +140,11 @@ export default function PageDisplaySettingsPanel({
         if (view?.table_id) {
           tableIdToUse = view.table_id
         }
-      } else if ((page.page_type === 'calendar' || page.page_type === 'record_review') && (page as any).base_table) {
-        // For calendar and record_review pages without a view, use base_table
-        // Check if base_table is a UUID (table ID) or needs lookup
+      }
+      
+      // If no table found from saved_view_id, check base_table for list/calendar/record_review pages
+      if (!tableIdToUse && (page.page_type === 'list' || page.page_type === 'calendar' || page.page_type === 'record_review') && (page as any).base_table) {
+        // Check if base_table is a UUID (table ID)
         const baseTable = (page as any).base_table
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(baseTable)) {
           tableIdToUse = baseTable
@@ -323,9 +325,31 @@ export default function PageDisplaySettingsPanel({
       setDefaultFocus(config.default_focus || 'first')
       
       // Load calendar date fields from config
+      // First try page.config, then try view.config (since CalendarView reads from views.config)
       if (page.page_type === 'calendar') {
-        setStartDateField(config.start_date_field || config.calendar_date_field || '')
-        setEndDateField(config.end_date_field || config.calendar_end_field || '')
+        let startField = config.start_date_field || config.calendar_date_field || config.calendar_start_field || ''
+        let endField = config.end_date_field || config.calendar_end_field || ''
+        
+        // If not found in page config, try loading from view config
+        if (!startField && page.saved_view_id) {
+          try {
+            const { data: view } = await supabase
+              .from('views')
+              .select('config')
+              .eq('id', page.saved_view_id)
+              .maybeSingle()
+            
+            if (view?.config) {
+              startField = view.config.calendar_date_field || view.config.calendar_start_field || startField
+              endField = view.config.calendar_end_field || endField
+            }
+          } catch (error) {
+            console.warn('Error loading calendar config from view:', error)
+          }
+        }
+        
+        setStartDateField(startField)
+        setEndDateField(endField)
       }
       
       // Load grouping field from config or grid_view_settings
@@ -380,6 +404,9 @@ export default function PageDisplaySettingsPanel({
   useEffect(() => {
     if (selectedTableId) {
       loadTableFields(selectedTableId)
+    } else {
+      // Clear fields when no table is selected
+      setTableFields([])
     }
   }, [selectedTableId])
 
@@ -415,14 +442,17 @@ export default function PageDisplaySettingsPanel({
 
         viewId = newView.id
 
-        // Update page with new view ID
+        // Update page with new view ID and base_table
         await supabase
           .from('interface_pages')
-          .update({ saved_view_id: viewId })
+          .update({ 
+            saved_view_id: viewId,
+            base_table: selectedTableId // Also update base_table when creating view
+          })
           .eq('id', page.id)
       }
 
-      // If table changed, update the view's table_id
+      // If table changed, update the view's table_id and page's base_table
       if (selectedTableId && viewId) {
         const { data: existingView } = await supabase
           .from('views')
@@ -435,7 +465,19 @@ export default function PageDisplaySettingsPanel({
             .from('views')
             .update({ table_id: selectedTableId })
             .eq('id', viewId)
+          
+          // Also update page's base_table
+          await supabase
+            .from('interface_pages')
+            .update({ base_table: selectedTableId })
+            .eq('id', page.id)
         }
+      } else if (selectedTableId && !viewId) {
+        // If we have a table but no view, update base_table anyway
+        await supabase
+          .from('interface_pages')
+          .update({ base_table: selectedTableId })
+          .eq('id', page.id)
       }
 
       // Update page config
@@ -471,6 +513,28 @@ export default function PageDisplaySettingsPanel({
         .from('interface_pages')
         .update({ config })
         .eq('id', page.id)
+
+      // For calendar pages, also update the view's config with calendar date fields
+      // This is critical because CalendarView reads from views.config, not page.config
+      if (page.page_type === 'calendar' && viewId) {
+        const { data: existingView } = await supabase
+          .from('views')
+          .select('config')
+          .eq('id', viewId)
+          .single()
+
+        const viewConfig = {
+          ...(existingView?.config || {}),
+          calendar_date_field: startDateField || null,
+          calendar_start_field: startDateField || null,
+          calendar_end_field: endDateField || null,
+        }
+
+        await supabase
+          .from('views')
+          .update({ config: viewConfig })
+          .eq('id', viewId)
+      }
 
       // Update view filters and sorts if saved_view_id exists
       if (viewId) {
@@ -589,18 +653,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, onUpdate])
-
-  // Auto-save on changes with debounce (skip initial load)
-  useEffect(() => {
-    if (!isOpen || !page || isInitialLoad || loading) return
-
-    const timeoutId = setTimeout(() => {
-      saveSettings()
-    }, 500) // 500ms debounce
-
-    return () => clearTimeout(timeoutId)
-  }, [isOpen, page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, startDateField, endDateField, selectedTableId, saveSettings, isInitialLoad, loading])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {

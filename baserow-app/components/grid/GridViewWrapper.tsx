@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
@@ -78,14 +78,26 @@ export default function GridViewWrapper({
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
 
+  // Track previous values to prevent infinite loops
+  const prevInitialFiltersRef = useRef<string>('')
+  const prevInitialSortsRef = useRef<string>('')
+  
   // Sync filters and sorts when initial props change (e.g., from block config)
   useEffect(() => {
-    setFilters(initialFilters)
-  }, [initialFilters.length, initialFilters.map(f => `${f.field_name}-${f.operator}-${f.value}`).join(',')])
+    const filtersKey = JSON.stringify(initialFilters)
+    if (prevInitialFiltersRef.current !== filtersKey) {
+      prevInitialFiltersRef.current = filtersKey
+      setFilters(initialFilters)
+    }
+  }, [initialFilters])
 
   useEffect(() => {
-    setSorts(initialSorts)
-  }, [initialSorts.length, initialSorts.map(s => `${s.field_name}-${s.direction}`).join(',')])
+    const sortsKey = JSON.stringify(initialSorts)
+    if (prevInitialSortsRef.current !== sortsKey) {
+      prevInitialSortsRef.current = sortsKey
+      setSorts(initialSorts)
+    }
+  }, [initialSorts])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {

@@ -158,6 +158,7 @@ export default function SettingsPanel({
     setSaving(true)
     setSaved(false)
     try {
+      // Save the full config object to ensure all settings are persisted
       await onSave(block.id, configToSave)
       setSaved(true)
       // Update previous config ref to prevent re-saving
@@ -184,44 +185,8 @@ export default function SettingsPanel({
     validateConfig()
   }, [config, block, isOpen])
 
-  // Auto-save on config change (debounced) - ONLY if config actually changed and is valid
-  useEffect(() => {
-    // Skip autosave if:
-    // 1. Panel is closed
-    // 2. No block selected
-    // 3. Initial load (prevent saving on mount)
-    // 4. Config hasn't actually changed
-    // 5. Config has validation errors
-    if (!block || !isOpen || isInitialLoadRef.current || validationErrors.length > 0) return
-    
-    const currentConfigJson = JSON.stringify(config)
-    
-    // Only save if config actually changed from previous saved state
-    if (currentConfigJson === previousConfigRef.current) {
-      return
-    }
-    
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-    
-    // Debounce save: wait 1500ms after last change
-    // Only save if still open and config still different and valid
-    saveTimeoutRef.current = setTimeout(() => {
-      // Double-check config hasn't changed back and panel is still open
-      const finalConfigJson = JSON.stringify(config)
-      if (finalConfigJson !== previousConfigRef.current && isOpen && block && validationErrors.length === 0) {
-        handleSave(config)
-      }
-    }, 1500)
-
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-    }
-  }, [config, block, isOpen, handleSave, validationErrors])
+  // Auto-save disabled - settings only save when Save button is clicked
+  // This prevents loops and ensures settings are only saved when user explicitly saves
 
   if (!isOpen || !block) return null
 
