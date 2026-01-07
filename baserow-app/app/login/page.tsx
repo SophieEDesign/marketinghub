@@ -55,9 +55,34 @@ function LoginForm() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         // Check for redirect parameter
-        const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+        let next = searchParams.get('next') || searchParams.get('callbackUrl')
+        
+        // If no specific redirect, try to get first page to avoid redirect loop
+        if (!next || next === '/') {
+          try {
+            const response = await fetch('/api/pages')
+            if (response.ok) {
+              const pages = await response.json()
+              if (pages && pages.length > 0) {
+                next = `/pages/${pages[0].id}`
+              } else {
+                // No pages, go to settings if admin, otherwise stay on login
+                next = '/settings?tab=pages'
+              }
+            } else {
+              // Fallback to settings
+              next = '/settings?tab=pages'
+            }
+          } catch {
+            // Fallback to settings on error
+            next = '/settings?tab=pages'
+          }
+        }
+        
         // Use window.location for full page reload to ensure proper redirect
-        window.location.href = next
+        if (next && next !== '/login') {
+          window.location.href = next
+        }
       }
     }
     checkUser()
@@ -89,11 +114,33 @@ function LoginForm() {
       }
 
       // Check for redirect parameter (next or callbackUrl)
-      const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
+      let next = searchParams.get('next') || searchParams.get('callbackUrl')
+      
+      // If no specific redirect, try to get first page to avoid redirect loop
+      // Don't redirect to '/' as it causes a loop
+      if (!next || next === '/') {
+        try {
+          const response = await fetch('/api/interface-pages')
+          if (response.ok) {
+            const pages = await response.json()
+            if (pages && pages.length > 0) {
+              next = `/pages/${pages[0].id}`
+            } else {
+              next = '/settings?tab=pages'
+            }
+          } else {
+            next = '/settings?tab=pages'
+          }
+        } catch {
+          next = '/settings?tab=pages'
+        }
+      }
       
       // Use window.location for full page reload to ensure cookies are sent
       // This ensures the server-side home page can read the session properly
-      window.location.href = next
+      if (next && next !== '/login' && next !== '/') {
+        window.location.href = next
+      }
     }
   }
 
@@ -117,8 +164,31 @@ function LoginForm() {
       
       if (user) {
         // Session created - redirect
-        const next = searchParams.get('next') || searchParams.get('callbackUrl') || '/'
-        window.location.href = next
+        let next = searchParams.get('next') || searchParams.get('callbackUrl')
+        
+        // If no specific redirect, try to get first page to avoid redirect loop
+        // Don't redirect to '/' as it causes a loop
+        if (!next || next === '/') {
+          try {
+            const response = await fetch('/api/interface-pages')
+            if (response.ok) {
+              const pages = await response.json()
+              if (pages && pages.length > 0) {
+                next = `/pages/${pages[0].id}`
+              } else {
+                next = '/settings?tab=pages'
+              }
+            } else {
+              next = '/settings?tab=pages'
+            }
+          } catch {
+            next = '/settings?tab=pages'
+          }
+        }
+        
+        if (next && next !== '/login' && next !== '/') {
+          window.location.href = next
+        }
       } else {
         // Email confirmation required
         setError('Please check your email to confirm your account before signing in.')
