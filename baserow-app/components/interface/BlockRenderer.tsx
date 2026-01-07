@@ -2,6 +2,7 @@
 
 import type { PageBlock } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
+import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
 import RecordBlock from "./blocks/RecordBlock"
@@ -69,6 +70,27 @@ export default function BlockRenderer({
   const renderBlock = () => {
     const canEdit = isEditing && !isLocked
     
+    // Pre-deployment guard: Validate block config before rendering
+    const blockValidity = assertBlockConfig(block.type, safeConfig, {
+      pageTableId,
+      pageRecordId: recordId,
+      hasDateField: !!safeConfig.date_field,
+    })
+    
+    // Show setup UI if block config is invalid
+    if (shouldShowBlockSetupUI(block.type, safeConfig, {
+      pageTableId,
+      pageRecordId: recordId,
+      hasDateField: !!safeConfig.date_field,
+    }) && !isEditing) {
+      // Return setup UI component (blocks handle this internally)
+      // But log for diagnostics
+      if (!warnedBlocks.has(block.id)) {
+        console.warn(`[BlockGuard] Block ${block.id} (${block.type}) showing setup UI: ${blockValidity.reason}`)
+        warnedBlocks.add(block.id)
+      }
+    }
+    
     // Check if config is complete enough to render
     const isComplete = isBlockConfigComplete(block.type, safeConfig)
     
@@ -77,7 +99,7 @@ export default function BlockRenderer({
     // Image blocks are always valid (can be empty), so skip warning for them
     if (!isComplete && !isEditing && block.type !== 'image' && !warnedBlocks.has(block.id)) {
       // In view mode, log warning but still attempt to render
-      console.warn(`Block ${block.id} (${block.type}) has incomplete config:`, safeConfig)
+      console.warn(`[BlockGuard] Block ${block.id} (${block.type}) has incomplete config:`, safeConfig)
       warnedBlocks.add(block.id)
     }
     

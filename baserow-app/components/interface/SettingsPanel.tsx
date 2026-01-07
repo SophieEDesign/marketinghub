@@ -37,6 +37,11 @@ import GridAppearanceSettings from "./settings/GridAppearanceSettings"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 import RecordDataSettings from "./settings/RecordDataSettings"
+import {
+  guardAgainstConfigOverwrite,
+  validateShallowMerge,
+  markUserInteraction,
+} from "@/lib/interface/editor-safety"
 import ImageDataSettings from "./settings/ImageDataSettings"
 import ImageAppearanceSettings from "./settings/ImageAppearanceSettings"
 import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
@@ -137,9 +142,31 @@ export default function SettingsPanel({
   const handleSave = useCallback(async (configToSave: BlockConfig) => {
     if (!block) return
     
+    // Mark user interaction (save button click is a user action)
+    markUserInteraction()
+    
+    // Pre-deployment guard: Validate config overwrite safety
+    const currentConfig = block.config || {}
+    const overwriteCheck = guardAgainstConfigOverwrite(
+      currentConfig as Record<string, any>,
+      configToSave as Record<string, any>,
+      'block settings save'
+    )
+    
+    if (overwriteCheck.blocked) {
+      setValidationErrors([overwriteCheck.reason || 'Invalid save operation'])
+      return
+    }
+    
+    // Pre-deployment guard: Ensure shallow merge (don't overwrite unrelated config)
+    const safeConfig = validateShallowMerge(
+      currentConfig as Record<string, any>,
+      configToSave as Record<string, any>
+    ) as BlockConfig
+    
     // Validate config before saving
     const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
-    const validation = validateBlockConfig(block.type, configToSave)
+    const validation = validateBlockConfig(block.type, safeConfig)
     
     if (!validation.valid) {
       setValidationErrors(validation.errors)
@@ -150,7 +177,7 @@ export default function SettingsPanel({
     setValidationErrors([])
     
     // Prevent saving if config hasn't actually changed
-    const configToSaveJson = JSON.stringify(configToSave)
+    const configToSaveJson = JSON.stringify(safeConfig)
     if (configToSaveJson === previousConfigRef.current) {
       return
     }
@@ -158,8 +185,8 @@ export default function SettingsPanel({
     setSaving(true)
     setSaved(false)
     try {
-      // Save the full config object to ensure all settings are persisted
-      await onSave(block.id, configToSave)
+      // Save the validated, safely merged config object
+      await onSave(block.id, safeConfig)
       setSaved(true)
       // Update previous config ref to prevent re-saving
       previousConfigRef.current = configToSaveJson

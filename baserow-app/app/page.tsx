@@ -57,7 +57,7 @@ export default async function HomePage({
                 No pages are available yet. Please contact an administrator to create pages.
               </p>
               <p className="text-sm text-gray-500">
-                If you&apos;re an administrator, you can create pages in Settings.
+                If you&#39;re an administrator, you can create pages in Settings.
               </p>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default async function HomePage({
                   No pages are available yet. Please contact an administrator to create pages.
                 </p>
                 <p className="text-sm text-gray-500">
-                  If you're an administrator, you can create pages in Settings.
+                  If you&#39;re an administrator, you can create pages in Settings.
                 </p>
               </div>
             </div>

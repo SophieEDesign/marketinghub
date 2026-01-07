@@ -13,6 +13,8 @@ import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
 import { createClient } from '@/lib/supabase/client'
 import GridView from '@/components/grid/GridView'
+import { assertPageIsValid, shouldShowSetupUI } from '@/lib/interface/assertPageIsValid'
+import { shouldShowSetupUIForDataWiring } from '@/lib/interface/data-wiring-guards'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
@@ -97,6 +99,32 @@ export default function PageRenderer({
           <div className="text-gray-500">Loading...</div>
         </div>
       )
+    }
+
+    // Pre-deployment guard: Validate page before rendering
+    const pageValidity = assertPageIsValid(page, {
+      hasBlocks: blocks.length > 0,
+      hasTableId: !!pageTableId,
+      hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
+    })
+
+    // Show setup UI if page is invalid
+    if (shouldShowSetupUI(page, {
+      hasBlocks: blocks.length > 0,
+      hasTableId: !!pageTableId,
+      hasDateField: !!config.date_field || !!config.start_date_field,
+    })) {
+      return <InvalidPageState page={page} reason={pageValidity.reason} />
+    }
+
+    // Check data wiring for pages that require it
+    if (shouldShowSetupUIForDataWiring(
+      !!pageTableId,
+      !!page.saved_view_id,
+      !!config.fields && config.fields.length > 0,
+      page.page_type
+    )) {
+      return <InvalidPageState page={page} reason="Missing required data configuration" />
     }
 
     switch (visualisation) {
@@ -353,7 +381,7 @@ function DashboardView({ page, data, config }: { page: InterfacePage; data: any[
   )
 }
 
-function InvalidPageState({ page }: { page: InterfacePage }) {
+function InvalidPageState({ page, reason }: { page: InterfacePage; reason?: string }) {
   return (
     <div className="flex items-center justify-center h-full p-4">
       <div className="text-center max-w-md">
@@ -366,7 +394,7 @@ function InvalidPageState({ page }: { page: InterfacePage }) {
           Page Configuration Required
         </h3>
         <p className="text-sm text-gray-500 mb-6">
-          This page is missing required configuration. Configure it to get started.
+          {reason || 'This page is missing required configuration. Configure it to get started.'}
         </p>
         <button
           onClick={() => {

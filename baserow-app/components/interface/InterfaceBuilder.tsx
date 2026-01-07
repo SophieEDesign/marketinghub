@@ -13,6 +13,12 @@ import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 import { useToast } from "@/components/ui/use-toast"
+import {
+  registerMount,
+  guardAgainstMountSave,
+  guardAgainstAutoSave,
+  markUserInteraction,
+} from "@/lib/interface/editor-safety"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -90,6 +96,12 @@ export default function InterfaceBuilder({
   const [currentPage, setCurrentPage] = useState<Page>(page)
   const [pendingLayout, setPendingLayout] = useState<LayoutItem[] | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const componentIdRef = useRef(`interface-builder-${page.id}`)
+
+  // Register mount time for editor safety guards
+  useEffect(() => {
+    registerMount(componentIdRef.current)
+  }, [])
 
   /**
    * Saves block layout to Supabase
@@ -107,9 +119,19 @@ export default function InterfaceBuilder({
    * Canvas manages its own layout state and only hydrates from blocks on mount.
    */
   const saveLayout = useCallback(
-    async (layout: LayoutItem[]) => {
+    async (layout: LayoutItem[], hasUserInteraction = false) => {
       // Only save in edit mode - view mode must never mutate layout
       if (!effectiveIsEditing) return
+
+      // Pre-deployment guard: Prevent saves during mount
+      if (guardAgainstMountSave(componentIdRef.current, 'saveLayout')) {
+        return
+      }
+
+      // Pre-deployment guard: Prevent saves without user interaction
+      if (guardAgainstAutoSave('saveLayout', hasUserInteraction || layoutModifiedByUserRef.current)) {
+        return
+      }
 
       // CRITICAL: Never save layout unless user actually modified it
       // This prevents regressions from automatic saves on mount/hydration
@@ -170,6 +192,9 @@ export default function InterfaceBuilder({
       // Only save in edit mode - view mode never mutates layout
       if (!effectiveIsEditing) return
 
+      // Mark user interaction for editor safety guards
+      markUserInteraction()
+
       // Mark that layout has been modified by user
       layoutModifiedByUserRef.current = true
 
@@ -202,7 +227,7 @@ export default function InterfaceBuilder({
       // Debounce save: wait 500ms after last change before saving to Supabase
       // This prevents excessive API calls during rapid drag/resize
       saveTimeoutRef.current = setTimeout(() => {
-        saveLayout(layout)
+        saveLayout(layout, true) // Pass hasUserInteraction=true since this is triggered by user drag/resize
       }, 500)
     },
     [effectiveIsEditing, saveLayout]
@@ -232,6 +257,9 @@ export default function InterfaceBuilder({
       setSettingsPanelOpen(false)
       return
     }
+
+    // Mark user interaction (exiting edit mode is a user action)
+    markUserInteraction()
 
     // Get current layout from blocks state and save before exiting edit mode
     // This ensures any unsaved drag/resize changes are persisted
