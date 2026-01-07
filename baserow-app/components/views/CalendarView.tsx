@@ -500,7 +500,7 @@ export default function CalendarView({
           
           // Check for date value - prefer start field if configured, otherwise use date field
           const dateValue = actualStartFieldName 
-            ? (row.data[actualStartFieldName] || row.data[viewConfig?.calendar_start_field])
+            ? (row.data[actualStartFieldName] || (viewConfig?.calendar_start_field ? row.data[viewConfig.calendar_start_field] : null))
             : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
           
           // Skip if no date value
@@ -520,11 +520,11 @@ export default function CalendarView({
         .map((row) => {
           // Get date values - support both single date field and start/end fields
           const dateValue = actualStartFieldName 
-            ? (row.data[actualStartFieldName] || row.data[viewConfig?.calendar_start_field])
+            ? (row.data[actualStartFieldName] || (viewConfig?.calendar_start_field ? row.data[viewConfig.calendar_start_field] : null))
             : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
           
           const endDateValue = actualEndFieldName 
-            ? (row.data[actualEndFieldName] || row.data[viewConfig?.calendar_end_field])
+            ? (row.data[actualEndFieldName] || (viewConfig?.calendar_end_field ? row.data[viewConfig.calendar_end_field] : null))
             : null
           
           // Parse date values
