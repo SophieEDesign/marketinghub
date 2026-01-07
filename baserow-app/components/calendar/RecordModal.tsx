@@ -215,7 +215,7 @@ export default function RecordModal({
                   )
                 }
 
-                if (field.type === 'text' && field.options?.multiline) {
+                if (field.type === 'long_text') {
                   return (
                     <div key={field.id} className="space-y-2">
                       <Label htmlFor={field.id} className="text-sm font-medium">
