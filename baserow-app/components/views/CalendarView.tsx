@@ -164,6 +164,68 @@ export default function CalendarView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedTableId, tableFieldsKey])
 
+  // Resolve date field from page config, view config, or fallback to dateFieldId prop
+  // Priority: block/page config > view config > dateFieldId prop
+  // MUST be declared before combinedFilters which uses it
+  const resolvedDateFieldId = useMemo(() => {
+    // 1. Check block/page config first (from page settings)
+    const pageDateField = blockConfig?.start_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
+    if (pageDateField) {
+      // Validate it exists in table fields and is a date field
+      const field = loadedTableFields.find(f => 
+        (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from page config:', field.name)
+        }
+        return field.name
+      }
+    }
+    
+    // 2. Check view config
+    if (viewConfig?.calendar_date_field) {
+      const field = loadedTableFields.find(f => 
+        (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from view config:', field.name)
+        }
+        return field.name
+      }
+    }
+    if (viewConfig?.calendar_start_field) {
+      const field = loadedTableFields.find(f => 
+        (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using start date field from view config:', field.name)
+        }
+        return field.name
+      }
+    }
+    
+    // 3. Fallback to dateFieldId prop
+    if (dateFieldId) {
+      const field = loadedTableFields.find(f => 
+        (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from prop:', field.name)
+        }
+        return field.name
+      }
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Calendar: No valid date field found. Block config:', blockConfig, 'View config:', viewConfig, 'Prop:', dateFieldId)
+    }
+    return ''
+  }, [blockConfig, viewConfig, dateFieldId, loadedTableFields])
+
   // Memoize filters to prevent unnecessary re-renders
   // Include date range filters in the key
   const filtersKey = useMemo(() => {
@@ -423,66 +485,6 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
 
-  // Resolve date field from page config, view config, or fallback to dateFieldId prop
-  // Priority: block/page config > view config > dateFieldId prop
-  const resolvedDateFieldId = useMemo(() => {
-    // 1. Check block/page config first (from page settings)
-    const pageDateField = blockConfig?.start_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
-    if (pageDateField) {
-      // Validate it exists in table fields and is a date field
-      const field = loadedTableFields.find(f => 
-        (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
-      )
-      if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from page config:', field.name)
-        }
-        return field.name
-      }
-    }
-    
-    // 2. Check view config
-    if (viewConfig?.calendar_date_field) {
-      const field = loadedTableFields.find(f => 
-        (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
-      )
-      if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from view config:', field.name)
-        }
-        return field.name
-      }
-    }
-    if (viewConfig?.calendar_start_field) {
-      const field = loadedTableFields.find(f => 
-        (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
-      )
-      if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using start date field from view config:', field.name)
-        }
-        return field.name
-      }
-    }
-    
-    // 3. Fallback to dateFieldId prop
-    if (dateFieldId) {
-      const field = loadedTableFields.find(f => 
-        (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
-      )
-      if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from prop:', field.name)
-        }
-        return field.name
-      }
-    }
-    
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Calendar: No valid date field found. Block config:', blockConfig, 'View config:', viewConfig, 'Prop:', dateFieldId)
-    }
-    return ''
-  }, [blockConfig, viewConfig, dateFieldId, loadedTableFields])
 
   // Find date field in loadedTableFields to validate it exists and is a date type
   const dateField = useMemo(() => {
