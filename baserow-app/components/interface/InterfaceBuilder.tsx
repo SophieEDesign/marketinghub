@@ -67,15 +67,15 @@ export default function InterfaceBuilder({
   // Track previous initialBlocks to prevent unnecessary updates
   const prevInitialBlocksRef = useRef<string>('')
   
-  // CRITICAL: Track if initial blocks have been applied to prevent overwrites
-  const initialBlocksAppliedRef = useRef<boolean>(false)
-  
   // Sync initialBlocks to blocks state when they change (important for async loading)
-  // CRITICAL: Only apply initialBlocks once on mount, then merge updates
+  // CRITICAL: Replace state entirely when initialBlocks change - database is source of truth
   useEffect(() => {
+    // Handle undefined/null initialBlocks
+    const safeInitialBlocks = initialBlocks || []
+    
     // Create a stable key from initialBlocks to detect actual changes
     // CRITICAL: Include config in the key to detect content changes (e.g., content_json updates)
-    const blocksArray = initialBlocks?.map(b => ({
+    const blocksArray = safeInitialBlocks.map(b => ({
       id: b.id,
       type: b.type,
       x: b.x,
@@ -83,7 +83,7 @@ export default function InterfaceBuilder({
       w: b.w,
       h: b.h,
       config: b.config // Include config to detect content changes
-    })) || []
+    }))
     const blocksKey = JSON.stringify(blocksArray)
     
     // Only update if blocks actually changed
@@ -93,17 +93,11 @@ export default function InterfaceBuilder({
     
     prevInitialBlocksRef.current = blocksKey
     
-    if (initialBlocks && initialBlocks.length > 0) {
-      // CRITICAL: Replace state entirely when initialBlocks change
-      // Database is source of truth - editor must reflect persisted data, not cached client state
-      // This ensures that after reload/navigation, editor shows what's actually saved
-      setBlocks(initialBlocks)
-      initialBlocksAppliedRef.current = true
-    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0) {
-      // Clear blocks if initialBlocks is explicitly empty
-      setBlocks([])
-      initialBlocksAppliedRef.current = true
-    }
+    // CRITICAL: Always replace state with initialBlocks when they change
+    // This handles both empty-to-populated transitions (e.g., async loading in RecordReviewView)
+    // and populated-to-populated updates (e.g., after save/reload)
+    // Database is source of truth - editor must reflect persisted data
+    setBlocks(safeInitialBlocks)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBlocks])
 
@@ -119,11 +113,18 @@ export default function InterfaceBuilder({
   // Register mount time for editor safety guards
   useEffect(() => {
     registerMount(componentIdRef.current)
-    console.log(`[Lifecycle] InterfaceBuilder MOUNT: pageId=${page.id}, blocks=${initialBlocks.length}`)
+    console.log(`[Lifecycle] InterfaceBuilder MOUNT: pageId=${page.id}, blocks=${initialBlocks?.length || 0}, isViewer=${isViewer}, effectiveIsEditing=${effectiveIsEditing}`)
     return () => {
       console.log(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
     }
   }, [])
+  
+  // Debug: Log when blocks state changes
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[InterfaceBuilder] Blocks state changed: count=${blocks.length}, effectiveIsEditing=${effectiveIsEditing}`)
+    }
+  }, [blocks.length, effectiveIsEditing])
 
   /**
    * Saves block layout to Supabase
