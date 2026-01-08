@@ -44,6 +44,13 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // CRITICAL: Read content ONLY from config.content_json
+  // No fallbacks, no other sources
+  const contentJson = config?.content_json
+  
+  // Track if config is still loading (content_json is undefined, not null)
+  const isConfigLoading = config !== undefined && contentJson === undefined
+  
   // PHASE 2 - TextBlock rehydration audit: Log on render
   if (process.env.NODE_ENV === 'development') {
     console.log(`[TextBlock Rehydration] Block ${block.id}: RENDER`, {
@@ -58,13 +65,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       isConfigLoading,
     })
   }
-  
-  // CRITICAL: Read content ONLY from config.content_json
-  // No fallbacks, no other sources
-  const contentJson = config?.content_json
-  
-  // Track if config is still loading (content_json is undefined, not null)
-  const isConfigLoading = config !== undefined && contentJson === undefined
   
   // Track if content_json exists and is valid (for setup state)
   const hasContent = contentJson !== null && 
