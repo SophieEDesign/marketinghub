@@ -1161,8 +1161,10 @@ export default function CalendarView({
             // CRITICAL: Handle event click - use onRecordClick callback if provided, otherwise use modal
             const recordId = info.event.id
             
-            // DEBUG_CALENDAR: Always log event clicks (even if debug flag not set, log in dev mode)
-            if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+            // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
+            // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
+            const debugEnabled = typeof window !== 'undefined' && localStorage.getItem("DEBUG_CALENDAR") === "1"
+            if (debugEnabled || process.env.NODE_ENV === 'development') {
               console.log('[Calendar] Event clicked', {
                 recordId,
                 eventId: info.event.id,
@@ -1170,6 +1172,7 @@ export default function CalendarView({
                 hasOnRecordClick: !!onRecordClick,
                 willUseModal: !onRecordClick,
                 willCallCallback: !!onRecordClick,
+                debugEnabled,
               })
             }
             
@@ -1183,13 +1186,13 @@ export default function CalendarView({
             if (recordId) {
               // If onRecordClick callback provided (e.g., from RecordReview), use it
               if (onRecordClick) {
-                if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+                if (debugEnabled || process.env.NODE_ENV === 'development') {
                   console.log('[Calendar] Calling onRecordClick callback', { recordId })
                 }
                 onRecordClick(recordId)
               } else {
                 // Otherwise, open modal (default behavior)
-                if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+                if (debugEnabled || process.env.NODE_ENV === 'development') {
                   console.log('[Calendar] Opening record modal', { recordId })
                 }
                 setSelectedRecordId(recordId)

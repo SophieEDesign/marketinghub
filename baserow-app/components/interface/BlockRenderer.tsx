@@ -111,6 +111,7 @@ export default function BlockRenderer({
       case "grid":
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
+        // pageTableId must flow to blocks for base_table fallback
         // Lazy-load GridBlock to improve initial page load performance
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
@@ -121,6 +122,7 @@ export default function BlockRenderer({
 
       case "form":
         // CRITICAL: Pass pageTableId to FormBlock for table resolution fallback
+        // pageTableId must flow to blocks for base_table fallback
         return (
           <FormBlock
             block={safeBlock}
@@ -150,6 +152,7 @@ export default function BlockRenderer({
       case "record":
         // CRITICAL: Pass pageTableId to RecordBlock for table resolution fallback
         // record_id can come from config OR from page context (for record review pages)
+        // pageTableId must flow to blocks for base_table fallback
         // Lazy-load RecordBlock to improve initial page load performance
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
@@ -160,10 +163,12 @@ export default function BlockRenderer({
 
       case "chart":
         // CRITICAL: Pass pageTableId to ChartBlock for table resolution fallback
+        // pageTableId must flow to blocks for base_table fallback
         return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
 
       case "kpi":
         // CRITICAL: Pass pageTableId to KPIBlock for table resolution fallback
+        // pageTableId must flow to blocks for base_table fallback
         return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
 
       case "filter":

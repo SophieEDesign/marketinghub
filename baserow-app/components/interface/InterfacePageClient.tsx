@@ -188,6 +188,23 @@ export default function InterfacePageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.id, page?.page_type])
 
+  // CRITICAL: Reload blocks when exiting edit mode to ensure preview shows latest saved content
+  // This fixes the issue where content saved in edit mode doesn't appear in preview
+  const prevIsBlockEditingRef = useRef<boolean>(isBlockEditing)
+  useEffect(() => {
+    // Detect when exiting edit mode (isBlockEditing changes from true to false)
+    if (prevIsBlockEditingRef.current && !isBlockEditing) {
+      // User just exited edit mode - reload blocks to get latest saved content
+      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+        // Small delay to ensure database transaction is committed
+        setTimeout(() => {
+          loadBlocks(true) // Force reload to get latest saved content
+        }, 150)
+      }
+    }
+    prevIsBlockEditingRef.current = isBlockEditing
+  }, [isBlockEditing, page?.id, page?.page_type])
+
   async function loadPage() {
     // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
     if (pageLoadedRef.current || loading) return
@@ -481,11 +498,12 @@ export default function InterfacePageClient({
   // CRITICAL: Track if blocks have been loaded to prevent overwrites
   const blocksLoadedRef = useRef<boolean>(false)
   
-  async function loadBlocks() {
+  async function loadBlocks(forceReload = false) {
     if (!page) return
     
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
-    if (blocksLoadedRef.current && blocks.length > 0) {
+    // Unless forceReload is true (e.g., when exiting edit mode to refresh saved content)
+    if (!forceReload && blocksLoadedRef.current && blocks.length > 0) {
       return
     }
 
@@ -541,9 +559,11 @@ export default function InterfacePageClient({
         }
       })
       // CRITICAL: Merge with existing blocks instead of replacing (preserve user state)
+      // EXCEPT when forceReload is true - then replace configs to get latest saved content
       setBlocks((prevBlocks) => {
-        if (prevBlocks.length === 0) {
+        if (prevBlocks.length === 0 || forceReload) {
           blocksLoadedRef.current = true
+          // On force reload, replace entirely to get latest saved content
           return pageBlocks
         }
         // Merge: update existing blocks, add new ones
@@ -552,7 +572,7 @@ export default function InterfacePageClient({
         pageBlocks.forEach((newBlock: any) => {
           const existingIndex = merged.findIndex(b => b.id === newBlock.id)
           if (existingIndex >= 0) {
-            // Merge config instead of replacing
+            // Merge config instead of replacing (preserves user state during normal operation)
             merged[existingIndex] = {
               ...merged[existingIndex],
               ...newBlock,
