@@ -241,6 +241,14 @@ export interface PageSettings {
     rowHeight?: number
     margin?: [number, number]
   }
+  // Record Review page settings
+  tableId?: string // Required for record_review pages
+  leftPanel?: {
+    visibleFieldIds: string[] // Which fields show in left column
+    fieldOrder: string[] // Order of fields (if empty, use table field order)
+    showLabels?: boolean // Show field labels
+    compact?: boolean // Compact display mode
+  }
 }
 
 export interface LayoutItem {

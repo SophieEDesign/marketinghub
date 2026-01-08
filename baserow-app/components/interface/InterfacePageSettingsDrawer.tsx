@@ -31,7 +31,8 @@ import {
 import { Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
-import { PAGE_TYPE_DEFINITIONS } from "@/lib/interface/page-types"
+import { PAGE_TYPE_DEFINITIONS, isRecordReviewPage } from "@/lib/interface/page-types"
+import RecordReviewLeftPanelSettings from "./RecordReviewLeftPanelSettings"
 
 interface InterfacePageSettingsDrawerProps {
   pageId: string
@@ -65,6 +66,13 @@ export default function InterfacePageSettingsDrawer({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Left panel settings for record_review pages
+  const [leftPanelSettings, setLeftPanelSettings] = useState<{
+    visibleFieldIds: string[]
+    fieldOrder: string[]
+    showLabels: boolean
+    compact: boolean
+  } | null>(null)
 
   useEffect(() => {
     if (isOpen && pageId) {
@@ -104,6 +112,21 @@ export default function InterfacePageSettingsDrawer({
       setBaseTable(pageData.base_table || "")
       setInterfaceId(pageData.group_id || "") // Interface is required, no "__none__" option
       setIsAdminOnly(pageData.is_admin_only || false)
+      
+      // Load left panel settings for record_review pages
+      if (isRecordReviewPage(pageData.page_type as any)) {
+        // InterfacePage stores settings in config field
+        const config = pageData.config || {}
+        setLeftPanelSettings({
+          visibleFieldIds: config.leftPanel?.visibleFieldIds || [],
+          fieldOrder: config.leftPanel?.fieldOrder || [],
+          showLabels: config.leftPanel?.showLabels ?? true,
+          compact: config.leftPanel?.compact ?? false,
+        })
+      } else {
+        setLeftPanelSettings(null)
+      }
+      
       setLoading(false)
     } catch (error) {
       console.error("Error loading page:", error)
@@ -176,6 +199,16 @@ export default function InterfacePageSettingsDrawer({
         updates.base_table = currentSelection || null
       }
       // If unchanged, don't include base_table in updates (preserves existing value)
+      
+      // For record_review pages, update config with leftPanel configuration
+      if (isRecordReviewPage(page.page_type as any) && leftPanelSettings) {
+        const currentConfig = page.config || {}
+        updates.config = {
+          ...currentConfig,
+          tableId: currentSelection || currentConfig.tableId || currentConfig.primary_table_id,
+          leftPanel: leftPanelSettings,
+        }
+      }
       
       const res = await fetch(`/api/interface-pages/${pageId}`, {
         method: 'PATCH',
@@ -334,6 +367,23 @@ export default function InterfacePageSettingsDrawer({
                 </Label>
               </div>
             </div>
+
+            {/* Record Review Left Panel Settings */}
+            {isRecordReviewPage(pageType as any) && baseTable && leftPanelSettings !== null && (
+              <div className="pt-4 border-t space-y-4">
+                <div>
+                  <Label className="text-sm font-semibold">Left Panel Fields</Label>
+                  <p className="text-xs text-gray-500 mt-1 mb-3">
+                    Configure which fields appear in the left column. This is page-level configuration, not block configuration.
+                  </p>
+                  <RecordReviewLeftPanelSettings
+                    tableId={baseTable}
+                    currentSettings={leftPanelSettings}
+                    onSettingsChange={setLeftPanelSettings}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-4 border-t">

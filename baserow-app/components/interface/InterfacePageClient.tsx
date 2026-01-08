@@ -17,6 +17,8 @@ import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
+// Lazy load RecordReviewPage for record_review pages
+const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 
 interface InterfacePageClientProps {
   pageId: string
@@ -824,16 +826,22 @@ function InterfacePageClientInternal({
   // CRITICAL: Memoize InterfaceBuilder page prop to prevent remounts
   // Creating new object on every render causes component remounts
   // UNIFIED: All pages use the same structure - no page-type-specific config
+  // Map InterfacePage.config to Page.settings for RecordReviewPage
   const interfaceBuilderPage = useMemo(() => {
     if (!page) return null
+    const pageConfig = page.config || {}
     return {
       id: page.id,
       name: page.name,
       settings: {
-        layout_template: 'content' as const
+        layout_template: 'content' as const,
+        // Map config to settings for RecordReviewPage
+        tableId: pageConfig.tableId || page.base_table || null,
+        leftPanel: pageConfig.leftPanel || null,
+        primary_table_id: page.base_table || null,
       }
     } as any
-  }, [page?.id, page?.name])
+  }, [page?.id, page?.name, page?.config, page?.base_table])
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
@@ -932,6 +940,7 @@ function InterfacePageClientInternal({
 
   const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
+  const isRecordReview = page?.page_type === 'record_review'
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
@@ -1123,36 +1132,48 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // UNIFIED: All pages render InterfaceBuilder (which wraps Canvas)
-          // Use isViewer prop to control edit/view mode instead of switching components
-          // This prevents remount storms when switching between edit and view modes
-          interfaceBuilderPage ? (
-            (() => {
-              console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
-                initialBlocksCount: memoizedBlocks.length,
-                initialBlockIds: memoizedBlocks.map(b => b.id),
-                isViewer,
-                isBlockEditing,
-                effectiveIsViewer: isViewer || !isBlockEditing,
-                recordId: isRecordView ? (page.config?.record_id || null) : null,
-              })
-              return (
-                <InterfaceBuilder
-                  key={`interface-builder-${page.id}`}
-                  page={interfaceBuilderPage}
-                  initialBlocks={memoizedBlocks}
-                  // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                  // URL-based viewer mode takes precedence (force read-only)
-                  // Otherwise, viewer mode = not in block editing mode
-                  isViewer={isViewer || !isBlockEditing}
-                  hideHeader={true}
-                  pageTableId={pageTableId}
-                  recordId={isRecordView ? (page.config?.record_id || null) : null}
-                  mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
-                />
-              )
-            })()
-          ) : null
+          // Record Review pages use special layout: fixed left column + right canvas
+          // Left column reads from page.settings.leftPanel (page-owned, not block-owned)
+          isRecordReview ? (
+            <RecordReviewPage
+              key={`record-review-${page.id}`}
+              page={interfaceBuilderPage as any}
+              initialBlocks={memoizedBlocks}
+              isViewer={isViewer || !isBlockEditing}
+              hideHeader={true}
+            />
+          ) : (
+            // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
+            // Use isViewer prop to control edit/view mode instead of switching components
+            // This prevents remount storms when switching between edit and view modes
+            interfaceBuilderPage ? (
+              (() => {
+                console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
+                  initialBlocksCount: memoizedBlocks.length,
+                  initialBlockIds: memoizedBlocks.map(b => b.id),
+                  isViewer,
+                  isBlockEditing,
+                  effectiveIsViewer: isViewer || !isBlockEditing,
+                  recordId: isRecordView ? (page.config?.record_id || null) : null,
+                })
+                return (
+                  <InterfaceBuilder
+                    key={`interface-builder-${page.id}`}
+                    page={interfaceBuilderPage}
+                    initialBlocks={memoizedBlocks}
+                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                    // URL-based viewer mode takes precedence (force read-only)
+                    // Otherwise, viewer mode = not in block editing mode
+                    isViewer={isViewer || !isBlockEditing}
+                    hideHeader={true}
+                    pageTableId={pageTableId}
+                    recordId={isRecordView ? (page.config?.record_id || null) : null}
+                    mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
+                  />
+                )
+              })()
+            ) : null
+          )
         ) : null}
       </div>
 

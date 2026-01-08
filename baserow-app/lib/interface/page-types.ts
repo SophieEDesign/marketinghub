@@ -9,7 +9,8 @@
 
 export type PageType = 
   | 'content'      // Generic canvas page - no inherent data context
-  | 'record_view'  // Canvas page with injected recordId - blocks may opt-in to record context
+  | 'record_view'  // Canvas page with injected recordId - blocks may opt-in to record context (legacy)
+  | 'record_review' // Record review page: fixed left column (record selector) + right canvas (blocks)
 
 export interface PageTypeDefinition {
   type: PageType
@@ -37,6 +38,15 @@ export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
     description: 'Canvas page with injected recordId - blocks may opt-in to record context',
     requiresSourceView: false,
     requiresBaseTable: false, // Optional - blocks define their own data sources
+    supportsGridToggle: false,
+    allowsInlineEditing: false,
+  },
+  record_review: {
+    type: 'record_review',
+    label: 'Record Review',
+    description: 'Fixed left column (record selector) + right canvas (blocks). Record selection is ephemeral UI state.',
+    requiresSourceView: false,
+    requiresBaseTable: true, // Required - needs tableId for record list
     supportsGridToggle: false,
     allowsInlineEditing: false,
   },
@@ -75,7 +85,14 @@ export function validatePageConfig(
  * Record view pages inject recordId context into blocks
  */
 export function isRecordViewPage(pageType: PageType): boolean {
-  return pageType === 'record_view'
+  return pageType === 'record_view' || pageType === 'record_review'
+}
+
+/**
+ * Check if a page type is a record review page (fixed left column + right canvas)
+ */
+export function isRecordReviewPage(pageType: PageType): boolean {
+  return pageType === 'record_review'
 }
 
 /**
