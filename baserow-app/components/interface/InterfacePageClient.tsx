@@ -55,6 +55,32 @@ function InterfacePageClientInternal({
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   
+  // Track previous pageId to reset blocks when page changes
+  const prevPageIdRef = useRef<string | null>(null)
+  
+  // CRITICAL: Track if blocks have been loaded to prevent overwrites
+  // Track both the loaded state and the pageId to ensure we reset when page changes
+  const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
+  
+  // CRITICAL: Reset blocks and edit mode state when pageId changes
+  // This ensures previous page's edit mode doesn't leak to the new page
+  useEffect(() => {
+    if (page?.id && prevPageIdRef.current !== page.id) {
+      // Page changed - reset blocks and loaded state
+      prevPageIdRef.current = page.id
+      setBlocks([])
+      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+      
+      // CRITICAL: Exit edit modes when navigating to a different page
+      // The EditModeContext should handle this, but we ensure it here as well
+      // This prevents edit mode from leaking between pages
+      if (prevPageIdRef.current !== null) {
+        exitPageEdit()
+        exitBlockEdit()
+      }
+    }
+  }, [page?.id, exitPageEdit, exitBlockEdit])
+  
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState("")
@@ -181,8 +207,13 @@ function InterfacePageClientInternal({
   // CRITICAL: Only load once per page visit - prevent remounts
   useEffect(() => {
     if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+      // Reset loaded state when pageId changes
+      if (blocksLoadedRef.current.pageId !== page.id) {
+        blocksLoadedRef.current = { pageId: page.id, loaded: false }
+      }
+      
       // Only load if blocks haven't been loaded yet for this page
-      if (!blocksLoading && (!blocksLoadedRef.current || blocks.length === 0)) {
+      if (!blocksLoading && (!blocksLoadedRef.current.loaded || blocks.length === 0)) {
         loadBlocks()
       }
     }
@@ -512,15 +543,21 @@ function InterfacePageClientInternal({
   }
 
   // CRITICAL: Track if blocks have been loaded to prevent overwrites
-  const blocksLoadedRef = useRef<boolean>(false)
+  // Track both the loaded state and the pageId to ensure we reset when page changes
+  const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
   
   async function loadBlocks(forceReload = false) {
     console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload })
     if (!page) return
     
+    // CRITICAL: Reset loaded state if pageId changed
+    if (blocksLoadedRef.current.pageId !== page.id) {
+      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    }
+    
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
     // Unless forceReload is true (e.g., when exiting edit mode to refresh saved content)
-    if (!forceReload && blocksLoadedRef.current && blocks.length > 0) {
+    if (!forceReload && blocksLoadedRef.current.loaded && blocks.length > 0) {
       return
     }
 
@@ -587,7 +624,7 @@ function InterfacePageClientInternal({
             pageId: page.id
           })
         }
-        blocksLoadedRef.current = true
+        blocksLoadedRef.current = { pageId: page.id, loaded: true }
         return
       }
       
@@ -600,7 +637,7 @@ function InterfacePageClientInternal({
         })
       }
       setBlocks(pageBlocks)
-      blocksLoadedRef.current = true
+      blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } catch (error) {
       console.error("Error loading blocks:", error)
       // CRITICAL: Never clear blocks on error - preserve existing blocks
@@ -828,7 +865,9 @@ function InterfacePageClientInternal({
     // CRITICAL: Reset loaded flags to allow reload after settings update
     // This is intentional - user explicitly updated settings
     pageLoadedRef.current = false
-    blocksLoadedRef.current = false
+    if (page?.id) {
+      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    }
     // Reload page data after settings update
     // Parallelize independent requests
     await Promise.all([
@@ -1016,7 +1055,10 @@ function InterfacePageClientInternal({
                 key={`interface-builder-${page.id}`}
                 page={interfaceBuilderPage}
                 initialBlocks={memoizedBlocks}
-                isViewer={!isBlockEditing}
+                // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                // URL-based viewer mode takes precedence (force read-only)
+                // Otherwise, viewer mode = not in block editing mode
+                isViewer={isViewer || !isBlockEditing}
                 hideHeader={true}
                 pageTableId={pageTableId}
               />

@@ -115,6 +115,7 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
   }, [state.activeScopes, isViewer])
 
   // Load page edit mode from localStorage when page changes
+  // CRITICAL: Reset edit mode when navigating to a different page to prevent mode leakage
   useEffect(() => {
     if (isViewer) return
     
@@ -122,14 +123,57 @@ export function EditModeProvider({ children, isViewer = false }: EditModeProvide
     const pageMatch = pathname.match(/\/pages\/([^\/]+)/)
     if (pageMatch) {
       const pageId = pageMatch[1]
+      
+      setState(prev => {
+        // CRITICAL: If we're navigating to a different page, clear page/block edit modes
+        // This prevents edit mode from leaking between pages
+        const isDifferentPage = prev.editingPageId !== null && prev.editingPageId !== pageId
+        
+        if (isDifferentPage) {
+          // Clear page and block scopes when navigating to a different page
+          const newScopes = new Set<EditScope>(prev.activeScopes)
+          newScopes.delete("page")
+          newScopes.delete("block")
+          
+          return {
+            ...prev,
+            activeScopes: newScopes,
+            editingPageId: null, // Clear until we restore from localStorage
+          }
+        }
+        
+        return prev
+      })
+      
+      // After clearing, restore edit mode from localStorage if saved for this page
       const saved = localStorage.getItem(`page-edit-mode-${pageId}`)
       if (saved === "true") {
-        setState(prev => ({
-          ...prev,
-          activeScopes: new Set([...prev.activeScopes, "page"]),
-          editingPageId: pageId,
-        }))
+        setState(prev => {
+          // Only restore if we're still on the same page (prevent race conditions)
+          const currentPageMatch = pathname.match(/\/pages\/([^\/]+)/)
+          if (currentPageMatch && currentPageMatch[1] === pageId) {
+            return {
+              ...prev,
+              activeScopes: new Set([...prev.activeScopes, "page"]),
+              editingPageId: pageId,
+            }
+          }
+          return prev
+        })
       }
+    } else {
+      // Not on a page route - clear page/block edit modes
+      setState(prev => {
+        const newScopes = new Set<EditScope>(prev.activeScopes)
+        newScopes.delete("page")
+        newScopes.delete("block")
+        
+        return {
+          ...prev,
+          activeScopes: newScopes,
+          editingPageId: null,
+        }
+      })
     }
   }, [pathname, isViewer])
 
