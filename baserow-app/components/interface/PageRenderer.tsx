@@ -59,6 +59,32 @@ export default function PageRenderer({
   const prevBaseTableRef = useRef<string | null>(null)
   const prevSavedViewIdRef = useRef<string | null>(null)
 
+  // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
+  // Creating new objects on every render causes component remounts
+  const dashboardPage = useMemo(() => ({
+    id: page.id,
+    name: page.name,
+    settings: { layout_template: 'dashboard' as const, primary_table_id: pageTableId }
+  }), [page.id, page.name, pageTableId])
+
+  const overviewPage = useMemo(() => ({
+    id: page.id,
+    name: page.name,
+    settings: { layout_template: 'overview' as const, primary_table_id: pageTableId }
+  }), [page.id, page.name, pageTableId])
+
+  const contentPage = useMemo(() => ({
+    id: page.id,
+    name: page.name,
+    settings: { layout_template: 'content' as const }
+  }), [page.id, page.name])
+
+  const galleryPage = useMemo(() => ({
+    id: page.id,
+    name: page.name,
+    settings: { layout_template: 'gallery' as const, primary_table_id: pageTableId }
+  }), [page.id, page.name, pageTableId])
+
   // Extract tableId from page - only update when relevant page properties change
   useEffect(() => {
     const pageId = page?.id || ''
@@ -178,11 +204,7 @@ export default function PageRenderer({
         return (
           <InterfaceBuilder
             key={`gallery-${page.id}`}
-            page={{ 
-              id: page.id, 
-              name: page.name,
-              settings: { layout_template: 'gallery', primary_table_id: pageTableId }
-            } as any}
+            page={galleryPage as any}
             initialBlocks={blocks}
             isViewer={true}
             hideHeader={true}
@@ -246,11 +268,7 @@ export default function PageRenderer({
         return (
           <InterfaceBuilder
             key={`dashboard-${page.id}`}
-            page={{ 
-              id: page.id, 
-              name: page.name,
-              settings: { layout_template: 'dashboard', primary_table_id: pageTableId }
-            } as any}
+            page={dashboardPage as any}
             initialBlocks={blocks}
             isViewer={true}
             hideHeader={true}
@@ -262,11 +280,7 @@ export default function PageRenderer({
         return (
           <InterfaceBuilder
             key={`overview-${page.id}`}
-            page={{ 
-              id: page.id, 
-              name: page.name,
-              settings: { layout_template: 'overview', primary_table_id: pageTableId }
-            } as any}
+            page={overviewPage as any}
             initialBlocks={blocks}
             isViewer={true}
             hideHeader={true}
@@ -280,12 +294,7 @@ export default function PageRenderer({
           <div className="h-full">
             <InterfaceBuilder
               key={`content-${page.id}`}
-              page={{ 
-                id: page.id, 
-                name: page.name,
-                settings: { layout_template: 'content' },
-                description: 'This is a content page. Add blocks to build your page.'
-              } as any}
+              page={contentPage as any}
               initialBlocks={blocks}
               isViewer={true}
               hideHeader={true}

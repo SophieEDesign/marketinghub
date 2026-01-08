@@ -63,6 +63,7 @@ export default function GridView({
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
+  const [initializingFields, setInitializingFields] = useState(false)
 
   // Get visible fields ordered by order_index (from table_fields) or position
   // Ensure viewFields is always an array to prevent runtime errors
@@ -357,6 +358,32 @@ export default function GridView({
     )
   }
 
+  // Function to initialize view fields
+  async function handleInitializeFields() {
+    if (!viewId) return
+    
+    setInitializingFields(true)
+    try {
+      const response = await fetch(`/api/views/${viewId}/initialize-fields`, {
+        method: 'POST',
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initialize fields')
+      }
+      
+      // Reload the page to refresh viewFields
+      window.location.reload()
+    } catch (error: any) {
+      console.error('Error initializing fields:', error)
+      alert(error.message || 'Failed to initialize fields. Please try again.')
+    } finally {
+      setInitializingFields(false)
+    }
+  }
+
   // Show message when no visible fields are configured
   if (visibleFields.length === 0) {
     return (
@@ -366,15 +393,36 @@ export default function GridView({
           <p className="text-sm text-gray-600 mb-4">
             This view has no visible fields configured. Add fields to the view to display data.
           </p>
-          {isEditing && onAddField && (
-            <button
-              onClick={onAddField}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors inline-flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Field
-            </button>
-          )}
+          <div className="flex flex-col gap-2 items-center">
+            {tableFields.length > 0 && (
+              <button
+                onClick={handleInitializeFields}
+                disabled={initializingFields}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors inline-flex items-center gap-2"
+              >
+                {initializingFields ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Adding fields...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Add All Fields ({tableFields.length})
+                  </>
+                )}
+              </button>
+            )}
+            {isEditing && onAddField && (
+              <button
+                onClick={onAddField}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors inline-flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Create New Field
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )

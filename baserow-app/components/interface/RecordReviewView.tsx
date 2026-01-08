@@ -22,6 +22,7 @@ import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
 import RecordFields from '@/components/records/RecordFields'
 import { useToast } from '@/components/ui/use-toast'
+import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -33,6 +34,50 @@ interface RecordReviewViewProps {
 }
 
 export default function RecordReviewView({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
+  const recordDebugEnabled = isDebugEnabled('RECORD')
+  
+  // DEBUG_RECORD: Log component mount
+  useEffect(() => {
+    debugLog('RECORD', 'RecordReviewView MOUNT', {
+      pageId: page.id,
+      pageName: page.name,
+      pageType: page.page_type,
+      dataLength: data.length,
+      blocksLength: blocks.length,
+      pageTableId,
+      isLoading,
+      config: {
+        allow_editing: config.allow_editing,
+        record_panel: config.record_panel,
+        visible_columns: config.visible_columns,
+        preview_fields: config.preview_fields,
+        filters: config.filters,
+      },
+    })
+  }, []) // Only on mount
+  
+  // DEBUG_RECORD: Log data changes
+  useEffect(() => {
+    if (recordDebugEnabled || process.env.NODE_ENV === 'development') {
+      debugLog('RECORD', 'Data changed', {
+        dataLength: data.length,
+        firstRecord: data[0] ? Object.keys(data[0]) : null,
+        isLoading,
+      })
+    }
+  }, [data.length, isLoading, recordDebugEnabled])
+  
+  // DEBUG_RECORD: Log blocks changes
+  useEffect(() => {
+    if (recordDebugEnabled || process.env.NODE_ENV === 'development') {
+      debugLog('RECORD', 'Blocks changed', {
+        blocksLength: blocks.length,
+        blockIds: blocks.map(b => b.id),
+        blockTypes: blocks.map(b => b.type),
+      })
+    }
+  }, [blocks.length, recordDebugEnabled])
+  
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [loadedBlocks, setLoadedBlocks] = useState<PageBlock[]>(blocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
@@ -203,33 +248,52 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   // Auto-select first record if none selected (use filtered data)
   useEffect(() => {
     if (!selectedRecordId && filteredData.length > 0) {
-      setSelectedRecordId(filteredData[0].id)
+      const firstRecordId = filteredData[0].id
+      debugLog('RECORD', 'Auto-selecting first record', {
+        recordId: firstRecordId,
+        filteredDataLength: filteredData.length,
+      })
+      setSelectedRecordId(firstRecordId)
     } else if (selectedRecordId && !filteredData.find(r => r.id === selectedRecordId)) {
       // If selected record is filtered out, select first available
       if (filteredData.length > 0) {
-        setSelectedRecordId(filteredData[0].id)
+        const newRecordId = filteredData[0].id
+        debugLog('RECORD', 'Selected record filtered out, selecting new record', {
+          oldRecordId: selectedRecordId,
+          newRecordId,
+          filteredDataLength: filteredData.length,
+        })
+        setSelectedRecordId(newRecordId)
       } else {
+        debugLog('RECORD', 'No records available, clearing selection', {
+          oldRecordId: selectedRecordId,
+        })
         setSelectedRecordId(null)
       }
     }
     
-    // Defensive logging for Record Review pages
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[RecordReviewView] recordId resolution:', {
-        selectedRecordId,
-        filteredDataLength: filteredData.length,
-        blocksLength: loadedBlocks.length,
-        blocksLoading,
-        renderPath: selectedRecordId ? 'view' : 'setup',
-      })
-    }
-  }, [filteredData, selectedRecordId, loadedBlocks.length, blocksLoading])
+    // DEBUG_RECORD: Log record selection state
+    debugLog('RECORD', 'Record selection state', {
+      selectedRecordId,
+      filteredDataLength: filteredData.length,
+      blocksLength: loadedBlocks.length,
+      blocksLoading,
+      renderPath: selectedRecordId ? 'view' : 'setup',
+    })
+  }, [filteredData, selectedRecordId, loadedBlocks.length, blocksLoading, recordDebugEnabled])
 
   // Load table fields
   useEffect(() => {
     if (pageTableId) {
+      debugLog('RECORD', 'Loading table fields', {
+        pageTableId,
+      })
       loadTableFields()
       loadFieldGroups()
+    } else {
+      debugWarn('RECORD', 'No pageTableId provided, cannot load fields', {
+        pageId: page.id,
+      })
     }
   }, [pageTableId])
   
@@ -237,6 +301,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     if (!pageTableId) return
     
     try {
+      debugLog('RECORD', 'Fetching table fields', {
+        pageTableId,
+      })
       const supabase = createClient()
       const { data: fieldsData, error } = await supabase
         .from('table_fields')
@@ -244,10 +311,32 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         .eq('table_id', pageTableId)
         .order('position', { ascending: true })
       
-      if (!error && fieldsData) {
-        setTableFields(fieldsData as TableField[])
+      if (error) {
+        debugError('RECORD', 'Error loading table fields', {
+          pageTableId,
+          error: error.message,
+        })
+        console.error('Error loading table fields:', error)
+        return
       }
-    } catch (error) {
+      
+      if (fieldsData) {
+        debugLog('RECORD', 'Table fields loaded', {
+          pageTableId,
+          fieldsCount: fieldsData.length,
+          fieldNames: fieldsData.map((f: any) => f.name),
+        })
+        setTableFields(fieldsData as TableField[])
+      } else {
+        debugWarn('RECORD', 'No fields returned', {
+          pageTableId,
+        })
+      }
+    } catch (error: any) {
+      debugError('RECORD', 'Exception loading table fields', {
+        pageTableId,
+        error: error.message,
+      })
       console.error('Error loading table fields:', error)
     }
   }
@@ -256,22 +345,43 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     if (!pageTableId) return
     
     try {
+      debugLog('RECORD', 'Fetching field groups', {
+        pageTableId,
+      })
       const supabase = createClient()
       const { data: groupsData, error } = await supabase
         .from('field_groups')
         .select('*')
         .eq('table_id', pageTableId)
       
-      if (!error && groupsData) {
+      if (error) {
+        debugError('RECORD', 'Error loading field groups', {
+          pageTableId,
+          error: error.message,
+        })
+        console.error('Error loading field groups:', error)
+        return
+      }
+      
+      if (groupsData) {
         const groups: Record<string, string[]> = {}
         groupsData.forEach((group: any) => {
           if (group.field_names && Array.isArray(group.field_names)) {
             groups[group.name] = group.field_names
           }
         })
+        debugLog('RECORD', 'Field groups loaded', {
+          pageTableId,
+          groupsCount: Object.keys(groups).length,
+          groupNames: Object.keys(groups),
+        })
         setFieldGroups(groups)
       }
-    } catch (error) {
+    } catch (error: any) {
+      debugError('RECORD', 'Exception loading field groups', {
+        pageTableId,
+        error: error.message,
+      })
       console.error('Error loading field groups:', error)
     }
   }
@@ -279,11 +389,19 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   // Update formData when selected record changes
   useEffect(() => {
     if (selectedRecord) {
+      debugLog('RECORD', 'Selected record changed', {
+        recordId: selectedRecord.id,
+        recordKeys: Object.keys(selectedRecord),
+        hasBlocks: loadedBlocks.length > 0,
+      })
       setFormData({ ...selectedRecord })
     } else {
+      debugLog('RECORD', 'No record selected', {
+        filteredDataLength: filteredData.length,
+      })
       setFormData({})
     }
-  }, [selectedRecord])
+  }, [selectedRecord, loadedBlocks.length, filteredData.length, recordDebugEnabled])
 
   // Handle field changes
   const handleFieldChange = async (fieldName: string, value: any) => {
@@ -352,10 +470,22 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   }, [page.id, blocks])
 
   async function loadBlocks() {
+    debugLog('RECORD', 'Loading blocks', {
+      pageId: page.id,
+    })
     setBlocksLoading(true)
     try {
       const res = await fetch(`/api/pages/${page.id}/blocks`)
-      if (!res.ok) throw new Error('Failed to load blocks')
+      if (!res.ok) {
+        const errorText = await res.text()
+        debugError('RECORD', 'Failed to load blocks', {
+          pageId: page.id,
+          status: res.status,
+          statusText: res.statusText,
+          errorText,
+        })
+        throw new Error('Failed to load blocks')
+      }
       
       const data = await res.json()
       const pageBlocks = (data.blocks || []).map((block: any) => ({
@@ -371,8 +501,19 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         created_at: block.created_at,
         updated_at: block.updated_at,
       }))
+      
+      debugLog('RECORD', 'Blocks loaded', {
+        pageId: page.id,
+        blocksCount: pageBlocks.length,
+        blockIds: pageBlocks.map(b => b.id),
+        blockTypes: pageBlocks.map(b => b.type),
+      })
       setLoadedBlocks(pageBlocks)
-    } catch (error) {
+    } catch (error: any) {
+      debugError('RECORD', 'Exception loading blocks', {
+        pageId: page.id,
+        error: error.message,
+      })
       console.error("Error loading blocks:", error)
       setLoadedBlocks([])
     } finally {
@@ -470,7 +611,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                             return (
                               <div
                                 key={record.id}
-                                onClick={() => setSelectedRecordId(record.id)}
+                                onClick={() => {
+                                  debugLog('RECORD', 'Record clicked', {
+                                    recordId: record.id,
+                                    recordData: Object.keys(record),
+                                    hasBlocks: loadedBlocks.length > 0,
+                                  })
+                                  setSelectedRecordId(record.id)
+                                }}
                                 className={cn(
                                   'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs',
                                   isSelected 
@@ -651,6 +799,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                     onRecordClick={(recordId) => {
                       // CRITICAL: When calendar event is clicked, update selected record
                       // This allows calendar blocks in RecordReview to switch records
+                      debugLog('RECORD', 'Calendar event clicked, switching record', {
+                        recordId,
+                        previousRecordId: selectedRecordId,
+                        hasBlocks: loadedBlocks.length > 0,
+                      })
                       setSelectedRecordId(recordId)
                     }}
                   />

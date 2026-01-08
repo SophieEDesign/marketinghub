@@ -677,6 +677,31 @@ export default function InterfacePageClient({
     }
   }, [page, isGridMode])
 
+  // CRITICAL: Memoize InterfaceBuilder page prop to prevent remounts
+  // Creating new object on every render causes component remounts
+  const interfaceBuilderPage = useMemo(() => {
+    if (!page) return null
+    return {
+      id: page.id,
+      name: page.name,
+      settings: {
+        layout_template: page.page_type === 'content' ? 'content' :
+                        page.page_type === 'overview' ? 'overview' :
+                        page.page_type === 'dashboard' ? 'dashboard' : null
+      }
+    } as any
+  }, [page?.id, page?.name, page?.page_type])
+
+  // CRITICAL: Memoize blocks array to prevent remounts
+  // Only create new reference if blocks actually changed
+  const memoizedBlocks = useMemo(() => blocks || [], [blocks])
+  
+  // CRITICAL: Memoize blocks prop for PageRenderer to prevent remounts
+  // Conditionally creating array/undefined on every render causes remounts
+  const pageRendererBlocks = useMemo(() => {
+    return (page?.page_type === 'record_review') ? memoizedBlocks : undefined
+  }, [page?.page_type, memoizedBlocks])
+
   // Save page title with debouncing - MUST be before early returns (React Hooks rule)
   const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
     if (!page || !isAdmin) return
@@ -1006,22 +1031,16 @@ export default function InterfacePageClient({
           // Use isViewer prop to control edit/view mode instead of switching components
           // This prevents remount storms when switching between edit and view modes
           (isDashboardOrOverview || page.page_type === 'content') ? (
-            <InterfaceBuilder
-              key={`interface-builder-${page.id}`}
-              page={{ 
-                id: page.id, 
-                name: page.name,
-                settings: { 
-                  layout_template: page.page_type === 'content' ? 'content' : 
-                                  page.page_type === 'overview' ? 'overview' : 
-                                  page.page_type === 'dashboard' ? 'dashboard' : null
-                }
-              } as any}
-              initialBlocks={blocks || []}
-              isViewer={!isBlockEditing}
-              hideHeader={true}
-              pageTableId={pageTableId}
-            />
+            interfaceBuilderPage ? (
+              <InterfaceBuilder
+                key={`interface-builder-${page.id}`}
+                page={interfaceBuilderPage}
+                initialBlocks={memoizedBlocks}
+                isViewer={!isBlockEditing}
+                hideHeader={true}
+                pageTableId={pageTableId}
+              />
+            ) : null
           ) : (
             // For other page types, use PageRenderer
             <PageRenderer
@@ -1031,7 +1050,7 @@ export default function InterfacePageClient({
               isLoading={loading || dataLoading}
               onGridToggle={showGridToggle ? handleGridToggle : undefined}
               showGridToggle={showGridToggle}
-              blocks={(page?.page_type === 'record_review') ? blocks : undefined}
+              blocks={pageRendererBlocks}
               isAdmin={isAdmin}
               onOpenSettings={() => {
                 if (page?.page_type === 'form') {
