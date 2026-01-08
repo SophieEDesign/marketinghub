@@ -872,7 +872,7 @@ export default function PageDisplaySettingsPanel({
               </div>
 
               {/* UNIFIED: Preview fields configuration moved to blocks */}
-              {false && page && page.page_type === 'record_view' && (
+              {false && currentPage && currentPage.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Preview Fields</Label>
                   <div className="text-sm text-gray-500 mb-2">
@@ -984,7 +984,7 @@ export default function PageDisplaySettingsPanel({
               )}
 
               {/* UNIFIED: Panel layout configuration moved to blocks */}
-              {false && page && page.page_type === 'record_view' && (
+              {false && currentPage && currentPage.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Record Panel Layout</Label>
                   <div className="text-sm text-gray-500 mb-2">
