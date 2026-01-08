@@ -515,7 +515,7 @@ function InterfacePageClientInternal({
   const blocksLoadedRef = useRef<boolean>(false)
   
   async function loadBlocks(forceReload = false) {
-    console.log('🔥 loadBlocks CALLED', { pageId: page?.id, forceReload })
+    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload })
     if (!page) return
     
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
