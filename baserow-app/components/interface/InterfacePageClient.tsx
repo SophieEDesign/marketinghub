@@ -629,9 +629,9 @@ export default function InterfacePageClient({
       })
     } catch (error) {
       console.error("Error loading blocks:", error)
-      if (blocks.length === 0) {
-        setBlocks([])
-      }
+      // CRITICAL: Never clear blocks on error - preserve existing blocks
+      // This prevents remount storms when errors occur during reload
+      // Only set loading to false so UI can show error state
     } finally {
       setBlocksLoading(false)
     }
@@ -658,7 +658,16 @@ export default function InterfacePageClient({
 
   // Merge config with grid mode override
   const pageWithConfig = useMemo(() => {
-    if (!page) return null
+    if (!page) {
+      // CRITICAL: Return a placeholder object instead of null to prevent remounts
+      // This ensures the component tree stays stable
+      return {
+        id: '',
+        name: '',
+        page_type: 'dashboard' as const,
+        config: {},
+      } as InterfacePage
+    }
     return {
       ...page,
       config: {
@@ -979,7 +988,8 @@ export default function InterfacePageClient({
 
       {/* Content Area */}
       <div className="flex-1 overflow-hidden">
-        {/* Show loading state */}
+        {/* CRITICAL: Always render the same component tree to prevent remount storms */}
+        {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-gray-500">Loading page...</div>
@@ -991,12 +1001,13 @@ export default function InterfacePageClient({
               <p className="text-sm text-gray-500">The page you&apos;re looking for doesn&apos;t exist.</p>
             </div>
           </div>
-        ) : isDashboardOrOverview && isBlockEditing ? (
-          // For dashboard/overview in block edit mode, use InterfaceBuilder
-          // CRITICAL: Always render InterfaceBuilder to prevent remounts
-          // Don't unmount when blocksLoading changes - let it handle loading state internally
-          <InterfaceBuilder
-              key={`interface-builder-edit-${page.id}-${isBlockEditing}`}
+        ) : page ? (
+          // CRITICAL: For dashboard/overview/content pages, always render InterfaceBuilder
+          // Use isViewer prop to control edit/view mode instead of switching components
+          // This prevents remount storms when switching between edit and view modes
+          (isDashboardOrOverview || page.page_type === 'content') ? (
+            <InterfaceBuilder
+              key={`interface-builder-${page.id}`}
               page={{ 
                 id: page.id, 
                 name: page.name,
@@ -1007,29 +1018,30 @@ export default function InterfacePageClient({
                 }
               } as any}
               initialBlocks={blocks || []}
-              isViewer={false}
+              isViewer={!isBlockEditing}
               hideHeader={true}
               pageTableId={pageTableId}
             />
-        ) : page ? (
-          // Always render PageRenderer - it will show setup UI if page is invalid
-          // NEVER redirect - invalid pages show setup UI instead
-          <PageRenderer
-            page={pageWithConfig}
-            data={data}
-            isLoading={loading || dataLoading}
-            onGridToggle={showGridToggle ? handleGridToggle : undefined}
-            showGridToggle={showGridToggle}
-            blocks={(isDashboardOrOverview || page?.page_type === 'record_review' || page?.page_type === 'content') ? blocks : undefined}
-            isAdmin={isAdmin}
-            onOpenSettings={() => {
-              if (page?.page_type === 'form') {
-                setFormSettingsOpen(true)
-              } else {
-                setDisplaySettingsOpen(true)
-              }
-            }}
-          />
+          ) : (
+            // For other page types, use PageRenderer
+            <PageRenderer
+              key={`page-renderer-${page.id}`}
+              page={pageWithConfig}
+              data={data}
+              isLoading={loading || dataLoading}
+              onGridToggle={showGridToggle ? handleGridToggle : undefined}
+              showGridToggle={showGridToggle}
+              blocks={(page?.page_type === 'record_review') ? blocks : undefined}
+              isAdmin={isAdmin}
+              onOpenSettings={() => {
+                if (page?.page_type === 'form') {
+                  setFormSettingsOpen(true)
+                } else {
+                  setDisplaySettingsOpen(true)
+                }
+              }}
+            />
+          )
         ) : null}
       </div>
 

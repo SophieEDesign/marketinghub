@@ -177,6 +177,7 @@ export default function PageRenderer({
         // Gallery views use InterfaceBuilder with blocks
         return (
           <InterfaceBuilder
+            key={`gallery-${page.id}`}
             page={{ 
               id: page.id, 
               name: page.name,
@@ -244,6 +245,7 @@ export default function PageRenderer({
       case 'dashboard':
         return (
           <InterfaceBuilder
+            key={`dashboard-${page.id}`}
             page={{ 
               id: page.id, 
               name: page.name,
@@ -259,6 +261,7 @@ export default function PageRenderer({
       case 'overview':
         return (
           <InterfaceBuilder
+            key={`overview-${page.id}`}
             page={{ 
               id: page.id, 
               name: page.name,
@@ -276,6 +279,7 @@ export default function PageRenderer({
         return (
           <div className="h-full">
             <InterfaceBuilder
+              key={`content-${page.id}`}
               page={{ 
                 id: page.id, 
                 name: page.name,
