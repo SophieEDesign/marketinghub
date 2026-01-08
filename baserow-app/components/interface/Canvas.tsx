@@ -10,6 +10,8 @@ import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterConfig } from "@/lib/interface/filters"
+import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
+import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -142,63 +144,46 @@ export default function Canvas({
       // CRITICAL: Database values (position_x, position_y, width, height) are single source of truth
       // Only apply defaults when ALL position values are NULL (newly created block)
       const newLayout: Layout[] = blocks.map((block) => {
-        // CRITICAL: Use block values directly - API already maps position_x/position_y/width/height to x/y/w/h
-        // Only apply defaults if ALL values are explicitly null/undefined (newly created block)
-        // If any value exists (even 0), use it - don't default
-        const allNull = 
-          (block.x == null) && 
-          (block.y == null) && 
-          (block.w == null) && 
-          (block.h == null)
+      // CRITICAL: Use unified mapping function - enforces single source of truth
+      // Map DB values using unified function (throws if corrupted, returns null if new)
+      // Note: API already maps position_x/position_y/width/height to x/y/w/h
+      const layout = dbBlockToPageBlock({
+        id: block.id,
+        position_x: block.x, // API already maps position_x → x
+        position_y: block.y,
+        width: block.w,
+        height: block.h,
+      })
+      
+      let x: number, y: number, w: number, h: number
+      
+      if (!layout) {
+        // New block (all null) - apply defaults
+        x = 0
+        y = 0
+        w = 4
+        h = 4
         
-        let x: number, y: number, w: number, h: number
+        // DEBUG_LAYOUT: Log default application
+        debugLog('LAYOUT', `Block ${block.id}: DEFAULTS APPLIED (new block)`, {
+          blockId: block.id,
+          fromDB: { x: null, y: null, w: null, h: null },
+          applied: { x, y, w, h },
+        })
+      } else {
+        // Existing block - use mapped values (no defaults)
+        x = layout.x
+        y = layout.y
+        w = layout.w
+        h = layout.h
         
-        if (allNull) {
-          // ALL position values are NULL - apply defaults (newly created block)
-          x = 0
-          y = 0
-          w = 4
-          h = 4
-          
-          // PHASE 2 - Layout rehydration audit: Log default application
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[Layout Rehydration] Block ${block.id}: DEFAULTS APPLIED`, {
-              blockId: block.id,
-              fromDB: { x: null, y: null, w: null, h: null },
-              applied: { x, y, w, h },
-              defaultsApplied: true
-            })
-          }
-        } else {
-          // CRITICAL: Use actual block values - API maps DB columns correctly
-          // Don't use ?? defaults here - if value is 0, use 0; if 4, use 4
-          // Only default if explicitly null/undefined
-          x = block.x != null ? block.x : 0
-          y = block.y != null ? block.y : 0
-          w = block.w != null ? block.w : 4
-          h = block.h != null ? block.h : 4
-          
-          // REGRESSION CHECK: Warn if we're defaulting for an existing block that should have values
-          if (process.env.NODE_ENV === 'development') {
-            const hasNullValues = block.x == null || block.y == null || block.w == null || block.h == null
-            if (hasNullValues && block.created_at) {
-              // Block exists but has null layout values - this shouldn't happen after first save
-              console.warn(`[Layout Rehydration] Block ${block.id}: NULL VALUES DETECTED for existing block`, {
-                blockId: block.id,
-                blockValues: { x: block.x, y: block.y, w: block.w, h: block.h },
-                created_at: block.created_at,
-                warning: 'Block has been created but layout values are null - keeping previous layout if available'
-              })
-            }
-            
-            console.log(`[Layout Rehydration] Block ${block.id}: FROM DB`, {
-              blockId: block.id,
-              fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
-              applied: { x, y, w, h },
-              defaultsApplied: false
-            })
-          }
-        }
+        // DEBUG_LAYOUT: Log DB values used
+        debugLog('LAYOUT', `Block ${block.id}: FROM DB`, {
+          blockId: block.id,
+          fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
+          applied: { x, y, w, h },
+        })
+      }
         
         return {
           i: block.id,

@@ -7,6 +7,7 @@ import Link from "@tiptap/extension-link"
 import TextStyle from "@tiptap/extension-text-style"
 import Color from "@tiptap/extension-color"
 import type { PageBlock } from "@/lib/interface/types"
+import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
 import { 
   Bold, 
   Italic, 
@@ -61,20 +62,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // Empty/null content_json is VALID (empty content), not loading state
   const isConfigLoading = config === undefined
   
-  // PHASE 2 - TextBlock rehydration audit: Log on render
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[TextBlock Rehydration] Block ${block.id}: RENDER`, {
-      blockId: block.id,
-      rawBlockConfig: config,
-      rawContentJson: config?.content_json,
-      hasContentJson: !!config?.content_json,
-      contentJsonType: typeof config?.content_json,
-      isDoc: config?.content_json?.type === 'doc',
-      contentLength: config?.content_json?.content?.length || 0,
-      isEditing,
-      isConfigLoading,
-    })
-  }
+  // DEBUG_TEXT: Log on render
+  debugLog('TEXT', `Block ${block.id}: RENDER`, {
+    blockId: block.id,
+    rawBlockConfig: config,
+    rawContentJson: config?.content_json,
+    hasContentJson: !!config?.content_json,
+    contentJsonType: typeof config?.content_json,
+    isDoc: config?.content_json?.type === 'doc',
+    contentLength: config?.content_json?.content?.length || 0,
+    isEditing,
+    isConfigLoading,
+  })
   
   // Track if content_json exists and is valid (for setup state)
   const hasContent = contentJson !== null && 
@@ -311,22 +310,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     const blockIdChanged = previousBlockIdRef.current !== block.id
     const configReferenceChanged = previousConfigRef.current !== config
     
-    // PHASE 2 - TextBlock rehydration audit: Log config changes
-    if (process.env.NODE_ENV === 'development') {
-      if (blockIdChanged || configReferenceChanged) {
-        console.log(`[TextBlock Rehydration] Block ${block.id}: CONFIG CHANGED`, {
-          blockId: block.id,
-          blockIdChanged,
-          configReferenceChanged,
-          previousBlockId: previousBlockIdRef.current,
-          currentConfig: config,
-          currentContentJson: config?.content_json,
-          previousConfig: previousConfigRef.current,
-          previousContentJson: previousConfigRef.current?.content_json,
-          isFocused,
-          isBlockEditing,
-        })
-      }
+    // DEBUG_TEXT: Log config changes
+    if (blockIdChanged || configReferenceChanged) {
+      debugLog('TEXT', `Block ${block.id}: CONFIG CHANGED`, {
+        blockId: block.id,
+        blockIdChanged,
+        configReferenceChanged,
+        previousBlockId: previousBlockIdRef.current,
+        currentConfig: config,
+        currentContentJson: config?.content_json,
+        previousConfig: previousConfigRef.current,
+        previousContentJson: previousConfigRef.current?.content_json,
+        isFocused,
+        isBlockEditing,
+      })
     }
     
     // Update refs
@@ -337,27 +334,23 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     if (blockIdChanged) {
       // CRITICAL: Don't rehydrate if user is actively editing this block
       if (isBlockEditing && isFocused) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock Rehydration] Block ${block.id}: SKIPPED (user editing)`, {
-            blockId: block.id,
-            isBlockEditing,
-            isFocused
-          })
-        }
+        debugLog('TEXT', `Block ${block.id}: SKIPPED (user editing)`, {
+          blockId: block.id,
+          isBlockEditing,
+          isFocused
+        })
         return
       }
       
       const newContent = getInitialContent()
       
-      // PHASE 2 - TextBlock rehydration audit: Log editor initialization
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[TextBlock Rehydration] Block ${block.id}: EDITOR INIT (block ID changed)`, {
-          blockId: block.id,
-          editorInitialContent: newContent,
-          configContentJson: config?.content_json,
-          matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
-        })
-      }
+      // DEBUG_TEXT: Log editor initialization
+      debugLog('TEXT', `Block ${block.id}: EDITOR INIT (block ID changed)`, {
+        blockId: block.id,
+        editorInitialContent: newContent,
+        configContentJson: config?.content_json,
+        matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
+      })
       
       editor.commands.setContent(newContent, false) // false = don't emit update event
       // Use cached serialized content from config instead of stringifying again
@@ -372,13 +365,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     if (configReferenceChanged) {
       // CRITICAL: Don't rehydrate if user is actively editing
       if (isBlockEditing && isFocused) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock Rehydration] Block ${block.id}: SKIPPED (user editing)`, {
-            blockId: block.id,
-            isBlockEditing,
-            isFocused
-          })
-        }
+        debugLog('TEXT', `Block ${block.id}: SKIPPED (user editing)`, {
+          blockId: block.id,
+          isBlockEditing,
+          isFocused
+        })
         return
       }
       
@@ -389,35 +380,31 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       // Use cached config content string (updated in separate effect when config changes)
       const newStr = cachedConfigContentStrRef.current
       
-      // PHASE 2 - TextBlock rehydration audit: Log rehydration decision
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[TextBlock Rehydration] Block ${block.id}: REHYDRATION CHECK`, {
-          blockId: block.id,
-          currentEditorContent: currentContent,
-          currentEditorContentStr: currentStr,
-          configContentJson: config?.content_json,
-          configContentStr: newStr,
-          contentChanged: currentStr !== newStr,
-          isFocused,
-          isBlockEditing,
-          willRehydrate: currentStr !== newStr && !isFocused && !isBlockEditing,
-        })
-      }
+      // DEBUG_TEXT: Log rehydration decision
+      debugLog('TEXT', `Block ${block.id}: REHYDRATION CHECK`, {
+        blockId: block.id,
+        currentEditorContent: currentContent,
+        currentEditorContentStr: currentStr,
+        configContentJson: config?.content_json,
+        configContentStr: newStr,
+        contentChanged: currentStr !== newStr,
+        isFocused,
+        isBlockEditing,
+        willRehydrate: currentStr !== newStr && !isFocused && !isBlockEditing,
+      })
       
       // Only update if content actually changed AND editor is not focused (to avoid interrupting typing)
       if (currentStr !== newStr && !isFocused && !isBlockEditing) {
         const newContent = getInitialContent()
         
-        // PHASE 2 - TextBlock rehydration audit: Log actual rehydration
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[TextBlock Rehydration] Block ${block.id}: REHYDRATING`, {
-            blockId: block.id,
-            oldContent: currentContent,
-            newContent,
-            configContentJson: config?.content_json,
-            matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
-          })
-        }
+        // DEBUG_TEXT: Log actual rehydration
+        debugLog('TEXT', `Block ${block.id}: REHYDRATING`, {
+          blockId: block.id,
+          oldContent: currentContent,
+          newContent,
+          configContentJson: config?.content_json,
+          matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
+        })
         
         editor.commands.setContent(newContent, false) // false = don't emit update event
         // Update last saved reference to prevent immediate re-save
@@ -464,15 +451,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       // Config just finished loading, initialize editor content
       const initialContent = getInitialContent()
       
-      // PHASE 2 - TextBlock rehydration audit: Log config load completion
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[TextBlock Rehydration] Block ${block.id}: CONFIG LOADED`, {
-          blockId: block.id,
-          configContentJson: config?.content_json,
-          editorInitialContent: initialContent,
-          matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
-        })
-      }
+      // DEBUG_TEXT: Log config load completion
+      debugLog('TEXT', `Block ${block.id}: CONFIG LOADED`, {
+        blockId: block.id,
+        configContentJson: config?.content_json,
+        editorInitialContent: initialContent,
+        matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
+      })
       
       editor.commands.setContent(initialContent, false)
       // Use cached config content string if available

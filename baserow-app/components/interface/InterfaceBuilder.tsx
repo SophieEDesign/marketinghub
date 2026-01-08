@@ -482,7 +482,7 @@ export default function InterfaceBuilder({
         })
         if (blocksResponse.ok) {
           const blocksData = await blocksResponse.json()
-          const pageBlocks = (blocksData.blocks || []).map((block: any) => ({
+          const pageBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
             id: block.id,
             page_id: block.page_id || page.id,
             type: block.type,
@@ -499,7 +499,7 @@ export default function InterfaceBuilder({
           setBlocks((prevBlocks) => {
             const existingIds = new Set(prevBlocks.map(b => b.id))
             const merged = prevBlocks.map(b => {
-              const updated = pageBlocks.find(pb => pb.id === b.id)
+              const updated = pageBlocks.find((pb: PageBlock) => pb.id === b.id)
               if (updated) {
                 return {
                   ...b,

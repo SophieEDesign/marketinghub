@@ -5,6 +5,7 @@ import { normalizeBlockConfig } from '@/lib/interface/block-validator'
 import { validateBlockConfig } from '@/lib/interface/block-config-types'
 import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
 import { dbBlockToPageBlock } from '@/lib/interface/layout-mapping'
+import { debugLog, debugWarn } from '@/lib/interface/debug-flags'
 
 /**
  * GET /api/pages/[pageId]/blocks - Load blocks for a page
@@ -52,16 +53,18 @@ export async function GET(
     // Convert view_blocks to PageBlock format
     // CRITICAL: Use unified mapping function (no defaults, no guessing)
     const blocks = (data || []).map((block: any) => {
-      // 🔥 PROOF LOGGING - Log loaded layout from DB
-      console.log('[LAYOUT LOAD] Block FROM DB', {
-        blockId: block.id,
-        fromDB: {
-          position_x: block.position_x,
-          position_y: block.position_y,
-          width: block.width,
-          height: block.height,
-        },
-      })
+      // DEBUG_LAYOUT: Log loaded layout from DB (server-side, always logs in dev)
+      if (process.env.NODE_ENV === 'development') {
+        debugLog('LAYOUT', 'Block FROM DB', {
+          blockId: block.id,
+          fromDB: {
+            position_x: block.position_x,
+            position_y: block.position_y,
+            width: block.width,
+            height: block.height,
+          },
+        })
+      }
 
       // CRITICAL: Use unified mapping - throws if corrupted, returns null if new block
       const layout = dbBlockToPageBlock({
@@ -74,10 +77,12 @@ export async function GET(
 
       // If layout is null (new block), use defaults BUT log warning
       if (!layout) {
-        console.warn(`[LAYOUT LOAD] Block ${block.id}: New block (no layout) - using defaults`, {
-          blockId: block.id,
-          defaults: { x: 0, y: 0, w: 4, h: 4 },
-        })
+        if (process.env.NODE_ENV === 'development') {
+          debugWarn('LAYOUT', `Block ${block.id}: New block (no layout) - using defaults`, {
+            blockId: block.id,
+            defaults: { x: 0, y: 0, w: 4, h: 4 },
+          })
+        }
       }
 
       return {
@@ -130,32 +135,36 @@ export async function PATCH(
 
     // Save layout if provided
     if (layout && Array.isArray(layout)) {
-      // 🔥 PROOF LOGGING - Always log to prove layout persistence
-      console.log('[LAYOUT SAVE] API RECEIVED', {
-        pageId,
-        layoutCount: layout.length,
-        layoutItems: layout.map((item: LayoutItem) => ({
-          id: item.i,
-          x: item.x,
-          y: item.y,
-          w: item.w,
-          h: item.h,
-          // Map to DB columns
-          position_x: item.x,
-          position_y: item.y,
-          width: item.w,
-          height: item.h,
-        })),
-      })
+      // DEBUG_LAYOUT: Log layout save (server-side, always logs in dev)
+      if (process.env.NODE_ENV === 'development') {
+        debugLog('LAYOUT', 'API RECEIVED', {
+          pageId,
+          layoutCount: layout.length,
+          layoutItems: layout.map((item: LayoutItem) => ({
+            id: item.i,
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+            // Map to DB columns
+            position_x: item.x,
+            position_y: item.y,
+            width: item.w,
+            height: item.h,
+          })),
+        })
+      }
 
       await saveBlockLayout(pageId, layout as LayoutItem[])
 
-      // 🔥 PROOF LOGGING - Verify save completed
-      console.log('[LAYOUT SAVE] API COMPLETED', {
-        pageId,
-        layoutCount: layout.length,
-        timestamp: new Date().toISOString(),
-      })
+      // DEBUG_LAYOUT: Verify save completed
+      if (process.env.NODE_ENV === 'development') {
+        debugLog('LAYOUT', 'API COMPLETED', {
+          pageId,
+          layoutCount: layout.length,
+          timestamp: new Date().toISOString(),
+        })
+      }
     }
 
     // Update individual blocks if provided
@@ -176,9 +185,10 @@ export async function PATCH(
             throw new Error(`Block ${update.id} not found`)
           }
 
-          // PHASE 1 - TextBlock write verification: Log received content_json
+          // DEBUG_TEXT: Log received content_json (server-side, always logs in dev)
           if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
-            console.log(`[API Write] Block ${update.id}: RECEIVED`, {
+            // Note: DEBUG_TEXT flag is client-side only, but we log in dev mode
+            console.log(`[DEBUG TEXT] Block ${update.id}: RECEIVED`, {
               blockId: update.id,
               receivedConfig: update.config,
               receivedContentJson: update.config.content_json,
@@ -195,9 +205,9 @@ export async function PATCH(
             ...(update.config || {}),
           }
 
-          // PHASE 1 - TextBlock write verification: Log before normalization
+          // DEBUG_TEXT: Log before normalization
           if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
-            console.log(`[API Write] Block ${update.id}: BEFORE NORMALIZE`, {
+            console.log(`[DEBUG TEXT] Block ${update.id}: BEFORE NORMALIZE`, {
               blockId: update.id,
               configToNormalize,
               contentJsonBeforeNormalize: configToNormalize.content_json,
@@ -211,9 +221,9 @@ export async function PATCH(
             configToNormalize
           )
 
-          // PHASE 1 - TextBlock write verification: Log after normalization
+          // DEBUG_TEXT: Log after normalization
           if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
-            console.log(`[API Write] Block ${update.id}: AFTER NORMALIZE`, {
+            console.log(`[DEBUG TEXT] Block ${update.id}: AFTER NORMALIZE`, {
               blockId: update.id,
               normalizedConfig,
               contentJsonAfterNormalize: normalizedConfig.content_json,
@@ -259,9 +269,9 @@ export async function PATCH(
             throw new Error(`Block ${update.id} update succeeded but no data returned`)
           }
 
-          // PHASE 1 - TextBlock write verification: Log persisted data from DB
+          // DEBUG_TEXT: Log persisted data from DB
           if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
-            console.log(`[API Write] Block ${update.id}: PERSISTED`, {
+            console.log(`[DEBUG TEXT] Block ${update.id}: PERSISTED`, {
               blockId: update.id,
               updatedBlockFromDB: updatedBlock,
               persistedConfig: updatedBlock.config,

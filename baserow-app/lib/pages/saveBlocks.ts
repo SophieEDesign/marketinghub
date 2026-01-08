@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { PageBlock, LayoutItem } from '@/lib/interface/types'
 import { layoutItemToDbUpdate } from '@/lib/interface/layout-mapping'
+import { debugLog, debugError } from '@/lib/interface/debug-flags'
 
 
 /**
@@ -48,8 +49,8 @@ export async function saveBlockLayout(
   // Filter blocks by page_id or view_id to ensure we only update blocks for this page
   await Promise.all(
     updates.map(async (update) => {
-      // 🔥 PROOF LOGGING - Always log to prove layout persistence
-      console.log('[LAYOUT SAVE] Block BEFORE DB UPDATE', {
+      // DEBUG_LAYOUT: Log before DB update
+      debugLog('LAYOUT', 'Block BEFORE DB UPDATE', {
         blockId: update.id,
         position_x: update.position_x,
         position_y: update.position_y,
@@ -88,7 +89,7 @@ export async function saveBlockLayout(
         throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
       }
 
-      // 🔥 PROOF LOGGING - Verify DB actually persisted the values
+      // DEBUG_LAYOUT: Verify DB actually persisted the values
       const persisted = data[0]
       const matches = 
         persisted.position_x === update.position_x &&
@@ -96,7 +97,7 @@ export async function saveBlockLayout(
         persisted.width === update.width &&
         persisted.height === update.height
 
-      console.log('[LAYOUT SAVE] Block AFTER DB UPDATE', {
+      debugLog('LAYOUT', 'Block AFTER DB UPDATE', {
         blockId: update.id,
         sent: {
           position_x: update.position_x,
@@ -115,7 +116,11 @@ export async function saveBlockLayout(
       })
 
       if (!matches) {
-        console.error(`[LAYOUT SAVE] Block ${update.id}: ❌ MISMATCH - DB persisted different values than sent!`)
+        debugError('LAYOUT', `Block ${update.id}: ❌ MISMATCH - DB persisted different values than sent!`, {
+          blockId: update.id,
+          sent: update,
+          persisted,
+        })
         throw new Error(`Layout save mismatch for block ${update.id}`)
       }
     })
