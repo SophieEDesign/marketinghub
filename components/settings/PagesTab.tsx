@@ -78,7 +78,7 @@ export default function SettingsPagesTab() {
     try {
       const supabase = createClientSupabaseClient()
       
-      // Load all views from views table (including interface pages with type='interface')
+      // Load all views from views table (OLD SYSTEM - including interface pages with type='interface')
       const { data: views, error: viewsError } = await supabase
         .from('views')
         .select('id, name, type, table_id, updated_at, created_at')
@@ -86,11 +86,19 @@ export default function SettingsPagesTab() {
 
       if (viewsError) {
         console.error('Error loading views:', viewsError)
-        setPages([])
-        return
       }
 
-      // Load table names separately
+      // Load interface pages from interface_pages table (NEW SYSTEM)
+      const { data: interfacePages, error: interfacePagesError } = await supabase
+        .from('interface_pages')
+        .select('id, name, page_type, group_id, updated_at, created_at')
+        .order('updated_at', { ascending: false })
+
+      if (interfacePagesError) {
+        console.error('Error loading interface pages:', interfacePagesError)
+      }
+
+      // Load table names separately for views
       const tableIds = views?.map(v => v.table_id).filter(Boolean) || []
       const tableMap = new Map<string, string>()
       if (tableIds.length > 0) {
@@ -104,15 +112,54 @@ export default function SettingsPagesTab() {
         }
       }
 
-      const allPages: Page[] = (views || []).map((view: any) => ({
-        id: view.id,
-        name: view.name,
-        type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
-        tableId: view.table_id,
-        tableName: view.table_id ? tableMap.get(view.table_id) : undefined,
-        updated_at: view.updated_at,
-        created_at: view.created_at,
-      }))
+      // Load group names for interface pages disambiguation
+      const groupIds = interfacePages?.map(p => p.group_id).filter(Boolean) || []
+      const groupMap = new Map<string, string>()
+      if (groupIds.length > 0) {
+        const { data: groupsData } = await supabase
+          .from('interface_groups')
+          .select('id, name')
+          .in('id', groupIds)
+        
+        if (groupsData) {
+          groupsData.forEach(g => groupMap.set(g.id, g.name))
+        }
+      }
+
+      const allPages: Page[] = []
+
+      // Add pages from old system (views table)
+      if (views) {
+        views.forEach((view: any) => {
+          allPages.push({
+            id: view.id,
+            name: view.name,
+            type: view.type === 'interface' ? 'interface' : (view.type as 'grid' | 'kanban' | 'calendar' | 'form'),
+            tableId: view.table_id,
+            tableName: view.table_id ? tableMap.get(view.table_id) : undefined,
+            updated_at: view.updated_at,
+            created_at: view.created_at,
+          })
+        })
+      }
+
+      // Add pages from new system (interface_pages table)
+      if (interfacePages) {
+        interfacePages.forEach((page: any) => {
+          const groupName = page.group_id ? groupMap.get(page.group_id) : null
+          const displayName = groupName ? `${page.name} (${groupName})` : page.name
+          
+          allPages.push({
+            id: page.id,
+            name: displayName,
+            type: 'interface',
+            tableId: null,
+            tableName: undefined,
+            updated_at: page.updated_at,
+            created_at: page.created_at,
+          })
+        })
+      }
 
       // Sort by updated_at descending
       allPages.sort((a, b) => {

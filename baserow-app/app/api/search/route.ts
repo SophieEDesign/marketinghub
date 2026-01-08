@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/roles'
 
 /**
  * GET /api/search - Global search across tables, pages, views, interfaces
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Search views (includes pages and interfaces)
+    // Search views (includes pages and interfaces) - OLD SYSTEM
     if (!type || type === 'pages' || type === 'views') {
       const { data: views } = await supabase
         .from('views')
@@ -50,6 +51,55 @@ export async function GET(request: NextRequest) {
           table_id: v.table_id,
           searchType: v.type === 'interface' ? 'page' : 'view',
         })))
+      }
+    }
+
+    // Search interface_pages table - NEW SYSTEM
+    if (!type || type === 'pages') {
+      const userIsAdmin = await isAdmin()
+      let interfacePagesQuery = supabase
+        .from('interface_pages')
+        .select('id, name, page_type, group_id, is_admin_only')
+        .ilike('name', `%${query}%`)
+      
+      // Filter out admin-only pages for non-admin users
+      if (!userIsAdmin) {
+        interfacePagesQuery = interfacePagesQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+      }
+      
+      const { data: interfacePages } = await interfacePagesQuery.limit(20)
+      
+      if (interfacePages) {
+        // Load group names for disambiguation
+        const groupIds = interfacePages.map(p => p.group_id).filter(Boolean) as string[]
+        const groupMap = new Map<string, string>()
+        if (groupIds.length > 0) {
+          const { data: groups } = await supabase
+            .from('interface_groups')
+            .select('id, name')
+            .in('id', groupIds)
+          
+          if (groups) {
+            groups.forEach(g => groupMap.set(g.id, g.name))
+          }
+        }
+
+        results.push(...interfacePages.map(p => {
+          const groupName = p.group_id ? groupMap.get(p.group_id) : null
+          const displayName = groupName ? `${p.name} (${groupName})` : p.name
+          
+          return {
+            id: p.id,
+            name: displayName,
+            originalName: p.name,
+            type: 'interface',
+            page_type: p.page_type,
+            table_id: null,
+            searchType: 'page',
+            group_id: p.group_id,
+            group_name: groupName,
+          }
+        }))
       }
     }
 

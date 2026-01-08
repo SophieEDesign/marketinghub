@@ -65,6 +65,7 @@ export async function getInterfacePagesByGroup(groupId: string | null): Promise<
     .select('*')
     .eq('group_id', groupId)
     .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true }) // Secondary sort for consistency
 
   if (error) {
     console.error('Error loading interface pages:', error)
@@ -87,6 +88,7 @@ export async function getAllInterfacePages(): Promise<InterfacePage[]> {
     .from('interface_pages')
     .select('*')
     .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true }) // Secondary sort for consistency
 
   if (error) {
     console.error('Error loading interface pages:', error)

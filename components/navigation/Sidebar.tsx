@@ -82,6 +82,7 @@ export default async function Sidebar() {
       .from('interface_pages')
       .select('id, name, group_id, order_index, is_admin_only')
       .order('order_index', { ascending: true })
+      .order('created_at', { ascending: true }) // Secondary sort for consistency
     
     // Filter out admin-only pages for non-admin users
     if (!userIsAdmin) {
@@ -94,6 +95,9 @@ export default async function Sidebar() {
       console.error('Error loading interface pages:', pagesError)
     } else if (pagesData) {
       // Group pages by group_id (interface)
+      // Pages without group_id will be added to a special "Ungrouped" section
+      const ungroupedPages: Array<{ id: string; name: string; order_index: number }> = []
+      
       pagesData.forEach((page) => {
         const groupId = page.group_id
         if (groupId) {
@@ -105,8 +109,20 @@ export default async function Sidebar() {
             name: page.name,
             order_index: page.order_index || 0,
           })
+        } else {
+          // Pages without group_id go to ungrouped section
+          ungroupedPages.push({
+            id: page.id,
+            name: page.name,
+            order_index: page.order_index || 0,
+          })
         }
       })
+      
+      // Add ungrouped pages to a special key if any exist
+      if (ungroupedPages.length > 0) {
+        interfacePagesByGroup.set('__ungrouped__', ungroupedPages)
+      }
     }
   } catch (error) {
     console.error('Error loading interfaces:', error)
@@ -149,7 +165,7 @@ export default async function Sidebar() {
         </div>
 
         {/* Interfaces Section - Primary Navigation */}
-        {interfaceGroups.length > 0 && (
+        {(interfaceGroups.length > 0 || interfacePagesByGroup.has('__ungrouped__')) && (
           <div className="space-y-1">
             <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Interfaces
@@ -174,6 +190,17 @@ export default async function Sidebar() {
                   />
                 )
               })}
+            {/* Ungrouped Pages Section */}
+            {interfacePagesByGroup.has('__ungrouped__') && (
+              <InterfaceSection
+                key="__ungrouped__"
+                interfaceId="__ungrouped__"
+                interfaceName="Ungrouped"
+                pages={interfacePagesByGroup.get('__ungrouped__') || []}
+                defaultCollapsed={false}
+                isAdmin={userIsAdmin}
+              />
+            )}
           </div>
         )}
 

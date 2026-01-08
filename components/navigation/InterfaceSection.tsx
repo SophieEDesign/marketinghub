@@ -32,6 +32,23 @@ export default function InterfaceSection({
   // Sort pages by order_index
   const sortedPages = [...pages].sort((a, b) => a.order_index - b.order_index)
 
+  // Check for duplicate names within this group for disambiguation
+  const nameCounts = new Map<string, number>()
+  sortedPages.forEach(page => {
+    nameCounts.set(page.name, (nameCounts.get(page.name) || 0) + 1)
+  })
+
+  // Helper to get disambiguated label
+  const getPageLabel = (page: { id: string; name: string; order_index: number }) => {
+    const count = nameCounts.get(page.name) || 0
+    if (count > 1) {
+      // Multiple pages with same name - add UUID suffix for disambiguation
+      const shortId = page.id.substring(0, 8)
+      return `${page.name} (${shortId})`
+    }
+    return page.name
+  }
+
   return (
     <div className="space-y-1">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="group">
@@ -51,7 +68,7 @@ export default function InterfaceSection({
               <SidebarItem
                 key={page.id}
                 id={page.id}
-                label={page.name}
+                label={getPageLabel(page)}
                 href={`/pages/${page.id}`}
                 icon="file-text"
                 level={1}
