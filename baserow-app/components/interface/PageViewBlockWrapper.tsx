@@ -31,8 +31,9 @@ export default function PageViewBlockWrapper({
   // Convert page to block structure - use useMemo to ensure it updates when pageTableId changes
   // This is critical: when pageTableId is loaded asynchronously, the block config must update
   const block: PageBlock = useMemo(() => {
-    // Determine table_id with proper fallback chain
-    const resolvedTableId = pageTableId || config.table_id || config.base_table || undefined
+    // CRITICAL: Resolve tableId with proper fallback chain
+    // Enforce: const tableId = block.config.table_id || pageTableId || page.base_table || null
+    const resolvedTableId = config.table_id || pageTableId || config.base_table || page.base_table || null
     
     // Determine view_id
     const resolvedViewId = page.saved_view_id || config.view_id || undefined
@@ -49,14 +50,14 @@ export default function PageViewBlockWrapper({
         // Pass through page config first
         ...config,
         // Then override with our resolved values to ensure they take precedence
-        table_id: resolvedTableId,
+        table_id: resolvedTableId || undefined, // Use undefined instead of null for consistency
         view_id: resolvedViewId,
         view_type: viewType,
       },
       order_index: 0,
       created_at: page.created_at || new Date().toISOString(),
     }
-  }, [page.id, page.saved_view_id, page.created_at, pageTableId, viewType, config])
+  }, [page.id, page.saved_view_id, page.base_table, page.created_at, pageTableId, viewType, config])
 
   return (
     <div className="h-full w-full">

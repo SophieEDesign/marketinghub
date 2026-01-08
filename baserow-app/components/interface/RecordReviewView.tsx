@@ -486,6 +486,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 // Render InterfaceBuilder with recordId
                 // Key ensures blocks re-render with new recordId when record changes
                 // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
+                // CRITICAL: Do NOT pass isViewer prop - let InterfaceBuilder use useBlockEditMode directly
+                // This ensures the right panel is editable exactly like Content pages
                 <InterfaceBuilder
                   key={`record-${selectedRecordId}`}
                   page={{
@@ -495,7 +497,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                     description: 'Record detail view'
                   } as any}
                   initialBlocks={loadedBlocks}
-                  isViewer={!isEditing}
                   hideHeader={true}
                   pageTableId={pageTableId}
                   recordId={selectedRecordId}

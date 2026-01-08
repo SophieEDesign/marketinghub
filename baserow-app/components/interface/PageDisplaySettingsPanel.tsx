@@ -79,9 +79,11 @@ export default function PageDisplaySettingsPanel({
   const [endDateField, setEndDateField] = useState<string>("")
   const [calendarDisplayFields, setCalendarDisplayFields] = useState<string[]>([])
   const [previewFields, setPreviewFields] = useState<string[]>([])
+  const [selectedFieldsForBlocks, setSelectedFieldsForBlocks] = useState<string[]>([]) // Fields selected for blocks
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [panelEditorOpen, setPanelEditorOpen] = useState(false)
+  const [addingFields, setAddingFields] = useState(false)
 
   // Load initial data
   useEffect(() => {

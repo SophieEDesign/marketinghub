@@ -274,9 +274,12 @@ export default function InterfaceBuilder({
     [effectiveIsEditing, saveLayout]
   )
 
-  // Reset layout modified flag when exiting edit mode
+  // Reset layout modified flag when entering edit mode (not exiting)
+  // CRITICAL: Reset on ENTER, not EXIT, to allow saves when user actually modifies layout
+  // This ensures layout persistence works correctly - we only prevent saves during mount/hydration
   useEffect(() => {
-    if (!effectiveIsEditing) {
+    if (effectiveIsEditing) {
+      // Reset flag when entering edit mode - user hasn't modified layout yet
       layoutModifiedByUserRef.current = false
     }
   }, [effectiveIsEditing])
