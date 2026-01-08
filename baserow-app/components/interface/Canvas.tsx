@@ -41,7 +41,6 @@ interface CanvasProps {
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
-  aggregateData?: Record<string, { data: any; error: string | null; isLoading: boolean }> // Page-level aggregate data for blocks
 }
 
 export default function Canvas({
@@ -65,7 +64,6 @@ export default function Canvas({
   pageId = null,
   recordId = null,
   onRecordClick,
-  aggregateData = {},
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock } = useFilterState()
