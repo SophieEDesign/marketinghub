@@ -66,39 +66,26 @@ export default function InterfaceBuilder({
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
 
-  // Track previous initialBlocks to prevent unnecessary updates
-  const prevInitialBlocksRef = useRef<string>('')
+  // CRITICAL: View mode is READ-ONLY - never update blocks on mode changes
+  // Only initialize blocks once on page load or when initialBlocks actually change from API
+  // Use hash-based guard to prevent unnecessary updates
+  const lastLoadedBlockHashRef = useRef<string | null>(null)
+  const hasInitializedRef = useRef<boolean>(false)
   const prevPageIdRef = useRef<string>(page.id)
   
-  // Reset comparison when page changes
-  useEffect(() => {
-    if (prevPageIdRef.current !== page.id) {
-      prevPageIdRef.current = page.id
-      prevInitialBlocksRef.current = '' // Reset comparison key when page changes
-    }
-  }, [page.id])
-  
-  // Sync initialBlocks to blocks state when they change (important for async loading)
-  // CRITICAL: Replace state entirely when initialBlocks change - database is source of truth
-  useEffect(() => {
-    // Handle undefined/null initialBlocks
-    const safeInitialBlocks = initialBlocks || []
-    
-    // Create a stable key from initialBlocks to detect actual changes
-    // CRITICAL: Include config in the key to detect content changes (e.g., content_json updates)
-    // Use deep comparison including all config properties to detect content changes
-    const blocksArray = safeInitialBlocks.map(b => ({
+  // Helper to create stable hash from blocks
+  const hashBlocks = useCallback((blocks: PageBlock[]) => {
+    const blocksArray = blocks.map((b: PageBlock) => ({
       id: b.id,
       type: b.type,
       x: b.x,
       y: b.y,
       w: b.w,
       h: b.h,
-      config: b.config, // Include full config to detect content changes
-      updated_at: (b as any).updated_at, // Include updated_at to detect saves
+      config: b.config,
+      updated_at: (b as any).updated_at,
     }))
-    // Use a more reliable comparison that includes all nested properties
-    const blocksKey = JSON.stringify(blocksArray, (key, value) => {
+    return JSON.stringify(blocksArray, (key, value) => {
       // Sort object keys for consistent comparison
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         return Object.keys(value).sort().reduce((acc, k) => {
@@ -108,42 +95,51 @@ export default function InterfaceBuilder({
       }
       return value
     })
+  }, [])
+  
+  // Reset initialization when page changes
+  useEffect(() => {
+    if (prevPageIdRef.current !== page.id) {
+      prevPageIdRef.current = page.id
+      hasInitializedRef.current = false
+      lastLoadedBlockHashRef.current = null
+    }
+  }, [page.id])
+  
+  // CRITICAL: Only initialize blocks once on page load or when data actually changes
+  // View mode must never write to block state - it's READ-ONLY
+  useEffect(() => {
+    const safeInitialBlocks = initialBlocks || []
+    const newHash = hashBlocks(safeInitialBlocks)
     
-    // Only update if blocks actually changed
-    if (prevInitialBlocksRef.current === blocksKey) {
-      return
+    // Only update if:
+    // 1. Not yet initialized (first load)
+    // 2. Data actually changed (hash differs)
+    // NEVER update based on mode changes (effectiveIsEditing)
+    const shouldUpdate = !hasInitializedRef.current || newHash !== lastLoadedBlockHashRef.current
+    
+    if (!shouldUpdate) {
+      return // No actual change - do nothing (view mode is passive)
     }
     
-    prevInitialBlocksRef.current = blocksKey
+    // Update only when data actually changed
+    const hashChanged = newHash !== lastLoadedBlockHashRef.current
+    const wasInitialized = hasInitializedRef.current
+    lastLoadedBlockHashRef.current = newHash
+    hasInitializedRef.current = true
     
-    // CRITICAL: Always replace state with initialBlocks when they change
-    // This handles both empty-to-populated transitions (e.g., async loading in RecordReviewView)
-    // and populated-to-populated updates (e.g., after save/reload)
-    // Database is source of truth - editor must reflect persisted data
-    console.log(`[InterfaceBuilder] setBlocks from initialBlocks: pageId=${page.id}`, {
+    console.log(`[InterfaceBuilder] Initializing/updating blocks from API: pageId=${page.id}`, {
+      isInitialization: !wasInitialized,
       oldBlocksCount: blocks.length,
       newBlocksCount: safeInitialBlocks.length,
       oldBlockIds: blocks.map(b => b.id),
       newBlockIds: safeInitialBlocks.map(b => b.id),
-      willReplace: true,
-      effectiveIsEditing,
-      blocksKeyChanged: true,
+      hashChanged,
     })
     
-    // CRITICAL: Always update blocks when initialBlocks change, regardless of edit mode
-    // The comparison above already ensures we only update when blocks actually changed
-    // This ensures:
-    // 1. Saved content appears in view mode after exiting edit mode
-    // 2. Blocks load properly when navigating to a page
-    // 3. Blocks update when reloaded from database
     setBlocks(safeInitialBlocks)
-    console.log(`[InterfaceBuilder] Blocks updated from initialBlocks: pageId=${page.id}`, {
-      reason: !effectiveIsEditing ? 'View mode - syncing saved content' : 'initialBlocks changed',
-      blocksCount: safeInitialBlocks.length,
-      effectiveIsEditing,
-    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialBlocks, effectiveIsEditing])
+  }, [initialBlocks, page.id, hashBlocks]) // NO effectiveIsEditing dependency!
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
@@ -262,41 +258,10 @@ export default function InterfaceBuilder({
           setSaveStatus("saved")
           setPendingLayout(null)
           
-          console.log('🔥 saveLayout COMPLETE – reloading from DB')
-          // CRITICAL: Reload blocks from database after successful save
-          // This ensures database is the source of truth and preview reflects persisted state
-          try {
-            const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
-              cache: 'no-store',
-            })
-            if (blocksResponse.ok) {
-              const blocksData = await blocksResponse.json()
-              const reloadedBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
-                id: block.id,
-                page_id: block.page_id || page.id,
-                type: block.type,
-                x: block.x ?? block.position_x ?? 0,
-                y: block.y ?? block.position_y ?? 0,
-                w: block.w ?? block.width ?? 4,
-                h: block.h ?? block.height ?? 4,
-                config: block.config || {},
-                order_index: block.order_index ?? 0,
-                created_at: block.created_at,
-                updated_at: block.updated_at,
-              }))
-              // Replace state entirely - database is source of truth
-              console.log(`[InterfaceBuilder] setBlocks after layout save reload: pageId=${page.id}`, {
-                oldBlocksCount: blocks.length,
-                newBlocksCount: reloadedBlocks.length,
-                oldBlockIds: blocks.map(b => b.id),
-                newBlockIds: reloadedBlocks.map(b => b.id),
-              })
-              setBlocks(reloadedBlocks)
-            }
-          } catch (reloadError) {
-            console.error("Failed to reload blocks after layout save:", reloadError)
-            // Continue - save succeeded, reload failure is non-critical
-          }
+          // CRITICAL: Do NOT reload blocks after save
+          // Blocks are already correct locally - reloading causes flicker/resets
+          // Only reload on explicit refresh, page change, or data change
+          console.log('🔥 saveLayout COMPLETE – not reloading (blocks already correct)')
           
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
