@@ -574,71 +574,32 @@ function InterfacePageClientInternal({
           updated_at: block.updated_at,
         }
       })
-      // CRITICAL: Merge with existing blocks instead of replacing (preserve user state)
-      // EXCEPT when forceReload is true - then replace configs to get latest saved content
-      // CRITICAL: Don't clear blocks if reload returns empty - preserve existing blocks
-      setBlocks((prevBlocks) => {
-        // If reload returns empty blocks and we have existing blocks, preserve them
-        // This prevents clearing blocks due to race conditions or temporary API issues
-        if (pageBlocks.length === 0 && prevBlocks.length > 0) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
-              prevBlocksCount: prevBlocks.length,
-              forceReload,
-              pageId: page.id
-            })
-          }
-          blocksLoadedRef.current = true
-          return prevBlocks
+      // CRITICAL: Database is source of truth - always replace state entirely when loading from DB
+      // Preview state is only valid before save completes - after reload, DB state must be used
+      // Exception: If reload returns empty blocks and we have existing blocks, preserve them
+      // (prevents clearing blocks due to race conditions or temporary API issues)
+      if (pageBlocks.length === 0 && blocks.length > 0 && !forceReload) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
+            prevBlocksCount: blocks.length,
+            forceReload,
+            pageId: page.id
+          })
         }
-        
-        if (prevBlocks.length === 0 || forceReload) {
-          blocksLoadedRef.current = true
-          // On force reload, replace entirely to get latest saved content
-          // But only if we actually got blocks back, otherwise preserve existing
-          if (pageBlocks.length > 0) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Blocks] Force reload: replacing blocks', {
-                oldCount: prevBlocks.length,
-                newCount: pageBlocks.length,
-                pageId: page.id
-              })
-            }
-            return pageBlocks
-          }
-          // If force reload but no blocks returned, preserve existing
-          return prevBlocks
-        }
-        // Merge: update existing blocks, add new ones
-        // CRITICAL: When merging, always use saved layout values from reloaded blocks
-        // This ensures layout persists after navigation
-        const existingIds = new Set(prevBlocks.map(b => b.id))
-        const merged = [...prevBlocks]
-        pageBlocks.forEach((newBlock: any) => {
-          const existingIndex = merged.findIndex(b => b.id === newBlock.id)
-          if (existingIndex >= 0) {
-            // CRITICAL: Always use saved layout values (x, y, w, h) from reloaded blocks
-            // CRITICAL: When reloading blocks (e.g., after navigation), use saved config to get latest content
-            // Merge config with newBlock.config taking precedence to ensure saved content_json is used
-            merged[existingIndex] = {
-              ...merged[existingIndex],
-              ...newBlock,
-              // CRITICAL: Use saved layout values from database - don't preserve current state
-              x: newBlock.x != null ? newBlock.x : merged[existingIndex].x,
-              y: newBlock.y != null ? newBlock.y : merged[existingIndex].y,
-              w: newBlock.w != null ? newBlock.w : merged[existingIndex].w,
-              h: newBlock.h != null ? newBlock.h : merged[existingIndex].h,
-              // CRITICAL: Prioritize saved config (newBlock.config) to ensure content_json persists after navigation
-              // This ensures TextBlock content and other config values are restored correctly
-              config: { ...merged[existingIndex].config, ...newBlock.config }
-            }
-          } else {
-            merged.push(newBlock)
-          }
-        })
         blocksLoadedRef.current = true
-        return merged
-      })
+        return
+      }
+      
+      // Replace state entirely - database is source of truth
+      if (process.env.NODE_ENV === 'development' && forceReload) {
+        console.log('[Blocks] Force reload: replacing blocks', {
+          oldCount: blocks.length,
+          newCount: pageBlocks.length,
+          pageId: page.id
+        })
+      }
+      setBlocks(pageBlocks)
+      blocksLoadedRef.current = true
     } catch (error) {
       console.error("Error loading blocks:", error)
       // CRITICAL: Never clear blocks on error - preserve existing blocks

@@ -46,16 +46,39 @@ export async function loadPage(pageId: string): Promise<Page | null> {
  * 
  * These positions are used to hydrate react-grid-layout on page load.
  * Called by: Interface page component on initial render
+ * 
+ * CRITICAL: Mirrors the logic in GET /api/pages/[pageId]/blocks
+ * - Checks if pageId belongs to interface_pages (uses page_id)
+ * - Otherwise assumes views.id (uses view_id)
+ * - Ensures save/load symmetry
  */
 export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
   const supabase = await createClient()
 
-  // Load from view_blocks table - ordered by order_index to maintain display order
-  const { data, error } = await supabase
-    .from('view_blocks')
-    .select('*')
-    .eq('view_id', pageId)
-    .order('order_index', { ascending: true })
+  // Check if this is an interface_pages.id or views.id
+  // Try interface_pages first (new system) - mirrors API route logic
+  const { data: page } = await supabase
+    .from('interface_pages')
+    .select('id')
+    .eq('id', pageId)
+    .maybeSingle()
+
+  let query
+  if (page) {
+    // This is an interface_pages.id - use page_id
+    query = supabase
+      .from('view_blocks')
+      .select('*')
+      .eq('page_id', pageId)
+  } else {
+    // This is a views.id - use view_id (backward compatibility)
+    query = supabase
+      .from('view_blocks')
+      .select('*')
+      .eq('view_id', pageId)
+  }
+
+  const { data, error } = await query.order('order_index', { ascending: true })
 
   if (error) {
     console.error('Error loading page blocks:', error)
@@ -68,7 +91,7 @@ export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
   // This ensures saved layout is the single source of truth
   return (data || []).map((block: any) => ({
     id: block.id,
-    page_id: block.view_id, // Map view_id to page_id for compatibility
+    page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
     type: block.type,
     x: block.position_x ?? 0, // Restore saved X position, default to 0 if null
     y: block.position_y ?? 0, // Restore saved Y position, default to 0 if null

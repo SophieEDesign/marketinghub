@@ -94,53 +94,13 @@ export default function InterfaceBuilder({
     prevInitialBlocksRef.current = blocksKey
     
     if (initialBlocks && initialBlocks.length > 0) {
-      // CRITICAL: On first load, set blocks. After that, merge to preserve user state
-      if (!initialBlocksAppliedRef.current) {
-        setBlocks(initialBlocks)
-        initialBlocksAppliedRef.current = true
-      } else {
-        // Merge: update existing blocks, add new ones
-        // CRITICAL: When reloading blocks (e.g., after navigation), always use saved layout values from database
-        // Only preserve current layout state if we're actively editing (user is dragging/resizing)
-        // CRITICAL: In viewer mode, always use saved values. In edit mode, prioritize saved values unless user is actively editing
-        setBlocks((prevBlocks) => {
-          const existingIds = new Set(prevBlocks.map(b => b.id))
-          const merged = prevBlocks.map(b => {
-            const updated = initialBlocks.find(ib => ib.id === b.id)
-            if (updated) {
-              // CRITICAL: Always use saved layout values from reloaded blocks (they come from database)
-              // The check for undefined/null ensures we don't overwrite with invalid values
-              // But if updated block has valid values (including 0, which is valid), use them
-              // This ensures saved layout persists after navigation
-              return {
-                ...b,
-                // CRITICAL: Always use saved layout values - don't preserve current state on reload
-                // This fixes the issue where blocks revert to small after navigation
-                x: updated.x != null ? updated.x : b.x,
-                y: updated.y != null ? updated.y : b.y,
-                w: updated.w != null ? updated.w : b.w,
-                h: updated.h != null ? updated.h : b.h,
-                // CRITICAL: In viewer mode, replace config entirely to get latest saved content
-                // In edit mode, merge config to preserve user state during editing
-                config: isViewer ? updated.config : { ...b.config, ...updated.config },
-                // Preserve other metadata
-                updated_at: updated.updated_at ?? b.updated_at,
-                order_index: updated.order_index ?? b.order_index,
-              }
-            }
-            return b
-          })
-          // Add new blocks
-          initialBlocks.forEach(ib => {
-            if (!existingIds.has(ib.id)) {
-              merged.push(ib)
-            }
-          })
-          return merged
-        })
-      }
-    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0 && !initialBlocksAppliedRef.current) {
-      // Only clear blocks if initialBlocks is explicitly empty AND we haven't applied initial blocks yet
+      // CRITICAL: Replace state entirely when initialBlocks change
+      // Database is source of truth - editor must reflect persisted data, not cached client state
+      // This ensures that after reload/navigation, editor shows what's actually saved
+      setBlocks(initialBlocks)
+      initialBlocksAppliedRef.current = true
+    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0) {
+      // Clear blocks if initialBlocks is explicitly empty
       setBlocks([])
       initialBlocksAppliedRef.current = true
     }
@@ -256,6 +216,36 @@ export default function InterfaceBuilder({
 
           setSaveStatus("saved")
           setPendingLayout(null)
+          
+          // CRITICAL: Reload blocks from database after successful save
+          // This ensures database is the source of truth and preview reflects persisted state
+          try {
+            const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
+              cache: 'no-store',
+            })
+            if (blocksResponse.ok) {
+              const blocksData = await blocksResponse.json()
+              const reloadedBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
+                id: block.id,
+                page_id: block.page_id || page.id,
+                type: block.type,
+                x: block.x ?? block.position_x ?? 0,
+                y: block.y ?? block.position_y ?? 0,
+                w: block.w ?? block.width ?? 4,
+                h: block.h ?? block.height ?? 4,
+                config: block.config || {},
+                order_index: block.order_index ?? 0,
+                created_at: block.created_at,
+                updated_at: block.updated_at,
+              }))
+              // Replace state entirely - database is source of truth
+              setBlocks(reloadedBlocks)
+            }
+          } catch (reloadError) {
+            console.error("Failed to reload blocks after layout save:", reloadError)
+            // Continue - save succeeded, reload failure is non-critical
+          }
+          
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
         } else {
@@ -474,70 +464,14 @@ export default function InterfaceBuilder({
           })
         }
 
-        // CRITICAL: Use returned blocks if available (more efficient and ensures consistency)
-        // The API now returns updated blocks with the latest config including content_json
-        if (responseData.blocks && responseData.blocks.length > 0) {
-          const updatedBlock = responseData.blocks.find((b: PageBlock) => b.id === blockId)
-          if (updatedBlock) {
-            // PHASE 1 - TextBlock write verification: Verify returned content_json matches sent
-            if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
-              const sentContentStr = JSON.stringify((config as any).content_json)
-              const returnedContentStr = JSON.stringify(updatedBlock.config?.content_json)
-              const matches = sentContentStr === returnedContentStr
-              
-              console.log(`[TextBlock Write] Block ${blockId}: VERIFICATION`, {
-                blockId,
-                sentContentJson: (config as any).content_json,
-                returnedContentJson: updatedBlock.config?.content_json,
-                matches,
-                sentStr: sentContentStr,
-                returnedStr: returnedContentStr,
-              })
-              
-              if (!matches) {
-                console.error(`[TextBlock Write] Block ${blockId}: MISMATCH - API returned different content_json than sent!`)
-              }
-            }
-
-            // CRITICAL: Merge config instead of replacing wholesale (preserve user state)
-            // CRITICAL: Preserve layout columns (x, y, w, h) from current block state - don't overwrite with API response
-            // Only set x/y/w/h from updatedBlock IF explicitly provided (not undefined/null)
-            // The API response may have stale layout values if layout was updated separately
-            // BUT: When updating config, we want to preserve the current layout state (user might be dragging/resizing)
-            setBlocks((prev) =>
-              prev.map((b) => {
-                if (b.id === blockId) {
-                  return {
-                    ...b,
-                    // CRITICAL: Preserve layout from current state when updating config
-                    // Layout updates happen separately via handleLayoutChange, so API response may have stale layout
-                    // Only update layout if API explicitly provides valid values AND they differ significantly
-                    x: updatedBlock.x != null && Math.abs(updatedBlock.x - b.x) > 0.1 ? updatedBlock.x : b.x,
-                    y: updatedBlock.y != null && Math.abs(updatedBlock.y - b.y) > 0.1 ? updatedBlock.y : b.y,
-                    w: updatedBlock.w != null && Math.abs(updatedBlock.w - b.w) > 0.1 ? updatedBlock.w : b.w,
-                    h: updatedBlock.h != null && Math.abs(updatedBlock.h - b.h) > 0.1 ? updatedBlock.h : b.h,
-                    // Merge config shallowly (including content_json)
-                    config: { ...b.config, ...updatedBlock.config },
-                    // Preserve other metadata from updated block
-                    updated_at: updatedBlock.updated_at ?? b.updated_at,
-                    order_index: updatedBlock.order_index ?? b.order_index,
-                  }
-                }
-                return b
-              })
-            )
-            return // Success - no need to refetch
-          }
-        }
-
-        // Fallback: Reload blocks from server if returned blocks not available
-        // This ensures saved config is reflected correctly
+        // CRITICAL: After successful save, reload blocks from database and replace state entirely
+        // Database is the source of truth - preview state is only valid before save completes
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
           cache: 'no-store', // Ensure fresh data
         })
         if (blocksResponse.ok) {
           const blocksData = await blocksResponse.json()
-          const pageBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
+          const reloadedBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
             id: block.id,
             page_id: block.page_id || page.id,
             type: block.type,
@@ -550,38 +484,8 @@ export default function InterfaceBuilder({
             created_at: block.created_at,
             updated_at: block.updated_at,
           }))
-          // CRITICAL: Merge instead of replacing (preserve layout state)
-          // CRITICAL: Preserve layout columns (x, y, w, h) from current block state
-          // Only set x/y/w/h from updated block IF explicitly provided (not undefined/null)
-          setBlocks((prevBlocks) => {
-            const existingIds = new Set(prevBlocks.map(b => b.id))
-            const merged = prevBlocks.map(b => {
-              const updated = pageBlocks.find((pb: PageBlock) => pb.id === b.id)
-              if (updated) {
-                return {
-                  ...b,
-                  // Preserve layout from current state (x, y, w, h) - don't overwrite with undefined/null
-                  x: updated.x !== undefined && updated.x !== null ? updated.x : b.x,
-                  y: updated.y !== undefined && updated.y !== null ? updated.y : b.y,
-                  w: updated.w !== undefined && updated.w !== null ? updated.w : b.w,
-                  h: updated.h !== undefined && updated.h !== null ? updated.h : b.h,
-                  // Merge config shallowly (including content_json)
-                  config: { ...b.config, ...updated.config },
-                  // Preserve other metadata from updated block
-                  updated_at: updated.updated_at ?? b.updated_at,
-                  order_index: updated.order_index ?? b.order_index,
-                }
-              }
-              return b
-            })
-            // Add new blocks (these can use layout from API since they're new)
-            pageBlocks.forEach(pb => {
-              if (!existingIds.has(pb.id)) {
-                merged.push(pb)
-              }
-            })
-            return merged
-          })
+          // Replace state entirely - database is source of truth
+          setBlocks(reloadedBlocks)
         } else {
           // Fallback: update local state optimistically if reload fails
           setBlocks((prev) =>
