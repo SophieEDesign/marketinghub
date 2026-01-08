@@ -251,6 +251,8 @@ function InterfacePageClientInternal({
     // Detect when exiting edit mode (isBlockEditing changes from true to false)
     if (prevIsBlockEditingRef.current && !isBlockEditing) {
       // User just exited edit mode - reload blocks to get latest saved content
+      // CRITICAL: Do NOT clear blocks before reload - preserve them to prevent empty state flicker
+      // Canvas must always render blocks when they exist, regardless of edit/viewer mode
       if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
         // Clear any pending reload timeout
         if (reloadTimeoutRef.current) {
@@ -259,6 +261,8 @@ function InterfacePageClientInternal({
         // Longer delay to ensure database transaction is fully committed
         // This prevents race condition where reload happens before save completes
         reloadTimeoutRef.current = setTimeout(() => {
+          // CRITICAL: Force reload but preserve existing blocks during reload
+          // This prevents Canvas from rendering empty state during the reload delay
           loadBlocks(true) // Force reload to get latest saved content
           reloadTimeoutRef.current = null
         }, 500) // Increased delay to ensure save completes

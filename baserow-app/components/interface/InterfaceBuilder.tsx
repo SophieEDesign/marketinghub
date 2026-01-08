@@ -104,7 +104,27 @@ export default function InterfaceBuilder({
       newBlockIds: safeInitialBlocks.map(b => b.id),
       willReplace: true,
     })
-    setBlocks(safeInitialBlocks)
+    // CRITICAL: Only update blocks if initialBlocks actually has blocks
+    // If initialBlocks is empty but we have existing blocks, preserve them
+    // This prevents clearing blocks during reload delays or race conditions
+    // Viewer mode should NOT clear blocks - blocks must always render when they exist
+    if (safeInitialBlocks.length > 0 || blocks.length === 0) {
+      // Only update if:
+      // 1. New blocks exist (safeInitialBlocks.length > 0), OR
+      // 2. We have no existing blocks (blocks.length === 0) - allow empty state only when truly empty
+      setBlocks(safeInitialBlocks)
+    } else {
+      // Preserve existing blocks if new blocks are empty but we have blocks
+      // This prevents viewer mode from clearing blocks during reload
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[InterfaceBuilder] Preserving blocks (empty initialBlocks but blocks exist): pageId=${page.id}`, {
+          existingBlocksCount: blocks.length,
+          existingBlockIds: blocks.map((b: any) => b.id),
+          initialBlocksCount: safeInitialBlocks.length,
+          reason: 'Preventing empty state during reload/viewer mode transition',
+        })
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBlocks])
 
