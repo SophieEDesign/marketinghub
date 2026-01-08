@@ -87,6 +87,18 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
     // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
     const sanitizedTableId = tableId.split(':')[0]
 
+    // DEBUG_LIST: Log row loading
+    if (typeof window !== 'undefined' && localStorage.getItem('DEBUG_LIST') === '1') {
+      console.log('[DEBUG LIST] GridView: Loading rows', {
+        tableId,
+        sanitizedTableId,
+        viewId,
+        page,
+        filtersCount: filters.length,
+        sortsCount: sorts.length,
+      })
+    }
+
     loadingRowsRef.current = true
     setLoading(true)
     try {
@@ -122,7 +134,18 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
           }
         }
       } else {
-        setRows(data || [])
+        const loadedRows = data || []
+        setRows(loadedRows)
+        
+        // DEBUG_LIST: Log loaded rows
+        if (typeof window !== 'undefined' && localStorage.getItem('DEBUG_LIST') === '1') {
+          console.log('[DEBUG LIST] GridView: Loaded rows', {
+            rowCount: loadedRows.length,
+            tableId: sanitizedTableId,
+            viewId,
+            page,
+          })
+        }
       }
     } catch (error) {
       console.error("Error loading rows:", error)

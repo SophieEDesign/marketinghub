@@ -459,13 +459,23 @@ export default function InterfaceBuilder({
             }
 
             // CRITICAL: Merge config instead of replacing wholesale (preserve user state)
+            // CRITICAL: Preserve layout columns (x, y, w, h) from current block state - don't overwrite with API response
+            // The API response may have stale layout values if layout was updated separately
             setBlocks((prev) =>
               prev.map((b) => {
                 if (b.id === blockId) {
                   return {
                     ...b,
-                    ...updatedBlock,
-                    config: { ...b.config, ...updatedBlock.config }
+                    // Preserve layout from current state (x, y, w, h)
+                    x: b.x,
+                    y: b.y,
+                    w: b.w,
+                    h: b.h,
+                    // Merge config (including content_json)
+                    config: { ...b.config, ...updatedBlock.config },
+                    // Preserve other metadata from updated block
+                    updated_at: updatedBlock.updated_at,
+                    order_index: updatedBlock.order_index ?? b.order_index,
                   }
                 }
                 return b
@@ -496,6 +506,8 @@ export default function InterfaceBuilder({
             updated_at: block.updated_at,
           }))
           // CRITICAL: Merge instead of replacing (preserve layout state)
+          // CRITICAL: Preserve layout columns (x, y, w, h) from current block state
+          // Only update config, not layout, unless block is new
           setBlocks((prevBlocks) => {
             const existingIds = new Set(prevBlocks.map(b => b.id))
             const merged = prevBlocks.map(b => {
@@ -503,13 +515,21 @@ export default function InterfaceBuilder({
               if (updated) {
                 return {
                   ...b,
-                  ...updated,
-                  config: { ...b.config, ...updated.config }
+                  // Preserve layout from current state (x, y, w, h)
+                  x: b.x,
+                  y: b.y,
+                  w: b.w,
+                  h: b.h,
+                  // Merge config (including content_json)
+                  config: { ...b.config, ...updated.config },
+                  // Preserve other metadata from updated block
+                  updated_at: updated.updated_at,
+                  order_index: updated.order_index ?? b.order_index,
                 }
               }
               return b
             })
-            // Add new blocks
+            // Add new blocks (these can use layout from API since they're new)
             pageBlocks.forEach(pb => {
               if (!existingIds.has(pb.id)) {
                 merged.push(pb)

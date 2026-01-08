@@ -1160,6 +1160,19 @@ export default function CalendarView({
           eventClick={(info) => {
             // CRITICAL: Handle event click - use onRecordClick callback if provided, otherwise use modal
             const recordId = info.event.id
+            
+            // DEBUG_CALENDAR: Always log event clicks (even if debug flag not set, log in dev mode)
+            if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+              console.log('[Calendar] Event clicked', {
+                recordId,
+                eventId: info.event.id,
+                eventTitle: info.event.title,
+                hasOnRecordClick: !!onRecordClick,
+                willUseModal: !onRecordClick,
+                willCallCallback: !!onRecordClick,
+              })
+            }
+            
             debugCalendar('CALENDAR', 'Event clicked', {
               recordId,
               event: info.event,
@@ -1170,11 +1183,19 @@ export default function CalendarView({
             if (recordId) {
               // If onRecordClick callback provided (e.g., from RecordReview), use it
               if (onRecordClick) {
+                if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+                  console.log('[Calendar] Calling onRecordClick callback', { recordId })
+                }
                 onRecordClick(recordId)
               } else {
                 // Otherwise, open modal (default behavior)
+                if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
+                  console.log('[Calendar] Opening record modal', { recordId })
+                }
                 setSelectedRecordId(recordId)
               }
+            } else {
+              console.warn('[Calendar] Event clicked but no recordId found', { event: info.event })
             }
           }}
           dateClick={(info) => {

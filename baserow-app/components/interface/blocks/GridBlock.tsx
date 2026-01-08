@@ -9,6 +9,7 @@ import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
 import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
+import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 
 interface GridBlockProps {
   block: PageBlock
@@ -26,6 +27,20 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   const tableId = config?.table_id || pageTableId || config?.base_table || null
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
+  
+  // DEBUG_LIST: Log tableId resolution
+  const listDebugEnabled = isDebugEnabled('LIST')
+  if (listDebugEnabled) {
+    debugLog('LIST', 'GridBlock tableId resolution', {
+      blockId: block.id,
+      configTableId: config?.table_id,
+      pageTableId,
+      configBaseTable: config?.base_table,
+      resolvedTableId: tableId,
+      viewId,
+      viewType,
+    })
+  }
   // Visible fields from config (required) - ensure it's always an array
   const visibleFieldsConfig = Array.isArray(config?.visible_fields) 
     ? config.visible_fields 
