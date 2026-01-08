@@ -66,6 +66,15 @@ export default function InterfaceBuilder({
 
   // Track previous initialBlocks to prevent unnecessary updates
   const prevInitialBlocksRef = useRef<string>('')
+  const prevPageIdRef = useRef<string>(page.id)
+  
+  // Reset comparison when page changes
+  useEffect(() => {
+    if (prevPageIdRef.current !== page.id) {
+      prevPageIdRef.current = page.id
+      prevInitialBlocksRef.current = '' // Reset comparison key when page changes
+    }
+  }, [page.id])
   
   // Sync initialBlocks to blocks state when they change (important for async loading)
   // CRITICAL: Replace state entirely when initialBlocks change - database is source of truth
@@ -75,6 +84,7 @@ export default function InterfaceBuilder({
     
     // Create a stable key from initialBlocks to detect actual changes
     // CRITICAL: Include config in the key to detect content changes (e.g., content_json updates)
+    // Use deep comparison including all config properties to detect content changes
     const blocksArray = safeInitialBlocks.map(b => ({
       id: b.id,
       type: b.type,
@@ -82,9 +92,20 @@ export default function InterfaceBuilder({
       y: b.y,
       w: b.w,
       h: b.h,
-      config: b.config // Include config to detect content changes
+      config: b.config, // Include full config to detect content changes
+      updated_at: (b as any).updated_at, // Include updated_at to detect saves
     }))
-    const blocksKey = JSON.stringify(blocksArray)
+    // Use a more reliable comparison that includes all nested properties
+    const blocksKey = JSON.stringify(blocksArray, (key, value) => {
+      // Sort object keys for consistent comparison
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        return Object.keys(value).sort().reduce((acc, k) => {
+          acc[k] = value[k]
+          return acc
+        }, {} as any)
+      }
+      return value
+    })
     
     // Only update if blocks actually changed
     if (prevInitialBlocksRef.current === blocksKey) {
@@ -103,30 +124,24 @@ export default function InterfaceBuilder({
       oldBlockIds: blocks.map(b => b.id),
       newBlockIds: safeInitialBlocks.map(b => b.id),
       willReplace: true,
+      effectiveIsEditing,
+      blocksKeyChanged: true,
     })
-    // CRITICAL: Only update blocks if initialBlocks actually has blocks
-    // If initialBlocks is empty but we have existing blocks, preserve them
-    // This prevents clearing blocks during reload delays or race conditions
-    // Viewer mode should NOT clear blocks - blocks must always render when they exist
-    if (safeInitialBlocks.length > 0 || blocks.length === 0) {
-      // Only update if:
-      // 1. New blocks exist (safeInitialBlocks.length > 0), OR
-      // 2. We have no existing blocks (blocks.length === 0) - allow empty state only when truly empty
-      setBlocks(safeInitialBlocks)
-    } else {
-      // Preserve existing blocks if new blocks are empty but we have blocks
-      // This prevents viewer mode from clearing blocks during reload
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[InterfaceBuilder] Preserving blocks (empty initialBlocks but blocks exist): pageId=${page.id}`, {
-          existingBlocksCount: blocks.length,
-          existingBlockIds: blocks.map((b: any) => b.id),
-          initialBlocksCount: safeInitialBlocks.length,
-          reason: 'Preventing empty state during reload/viewer mode transition',
-        })
-      }
-    }
+    
+    // CRITICAL: Always update blocks when initialBlocks change, regardless of edit mode
+    // The comparison above already ensures we only update when blocks actually changed
+    // This ensures:
+    // 1. Saved content appears in view mode after exiting edit mode
+    // 2. Blocks load properly when navigating to a page
+    // 3. Blocks update when reloaded from database
+    setBlocks(safeInitialBlocks)
+    console.log(`[InterfaceBuilder] Blocks updated from initialBlocks: pageId=${page.id}`, {
+      reason: !effectiveIsEditing ? 'View mode - syncing saved content' : 'initialBlocks changed',
+      blocksCount: safeInitialBlocks.length,
+      effectiveIsEditing,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialBlocks])
+  }, [initialBlocks, effectiveIsEditing])
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)

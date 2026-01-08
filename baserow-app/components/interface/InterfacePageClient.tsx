@@ -258,14 +258,16 @@ function InterfacePageClientInternal({
         if (reloadTimeoutRef.current) {
           clearTimeout(reloadTimeoutRef.current)
         }
+        console.log(`[InterfacePageClient] Exiting edit mode - scheduling block reload: pageId=${page.id}`)
         // Longer delay to ensure database transaction is fully committed
         // This prevents race condition where reload happens before save completes
         reloadTimeoutRef.current = setTimeout(() => {
+          console.log(`[InterfacePageClient] Executing block reload after exit edit mode: pageId=${page.id}`)
           // CRITICAL: Force reload but preserve existing blocks during reload
           // This prevents Canvas from rendering empty state during the reload delay
           loadBlocks(true) // Force reload to get latest saved content
           reloadTimeoutRef.current = null
-        }, 500) // Increased delay to ensure save completes
+        }, 750) // Increased delay to ensure save completes and database is consistent
       }
     }
     prevIsBlockEditingRef.current = isBlockEditing
