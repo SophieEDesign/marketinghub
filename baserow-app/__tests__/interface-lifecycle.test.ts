@@ -3,6 +3,8 @@
  * These tests verify critical wiring paths don't break
  */
 
+import { describe, it, expect } from 'vitest'
+
 describe('Interface Lifecycle - Pre-deploy Checks', () => {
   describe('Table ID Resolution', () => {
     it('should resolve tableId in correct order: block.config.table_id → page.base_table → block.config.base_table → null', () => {

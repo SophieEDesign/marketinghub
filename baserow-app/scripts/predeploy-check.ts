@@ -301,6 +301,8 @@ async function runTypecheck() {
   console.log('🔍 Running TypeScript typecheck...')
   const { execSync } = require('child_process')
   try {
+    // Test files are excluded in tsconfig.json
+    // They are validated by vitest itself
     execSync('npx tsc --noEmit', { stdio: 'inherit' })
     console.log('✅ Typecheck passed')
     return true
@@ -349,15 +351,20 @@ async function runTests() {
       console.log('✅ Tests passed')
       return true
     } catch (error) {
-      console.warn('⚠️  Vitest not available or tests failed. Skipping tests.')
-      return true // Don't fail build if tests aren't set up
+      console.error('❌ Tests failed')
+      errors.push({
+        type: 'test_error',
+        id: 'vitest',
+        message: 'Tests failed. Fix failing tests before deploying.',
+      })
+      return false
     }
   } catch (error) {
-    console.error('❌ Tests failed')
+    console.error('❌ Error running tests:', error)
     errors.push({
       type: 'test_error',
       id: 'vitest',
-      message: 'Tests failed. Fix failing tests before deploying.',
+      message: 'Error running tests. Check test configuration.',
     })
     return false
   }

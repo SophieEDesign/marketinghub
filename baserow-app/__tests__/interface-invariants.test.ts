@@ -49,10 +49,16 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       // Step 4: Convert back to LayoutItem
       const pageBlock = {
         id: 'block-1',
+        page_id: 'page-1',
+        type: 'text' as const,
         x: layout!.x,
         y: layout!.y,
         w: layout!.w,
         h: layout!.h,
+        config: {},
+        order_index: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }
       const restoredLayoutItem = blockToLayoutItem(pageBlock)
       expect(restoredLayoutItem).toEqual(layoutItem)
@@ -195,11 +201,11 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       }
       
       // CRITICAL: Must use field NAME to read row data
-      const dateValue = row.data[dateFieldName] // ✅ Correct: uses name
+      const dateValue = row.data[dateFieldName as keyof typeof row.data] // ✅ Correct: uses name
       // const dateValue = row.data[dateFieldId] // ❌ Wrong: would be undefined
       
       expect(dateValue).toBe('2024-01-15')
-      expect(row.data[dateFieldId]).toBeUndefined() // ID doesn't exist as key
+      expect((row.data as any)[dateFieldId]).toBeUndefined() // ID doesn't exist as key
     })
 
     it('should resolve date field ID to name before reading rows', () => {
@@ -214,7 +220,7 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       const dateFieldName = dateField?.name || dateFieldId
       
       // Row data uses field name
-      const row = {
+      const row: { id: string; data: Record<string, any> } = {
         id: 'row-1',
         data: {
           start_date: '2024-01-15', // Field NAME
@@ -312,21 +318,22 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
   describe('6. Table ID Resolution Order', () => {
     it('should resolve tableId in correct order: config.table_id → page.base_table → config.base_table → null', () => {
       // Priority 1: block.config.table_id
-      const blockConfig1 = { table_id: 'block-table-id' }
+      const blockConfig1: { table_id?: string; base_table?: string } = { table_id: 'block-table-id' }
       const pageTableId = 'page-table-id'
       expect(blockConfig1.table_id || pageTableId || blockConfig1.base_table || null).toBe('block-table-id')
       
       // Priority 2: page.base_table (pageTableId)
-      const blockConfig2 = {}
+      const blockConfig2: { table_id?: string; base_table?: string } = {}
       expect(blockConfig2.table_id || pageTableId || blockConfig2.base_table || null).toBe('page-table-id')
       
       // Priority 3: block.config.base_table (only if pageTableId is null)
-      const blockConfig3 = { base_table: 'block-base-table' }
-      const nullPageTableId = null
+      const blockConfig3: { table_id?: string; base_table?: string } = { base_table: 'block-base-table' }
+      const nullPageTableId: string | null = null
       expect(blockConfig3.table_id || nullPageTableId || blockConfig3.base_table || null).toBe('block-base-table')
       
-      // Priority 4: null
-      expect(null || null || null || null).toBe(null)
+      // Priority 4: null (all values are null)
+      const allNull: string | null = null
+      expect(allNull || allNull || allNull || allNull).toBe(null)
     })
   })
 
@@ -405,6 +412,11 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
 
   describe('9. No Remount Loops - Stable Keys', () => {
     it('should use stable keys that do not include array lengths', () => {
+      // Test variables
+      const tableId = 'table-123'
+      const dateFieldId = 'date-field-456'
+      const events: any[] = [{ id: '1' }, { id: '2' }]
+      
       // ❌ BAD: Unstable key (changes when data updates)
       const badKey = `calendar-${tableId}-${dateFieldId}-${events.length}`
       
@@ -414,6 +426,9 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       // Verify stable key doesn't include length
       expect(goodKey.includes('length')).toBe(false)
       expect(goodKey.includes('.length')).toBe(false)
+      
+      // Verify bad key includes length (demonstrates the problem)
+      expect(badKey.includes('2')).toBe(true) // events.length = 2
     })
 
     it('should use block.id as key for block lists', () => {
@@ -428,7 +443,9 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       
       // Keys should NOT include counts or lengths
       const badKeys = blocks.map((b, i) => `block-${i}-${blocks.length}`)
-      expect(badKeys.some(k => k.includes('length'))).toBe(true) // Bad example
+      // Bad keys include the length value (2) in the string
+      expect(badKeys.some(k => k.includes('2'))).toBe(true) // Bad example - includes length value
+      expect(badKeys[0]).toBe('block-0-2') // Demonstrates the problem
     })
   })
 
@@ -437,7 +454,7 @@ describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
       // Simulate: GridBlock query (same for edit/view)
       const tableId = 'table-123'
       const viewId = 'view-456'
-      const filters = []
+      const filters: any[] = []
       
       // Query should be identical regardless of isEditing
       const queryEdit = { tableId, viewId, filters }
