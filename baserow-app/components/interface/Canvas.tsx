@@ -92,6 +92,26 @@ export default function Canvas({
   const layoutHydratedRef = useRef(false)
   const isResizingRef = useRef(false)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const prevPageIdRef = useRef<string>(pageId)
+  
+  // Reset hydration state when page changes (Canvas remounts)
+  // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
+  useEffect(() => {
+    if (prevPageIdRef.current !== pageId && pageId) {
+      const oldPageId = prevPageIdRef.current
+      prevPageIdRef.current = pageId
+      previousBlockIdsRef.current = ""
+      layoutHydratedRef.current = false
+      isInitializedRef.current = false
+      setLayout([]) // Clear layout when page changes
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Page changed - resetting hydration state', {
+          oldPageId,
+          newPageId: pageId,
+        })
+      }
+    }
+  }, [pageId])
   
   // Lifecycle logging
   useEffect(() => {
@@ -105,15 +125,15 @@ export default function Canvas({
    * Hydrates react-grid-layout from Supabase on page load
    * 
    * CRITICAL RULES:
-   * 1. Database values (position_x, position_y, width, height) are the single source of truth
-   * 2. ALWAYS hydrate layout from database values
-   * 3. NEVER regenerate layout if position_x/y/w/h exist
+   * 1. Database values (position_x, position_y, width, height) are the single source of truth FOR INITIAL LOAD ONLY
+   * 2. After initial hydration, layout state becomes locally authoritative
+   * 3. NEVER regenerate layout if position_x/y/w/h exist (except on first load)
    * 4. Default layout generation is ONLY allowed when ALL of position_x, position_y, width, height are NULL
    * 5. This applies per block, not per page
    * 6. Edit/view transitions do NOT trigger layout writes
    * 
    * Only syncs from blocks prop when:
-   * 1. First load (not yet initialized)
+   * 1. First load (not yet initialized) - ONCE ONLY
    * 2. Block IDs changed (block added or removed)
    * 
    * After hydration, layout state is managed locally and only updates via:
@@ -123,8 +143,12 @@ export default function Canvas({
    * - Parent component re-renders
    * - Block config updates (but positions unchanged)
    * - Edit/view mode transitions
+   * - Save + reload cycles (blocks arrive with stale positions)
    * - Other state changes in parent
    * - During active resize/drag operations
+   * 
+   * KEY INSIGHT: After initial hydration, blocks.x/y/w/h may lag behind saved layout.
+   * Layout state is the source of truth after first load.
    */
   useEffect(() => {
     // Don't reset layout if user is currently resizing/dragging
@@ -132,23 +156,69 @@ export default function Canvas({
       return
     }
 
+    // Don't hydrate if no blocks - but reset refs to allow hydration when blocks load
+    if (blocks.length === 0) {
+      // Reset refs when blocks are cleared (page change, etc.) to allow rehydration when blocks load
+      if (previousBlockIdsRef.current !== "") {
+        previousBlockIdsRef.current = ""
+        layoutHydratedRef.current = false
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Blocks cleared - resetting hydration state', {
+            pageId,
+            previousBlockIds: previousBlockIdsRef.current,
+          })
+        }
+      }
+      return
+    }
+
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
     
-    // Only hydrate layout from blocks prop if:
-    // 1. First load (not yet initialized)
-    // 2. Block IDs changed (block added or removed)
+    // Only hydrate layout from blocks prop if block IDs changed (block added or removed)
+    // CRITICAL: Do NOT rehydrate after initial hydration - layout state is authoritative
     // CRITICAL: Do NOT rehydrate on edit mode entry - layout persists across mode changes
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
-    if (!layoutHydratedRef.current || blockIdsChanged) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Canvas] Hydration check', {
+        pageId,
+        blocksCount: blocks.length,
+        currentBlockIds,
+        previousBlockIds,
+        blockIdsChanged,
+        layoutLength: layout.length,
+        layoutHydrated: layoutHydratedRef.current,
+      })
+    }
+    
+    // Safety guard: If layout exists and block IDs haven't changed, preserve local layout
+    if (layout.length > 0 && !blockIdsChanged) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Hydration skipped – preserving local layout', {
+          layoutLength: layout.length,
+          blockIdsChanged,
+          previousBlockIds,
+          currentBlockIds,
+          blocksCount: blocks.length,
+        })
+      }
+      // Update edit mode ref without rehydrating
+      previousIsEditingRef.current = isEditing
+      return
+    }
+    
+    // Only hydrate when block IDs change (first load or block added/removed)
+    if (blockIdsChanged) {
       // PHASE 2 - Layout rehydration audit: Log before hydration
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Layout Rehydration] BEFORE HYDRATION`, {
-          isFirstLoad: !layoutHydratedRef.current,
+        console.log(`[Canvas] BEFORE HYDRATION`, {
+          pageId,
+          isFirstLoad: previousBlockIds === "",
           blockIdsChanged,
           previousBlockIds: previousBlockIdsRef.current,
           currentBlockIds,
+          blocksCount: blocks.length,
           blocks: blocks.map(b => ({
             id: b.id,
             x: b.x,
@@ -233,19 +303,28 @@ export default function Canvas({
       previousIsEditingRef.current = isEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
-    } else {
-      // PHASE 2 - Layout rehydration audit: Log skipped hydration
+      
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[Layout Rehydration] SKIPPED (already hydrated, no block ID change)`, {
+        console.log('[Canvas] Layout hydrated', {
+          isFirstLoad: previousBlockIds === "",
+          blockIdsChanged,
+          blocksCount: blocks.length,
+        })
+      }
+    } else {
+      // Block IDs haven't changed and layout already hydrated - preserve local layout
+      // This is the normal state after initial load - layout is managed locally
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Hydration skipped – preserving local layout (block IDs unchanged)', {
           layoutHydrated: layoutHydratedRef.current,
           blockIdsChanged,
+          layoutLength: layout.length,
         })
       }
       // Update edit mode ref without rehydrating
       previousIsEditingRef.current = isEditing
     }
-    // If block IDs haven't changed and already hydrated, preserve current layout state
-  }, [blocks, isEditing])
+  }, [blocks, isEditing, layout.length])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {

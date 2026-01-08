@@ -56,32 +56,50 @@ function InterfacePageClientInternal({
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   
   // Track previous pageId to reset blocks when page changes
-  const prevPageIdRef = useRef<string | null>(null)
+  // CRITICAL: Use ref to track actual pageId changes, not effect dependencies
+  const previousPageIdRef = useRef<string | null>(null)
   
   // CRITICAL: Track if blocks have been loaded to prevent overwrites
   // Track both the loaded state and the pageId to ensure we reset when page changes
   const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
   
-  // CRITICAL: Reset blocks and edit mode state when pageId changes
+  // CRITICAL: Reset blocks and edit mode state ONLY when pageId actually changes
   // This ensures previous page's edit mode doesn't leak to the new page
+  // DO NOT clear blocks for: edit mode toggles, viewer mode, saveLayout reloads, block updates, forceReload
+  // Only clear for actual navigation (pageId changes)
   useEffect(() => {
-    if (page?.id && prevPageIdRef.current !== page.id) {
-      // Page changed - reset blocks and loaded state
-      prevPageIdRef.current = page.id
-      console.log(`[loadBlocks] CLEARING blocks (page changed): pageId=${page.id}, page_type=${page.page_type}`, {
+    const currentPageId = page?.id || null
+    
+    // Only clear blocks if pageId actually changed (navigation occurred)
+    if (previousPageIdRef.current !== null && previousPageIdRef.current !== currentPageId) {
+      // Page actually changed - reset blocks and loaded state
+      console.log(`[loadBlocks] Page changed — clearing blocks: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
         previousBlocksCount: blocks.length,
         previousBlockIds: blocks.map(b => b.id),
       })
       setBlocks([])
-      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+      blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
       
       // CRITICAL: Exit edit modes when navigating to a different page
       // The EditModeContext should handle this, but we ensure it here as well
       // This prevents edit mode from leaking between pages
-      if (prevPageIdRef.current !== null) {
-        exitPageEdit()
-        exitBlockEdit()
+      exitPageEdit()
+      exitBlockEdit()
+    } else if (previousPageIdRef.current === null && currentPageId) {
+      // First load - just set the ref, don't clear blocks
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[loadBlocks] First page load: pageId=${currentPageId}`)
       }
+    } else if (previousPageIdRef.current === currentPageId && currentPageId) {
+      // Same page - preserve blocks
+      if (process.env.NODE_ENV === 'development' && blocks.length > 0) {
+        console.log(`[loadBlocks] Same page — preserving blocks: pageId=${currentPageId}, blocksCount=${blocks.length}`)
+      }
+    }
+    
+    // Update ref after checking (only if pageId exists)
+    if (currentPageId) {
+      previousPageIdRef.current = currentPageId
     }
   }, [page?.id, exitPageEdit, exitBlockEdit])
   
@@ -572,12 +590,18 @@ function InterfacePageClientInternal({
   }
 
   async function loadBlocks(forceReload = false) {
-    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload })
+    console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload, previousPageId: previousPageIdRef.current })
     if (!page) return
     
-    // CRITICAL: Reset loaded state if pageId changed
+    // CRITICAL: Only reset loaded state if pageId actually changed (not just on every call)
+    // DO NOT clear blocks here - that's handled by the page change effect above
     if (blocksLoadedRef.current.pageId !== page.id) {
+      console.log(`[loadBlocks] PageId changed in loadBlocks: old=${blocksLoadedRef.current.pageId}, new=${page.id}`)
       blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[loadBlocks] Same pageId — preserving blocks: pageId=${page.id}, forceReload=${forceReload}`)
+      }
     }
     
     // CRITICAL: Only load blocks once per page visit (prevent remounts)
