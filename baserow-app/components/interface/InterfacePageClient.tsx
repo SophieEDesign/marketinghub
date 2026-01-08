@@ -674,8 +674,8 @@ function InterfacePageClientInternal({
         forceReload,
         oldBlocksCount: blocks.length,
         newBlocksCount: pageBlocks.length,
-        oldBlockIds: blocks.map(b => b.id),
-        newBlockIds: pageBlocks.map(b => b.id),
+        oldBlockIds: blocks.map((b: any) => b.id),
+        newBlockIds: pageBlocks.map((b: any) => b.id),
         willReplace: true,
       })
       setBlocks(pageBlocks)
