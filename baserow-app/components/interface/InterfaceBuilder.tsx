@@ -29,6 +29,7 @@ interface InterfaceBuilderProps {
   hideHeader?: boolean
   pageTableId?: string | null // Table ID from the page
   recordId?: string | null // Record ID for record review pages
+  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
 export default function InterfaceBuilder({
@@ -40,6 +41,7 @@ export default function InterfaceBuilder({
   hideHeader = false,
   pageTableId = null,
   recordId = null,
+  onRecordClick,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -60,7 +62,11 @@ export default function InterfaceBuilder({
   // Track previous initialBlocks to prevent unnecessary updates
   const prevInitialBlocksRef = useRef<string>('')
   
+  // CRITICAL: Track if initial blocks have been applied to prevent overwrites
+  const initialBlocksAppliedRef = useRef<boolean>(false)
+  
   // Sync initialBlocks to blocks state when they change (important for async loading)
+  // CRITICAL: Only apply initialBlocks once on mount, then merge updates
   useEffect(() => {
     // Create a stable key from initialBlocks to detect actual changes
     const blocksArray = initialBlocks?.map(b => ({
@@ -81,10 +87,38 @@ export default function InterfaceBuilder({
     prevInitialBlocksRef.current = blocksKey
     
     if (initialBlocks && initialBlocks.length > 0) {
-      setBlocks(initialBlocks)
-    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0) {
-      // Only clear blocks if initialBlocks is explicitly empty (not just undefined)
+      // CRITICAL: On first load, set blocks. After that, merge to preserve user state
+      if (!initialBlocksAppliedRef.current) {
+        setBlocks(initialBlocks)
+        initialBlocksAppliedRef.current = true
+      } else {
+        // Merge: update existing blocks, add new ones
+        setBlocks((prevBlocks) => {
+          const existingIds = new Set(prevBlocks.map(b => b.id))
+          const merged = prevBlocks.map(b => {
+            const updated = initialBlocks.find(ib => ib.id === b.id)
+            if (updated) {
+              return {
+                ...b,
+                ...updated,
+                config: { ...b.config, ...updated.config }
+              }
+            }
+            return b
+          })
+          // Add new blocks
+          initialBlocks.forEach(ib => {
+            if (!existingIds.has(ib.id)) {
+              merged.push(ib)
+            }
+          })
+          return merged
+        })
+      }
+    } else if (initialBlocks && initialBlocks.length === 0 && blocks.length > 0 && !initialBlocksAppliedRef.current) {
+      // Only clear blocks if initialBlocks is explicitly empty AND we haven't applied initial blocks yet
       setBlocks([])
+      initialBlocksAppliedRef.current = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBlocks])
@@ -101,6 +135,10 @@ export default function InterfaceBuilder({
   // Register mount time for editor safety guards
   useEffect(() => {
     registerMount(componentIdRef.current)
+    console.log(`[Lifecycle] InterfaceBuilder MOUNT: pageId=${page.id}, blocks=${initialBlocks.length}`)
+    return () => {
+      console.log(`[Lifecycle] InterfaceBuilder UNMOUNT: pageId=${page.id}`)
+    }
   }, [])
 
   /**
@@ -420,9 +458,18 @@ export default function InterfaceBuilder({
               }
             }
 
-            // Update the specific block in state with the returned data
+            // CRITICAL: Merge config instead of replacing wholesale (preserve user state)
             setBlocks((prev) =>
-              prev.map((b) => (b.id === blockId ? updatedBlock : b))
+              prev.map((b) => {
+                if (b.id === blockId) {
+                  return {
+                    ...b,
+                    ...updatedBlock,
+                    config: { ...b.config, ...updatedBlock.config }
+                  }
+                }
+                return b
+              })
             )
             return // Success - no need to refetch
           }
@@ -448,7 +495,28 @@ export default function InterfaceBuilder({
             created_at: block.created_at,
             updated_at: block.updated_at,
           }))
-          setBlocks(pageBlocks)
+          // CRITICAL: Merge instead of replacing (preserve layout state)
+          setBlocks((prevBlocks) => {
+            const existingIds = new Set(prevBlocks.map(b => b.id))
+            const merged = prevBlocks.map(b => {
+              const updated = pageBlocks.find(pb => pb.id === b.id)
+              if (updated) {
+                return {
+                  ...b,
+                  ...updated,
+                  config: { ...b.config, ...updated.config }
+                }
+              }
+              return b
+            })
+            // Add new blocks
+            pageBlocks.forEach(pb => {
+              if (!existingIds.has(pb.id)) {
+                merged.push(pb)
+              }
+            })
+            return merged
+          })
         } else {
           // Fallback: update local state optimistically if reload fails
           setBlocks((prev) =>
@@ -891,6 +959,7 @@ export default function InterfaceBuilder({
               pageTableId={pageTableId}
               pageId={page.id}
               recordId={recordId}
+              onRecordClick={onRecordClick}
             />
           </FilterStateProvider>
         </div>

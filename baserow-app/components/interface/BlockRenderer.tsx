@@ -34,6 +34,7 @@ interface BlockRendererProps {
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
+  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
 export default function BlockRenderer({
@@ -45,6 +46,7 @@ export default function BlockRenderer({
   pageId = null,
   recordId = null,
   filters = [],
+  onRecordClick,
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -107,31 +109,29 @@ export default function BlockRenderer({
     
     switch (block.type) {
       case "grid":
-        // Grid block MUST have table_id configured - no fallback
-        // Deployment safety: Warn if table_id is missing
-        if (!safeConfig.table_id && !isEditing) {
-          console.warn(`Grid block ${block.id} is missing table_id - block will show setup state`)
-        }
+        // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
+        // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
         // Lazy-load GridBlock to improve initial page load performance
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+            <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
           </LazyBlockWrapper>
         )
 
       case "form":
-        // Form block MUST have table_id configured - no fallback
+        // CRITICAL: Pass pageTableId to FormBlock for table resolution fallback
         return (
           <FormBlock
             block={safeBlock}
             isEditing={canEdit}
-            pageTableId={null}
+            pageTableId={pageTableId}
             pageId={pageId}
             onSubmit={async (data) => {
               // Handle form submission
               const supabase = await import("@/lib/supabase/client").then((m) => m.createClient())
-              const tableId = mergedConfig.table_id
+              // CRITICAL: Use resolved tableId (config first, then pageTableId fallback)
+              const tableId = mergedConfig.table_id || pageTableId
               if (tableId) {
                 const { data: table } = await supabase
                   .from("tables")
@@ -148,23 +148,23 @@ export default function BlockRenderer({
         )
 
       case "record":
-        // Record block MUST have table_id configured
+        // CRITICAL: Pass pageTableId to RecordBlock for table resolution fallback
         // record_id can come from config OR from page context (for record review pages)
         // Lazy-load RecordBlock to improve initial page load performance
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} recordId={recordId} />
+            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} recordId={recordId} />
           </LazyBlockWrapper>
         )
 
       case "chart":
-        // Chart block MUST have table_id configured - no fallback
-        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+        // CRITICAL: Pass pageTableId to ChartBlock for table resolution fallback
+        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
 
       case "kpi":
-        // KPI block MUST have table_id configured - no fallback
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+        // CRITICAL: Pass pageTableId to KPIBlock for table resolution fallback
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
 
       case "filter":
         // Filter block emits filter state via context

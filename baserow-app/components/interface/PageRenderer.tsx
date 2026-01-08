@@ -138,6 +138,11 @@ export default function PageRenderer({
       case 'kanban':
       case 'calendar':
       case 'timeline':
+        // 🔥 CRITICAL: Enforce data anchor - no silent fallbacks
+        if (!page.base_table && !page.saved_view_id) {
+          return <PageSetupState page={page} isAdmin={isAdmin} onOpenSettings={onOpenSettings} />
+        }
+        
         // For data page views, use GridBlock to ensure unified rendering
         // This ensures they share the same renderer, settings schema, and data logic as blocks
         return (

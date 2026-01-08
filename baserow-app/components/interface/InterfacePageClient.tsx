@@ -38,6 +38,11 @@ export default function InterfacePageClient({
   const [loading, setLoading] = useState(!initialPage)
   const [isGridMode, setIsGridMode] = useState(false)
   
+  // CRITICAL: Store initial page/data in refs to prevent overwrites after initial load
+  const initialPageRef = useRef<InterfacePage | null>(initialPage || null)
+  const initialDataRef = useRef<any[]>(initialData)
+  const pageLoadedRef = useRef<boolean>(!!initialPage)
+  
   // Use unified editing context
   const { isEditing: isPageEditing, enter: enterPageEdit, exit: exitPageEdit } = usePageEditMode(pageId)
   const { isEditing: isBlockEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(pageId)
@@ -47,6 +52,7 @@ export default function InterfacePageClient({
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [formSettingsOpen, setFormSettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
+  const [pageTableId, setPageTableId] = useState<string | null>(null)
   
   // Inline title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -67,8 +73,26 @@ export default function InterfacePageClient({
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
 
+  // CRITICAL: Extract pageTableId from page - only update when page changes
   useEffect(() => {
-    if (!initialPage && !loading) {
+    if (!page) {
+      setPageTableId(null)
+      return
+    }
+    
+    // Resolve tableId from page using the same logic as PageRenderer
+    const resolveTableId = async () => {
+      const { getPageTableId } = await import('@/lib/interface/page-table-utils')
+      const tableId = await getPageTableId(page)
+      setPageTableId(tableId)
+    }
+    
+    resolveTableId()
+  }, [page?.id, page?.base_table, page?.saved_view_id])
+
+  useEffect(() => {
+    // CRITICAL: Only load if we don't have initial page and haven't loaded yet
+    if (!initialPageRef.current && !pageLoadedRef.current && !loading) {
       loadPage()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -153,18 +177,20 @@ export default function InterfacePageClient({
 
   // Load blocks for dashboard/overview/content/record_review pages in BOTH edit and view mode
   // CRITICAL: Blocks must load in view mode so they render correctly
+  // CRITICAL: Only load once per page visit - prevent remounts
   useEffect(() => {
     if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-      // Always reload blocks when page changes or when entering edit mode
-      if (!blocksLoading) {
+      // Only load if blocks haven't been loaded yet for this page
+      if (!blocksLoading && (!blocksLoadedRef.current || blocks.length === 0)) {
         loadBlocks()
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id, page?.page_type, isBlockEditing])
+  }, [page?.id, page?.page_type])
 
   async function loadPage() {
-    if (loading) return // Prevent concurrent loads
+    // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
+    if (pageLoadedRef.current || loading) return
     
     setLoading(true)
     try {
@@ -174,18 +200,24 @@ export default function InterfacePageClient({
           // Page not found - set page to null so UI shows "not found" message
           // DO NOT redirect - let the component render the error state
           setPage(null)
+          pageLoadedRef.current = true
           return
         }
         throw new Error('Failed to load page')
       }
       
       const pageData = await res.json()
-      setPage(pageData)
+      // CRITICAL: Only update if page hasn't been loaded yet (preserve initial data)
+      if (!pageLoadedRef.current) {
+        setPage(pageData)
+        pageLoadedRef.current = true
+      }
     } catch (error) {
       console.error("Error loading page:", error)
       // Set page to null on error - component will show error UI
       // DO NOT redirect - always render UI
       setPage(null)
+      pageLoadedRef.current = true
     } finally {
       setLoading(false)
     }
@@ -446,8 +478,16 @@ export default function InterfacePageClient({
     }
   }
 
+  // CRITICAL: Track if blocks have been loaded to prevent overwrites
+  const blocksLoadedRef = useRef<boolean>(false)
+  
   async function loadBlocks() {
     if (!page) return
+    
+    // CRITICAL: Only load blocks once per page visit (prevent remounts)
+    if (blocksLoadedRef.current && blocks.length > 0) {
+      return
+    }
 
     setBlocksLoading(true)
     try {
@@ -456,24 +496,80 @@ export default function InterfacePageClient({
       
       const data = await res.json()
       // Convert view_blocks format to PageBlock format
-      // Ensure width/height are never null (default to 4 if null, which matches database default)
-      const pageBlocks = (data.blocks || []).map((block: any) => ({
-        id: block.id,
-        page_id: block.page_id || page.id,
-        type: block.type,
-        x: block.x ?? block.position_x ?? 0,
-        y: block.y ?? block.position_y ?? 0,
-        w: block.w ?? block.width ?? 4,
-        h: block.h ?? block.height ?? 4,
-        config: block.config || {},
-        order_index: block.order_index ?? 0,
-        created_at: block.created_at,
-        updated_at: block.updated_at,
-      }))
-      setBlocks(pageBlocks)
+      // CRITICAL: Preserve actual database values - API already maps position_x/position_y/width/height to x/y/w/h
+      // Only default if values are explicitly null/undefined (new blocks)
+      const pageBlocks = (data.blocks || []).map((block: any) => {
+        // REGRESSION CHECK: Warn if existing block has null layout values
+        if (process.env.NODE_ENV === 'development' && block.created_at) {
+          const hasNullLayout = 
+            (block.position_x == null && block.x == null) ||
+            (block.position_y == null && block.y == null) ||
+            (block.width == null && block.w == null) ||
+            (block.height == null && block.h == null)
+          
+          if (hasNullLayout) {
+            console.warn(`[Layout Load] Block ${block.id}: NULL layout values for existing block`, {
+              blockId: block.id,
+              position_x: block.position_x,
+              position_y: block.position_y,
+              width: block.width,
+              height: block.height,
+              x: block.x,
+              y: block.y,
+              w: block.w,
+              h: block.h,
+              created_at: block.created_at,
+              warning: 'Existing block has null layout - this may cause layout reset'
+            })
+          }
+        }
+        
+        return {
+          id: block.id,
+          page_id: block.page_id || page.id,
+          type: block.type,
+          // CRITICAL: Use API-mapped values (x/y/w/h) if available, otherwise use DB columns
+          // API maps position_x -> x, position_y -> y, width -> w, height -> h
+          x: block.x != null ? block.x : (block.position_x != null ? block.position_x : 0),
+          y: block.y != null ? block.y : (block.position_y != null ? block.position_y : 0),
+          w: block.w != null ? block.w : (block.width != null ? block.width : 4),
+          h: block.h != null ? block.h : (block.height != null ? block.height : 4),
+          config: block.config || {},
+          order_index: block.order_index ?? 0,
+          created_at: block.created_at,
+          updated_at: block.updated_at,
+        }
+      })
+      // CRITICAL: Merge with existing blocks instead of replacing (preserve user state)
+      setBlocks((prevBlocks) => {
+        if (prevBlocks.length === 0) {
+          blocksLoadedRef.current = true
+          return pageBlocks
+        }
+        // Merge: update existing blocks, add new ones
+        const existingIds = new Set(prevBlocks.map(b => b.id))
+        const merged = [...prevBlocks]
+        pageBlocks.forEach((newBlock: any) => {
+          const existingIndex = merged.findIndex(b => b.id === newBlock.id)
+          if (existingIndex >= 0) {
+            // Merge config instead of replacing
+            merged[existingIndex] = {
+              ...merged[existingIndex],
+              ...newBlock,
+              config: { ...merged[existingIndex].config, ...newBlock.config }
+            }
+          } else {
+            merged.push(newBlock)
+          }
+        })
+        blocksLoadedRef.current = true
+        return merged
+      })
     } catch (error) {
       console.error("Error loading blocks:", error)
-      setBlocks([])
+      if (blocks.length === 0) {
+        setBlocks([])
+      }
     } finally {
       setBlocksLoading(false)
     }
@@ -659,6 +755,10 @@ export default function InterfacePageClient({
   }
 
   async function handlePageUpdate() {
+    // CRITICAL: Reset loaded flags to allow reload after settings update
+    // This is intentional - user explicitly updated settings
+    pageLoadedRef.current = false
+    blocksLoadedRef.current = false
     // Reload page data after settings update
     await loadPage()
     if (page?.source_view) {
@@ -849,6 +949,7 @@ export default function InterfacePageClient({
               initialBlocks={blocks || []}
               isViewer={false}
               hideHeader={true}
+              pageTableId={pageTableId}
             />
           )
         ) : page ? (

@@ -37,6 +37,7 @@ interface CanvasProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
 export default function Canvas({
@@ -59,6 +60,7 @@ export default function Canvas({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  onRecordClick,
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock } = useFilterState()
@@ -69,6 +71,14 @@ export default function Canvas({
   const layoutHydratedRef = useRef(false)
   const isResizingRef = useRef(false)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Lifecycle logging
+  useEffect(() => {
+    console.log(`[Lifecycle] Canvas MOUNT: pageId=${pageId}, blocks=${blocks.length}, recordId=${recordId}`)
+    return () => {
+      console.log(`[Lifecycle] Canvas UNMOUNT: pageId=${pageId}, recordId=${recordId}`)
+    }
+  }, [])
 
   /**
    * Hydrates react-grid-layout from Supabase on page load
@@ -132,9 +142,9 @@ export default function Canvas({
       // CRITICAL: Database values (position_x, position_y, width, height) are single source of truth
       // Only apply defaults when ALL position values are NULL (newly created block)
       const newLayout: Layout[] = blocks.map((block) => {
-        // Check if block has persisted layout values from database
-        // If ALL of x, y, w, h are null/undefined, then apply defaults
-        // Otherwise, use database values (even if they're default values like 0, 0, 4, 4)
+        // CRITICAL: Use block values directly - API already maps position_x/position_y/width/height to x/y/w/h
+        // Only apply defaults if ALL values are explicitly null/undefined (newly created block)
+        // If any value exists (even 0), use it - don't default
         const allNull = 
           (block.x == null) && 
           (block.y == null) && 
@@ -160,14 +170,27 @@ export default function Canvas({
             })
           }
         } else {
-          // Block has persisted layout - use database values, never regenerate
-          x = block.x ?? 0
-          y = block.y ?? 0
-          w = block.w ?? 4
-          h = block.h ?? 4
+          // CRITICAL: Use actual block values - API maps DB columns correctly
+          // Don't use ?? defaults here - if value is 0, use 0; if 4, use 4
+          // Only default if explicitly null/undefined
+          x = block.x != null ? block.x : 0
+          y = block.y != null ? block.y : 0
+          w = block.w != null ? block.w : 4
+          h = block.h != null ? block.h : 4
           
-          // PHASE 2 - Layout rehydration audit: Log DB values used
+          // REGRESSION CHECK: Warn if we're defaulting for an existing block that should have values
           if (process.env.NODE_ENV === 'development') {
+            const hasNullValues = block.x == null || block.y == null || block.w == null || block.h == null
+            if (hasNullValues && block.created_at) {
+              // Block exists but has null layout values - this shouldn't happen after first save
+              console.warn(`[Layout Rehydration] Block ${block.id}: NULL VALUES DETECTED for existing block`, {
+                blockId: block.id,
+                blockValues: { x: block.x, y: block.y, w: block.w, h: block.h },
+                created_at: block.created_at,
+                warning: 'Block has been created but layout values are null - keeping previous layout if available'
+              })
+            }
+            
             console.log(`[Layout Rehydration] Block ${block.id}: FROM DB`, {
               blockId: block.id,
               fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
@@ -576,6 +599,7 @@ export default function Canvas({
                     pageId={pageId}
                     recordId={recordId}
                     filters={getFiltersForBlock(block.id)}
+                    onRecordClick={onRecordClick}
                   />
                 </div>
               </BlockAppearanceWrapper>

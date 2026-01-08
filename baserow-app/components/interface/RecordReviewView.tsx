@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, Filter, List, Plus, ChevronDown, MessageSquare } from 'lucide-react'
+import { Search, Filter, List, Plus, ChevronDown, MessageSquare, Edit2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -37,7 +37,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<FilterConfig[]>(config.filters || [])
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const { isEditing } = useBlockEditMode(page.id)
+  const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   
   const allowEditing = config.allow_editing || false
   const recordPanel = config.record_panel || 'side'
@@ -450,60 +450,91 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       {/* Detail panel - Right Column - Shows blocks for selected record */}
       {/* ALWAYS render the panel - never return null */}
       {recordPanel !== 'none' && (
-        <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto bg-white' : 'w-full border-t overflow-auto'}>
-          {!selectedRecordId ? (
-            // Setup state: No record selected
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="mb-2 font-medium">Select a record to see details</p>
-                <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
+        <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto bg-white flex flex-col' : 'w-full border-t overflow-auto flex flex-col'}>
+          {/* Edit Mode Toggle - Only show when record is selected */}
+          {selectedRecordId && (
+            <div className="border-b bg-gray-50 px-4 py-2 flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                {isEditing ? 'Editing panel layout' : 'View mode'}
               </div>
-            </div>
-          ) : blocksLoading ? (
-            // Loading state: Blocks are being loaded
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Loading blocks...</p>
-              </div>
-            </div>
-          ) : (
-            // Render blocks with record context - Always render something
-            <div className="h-full">
-              {loadedBlocks.length === 0 ? (
-                // Setup state: No blocks configured
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                  <div className="text-center">
-                    <p className="mb-2 font-medium">Add fields or blocks to design this view</p>
-                    <p className="text-xs text-gray-400">
-                      {isEditing 
-                        ? "Click 'Edit Page' to add fields from Settings, or add blocks to customize the layout."
-                        : "Edit this page to add fields and blocks."}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                // Render InterfaceBuilder with recordId
-                // Key ensures blocks re-render with new recordId when record changes
-                // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
-                // CRITICAL: Do NOT pass isViewer prop - let InterfaceBuilder use useBlockEditMode directly
-                // This ensures the right panel is editable exactly like Content pages
-                <InterfaceBuilder
-                  key={`record-${selectedRecordId}`}
-                  page={{
-                    id: page.id,
-                    name: page.name,
-                    settings: { layout_template: 'record_review' },
-                    description: 'Record detail view'
-                  } as any}
-                  initialBlocks={loadedBlocks}
-                  hideHeader={true}
-                  pageTableId={pageTableId}
-                  recordId={selectedRecordId}
-                />
-              )}
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (isEditing) {
+                    exitBlockEdit()
+                  } else {
+                    enterBlockEdit()
+                  }
+                }}
+                className="h-8"
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                {isEditing ? 'Done' : 'Edit Panel'}
+              </Button>
             </div>
           )}
+          
+          <div className="flex-1 overflow-auto">
+            {!selectedRecordId ? (
+              // Setup state: No record selected
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                <div className="text-center">
+                  <p className="mb-2 font-medium">Select a record to see details</p>
+                  <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
+                </div>
+              </div>
+            ) : blocksLoading ? (
+              // Loading state: Blocks are being loaded
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Loading blocks...</p>
+                </div>
+              </div>
+            ) : (
+              // Render blocks with record context - Always render something
+              <div className="h-full">
+                {loadedBlocks.length === 0 ? (
+                  // Setup state: No blocks configured
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                    <div className="text-center">
+                      <p className="mb-2 font-medium">Add fields or blocks to design this view</p>
+                      <p className="text-xs text-gray-400">
+                        {isEditing 
+                          ? "Click 'Edit Page' to add fields from Settings, or add blocks to customize the layout."
+                          : "Click 'Edit Panel' above to add fields and blocks."}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  // Render InterfaceBuilder with recordId
+                  // Key ensures blocks re-render with new recordId when record changes
+                  // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
+                  // CRITICAL: Do NOT pass isViewer prop - let InterfaceBuilder use useBlockEditMode directly
+                  // This ensures the right panel is editable exactly like Content pages
+                  <InterfaceBuilder
+                    key={`record-${selectedRecordId}`}
+                    page={{
+                      id: page.id,
+                      name: page.name,
+                      settings: { layout_template: 'record_review' },
+                      description: 'Record detail view'
+                    } as any}
+                    initialBlocks={loadedBlocks}
+                    hideHeader={true}
+                    pageTableId={pageTableId}
+                    recordId={selectedRecordId}
+                    onRecordClick={(recordId) => {
+                      // CRITICAL: When calendar event is clicked, update selected record
+                      // This allows calendar blocks in RecordReview to switch records
+                      setSelectedRecordId(recordId)
+                    }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
       

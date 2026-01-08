@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import type { PageBlock, LayoutItem } from '@/lib/interface/types'
+import { layoutItemToDbUpdate } from '@/lib/interface/layout-mapping'
 
 
 /**
@@ -47,19 +48,15 @@ export async function saveBlockLayout(
   // Filter blocks by page_id or view_id to ensure we only update blocks for this page
   await Promise.all(
     updates.map(async (update) => {
-      // PHASE 1 - Layout write verification: Log before DB update
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Layout Write] Block ${update.id}: BEFORE DB UPDATE`, {
-          blockId: update.id,
-          update: {
-            position_x: update.position_x,
-            position_y: update.position_y,
-            width: update.width,
-            height: update.height,
-            order_index: update.order_index,
-          },
-        })
-      }
+      // 🔥 PROOF LOGGING - Always log to prove layout persistence
+      console.log('[LAYOUT SAVE] Block BEFORE DB UPDATE', {
+        blockId: update.id,
+        position_x: update.position_x,
+        position_y: update.position_y,
+        width: update.width,
+        height: update.height,
+        order_index: update.order_index,
+      })
 
       let query = supabase
         .from('view_blocks')
@@ -91,35 +88,35 @@ export async function saveBlockLayout(
         throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
       }
 
-      // PHASE 1 - Layout write verification: Log after DB update and verify
-      if (process.env.NODE_ENV === 'development') {
-        const persisted = data[0]
-        const matches = 
-          persisted.position_x === update.position_x &&
-          persisted.position_y === update.position_y &&
-          persisted.width === update.width &&
-          persisted.height === update.height
+      // 🔥 PROOF LOGGING - Verify DB actually persisted the values
+      const persisted = data[0]
+      const matches = 
+        persisted.position_x === update.position_x &&
+        persisted.position_y === update.position_y &&
+        persisted.width === update.width &&
+        persisted.height === update.height
 
-        console.log(`[Layout Write] Block ${update.id}: AFTER DB UPDATE`, {
-          blockId: update.id,
-          sent: {
-            position_x: update.position_x,
-            position_y: update.position_y,
-            width: update.width,
-            height: update.height,
-          },
-          persisted: {
-            position_x: persisted.position_x,
-            position_y: persisted.position_y,
-            width: persisted.width,
-            height: persisted.height,
-          },
-          matches,
-        })
+      console.log('[LAYOUT SAVE] Block AFTER DB UPDATE', {
+        blockId: update.id,
+        sent: {
+          position_x: update.position_x,
+          position_y: update.position_y,
+          width: update.width,
+          height: update.height,
+        },
+        persisted: {
+          position_x: persisted.position_x,
+          position_y: persisted.position_y,
+          width: persisted.width,
+          height: persisted.height,
+        },
+        matches,
+        timestamp: new Date().toISOString(),
+      })
 
-        if (!matches) {
-          console.error(`[Layout Write] Block ${update.id}: MISMATCH - DB persisted different values than sent!`)
-        }
+      if (!matches) {
+        console.error(`[LAYOUT SAVE] Block ${update.id}: ❌ MISMATCH - DB persisted different values than sent!`)
+        throw new Error(`Layout save mismatch for block ${update.id}`)
       }
     })
   )

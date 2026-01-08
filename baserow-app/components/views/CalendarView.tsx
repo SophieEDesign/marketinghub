@@ -47,6 +47,17 @@ export default function CalendarView({
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Lifecycle logging
+  useEffect(() => {
+    console.log(`[Lifecycle] CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
+    return () => {
+      console.log(`[Lifecycle] CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
+    }
+  }, [])
+  
+  // DEBUG logging flag - enable via localStorage.DEBUG_CALENDAR=1
+  const debugEnabled = typeof window !== 'undefined' && localStorage.getItem('DEBUG_CALENDAR') === '1'
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
@@ -420,13 +431,15 @@ export default function CalendarView({
     try {
       const supabase = createClient()
       
-      // Only log when actually loading (not on every render check)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Calendar: Loading rows from table', {
+      // DEBUG logging - always log if debug flag is set
+      if (debugEnabled || process.env.NODE_ENV === 'development') {
+        console.log(`[Calendar] Loading rows from table`, {
           tableId: resolvedTableId,
           supabaseTableName,
           filtersCount: filters.length,
-          fieldIdsCount: fieldIds.length
+          fieldIdsCount: fieldIds.length,
+          resolvedDateFieldId,
+          viewId
         })
       }
       
@@ -466,12 +479,14 @@ export default function CalendarView({
         }))
         setRows(tableRows)
         
-        // Only log in development and only once per actual load
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Loaded', data?.length || 0, 'rows from', supabaseTableName)
-          if (tableRows.length > 0) {
-            console.log('Calendar: Sample row data keys:', Object.keys(tableRows[0].data).slice(0, 10))
-          }
+        // DEBUG logging - always log if debug flag is set
+        if (debugEnabled || process.env.NODE_ENV === 'development') {
+          console.log(`[Calendar] Loaded ${data?.length || 0} rows from ${supabaseTableName}`, {
+            rowCount: data?.length || 0,
+            supabaseTableName,
+            resolvedDateFieldId,
+            sampleRowKeys: tableRows.length > 0 ? Object.keys(tableRows[0].data).slice(0, 10) : []
+          })
         }
       }
     } catch (error) {
@@ -586,9 +601,20 @@ export default function CalendarView({
     }
     
     try {
-      // Find the actual field name to use (could be name or id)
+      // CRITICAL: Use field NAME (not ID) when reading row data
+      // Supabase row keys are field names, not IDs
       // Priority: block config > view config > resolved field
       const actualFieldName = effectiveDateField?.name || effectiveDateFieldId
+      
+      // DEBUG logging
+      if (debugEnabled) {
+        console.log(`[Calendar] Date field resolution for events:`, {
+          effectiveDateFieldId,
+          effectiveDateFieldName: effectiveDateField?.name,
+          actualFieldName,
+          sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
+        })
+      }
       
       // Resolve start field: block config > view config > null
       const blockStartField = blockConfig?.start_date_field || blockConfig?.calendar_start_field
@@ -843,11 +869,12 @@ export default function CalendarView({
           }
         })
       
-      // Defensive check: log warning if rows exist but no events generated
-      if (events.length === 0 && filteredRows.length > 0) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('Calendar: No events generated from', filteredRows.length, 'rows', {
+      // DEBUG logging - always log if debug flag is set
+      if (debugEnabled || process.env.NODE_ENV === 'development') {
+        if (events.length === 0 && filteredRows.length > 0) {
+          console.warn(`[Calendar] No events generated from ${filteredRows.length} rows`, {
             dateField: effectiveDateFieldId,
+            resolvedDateFieldId,
             sampleRowData: filteredRows[0]?.data ? {
               id: filteredRows[0].id,
               dateFieldValue: filteredRows[0].data[effectiveDateFieldId],
@@ -855,9 +882,18 @@ export default function CalendarView({
             } : null,
             check: 'Ensure date field is correctly configured and rows have valid date values'
           })
+        } else if (events.length > 0) {
+          console.log(`[Calendar] Generated ${events.length} events successfully`, {
+            eventCount: events.length,
+            rowCount: filteredRows.length,
+            dateField: effectiveDateFieldId,
+            sampleEvent: events[0] ? {
+              id: events[0].id,
+              title: events[0].title,
+              start: events[0].start
+            } : null
+          })
         }
-      } else if (events.length > 0 && process.env.NODE_ENV === 'development') {
-        console.log('Calendar: Generated', events.length, 'events successfully')
       }
       return events
     } catch (error) {
@@ -1110,7 +1146,7 @@ export default function CalendarView({
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           events={calendarEvents}
-          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}-${calendarEvents.length}`} // Force re-render when data changes
+          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`} // CRITICAL: Stable key - don't include events.length to prevent remounts
           editable={true}
           headerToolbar={{
             left: "prev,next today",
@@ -1127,10 +1163,25 @@ export default function CalendarView({
             }
           }}
           eventClick={(info) => {
-            // Open record in modal instead of navigating
+            // CRITICAL: Handle event click - use onRecordClick callback if provided, otherwise use modal
             const recordId = info.event.id
+            if (debugEnabled) {
+              console.log(`[Calendar] Event clicked:`, {
+                recordId,
+                event: info.event,
+                hasOnRecordClick: !!onRecordClick,
+                willUseModal: !onRecordClick
+              })
+            }
+            
             if (recordId) {
-              setSelectedRecordId(recordId)
+              // If onRecordClick callback provided (e.g., from RecordReview), use it
+              if (onRecordClick) {
+                onRecordClick(recordId)
+              } else {
+                // Otherwise, open modal (default behavior)
+                setSelectedRecordId(recordId)
+              }
             }
           }}
           dateClick={(info) => {

@@ -16,9 +16,10 @@ interface GridBlockProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level or filter block filters
+  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
-export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: GridBlockProps) {
+export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: GridBlockProps) {
   const { config } = block
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
@@ -296,7 +297,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             tableFields={tableFields}
             filters={allFilters}
             blockConfig={config} // Pass block config so CalendarView can read date_field from page settings
-            // onRecordClick is handled internally by CalendarView using modal
+            onRecordClick={onRecordClick} // CRITICAL: Pass onRecordClick for RecordReview integration
           />
         )
       }
@@ -410,11 +411,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}
-            onRecordClick={(recordId) => {
+            onRecordClick={onRecordClick || ((recordId) => {
+              // Default: navigate to record page if no callback provided
               if (tableId) {
                 window.location.href = `/tables/${tableId}/records/${recordId}`
               }
-            }}
+            })}
             appearance={appearance}
           />
         )

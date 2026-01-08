@@ -4,6 +4,7 @@ import { saveBlockLayout, createBlock, deleteBlock } from '@/lib/pages/saveBlock
 import { normalizeBlockConfig } from '@/lib/interface/block-validator'
 import { validateBlockConfig } from '@/lib/interface/block-config-types'
 import type { LayoutItem, PageBlock, BlockType } from '@/lib/interface/types'
+import { dbBlockToPageBlock } from '@/lib/interface/layout-mapping'
 
 /**
  * GET /api/pages/[pageId]/blocks - Load blocks for a page
@@ -49,46 +50,45 @@ export async function GET(
     }
 
     // Convert view_blocks to PageBlock format
-    // Ensure width/height are never null (default to 4 if null, which matches database default)
+    // CRITICAL: Use unified mapping function (no defaults, no guessing)
     const blocks = (data || []).map((block: any) => {
-      // PHASE 2 - TextBlock rehydration audit: Log loaded blocks
-      if (process.env.NODE_ENV === 'development' && block.type === 'text') {
-        console.log(`[API Read] Block ${block.id}: LOADED`, {
-          blockId: block.id,
-          rawBlockFromDB: block,
-          rawConfig: block.config,
-          rawContentJson: block.config?.content_json,
-          hasContentJson: !!block.config?.content_json,
-        })
-      }
+      // 🔥 PROOF LOGGING - Log loaded layout from DB
+      console.log('[LAYOUT LOAD] Block FROM DB', {
+        blockId: block.id,
+        fromDB: {
+          position_x: block.position_x,
+          position_y: block.position_y,
+          width: block.width,
+          height: block.height,
+        },
+      })
 
-      // PHASE 2 - Layout rehydration audit: Log loaded layout
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API Read] Block ${block.id}: LAYOUT LOADED`, {
+      // CRITICAL: Use unified mapping - throws if corrupted, returns null if new block
+      const layout = dbBlockToPageBlock({
+        id: block.id,
+        position_x: block.position_x,
+        position_y: block.position_y,
+        width: block.width,
+        height: block.height,
+      })
+
+      // If layout is null (new block), use defaults BUT log warning
+      if (!layout) {
+        console.warn(`[LAYOUT LOAD] Block ${block.id}: New block (no layout) - using defaults`, {
           blockId: block.id,
-          fromDB: {
-            position_x: block.position_x,
-            position_y: block.position_y,
-            width: block.width,
-            height: block.height,
-          },
-          mapped: {
-            x: block.position_x ?? 0,
-            y: block.position_y ?? 0,
-            w: block.width ?? 4,
-            h: block.height ?? 4,
-          },
+          defaults: { x: 0, y: 0, w: 4, h: 4 },
         })
       }
 
       return {
         id: block.id,
-        page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
+        page_id: block.page_id || block.view_id,
         type: block.type,
-        x: block.position_x ?? 0,
-        y: block.position_y ?? 0,
-        w: block.width ?? 4,
-        h: block.height ?? 4,
+        // CRITICAL: Use mapped layout if available, otherwise defaults (new block)
+        x: layout?.x ?? 0,
+        y: layout?.y ?? 0,
+        w: layout?.w ?? 4,
+        h: layout?.h ?? 4,
         config: block.config || {},
         order_index: block.order_index ?? 0,
         created_at: block.created_at,
@@ -130,30 +130,32 @@ export async function PATCH(
 
     // Save layout if provided
     if (layout && Array.isArray(layout)) {
-      // PHASE 1 - Layout write verification: Log received layout
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API Write] Layout: RECEIVED`, {
-          pageId,
-          layout,
-          layoutItems: layout.map((item: LayoutItem) => ({
-            id: item.i,
-            position_x: item.x,
-            position_y: item.y,
-            width: item.w,
-            height: item.h,
-          })),
-        })
-      }
+      // 🔥 PROOF LOGGING - Always log to prove layout persistence
+      console.log('[LAYOUT SAVE] API RECEIVED', {
+        pageId,
+        layoutCount: layout.length,
+        layoutItems: layout.map((item: LayoutItem) => ({
+          id: item.i,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          // Map to DB columns
+          position_x: item.x,
+          position_y: item.y,
+          width: item.w,
+          height: item.h,
+        })),
+      })
 
       await saveBlockLayout(pageId, layout as LayoutItem[])
 
-      // PHASE 1 - Layout write verification: Log after save
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API Write] Layout: SAVED`, {
-          pageId,
-          layout,
-        })
-      }
+      // 🔥 PROOF LOGGING - Verify save completed
+      console.log('[LAYOUT SAVE] API COMPLETED', {
+        pageId,
+        layoutCount: layout.length,
+        timestamp: new Date().toISOString(),
+      })
     }
 
     // Update individual blocks if provided
@@ -225,11 +227,24 @@ export async function PATCH(
             console.warn(`Block ${update.id} config validation warnings:`, validation.errors)
           }
 
-          // Execute the update query and check for errors
+          // CRITICAL: When updating block config, preserve layout columns (position_x, position_y, width, height)
+          // Get current layout values to preserve them
+          const { data: currentBlockData } = await supabase
+            .from('view_blocks')
+            .select('position_x, position_y, width, height')
+            .eq('id', update.id)
+            .single()
+          
+          // Execute the update query - preserve layout columns
           const { data: updatedBlock, error } = await supabase
             .from('view_blocks')
             .update({
               config: normalizedConfig,
+              // CRITICAL: Preserve layout columns - don't overwrite with null
+              position_x: currentBlockData?.position_x ?? undefined,
+              position_y: currentBlockData?.position_y ?? undefined,
+              width: currentBlockData?.width ?? undefined,
+              height: currentBlockData?.height ?? undefined,
               updated_at: new Date().toISOString(),
             })
             .eq('id', update.id)

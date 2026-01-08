@@ -44,12 +44,22 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // Lifecycle logging
+  useEffect(() => {
+    console.log(`[Lifecycle] TextBlock MOUNT: blockId=${block.id}`)
+    return () => {
+      console.log(`[Lifecycle] TextBlock UNMOUNT: blockId=${block.id}`)
+    }
+  }, [])
+  
   // CRITICAL: Read content ONLY from config.content_json
   // No fallbacks, no other sources
   const contentJson = config?.content_json
   
-  // Track if config is still loading (content_json is undefined, not null)
-  const isConfigLoading = config !== undefined && contentJson === undefined
+  // Track if config is still loading
+  // CRITICAL: Config is loading ONLY if config itself is undefined (not yet loaded)
+  // Empty/null content_json is VALID (empty content), not loading state
+  const isConfigLoading = config === undefined
   
   // PHASE 2 - TextBlock rehydration audit: Log on render
   if (process.env.NODE_ENV === 'development') {
@@ -293,6 +303,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
    * Rehydrate editor when block.id or block.config reference changes
    * CRITICAL: This ensures editor content matches fresh config from API
    * Treats block.config as immutable - rehydrate on reference change
+   * CRITICAL: Only rehydrate when editor is not focused to avoid interrupting typing
    */
   useEffect(() => {
     if (!editor) return
@@ -312,6 +323,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           currentContentJson: config?.content_json,
           previousConfig: previousConfigRef.current,
           previousContentJson: previousConfigRef.current?.content_json,
+          isFocused,
+          isBlockEditing,
         })
       }
     }
@@ -320,8 +333,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     previousBlockIdRef.current = block.id
     previousConfigRef.current = config
     
-    // If block ID changed, this is a different block - always rehydrate
+    // If block ID changed, this is a different block - always rehydrate (unless editing)
     if (blockIdChanged) {
+      // CRITICAL: Don't rehydrate if user is actively editing this block
+      if (isBlockEditing && isFocused) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock Rehydration] Block ${block.id}: SKIPPED (user editing)`, {
+            blockId: block.id,
+            isBlockEditing,
+            isFocused
+          })
+        }
+        return
+      }
+      
       const newContent = getInitialContent()
       
       // PHASE 2 - TextBlock rehydration audit: Log editor initialization
@@ -343,7 +368,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     
     // If config reference changed (immutable update), rehydrate if content changed
     // CRITICAL: Compare using cached serialized content to avoid JSON.stringify in hot path
+    // CRITICAL: Only rehydrate when editor is not focused to avoid interrupting typing
     if (configReferenceChanged) {
+      // CRITICAL: Don't rehydrate if user is actively editing
+      if (isBlockEditing && isFocused) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock Rehydration] Block ${block.id}: SKIPPED (user editing)`, {
+            blockId: block.id,
+            isBlockEditing,
+            isFocused
+          })
+        }
+        return
+      }
+      
       // Get current editor content once
       const currentContent = editor.getJSON()
       const currentStr = JSON.stringify(currentContent)
@@ -361,12 +399,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           configContentStr: newStr,
           contentChanged: currentStr !== newStr,
           isFocused,
-          willRehydrate: currentStr !== newStr && !isFocused,
+          isBlockEditing,
+          willRehydrate: currentStr !== newStr && !isFocused && !isBlockEditing,
         })
       }
       
       // Only update if content actually changed AND editor is not focused (to avoid interrupting typing)
-      if (currentStr !== newStr && !isFocused) {
+      if (currentStr !== newStr && !isFocused && !isBlockEditing) {
         const newContent = getInitialContent()
         
         // PHASE 2 - TextBlock rehydration audit: Log actual rehydration
@@ -385,7 +424,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         lastSavedContentRef.current = newStr
       }
     }
-  }, [block.id, config, editor, isFocused, getInitialContent])
+  }, [block.id, config, editor, isFocused, isBlockEditing, getInitialContent])
 
   /**
    * Initialize editor content and lastSavedContentRef when editor is first created
