@@ -191,18 +191,33 @@ export default function InterfacePageClient({
   // CRITICAL: Reload blocks when exiting edit mode to ensure preview shows latest saved content
   // This fixes the issue where content saved in edit mode doesn't appear in preview
   const prevIsBlockEditingRef = useRef<boolean>(isBlockEditing)
+  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     // Detect when exiting edit mode (isBlockEditing changes from true to false)
     if (prevIsBlockEditingRef.current && !isBlockEditing) {
       // User just exited edit mode - reload blocks to get latest saved content
       if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-        // Small delay to ensure database transaction is committed
-        setTimeout(() => {
+        // Clear any pending reload timeout
+        if (reloadTimeoutRef.current) {
+          clearTimeout(reloadTimeoutRef.current)
+        }
+        // Longer delay to ensure database transaction is fully committed
+        // This prevents race condition where reload happens before save completes
+        reloadTimeoutRef.current = setTimeout(() => {
           loadBlocks(true) // Force reload to get latest saved content
-        }, 150)
+          reloadTimeoutRef.current = null
+        }, 500) // Increased delay to ensure save completes
       }
     }
     prevIsBlockEditingRef.current = isBlockEditing
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current)
+        reloadTimeoutRef.current = null
+      }
+    }
   }, [isBlockEditing, page?.id, page?.page_type])
 
   async function loadPage() {
@@ -560,11 +575,38 @@ export default function InterfacePageClient({
       })
       // CRITICAL: Merge with existing blocks instead of replacing (preserve user state)
       // EXCEPT when forceReload is true - then replace configs to get latest saved content
+      // CRITICAL: Don't clear blocks if reload returns empty - preserve existing blocks
       setBlocks((prevBlocks) => {
+        // If reload returns empty blocks and we have existing blocks, preserve them
+        // This prevents clearing blocks due to race conditions or temporary API issues
+        if (pageBlocks.length === 0 && prevBlocks.length > 0) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Blocks] Reload returned empty blocks, preserving existing blocks', {
+              prevBlocksCount: prevBlocks.length,
+              forceReload,
+              pageId: page.id
+            })
+          }
+          blocksLoadedRef.current = true
+          return prevBlocks
+        }
+        
         if (prevBlocks.length === 0 || forceReload) {
           blocksLoadedRef.current = true
           // On force reload, replace entirely to get latest saved content
-          return pageBlocks
+          // But only if we actually got blocks back, otherwise preserve existing
+          if (pageBlocks.length > 0) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Blocks] Force reload: replacing blocks', {
+                oldCount: prevBlocks.length,
+                newCount: pageBlocks.length,
+                pageId: page.id
+              })
+            }
+            return pageBlocks
+          }
+          // If force reload but no blocks returned, preserve existing
+          return prevBlocks
         }
         // Merge: update existing blocks, add new ones
         const existingIds = new Set(prevBlocks.map(b => b.id))
@@ -951,12 +993,10 @@ export default function InterfacePageClient({
           </div>
         ) : isDashboardOrOverview && isBlockEditing ? (
           // For dashboard/overview in block edit mode, use InterfaceBuilder
-          blocksLoading ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-gray-500">Loading blocks...</div>
-            </div>
-          ) : (
-            <InterfaceBuilder
+          // CRITICAL: Always render InterfaceBuilder to prevent remounts
+          // Don't unmount when blocksLoading changes - let it handle loading state internally
+          <InterfaceBuilder
+              key={`interface-builder-edit-${page.id}-${isBlockEditing}`}
               page={{ 
                 id: page.id, 
                 name: page.name,
@@ -971,7 +1011,6 @@ export default function InterfacePageClient({
               hideHeader={true}
               pageTableId={pageTableId}
             />
-          )
         ) : page ? (
           // Always render PageRenderer - it will show setup UI if page is invalid
           // NEVER redirect - invalid pages show setup UI instead

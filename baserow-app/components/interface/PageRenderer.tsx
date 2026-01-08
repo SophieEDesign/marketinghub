@@ -143,6 +143,24 @@ export default function PageRenderer({
           return <PageSetupState page={page} isAdmin={isAdmin} onOpenSettings={onOpenSettings} />
         }
         
+        // Wait for pageTableId to be resolved before rendering
+        // If pageTableId is null but page has base_table/saved_view_id, we're still loading
+        if (!pageTableId && (page.base_table || page.saved_view_id)) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-500">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                <p className="text-sm">Loading table connection...</p>
+              </div>
+            </div>
+          )
+        }
+        
+        // If pageTableId is still null after loading, show setup state
+        if (!pageTableId) {
+          return <PageSetupState page={page} isAdmin={isAdmin} onOpenSettings={onOpenSettings} />
+        }
+        
         // For data page views, use GridBlock to ensure unified rendering
         // This ensures they share the same renderer, settings schema, and data logic as blocks
         return (

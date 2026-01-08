@@ -345,21 +345,13 @@ export default function InterfaceBuilder({
       saveTimeoutRef.current = null
     }
 
-    // Only save if layout was actually modified by user
-    // Prevents unnecessary saves when just entering/exiting edit mode without changes
-    if (!layoutModifiedByUserRef.current && !pendingLayout) {
-      // No changes made, just exit
-      exitBlockEdit()
-      setSelectedBlockId(null)
-      setSettingsPanelOpen(false)
-      return
-    }
-
     // Mark user interaction (exiting edit mode is a user action)
     markUserInteraction()
 
     // Get current layout from blocks state and save before exiting edit mode
     // This ensures any unsaved drag/resize changes are persisted
+    // CRITICAL: Always save layout when exiting edit mode to ensure positions are persisted
+    // Even if user didn't explicitly drag/resize, blocks might have been moved programmatically
     const currentLayout: LayoutItem[] = blocks.map((block) => ({
       i: block.id,
       x: block.x,
@@ -368,20 +360,45 @@ export default function InterfaceBuilder({
       h: block.h,
     }))
 
-    // Save layout when exiting edit mode if there are changes
-    // Use pendingLayout if available (has latest changes), otherwise use currentLayout
+    // CRITICAL: Always save layout when exiting edit mode if we have blocks
+    // This ensures block positions are persisted even if user didn't explicitly drag/resize
     if (currentLayout.length > 0) {
       setIsSaving(true)
       try {
         // Use pendingLayout if it exists (has the latest drag/resize changes)
         // Otherwise fall back to currentLayout from blocks state
         const layoutToSave = pendingLayout || currentLayout
-        await saveLayout(layoutToSave)
-        // Small delay to ensure database transaction is committed before reload
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Layout] Saving layout on exit:', {
+            pageId: page.id,
+            layoutCount: layoutToSave.length,
+            layoutItems: layoutToSave,
+            hasPendingLayout: !!pendingLayout,
+            layoutModifiedByUser: layoutModifiedByUserRef.current,
+          })
+        }
+        
+        // CRITICAL: Pass hasUserInteraction=true to bypass guards when exiting edit mode
+        // This ensures layout is saved even if layoutModifiedByUserRef was reset
+        // Also mark as modified to ensure save goes through
+        layoutModifiedByUserRef.current = true
+        await saveLayout(layoutToSave, true)
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Layout] Layout saved successfully on exit')
+        }
+        
+        // Longer delay to ensure database transaction is fully committed before reload
         // This prevents race condition where blocks reload before save completes
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 300))
       } catch (error) {
         console.error("Failed to save layout on exit:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to save layout",
+          description: error instanceof Error ? error.message : "Please try again",
+        })
         // Don't exit edit mode if save failed - user should see the error
         return
       } finally {
@@ -395,7 +412,7 @@ export default function InterfaceBuilder({
     exitBlockEdit()
     setSelectedBlockId(null)
     setSettingsPanelOpen(false)
-  }, [blocks, pendingLayout, saveLayout, exitBlockEdit])
+  }, [blocks, pendingLayout, saveLayout, exitBlockEdit, page.id, toast])
 
   // Cleanup timeout on unmount
   useEffect(() => {
