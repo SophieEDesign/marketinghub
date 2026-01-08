@@ -47,6 +47,20 @@ export async function saveBlockLayout(
   // Filter blocks by page_id or view_id to ensure we only update blocks for this page
   await Promise.all(
     updates.map(async (update) => {
+      // PHASE 1 - Layout write verification: Log before DB update
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Layout Write] Block ${update.id}: BEFORE DB UPDATE`, {
+          blockId: update.id,
+          update: {
+            position_x: update.position_x,
+            position_y: update.position_y,
+            width: update.width,
+            height: update.height,
+            order_index: update.order_index,
+          },
+        })
+      }
+
       let query = supabase
         .from('view_blocks')
         .update({
@@ -58,7 +72,7 @@ export async function saveBlockLayout(
           updated_at: new Date().toISOString(),
         })
         .eq('id', update.id)
-        .select('id') // Select to verify update succeeded
+        .select('id, position_x, position_y, width, height') // Select to verify update succeeded
 
       // Ensure we're only updating blocks that belong to this page
       if (isInterfacePage) {
@@ -75,6 +89,37 @@ export async function saveBlockLayout(
       // Verify the update actually happened (RLS might silently fail)
       if (!data || data.length === 0) {
         throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
+      }
+
+      // PHASE 1 - Layout write verification: Log after DB update and verify
+      if (process.env.NODE_ENV === 'development') {
+        const persisted = data[0]
+        const matches = 
+          persisted.position_x === update.position_x &&
+          persisted.position_y === update.position_y &&
+          persisted.width === update.width &&
+          persisted.height === update.height
+
+        console.log(`[Layout Write] Block ${update.id}: AFTER DB UPDATE`, {
+          blockId: update.id,
+          sent: {
+            position_x: update.position_x,
+            position_y: update.position_y,
+            width: update.width,
+            height: update.height,
+          },
+          persisted: {
+            position_x: persisted.position_x,
+            position_y: persisted.position_y,
+            width: persisted.width,
+            height: persisted.height,
+          },
+          matches,
+        })
+
+        if (!matches) {
+          console.error(`[Layout Write] Block ${update.id}: MISMATCH - DB persisted different values than sent!`)
+        }
       }
     })
   )

@@ -76,20 +76,42 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   // Track loading state to prevent concurrent loads
   const loadingRef = useRef(false)
   const tableIdRef = useRef<string | null>(null)
+  const viewIdRef = useRef<string | null | undefined>(null)
+  
+  // Track previous tableId/viewId to prevent unnecessary reloads when config reference changes
+  // but actual values remain the same
+  const prevTableIdRef = useRef<string | null>(null)
+  const prevViewIdRef = useRef<string | null | undefined>(null)
 
   useEffect(() => {
     if (!tableId) {
       setLoading(false)
+      prevTableIdRef.current = null
+      prevViewIdRef.current = null
+      return
+    }
+
+    // CRITICAL: Skip reload if tableId and viewId haven't actually changed
+    // This prevents unnecessary reloads when config reference changes but values are the same
+    const tableIdChanged = prevTableIdRef.current !== tableId
+    const viewIdChanged = prevViewIdRef.current !== viewId
+    
+    if (!tableIdChanged && !viewIdChanged) {
+      // Values haven't changed, skip reload
       return
     }
 
     // Skip if already loading the same table
-    if (loadingRef.current && tableIdRef.current === tableId) {
+    if (loadingRef.current && tableIdRef.current === tableId && viewIdRef.current === viewId) {
       return
     }
 
+    // Update refs
+    prevTableIdRef.current = tableId
+    prevViewIdRef.current = viewId
     loadingRef.current = true
     tableIdRef.current = tableId
+    viewIdRef.current = viewId
     setLoading(true)
 
     async function loadTableData() {
@@ -143,7 +165,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     }
 
     loadTableData()
-  }, [tableId, viewId])
+  }, [tableId, viewId]) // Dependencies are tableId/viewId values, not config reference
 
   // Combine loading states
   const isLoading = loading || metaLoading

@@ -142,8 +142,38 @@ export default function InterfaceBuilder({
         return
       }
 
+      // PHASE 1 - Layout write verification: Log before save (client)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Layout Write] BEFORE SAVE (client)`, {
+          pageId: page.id,
+          layout,
+          layoutItems: layout.map(item => ({
+            id: item.i,
+            position_x: item.x,
+            position_y: item.y,
+            width: item.w,
+            height: item.h,
+          })),
+        })
+      }
+
       setSaveStatus("saving")
       try {
+        // PHASE 1 - Layout write verification: Log API payload
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Layout Write] API PAYLOAD`, {
+            pageId: page.id,
+            payload: { layout },
+            layoutItems: layout.map(item => ({
+              id: item.i,
+              position_x: item.x,
+              position_y: item.y,
+              width: item.w,
+              height: item.h,
+            })),
+          })
+        }
+
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -151,6 +181,17 @@ export default function InterfaceBuilder({
         })
 
         if (response.ok) {
+          const responseData = await response.json()
+          
+          // PHASE 1 - Layout write verification: Log API response
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[Layout Write] API RESPONSE`, {
+              pageId: page.id,
+              responseData,
+              success: response.ok,
+            })
+          }
+
           setSaveStatus("saved")
           setPendingLayout(null)
           // Show success feedback briefly, then reset to idle
@@ -312,12 +353,18 @@ export default function InterfaceBuilder({
   const handleBlockUpdate = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
       try {
-        // DEV: Debug log for content_json persistence
+        // PHASE 1 - TextBlock write verification: Log API payload
         if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
-          console.log(`[TextBlock Save] Block ${blockId}: Saving content_json`, {
-            hasContent: !!(config as any).content_json,
-            contentType: typeof (config as any).content_json,
-            contentKeys: (config as any).content_json?.type === 'doc' ? Object.keys((config as any).content_json) : 'not-doc',
+          console.log(`[TextBlock Write] Block ${blockId}: API PAYLOAD`, {
+            blockId,
+            payload: {
+              id: blockId,
+              config: {
+                content_json: (config as any).content_json,
+              }
+            },
+            contentJson: (config as any).content_json,
+            contentJsonStr: JSON.stringify((config as any).content_json),
           })
         }
 
@@ -335,17 +382,39 @@ export default function InterfaceBuilder({
 
         const responseData = await response.json()
 
+        // PHASE 1 - TextBlock write verification: Log API response
+        if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
+          console.log(`[TextBlock Write] Block ${blockId}: API RESPONSE`, {
+            blockId,
+            responseData,
+            returnedBlocks: responseData.blocks,
+            hasContentJson: responseData.blocks?.find((b: PageBlock) => b.id === blockId)?.config?.content_json ? true : false,
+          })
+        }
+
         // CRITICAL: Use returned blocks if available (more efficient and ensures consistency)
         // The API now returns updated blocks with the latest config including content_json
         if (responseData.blocks && responseData.blocks.length > 0) {
           const updatedBlock = responseData.blocks.find((b: PageBlock) => b.id === blockId)
           if (updatedBlock) {
-            // DEV: Debug log for returned content_json
-            if (process.env.NODE_ENV === 'development' && updatedBlock.config?.content_json) {
-              console.log(`[TextBlock Save] Block ${blockId}: Received updated block with content_json`, {
-                hasContent: !!updatedBlock.config.content_json,
-                contentType: typeof updatedBlock.config.content_json,
+            // PHASE 1 - TextBlock write verification: Verify returned content_json matches sent
+            if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
+              const sentContentStr = JSON.stringify((config as any).content_json)
+              const returnedContentStr = JSON.stringify(updatedBlock.config?.content_json)
+              const matches = sentContentStr === returnedContentStr
+              
+              console.log(`[TextBlock Write] Block ${blockId}: VERIFICATION`, {
+                blockId,
+                sentContentJson: (config as any).content_json,
+                returnedContentJson: updatedBlock.config?.content_json,
+                matches,
+                sentStr: sentContentStr,
+                returnedStr: returnedContentStr,
               })
+              
+              if (!matches) {
+                console.error(`[TextBlock Write] Block ${blockId}: MISMATCH - API returned different content_json than sent!`)
+              }
             }
 
             // Update the specific block in state with the returned data

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { PageBlock } from "@/lib/interface/types"
@@ -24,11 +24,44 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  
+  // Track previous tableId to prevent unnecessary reloads when config reference changes
+  // but tableId value remains the same
+  const prevTableIdRef = useRef<string | null>(null)
+  const loadingRef = useRef(false)
+  
+  // Defensive logging for Record Review pages
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[RecordBlock] recordId resolution:', {
+        blockId: block.id,
+        configRecordId: config?.record_id,
+        pageRecordId,
+        resolvedRecordId: recordId,
+        tableId,
+      })
+    }
+  }, [block.id, config?.record_id, pageRecordId, recordId, tableId])
 
   useEffect(() => {
-    if (tableId) {
-      loadTableName()
+    if (!tableId) {
+      prevTableIdRef.current = null
+      return
     }
+
+    // CRITICAL: Skip reload if tableId hasn't actually changed
+    // This prevents unnecessary reloads when config reference changes but value is the same
+    if (prevTableIdRef.current === tableId) {
+      return
+    }
+
+    // Skip if already loading the same table
+    if (loadingRef.current && prevTableIdRef.current === tableId) {
+      return
+    }
+
+    prevTableIdRef.current = tableId
+    loadTableName()
   }, [tableId])
 
   // Open record panel when recordId changes (for record review pages)
@@ -42,6 +75,7 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   async function loadTableName() {
     if (!tableId) return
 
+    loadingRef.current = true
     setLoading(true)
     try {
       const supabase = createClient()
@@ -56,11 +90,16 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
       }
     } catch (error) {
       console.error("Error loading table:", error)
+      // CRITICAL: Do NOT retry automatically on network failure
+      // Keep existing data if available
     } finally {
       setLoading(false)
+      loadingRef.current = false
     }
   }
 
+  // Always render something - never return null
+  // For Record Review pages, show setup state if tableId or recordId is missing
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
@@ -74,13 +113,18 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     )
   }
   
+  // For Record Review pages: if recordId is missing, show setup state (not blank)
+  // This ensures the panel always renders something
   if (!recordId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
-          <p className="mb-2">{isEditing ? "This block requires a record ID." : "No record selected"}</p>
+          <p className="mb-2">{isEditing ? "This block requires a record ID." : "Select a record to see details"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Configure the record ID in block settings.</p>
+            <p className="text-xs text-gray-400">Configure the record ID in block settings, or select a record from the list.</p>
+          )}
+          {!isEditing && (
+            <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
           )}
         </div>
       </div>

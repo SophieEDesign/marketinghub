@@ -263,6 +263,13 @@ export default function CalendarView({
     
     // Early return if prerequisites aren't met
     if (!resolvedTableId || !supabaseTableName || loadedTableFields.length === 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Calendar: Skipping loadRows - prerequisites not met', {
+          resolvedTableId: !!resolvedTableId,
+          supabaseTableName: !!supabaseTableName,
+          loadedTableFieldsCount: loadedTableFields.length
+        })
+      }
       return
     }
     
@@ -276,9 +283,18 @@ export default function CalendarView({
     const currentFiltersKey = filtersKey
     const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}`
     
-    // Only call loadRows if the combined key actually changed
-    // This prevents infinite loops when props are recreated but content is the same
-    if (prevFiltersRef.current !== combinedKey && combinedKey !== '') {
+    // CRITICAL: Load rows if key changed OR if we have no rows yet (initial load)
+    // This ensures rows are always loaded when prerequisites are met
+    const shouldLoad = prevFiltersRef.current !== combinedKey || rows.length === 0
+    
+    if (shouldLoad) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Calendar: Triggering loadRows', {
+          keyChanged: prevFiltersRef.current !== combinedKey,
+          noRowsYet: rows.length === 0,
+          combinedKey: combinedKey.substring(0, 50) + '...'
+        })
+      }
       prevFiltersRef.current = combinedKey
       loadRows()
     }
@@ -598,22 +614,57 @@ export default function CalendarView({
         })
       }
       
+      // CRITICAL: Log sample row data to debug date field extraction
+      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
+        const sampleRow = filteredRows[0]
+        console.log('Calendar: Sample row data for event mapping', {
+          rowId: sampleRow.id,
+          dateFieldName: actualStartFieldName || actualFieldName,
+          dateValue: sampleRow.data ? sampleRow.data[actualStartFieldName || actualFieldName] : 'no data',
+          allDataKeys: sampleRow.data ? Object.keys(sampleRow.data) : [],
+          rowDataSample: sampleRow.data ? Object.fromEntries(
+            Object.entries(sampleRow.data).slice(0, 5)
+          ) : null
+        })
+      }
+      
       const events = filteredRows
         .filter((row) => {
           if (!row || !row.data) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('Calendar: Row missing or has no data', { rowId: row?.id })
+            }
             return false
           }
           
           // Check for date value - prefer start field if configured, otherwise use date field
           let dateValue: any = null
-          if (actualStartFieldName) {
-            dateValue = row.data[actualStartFieldName]
-          } else if (actualFieldName) {
-            dateValue = row.data[actualFieldName]
+          const dateFieldToUse = actualStartFieldName || actualFieldName
+          
+          if (dateFieldToUse) {
+            dateValue = row.data[dateFieldToUse]
+            
+            // Also try common variations (case-insensitive, with/without underscores)
+            if (!dateValue) {
+              const lowerFieldName = dateFieldToUse.toLowerCase()
+              for (const key of Object.keys(row.data)) {
+                if (key.toLowerCase() === lowerFieldName) {
+                  dateValue = row.data[key]
+                  break
+                }
+              }
+            }
           }
           
           // Skip if no date value
           if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
+            if (process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
+              console.log('Calendar: Row filtered out - no date value', {
+                rowId: row.id,
+                dateField: dateFieldToUse,
+                availableKeys: Object.keys(row.data)
+              })
+            }
             return false
           }
           
@@ -621,18 +672,44 @@ export default function CalendarView({
           try {
             const parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
             // Check if date is valid
-            return !isNaN(parsedDate.getTime())
-          } catch {
+            const isValid = !isNaN(parsedDate.getTime())
+            if (!isValid && process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
+              console.warn('Calendar: Row filtered out - invalid date', {
+                rowId: row.id,
+                dateValue,
+                parsedDate
+              })
+            }
+            return isValid
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
+              console.warn('Calendar: Row filtered out - date parse error', {
+                rowId: row.id,
+                dateValue,
+                error
+              })
+            }
             return false
           }
         })
         .map((row) => {
           // Get date values - support both single date field and start/end fields
+          const dateFieldToUse = actualStartFieldName || actualFieldName
           let dateValue: any = null
-          if (actualStartFieldName) {
-            dateValue = row.data[actualStartFieldName]
-          } else if (actualFieldName) {
-            dateValue = row.data[actualFieldName]
+          
+          if (dateFieldToUse) {
+            dateValue = row.data[dateFieldToUse]
+            
+            // Also try common variations (case-insensitive, with/without underscores)
+            if (!dateValue) {
+              const lowerFieldName = dateFieldToUse.toLowerCase()
+              for (const key of Object.keys(row.data)) {
+                if (key.toLowerCase() === lowerFieldName) {
+                  dateValue = row.data[key]
+                  break
+                }
+              }
+            }
           }
           
           const endDateValue = actualEndFieldName ? row.data[actualEndFieldName] : null
@@ -659,6 +736,7 @@ export default function CalendarView({
           }
           
           // Use visible fields (fieldIds) to determine title - prefer first text field
+          // Also check for primary field (name field) or first non-date field
           const visibleFieldsForTitle = (Array.isArray(fieldIds) ? fieldIds : [])
             .filter((fid) => {
               const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
@@ -671,19 +749,44 @@ export default function CalendarView({
                 field.id !== effectiveDateFieldId
             })
           
-          // Find first text field for title, or use first visible field
-          const titleFieldId = visibleFieldsForTitle.find((fid) => {
-            const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
-            return field && (field.type === 'text' || field.type === 'long_text')
-          }) || visibleFieldsForTitle[0]
+          // Find primary field (name field) or first text field for title
+          const primaryField = loadedTableFields.find(f => 
+            f.type === 'text' && (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
+          )
+          
+          const titleFieldId = primaryField 
+            ? (primaryField.name || primaryField.id)
+            : visibleFieldsForTitle.find((fid) => {
+                const field = loadedTableFields.find(f => f.name === fid || f.id === fid)
+                return field && (field.type === 'text' || field.type === 'long_text')
+              }) || visibleFieldsForTitle[0]
           
           // Find the actual field name for title
-          const titleFieldObj = loadedTableFields.find(f => f.name === titleFieldId || f.id === titleFieldId)
+          const titleFieldObj = loadedTableFields.find(f => 
+            (f.name === titleFieldId || f.id === titleFieldId) || 
+            (primaryField && (f.name === primaryField.name || f.id === primaryField.id))
+          ) || (primaryField ? primaryField : null)
+          
           const titleFieldName = titleFieldObj?.name || titleFieldId
           
-          const title = titleFieldName 
-            ? String(row.data[titleFieldName] || row.data[titleFieldId] || "Untitled")
-            : `Event ${row.id.substring(0, 8)}`
+          // Extract title from row data
+          let title = "Untitled"
+          if (titleFieldName && row.data[titleFieldName]) {
+            title = String(row.data[titleFieldName])
+          } else if (titleFieldId && row.data[titleFieldId]) {
+            title = String(row.data[titleFieldId])
+          } else {
+            // Fallback: use first non-date, non-id field
+            for (const [key, value] of Object.entries(row.data)) {
+              if (key !== 'id' && key !== dateFieldToUse && key !== actualEndFieldName && value) {
+                title = String(value)
+                break
+              }
+            }
+            if (title === "Untitled") {
+              title = `Event ${row.id.substring(0, 8)}`
+            }
+          }
 
           // Get color from color field if configured
           let eventColor: string | undefined = undefined
@@ -840,11 +943,26 @@ export default function CalendarView({
   const calendarEvents = getEvents()
 
   // Empty state: rows exist but no events generated (likely missing/invalid date values)
+  // CRITICAL: This check must happen AFTER rows are loaded and events are generated
   if (!loading && rows.length > 0 && calendarEvents.length === 0) {
+    // Log diagnostic info in development
+    if (process.env.NODE_ENV === 'development') {
+      const sampleRow = rows[0]
+      console.warn('Calendar: Rows exist but no events generated', {
+        rowCount: rows.length,
+        dateField: resolvedDateFieldId,
+        sampleRowData: sampleRow?.data ? {
+          id: sampleRow.id,
+          dateFieldValue: sampleRow.data[resolvedDateFieldId],
+          allKeys: Object.keys(sampleRow.data)
+        } : null
+      })
+    }
+    
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
         <div className="text-sm mb-2 text-center font-medium">
-          No calendar events found
+          No records with dates to display
         </div>
         <div className="text-xs text-gray-400 text-center max-w-md">
           {rows.length} {rows.length === 1 ? 'record' : 'records'} found, but none have valid date values in the selected date field &quot;{resolvedDateFieldId}&quot;.
@@ -992,6 +1110,7 @@ export default function CalendarView({
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           events={calendarEvents}
+          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}-${calendarEvents.length}`} // Force re-render when data changes
           editable={true}
           headerToolbar={{
             left: "prev,next today",

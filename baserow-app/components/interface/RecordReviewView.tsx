@@ -206,7 +206,18 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         setSelectedRecordId(null)
       }
     }
-  }, [filteredData, selectedRecordId])
+    
+    // Defensive logging for Record Review pages
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[RecordReviewView] recordId resolution:', {
+        selectedRecordId,
+        filteredDataLength: filteredData.length,
+        blocksLength: loadedBlocks.length,
+        blocksLoading,
+        renderPath: selectedRecordId ? 'view' : 'setup',
+      })
+    }
+  }, [filteredData, selectedRecordId, loadedBlocks.length, blocksLoading])
 
   // Load table fields
   useEffect(() => {
@@ -437,16 +448,19 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       </div>
 
       {/* Detail panel - Right Column - Shows blocks for selected record */}
+      {/* ALWAYS render the panel - never return null */}
       {recordPanel !== 'none' && (
         <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto bg-white' : 'w-full border-t overflow-auto'}>
-          {!selectedRecord ? (
+          {!selectedRecordId ? (
+            // Setup state: No record selected
             <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
               <div className="text-center">
-                <p className="mb-2 font-medium">Select a record to see details.</p>
+                <p className="mb-2 font-medium">Select a record to see details</p>
                 <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
               </div>
             </div>
           ) : blocksLoading ? (
+            // Loading state: Blocks are being loaded
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
@@ -454,9 +468,10 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
               </div>
             </div>
           ) : (
+            // Render blocks with record context - Always render something
             <div className="h-full">
-              {/* Render blocks with record context - Always use Canvas/BlockRenderer */}
               {loadedBlocks.length === 0 ? (
+                // Setup state: No blocks configured
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
                   <div className="text-center">
                     <p className="mb-2 font-medium">Add fields or blocks to design this view</p>
@@ -468,8 +483,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   </div>
                 </div>
               ) : (
+                // Render InterfaceBuilder with recordId
+                // Key ensures blocks re-render with new recordId when record changes
+                // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
                 <InterfaceBuilder
-                  key={`record-${selectedRecordId || 'none'}`}
+                  key={`record-${selectedRecordId}`}
                   page={{
                     id: page.id,
                     name: page.name,
@@ -480,7 +498,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   isViewer={!isEditing}
                   hideHeader={true}
                   pageTableId={pageTableId}
-                  recordId={selectedRecordId || null}
+                  recordId={selectedRecordId}
                 />
               )}
             </div>

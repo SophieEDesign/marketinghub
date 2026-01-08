@@ -11,7 +11,7 @@
  * - Filters narrow results, never override base filters
  */
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
@@ -66,18 +66,35 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
   const [filters, setFilters] = useState<FilterConfig[]>(() => convertToFilterConfigs(config?.filters))
   const [tableFields, setTableFields] = useState<Array<{ name: string; type: string; options?: any }>>([])
   const [loading, setLoading] = useState(false)
+  
+  // Cache serialized config filters to avoid repeated JSON.stringify calls
+  const cachedConfigFiltersStrRef = useRef<string>("")
+  const prevFiltersStrRef = useRef<string>("")
 
   // Load table fields if table_id is configured
   const tableId = config?.table_id || pageTableId
 
   // Sync filters when config changes externally
+  // CRITICAL: Cache serialized config filters to avoid JSON.stringify in hot paths
   useEffect(() => {
     const configFilters = convertToFilterConfigs(config?.filters)
+    // Serialize config filters once and cache in ref
+    const configStr = JSON.stringify(configFilters)
+    
+    // Only update if config actually changed (prevent unnecessary re-renders)
+    if (cachedConfigFiltersStrRef.current === configStr) {
+      return // Config filters haven't changed, skip update
+    }
+    
+    // Update cached string
+    cachedConfigFiltersStrRef.current = configStr
+    
     setFilters(prev => {
-      // Only update if config actually changed (prevent unnecessary re-renders)
-      const prevStr = JSON.stringify(prev)
-      const configStr = JSON.stringify(configFilters)
+      // Compare with cached previous filters string to avoid JSON.stringify
+      const prevStr = prevFiltersStrRef.current || JSON.stringify(prev)
       if (prevStr !== configStr) {
+        // Update cached previous string
+        prevFiltersStrRef.current = configStr
         return configFilters
       }
       return prev

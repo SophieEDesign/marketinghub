@@ -111,6 +111,23 @@ export default function Canvas({
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
     if (!layoutHydratedRef.current || blockIdsChanged) {
+      // PHASE 2 - Layout rehydration audit: Log before hydration
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Layout Rehydration] BEFORE HYDRATION`, {
+          isFirstLoad: !layoutHydratedRef.current,
+          blockIdsChanged,
+          previousBlockIds: previousBlockIdsRef.current,
+          currentBlockIds,
+          blocks: blocks.map(b => ({
+            id: b.id,
+            x: b.x,
+            y: b.y,
+            w: b.w,
+            h: b.h,
+          })),
+        })
+      }
+
       // Convert blocks to layout format - use saved positions from Supabase
       // CRITICAL: Database values (position_x, position_y, width, height) are single source of truth
       // Only apply defaults when ALL position values are NULL (newly created block)
@@ -133,10 +150,12 @@ export default function Canvas({
           w = 4
           h = 4
           
+          // PHASE 2 - Layout rehydration audit: Log default application
           if (process.env.NODE_ENV === 'development') {
-            console.warn("[Layout hydrate]", {
+            console.log(`[Layout Rehydration] Block ${block.id}: DEFAULTS APPLIED`, {
               blockId: block.id,
               fromDB: { x: null, y: null, w: null, h: null },
+              applied: { x, y, w, h },
               defaultsApplied: true
             })
           }
@@ -147,10 +166,12 @@ export default function Canvas({
           w = block.w ?? 4
           h = block.h ?? 4
           
+          // PHASE 2 - Layout rehydration audit: Log DB values used
           if (process.env.NODE_ENV === 'development') {
-            console.warn("[Layout hydrate]", {
+            console.log(`[Layout Rehydration] Block ${block.id}: FROM DB`, {
               blockId: block.id,
               fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
+              applied: { x, y, w, h },
               defaultsApplied: false
             })
           }
@@ -167,12 +188,32 @@ export default function Canvas({
         }
       })
       
+      // PHASE 2 - Layout rehydration audit: Log after hydration
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Layout Rehydration] AFTER HYDRATION`, {
+          newLayout: newLayout.map(item => ({
+            id: item.i,
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+          })),
+        })
+      }
+      
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
       previousIsEditingRef.current = isEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
     } else {
+      // PHASE 2 - Layout rehydration audit: Log skipped hydration
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Layout Rehydration] SKIPPED (already hydrated, no block ID change)`, {
+          layoutHydrated: layoutHydratedRef.current,
+          blockIdsChanged,
+        })
+      }
       // Update edit mode ref without rehydrating
       previousIsEditingRef.current = isEditing
     }

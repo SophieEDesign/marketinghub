@@ -20,6 +20,7 @@ import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
+import LazyBlockWrapper from "./LazyBlockWrapper"
 
 // Module-level Set to track warned blocks across all component instances
 const warnedBlocks = new Set<string>()
@@ -111,7 +112,13 @@ export default function BlockRenderer({
         if (!safeConfig.table_id && !isEditing) {
           console.warn(`Grid block ${block.id} is missing table_id - block will show setup state`)
         }
-        return <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+        // Lazy-load GridBlock to improve initial page load performance
+        // Disable lazy loading in edit mode so users can see all blocks immediately
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} filters={filters} />
+          </LazyBlockWrapper>
+        )
 
       case "form":
         // Form block MUST have table_id configured - no fallback
@@ -141,8 +148,15 @@ export default function BlockRenderer({
         )
 
       case "record":
-        // Record block MUST have table_id and record_id configured - no fallback
-        return <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} recordId={null} />
+        // Record block MUST have table_id configured
+        // record_id can come from config OR from page context (for record review pages)
+        // Lazy-load RecordBlock to improve initial page load performance
+        // Disable lazy loading in edit mode so users can see all blocks immediately
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <RecordBlock block={safeBlock} isEditing={canEdit} pageTableId={null} pageId={pageId} recordId={recordId} />
+          </LazyBlockWrapper>
+        )
 
       case "chart":
         // Chart block MUST have table_id configured - no fallback
@@ -161,7 +175,13 @@ export default function BlockRenderer({
         return <FieldBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
 
       case "text":
-        return <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
+        // Lazy-load TextBlock to improve initial page load performance
+        // Disable lazy loading in edit mode so users can see all blocks immediately
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
+          </LazyBlockWrapper>
+        )
 
       case "table_snapshot":
         return <TableSnapshotBlock block={safeBlock} isEditing={canEdit} />

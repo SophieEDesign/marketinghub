@@ -44,14 +44,18 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
-  // DEV: Debug log for content_json on render
+  // PHASE 2 - TextBlock rehydration audit: Log on render
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[TextBlock Render] Block ${block.id}:`, {
+    console.log(`[TextBlock Rehydration] Block ${block.id}: RENDER`, {
+      blockId: block.id,
+      rawBlockConfig: config,
+      rawContentJson: config?.content_json,
       hasContentJson: !!config?.content_json,
       contentJsonType: typeof config?.content_json,
       isDoc: config?.content_json?.type === 'doc',
       contentLength: config?.content_json?.content?.length || 0,
       isEditing,
+      isConfigLoading,
     })
   }
   
@@ -86,6 +90,30 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const previousBlockIdRef = useRef<string>(block.id)
   const previousConfigRef = useRef<any>(config)
   const editorInitializedRef = useRef<boolean>(false)
+  
+  // Cache serialized config content_json to avoid repeated JSON.stringify calls
+  // This ref is updated only when config.content_json actually changes
+  const cachedConfigContentStrRef = useRef<string>("")
+  
+  // Update cached config content string when config changes
+  // This avoids JSON.stringify in hot render paths
+  useEffect(() => {
+    const currentContentJson = config?.content_json
+    if (currentContentJson && typeof currentContentJson === 'object' && currentContentJson.type === 'doc') {
+      const newStr = JSON.stringify(currentContentJson)
+      // Only update if content actually changed (reference equality check first)
+      if (cachedConfigContentStrRef.current !== newStr) {
+        cachedConfigContentStrRef.current = newStr
+      }
+    } else {
+      // Empty content
+      const emptyContent = { type: 'doc', content: [] }
+      const emptyStr = JSON.stringify(emptyContent)
+      if (cachedConfigContentStrRef.current !== emptyStr) {
+        cachedConfigContentStrRef.current = emptyStr
+      }
+    }
+  }, [config?.content_json])
 
   /**
    * Get initial content for editor
@@ -175,8 +203,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
       
       // Save on blur if content changed
+      // CRITICAL: Use cached serialized content for comparison to avoid JSON.stringify in hot path
       if (isEditing && onUpdate && editor) {
         const json = editor.getJSON()
+        // Cache serialized content in a ref for comparison
+        // This avoids repeated JSON.stringify calls during typing
         const currentJsonStr = JSON.stringify(json)
         
         // Only save if content actually changed
@@ -227,6 +258,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       return
     }
 
+    // PHASE 1 - TextBlock write verification: Log before save
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TextBlock Write] Block ${block.id}: BEFORE SAVE`, {
+        blockId: block.id,
+        contentJson: json,
+        contentJsonStr: jsonStr,
+        contentJsonType: typeof json,
+        isDoc: json?.type === 'doc',
+        contentLength: json?.content?.length || 0,
+      })
+    }
+
     // Update last saved content reference BEFORE calling onUpdate
     // This prevents race conditions where multiple saves could be triggered
     lastSavedContentRef.current = jsonStr
@@ -257,6 +300,22 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     const blockIdChanged = previousBlockIdRef.current !== block.id
     const configReferenceChanged = previousConfigRef.current !== config
     
+    // PHASE 2 - TextBlock rehydration audit: Log config changes
+    if (process.env.NODE_ENV === 'development') {
+      if (blockIdChanged || configReferenceChanged) {
+        console.log(`[TextBlock Rehydration] Block ${block.id}: CONFIG CHANGED`, {
+          blockId: block.id,
+          blockIdChanged,
+          configReferenceChanged,
+          previousBlockId: previousBlockIdRef.current,
+          currentConfig: config,
+          currentContentJson: config?.content_json,
+          previousConfig: previousConfigRef.current,
+          previousContentJson: previousConfigRef.current?.content_json,
+        })
+      }
+    }
+    
     // Update refs
     previousBlockIdRef.current = block.id
     previousConfigRef.current = config
@@ -264,24 +323,63 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     // If block ID changed, this is a different block - always rehydrate
     if (blockIdChanged) {
       const newContent = getInitialContent()
+      
+      // PHASE 2 - TextBlock rehydration audit: Log editor initialization
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TextBlock Rehydration] Block ${block.id}: EDITOR INIT (block ID changed)`, {
+          blockId: block.id,
+          editorInitialContent: newContent,
+          configContentJson: config?.content_json,
+          matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
+        })
+      }
+      
       editor.commands.setContent(newContent, false) // false = don't emit update event
-      const newStr = JSON.stringify(newContent)
-      lastSavedContentRef.current = newStr
+      // Use cached serialized content from config instead of stringifying again
+      lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(newContent)
       editorInitializedRef.current = true
       return
     }
     
     // If config reference changed (immutable update), rehydrate if content changed
+    // CRITICAL: Compare using cached serialized content to avoid JSON.stringify in hot path
     if (configReferenceChanged) {
-      const newContent = getInitialContent()
+      // Get current editor content once
       const currentContent = editor.getJSON()
-      
-      // Compare stringified versions to detect real changes
       const currentStr = JSON.stringify(currentContent)
-      const newStr = JSON.stringify(newContent)
+      
+      // Use cached config content string (updated in separate effect when config changes)
+      const newStr = cachedConfigContentStrRef.current
+      
+      // PHASE 2 - TextBlock rehydration audit: Log rehydration decision
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TextBlock Rehydration] Block ${block.id}: REHYDRATION CHECK`, {
+          blockId: block.id,
+          currentEditorContent: currentContent,
+          currentEditorContentStr: currentStr,
+          configContentJson: config?.content_json,
+          configContentStr: newStr,
+          contentChanged: currentStr !== newStr,
+          isFocused,
+          willRehydrate: currentStr !== newStr && !isFocused,
+        })
+      }
       
       // Only update if content actually changed AND editor is not focused (to avoid interrupting typing)
       if (currentStr !== newStr && !isFocused) {
+        const newContent = getInitialContent()
+        
+        // PHASE 2 - TextBlock rehydration audit: Log actual rehydration
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock Rehydration] Block ${block.id}: REHYDRATING`, {
+            blockId: block.id,
+            oldContent: currentContent,
+            newContent,
+            configContentJson: config?.content_json,
+            matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
+          })
+        }
+        
         editor.commands.setContent(newContent, false) // false = don't emit update event
         // Update last saved reference to prevent immediate re-save
         lastSavedContentRef.current = newStr
@@ -291,28 +389,58 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   /**
    * Initialize editor content and lastSavedContentRef when editor is first created
+   * CRITICAL: Use cached serialized content to avoid JSON.stringify
    */
   useEffect(() => {
     if (editor && !editorInitializedRef.current && !isConfigLoading) {
-      const initialContent = editor.getJSON()
-      lastSavedContentRef.current = JSON.stringify(initialContent)
+      // PHASE 2 - TextBlock rehydration audit: Log initial editor setup
+      if (process.env.NODE_ENV === 'development') {
+        const initialContent = editor.getJSON()
+        console.log(`[TextBlock Rehydration] Block ${block.id}: INITIAL EDITOR SETUP`, {
+          blockId: block.id,
+          editorInitialContent: initialContent,
+          configContentJson: config?.content_json,
+          cachedConfigContentStr: cachedConfigContentStrRef.current,
+          matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
+        })
+      }
+
+      // Use cached config content string if available, otherwise stringify current content
+      if (cachedConfigContentStrRef.current) {
+        lastSavedContentRef.current = cachedConfigContentStrRef.current
+      } else {
+        const initialContent = editor.getJSON()
+        lastSavedContentRef.current = JSON.stringify(initialContent)
+      }
       editorInitializedRef.current = true
     }
-  }, [editor, isConfigLoading])
+  }, [editor, isConfigLoading, block.id, config])
   
   /**
    * Handle config loading state - reinitialize editor when config becomes available
+   * CRITICAL: Use cached serialized content to avoid JSON.stringify
    */
   useEffect(() => {
     if (editor && isConfigLoading === false && !editorInitializedRef.current) {
       // Config just finished loading, initialize editor content
       const initialContent = getInitialContent()
+      
+      // PHASE 2 - TextBlock rehydration audit: Log config load completion
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TextBlock Rehydration] Block ${block.id}: CONFIG LOADED`, {
+          blockId: block.id,
+          configContentJson: config?.content_json,
+          editorInitialContent: initialContent,
+          matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
+        })
+      }
+      
       editor.commands.setContent(initialContent, false)
-      const initialStr = JSON.stringify(initialContent)
-      lastSavedContentRef.current = initialStr
+      // Use cached config content string if available
+      lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(initialContent)
       editorInitializedRef.current = true
     }
-  }, [editor, isConfigLoading, getInitialContent])
+  }, [editor, isConfigLoading, getInitialContent, block.id, config])
 
   // Calculate toolbar position
   useEffect(() => {

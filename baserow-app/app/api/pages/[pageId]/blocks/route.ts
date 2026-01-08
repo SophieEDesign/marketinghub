@@ -50,19 +50,51 @@ export async function GET(
 
     // Convert view_blocks to PageBlock format
     // Ensure width/height are never null (default to 4 if null, which matches database default)
-    const blocks = (data || []).map((block: any) => ({
-      id: block.id,
-      page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
-      type: block.type,
-      x: block.position_x ?? 0,
-      y: block.position_y ?? 0,
-      w: block.width ?? 4,
-      h: block.height ?? 4,
-      config: block.config || {},
-      order_index: block.order_index ?? 0,
-      created_at: block.created_at,
-      updated_at: block.updated_at,
-    }))
+    const blocks = (data || []).map((block: any) => {
+      // PHASE 2 - TextBlock rehydration audit: Log loaded blocks
+      if (process.env.NODE_ENV === 'development' && block.type === 'text') {
+        console.log(`[API Read] Block ${block.id}: LOADED`, {
+          blockId: block.id,
+          rawBlockFromDB: block,
+          rawConfig: block.config,
+          rawContentJson: block.config?.content_json,
+          hasContentJson: !!block.config?.content_json,
+        })
+      }
+
+      // PHASE 2 - Layout rehydration audit: Log loaded layout
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API Read] Block ${block.id}: LAYOUT LOADED`, {
+          blockId: block.id,
+          fromDB: {
+            position_x: block.position_x,
+            position_y: block.position_y,
+            width: block.width,
+            height: block.height,
+          },
+          mapped: {
+            x: block.position_x ?? 0,
+            y: block.position_y ?? 0,
+            w: block.width ?? 4,
+            h: block.height ?? 4,
+          },
+        })
+      }
+
+      return {
+        id: block.id,
+        page_id: block.page_id || block.view_id, // Use page_id if available, fallback to view_id
+        type: block.type,
+        x: block.position_x ?? 0,
+        y: block.position_y ?? 0,
+        w: block.width ?? 4,
+        h: block.height ?? 4,
+        config: block.config || {},
+        order_index: block.order_index ?? 0,
+        created_at: block.created_at,
+        updated_at: block.updated_at,
+      }
+    })
 
     // CRITICAL: Disable caching to prevent stale data
     // Add cache-busting headers to ensure fresh data on every request
@@ -98,7 +130,30 @@ export async function PATCH(
 
     // Save layout if provided
     if (layout && Array.isArray(layout)) {
+      // PHASE 1 - Layout write verification: Log received layout
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API Write] Layout: RECEIVED`, {
+          pageId,
+          layout,
+          layoutItems: layout.map((item: LayoutItem) => ({
+            id: item.i,
+            position_x: item.x,
+            position_y: item.y,
+            width: item.w,
+            height: item.h,
+          })),
+        })
+      }
+
       await saveBlockLayout(pageId, layout as LayoutItem[])
+
+      // PHASE 1 - Layout write verification: Log after save
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[API Write] Layout: SAVED`, {
+          pageId,
+          layout,
+        })
+      }
     }
 
     // Update individual blocks if provided
@@ -119,6 +174,17 @@ export async function PATCH(
             throw new Error(`Block ${update.id} not found`)
           }
 
+          // PHASE 1 - TextBlock write verification: Log received content_json
+          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+            console.log(`[API Write] Block ${update.id}: RECEIVED`, {
+              blockId: update.id,
+              receivedConfig: update.config,
+              receivedContentJson: update.config.content_json,
+              currentBlockConfig: currentBlock.config,
+              currentContentJson: currentBlock.config?.content_json,
+            })
+          }
+
           // Use the provided config - SettingsPanel always passes full config
           // Merge with existing to handle any edge cases, but new config takes precedence
           // CRITICAL: This merge ensures partial updates (like content_json) are preserved
@@ -127,12 +193,31 @@ export async function PATCH(
             ...(update.config || {}),
           }
 
+          // PHASE 1 - TextBlock write verification: Log before normalization
+          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+            console.log(`[API Write] Block ${update.id}: BEFORE NORMALIZE`, {
+              blockId: update.id,
+              configToNormalize,
+              contentJsonBeforeNormalize: configToNormalize.content_json,
+            })
+          }
+
           // Validate and normalize config
           // CRITICAL: normalizeBlockConfig now preserves content_json for text blocks
           const normalizedConfig = normalizeBlockConfig(
             currentBlock.type as BlockType,
             configToNormalize
           )
+
+          // PHASE 1 - TextBlock write verification: Log after normalization
+          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+            console.log(`[API Write] Block ${update.id}: AFTER NORMALIZE`, {
+              blockId: update.id,
+              normalizedConfig,
+              contentJsonAfterNormalize: normalizedConfig.content_json,
+              preserved: JSON.stringify(normalizedConfig.content_json) === JSON.stringify(configToNormalize.content_json),
+            })
+          }
 
           // Validate config (warn but don't fail - use normalized config)
           const validation = validateBlockConfig(currentBlock.type as BlockType, normalizedConfig)
@@ -157,6 +242,17 @@ export async function PATCH(
 
           if (!updatedBlock) {
             throw new Error(`Block ${update.id} update succeeded but no data returned`)
+          }
+
+          // PHASE 1 - TextBlock write verification: Log persisted data from DB
+          if (process.env.NODE_ENV === 'development' && update.config?.content_json) {
+            console.log(`[API Write] Block ${update.id}: PERSISTED`, {
+              blockId: update.id,
+              updatedBlockFromDB: updatedBlock,
+              persistedConfig: updatedBlock.config,
+              persistedContentJson: updatedBlock.config?.content_json,
+              matchesSent: JSON.stringify(updatedBlock.config?.content_json) === JSON.stringify(update.config.content_json),
+            })
           }
 
           // Convert to PageBlock format and add to results
