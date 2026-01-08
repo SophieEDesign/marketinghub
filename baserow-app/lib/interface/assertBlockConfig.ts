@@ -70,8 +70,17 @@ export function assertBlockConfig(
         }
       }
       // Calendar views (grid blocks with view_type: 'calendar') also need date field
-      if (config.view_type === 'calendar' && !hasDateField && !config.date_field) {
-        missingFields.push('date_field')
+      // Check for all possible date field config properties
+      const hasDateFieldConfig = !!(
+        config.start_date_field ||
+        config.from_date_field ||
+        config.date_field ||
+        config.calendar_date_field ||
+        config.calendar_start_field ||
+        hasDateField
+      )
+      if (config.view_type === 'calendar' && !hasDateFieldConfig) {
+        missingFields.push('start_date_field or from_date_field')
         const reason = 'Calendar view (grid block) requires a date field'
         if (isDev) {
           console.warn(`[BlockGuard] Calendar view block is missing date field`)

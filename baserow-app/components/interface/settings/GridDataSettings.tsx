@@ -124,8 +124,8 @@ export default function GridDataSettings({
         </p>
       </div>
 
-      {/* View Selection (optional) */}
-      {config.table_id && views.length > 0 && (
+      {/* View Selection (optional) - Only for Grid view, not Calendar */}
+      {currentViewType === 'grid' && config.table_id && views.length > 0 && (
         <div className="space-y-2">
           <Label>View (optional)</Label>
           <Select
@@ -267,8 +267,8 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Filters (optional) - Only for Grid view */}
-      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
+      {/* Filters (optional) - For Grid and Calendar views */}
+      {(currentViewType === 'grid' || currentViewType === 'calendar') && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Filters (optional)</Label>
@@ -455,35 +455,64 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Date Field (for Calendar) */}
+      {/* Date Fields (for Calendar) */}
       {currentViewType === 'calendar' && config.table_id && fields.length > 0 && (
-        <div className="space-y-2">
-          <Label>Date Field *</Label>
-          <Select
-            value={config.calendar_date_field || config.start_date_field || ""}
-            onValueChange={(value) => onUpdate({ calendar_date_field: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a date field" />
-            </SelectTrigger>
-            <SelectContent>
-              {fields
-                .filter(field => field.type === 'date')
-                .map((field) => (
-                  <SelectItem key={field.id} value={field.name}>
-                    {field.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-          {fields.filter(f => f.type === 'date').length === 0 && (
-            <p className="text-xs text-amber-600">
-              No date fields found. Please add a date field to the table.
+        <div className="space-y-4">
+          {/* From Date Field */}
+          <div className="space-y-2">
+            <Label>From Date Field *</Label>
+            <Select
+              value={config.start_date_field || config.calendar_date_field || config.from_date_field || ""}
+              onValueChange={(value) => onUpdate({ start_date_field: value, from_date_field: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a date field" />
+              </SelectTrigger>
+              <SelectContent>
+                {fields
+                  .filter(field => field.type === 'date')
+                  .map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {fields.filter(f => f.type === 'date').length === 0 && (
+              <p className="text-xs text-amber-600">
+                No date fields found. Please add a date field to the table.
+              </p>
+            )}
+            <p className="text-xs text-gray-500">
+              Select the start date field for calendar events.
             </p>
-          )}
-          <p className="text-xs text-gray-500">
-            Select the date field to display events on the calendar.
-          </p>
+          </div>
+
+          {/* To Date Field */}
+          <div className="space-y-2">
+            <Label>To Date Field (optional)</Label>
+            <Select
+              value={config.end_date_field || config.to_date_field || ""}
+              onValueChange={(value) => onUpdate({ end_date_field: value === "__none__" ? undefined : value, to_date_field: value === "__none__" ? undefined : value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a date field (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None (single date events)</SelectItem>
+                {fields
+                  .filter(field => field.type === 'date')
+                  .map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Optional: Select an end date field for multi-day events. Leave empty for single-day events.
+            </p>
+          </div>
         </div>
       )}
     </div>

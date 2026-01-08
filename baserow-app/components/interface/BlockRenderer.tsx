@@ -77,17 +77,25 @@ export default function BlockRenderer({
     const canEdit = isEditing && !isLocked
     
     // Pre-deployment guard: Validate block config before rendering
+    // Check for all possible date field config properties
+    const hasDateField = !!(
+      safeConfig.start_date_field ||
+      safeConfig.from_date_field ||
+      safeConfig.date_field ||
+      safeConfig.calendar_date_field ||
+      safeConfig.calendar_start_field
+    )
     const blockValidity = assertBlockConfig(block.type, safeConfig, {
       pageTableId,
       pageRecordId: recordId,
-      hasDateField: !!safeConfig.date_field,
+      hasDateField,
     })
     
     // Show setup UI if block config is invalid
     if (shouldShowBlockSetupUI(block.type, safeConfig, {
       pageTableId,
       pageRecordId: recordId,
-      hasDateField: !!safeConfig.date_field,
+      hasDateField,
     }) && !isEditing) {
       // Return setup UI component (blocks handle this internally)
       // But log for diagnostics

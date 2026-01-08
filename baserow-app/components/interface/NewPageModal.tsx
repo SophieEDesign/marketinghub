@@ -164,36 +164,100 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
 
       const orderIndex = lastInterface ? (lastInterface.order_index + 1) : 0
 
-      // Create interface page as a view with type='interface'
-      const { data: view, error: viewError } = await supabase
-        .from('views')
-        .insert([
-          {
-            name: name.trim(),
-            type: 'interface',
-            table_id: primaryTableId,
-            group_id: defaultGroupId || null,
-            order_index: orderIndex,
-            page_type: selectedPageType, // Store page type
-            config: {
-              settings: {
-                icon: icon.trim() || null,
-                access: 'authenticated',
-                layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
-                primary_table_id: primaryTableId,
-                page_type: selectedPageType, // Also store in config for backward compatibility
-              },
-            },
-            owner_id: user?.id,
-            access_level: 'authenticated',
-          },
-        ])
-        .select()
-        .single()
+      // Generate unique view name to avoid duplicate key errors
+      const baseViewName = name.trim()
+      let viewName = baseViewName
+      let counter = 1
+      let view: any = null
+      let viewCreated = false
+      const maxAttempts = 100 // Safety limit
 
-      if (viewError) {
-        throw new Error(viewError.message || "Failed to create interface")
+      // Try to create view with retry logic for duplicate names
+      while (!viewCreated && counter <= maxAttempts) {
+        // Check if view name already exists (check both table_id and group_id constraints)
+        const checkQueries = []
+        
+        if (primaryTableId) {
+          checkQueries.push(
+            supabase
+              .from('views')
+              .select('id')
+              .eq('table_id', primaryTableId)
+              .eq('name', viewName)
+              .is('is_archived', false)
+              .limit(1)
+          )
+        }
+        
+        if (defaultGroupId) {
+          checkQueries.push(
+            supabase
+              .from('views')
+              .select('id')
+              .eq('group_id', defaultGroupId)
+              .eq('name', viewName)
+              .is('is_archived', false)
+              .limit(1)
+          )
+        }
+
+        const results = await Promise.all(checkQueries)
+        const nameExists = results.some(result => result.data && result.data.length > 0)
+
+        if (!nameExists) {
+          // Name is available, try to create it
+          const { data: newView, error: viewError } = await supabase
+            .from('views')
+            .insert([
+              {
+                name: viewName,
+                type: 'interface',
+                table_id: primaryTableId,
+                group_id: defaultGroupId || null,
+                order_index: orderIndex,
+                page_type: selectedPageType, // Store page type
+                config: {
+                  settings: {
+                    icon: icon.trim() || null,
+                    access: 'authenticated',
+                    layout: { cols: 12, rowHeight: 30, margin: [10, 10] },
+                    primary_table_id: primaryTableId,
+                    page_type: selectedPageType, // Also store in config for backward compatibility
+                  },
+                },
+                owner_id: user?.id,
+                access_level: 'authenticated',
+              },
+            ])
+            .select()
+            .single()
+
+          if (viewError) {
+            // If it's a duplicate key error, try next name (race condition occurred)
+            if (viewError.code === '23505' && (viewError.message?.includes('idx_views_table_name') || viewError.message?.includes('idx_views_group_name'))) {
+              viewName = `${baseViewName} (${counter})`
+              counter++
+              continue // Retry with new name
+            } else {
+              // Other error - throw it
+              throw new Error(viewError.message || "Failed to create interface")
+            }
+          } else if (newView) {
+            view = newView
+            viewCreated = true
+          }
+        } else {
+          // Name exists, try next name
+          viewName = `${baseViewName} (${counter})`
+          counter++
+        }
       }
+
+      if (!viewCreated || !view) {
+        throw new Error(`Failed to create interface: Could not generate unique view name after ${counter} attempts`)
+      }
+
+      const viewError = null // No error if we got here
 
       if (view) {
         // Seed blocks from template

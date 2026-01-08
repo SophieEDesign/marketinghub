@@ -208,23 +208,65 @@ export default function PageCreationWizard({
         base_table = tableId.trim()
         
         // Create a grid view for data access (optional - blocks can use their own views)
-        const { data: recordView, error: recordViewError } = await supabase
-          .from('views')
-          .insert([
-            {
-              table_id: tableId,
-              name: `${pageName.trim()} View`,
-              type: 'grid',
-              config: {},
-              access_level: 'authenticated',
-              owner_id: user?.id,
-            },
-          ])
-          .select()
-          .single()
+        // Check for existing views with the same name to avoid duplicate key errors
+        const baseViewName = `${pageName.trim()} View`
+        let viewName = baseViewName
+        let counter = 1
+        let recordView: any = null
+        let viewCreated = false
+        const maxAttempts = 100 // Safety limit
+        
+        // Try to create view with retry logic for duplicate names
+        while (!viewCreated && counter <= maxAttempts) {
+          // Check if view name already exists
+          const { data: existingViews } = await supabase
+            .from('views')
+            .select('id')
+            .eq('table_id', tableId)
+            .eq('name', viewName)
+            .is('is_archived', false)
+            .limit(1)
+          
+          // If name doesn't exist, try to create it
+          if (!existingViews || existingViews.length === 0) {
+            const { data: newView, error: viewError } = await supabase
+              .from('views')
+              .insert([
+                {
+                  table_id: tableId,
+                  name: viewName,
+                  type: 'grid',
+                  config: {},
+                  access_level: 'authenticated',
+                  owner_id: user?.id,
+                },
+              ])
+              .select()
+              .single()
 
-        if (recordViewError || !recordView) {
-          throw new Error(`Failed to create view: ${recordViewError?.message || 'Unknown error'}`)
+            if (viewError) {
+              // If it's a duplicate key error, try next name (race condition occurred)
+              if (viewError.code === '23505' && (viewError.message?.includes('idx_views_table_name') || viewError.message?.includes('idx_views_group_name'))) {
+                viewName = `${baseViewName} (${counter})`
+                counter++
+                continue // Retry with new name
+              } else {
+                // Other error - throw it
+                throw new Error(`Failed to create view: ${viewError.message || 'Unknown error'}`)
+              }
+            } else if (newView) {
+              recordView = newView
+              viewCreated = true
+            }
+          } else {
+            // Name exists, try next name
+            viewName = `${baseViewName} (${counter})`
+            counter++
+          }
+        }
+
+        if (!viewCreated || !recordView) {
+          throw new Error(`Failed to create view: Could not generate unique view name after ${counter} attempts`)
         }
 
         saved_view_id = recordView.id

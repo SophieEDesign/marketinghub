@@ -181,7 +181,7 @@ export default function CalendarView({
   // MUST be declared before combinedFilters which uses it
   const resolvedDateFieldId = useMemo(() => {
     // 1. Check block/page config first (from page settings)
-    const pageDateField = blockConfig?.start_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
+    const pageDateField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
     if (pageDateField) {
       // Validate it exists in table fields and is a date field
       const field = loadedTableFields.find(f => 
@@ -614,14 +614,14 @@ export default function CalendarView({
       })
       
       // Resolve start field: block config > view config > null
-      const blockStartField = blockConfig?.start_date_field || blockConfig?.calendar_start_field
+      const blockStartField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.calendar_start_field
       const resolvedStartField = blockStartField 
         ? loadedTableFields.find(f => (f.name === blockStartField || f.id === blockStartField) && f.type === 'date')
         : null
       const actualStartFieldName = resolvedStartField?.name || startField?.name || viewConfig?.calendar_start_field || null
       
       // Resolve end field: block config > view config > null
-      const blockEndField = blockConfig?.end_date_field || blockConfig?.calendar_end_field
+      const blockEndField = blockConfig?.end_date_field || blockConfig?.to_date_field || blockConfig?.calendar_end_field
       const resolvedEndField = blockEndField
         ? loadedTableFields.find(f => (f.name === blockEndField || f.id === blockEndField) && f.type === 'date')
         : null
