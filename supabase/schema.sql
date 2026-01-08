@@ -272,7 +272,7 @@ CREATE TABLE IF NOT EXISTS public.interfaces (
 CREATE TABLE IF NOT EXISTS public.interface_pages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL,
-  page_type text NOT NULL CHECK (page_type = ANY (ARRAY['list'::text, 'gallery'::text, 'kanban'::text, 'calendar'::text, 'timeline'::text, 'form'::text, 'dashboard'::text, 'overview'::text, 'record_review'::text, 'content'::text])),
+  page_type text NOT NULL CHECK (page_type = ANY (ARRAY['list'::text, 'gallery'::text, 'kanban'::text, 'calendar'::text, 'timeline'::text, 'form'::text, 'dashboard'::text, 'overview'::text, 'record_review'::text, 'content'::text, 'record_view'::text])),
   source_view text,
   base_table text,
   config jsonb DEFAULT '{}'::jsonb,
