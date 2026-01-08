@@ -207,4 +207,3 @@ For immediate testing while setting up SMTP:
 7. Verify user appears in Users list with correct role
 
 **Note:** For production, always use a custom SMTP provider and production URL to avoid spam issues.
-

@@ -226,4 +226,3 @@ See `PRE_DEPLOY_CHECKLIST.md` for detailed testing procedures and future enhance
 - `baserow-app/types/database.ts` - Type definitions updated to match database schema
 
 **Result:** Build now succeeds, types match actual database structure and code usage.
-

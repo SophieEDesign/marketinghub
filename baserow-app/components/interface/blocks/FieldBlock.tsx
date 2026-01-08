@@ -101,7 +101,8 @@ export default function FieldBlock({
 
       if (error) throw error
       if (data) {
-        setFieldValue(data[field.name])
+        // Type assertion needed because Supabase returns dynamic field names
+        setFieldValue((data as Record<string, any>)[field.name])
       }
     } catch (error) {
       console.error("Error loading field value:", error)
