@@ -117,9 +117,13 @@ export async function GET(
 
     // CRITICAL: Log final response for debugging
     console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
+      isInterfacePage: !!page,
+      queryType: page ? 'page_id' : 'view_id',
+      dbRowCount: data?.length || 0,
       blocksCount: blocks.length,
       blockIds: blocks.map(b => b.id),
-      isInterfacePage: !!page,
+      blocks: blocks.length > 0 ? blocks : 'EMPTY ARRAY',
+      responseBody: { blocks },
     })
 
     // CRITICAL: Disable caching to prevent stale data

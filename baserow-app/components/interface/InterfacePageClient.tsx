@@ -583,14 +583,26 @@ function InterfacePageClientInternal({
     setBlocksLoading(true)
     try {
       const res = await fetch(`/api/pages/${page.id}/blocks`)
-      if (!res.ok) throw new Error('Failed to load blocks')
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error(`[loadBlocks] API ERROR: pageId=${page.id}, page_type=${page.page_type}`, {
+          status: res.status,
+          statusText: res.statusText,
+          errorText,
+        })
+        throw new Error(`Failed to load blocks: ${res.status} ${res.statusText}`)
+      }
       
       const data = await res.json()
       
-      // CRITICAL: Log API response for debugging
+      // CRITICAL: Log API response for debugging - show full response structure
       console.log(`[loadBlocks] API returned: pageId=${page.id}, page_type=${page.page_type}`, {
+        responseStatus: res.status,
+        responseOk: res.ok,
+        apiResponseRaw: data,
         apiResponseBlocksCount: data.blocks?.length || 0,
         apiResponseBlockIds: data.blocks?.map((b: any) => b.id) || [],
+        apiResponseBlocks: data.blocks, // Full blocks array for inspection
         forceReload,
         currentBlocksCount: blocks.length,
         currentBlockIds: blocks.map(b => b.id),
