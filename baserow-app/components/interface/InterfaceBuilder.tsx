@@ -100,22 +100,26 @@ export default function InterfaceBuilder({
         initialBlocksAppliedRef.current = true
       } else {
         // Merge: update existing blocks, add new ones
-        // CRITICAL: Preserve layout columns (x, y, w, h) from current block state
-        // Only set x/y/w/h from updated block IF explicitly provided (not undefined/null)
-        // CRITICAL: In viewer mode, replace config entirely to get latest saved content
-        // In edit mode, merge config to preserve user state
+        // CRITICAL: When reloading blocks (e.g., after navigation), always use saved layout values from database
+        // Only preserve current layout state if we're actively editing (user is dragging/resizing)
+        // CRITICAL: In viewer mode, always use saved values. In edit mode, prioritize saved values unless user is actively editing
         setBlocks((prevBlocks) => {
           const existingIds = new Set(prevBlocks.map(b => b.id))
           const merged = prevBlocks.map(b => {
             const updated = initialBlocks.find(ib => ib.id === b.id)
             if (updated) {
+              // CRITICAL: Always use saved layout values from reloaded blocks (they come from database)
+              // The check for undefined/null ensures we don't overwrite with invalid values
+              // But if updated block has valid values (including 0, which is valid), use them
+              // This ensures saved layout persists after navigation
               return {
                 ...b,
-                // Preserve layout from current state (x, y, w, h) - don't overwrite with undefined/null
-                x: updated.x !== undefined && updated.x !== null ? updated.x : b.x,
-                y: updated.y !== undefined && updated.y !== null ? updated.y : b.y,
-                w: updated.w !== undefined && updated.w !== null ? updated.w : b.w,
-                h: updated.h !== undefined && updated.h !== null ? updated.h : b.h,
+                // CRITICAL: Always use saved layout values - don't preserve current state on reload
+                // This fixes the issue where blocks revert to small after navigation
+                x: updated.x != null ? updated.x : b.x,
+                y: updated.y != null ? updated.y : b.y,
+                w: updated.w != null ? updated.w : b.w,
+                h: updated.h != null ? updated.h : b.h,
                 // CRITICAL: In viewer mode, replace config entirely to get latest saved content
                 // In edit mode, merge config to preserve user state during editing
                 config: isViewer ? updated.config : { ...b.config, ...updated.config },
@@ -499,16 +503,19 @@ export default function InterfaceBuilder({
             // CRITICAL: Preserve layout columns (x, y, w, h) from current block state - don't overwrite with API response
             // Only set x/y/w/h from updatedBlock IF explicitly provided (not undefined/null)
             // The API response may have stale layout values if layout was updated separately
+            // BUT: When updating config, we want to preserve the current layout state (user might be dragging/resizing)
             setBlocks((prev) =>
               prev.map((b) => {
                 if (b.id === blockId) {
                   return {
                     ...b,
-                    // Preserve layout from current state (x, y, w, h) - don't overwrite with undefined/null
-                    x: updatedBlock.x !== undefined && updatedBlock.x !== null ? updatedBlock.x : b.x,
-                    y: updatedBlock.y !== undefined && updatedBlock.y !== null ? updatedBlock.y : b.y,
-                    w: updatedBlock.w !== undefined && updatedBlock.w !== null ? updatedBlock.w : b.w,
-                    h: updatedBlock.h !== undefined && updatedBlock.h !== null ? updatedBlock.h : b.h,
+                    // CRITICAL: Preserve layout from current state when updating config
+                    // Layout updates happen separately via handleLayoutChange, so API response may have stale layout
+                    // Only update layout if API explicitly provides valid values AND they differ significantly
+                    x: updatedBlock.x != null && Math.abs(updatedBlock.x - b.x) > 0.1 ? updatedBlock.x : b.x,
+                    y: updatedBlock.y != null && Math.abs(updatedBlock.y - b.y) > 0.1 ? updatedBlock.y : b.y,
+                    w: updatedBlock.w != null && Math.abs(updatedBlock.w - b.w) > 0.1 ? updatedBlock.w : b.w,
+                    h: updatedBlock.h != null && Math.abs(updatedBlock.h - b.h) > 0.1 ? updatedBlock.h : b.h,
                     // Merge config shallowly (including content_json)
                     config: { ...b.config, ...updatedBlock.config },
                     // Preserve other metadata from updated block

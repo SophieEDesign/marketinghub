@@ -7,11 +7,11 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { viewId: string } }
+  { params }: { params: Promise<{ viewId: string }> }
 ) {
   try {
     const supabase = await createClient()
-    const { viewId } = params
+    const { viewId } = await params
 
     // 1. Get the view to find its table_id
     const { data: view, error: viewError } = await supabase

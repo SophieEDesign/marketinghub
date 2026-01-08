@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Edit2, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,8 @@ interface InterfacePageClientProps {
   isAdmin?: boolean
 }
 
-export default function InterfacePageClient({ 
+// Internal component that uses useSearchParams - must be wrapped in Suspense
+function InterfacePageClientInternal({ 
   pageId, 
   initialPage,
   initialData = [],
@@ -609,15 +610,26 @@ export default function InterfacePageClient({
           return prevBlocks
         }
         // Merge: update existing blocks, add new ones
+        // CRITICAL: When merging, always use saved layout values from reloaded blocks
+        // This ensures layout persists after navigation
         const existingIds = new Set(prevBlocks.map(b => b.id))
         const merged = [...prevBlocks]
         pageBlocks.forEach((newBlock: any) => {
           const existingIndex = merged.findIndex(b => b.id === newBlock.id)
           if (existingIndex >= 0) {
-            // Merge config instead of replacing (preserves user state during normal operation)
+            // CRITICAL: Always use saved layout values (x, y, w, h) from reloaded blocks
+            // CRITICAL: When reloading blocks (e.g., after navigation), use saved config to get latest content
+            // Merge config with newBlock.config taking precedence to ensure saved content_json is used
             merged[existingIndex] = {
               ...merged[existingIndex],
               ...newBlock,
+              // CRITICAL: Use saved layout values from database - don't preserve current state
+              x: newBlock.x != null ? newBlock.x : merged[existingIndex].x,
+              y: newBlock.y != null ? newBlock.y : merged[existingIndex].y,
+              w: newBlock.w != null ? newBlock.w : merged[existingIndex].w,
+              h: newBlock.h != null ? newBlock.h : merged[existingIndex].h,
+              // CRITICAL: Prioritize saved config (newBlock.config) to ensure content_json persists after navigation
+              // This ensures TextBlock content and other config values are restored correctly
               config: { ...merged[existingIndex].config, ...newBlock.config }
             }
           } else {
@@ -784,7 +796,7 @@ export default function InterfacePageClient({
     return <div className="h-screen flex items-center justify-center">Page not found</div>
   }
 
-  const isViewer = searchParams.get("view") === "true"
+  const isViewer = searchParams?.get("view") === "true"
   const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content'
   const isRecordReview = page?.page_type === 'record_review'
   
@@ -1090,5 +1102,14 @@ export default function InterfacePageClient({
         />
       )}
     </div>
+  )
+}
+
+// Export wrapper with Suspense boundary for useSearchParams
+export default function InterfacePageClient(props: InterfacePageClientProps) {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+      <InterfacePageClientInternal {...props} />
+    </Suspense>
   )
 }
