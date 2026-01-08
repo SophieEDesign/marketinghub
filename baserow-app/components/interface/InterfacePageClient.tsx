@@ -856,7 +856,15 @@ export default function InterfacePageClient({
     pageLoadedRef.current = false
     blocksLoadedRef.current = false
     // Reload page data after settings update
-    await loadPage()
+    // Parallelize independent requests
+    await Promise.all([
+      loadPage(),
+      // Load blocks in parallel if page type supports it
+      (page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content' || page?.page_type === 'record_review') 
+        ? loadBlocks() 
+        : Promise.resolve(),
+    ])
+    // Load data after page is loaded (depends on page.source_view)
     if (page?.source_view) {
       await loadSqlViewData()
     }
@@ -955,13 +963,11 @@ export default function InterfacePageClient({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
+                    onClick={() => {
                       // Enter block edit mode
                       enterBlockEdit()
-                      // Ensure blocks are loaded immediately
-                      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-                        await loadBlocks()
-                      }
+                      // Blocks are already loaded (loaded in useEffect on mount)
+                      // No need to await - edit mode doesn't require fresh data
                     }}
                   >
                     <Edit2 className="h-4 w-4 mr-2" />

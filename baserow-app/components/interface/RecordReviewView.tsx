@@ -5,7 +5,7 @@
  * Master-detail layout: Left column shows record list with search/filters, right panel shows blocks for selected record
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Search, Filter, List, Plus, ChevronDown, MessageSquare, Edit2, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,8 +72,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     if (recordDebugEnabled || process.env.NODE_ENV === 'development') {
       debugLog('RECORD', 'Blocks changed', {
         blocksLength: blocks.length,
-        blockIds: blocks.map(b => b.id),
-        blockTypes: blocks.map(b => b.type),
+        blockIds: blocks.map((b: PageBlock) => b.id),
+        blockTypes: blocks.map((b: PageBlock) => b.type),
       })
     }
   }, [blocks.length, recordDebugEnabled])
@@ -459,6 +459,15 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return tableFields
   }, [tableFields, config.detail_fields])
 
+  // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
+  // Creating new objects on every render causes component remounts and canvas resets
+  const recordReviewPage = useMemo(() => ({
+    id: page.id,
+    name: page.name,
+    settings: { layout_template: 'record_review' as const },
+    description: 'Record detail view'
+  }), [page.id, page.name])
+
   // Load blocks for detail panel
   useEffect(() => {
     if (blocks.length === 0 && !blocksLoading) {
@@ -505,8 +514,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       debugLog('RECORD', 'Blocks loaded', {
         pageId: page.id,
         blocksCount: pageBlocks.length,
-        blockIds: pageBlocks.map(b => b.id),
-        blockTypes: pageBlocks.map(b => b.type),
+        blockIds: pageBlocks.map((b: PageBlock) => b.id),
+        blockTypes: pageBlocks.map((b: PageBlock) => b.type),
       })
       setLoadedBlocks(pageBlocks)
     } catch (error: any) {
@@ -784,14 +793,10 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
                   // CRITICAL: Do NOT pass isViewer prop - let InterfaceBuilder use useBlockEditMode directly
                   // This ensures the right panel is editable exactly like Content pages
+                  // Use memoized page object to prevent unnecessary remounts
                   <InterfaceBuilder
                     key={`record-${selectedRecordId}`}
-                    page={{
-                      id: page.id,
-                      name: page.name,
-                      settings: { layout_template: 'record_review' },
-                      description: 'Record detail view'
-                    } as any}
+                    page={recordReviewPage as any}
                     initialBlocks={loadedBlocks}
                     hideHeader={true}
                     pageTableId={pageTableId}

@@ -19,6 +19,8 @@ import {
   guardAgainstAutoSave,
   markUserInteraction,
 } from "@/lib/interface/editor-safety"
+import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
+import { useFilterState } from "@/lib/interface/filter-state"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -53,6 +55,9 @@ export default function InterfaceBuilder({
   
   // Override edit mode if viewer mode is forced
   const effectiveIsEditing = isViewer ? false : isEditing
+  
+  // Aggregate data fetching moved to Canvas (inside FilterStateProvider)
+  // This allows access to dynamic filter block filters
   
   // Notify parent of edit mode changes
   useEffect(() => {

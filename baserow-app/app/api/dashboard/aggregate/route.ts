@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aggregateTableData, comparePeriods, type AggregateFunction } from '@/lib/dashboard/aggregations'
+import { getCachedAggregate, setCachedAggregate, getOrCreatePromise } from '@/lib/dashboard/aggregateCache'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,47 +20,68 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Handle comparison request
-    if (comparison) {
-      const {
-        dateFieldName,
-        currentStart,
-        currentEnd,
-        previousStart,
-        previousEnd,
-      } = comparison
+    // Check cache first
+    const cacheParams = {
+      tableId,
+      aggregate,
+      fieldName,
+      filters,
+      comparison,
+    }
+    
+    const cached = getCachedAggregate(cacheParams)
+    if (cached) {
+      // Return cached response with cache header
+      return NextResponse.json(cached, {
+        headers: {
+          'X-Cache': 'HIT',
+        },
+      })
+    }
 
-      if (!dateFieldName || !currentStart || !currentEnd || !previousStart || !previousEnd) {
-        return NextResponse.json(
-          { error: 'Comparison requires dateFieldName and date ranges' },
-          { status: 400 }
+    // Use getOrCreatePromise to deduplicate concurrent requests
+    const result = await getOrCreatePromise(cacheParams, async () => {
+      // Handle comparison request
+      if (comparison) {
+        const {
+          dateFieldName,
+          currentStart,
+          currentEnd,
+          previousStart,
+          previousEnd,
+        } = comparison
+
+        if (!dateFieldName || !currentStart || !currentEnd || !previousStart || !previousEnd) {
+          throw new Error('Comparison requires dateFieldName and date ranges')
+        }
+
+        return await comparePeriods(
+          tableId,
+          aggregate as AggregateFunction,
+          fieldName,
+          dateFieldName,
+          new Date(currentStart),
+          new Date(currentEnd),
+          new Date(previousStart),
+          new Date(previousEnd),
+          filters
         )
       }
 
-      const result = await comparePeriods(
+      // Regular aggregation
+      return await aggregateTableData(
         tableId,
         aggregate as AggregateFunction,
         fieldName,
-        dateFieldName,
-        new Date(currentStart),
-        new Date(currentEnd),
-        new Date(previousStart),
-        new Date(previousEnd),
         filters
       )
+    })
 
-      return NextResponse.json(result)
-    }
-
-    // Regular aggregation
-    const result = await aggregateTableData(
-      tableId,
-      aggregate as AggregateFunction,
-      fieldName,
-      filters
-    )
-
-    return NextResponse.json(result)
+    return NextResponse.json(result, {
+      headers: {
+        'X-Cache': 'MISS',
+      },
+    })
   } catch (error: any) {
     console.error('Error aggregating data:', error)
     return NextResponse.json(

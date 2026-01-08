@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { Responsive, WidthProvider, Layout } from "react-grid-layout"
 import "react-grid-layout/css/styles.css"
 import "react-resizable/css/styles.css"
@@ -12,6 +12,7 @@ import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
 import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
+import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
 
@@ -40,6 +41,7 @@ interface CanvasProps {
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  aggregateData?: Record<string, { data: any; error: string | null; isLoading: boolean }> // Page-level aggregate data for blocks
 }
 
 export default function Canvas({
@@ -63,9 +65,28 @@ export default function Canvas({
   pageId = null,
   recordId = null,
   onRecordClick,
+  aggregateData = {},
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock } = useFilterState()
+  
+  // CRITICAL: Fetch aggregate data at page level (inside FilterStateProvider)
+  // This eliminates duplicate requests - SWR handles deduplication automatically
+  // Collect page-level filters from all filter blocks
+  const pageFilters = useMemo(() => {
+    const filters: FilterConfig[] = []
+    blocks.forEach(block => {
+      if (block.type === 'filter') {
+        const blockFilters = getFiltersForBlock(block.id)
+        filters.push(...blockFilters)
+      }
+    })
+    return filters
+  }, [blocks, getFiltersForBlock])
+  
+  // Fetch all aggregates for KPI blocks
+  const aggregateData = usePageAggregates(blocks, pageFilters)
+  
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
   const previousIsEditingRef = useRef<boolean>(isEditing)
@@ -585,6 +606,7 @@ export default function Canvas({
                     recordId={recordId}
                     filters={getFiltersForBlock(block.id)}
                     onRecordClick={onRecordClick}
+                    aggregateData={aggregateData[block.id]}
                   />
                 </div>
               </BlockAppearanceWrapper>

@@ -35,6 +35,7 @@ interface BlockRendererProps {
   recordId?: string | null // Record ID for record review pages
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
 }
 
 export default function BlockRenderer({
@@ -47,6 +48,7 @@ export default function BlockRenderer({
   recordId = null,
   filters = [],
   onRecordClick,
+  aggregateData,
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -169,7 +171,8 @@ export default function BlockRenderer({
       case "kpi":
         // CRITICAL: Pass pageTableId to KPIBlock for table resolution fallback
         // pageTableId must flow to blocks for base_table fallback
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
+        // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} aggregateData={aggregateData} />
 
       case "filter":
         // Filter block emits filter state via context

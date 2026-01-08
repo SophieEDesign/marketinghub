@@ -54,7 +54,8 @@
     "@tiptap/starter-kit": "^2.1.13",
     "@tiptap/extension-link": "^2.1.13",
     "@tiptap/extension-text-style": "^2.1.13",
-    "@tiptap/extension-color": "^2.1.13"
+    "@tiptap/extension-color": "^2.1.13",
+    "swr": "^2.2.5"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",

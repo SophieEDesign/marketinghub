@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
 import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react"
-import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import type { FilterConfig } from "@/lib/interface/filters"
 
 interface KPIBlockProps {
   block: PageBlock
@@ -12,6 +11,7 @@ interface KPIBlockProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level filters
+  aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data (page-level)
 }
 
 interface ComparisonData {
@@ -22,7 +22,7 @@ interface ComparisonData {
   trend: 'up' | 'down' | 'neutral'
 }
 
-export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: KPIBlockProps) {
+export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], aggregateData }: KPIBlockProps) {
   const router = useRouter()
   const { config } = block
   // KPI block MUST have table_id configured - no fallback to page table
@@ -34,73 +34,29 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
   const target = config?.target_value
   const clickThrough = config?.click_through
   
-  const [value, setValue] = useState<number | null>(null)
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // CRITICAL: Use pre-fetched aggregate data if available (page-level fetching)
+  // Fallback to local state only if aggregateData is not provided (backward compatibility)
+  const hasPreFetchedData = aggregateData !== undefined
   
-  // Apply filters with proper precedence:
-  // 1. Block base filters (config.filters) - always applied
-  // 2. Filter block filters (filters prop) - narrows results
-  const blockBaseFilters = config?.filters || []
-  const filterBlockFilters = filters || []
-  const allFilters = useMemo(() => {
-    return mergeFilters(blockBaseFilters, filterBlockFilters, [])
-  }, [blockBaseFilters, filterBlockFilters])
-
-  useEffect(() => {
-    if (tableId) {
-      loadKPI()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, field, aggregate, comparison, allFilters])
-
-  async function loadKPI() {
-    if (!tableId) return
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Use server-side aggregation API
-      const response = await fetch('/api/dashboard/aggregate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tableId,
-          aggregate,
-          fieldName: field,
-          filters: allFilters, // Use merged filters
-          comparison: comparison ? {
-            dateFieldName: comparison.date_field,
-            currentStart: comparison.current_start,
-            currentEnd: comparison.current_end,
-            previousStart: comparison.previous_start,
-            previousEnd: comparison.previous_end,
-          } : undefined,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to load KPI')
+  // Extract value and comparison data from pre-fetched data
+  const value = hasPreFetchedData && aggregateData?.data
+    ? (comparison && aggregateData.data.current !== undefined 
+        ? aggregateData.data.current 
+        : aggregateData.data.value)
+    : null
+  
+  const comparisonData: ComparisonData | null = hasPreFetchedData && aggregateData?.data && comparison
+    ? {
+        current: aggregateData.data.current ?? null,
+        previous: aggregateData.data.previous ?? null,
+        change: aggregateData.data.change ?? null,
+        changePercent: aggregateData.data.changePercent ?? null,
+        trend: aggregateData.data.trend || 'neutral',
       }
-
-      // Handle comparison response
-      if (comparison && data.current !== undefined) {
-        setComparisonData(data)
-        setValue(data.current)
-      } else {
-        setValue(data.value)
-      }
-    } catch (error: any) {
-      console.error("Error loading KPI:", error)
-      setError(error.message || 'Failed to load KPI')
-    } finally {
-      setLoading(false)
-    }
-  }
+    : null
+  
+  const loading = hasPreFetchedData ? (aggregateData?.isLoading ?? false) : false
+  const error = hasPreFetchedData ? aggregateData?.error : null
 
   function handleClick() {
     if (clickThrough && !isEditing) {

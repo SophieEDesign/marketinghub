@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
 import DynamicTitle from "@/components/layout/DynamicTitle"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
+import SWRProvider from "@/components/providers/SWRProvider"
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -33,11 +34,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <DiagnosticsInitializer />
-        <DynamicTitle />
-        {children}
-        <Toaster />
-        <CommandPaletteProvider />
+        <SWRProvider>
+          <DiagnosticsInitializer />
+          <DynamicTitle />
+          {children}
+          <Toaster />
+          <CommandPaletteProvider />
+        </SWRProvider>
       </body>
     </html>
   )
