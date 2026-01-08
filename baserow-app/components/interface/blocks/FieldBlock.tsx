@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { formatDateUK, cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
-import { cn } from "@/lib/utils"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -158,13 +158,8 @@ export default function FieldBlock({
       case 'checkbox':
         return value ? '✓' : '✗'
       case 'date':
-        if (!value) return "—"
-        try {
-          const date = new Date(value)
-          return date.toLocaleDateString()
-        } catch {
-          return String(value)
-        }
+        // Use UK date format (DD/MM/YYYY)
+        return formatDateUK(String(value), "—")
       case 'currency':
         const currencySymbol = options?.currency_symbol || '$'
         const precision = options?.precision ?? 2

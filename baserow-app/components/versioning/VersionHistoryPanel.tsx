@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Clock, User, RotateCcw, Eye, Loader2 } from "lucide-react"
 import { getVersionsClient, restoreVersionClient } from "@/lib/versioning/versioning.client"
+import { formatDateTimeUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import type { EntityType, EntityVersion } from "@/lib/versioning/versioning"
 
@@ -93,14 +94,8 @@ export default function VersionHistoryPanel({
   }
 
   function formatDate(dateString: string): string {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(date)
+    // UK format: DD/MM/YYYY HH:mm
+    return formatDateTimeUK(dateString)
   }
 
   function getReasonBadge(reason: string) {

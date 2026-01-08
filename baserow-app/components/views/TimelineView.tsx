@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { format } from "date-fns"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -535,29 +536,39 @@ function addTime(date: Date, increment: number, zoom: ZoomLevel): Date {
 function formatDateForZoom(date: Date, zoom: ZoomLevel): string {
   switch (zoom) {
     case "day":
-      return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      // Time format: HH:mm (24-hour clock, UK standard)
+      return format(date, "HH:mm")
     case "week":
-      return date.toLocaleDateString("en-US", { weekday: "short", day: "numeric" })
+      // Day name and day number: "Mon 08"
+      return format(date, "EEE d")
     case "month":
-      return date.toLocaleDateString("en-US", { day: "numeric" })
+      // Day number only: "08"
+      return format(date, "d")
     case "quarter":
-      return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      // Month abbreviation and day: "Jan 08"
+      return format(date, "MMM d")
     case "year":
-      return date.toLocaleDateString("en-US", { month: "short" })
+      // Month abbreviation only: "Jan"
+      return format(date, "MMM")
   }
 }
 
 function formatDateRange(start: Date, end: Date, zoom: ZoomLevel): string {
   switch (zoom) {
     case "day":
-      return start.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      // Full date: "08 January 2026" (UK format)
+      return format(start, "d MMMM yyyy")
     case "week":
-      return `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      // Date range: "08 Jan - 14 Jan" (UK format)
+      return `${format(start, "d MMM")} - ${format(end, "d MMM")}`
     case "month":
-      return start.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      // Month and year: "January 2026"
+      return format(start, "MMMM yyyy")
     case "quarter":
-      return `${start.toLocaleDateString("en-US", { month: "short" })} - ${end.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`
+      // Month range: "Jan - Mar 2026"
+      return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`
     case "year":
+      // Year only: "2026"
       return start.getFullYear().toString()
   }
 }

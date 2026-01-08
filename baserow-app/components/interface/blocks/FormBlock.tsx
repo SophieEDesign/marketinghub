@@ -231,6 +231,14 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
         )
 
       case "date":
+        // Convert ISO date string to YYYY-MM-DD format for HTML5 date input
+        // HTML5 date inputs require YYYY-MM-DD format internally
+        const dateInputValue = value 
+          ? (typeof value === 'string' 
+              ? value.split('T')[0] // Extract date part from ISO string
+              : new Date(value).toISOString().split('T')[0])
+          : ''
+        
         return (
           <div key={field.id} className="mb-4">
             <label className="block text-sm font-medium mb-1">
@@ -238,9 +246,13 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </label>
             <input
-              type="datetime-local"
-              value={value}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+              type="date"
+              value={dateInputValue}
+              onChange={(e) => {
+                // Store as ISO date string (YYYY-MM-DD) for consistency
+                const isoDate = e.target.value ? `${e.target.value}T00:00:00.000Z` : null
+                setFormData({ ...formData, [field.name]: isoDate })
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               disabled={isEditing}
               required={isRequired}

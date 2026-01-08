@@ -133,7 +133,7 @@ export default function CreateEventModal({
                     className={cn('w-full justify-start text-left font-normal', !date && 'text-muted-foreground')}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, 'PPP') : <span>Pick a date</span>}
+                    {date ? formatDateObjectUK(date, 'Pick a date') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -156,11 +156,11 @@ export default function CreateEventModal({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, 'PPP') : <span>Pick start date</span>}
+                    {startDate ? formatDateObjectUK(startDate, 'Pick start date') : <span>Pick start date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={startDate} onSelect={(d) => d && setStartDate(d)} />
+                  <CalendarPicker mode="single" selected={startDate} onSelect={(d) => d && setStartDate(d)} />
                 </PopoverContent>
               </Popover>
             </div>

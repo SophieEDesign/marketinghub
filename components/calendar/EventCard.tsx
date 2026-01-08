@@ -1,7 +1,7 @@
 "use client"
 
 import { format } from 'date-fns'
-import { cn } from '@/lib/utils'
+import { cn, formatDateUK } from '@/lib/utils'
 import type { CalendarEvent } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
@@ -47,11 +47,8 @@ export default function EventCard({
         
         // Format based on field type
         if (field?.type === 'date' && value) {
-          try {
-            displayValue = format(new Date(value), 'MMM d')
-          } catch {
-            displayValue = String(value)
-          }
+          // Use UK date format (DD/MM/YYYY)
+          displayValue = formatDateUK(String(value), String(value))
         } else if (field?.type === 'checkbox') {
           displayValue = value ? '✓' : ''
         } else if (field?.type === 'number' || field?.type === 'currency') {

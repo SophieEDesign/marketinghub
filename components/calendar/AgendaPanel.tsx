@@ -1,6 +1,7 @@
 "use client"
 
 import { format, isSameDay } from 'date-fns'
+import { formatDateObjectUK } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import EventCard from './EventCard'
@@ -36,7 +37,7 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold text-lg">
-            {selectedDate ? format(selectedDate, 'EEEE, MMMM d') : 'All Events'}
+            {selectedDate ? `${format(selectedDate, 'EEEE')}, ${formatDateObjectUK(selectedDate)}` : 'All Events'}
           </h3>
           <Button size="sm" onClick={onCreateEvent}>
             <Plus className="mr-1 h-3 w-3" />
@@ -56,7 +57,7 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
             return (
               <div key={dateKey}>
                 <div className="sticky top-0 bg-white z-10 pb-2 mb-2 border-b border-gray-200">
-                  <h4 className="font-semibold text-sm text-gray-700">{format(date, 'EEEE, MMMM d')}</h4>
+                  <h4 className="font-semibold text-sm text-gray-700">{`${format(date, 'EEEE')}, ${formatDateObjectUK(date)}`}</h4>
                 </div>
                 <div className="space-y-2">
                   {dayEvents

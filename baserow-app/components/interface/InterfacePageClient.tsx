@@ -6,6 +6,7 @@ import { Edit2, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
+import { formatDateUK } from "@/lib/utils"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
@@ -117,6 +118,10 @@ function InterfacePageClientInternal({
   const prevBaseTableRef = useRef<string | null>(null)
   const dataLoadingRef = useRef<boolean>(false)
   
+  // Track view's updated_at to detect when view is edited
+  const savedViewUpdatedAtRef = useRef<string | null>(null)
+  const viewCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Determine if we're in edit mode (page or block editing)
   const isEditing = isPageEditing || isBlockEditing
 
@@ -209,9 +214,82 @@ function InterfacePageClientInternal({
     // Pages don't need to load data - blocks define their own data sources
     if (sourceView) {
       loadSqlViewData()
+    } else if (savedViewId) {
+      // Load data for pages with saved_view_id
+      loadListViewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config, page?.base_table])
+  
+  // CRITICAL: Watch for view updates when page uses saved_view_id
+  // This ensures that when a view is edited, the interface page refreshes
+  useEffect(() => {
+    if (!page?.saved_view_id) {
+      // Clear interval if no saved_view_id
+      if (viewCheckIntervalRef.current) {
+        clearInterval(viewCheckIntervalRef.current)
+        viewCheckIntervalRef.current = null
+      }
+      return
+    }
+    
+    // Check for view updates periodically
+    // Only check when page is visible to avoid unnecessary requests
+    const checkViewUpdates = async () => {
+      // Skip check if page is hidden (tab in background)
+      if (document.hidden) return
+      
+      try {
+        const supabase = createClient()
+        const { data: view, error } = await supabase
+          .from('views')
+          .select('updated_at')
+          .eq('id', page.saved_view_id)
+          .single()
+        
+        if (!error && view?.updated_at) {
+          const currentUpdatedAt = view.updated_at
+          const previousUpdatedAt = savedViewUpdatedAtRef.current
+          
+          // If view was updated, reload data
+          if (previousUpdatedAt && currentUpdatedAt !== previousUpdatedAt) {
+            console.log(`[InterfacePageClient] View updated detected - reloading data: viewId=${page.saved_view_id}`)
+            savedViewUpdatedAtRef.current = currentUpdatedAt
+            loadListViewData()
+          } else if (!previousUpdatedAt) {
+            // First check - just store the timestamp
+            savedViewUpdatedAtRef.current = currentUpdatedAt
+          }
+        }
+      } catch (error) {
+        console.error('Error checking view updates:', error)
+      }
+    }
+    
+    // Initial check
+    checkViewUpdates()
+    
+    // Set up interval to check every 5 seconds (less frequent to reduce load)
+    viewCheckIntervalRef.current = setInterval(checkViewUpdates, 5000)
+    
+    // Also check when page becomes visible (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (!document.hidden && page?.saved_view_id) {
+        checkViewUpdates()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Cleanup interval and event listener on unmount or when saved_view_id changes
+    return () => {
+      if (viewCheckIntervalRef.current) {
+        clearInterval(viewCheckIntervalRef.current)
+        viewCheckIntervalRef.current = null
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page?.saved_view_id])
 
   // CRITICAL: Load blocks for ALL pages - unified Canvas + Blocks architecture
   // All pages render Canvas, so all pages need blocks loaded
@@ -443,10 +521,10 @@ function InterfacePageClientInternal({
     try {
       const supabase = createClient()
       
-      // Get view with table_id
+      // Get view with table_id and updated_at to track view changes
       const { data: view, error: viewError } = await supabase
         .from('views')
-        .select('table_id')
+        .select('table_id, updated_at')
         .eq('id', page.saved_view_id)
         .single()
 
@@ -457,6 +535,9 @@ function InterfacePageClientInternal({
         setDataLoading(false)
         return
       }
+      
+      // Track view's updated_at to detect changes
+      savedViewUpdatedAtRef.current = view.updated_at || null
 
       // Get table name
       const { data: table, error: tableError } = await supabase
@@ -956,7 +1037,7 @@ function InterfacePageClientInternal({
                 </h1>
                 {page.updated_at && (
                   <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                    Updated {new Date(page.updated_at).toLocaleDateString()}
+                    Updated {formatDateUK(page.updated_at)}
                   </span>
                 )}
               </>

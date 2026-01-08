@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Link2, Plus, X, Calculator } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
@@ -308,7 +309,10 @@ export default function InlineFieldEditor({
 
   // Date fields
   if (field.type === "date") {
-    const dateValue = value ? new Date(value).toISOString().split("T")[0] : ""
+    // For input: use ISO format (YYYY-MM-DD) - HTML5 date input requires this
+    const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
+    // For display: use UK format (DD/MM/YYYY)
+    const dateValueForDisplay = value ? formatDateUK(value, "—") : ""
 
     if (isEditing && !isReadOnly) {
       return (
@@ -317,7 +321,7 @@ export default function InlineFieldEditor({
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="date"
-            value={dateValue}
+            value={dateValueForInput}
             onChange={(e) => handleChange(e.target.value || null)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
@@ -339,14 +343,14 @@ export default function InlineFieldEditor({
         </label>
         {isReadOnly ? (
           <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
-            {dateValue || "—"}
+            {dateValueForDisplay || "—"}
           </div>
         ) : (
           <div
             onClick={onEditStart}
             className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer text-sm text-gray-900"
           >
-            {dateValue || <span className="text-gray-400">Click to set date...</span>}
+            {dateValueForDisplay || <span className="text-gray-400">Click to set date...</span>}
           </div>
         )}
       </div>

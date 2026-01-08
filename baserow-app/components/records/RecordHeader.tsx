@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Copy, Trash2, Copy as CopyIcon, Save, Edit2, Check, X } from "lucide-react"
+import { formatDateUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import type { TableField } from "@/types/fields"
 
@@ -90,21 +91,13 @@ export default function RecordHeader({
 
   const statusValue = statusField ? formData[statusField.name] : null
 
-  // Get created/modified metadata
+  // Get created/modified metadata (UK format: DD/MM/YYYY)
   const createdAt = record?.created_at
-    ? new Date(record.created_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+    ? formatDateUK(record.created_at)
     : null
 
   const updatedAt = record?.updated_at
-    ? new Date(record.updated_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+    ? formatDateUK(record.updated_at)
     : null
 
   if (loading) {

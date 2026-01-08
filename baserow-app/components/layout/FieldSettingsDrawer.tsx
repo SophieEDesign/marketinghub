@@ -25,6 +25,14 @@ import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { FIELD_TYPES } from '@/types/fields'
 import { canChangeType } from '@/lib/fields/validation'
 import FormulaEditor from '@/components/fields/FormulaEditor'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface FieldSettingsDrawerProps {
   field: TableField | null
@@ -56,6 +64,11 @@ export default function FieldSettingsDrawer({
   const [typeChangeWarning, setTypeChangeWarning] = useState<string | null>(null)
   const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
   const [loadingLookupFields, setLoadingLookupFields] = useState(false)
+  const [showAddOptionsDialog, setShowAddOptionsDialog] = useState(false)
+  const [foundOptions, setFoundOptions] = useState<string[]>([])
+  const [loadingOptions, setLoadingOptions] = useState(false)
+  const previousTypeRef = useRef<FieldType | null>(null)
+  const hasPromptedForOptionsRef = useRef(false)
 
   // Load tables for link_to_table fields
   useEffect(() => {
@@ -125,6 +138,8 @@ export default function FieldSettingsDrawer({
       setDefaultValue(field.default_value || null)
       setOptions(field.options || {})
       setTypeChangeWarning(null)
+      previousTypeRef.current = field.type
+      hasPromptedForOptionsRef.current = false
     } else if (!open) {
       // Reset when drawer closes
       setName('')
@@ -135,6 +150,10 @@ export default function FieldSettingsDrawer({
       setDefaultValue(null)
       setOptions({})
       setTypeChangeWarning(null)
+      previousTypeRef.current = null
+      hasPromptedForOptionsRef.current = false
+      setShowAddOptionsDialog(false)
+      setFoundOptions([])
     }
   }, [field, open])
 
@@ -153,6 +172,115 @@ export default function FieldSettingsDrawer({
       setTypeChangeWarning(null)
     }
   }, [type, field, open])
+
+  // Detect when type changes to single_select and fetch existing values
+  useEffect(() => {
+    // Only trigger if:
+    // 1. Drawer is open
+    // 2. Field exists (not a new field)
+    // 3. Type changed to single_select
+    // 4. Previous type was not single_select
+    // 5. Options are empty or don't have choices
+    // 6. We haven't already prompted for this type change
+    if (
+      open &&
+      field &&
+      type === 'single_select' &&
+      previousTypeRef.current !== 'single_select' &&
+      previousTypeRef.current !== null && // Only if there was a previous type (not initial load)
+      (!options.choices || options.choices.length === 0 || (options.choices.length === 1 && options.choices[0] === '')) &&
+      !hasPromptedForOptionsRef.current
+    ) {
+      hasPromptedForOptionsRef.current = true
+      fetchExistingValues()
+    }
+    
+    // Reset prompt flag when type changes away from single_select
+    if (type !== 'single_select') {
+      hasPromptedForOptionsRef.current = false
+    }
+    
+    // Update previous type ref
+    previousTypeRef.current = type
+  }, [type, field, open])
+
+  async function fetchExistingValues() {
+    if (!field || !field.name) return
+
+    setLoadingOptions(true)
+    try {
+      const supabase = createClient()
+      
+      // Get table info to get supabase_table name
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', tableId)
+        .single()
+
+      if (tableError || !table) {
+        console.error('Error loading table:', tableError)
+        setLoadingOptions(false)
+        return
+      }
+
+      // Query all records to get unique values from this field
+      const { data: records, error: recordsError } = await supabase
+        .from(table.supabase_table)
+        .select(field.name)
+        .limit(10000) // Limit to prevent performance issues
+
+      if (recordsError) {
+        console.error('Error loading records:', recordsError)
+        setLoadingOptions(false)
+        return
+      }
+
+      // Extract unique non-empty values
+      const uniqueValues = new Set<string>()
+      records?.forEach((record: any) => {
+        const value = record[field.name]
+        if (value !== null && value !== undefined && value !== '') {
+          const stringValue = String(value).trim()
+          if (stringValue) {
+            uniqueValues.add(stringValue)
+          }
+        }
+      })
+
+      const uniqueArray = Array.from(uniqueValues).sort()
+      
+      // Only show dialog if we found values
+      if (uniqueArray.length > 0) {
+        setFoundOptions(uniqueArray)
+        setShowAddOptionsDialog(true)
+      }
+    } catch (error) {
+      console.error('Error fetching existing values:', error)
+    } finally {
+      setLoadingOptions(false)
+    }
+  }
+
+  function handleAddOptions() {
+    if (foundOptions.length > 0) {
+      // Merge with existing choices, avoiding duplicates
+      const existingChoices = options.choices || []
+      const mergedChoices = [...new Set([...existingChoices.filter(c => c.trim() !== ''), ...foundOptions])]
+      
+      setOptions({
+        ...options,
+        choices: mergedChoices,
+      })
+    }
+    setShowAddOptionsDialog(false)
+    setFoundOptions([])
+  }
+
+  function handleSkipOptions() {
+    setShowAddOptionsDialog(false)
+    setFoundOptions([])
+  }
 
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
@@ -228,7 +356,41 @@ export default function FieldSettingsDrawer({
   if (!field) return null
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={showAddOptionsDialog} onOpenChange={setShowAddOptionsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Existing Values as Options?</DialogTitle>
+            <DialogDescription>
+              Found {foundOptions.length} unique {foundOptions.length === 1 ? 'value' : 'values'} in this field. Would you like to add {foundOptions.length === 1 ? 'it' : 'them'} as options for the single select field?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-60 overflow-y-auto py-4">
+            <div className="space-y-1">
+              {foundOptions.slice(0, 20).map((option, index) => (
+                <div key={index} className="text-sm p-2 bg-muted rounded">
+                  {option}
+                </div>
+              ))}
+              {foundOptions.length > 20 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  ... and {foundOptions.length - 20} more
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleSkipOptions}>
+              Skip
+            </Button>
+            <Button onClick={handleAddOptions}>
+              Add {foundOptions.length} {foundOptions.length === 1 ? 'Option' : 'Options'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Field Settings</SheetTitle>
@@ -925,5 +1087,6 @@ export default function FieldSettingsDrawer({
         </div>
       </SheetContent>
     </Sheet>
+    </>
   )
 }

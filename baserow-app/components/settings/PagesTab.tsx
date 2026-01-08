@@ -42,6 +42,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateTimeUK } from '@/lib/utils'
 import InterfacePageSettingsDrawer from '@/components/interface/InterfacePageSettingsDrawer'
 import PageCreationWizard from '@/components/interface/PageCreationWizard'
 import type { InterfacePage } from '@/lib/interface/page-types-only'
@@ -374,13 +375,8 @@ export default function SettingsPagesTab() {
   }
 
   function formatDate(dateString?: string): string {
-    if (!dateString) return '—'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    } catch {
-      return '—'
-    }
+    // UK format: DD/MM/YYYY HH:mm
+    return formatDateTimeUK(dateString || null, '—')
   }
 
   // Group pages by interface

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Clock, User, Edit } from "lucide-react"
+import { formatDateTimeUK } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
 interface RecordActivityProps {
@@ -53,24 +54,13 @@ export default function RecordActivity({ record, tableId }: RecordActivityProps)
     }
   }
 
+  // UK format: DD/MM/YYYY HH:mm
   const createdAt = record.created_at
-    ? new Date(record.created_at).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
+    ? formatDateTimeUK(record.created_at)
     : null
 
   const updatedAt = record.updated_at
-    ? new Date(record.updated_at).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })
+    ? formatDateTimeUK(record.updated_at)
     : null
 
   const isModified = updatedAt && createdAt && record.updated_at !== record.created_at

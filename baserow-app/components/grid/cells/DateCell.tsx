@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { format, parseISO } from 'date-fns'
+import { formatDateUK, toISODateString } from '@/lib/utils'
 
 interface DateCellProps {
   value: string | null
@@ -48,7 +49,9 @@ export default function DateCell({
     if (saving) return
     setSaving(true)
     try {
-      const dateValue = editValue ? new Date(editValue).toISOString() : null
+      // editValue is in YYYY-MM-DD format (from HTML5 date input)
+      // Convert to ISO string for storage (ensures proper format)
+      const dateValue = editValue ? toISODateString(editValue) : null
       await onSave(dateValue)
       setEditing(false)
     } catch (error) {
@@ -82,12 +85,7 @@ export default function DateCell({
   }
 
   const formatDisplayValue = (val: string | null): string => {
-    if (!val) return placeholder
-    try {
-      return format(parseISO(val), 'MMM d, yyyy')
-    } catch {
-      return val
-    }
+    return formatDateUK(val, placeholder)
   }
 
   if (editing && editable) {
