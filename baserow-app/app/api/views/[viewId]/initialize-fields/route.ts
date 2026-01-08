@@ -12,6 +12,7 @@ export async function POST(
   try {
     const supabase = await createClient()
     const { viewId } = await params
+    console.log('🔥 initialize-fields CALLED', { viewId })
 
     // 1. Get the view to find its table_id
     const { data: view, error: viewError } = await supabase
@@ -86,14 +87,83 @@ export async function POST(
     }
 
     // 5. Insert the new view_fields
+    // Try batch insert first for performance
     const { data: insertedFields, error: insertError } = await supabase
       .from('view_fields')
       .insert(fieldsToAdd)
       .select()
 
     if (insertError) {
+      // Check for unique constraint violation - if so, try inserting individually to skip duplicates
+      const isUniqueViolation = insertError.code === '23505' || 
+                                insertError.message?.includes('unique') || 
+                                insertError.message?.includes('duplicate')
+      
+      // Check for RLS policy violation
+      const isRLSViolation = insertError.code === '42501' || 
+                            insertError.message?.includes('permission') || 
+                            insertError.message?.includes('policy') ||
+                            insertError.message?.includes('row-level security')
+      
+      if (isUniqueViolation) {
+        // Try inserting individually to skip duplicates
+        console.log(`Batch insert failed due to unique constraint, trying individual inserts for ${fieldsToAdd.length} fields`)
+        const successfulInserts: any[] = []
+        const skippedFields: string[] = []
+        
+        for (const fieldToAdd of fieldsToAdd) {
+          const { data, error } = await supabase
+            .from('view_fields')
+            .insert(fieldToAdd)
+            .select()
+            .single()
+          
+          if (error) {
+            if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
+              skippedFields.push(fieldToAdd.field_name)
+            } else {
+              console.error(`Error inserting field ${fieldToAdd.field_name}:`, error)
+            }
+          } else if (data) {
+            successfulInserts.push(data)
+          }
+        }
+        
+        if (successfulInserts.length > 0) {
+          return NextResponse.json({
+            message: `Successfully added ${successfulInserts.length} field(s) to view${skippedFields.length > 0 ? `, ${skippedFields.length} already existed` : ''}`,
+            added: successfulInserts.length,
+            total: tableFields.length,
+            fields: successfulInserts,
+            skipped: skippedFields,
+          })
+        }
+      }
+      
+      // Enhanced error message with more context
+      const errorMessage = isRLSViolation
+        ? 'Permission denied. Check Row Level Security (RLS) policies for view_fields table.'
+        : insertError.message || 'Unknown error'
+      
+      console.error('🔥 initialize-fields INSERT ERROR:', {
+        viewId,
+        tableId: view.table_id,
+        fieldsToAddCount: fieldsToAdd.length,
+        errorCode: insertError.code,
+        errorMessage: insertError.message,
+        errorDetails: insertError,
+        isRLSViolation,
+        isUniqueViolation,
+      })
+      
       return NextResponse.json(
-        { error: 'Failed to add fields to view', error_code: 'INSERT_ERROR', details: insertError.message },
+        { 
+          error: 'Failed to add fields to view', 
+          error_code: isRLSViolation ? 'RLS_ERROR' : 'INSERT_ERROR', 
+          details: errorMessage,
+          viewId,
+          tableId: view.table_id,
+        },
         { status: 500 }
       )
     }
@@ -105,7 +175,13 @@ export async function POST(
       fields: insertedFields,
     })
   } catch (error: any) {
-    console.error('Error initializing view fields:', error)
+    console.error('🔥 initialize-fields ERROR:', {
+      viewId,
+      error: error.message,
+      errorCode: error.code,
+      errorStack: error.stack,
+      errorDetails: error,
+    })
     return NextResponse.json(
       { error: 'Internal server error', error_code: 'INTERNAL_ERROR', details: error.message },
       { status: 500 }
