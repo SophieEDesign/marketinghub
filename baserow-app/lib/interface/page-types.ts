@@ -1,20 +1,15 @@
 /**
  * Page Type Definitions
- * Page types are visualizations only - they define HOW data is displayed, not WHAT data.
+ * 
+ * Unified Canvas + Blocks Architecture:
+ * - Pages are containers only - they provide context (pageId, optional recordId)
+ * - All UI, data access, and behaviour lives inside blocks
+ * - Only two page types exist: 'content' and 'record_view'
  */
 
 export type PageType = 
-  | 'list'
-  | 'gallery'
-  | 'kanban'
-  | 'calendar'
-  | 'timeline'
-  | 'form'
-  | 'dashboard'
-  | 'overview'
-  | 'record_review'
-  | 'content' // Content Pages are user-facing, block-based pages that do not require data sources and are used for documentation and resources.
-  // 'blank' removed - invalid page type, pages must have an anchor
+  | 'content'      // Generic canvas page - no inherent data context
+  | 'record_view'  // Canvas page with injected recordId - blocks may opt-in to record context
 
 export interface PageTypeDefinition {
   type: PageType
@@ -27,97 +22,24 @@ export interface PageTypeDefinition {
 }
 
 export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
-  list: {
-    type: 'list',
-    label: 'List',
-    description: 'Grid view with columns and rows',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
-    allowsInlineEditing: true,
-  },
-  gallery: {
-    type: 'gallery',
-    label: 'Gallery',
-    description: 'Card-based visual layout',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
-    allowsInlineEditing: false,
-  },
-  kanban: {
-    type: 'kanban',
-    label: 'Kanban',
-    description: 'Board view with drag-and-drop columns',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
-    allowsInlineEditing: false,
-  },
-  calendar: {
-    type: 'calendar',
-    label: 'Calendar',
-    description: 'Month/week calendar view',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
-    allowsInlineEditing: false,
-  },
-  timeline: {
-    type: 'timeline',
-    label: 'Timeline',
-    description: 'Chronological timeline view',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: true,
-    allowsInlineEditing: false,
-  },
-  form: {
-    type: 'form',
-    label: 'Form',
-    description: 'Data collection form for record creation',
-    requiresSourceView: false,
-    requiresBaseTable: true,
-    supportsGridToggle: false,
-    allowsInlineEditing: false,
-  },
-  dashboard: {
-    type: 'dashboard',
-    label: 'Dashboard',
-    description: 'Overview with KPIs, charts, and metrics',
-    requiresSourceView: true,
-    requiresBaseTable: false,
-    supportsGridToggle: false,
-    allowsInlineEditing: false,
-  },
-  overview: {
-    type: 'overview',
-    label: 'Overview',
-    description: 'Navigation and information page',
-    requiresSourceView: false,
-    requiresBaseTable: false,
-    supportsGridToggle: false,
-    allowsInlineEditing: false,
-  },
-  record_review: {
-    type: 'record_review',
-    label: 'Record Review',
-    description: 'Single record view with detail panel - record-based, not view-based',
-    requiresSourceView: false, // Record Review pages are block-driven, not view-driven
-    requiresBaseTable: true, // Requires table but not a specific view type
-    supportsGridToggle: false, // Fixed layout mode
-    allowsInlineEditing: false,
-  },
   content: {
     type: 'content',
     label: 'Content Page',
-    description: 'Docs, links, resources, information',
+    description: 'Generic canvas page with blocks - no inherent data context',
     requiresSourceView: false,
     requiresBaseTable: false,
     supportsGridToggle: false,
     allowsInlineEditing: false,
   },
-  // blank removed - invalid page type
+  record_view: {
+    type: 'record_view',
+    label: 'Record View',
+    description: 'Canvas page with injected recordId - blocks may opt-in to record context',
+    requiresSourceView: false,
+    requiresBaseTable: false, // Optional - blocks define their own data sources
+    supportsGridToggle: false,
+    allowsInlineEditing: false,
+  },
 }
 
 export function getPageTypeDefinition(type: PageType): PageTypeDefinition {
@@ -149,47 +71,25 @@ export function validatePageConfig(
 }
 
 /**
- * Check if a page type is a collection page (view-based)
- * Collection pages support selectable view types: List, Gallery, Kanban, Calendar, Timeline
+ * Check if a page type is a record view page (record-based)
+ * Record view pages inject recordId context into blocks
  */
-export function isCollectionPage(pageType: PageType): boolean {
-  return ['list', 'gallery', 'kanban', 'calendar', 'timeline'].includes(pageType)
-}
-
-/**
- * Check if a page type is a record review page (record-based)
- * Record Review pages are block-driven, not view-driven, and have fixed layout mode
- */
-export function isRecordReviewPage(pageType: PageType): boolean {
-  return pageType === 'record_review'
+export function isRecordViewPage(pageType: PageType): boolean {
+  return pageType === 'record_view'
 }
 
 /**
  * Get the required anchor type for a page type
+ * In unified architecture, pages don't require anchors - blocks define their own data sources
  */
 export function getRequiredAnchorType(pageType: PageType): 'saved_view' | 'dashboard' | 'form' | 'record' | null {
-  switch (pageType) {
-    case 'list':
-    case 'gallery':
-    case 'kanban':
-    case 'calendar':
-    case 'timeline':
-      return 'saved_view'
-    case 'record_review':
-      return 'record' // Record Review pages use record anchor, not saved_view
-    case 'dashboard':
-    case 'overview':
-    case 'content':
-      return 'dashboard' // Content pages use dashboard anchor (blocks) but don't require data
-    case 'form':
-      return 'form'
-    default:
-      throw new Error(`Unknown page type: ${pageType}`)
-  }
+  // Pages don't require anchors - blocks define their own data sources
+  return null
 }
 
 /**
  * Validate that a page has the correct anchor for its type
+ * In unified architecture, pages don't require anchors - blocks define their own data sources
  */
 export function validatePageAnchor(
   pageType: PageType,
@@ -198,56 +98,7 @@ export function validatePageAnchor(
   formConfigId: string | null,
   recordConfigId: string | null
 ): { valid: boolean; error?: string } {
-  const requiredAnchor = getRequiredAnchorType(pageType)
-  
-  // Content pages don't require any anchor (they use dashboard anchor but it's optional)
-  if (pageType === 'content') {
-    // Content pages can have dashboard_layout_id set (for blocks) but it's not required initially
-    // They will have it set after creation (self-reference like dashboard/overview)
-    return { valid: true }
-  }
-  
-  if (!requiredAnchor) {
-    return { valid: true } // Pages without required anchor are valid
-  }
-  
-  switch (requiredAnchor) {
-    case 'saved_view':
-      if (!savedViewId) {
-        return { valid: false, error: `${pageType} pages require a saved view` }
-      }
-      break
-    case 'dashboard':
-      if (!dashboardLayoutId) {
-        return { valid: false, error: `${pageType} pages require a dashboard layout` }
-      }
-      break
-    case 'form':
-      if (!formConfigId) {
-        return { valid: false, error: `${pageType} pages require form configuration` }
-      }
-      break
-    case 'record':
-      // Record Review pages require base_table but not a specific view_type
-      // They use saved_view_id for the underlying grid view, but don't expose view type selection
-      if (!savedViewId) {
-        return { valid: false, error: `${pageType} pages require a saved view` }
-      }
-      break
-  }
-
-  // Ensure only one anchor is set (for non-content pages)
-  const anchorCount = [
-    savedViewId,
-    dashboardLayoutId,
-    formConfigId,
-    recordConfigId,
-  ].filter(Boolean).length
-
-  if (anchorCount !== 1) {
-    return { valid: false, error: 'Page must have exactly one anchor' }
-  }
-
+  // Pages don't require anchors - blocks define their own data sources
   return { valid: true }
 }
 

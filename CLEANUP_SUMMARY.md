@@ -1,113 +1,111 @@
-# Code Cleanup Summary
+# Code Cleanup Summary - Unified Canvas + Blocks Architecture
 
-**Date:** January 2025  
-**Status:** Partial cleanup completed
+## Files Cleaned Up ✅
 
----
+### Core Architecture Files
 
-## ✅ Completed Actions
+1. **`baserow-app/lib/interface/page-types.ts`**
+   - ✅ Simplified to 2 page types (`content`, `record_view`)
+   - ✅ Removed all old page type definitions
+   - ✅ Simplified validation functions
 
-### 1. Removed Duplicate Files
+2. **`baserow-app/components/interface/PageRenderer.tsx`**
+   - ✅ Removed all conditional rendering based on page type
+   - ✅ Always renders Canvas via InterfaceBuilder
+   - ✅ Removed 400+ lines of view-specific rendering logic
 
-- ✅ **Deleted:** `lib/utils.ts` 
-  - Reason: Identical duplicate of `baserow-app/lib/utils.ts`
-  - Impact: None (root version was not imported)
+3. **`baserow-app/components/interface/InterfacePageClient.tsx`**
+   - ✅ Unified block loading for all pages
+   - ✅ Removed page-type-specific conditional logic
+   - ✅ Removed form settings panel
+   - ✅ Simplified edit mode handling
 
----
+4. **`baserow-app/lib/interface/assertPageIsValid.ts`**
+   - ✅ Simplified validation - all pages valid by default
+   - ✅ Removed page-type-specific validation checks
+   - ✅ Removed calendar/record_review specific checks
 
-## ⚠️ Important Discovery
+5. **`baserow-app/components/interface/PageSetupState.tsx`**
+   - ✅ Simplified setup content for unified architecture
+   - ✅ Removed page-type-specific setup logic
+   - ✅ Unified edit mode handling
 
-### Two Separate Next.js Applications
+6. **`baserow-app/components/interface/PageDisplaySettingsPanel.tsx`**
+   - ✅ Removed page-type-specific configuration sections
+   - ✅ Disabled calendar/record_review specific UI (moved to blocks)
+   - ✅ Simplified to handle basic page metadata only
+   - ⚠️ Large file - some legacy code remains but disabled
 
-The codebase contains **TWO separate Next.js applications**:
+## Remaining References (Expected)
 
-1. **Root App** (`app/`, `components/`, `lib/` at root)
-   - Routes: `/data/[tableId]`, `/tables/[tableId]`, `/import`
-   - Uses root-level components and lib
-   - 9 files, 64 imports
+### Block-Level Configuration
+These references are **expected** and **acceptable**:
+- Block components may reference view types for their own configuration
+- Block settings panels may have view-specific options
+- Example: `GridBlock` may have `view_type: 'grid' | 'list'` in its config
 
-2. **Baserow App** (`baserow-app/`)
-   - Routes: `/tables`, `/pages`, `/interface`, `/settings`
-   - Complete Next.js app with package.json
-   - 294 files, 1,285 imports
+### Type Definitions
+These references are **expected** for backward compatibility:
+- Type definitions may include old types for migration purposes
+- Database schema may still reference old page types
+- Example: `page-types-only.ts` may have old types for type safety
 
-**Both are active and serve different purposes!**
+### Comments/Documentation
+These references are **acceptable**:
+- Comments explaining migration paths
+- Documentation files
+- Example: Migration guides referencing old page types
 
----
+## Files That May Need Further Cleanup
 
-## 🔍 Files That Cannot Be Deleted
+### High Priority
+1. **`baserow-app/components/interface/PageCreationWizard.tsx`** (41 references)
+   - Update to only show `content` and `record_view` options
+   - Remove old page type selection UI
 
-These files are **actively used** by the root `app/` directory:
+2. **`baserow-app/components/interface/NewPageModal.tsx`** (2 references)
+   - Update page creation modal
+   - Remove old page type options
 
-### Root Components (Used by Root App)
-- `components/ui/*` - All UI components
-- `components/navigation/*` - Navigation components
-- `components/views/InterfacePage.tsx` - Interface page component
-- `components/blocks/BlockRenderer.tsx` - Block renderer (used by InterfacePage)
+### Medium Priority
+3. **`baserow-app/components/interface/RecordReviewView.tsx`** (12 references)
+   - May need refactoring or removal if replaced by blocks
+   - Check if still needed in unified architecture
 
-### Root Libraries (Used by Root App)
-- `lib/supabase.ts` - Supabase client
-- `lib/icons.ts` - Icon utilities
-- `lib/views.ts` - View utilities
-- `lib/blocks.ts` - Block utilities
-- `lib/data.ts` - Data utilities
-- `lib/permissions.ts` - Permission utilities
-- `lib/navigation.ts` - Navigation utilities
+4. **`baserow-app/components/interface/blocks/FormBlock.tsx`** (24 references)
+   - May have form-specific logic that needs updating
+   - Ensure it works with unified architecture
 
-### Root Types (Used by Root App)
-- `types/database.ts` - Database type definitions
+### Low Priority
+5. **Block Settings Panels**
+   - `GridDataSettings.tsx` (8 references)
+   - `FormDataSettings.tsx` (31 references)
+   - These are block-level, so view type references are acceptable
 
----
+6. **Type Definition Files**
+   - `page-types-only.ts` (5 references)
+   - `types.ts` (6 references)
+   - May need updates for type safety
 
-## 📋 Recommendations
+## Summary
 
-### Option 1: Keep Both Apps (Current State)
-- **Pros:** Both apps can coexist
-- **Cons:** Code duplication, maintenance overhead
-- **Action:** Document which app serves which purpose
+### ✅ Completed
+- Core architecture unified
+- Page rendering simplified
+- Block lifecycle rules implemented
+- Page type validation simplified
+- Setup state unified
 
-### Option 2: Consolidate to Baserow App
-- **Pros:** Single codebase, no duplication
-- **Cons:** Requires migration work
-- **Action:** 
-  1. Migrate root `app/` routes to `baserow-app/app/`
-  2. Update imports to use `baserow-app/` components
-  3. Delete root `app/`, `components/`, `lib/` directories
+### ⏳ Remaining Work
+- Update page creation UI (NewPageModal, PageCreationWizard)
+- Review and update block components if needed
+- Update type definitions for consistency
+- Test with existing pages
 
-### Option 3: Separate Repositories
-- **Pros:** Clear separation, independent development
-- **Cons:** Shared code becomes harder
-- **Action:** Split into two repositories
+## Notes
 
----
+1. **Block-Level View Types**: It's acceptable for blocks to have their own `view_type` configuration (e.g., `GridBlock` with `view_type: 'grid'`). This is different from page types.
 
-## 🎯 Next Steps
+2. **Backward Compatibility**: Some old page type references may remain in type definitions for backward compatibility during migration.
 
-1. **Documentation:** 
-   - Document which app is primary
-   - Document purpose of each app
-   - Create architecture diagram
-
-2. **Decision Required:**
-   - Choose Option 1, 2, or 3 above
-   - Get stakeholder approval
-
-3. **If Consolidating:**
-   - Create migration plan
-   - Migrate routes gradually
-   - Test thoroughly before deletion
-
----
-
-## 📊 Statistics
-
-- **Files Deleted:** 1 (`lib/utils.ts`)
-- **Files Identified as Duplicates:** ~50+
-- **Files Confirmed as Active:** ~30+ (root app dependencies)
-- **Cleanup Potential:** Low (both apps are active)
-
----
-
-**Status:** Cleanup paused pending architectural decision  
-**Next Review:** After architectural decision
-
+3. **Gradual Migration**: The cleanup can be done gradually - core architecture is unified, remaining work is mostly UI updates.

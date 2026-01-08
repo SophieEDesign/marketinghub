@@ -96,13 +96,12 @@ export default function PageDisplaySettingsPanel({
   async function loadInitialData() {
     if (!page) return
 
-    // Don't load settings for dashboard/overview/content pages - they use block editing
-    if (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content') {
+    // UNIFIED: All pages use blocks - settings panel is for page metadata only
+    // Block-specific settings are handled in block settings panels
+    // Content pages don't need view-specific settings
+    if (page.page_type === 'content') {
       return
     }
-    
-    // Check if page supports grouping (for kanban/list pages)
-    const supportsGroupingCheck = ['list', 'kanban'].includes(page.page_type || '')
 
     // Reset state when panel opens/closes to prevent glitching
     if (!isOpen) {
@@ -159,7 +158,8 @@ export default function PageDisplaySettingsPanel({
         setTableFields(fields)
         
         // Load grouping field from page config (blocks store config in page.config)
-        if (supportsGroupingCheck) {
+        // UNIFIED: Grouping is handled by blocks
+        if (false) {
           const groupByFromConfig = page.config?.group_by || page.config?.group_by_field || ''
           if (groupByFromConfig) {
             setGroupBy(groupByFromConfig)
@@ -204,27 +204,10 @@ export default function PageDisplaySettingsPanel({
       setReadOnly(config.read_only || false)
       setDefaultFocus(config.default_focus || 'first')
       
-      // Load calendar date fields from page config (blocks store config in page.config)
-      if (page.page_type === 'calendar') {
-        const startField = config.start_date_field || config.calendar_date_field || config.calendar_start_field || ''
-        const endField = config.end_date_field || config.calendar_end_field || ''
-        setStartDateField(startField)
-        setEndDateField(endField)
-        // Load calendar display fields
-        const displayFields = config.calendar_display_fields || []
-        setCalendarDisplayFields(Array.isArray(displayFields) ? displayFields : [])
-      }
-      
-      // Load preview fields and detail fields for record_review pages
-      if (page.page_type === 'record_review') {
-        const previewFieldsFromConfig = config.preview_fields || []
-        setPreviewFields(Array.isArray(previewFieldsFromConfig) ? previewFieldsFromConfig : [])
-        const detailFieldsFromConfig = config.detail_fields || []
-        setDetailFields(Array.isArray(detailFieldsFromConfig) ? detailFieldsFromConfig : [])
-      }
-      
-      // Load grouping field from config or grid_view_settings
-      if (supportsGroupingCheck) {
+      // UNIFIED: Blocks handle their own configuration
+      // Page config only stores basic metadata
+      // Load grouping field from config if present
+      if (config.group_by) {
         const groupByFromConfig = config.group_by || ''
         if (groupByFromConfig) {
           setGroupBy(groupByFromConfig)
@@ -331,22 +314,8 @@ export default function PageDisplaySettingsPanel({
         sorts: blockSorts,
         // Store grouping field for kanban/list pages
         ...(supportsGrouping && groupBy ? { group_by: groupBy, group_by_field: groupBy } : {}),
-        // Store calendar date fields for calendar pages
-        ...(page.page_type === 'calendar' ? {
-          start_date_field: startDateField || undefined,
-          end_date_field: endDateField || undefined,
-          calendar_date_field: startDateField || undefined,
-          calendar_start_field: startDateField || undefined,
-          calendar_end_field: endDateField || undefined,
-          calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
-        } : {}),
-        // Store preview fields and detail fields for record_review pages
-        ...(page.page_type === 'record_review' ? {
-          preview_fields: previewFields.length > 0 ? previewFields : undefined,
-          detail_fields: detailFields.length > 0 ? detailFields : undefined,
-        } : {}),
-        // Store view type for the block
-        view_type: page.page_type === 'list' ? 'grid' : page.page_type,
+        // UNIFIED: Blocks handle their own view type and configuration
+        // Page config only stores basic metadata
       }
 
       await supabase
@@ -375,16 +344,7 @@ export default function PageDisplaySettingsPanel({
               filters: blockFilters,
               sorts: blockSorts,
               ...(supportsGrouping && groupBy ? { group_by_field: groupBy } : {}),
-              ...(page.page_type === 'calendar' ? {
-                calendar_date_field: startDateField,
-                calendar_start_field: startDateField,
-                calendar_end_field: endDateField,
-                calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
-              } : {}),
-              ...(page.page_type === 'record_review' ? {
-                preview_fields: previewFields.length > 0 ? previewFields : undefined,
-                detail_fields: detailFields.length > 0 ? detailFields : undefined,
-              } : {}),
+              // UNIFIED: Blocks handle their own configuration
             }
           })
           .eq('id', gridBlock.id)
@@ -405,16 +365,7 @@ export default function PageDisplaySettingsPanel({
               filters: blockFilters,
               sorts: blockSorts,
               ...(supportsGrouping && groupBy ? { group_by_field: groupBy } : {}),
-              ...(page.page_type === 'calendar' ? {
-                calendar_date_field: startDateField,
-                calendar_start_field: startDateField,
-                calendar_end_field: endDateField,
-                calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
-              } : {}),
-              ...(page.page_type === 'record_review' ? {
-                preview_fields: previewFields.length > 0 ? previewFields : undefined,
-                detail_fields: detailFields.length > 0 ? detailFields : undefined,
-              } : {}),
+              // UNIFIED: Blocks handle their own configuration
             },
             order_index: 0,
           })
@@ -522,32 +473,9 @@ export default function PageDisplaySettingsPanel({
     return null
   }
 
-  const layoutOptions = [
-    { value: 'list', label: 'List' },
-    { value: 'grid', label: 'Grid' },
-    { value: 'calendar', label: 'Calendar' },
-    { value: 'kanban', label: 'Kanban' },
-    { value: 'gallery', label: 'Gallery' },
-    { value: 'record_review', label: 'Record Review' },
-  ].filter((opt) => {
-    // Filter based on page type capabilities
-    if (page.page_type === 'list') {
-      return ['list', 'grid'].includes(opt.value)
-    }
-    if (page.page_type === 'calendar') {
-      return opt.value === 'calendar'
-    }
-    if (page.page_type === 'kanban') {
-      return opt.value === 'kanban'
-    }
-    if (page.page_type === 'gallery') {
-      return opt.value === 'gallery'
-    }
-    if (page.page_type === 'record_review') {
-      return opt.value === 'record_review'
-    }
-    return true
-  })
+  // UNIFIED: Layout is handled by blocks, not pages
+  // This panel only handles basic page metadata
+  const layoutOptions: Array<{ value: string; label: string }> = []
 
   return (
     <>
@@ -789,8 +717,8 @@ export default function PageDisplaySettingsPanel({
                 </div>
               )}
 
-              {/* Calendar Date Fields */}
-              {page.page_type === 'calendar' && (
+              {/* UNIFIED: Calendar configuration moved to CalendarBlock */}
+              {false && page.page_type === 'calendar' && (
                 <>
                   <div className="space-y-2">
                     <Label>Start Date Field</Label>
@@ -889,7 +817,8 @@ export default function PageDisplaySettingsPanel({
 
             <TabsContent value="layout" className="mt-6 space-y-6">
               {/* Layout Selector - Hidden for Record Review pages (fixed layout) */}
-              {page.page_type !== 'record_review' && (
+              {/* UNIFIED: Layout options moved to block settings */}
+              {false && page.page_type !== 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <Select value={layout} onValueChange={setLayout}>
@@ -907,8 +836,8 @@ export default function PageDisplaySettingsPanel({
                 </div>
               )}
               
-              {/* Record Review pages have fixed layout - show info message */}
-              {page.page_type === 'record_review' && (
+              {/* UNIFIED: Record view configuration moved to blocks */}
+              {false && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
@@ -931,8 +860,8 @@ export default function PageDisplaySettingsPanel({
                 />
               </div>
 
-              {/* Preview Fields - Record Review pages only */}
-              {page.page_type === 'record_review' && (
+              {/* UNIFIED: Preview fields configuration moved to blocks */}
+              {false && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Preview Fields</Label>
                   <div className="text-sm text-gray-500 mb-2">
@@ -974,7 +903,8 @@ export default function PageDisplaySettingsPanel({
               )}
 
               {/* Detail Fields - Record Review pages only */}
-              {page.page_type === 'record_review' && (
+              {/* UNIFIED: Record review layout moved to block settings */}
+              {false && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1042,8 +972,8 @@ export default function PageDisplaySettingsPanel({
                 </div>
               )}
 
-              {/* Edit Panel Layout - Record Review pages only */}
-              {page.page_type === 'record_review' && (
+              {/* UNIFIED: Panel layout configuration moved to blocks */}
+              {false && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Record Panel Layout</Label>
                   <div className="text-sm text-gray-500 mb-2">
@@ -1117,8 +1047,8 @@ export default function PageDisplaySettingsPanel({
       </SheetContent>
       </Sheet>
 
-      {/* Record Panel Editor */}
-      {page && page.page_type === 'record_review' && (
+      {/* UNIFIED: Record panel editor moved to block settings */}
+      {false && page && page.page_type === 'record_view' && (
         <RecordPanelEditor
           page={page}
           isOpen={panelEditorOpen}

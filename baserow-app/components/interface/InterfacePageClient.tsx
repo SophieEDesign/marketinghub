@@ -11,8 +11,7 @@ import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
-import FormPageSettingsPanel from "./FormPageSettingsPanel"
-import { getPageTypeDefinition, getRequiredAnchorType } from "@/lib/interface/page-types"
+import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
@@ -51,7 +50,6 @@ function InterfacePageClientInternal({
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
-  const [formSettingsOpen, setFormSettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   
@@ -150,17 +148,13 @@ function InterfacePageClientInternal({
   // Listen for custom event to open settings panel
   useEffect(() => {
     const handleOpenSettings = () => {
-      if (page?.page_type === 'form') {
-        setFormSettingsOpen(true)
-      } else {
-        setDisplaySettingsOpen(true)
-      }
+      setDisplaySettingsOpen(true)
     }
     window.addEventListener('open-page-settings', handleOpenSettings)
     return () => {
       window.removeEventListener('open-page-settings', handleOpenSettings)
     }
-  }, [page?.page_type])
+  }, [])
 
   // Initialize title value when page loads
   useEffect(() => {
@@ -211,82 +205,57 @@ function InterfacePageClientInternal({
     // Prevent concurrent loads
     if (dataLoadingRef.current) return
     
+    // UNIFIED: Blocks handle their own data loading
+    // Pages don't need to load data - blocks define their own data sources
     if (sourceView) {
       loadSqlViewData()
-    } else if (pageType === 'record_review') {
-      // Load table data for record_review pages (check both saved_view_id and base_table)
-      loadRecordReviewData()
-    } else if (savedViewId && pageType === 'list') {
-      // NOTE: List view pages use GridBlock which loads its own data
-      // This data loading is kept for backward compatibility but may not be used
-      loadListViewData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config, page?.base_table])
 
-  // CRITICAL: Load blocks ONLY for Canvas page types (dashboard, content, record_review)
-  // Other page types (list/calendar/grid/form) do NOT use Canvas and should NOT load blocks
+  // CRITICAL: Load blocks for ALL pages - unified Canvas + Blocks architecture
+  // All pages render Canvas, so all pages need blocks loaded
   // Blocks must load in BOTH edit and view mode so they render correctly
   useEffect(() => {
-    const canvasPageTypes = ['dashboard', 'content', 'record_review']
-    const isCanvasPage = page && canvasPageTypes.includes(page.page_type)
+    if (!page) return
     
-    if (isCanvasPage) {
-      // Reset loaded state when pageId changes
-      if (blocksLoadedRef.current.pageId !== page.id) {
-        blocksLoadedRef.current = { pageId: page.id, loaded: false }
-      }
-      
-      // Only load if blocks haven't been loaded yet for this page
-      if (!blocksLoading && (!blocksLoadedRef.current.loaded || blocks.length === 0)) {
-        loadBlocks()
-      }
-    } else if (page) {
-      // Non-canvas page type - skip block loading and ensure blocks state is empty
-      console.log(`[Blocks] loadBlocks SKIPPED (non-canvas page_type): pageId=${page.id}, page_type=${page.page_type}`, {
-        currentBlocksCount: blocks.length,
-        currentBlockIds: blocks.map(b => b.id),
-        willClear: blocks.length > 0,
-      })
-      // Clear blocks state for non-canvas pages
-      if (blocks.length > 0) {
-        console.log(`[Blocks] CLEARING blocks (non-canvas page): pageId=${page.id}, page_type=${page.page_type}`, {
-          clearedBlocksCount: blocks.length,
-          clearedBlockIds: blocks.map(b => b.id),
-        })
-        setBlocks([])
-        blocksLoadedRef.current = { pageId: page.id, loaded: false }
-      }
+    // Reset loaded state when pageId changes
+    if (blocksLoadedRef.current.pageId !== page.id) {
+      blocksLoadedRef.current = { pageId: page.id, loaded: false }
+    }
+    
+    // Only load if blocks haven't been loaded yet for this page
+    if (!blocksLoading && (!blocksLoadedRef.current.loaded || blocks.length === 0)) {
+      loadBlocks()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page?.id, page?.page_type])
+  }, [page?.id])
 
   // CRITICAL: Reload blocks when exiting edit mode to ensure preview shows latest saved content
   // This fixes the issue where content saved in edit mode doesn't appear in preview
+  // UNIFIED: All pages use blocks, so reload for all pages
   const prevIsBlockEditingRef = useRef<boolean>(isBlockEditing)
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   useEffect(() => {
     // Detect when exiting edit mode (isBlockEditing changes from true to false)
-    if (prevIsBlockEditingRef.current && !isBlockEditing) {
+    if (prevIsBlockEditingRef.current && !isBlockEditing && page) {
       // User just exited edit mode - reload blocks to get latest saved content
       // CRITICAL: Do NOT clear blocks before reload - preserve them to prevent empty state flicker
       // Canvas must always render blocks when they exist, regardless of edit/viewer mode
-      if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-        // Clear any pending reload timeout
-        if (reloadTimeoutRef.current) {
-          clearTimeout(reloadTimeoutRef.current)
-        }
-        console.log(`[InterfacePageClient] Exiting edit mode - scheduling block reload: pageId=${page.id}`)
-        // Longer delay to ensure database transaction is fully committed
-        // This prevents race condition where reload happens before save completes
-        reloadTimeoutRef.current = setTimeout(() => {
-          console.log(`[InterfacePageClient] Executing block reload after exit edit mode: pageId=${page.id}`)
-          // CRITICAL: Force reload but preserve existing blocks during reload
-          // This prevents Canvas from rendering empty state during the reload delay
-          loadBlocks(true) // Force reload to get latest saved content
-          reloadTimeoutRef.current = null
-        }, 750) // Increased delay to ensure save completes and database is consistent
+      // Clear any pending reload timeout
+      if (reloadTimeoutRef.current) {
+        clearTimeout(reloadTimeoutRef.current)
       }
+      console.log(`[InterfacePageClient] Exiting edit mode - scheduling block reload: pageId=${page.id}`)
+      // Longer delay to ensure database transaction is fully committed
+      // This prevents race condition where reload happens before save completes
+      reloadTimeoutRef.current = setTimeout(() => {
+        console.log(`[InterfacePageClient] Executing block reload after exit edit mode: pageId=${page.id}`)
+        // CRITICAL: Force reload but preserve existing blocks during reload
+        // This prevents Canvas from rendering empty state during the reload delay
+        loadBlocks(true) // Force reload to get latest saved content
+        reloadTimeoutRef.current = null
+      }, 750) // Increased delay to ensure save completes and database is consistent
     }
     prevIsBlockEditingRef.current = isBlockEditing
     
@@ -297,7 +266,7 @@ function InterfacePageClientInternal({
         reloadTimeoutRef.current = null
       }
     }
-  }, [isBlockEditing, page?.id, page?.page_type])
+  }, [isBlockEditing, page?.id])
 
   async function loadPage() {
     // CRITICAL: Only load if not already loaded (prevent overwriting initial data)
@@ -729,15 +698,8 @@ function InterfacePageClientInternal({
     setIsGridMode(!isGridMode)
   }
 
-  // Determine if grid toggle should be shown
-  // Record Review pages NEVER show grid toggle (fixed layout, record-based)
-  const showGridToggle = useMemo(() => {
-    if (!page) return false
-    // Record Review pages are record-based, not view-based - no grid toggle
-    if (page.page_type === 'record_review') return false
-    const definition = getPageTypeDefinition(page.page_type)
-    return definition.supportsGridToggle && page.page_type !== 'dashboard' && page.page_type !== 'overview'
-  }, [page])
+  // UNIFIED: No grid toggle - all pages use Canvas with blocks
+  const showGridToggle = false
 
   // Merge config with grid mode override
   const pageWithConfig = useMemo(() => {
@@ -762,18 +724,17 @@ function InterfacePageClientInternal({
 
   // CRITICAL: Memoize InterfaceBuilder page prop to prevent remounts
   // Creating new object on every render causes component remounts
+  // UNIFIED: All pages use the same structure - no page-type-specific config
   const interfaceBuilderPage = useMemo(() => {
     if (!page) return null
     return {
       id: page.id,
       name: page.name,
       settings: {
-        layout_template: page.page_type === 'content' ? 'content' :
-                        page.page_type === 'overview' ? 'overview' :
-                        page.page_type === 'dashboard' ? 'dashboard' : null
+        layout_template: 'content' as const
       }
     } as any
-  }, [page?.id, page?.name, page?.page_type])
+  }, [page?.id, page?.name])
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
@@ -787,11 +748,6 @@ function InterfacePageClientInternal({
     return result
   }, [blocks, page?.id, page?.page_type])
   
-  // CRITICAL: Memoize blocks prop for PageRenderer to prevent remounts
-  // Conditionally creating array/undefined on every render causes remounts
-  const pageRendererBlocks = useMemo(() => {
-    return (page?.page_type === 'record_review') ? memoizedBlocks : undefined
-  }, [page?.page_type, memoizedBlocks])
 
   // Save page title with debouncing - MUST be before early returns (React Hooks rule)
   const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
@@ -876,69 +832,24 @@ function InterfacePageClientInternal({
   }
 
   const isViewer = searchParams?.get("view") === "true"
-  const isDashboardOrOverview = page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content'
-  const isRecordReview = page?.page_type === 'record_review'
+  const isRecordView = page?.page_type === 'record_view'
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
   const pageAnchor = page ? getPageAnchor(page) : null
   const requiredAnchor = page ? getRequiredAnchorType(page.page_type) : null
 
-  // Edit page behavior based on anchor type - NEVER show alerts, always open contextual editor
+  // Edit page behavior - UNIFIED: Always enter block editing mode
   const handleEditClick = () => {
     if (!page) return
     
-    // If page doesn't have anchor, open settings instead of redirecting
-    if (!pageHasAnchor) {
-      // Open appropriate settings panel based on page type
-      if (page.page_type === 'form') {
-        setFormSettingsOpen(true)
-      } else {
-        setDisplaySettingsOpen(true)
-      }
-      return
-    }
-
-    // Open appropriate editor based on anchor type - NO ALERTS, always open editor
-    switch (pageAnchor) {
-      case 'dashboard':
-        // For dashboard/overview/content pages, enter block editing mode
-        enterBlockEdit()
-        break
-      case 'saved_view':
-        // For list/gallery/kanban/calendar/timeline pages, open view settings
-        setDisplaySettingsOpen(true)
-        break
-      case 'form':
-        // Open form settings panel
-        setFormSettingsOpen(true)
-        break
-      case 'record':
-        // For record review pages, check if they should use block editing or settings
-        // If page has blocks, use block editing; otherwise use settings panel
-        if (blocks.length > 0) {
-          enterBlockEdit()
-        } else {
-          setDisplaySettingsOpen(true)
-        }
-        break
-      default:
-        // Fallback: open settings panel (never redirect or alert)
-        if (page.page_type === 'form') {
-          setFormSettingsOpen(true)
-        } else {
-          setDisplaySettingsOpen(true)
-        }
-    }
+    // UNIFIED: All pages use block editing mode
+    enterBlockEdit()
   }
   
   // Handler to open page settings drawer
   const handleOpenPageSettings = () => {
-    if (page?.page_type === 'form') {
-      setFormSettingsOpen(true)
-    } else {
-      setDisplaySettingsOpen(true)
-    }
+    setDisplaySettingsOpen(true)
   }
 
   async function handlePageUpdate() {
@@ -952,10 +863,8 @@ function InterfacePageClientInternal({
     // Parallelize independent requests
     await Promise.all([
       loadPage(),
-      // Load blocks in parallel if page type supports it
-      (page?.page_type === 'dashboard' || page?.page_type === 'overview' || page?.page_type === 'content' || page?.page_type === 'record_review') 
-        ? loadBlocks() 
-        : Promise.resolve(),
+      // UNIFIED: All pages support blocks
+      loadBlocks(),
     ])
     // Load data after page is loaded (depends on page.source_view)
     if (page?.source_view) {
@@ -1042,7 +951,7 @@ function InterfacePageClientInternal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isDashboardOrOverview && isBlockEditing ? (
+            {isBlockEditing ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -1052,30 +961,19 @@ function InterfacePageClientInternal({
               </Button>
             ) : (
               <>
-                {isDashboardOrOverview ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Enter block edit mode
-                      enterBlockEdit()
-                      // Blocks are already loaded (loaded in useEffect on mount)
-                      // No need to await - edit mode doesn't require fresh data
-                    }}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit interface
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleEditClick}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit Page
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Enter block edit mode
+                    enterBlockEdit()
+                    // Blocks are already loaded (loaded in useEffect on mount)
+                    // No need to await - edit mode doesn't require fresh data
+                  }}
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit interface
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1126,54 +1024,35 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // CRITICAL: For dashboard/overview/content pages, always render InterfaceBuilder
+          // UNIFIED: All pages render InterfaceBuilder (which wraps Canvas)
           // Use isViewer prop to control edit/view mode instead of switching components
           // This prevents remount storms when switching between edit and view modes
-          (isDashboardOrOverview || page.page_type === 'content') ? (
-            interfaceBuilderPage ? (
-              (() => {
-                console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
-                  initialBlocksCount: memoizedBlocks.length,
-                  initialBlockIds: memoizedBlocks.map(b => b.id),
-                  isViewer,
-                  isBlockEditing,
-                  effectiveIsViewer: isViewer || !isBlockEditing,
-                })
-                return (
-                  <InterfaceBuilder
-                    key={`interface-builder-${page.id}`}
-                    page={interfaceBuilderPage}
-                    initialBlocks={memoizedBlocks}
-                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                    // URL-based viewer mode takes precedence (force read-only)
-                    // Otherwise, viewer mode = not in block editing mode
-                    isViewer={isViewer || !isBlockEditing}
-                    hideHeader={true}
-                    pageTableId={pageTableId}
-                  />
-                )
-              })()
-            ) : null
-          ) : (
-            // For other page types, use PageRenderer
-            <PageRenderer
-              key={`page-renderer-${page.id}`}
-              page={pageWithConfig}
-              data={data}
-              isLoading={loading || dataLoading}
-              onGridToggle={showGridToggle ? handleGridToggle : undefined}
-              showGridToggle={showGridToggle}
-              blocks={pageRendererBlocks}
-              isAdmin={isAdmin}
-              onOpenSettings={() => {
-                if (page?.page_type === 'form') {
-                  setFormSettingsOpen(true)
-                } else {
-                  setDisplaySettingsOpen(true)
-                }
-              }}
-            />
-          )
+          interfaceBuilderPage ? (
+            (() => {
+              console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
+                initialBlocksCount: memoizedBlocks.length,
+                initialBlockIds: memoizedBlocks.map(b => b.id),
+                isViewer,
+                isBlockEditing,
+                effectiveIsViewer: isViewer || !isBlockEditing,
+                recordId: isRecordView ? (page.config?.record_id || null) : null,
+              })
+              return (
+                <InterfaceBuilder
+                  key={`interface-builder-${page.id}`}
+                  page={interfaceBuilderPage}
+                  initialBlocks={memoizedBlocks}
+                  // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                  // URL-based viewer mode takes precedence (force read-only)
+                  // Otherwise, viewer mode = not in block editing mode
+                  isViewer={isViewer || !isBlockEditing}
+                  hideHeader={true}
+                  pageTableId={pageTableId}
+                  recordId={isRecordView ? (page.config?.record_id || null) : null}
+                />
+              )
+            })()
+          ) : null
         ) : null}
       </div>
 
@@ -1187,15 +1066,6 @@ function InterfacePageClientInternal({
         />
       )}
 
-      {/* Form Page Settings Panel */}
-      {page && page.page_type === 'form' && (
-        <FormPageSettingsPanel
-          page={page}
-          isOpen={formSettingsOpen}
-          onClose={() => setFormSettingsOpen(false)}
-          onUpdate={handlePageUpdate}
-        />
-      )}
     </div>
   )
 }
