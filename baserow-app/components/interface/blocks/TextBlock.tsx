@@ -45,6 +45,11 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // CRITICAL: Determine if viewer mode is forced (check URL or parent context)
+  // Viewer mode should always force read-only, regardless of isEditing prop
+  const isViewer = typeof window !== 'undefined' && window.location.search.includes('view=true')
+  const readOnly = isViewer || !isEditing
+  
   // Lifecycle logging
   useEffect(() => {
     console.log(`[Lifecycle] TextBlock MOUNT: blockId=${block.id}`)
@@ -52,6 +57,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       console.log(`[Lifecycle] TextBlock UNMOUNT: blockId=${block.id}`)
     }
   }, [])
+  
+  // Log render mode for debugging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TextBlock] render mode: blockId=${block.id}`, {
+        isViewer,
+        isEditing,
+        readOnly,
+        effectiveIsEditing: !readOnly,
+      })
+    }
+  }, [block.id, isViewer, isEditing, readOnly])
   
   // CRITICAL: Read content ONLY from config.content_json
   // No fallbacks, no other sources
@@ -143,8 +160,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   /**
    * TipTap Editor Instance
-   * CRITICAL: Editor is always mounted, editable state changes based on isEditing prop
+   * CRITICAL: Editor is always mounted, editable state changes based on isEditing prop and viewer mode
    * Content is initialized from config.content_json and rehydrated when config changes
+   * CRITICAL: Editor must be editable when effectiveIsEditing=true (isEditing=true AND not viewer mode)
    */
   const editor = useEditor({
     extensions: [
@@ -165,12 +183,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     // Initialize with empty content if config is loading, otherwise use actual content
     // Content will be set via setContent when config loads (handled in useEffect)
     content: isConfigLoading ? { type: 'doc', content: [] } : getInitialContent(),
-    editable: isEditing,
+    editable: !readOnly, // CRITICAL: Editor is editable when NOT in read-only mode
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px] w-full',
         'data-placeholder': isEditing ? 'Start typing…' : '',
         tabindex: isEditing ? '0' : '-1',
+        style: config?.appearance?.text_color 
+          ? `color: ${config.appearance.text_color};` 
+          : undefined,
       },
       handleKeyDown: (view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
@@ -200,9 +221,17 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         blurTimeoutRef.current = null
       }
       setIsFocused(true)
-      // Enter block editing mode when editor receives focus
-      if (isEditing) {
+      // Enter block editing mode when editor receives focus (only if editable)
+      if (!readOnly) {
         setIsBlockEditing(true)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[TextBlock] editor init: blockId=${block.id}`, {
+            isEditing,
+            isViewer,
+            readOnly,
+            effectiveIsEditing: !readOnly,
+          })
+        }
       }
     },
     onBlur: ({ event }) => {
@@ -213,7 +242,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       
       // Save on blur if content changed
       // CRITICAL: Use cached serialized content for comparison to avoid JSON.stringify in hot path
-      if (isEditing && onUpdate && editor) {
+      if (!readOnly && onUpdate && editor) {
         const json = editor.getJSON()
         // Cache serialized content in a ref for comparison
         // This avoids repeated JSON.stringify calls during typing
@@ -232,8 +261,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }, 150)
     },
     onUpdate: ({ editor }) => {
-      // Debounced save - only when in edit mode
-      if (!onUpdate || !isEditing) return
+      // Debounced save - only when in edit mode (not read-only)
+      if (!onUpdate || readOnly) return
 
       setSaveStatus("saving")
 
@@ -485,6 +514,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
     }
 
+    // Check position immediately and on changes
     checkPosition()
     window.addEventListener('scroll', checkPosition, true)
     window.addEventListener('resize', checkPosition)
@@ -493,7 +523,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       window.removeEventListener('scroll', checkPosition, true)
       window.removeEventListener('resize', checkPosition)
     }
-  }, [isEditing, isFocused])
+  }, [isEditing, isFocused, isBlockEditing])
 
   // Cleanup timeouts
   useEffect(() => {
@@ -507,15 +537,39 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [])
 
-  // Update editor editable state when isEditing changes
+  // Apply appearance settings (declare before useEffect that uses them)
+  const appearance = config?.appearance || {}
+  const textAlign = appearance.text_align || 'left'
+  const textSize = appearance.text_size || 'md'
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : undefined,
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+    // Note: text_color is applied directly to editor element, not container
+  }
+
+  // Update editor editable state and appearance when isEditing or appearance changes
+  // CRITICAL: Editor editable state must respect both isEditing prop AND viewer mode
   useEffect(() => {
     if (!editor) return
     
-    editor.setEditable(isEditing)
+    const shouldBeEditable = !readOnly
+    editor.setEditable(shouldBeEditable)
+    
+    if (process.env.NODE_ENV === 'development' && shouldBeEditable && !editorInitializedRef.current) {
+      console.log(`[TextBlock] editor init: blockId=${block.id}`, {
+        isEditing,
+        isViewer,
+        readOnly,
+        effectiveIsEditing: shouldBeEditable,
+      })
+    }
     
     const editorElement = editor.view.dom as HTMLElement
     if (editorElement) {
-      if (isEditing) {
+      if (!readOnly) {
         editorElement.setAttribute('data-placeholder', 'Start typing…')
         editorElement.setAttribute('tabindex', '0')
         editorElement.style.cursor = 'text'
@@ -529,44 +583,53 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editorElement.style.userSelect = 'text'
         editorElement.style.webkitUserSelect = 'text'
       }
+      
+      // Apply text color directly to editor element
+      if (appearance.text_color) {
+        editorElement.style.color = appearance.text_color
+      } else {
+        editorElement.style.color = ''
+      }
+      
+      // Apply text alignment
+      if (textAlign === 'center') {
+        editorElement.style.textAlign = 'center'
+      } else if (textAlign === 'right') {
+        editorElement.style.textAlign = 'right'
+      } else if (textAlign === 'justify') {
+        editorElement.style.textAlign = 'justify'
+      } else {
+        editorElement.style.textAlign = 'left'
+      }
     }
-  }, [editor, isEditing])
-
-  // Apply appearance settings
-  const appearance = config?.appearance || {}
-  const blockStyle: React.CSSProperties = {
-    backgroundColor: appearance.background_color,
-    borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : undefined,
-    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
-    color: appearance.text_color,
-  }
-
-  const textAlign = appearance.text_align || 'left'
-  const textSize = appearance.text_size || 'md'
+  }, [editor, readOnly, appearance.text_color, textAlign, block.id, isEditing, isViewer])
 
   // Toolbar component
+  // CRITICAL: Only show toolbar when editor is editable (not read-only)
   const Toolbar = () => {
-    if (!editor || !isEditing) return null
+    if (!editor || readOnly) return null
+
+    // Always show toolbar when editing (make it more visible)
+    const isToolbarActive = isBlockEditing || isFocused
 
     return (
       <div 
         ref={toolbarRef}
+        data-toolbar="true"
         className={cn(
           "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[100] transition-all duration-200",
           toolbarPosition === 'top' 
             ? cn(
                 "top-0",
-                isFocused 
+                isToolbarActive
                   ? "-translate-y-[calc(100%+8px)] opacity-100 scale-100" 
-                  : "-translate-y-[calc(100%+4px)] opacity-70 scale-95 hover:opacity-100 hover:scale-100"
+                  : "-translate-y-[calc(100%+4px)] opacity-90 scale-100 hover:opacity-100"
               )
             : cn(
                 "bottom-0",
-                isFocused 
+                isToolbarActive
                   ? "translate-y-[calc(100%+8px)] opacity-100 scale-100" 
-                  : "translate-y-[calc(100%+4px)] opacity-70 scale-95 hover:opacity-100 hover:scale-100"
+                  : "translate-y-[calc(100%+4px)] opacity-90 scale-100 hover:opacity-100"
               )
         )}
         style={{
@@ -577,9 +640,18 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           e.preventDefault()
           e.stopPropagation()
         }}
+        onMouseEnter={() => {
+          // Ensure editor stays focused when hovering toolbar
+          if (editor && !editor.isFocused) {
+            setIsBlockEditing(true)
+            editor.commands.focus()
+          }
+        }}
         onClick={(e) => {
           e.stopPropagation()
+          e.preventDefault()
           if (editor && !editor.isFocused) {
+            setIsBlockEditing(true)
             editor.commands.focus()
           }
         }}
@@ -587,7 +659,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleBold().run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('bold') && "bg-gray-100")}
           title="Bold"
         >
@@ -596,7 +672,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleItalic().run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('italic') && "bg-gray-100")}
           title="Italic"
         >
@@ -605,7 +685,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleStrike().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleStrike().run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('strike') && "bg-gray-100")}
           title="Strikethrough"
         >
@@ -617,7 +701,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 1 }) && "bg-gray-100")}
           title="Heading 1"
         >
@@ -626,7 +714,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 2 }) && "bg-gray-100")}
           title="Heading 2"
         >
@@ -635,7 +727,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 3 }) && "bg-gray-100")}
           title="Heading 3"
         >
@@ -647,7 +743,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleBulletList().run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-gray-100")}
           title="Bullet List"
         >
@@ -656,7 +756,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleOrderedList().run()
+          }}
           className={cn("h-8 w-8 p-0", editor.isActive('orderedList') && "bg-gray-100")}
           title="Numbered List"
         >
@@ -668,7 +772,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => {
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
             const url = window.prompt('Enter URL:')
             if (url) {
               editor.chain().focus().setLink({ href: url }).run()
@@ -682,7 +788,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => editor.chain().focus().unsetLink().run()}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().unsetLink().run()
+          }}
           disabled={!editor.isActive('link')}
           title="Remove Link"
         >
@@ -739,17 +849,21 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       ref={containerRef}
       data-block-editing={isBlockEditing ? "true" : "false"}
       className={cn(
-        "h-full w-full overflow-auto flex flex-col relative",
+        "h-full w-full flex flex-col relative",
         // Visual editing state: blue ring when actively editing
         isBlockEditing && "ring-2 ring-blue-500 ring-offset-2 rounded-lg",
         // Subtle hover state when not editing
         isEditing && !isBlockEditing && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all",
         // Prevent dragging/resizing while editing
-        isBlockEditing && "pointer-events-auto"
+        isBlockEditing && "pointer-events-auto",
+        // Allow toolbar to overflow container
+        isEditing && "overflow-visible"
       )}
       style={{
         ...blockStyle,
         minHeight: '100px',
+        // Ensure toolbar can overflow
+        overflow: isEditing ? 'visible' : 'auto',
       }}
       // Prevent drag/resize events from propagating when editing
       onMouseDown={(e) => {
@@ -757,25 +871,29 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           e.stopPropagation()
         }
       }}
-      onClick={(e) => {
-        // Only enter edit mode when page is in edit mode
-        if (isEditing && !isBlockEditing && editor) {
-          const target = e.target as HTMLElement
-          // Don't focus if clicking buttons or toolbar
-          if (
-            !target.closest('button') &&
-            !target.closest('[role="button"]') &&
-            !target.closest('.drag-handle') &&
-            !target.closest('.react-resizable-handle')
-          ) {
-            setIsBlockEditing(true)
-            editor.commands.focus('end')
+        onClick={(e) => {
+          // Only enter edit mode when page is in edit mode
+          if (isEditing && editor) {
+            const target = e.target as HTMLElement
+            // Don't focus if clicking buttons or toolbar
+            if (
+              !target.closest('button') &&
+              !target.closest('[role="button"]') &&
+              !target.closest('.drag-handle') &&
+              !target.closest('.react-resizable-handle') &&
+              !target.closest('[data-toolbar]')
+            ) {
+              setIsBlockEditing(true)
+              // Small delay to ensure DOM is ready
+              setTimeout(() => {
+                editor.commands.focus('end')
+              }, 10)
+            }
           }
-        }
-      }}
+        }}
     >
-      {/* Toolbar */}
-      {isEditing && <Toolbar />}
+      {/* Toolbar - Always show when editing */}
+      {isEditing && editor && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
@@ -795,9 +913,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           isEditing && !isBlockEditing && "cursor-pointer",
           !isEditing && "cursor-default"
         )}
-        style={{
-          color: appearance.text_color || 'inherit',
-        }}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode
           if (isEditing && !isBlockEditing && editor) {

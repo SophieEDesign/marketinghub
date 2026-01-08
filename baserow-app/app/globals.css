@@ -67,6 +67,8 @@
   box-sizing: border-box;
   display: block;
   position: relative;
+  /* Text color will be applied via inline styles from TextBlock component */
+  color: inherit;
 }
 
 /* Ensure editor is visible and has proper spacing */

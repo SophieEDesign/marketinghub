@@ -360,7 +360,7 @@ export default function GridView({
 
   // Function to initialize view fields
   async function handleInitializeFields() {
-    if (!viewId) return
+    if (!viewId || initializingFields) return // Prevent duplicate calls
     
     setInitializingFields(true)
     try {
@@ -371,14 +371,54 @@ export default function GridView({
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize fields')
+        // Don't show error for expected cases (table not found, already configured, etc.)
+        const isExpectedError = data.error_code === 'TABLE_NOT_FOUND' || 
+                                data.error_code === 'NO_FIELDS' ||
+                                data.message?.includes('already') ||
+                                data.message?.includes('already configured')
+        
+        if (isExpectedError) {
+          // These are expected - just log and return
+          console.log('Fields initialization skipped (expected):', data.message || data.error)
+          return
+        }
+        
+        // Show detailed error message for unexpected errors
+        const errorMessage = data.details 
+          ? `${data.error || 'Failed to initialize fields'}: ${data.details}`
+          : data.error || 'Failed to initialize fields'
+        
+        // Log full error details for debugging
+        console.error('Error initializing fields:', {
+          status: response.status,
+          error: data.error,
+          error_code: data.error_code,
+          details: data.details,
+          viewId,
+          fullResponse: data,
+        })
+        
+        throw new Error(errorMessage)
       }
       
-      // Reload the page to refresh viewFields
-      window.location.reload()
+      // Show success message if partial success or warning
+      if (data.warning) {
+        console.log('Fields initialization warning:', data.warning)
+      }
+      
+      // Only reload if fields were actually added
+      if (data.added > 0) {
+        // Reload the page to refresh viewFields
+        window.location.reload()
+      } else if (data.message) {
+        // Just log if no fields were added (already configured)
+        console.log('Fields initialization:', data.message)
+      }
     } catch (error: any) {
       console.error('Error initializing fields:', error)
-      alert(error.message || 'Failed to initialize fields. Please try again.')
+      // Only show alert for unexpected errors
+      const errorMessage = error.message || 'Failed to initialize fields. Please try again.'
+      alert(`Error: ${errorMessage}\n\nIf this problem persists, please check:\n1. You have permission to modify this view\n2. The view is properly connected to a table\n3. The table has fields configured`)
     } finally {
       setInitializingFields(false)
     }

@@ -135,6 +135,15 @@ export default function PageRenderer({
       )
     }
 
+    // CRITICAL: Only dashboard, content, and record_review page types use Canvas/InterfaceBuilder
+    // All other page types use their dedicated view renderers (grid/list/calendar/form/etc)
+    const canvasPageTypes = ['dashboard', 'content', 'record_review']
+    const isCanvasPage = canvasPageTypes.includes(page.page_type)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Renderer] ${isCanvasPage ? 'Canvas' : 'View'} mode: pageId=${page.id}, page_type=${page.page_type}`)
+    }
+
     // Pre-deployment guard: Validate page before rendering
     // Invalid pages (missing anchors) show setup UI instead of redirecting
     const pageValidity = assertPageIsValid(page, {
@@ -265,22 +274,11 @@ export default function PageRenderer({
         )
 
       case 'dashboard':
+        // Dashboard pages use Canvas/InterfaceBuilder
         return (
           <InterfaceBuilder
             key={`dashboard-${page.id}`}
             page={dashboardPage as any}
-            initialBlocks={blocks}
-            isViewer={true}
-            hideHeader={true}
-            pageTableId={pageTableId}
-          />
-        )
-
-      case 'overview':
-        return (
-          <InterfaceBuilder
-            key={`overview-${page.id}`}
-            page={overviewPage as any}
             initialBlocks={blocks}
             isViewer={true}
             hideHeader={true}

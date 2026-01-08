@@ -202,11 +202,14 @@ function InterfacePageClientInternal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config, page?.base_table])
 
-  // Load blocks for dashboard/overview/content/record_review pages in BOTH edit and view mode
-  // CRITICAL: Blocks must load in view mode so they render correctly
-  // CRITICAL: Only load once per page visit - prevent remounts
+  // CRITICAL: Load blocks ONLY for Canvas page types (dashboard, content, record_review)
+  // Other page types (list/calendar/grid/form) do NOT use Canvas and should NOT load blocks
+  // Blocks must load in BOTH edit and view mode so they render correctly
   useEffect(() => {
-    if (page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
+    const canvasPageTypes = ['dashboard', 'content', 'record_review']
+    const isCanvasPage = page && canvasPageTypes.includes(page.page_type)
+    
+    if (isCanvasPage) {
       // Reset loaded state when pageId changes
       if (blocksLoadedRef.current.pageId !== page.id) {
         blocksLoadedRef.current = { pageId: page.id, loaded: false }
@@ -215,6 +218,16 @@ function InterfacePageClientInternal({
       // Only load if blocks haven't been loaded yet for this page
       if (!blocksLoading && (!blocksLoadedRef.current.loaded || blocks.length === 0)) {
         loadBlocks()
+      }
+    } else if (page) {
+      // Non-canvas page type - skip block loading and ensure blocks state is empty
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Blocks] loadBlocks SKIPPED (non-canvas page_type): pageId=${page.id}, page_type=${page.page_type}`)
+      }
+      // Clear blocks state for non-canvas pages
+      if (blocks.length > 0) {
+        setBlocks([])
+        blocksLoadedRef.current = { pageId: page.id, loaded: false }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
