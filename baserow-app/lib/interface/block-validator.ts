@@ -87,6 +87,7 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     link_preview: { link_url: '' },
     tabs: { tabs: [] },
     filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
+    field: { field_id: '' },
   }
 
   return defaults[blockType] || {}
