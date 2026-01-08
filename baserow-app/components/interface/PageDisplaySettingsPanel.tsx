@@ -829,7 +829,7 @@ export default function PageDisplaySettingsPanel({
             <TabsContent value="layout" className="mt-6 space-y-6">
               {/* Layout Selector - Hidden for Record Review pages (fixed layout) */}
               {/* UNIFIED: Layout options moved to block settings */}
-              {false && page && page.page_type !== 'record_view' && (
+              {false && currentPage && currentPage.page_type !== 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <Select value={layout} onValueChange={setLayout}>
@@ -848,7 +848,7 @@ export default function PageDisplaySettingsPanel({
               )}
               
               {/* UNIFIED: Record view configuration moved to blocks */}
-              {false && page && page.page_type === 'record_view' && (
+              {false && currentPage && currentPage.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
@@ -915,7 +915,7 @@ export default function PageDisplaySettingsPanel({
 
               {/* Detail Fields - Record Review pages only */}
               {/* UNIFIED: Record review layout moved to block settings */}
-              {false && page && page.page_type === 'record_view' && (
+              {false && currentPage && currentPage.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1059,9 +1059,9 @@ export default function PageDisplaySettingsPanel({
       </Sheet>
 
       {/* UNIFIED: Record panel editor moved to block settings */}
-      {false && page && page.page_type === 'record_view' && (
+      {false && currentPage && currentPage.page_type === 'record_view' && (
         <RecordPanelEditor
-          page={page as InterfacePage}
+          page={currentPage}
           isOpen={panelEditorOpen}
           onClose={() => setPanelEditorOpen(false)}
           onSave={() => {
