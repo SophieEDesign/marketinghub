@@ -6,6 +6,10 @@
  * - Pages are containers only - they provide context (pageId, optional recordId)
  * - All pages render Canvas - no conditional rendering based on page type
  * - Blocks define behaviour, layout, and data
+ * 
+ * ARCHITECTURE NOTE: All pages are canvas-based by design.
+ * Views (calendar, grid, dashboard) are implemented as blocks, not page types.
+ * Only 'content' and 'record_view' page types exist in the UI.
  */
 
 import type { InterfacePage } from '@/lib/interface/page-types-only'

@@ -52,6 +52,8 @@
 
 **Purpose**: Containers that provide context (pageId, optional recordId)
 
+**Important**: Pages never fetch data directly — blocks decide what data they need.
+
 ### 3. Blocks (Everything)
 
 All functionality lives in blocks:
@@ -152,6 +154,18 @@ Page (type: 'content')
 4. **Maintainable**: No page-type-specific code paths
 5. **Scalable**: New features = new blocks, not new page types
 
+## Guardrail Principle (Important)
+
+**Never introduce a new page type to add behaviour.**
+**If something needs new behaviour, it must be a block.**
+
+### Why this matters:
+- Prevents regression into page-type sprawl
+- Keeps the architecture honest
+- Makes reviews simpler ("should this be a block?" → yes)
+
+This principle will save Future You from Future Meetings™.
+
 ## Migration Path
 
 Old pages → New pages:
@@ -159,3 +173,5 @@ Old pages → New pages:
 - `calendar` → `content` page with `CalendarBlock`
 - `list` → `content` page with `TableBlock`
 - `record_review` → `record_view` page with blocks
+
+**Important**: Data (tables, views, records) remain unchanged — only UI structure is migrated.

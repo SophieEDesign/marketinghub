@@ -3,6 +3,10 @@
 /**
  * Record Review View Component
  * Master-detail layout: Left column shows record list with search/filters, right panel shows blocks for selected record
+ * 
+ * NOTE: This component renders a complete layout (not just a wrapper).
+ * Future consideration: Could this layout be migrated to blocks?
+ * However, this is often quietly depended on - do not rush migration.
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'

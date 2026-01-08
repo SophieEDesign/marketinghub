@@ -6,6 +6,9 @@
  * the product model: "Interfaces group pages. Pages render content. Creation flows must never mix the two."
  * 
  * Migration: Replace all usages of NewPageModal with PageCreationWizard.
+ * 
+ * NOTE: Only 'content' and 'record_view' page types are allowed.
+ * Dashboard, form, and view page types are no longer supported - they are now implemented as blocks.
  */
 
 import { useState, useEffect, useCallback } from "react"
@@ -82,9 +85,12 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
       const data = await response.json()
       setPageTypes(data.templates || [])
       
-      // Set default selection to first available type
-      if (data.templates && data.templates.length > 0 && !selectedPageType) {
-        setSelectedPageType(data.templates[0].type)
+      // Set default selection to first available allowed type (content or record_view)
+      const allowedTypes = (data.templates || []).filter((t: PageTypeTemplate) => 
+        t.type === 'content' || t.type === 'record_view'
+      )
+      if (allowedTypes.length > 0 && !selectedPageType) {
+        setSelectedPageType(allowedTypes[0].type)
       }
     } catch (error) {
       console.error('Error loading page types:', error)
@@ -240,10 +246,16 @@ export default function NewPageModal({ open, onOpenChange, defaultGroupId }: New
     onOpenChange(false)
   }
 
-  // Group page types by category
+  // Filter to only allow content and record_review page types
+  // All other page types (dashboard, form, view) are now implemented as blocks
+  const allowedPageTypes = pageTypes.filter(t => 
+    t.type === 'content' || t.type === 'record_review'
+  )
+  
+  // Group page types by category, but only show allowed types
   const groupedTypes = PAGE_TYPE_CATEGORIES.map(category => ({
     ...category,
-    templates: pageTypes.filter(t => t.category === category.id),
+    templates: allowedPageTypes.filter(t => t.category === category.id),
   })).filter(group => group.templates.length > 0)
 
   const selectedTemplate = pageTypes.find(t => t.type === selectedPageType)

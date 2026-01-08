@@ -177,8 +177,9 @@ export async function createInterfacePage(
 
   if (error) throw error
 
-  // For dashboard/overview pages, update dashboard_layout_id to the page's own ID (self-reference)
-  if ((requiredAnchor === 'dashboard' || pageType === 'overview') && data) {
+  // For dashboard pages, update dashboard_layout_id to the page's own ID (self-reference)
+  // Note: 'overview' is not a valid PageType in unified architecture
+  if (requiredAnchor === 'dashboard' && data) {
     const { error: updateError } = await supabase
       .from('interface_pages')
       .update({ dashboard_layout_id: data.id })

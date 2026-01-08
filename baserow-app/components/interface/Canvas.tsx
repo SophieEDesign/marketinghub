@@ -92,7 +92,7 @@ export default function Canvas({
   const layoutHydratedRef = useRef(false)
   const isResizingRef = useRef(false)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const prevPageIdRef = useRef<string>(pageId)
+  const prevPageIdRef = useRef<string | null>(pageId || null)
   
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset

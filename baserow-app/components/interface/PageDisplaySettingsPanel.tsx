@@ -159,7 +159,7 @@ export default function PageDisplaySettingsPanel({
         
         // Load grouping field from page config (blocks store config in page.config)
         // UNIFIED: Grouping is handled by blocks
-        if (false) {
+        if (false && page) {
           const groupByFromConfig = page.config?.group_by || page.config?.group_by_field || ''
           if (groupByFromConfig) {
             setGroupBy(groupByFromConfig)
@@ -718,7 +718,7 @@ export default function PageDisplaySettingsPanel({
               )}
 
               {/* UNIFIED: Calendar configuration moved to CalendarBlock */}
-              {false && page.page_type === 'calendar' && (
+              {false && page && page.page_type === 'calendar' && (
                 <>
                   <div className="space-y-2">
                     <Label>Start Date Field</Label>
@@ -818,7 +818,7 @@ export default function PageDisplaySettingsPanel({
             <TabsContent value="layout" className="mt-6 space-y-6">
               {/* Layout Selector - Hidden for Record Review pages (fixed layout) */}
               {/* UNIFIED: Layout options moved to block settings */}
-              {false && page.page_type !== 'record_view' && (
+              {false && page && page.page_type !== 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <Select value={layout} onValueChange={setLayout}>
@@ -837,7 +837,7 @@ export default function PageDisplaySettingsPanel({
               )}
               
               {/* UNIFIED: Record view configuration moved to blocks */}
-              {false && page.page_type === 'record_view' && (
+              {false && page && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Layout</Label>
                   <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
@@ -861,7 +861,7 @@ export default function PageDisplaySettingsPanel({
               </div>
 
               {/* UNIFIED: Preview fields configuration moved to blocks */}
-              {false && page.page_type === 'record_view' && (
+              {false && page && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Preview Fields</Label>
                   <div className="text-sm text-gray-500 mb-2">
@@ -904,7 +904,7 @@ export default function PageDisplaySettingsPanel({
 
               {/* Detail Fields - Record Review pages only */}
               {/* UNIFIED: Record review layout moved to block settings */}
-              {false && page.page_type === 'record_view' && (
+              {false && page && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1050,7 +1050,7 @@ export default function PageDisplaySettingsPanel({
       {/* UNIFIED: Record panel editor moved to block settings */}
       {false && page && page.page_type === 'record_view' && (
         <RecordPanelEditor
-          page={page}
+          page={page as InterfacePage}
           isOpen={panelEditorOpen}
           onClose={() => setPanelEditorOpen(false)}
           onSave={() => {

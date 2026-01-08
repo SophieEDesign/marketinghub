@@ -709,8 +709,20 @@ function InterfacePageClientInternal({
       return {
         id: '',
         name: '',
-        page_type: 'dashboard' as const,
+        page_type: 'content' as const,
         config: {},
+        source_view: null,
+        base_table: null,
+        group_id: null,
+        order_index: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: null,
+        is_admin_only: false,
+        saved_view_id: null,
+        dashboard_layout_id: null,
+        form_config_id: null,
+        record_config_id: null,
       } as InterfacePage
     }
     return {
@@ -1056,8 +1068,8 @@ function InterfacePageClientInternal({
         ) : null}
       </div>
 
-      {/* Page Display Settings Panel - Only for pages with saved_view_id or base_table, not dashboard/overview/content pages */}
-      {page && page.page_type !== 'dashboard' && page.page_type !== 'overview' && page.page_type !== 'content' && (
+      {/* Page Display Settings Panel - Available for all page types */}
+      {page && (
         <PageDisplaySettingsPanel
           page={page}
           isOpen={displaySettingsOpen}

@@ -23,8 +23,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isCollectionPage, isRecordReviewPage } from "@/lib/interface/page-types"
-import { Database, LayoutDashboard, FileText, FileCheck, BookOpen } from "lucide-react"
+import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isRecordViewPage } from "@/lib/interface/page-types"
+import { FileCheck, BookOpen } from "lucide-react"
 
 interface PageCreationWizardProps {
   open: boolean
@@ -42,7 +42,7 @@ export default function PageCreationWizard({
   const router = useRouter()
   const [step, setStep] = useState<WizardStep>('interface')
   const [selectedInterfaceId, setSelectedInterfaceId] = useState<string>(defaultGroupId || '')
-  const [pagePurpose, setPagePurpose] = useState<'view' | 'dashboard' | 'form' | 'record' | 'content'>('view')
+  const [pagePurpose, setPagePurpose] = useState<'record' | 'content'>('content')
   const [pageType, setPageType] = useState<PageType | ''>('')
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
@@ -58,7 +58,7 @@ export default function PageCreationWizard({
       // Reset state
       setStep('interface')
       setSelectedInterfaceId(defaultGroupId || '')
-      setPagePurpose('view')
+      setPagePurpose('content')
       setPageType('')
       setTableId('')
       setPageName('')
@@ -151,23 +151,14 @@ export default function PageCreationWizard({
     setStep('purpose')
   }
 
-  const handlePurposeSelect = (purpose: 'view' | 'dashboard' | 'form' | 'record' | 'content') => {
+  const handlePurposeSelect = (purpose: 'record' | 'content') => {
     setPagePurpose(purpose)
     
     // Auto-select default page type for purpose
     switch (purpose) {
-      case 'view':
-        setPageType('list')
-        break
-      case 'dashboard':
-        setPageType('dashboard')
-        break
-      case 'form':
-        setPageType('form')
-        break
       case 'record':
-        setPageType('record_review')
-        // Record Review pages skip view type selection - go to anchor step for table selection
+        setPageType('record_view')
+        // Record View pages skip view type selection - go to anchor step for table selection
         setStep('anchor')
         return
       case 'content':
@@ -176,8 +167,6 @@ export default function PageCreationWizard({
         setStep('name')
         return
     }
-    
-    setStep('anchor')
   }
 
   const handleAnchorConfigured = () => {
@@ -195,22 +184,9 @@ export default function PageCreationWizard({
       return
     }
 
-    const requiredAnchor = getRequiredAnchorType(pageType as PageType)
-    
-    // Content pages don't require table/view
-    if (pageType === 'content') {
-      // Skip validation - content pages don't need data sources
-    } else {
-      // Validate anchor is set - users select tables, not views
-      if ((requiredAnchor === 'saved_view' || requiredAnchor === 'record') && !tableId) {
-        alert('Please select a table')
-        return
-      }
-      if (requiredAnchor === 'form' && !tableId) {
-        alert('Please select a table for the form')
-        return
-      }
-    }
+    // Unified architecture: Pages don't require anchors - blocks define their own data sources
+    // Record view pages may optionally use a table for context, but it's not required
+    // Content pages don't require any data sources
 
     setCreating(true)
     try {
@@ -225,89 +201,39 @@ export default function PageCreationWizard({
       let record_config_id: string | null = null
       let base_table: string | null = null
 
-      // All page types that need data use base_table
-      // SQL views will be auto-generated from base_table if needed
-      // Content pages don't use base_table
-      if (tableId && tableId.trim() && pageType !== 'content') {
+      // Unified architecture: Pages don't require anchors
+      // Blocks define their own data sources
+      // Optional: Store base_table if provided for record_view pages (for block context)
+      if (tableId && tableId.trim() && pageType === 'record_view') {
         base_table = tableId.trim()
+        
+        // Create a grid view for data access (optional - blocks can use their own views)
+        const { data: recordView, error: recordViewError } = await supabase
+          .from('views')
+          .insert([
+            {
+              table_id: tableId,
+              name: `${pageName.trim()} View`,
+              type: 'grid',
+              config: {},
+              access_level: 'authenticated',
+              owner_id: user?.id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (recordViewError || !recordView) {
+          throw new Error(`Failed to create view: ${recordViewError?.message || 'Unknown error'}`)
+        }
+
+        saved_view_id = recordView.id
       }
 
-      // Content pages use dashboard anchor but don't require data
+      // Content pages use dashboard_layout_id (self-reference for blocks)
       if (pageType === 'content') {
         // Generate a temporary UUID that we'll update to the page's ID after creation
         dashboard_layout_id = crypto.randomUUID()
-      } else {
-        switch (requiredAnchor) {
-        case 'saved_view':
-          // For collection pages (view-based), create a view with the selected view type
-          // Map page_type to view type (only for collection pages)
-          const viewTypeMap: Record<string, 'grid' | 'gallery' | 'kanban' | 'calendar' | 'timeline'> = {
-            'list': 'grid',
-            'gallery': 'gallery',
-            'kanban': 'kanban',
-            'calendar': 'calendar',
-            'timeline': 'timeline',
-          }
-          const viewType = viewTypeMap[pageType] || 'grid'
-          
-          // Create a view for this page
-          const { data: newView, error: viewError } = await supabase
-            .from('views')
-            .insert([
-              {
-                table_id: tableId,
-                name: `${pageName.trim()} View`,
-                type: viewType,
-                config: {},
-                access_level: 'authenticated',
-                owner_id: user?.id,
-              },
-            ])
-            .select()
-            .single()
-
-          if (viewError || !newView) {
-            throw new Error(`Failed to create view: ${viewError?.message || 'Unknown error'}`)
-          }
-
-          saved_view_id = newView.id
-          break
-        case 'dashboard':
-          // For dashboard, generate a temporary UUID that we'll update to the page's ID after creation
-          // This satisfies the constraint that requires exactly one anchor
-          // We'll update it immediately after page creation
-          dashboard_layout_id = crypto.randomUUID()
-          break
-        case 'form':
-          form_config_id = tableId && tableId.trim() ? tableId.trim() : null
-          break
-        case 'record':
-          // Record Review pages: Create a grid view for the underlying data display
-          // But do NOT store view_type - Record Review pages are record-based, not view-based
-          // The view is just for data access, not for view type selection
-          const { data: recordView, error: recordViewError } = await supabase
-            .from('views')
-            .insert([
-              {
-                table_id: tableId,
-                name: `${pageName.trim()} View`,
-                type: 'grid', // Always grid for Record Review - fixed layout
-                config: {},
-                access_level: 'authenticated',
-                owner_id: user?.id,
-              },
-            ])
-            .select()
-            .single()
-
-          if (recordViewError || !recordView) {
-            throw new Error(`Failed to create view: ${recordViewError?.message || 'Unknown error'}`)
-          }
-
-          saved_view_id = recordView.id
-          // Do NOT set view_type - Record Review pages don't have view types
-          break
-        }
       }
 
       // Create interface page in interface_pages table
@@ -332,9 +258,9 @@ export default function PageCreationWizard({
 
       if (error) throw error
 
-      // For dashboard/overview/content pages, update dashboard_layout_id to the page's own ID (self-reference)
+      // For content pages, update dashboard_layout_id to the page's own ID (self-reference)
       // This allows the page to reference its own blocks in view_blocks table
-      if ((requiredAnchor === 'dashboard' || pageType === 'overview' || pageType === 'content') && page) {
+      if (pageType === 'content' && page) {
         const { error: updateError } = await supabase
           .from('interface_pages')
           .update({ dashboard_layout_id: page.id })
@@ -342,14 +268,27 @@ export default function PageCreationWizard({
         
         if (updateError) {
           console.error('Error updating dashboard_layout_id:', updateError)
-          throw updateError // Throw error since this is required for dashboard/content pages
+          throw updateError // Throw error since this is required for content pages
+        }
+      }
+      
+      // For record_view pages, optionally update dashboard_layout_id if we want blocks
+      if (pageType === 'record_view' && page) {
+        const { error: updateError } = await supabase
+          .from('interface_pages')
+          .update({ dashboard_layout_id: page.id })
+          .eq('id', page.id)
+        
+        if (updateError) {
+          console.error('Error updating dashboard_layout_id:', updateError)
+          // Don't throw - record_view pages can work without dashboard_layout_id
         }
       }
 
       // Reset and close
       setStep('interface')
       setSelectedInterfaceId('')
-      setPagePurpose('view')
+      setPagePurpose('content')
       setPageType('')
       setTableId('')
       setPageName('')
@@ -404,28 +343,12 @@ export default function PageCreationWizard({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <button
-          onClick={() => handlePurposeSelect('view')}
+          onClick={() => handlePurposeSelect('content')}
           className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
         >
-          <Database className="h-6 w-6 mb-2 text-gray-600" />
-          <h3 className="font-semibold">View Data</h3>
-          <p className="text-sm text-gray-500">List, Gallery, Kanban, Calendar, Timeline</p>
-        </button>
-        <button
-          onClick={() => handlePurposeSelect('dashboard')}
-          className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
-        >
-          <LayoutDashboard className="h-6 w-6 mb-2 text-gray-600" />
-          <h3 className="font-semibold">Dashboard</h3>
-          <p className="text-sm text-gray-500">KPIs, Charts, Metrics</p>
-        </button>
-        <button
-          onClick={() => handlePurposeSelect('form')}
-          className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
-        >
-          <FileText className="h-6 w-6 mb-2 text-gray-600" />
-          <h3 className="font-semibold">Form</h3>
-          <p className="text-sm text-gray-500">Collect Data</p>
+          <BookOpen className="h-6 w-6 mb-2 text-gray-600" />
+          <h3 className="font-semibold">Content Page</h3>
+          <p className="text-sm text-gray-500">Docs, links, resources, information</p>
         </button>
         <button
           onClick={() => handlePurposeSelect('record')}
@@ -435,31 +358,21 @@ export default function PageCreationWizard({
           <h3 className="font-semibold">Record Review</h3>
           <p className="text-sm text-gray-500">Browse & Review Records</p>
         </button>
-        <button
-          onClick={() => handlePurposeSelect('content')}
-          className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 text-left transition-colors"
-        >
-          <BookOpen className="h-6 w-6 mb-2 text-gray-600" />
-          <h3 className="font-semibold">Content Page</h3>
-          <p className="text-sm text-gray-500">Docs, links, resources, information</p>
-        </button>
       </div>
     </div>
   )
 
   const renderAnchorStep = () => {
-    const requiredAnchor = pageType ? getRequiredAnchorType(pageType as PageType) : null
-    const isRecordPage = pageType ? isRecordReviewPage(pageType as PageType) : false
-    const isCollection = pageType ? isCollectionPage(pageType as PageType) : false
+    const isRecordPage = pageType ? isRecordViewPage(pageType as PageType) : false
 
-    // Record Review pages: Only show table selection, no view type selection
+    // Record View pages: Only show table selection (optional - blocks define their own data sources)
     if (isRecordPage) {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Select Table *</Label>
+            <Label>Select Table (Optional)</Label>
             <p className="text-sm text-gray-500 mb-2">
-              This page will show a single record at a time. Select the table that contains the records you want to review.
+              This page will show records. Select a table to provide context for blocks. Blocks can define their own data sources.
             </p>
             <Select value={tableId} onValueChange={setTableId}>
               <SelectTrigger>
@@ -479,7 +392,6 @@ export default function PageCreationWizard({
           </div>
           <Button
             onClick={handleAnchorConfigured}
-            disabled={!tableId}
             className="w-full"
           >
             Continue
@@ -488,104 +400,8 @@ export default function PageCreationWizard({
       )
     }
 
-    // Collection pages (view-based): Show view type selection + table selection
-    if (requiredAnchor === 'saved_view' && isCollection) {
-      return (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>View Type</Label>
-            <p className="text-sm text-gray-500 mb-2">
-              Choose how you want to display your data
-            </p>
-            <Select value={pageType} onValueChange={(value) => setPageType(value as PageType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="list">List</SelectItem>
-                <SelectItem value="gallery">Gallery</SelectItem>
-                <SelectItem value="kanban">Kanban</SelectItem>
-                <SelectItem value="calendar">Calendar</SelectItem>
-                <SelectItem value="timeline">Timeline</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Select Table *</Label>
-            <Select value={tableId} onValueChange={setTableId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a table" />
-              </SelectTrigger>
-              <SelectContent>
-                {tables.map((table) => (
-                  <SelectItem key={table.id} value={table.id}>
-                    {table.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              SQL views are created automatically from the selected table
-            </p>
-            {tables.length === 0 && (
-              <p className="text-sm text-gray-500">No tables available. Create a table first in Settings → Data.</p>
-            )}
-          </div>
-          <Button
-            onClick={handleAnchorConfigured}
-            disabled={!tableId || !pageType}
-            className="w-full"
-          >
-            Continue
-          </Button>
-        </div>
-      )
-    }
-
-    if (requiredAnchor === 'form') {
-      return (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Select Table *</Label>
-            <Select value={tableId} onValueChange={setTableId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a table" />
-              </SelectTrigger>
-              <SelectContent>
-                {tables.map((table) => (
-                  <SelectItem key={table.id} value={table.id}>
-                    {table.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            onClick={handleAnchorConfigured}
-            disabled={!tableId}
-            className="w-full"
-          >
-            Continue
-          </Button>
-        </div>
-      )
-    }
-
-    if (requiredAnchor === 'dashboard') {
-      return (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">
-            Dashboard pages start empty. You&apos;ll add blocks after creation.
-          </p>
-          <Button
-            onClick={handleAnchorConfigured}
-            className="w-full"
-          >
-            Continue
-          </Button>
-        </div>
-      )
-    }
+    // Only record_view pages reach this step (content pages skip to name step)
+    // This should not be reached for other page types
 
     return null
   }
@@ -636,13 +452,13 @@ export default function PageCreationWizard({
           <DialogTitle>
             {step === 'interface' && 'Select Interface'}
             {step === 'purpose' && 'Create New Page'}
-            {step === 'anchor' && (isRecordReviewPage(pageType as PageType) ? 'Create Record Page' : isCollectionPage(pageType as PageType) ? 'Create Collection Page' : 'Configure Page')}
+            {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Create Record View Page' : 'Configure Page')}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
           <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
-            {step === 'anchor' && (isRecordReviewPage(pageType as PageType) ? 'Select the table that contains the records you want to review' : isCollectionPage(pageType as PageType) ? 'Choose how you want to display your data' : 'Set up the data source or layout')}
+            {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Select a table to provide context for blocks (optional)' : 'Set up the data source or layout')}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>
