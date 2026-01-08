@@ -357,6 +357,29 @@ export default function GridView({
     )
   }
 
+  // Show message when no visible fields are configured
+  if (visibleFields.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-md p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No columns configured</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            This view has no visible fields configured. Add fields to the view to display data.
+          </p>
+          {isEditing && onAddField && (
+            <button
+              onClick={onAddField}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors inline-flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Field
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full relative">
       {/* Toolbar - Only show builder controls in edit mode */}

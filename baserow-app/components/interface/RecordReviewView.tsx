@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { Search, Filter, List, Plus, ChevronDown, MessageSquare, Edit2 } from 'lucide-react'
+import { Search, Filter, List, Plus, ChevronDown, MessageSquare, Edit2, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,6 +20,8 @@ import type { TableField } from '@/types/fields'
 import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
+import RecordFields from '@/components/records/RecordFields'
+import { useToast } from '@/components/ui/use-toast'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -37,7 +39,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const [searchQuery, setSearchQuery] = useState('')
   const [filters, setFilters] = useState<FilterConfig[]>(config.filters || [])
   const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
+  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [recordListCollapsed, setRecordListCollapsed] = useState(false)
   const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
+  const { toast } = useToast()
   
   const allowEditing = config.allow_editing || false
   const recordPanel = config.record_panel || 'side'
@@ -223,6 +229,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   useEffect(() => {
     if (pageTableId) {
       loadTableFields()
+      loadFieldGroups()
     }
   }, [pageTableId])
   
@@ -244,6 +251,95 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       console.error('Error loading table fields:', error)
     }
   }
+
+  async function loadFieldGroups() {
+    if (!pageTableId) return
+    
+    try {
+      const supabase = createClient()
+      const { data: groupsData, error } = await supabase
+        .from('field_groups')
+        .select('*')
+        .eq('table_id', pageTableId)
+      
+      if (!error && groupsData) {
+        const groups: Record<string, string[]> = {}
+        groupsData.forEach((group: any) => {
+          if (group.field_names && Array.isArray(group.field_names)) {
+            groups[group.name] = group.field_names
+          }
+        })
+        setFieldGroups(groups)
+      }
+    } catch (error) {
+      console.error('Error loading field groups:', error)
+    }
+  }
+
+  // Update formData when selected record changes
+  useEffect(() => {
+    if (selectedRecord) {
+      setFormData({ ...selectedRecord })
+    } else {
+      setFormData({})
+    }
+  }, [selectedRecord])
+
+  // Handle field changes
+  const handleFieldChange = async (fieldName: string, value: any) => {
+    if (!allowEditing || !selectedRecordId || !pageTableId) return
+
+    setFormData(prev => ({ ...prev, [fieldName]: value }))
+
+    try {
+      const supabase = createClient()
+      const { data: table } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', pageTableId)
+        .single()
+
+      if (!table?.supabase_table) return
+
+      const { error } = await supabase
+        .from(table.supabase_table)
+        .update({ [fieldName]: value })
+        .eq('id', selectedRecordId)
+
+      if (error) throw error
+
+      toast({
+        title: 'Field updated',
+        description: `${fieldName} has been updated`,
+      })
+    } catch (error: any) {
+      console.error('Error updating field:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Failed to update field',
+        description: error.message || 'Please try again',
+      })
+      // Revert formData on error
+      if (selectedRecord) {
+        setFormData({ ...selectedRecord })
+      }
+    }
+  }
+
+  // Get fields to display in left panel (filtered by config.detail_fields)
+  const visibleFields = useMemo(() => {
+    if (!tableFields.length) return []
+    
+    const detailFields = config.detail_fields || []
+    
+    // If detail_fields is configured, filter by it
+    if (detailFields.length > 0) {
+      return tableFields.filter(field => detailFields.includes(field.name))
+    }
+    
+    // Otherwise show all fields
+    return tableFields
+  }, [tableFields, config.detail_fields])
 
   // Load blocks for detail panel
   useEffect(() => {
@@ -307,141 +403,168 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
 
   return (
     <div className="h-full flex bg-white">
-      {/* Main list view - Left Column */}
-      <div className={recordPanel === 'side' ? 'w-80 border-r flex flex-col overflow-hidden bg-white' : 'w-full flex flex-col overflow-hidden'}>
-        {/* Header */}
-        <div className="border-b bg-white p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">{page.name || 'Records'}</h2>
-            <Button size="sm" variant="outline" className="h-8">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+      {/* Left Column - Record List + Record Fields */}
+      <div className={recordPanel === 'side' ? 'w-96 border-r flex flex-col overflow-hidden bg-white' : 'w-full flex flex-col overflow-hidden'}>
+        {/* Record List Section - Collapsible */}
+        <div className="border-b bg-white">
+          <button
+            onClick={() => setRecordListCollapsed(!recordListCollapsed)}
+            className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors"
+          >
+            <h2 className="text-sm font-semibold text-gray-900">Records</h2>
+            {recordListCollapsed ? (
+              <ChevronDown className="h-4 w-4 text-gray-500" />
+            ) : (
+              <ChevronUp className="h-4 w-4 text-gray-500" />
+            )}
+          </button>
           
-          {/* Search and Icons */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-sm"
-              />
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <List className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <span className="text-xs">1</span>
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <Filter className="h-4 w-4" />
-            </Button>
-          </div>
+          {!recordListCollapsed && (
+            <>
+              {/* Search */}
+              <div className="px-4 pb-3">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Search records..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Records List - Grouped by Status */}
+              <div className="max-h-64 overflow-auto border-t">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500 p-4">
+                    <div className="text-center">
+                      <p className="text-xs mb-1 font-medium">Loading...</p>
+                    </div>
+                  </div>
+                ) : filteredData.length === 0 ? (
+                  <div className="flex items-center justify-center py-8 text-gray-500 p-4">
+                    <div className="text-center">
+                      <p className="text-xs mb-1 font-medium">
+                        {data.length === 0 ? 'No records' : 'No matches'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2">
+                    {Object.entries(groupedRecords).map(([status, records]) => (
+                      <div key={status} className="mb-4">
+                        {/* Status Header */}
+                        <div className="flex items-center gap-2 mb-1 px-2">
+                          <Badge className={cn('text-xs font-medium', getStatusColor(status))}>
+                            {status}
+                          </Badge>
+                        </div>
+                        
+                        {/* Records in this status */}
+                        <div className="space-y-1">
+                          {records.map((record) => {
+                            const isSelected = record.id === selectedRecordId
+                            
+                            return (
+                              <div
+                                key={record.id}
+                                onClick={() => setSelectedRecordId(record.id)}
+                                className={cn(
+                                  'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs',
+                                  isSelected 
+                                    ? 'bg-blue-50 border border-blue-200' 
+                                    : 'hover:bg-gray-50 border border-transparent'
+                                )}
+                              >
+                                {/* Render configured preview fields */}
+                                {previewFields.length > 0 ? (
+                                  <div className="space-y-0.5">
+                                    {previewFields.map((fieldIdOrName: string, idx: number) => {
+                                      const fieldValue = record[fieldIdOrName]
+                                      const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
+                                      const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
+                                                            fieldIdOrName.toLowerCase() === 'state' ||
+                                                            fieldIdOrName.toLowerCase() === 'stage'
+                                      
+                                      return (
+                                        <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                                          {isStatusField && fieldValue ? (
+                                            <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
+                                              {String(fieldValue)}
+                                            </Badge>
+                                          ) : (
+                                            <span>
+                                              {fieldValue !== null && fieldValue !== undefined 
+                                                ? String(fieldValue).substring(0, 30)
+                                                : '—'}
+                                              {fieldValue !== null && fieldValue !== undefined && String(fieldValue).length > 30 ? '...' : ''}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : (
+                                  // Fallback: show name and status if no preview fields configured
+                                  <>
+                                    <div className="font-medium text-gray-900">
+                                      {String(record[nameField] || record.id || 'Untitled').substring(0, 30)}
+                                      {String(record[nameField] || record.id || 'Untitled').length > 30 ? '...' : ''}
+                                    </div>
+                                    {record[statusField] && (
+                                      <Badge className={cn('text-xs mt-0.5', getStatusColor(String(record[statusField])))}>
+                                        {record[statusField]}
+                                      </Badge>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Records List - Grouped by Status */}
-        <div className="flex-1 overflow-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+        {/* Record Fields Section */}
+        <div className="flex-1 overflow-auto border-t">
+          {!selectedRecordId ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
               <div className="text-center">
-                <p className="text-sm mb-2 font-medium">Loading records...</p>
-                <p className="text-xs text-gray-400">Please wait while we fetch the data.</p>
+                <p className="text-xs mb-1 font-medium">Select a record</p>
+                <p className="text-xs text-gray-400">Choose a record from the list above to view its fields.</p>
               </div>
             </div>
-          ) : filteredData.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500 p-4">
+          ) : !selectedRecord ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
               <div className="text-center">
-                <p className="text-sm mb-2 font-medium">
-                  {data.length === 0 ? 'No records available' : 'No records match your search'}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {data.length === 0 
-                    ? "This table doesn't have any records yet."
-                    : "Try adjusting your search or filters."
-                  }
-                </p>
+                <p className="text-xs mb-1 font-medium">Loading record...</p>
+              </div>
+            </div>
+          ) : visibleFields.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="text-xs mb-1 font-medium">No fields configured</p>
+                <p className="text-xs text-gray-400">Configure fields to display in Settings.</p>
               </div>
             </div>
           ) : (
-            <div className="p-2">
-              {Object.entries(groupedRecords).map(([status, records]) => (
-                <div key={status} className="mb-6">
-                  {/* Status Header */}
-                  <div className="flex items-center gap-2 mb-2 px-2">
-                    <Badge className={cn('text-xs font-medium', getStatusColor(status))}>
-                      {status}
-                    </Badge>
-                  </div>
-                  
-                  {/* Records in this status */}
-                  <div className="space-y-1">
-                    {records.map((record) => {
-                      const isSelected = record.id === selectedRecordId
-                      
-                      return (
-                        <div
-                          key={record.id}
-                          onClick={() => setSelectedRecordId(record.id)}
-                          className={cn(
-                            'px-3 py-2 rounded-md cursor-pointer transition-colors',
-                            isSelected 
-                              ? 'bg-blue-50 border border-blue-200' 
-                              : 'hover:bg-gray-50 border border-transparent'
-                          )}
-                        >
-                          {/* Render configured preview fields */}
-                          {previewFields.length > 0 ? (
-                            <div className="space-y-1">
-                              {previewFields.map((fieldIdOrName: string, idx: number) => {
-                                const fieldValue = record[fieldIdOrName]
-                                const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
-                                const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
-                                                      fieldIdOrName.toLowerCase() === 'state' ||
-                                                      fieldIdOrName.toLowerCase() === 'stage'
-                                
-                                return (
-                                  <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-sm text-gray-900' : 'text-xs text-gray-600'}>
-                                    {isStatusField && fieldValue ? (
-                                      <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
-                                        {String(fieldValue)}
-                                      </Badge>
-                                    ) : (
-                                      <span>
-                                        {idx === 0 ? fieldDisplayName + ': ' : ''}
-                                        {fieldValue !== null && fieldValue !== undefined 
-                                          ? String(fieldValue).substring(0, idx === 0 ? 50 : 30)
-                                          : '—'}
-                                        {fieldValue !== null && fieldValue !== undefined && String(fieldValue).length > (idx === 0 ? 50 : 30) ? '...' : ''}
-                                      </span>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          ) : (
-                            // Fallback: show name and status if no preview fields configured
-                            <>
-                              <div className="font-medium text-sm text-gray-900 mb-1">
-                                {String(record[nameField] || record.id || 'Untitled').substring(0, 50)}
-                                {String(record[nameField] || record.id || 'Untitled').length > 50 ? '...' : ''}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Badge className={cn('text-xs', getStatusColor(String(record[statusField] || 'No Status')))}>
-                                  {record[statusField] || 'No Status'}
-                                </Badge>
-                                <span className="text-xs text-gray-400">—</span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+            <div className="p-4">
+              <RecordFields
+                fields={visibleFields}
+                formData={formData}
+                onFieldChange={handleFieldChange}
+                fieldGroups={fieldGroups}
+                tableId={pageTableId || ''}
+                recordId={selectedRecordId}
+              />
             </div>
           )}
         </div>

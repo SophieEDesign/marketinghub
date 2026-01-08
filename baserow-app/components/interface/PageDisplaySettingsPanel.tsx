@@ -79,6 +79,7 @@ export default function PageDisplaySettingsPanel({
   const [endDateField, setEndDateField] = useState<string>("")
   const [calendarDisplayFields, setCalendarDisplayFields] = useState<string[]>([])
   const [previewFields, setPreviewFields] = useState<string[]>([])
+  const [detailFields, setDetailFields] = useState<string[]>([])
   const [selectedFieldsForBlocks, setSelectedFieldsForBlocks] = useState<string[]>([]) // Fields selected for blocks
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
@@ -119,6 +120,7 @@ export default function PageDisplaySettingsPanel({
       setEndDateField("")
       setCalendarDisplayFields([])
       setPreviewFields([])
+      setDetailFields([])
       setIsInitialLoad(true)
       return
     }
@@ -213,10 +215,12 @@ export default function PageDisplaySettingsPanel({
         setCalendarDisplayFields(Array.isArray(displayFields) ? displayFields : [])
       }
       
-      // Load preview fields for record_review pages
+      // Load preview fields and detail fields for record_review pages
       if (page.page_type === 'record_review') {
         const previewFieldsFromConfig = config.preview_fields || []
         setPreviewFields(Array.isArray(previewFieldsFromConfig) ? previewFieldsFromConfig : [])
+        const detailFieldsFromConfig = config.detail_fields || []
+        setDetailFields(Array.isArray(detailFieldsFromConfig) ? detailFieldsFromConfig : [])
       }
       
       // Load grouping field from config or grid_view_settings
@@ -336,9 +340,10 @@ export default function PageDisplaySettingsPanel({
           calendar_end_field: endDateField || undefined,
           calendar_display_fields: calendarDisplayFields.length > 0 ? calendarDisplayFields : undefined,
         } : {}),
-        // Store preview fields for record_review pages
+        // Store preview fields and detail fields for record_review pages
         ...(page.page_type === 'record_review' ? {
           preview_fields: previewFields.length > 0 ? previewFields : undefined,
+          detail_fields: detailFields.length > 0 ? detailFields : undefined,
         } : {}),
         // Store view type for the block
         view_type: page.page_type === 'list' ? 'grid' : page.page_type,
@@ -378,6 +383,7 @@ export default function PageDisplaySettingsPanel({
               } : {}),
               ...(page.page_type === 'record_review' ? {
                 preview_fields: previewFields.length > 0 ? previewFields : undefined,
+                detail_fields: detailFields.length > 0 ? detailFields : undefined,
               } : {}),
             }
           })
@@ -407,6 +413,7 @@ export default function PageDisplaySettingsPanel({
               } : {}),
               ...(page.page_type === 'record_review' ? {
                 preview_fields: previewFields.length > 0 ? previewFields : undefined,
+                detail_fields: detailFields.length > 0 ? detailFields : undefined,
               } : {}),
             },
             order_index: 0,
@@ -418,7 +425,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, detailFields, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -929,7 +936,7 @@ export default function PageDisplaySettingsPanel({
                 <div className="space-y-2">
                   <Label>Preview Fields</Label>
                   <div className="text-sm text-gray-500 mb-2">
-                    Select which fields to display in the left preview panel. Leave empty to use default (name and status).
+                    Select which fields to display in the record list. Leave empty to use default (name and status).
                   </div>
                   {selectedTableId && tableFields.length > 0 ? (
                     <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
@@ -963,6 +970,75 @@ export default function PageDisplaySettingsPanel({
                       Select a data source to configure preview fields.
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Detail Fields - Record Review pages only */}
+              {page.page_type === 'record_review' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Detail Fields</Label>
+                      <div className="text-sm text-gray-500">
+                        Select which fields to display in the left detail panel. Leave empty to show all fields.
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allFieldNames = tableFields.map(f => f.name)
+                          setDetailFields(allFieldNames)
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-xs text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setDetailFields([])}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Select None
+                      </button>
+                    </div>
+                  </div>
+                  {selectedTableId && tableFields.length > 0 ? (
+                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                      {tableFields.map((field) => {
+                        const isSelected = detailFields.includes(field.name)
+                        return (
+                          <label
+                            key={field.id}
+                            className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setDetailFields([...detailFields, field.name])
+                                } else {
+                                  setDetailFields(detailFields.filter((f) => f !== field.name))
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">{field.name}</span>
+                            <span className="text-xs text-gray-400">({field.type})</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-400 p-3 bg-gray-50 rounded-md">
+                      Select a data source to configure detail fields.
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    {detailFields.length} of {tableFields.length} fields selected
+                  </p>
                 </div>
               )}
 

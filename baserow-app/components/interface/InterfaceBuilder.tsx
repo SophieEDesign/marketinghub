@@ -69,13 +69,15 @@ export default function InterfaceBuilder({
   // CRITICAL: Only apply initialBlocks once on mount, then merge updates
   useEffect(() => {
     // Create a stable key from initialBlocks to detect actual changes
+    // CRITICAL: Include config in the key to detect content changes (e.g., content_json updates)
     const blocksArray = initialBlocks?.map(b => ({
       id: b.id,
       type: b.type,
       x: b.x,
       y: b.y,
       w: b.w,
-      h: b.h
+      h: b.h,
+      config: b.config // Include config to detect content changes
     })) || []
     const blocksKey = JSON.stringify(blocksArray)
     
@@ -95,6 +97,8 @@ export default function InterfaceBuilder({
         // Merge: update existing blocks, add new ones
         // CRITICAL: Preserve layout columns (x, y, w, h) from current block state
         // Only set x/y/w/h from updated block IF explicitly provided (not undefined/null)
+        // CRITICAL: In viewer mode, replace config entirely to get latest saved content
+        // In edit mode, merge config to preserve user state
         setBlocks((prevBlocks) => {
           const existingIds = new Set(prevBlocks.map(b => b.id))
           const merged = prevBlocks.map(b => {
@@ -107,8 +111,9 @@ export default function InterfaceBuilder({
                 y: updated.y !== undefined && updated.y !== null ? updated.y : b.y,
                 w: updated.w !== undefined && updated.w !== null ? updated.w : b.w,
                 h: updated.h !== undefined && updated.h !== null ? updated.h : b.h,
-                // Merge config shallowly
-                config: { ...b.config, ...updated.config },
+                // CRITICAL: In viewer mode, replace config entirely to get latest saved content
+                // In edit mode, merge config to preserve user state during editing
+                config: isViewer ? updated.config : { ...b.config, ...updated.config },
                 // Preserve other metadata
                 updated_at: updated.updated_at ?? b.updated_at,
                 order_index: updated.order_index ?? b.order_index,

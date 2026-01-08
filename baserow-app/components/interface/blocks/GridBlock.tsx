@@ -209,6 +209,19 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
     : safeViewFields.filter(f => f && f.visible)
 
+  // DEBUG_LIST: Log visible fields resolution
+  if (listDebugEnabled) {
+    debugLog('LIST', 'GridBlock visible fields resolution', {
+      blockId: block.id,
+      visibleFieldsConfigCount: visibleFieldsConfig.length,
+      viewFieldsCount: safeViewFields.length,
+      visibleViewFieldsCount: safeViewFields.filter(f => f && f.visible).length,
+      tableFieldsCount: tableFields.length,
+      resolvedVisibleFieldsCount: visibleFields.length,
+      resolvedVisibleFields: visibleFields.map(f => f.field_name),
+    })
+  }
+
   // Convert merged filters to legacy format for GridViewWrapper (backward compatibility)
   const activeFilters = allFilters.map((f, idx) => ({
     id: f.field || `filter-${idx}`,
