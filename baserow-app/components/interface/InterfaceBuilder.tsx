@@ -218,6 +218,7 @@ export default function InterfaceBuilder({
           setSaveStatus("saved")
           setPendingLayout(null)
           
+          console.log('🔥 saveLayout COMPLETE – reloading from DB')
           // CRITICAL: Reload blocks from database after successful save
           // This ensures database is the source of truth and preview reflects persisted state
           try {
@@ -465,6 +466,7 @@ export default function InterfaceBuilder({
           })
         }
 
+        console.log('🔥 handleBlockUpdate COMPLETE – reloading from DB')
         // CRITICAL: After successful save, reload blocks from database and replace state entirely
         // Database is the source of truth - preview state is only valid before save completes
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {

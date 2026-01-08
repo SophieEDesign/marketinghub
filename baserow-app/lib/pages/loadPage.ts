@@ -53,6 +53,7 @@ export async function loadPage(pageId: string): Promise<Page | null> {
  * - Ensures save/load symmetry
  */
 export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
+  console.log('🔥 loadPageBlocks CALLED', pageId)
   const supabase = await createClient()
 
   // Check if this is an interface_pages.id or views.id
