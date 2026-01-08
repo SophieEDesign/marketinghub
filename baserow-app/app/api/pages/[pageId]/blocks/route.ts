@@ -43,7 +43,21 @@ export async function GET(
 
     const { data, error } = await query.order('order_index', { ascending: true })
 
+    // CRITICAL: Log query results for debugging
+    console.log(`[API GET /blocks] pageId=${pageId}`, {
+      isInterfacePage: !!page,
+      queryType: page ? 'page_id' : 'view_id',
+      dbRowCount: data?.length || 0,
+      blockIds: data?.map((b: any) => b.id) || [],
+      error: error?.message,
+    })
+
     if (error) {
+      console.error(`[API GET /blocks] ERROR: pageId=${pageId}`, {
+        error: error.message,
+        errorCode: error.code,
+        isInterfacePage: !!page,
+      })
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
@@ -99,6 +113,13 @@ export async function GET(
         created_at: block.created_at,
         updated_at: block.updated_at,
       }
+    })
+
+    // CRITICAL: Log final response for debugging
+    console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
+      blocksCount: blocks.length,
+      blockIds: blocks.map(b => b.id),
+      isInterfacePage: !!page,
     })
 
     // CRITICAL: Disable caching to prevent stale data

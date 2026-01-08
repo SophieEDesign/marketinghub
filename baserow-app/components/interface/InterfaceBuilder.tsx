@@ -97,6 +97,13 @@ export default function InterfaceBuilder({
     // This handles both empty-to-populated transitions (e.g., async loading in RecordReviewView)
     // and populated-to-populated updates (e.g., after save/reload)
     // Database is source of truth - editor must reflect persisted data
+    console.log(`[InterfaceBuilder] setBlocks from initialBlocks: pageId=${page.id}`, {
+      oldBlocksCount: blocks.length,
+      newBlocksCount: safeInitialBlocks.length,
+      oldBlockIds: blocks.map(b => b.id),
+      newBlockIds: safeInitialBlocks.map(b => b.id),
+      willReplace: true,
+    })
     setBlocks(safeInitialBlocks)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBlocks])
@@ -241,6 +248,12 @@ export default function InterfaceBuilder({
                 updated_at: block.updated_at,
               }))
               // Replace state entirely - database is source of truth
+              console.log(`[InterfaceBuilder] setBlocks after layout save reload: pageId=${page.id}`, {
+                oldBlocksCount: blocks.length,
+                newBlocksCount: reloadedBlocks.length,
+                oldBlockIds: blocks.map(b => b.id),
+                newBlockIds: reloadedBlocks.map(b => b.id),
+              })
               setBlocks(reloadedBlocks)
             }
           } catch (reloadError) {
@@ -488,6 +501,12 @@ export default function InterfaceBuilder({
             updated_at: block.updated_at,
           }))
           // Replace state entirely - database is source of truth
+          console.log(`[InterfaceBuilder] setBlocks after block update reload: pageId=${page.id}`, {
+            oldBlocksCount: blocks.length,
+            newBlocksCount: reloadedBlocks.length,
+            oldBlockIds: blocks.map(b => b.id),
+            newBlockIds: reloadedBlocks.map(b => b.id),
+          })
           setBlocks(reloadedBlocks)
         } else {
           // Fallback: update local state optimistically if reload fails

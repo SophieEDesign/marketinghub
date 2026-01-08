@@ -191,7 +191,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         tabindex: isEditing ? '0' : '-1',
         style: config?.appearance?.text_color 
           ? `color: ${config.appearance.text_color};` 
-          : undefined,
+          : '',
       },
       handleKeyDown: (view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'b') {

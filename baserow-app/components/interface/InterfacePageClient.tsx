@@ -68,6 +68,10 @@ function InterfacePageClientInternal({
     if (page?.id && prevPageIdRef.current !== page.id) {
       // Page changed - reset blocks and loaded state
       prevPageIdRef.current = page.id
+      console.log(`[loadBlocks] CLEARING blocks (page changed): pageId=${page.id}, page_type=${page.page_type}`, {
+        previousBlocksCount: blocks.length,
+        previousBlockIds: blocks.map(b => b.id),
+      })
       setBlocks([])
       blocksLoadedRef.current = { pageId: page.id, loaded: false }
       
@@ -221,11 +225,17 @@ function InterfacePageClientInternal({
       }
     } else if (page) {
       // Non-canvas page type - skip block loading and ensure blocks state is empty
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Blocks] loadBlocks SKIPPED (non-canvas page_type): pageId=${page.id}, page_type=${page.page_type}`)
-      }
+      console.log(`[Blocks] loadBlocks SKIPPED (non-canvas page_type): pageId=${page.id}, page_type=${page.page_type}`, {
+        currentBlocksCount: blocks.length,
+        currentBlockIds: blocks.map(b => b.id),
+        willClear: blocks.length > 0,
+      })
       // Clear blocks state for non-canvas pages
       if (blocks.length > 0) {
+        console.log(`[Blocks] CLEARING blocks (non-canvas page): pageId=${page.id}, page_type=${page.page_type}`, {
+          clearedBlocksCount: blocks.length,
+          clearedBlockIds: blocks.map(b => b.id),
+        })
         setBlocks([])
         blocksLoadedRef.current = { pageId: page.id, loaded: false }
       }
@@ -576,6 +586,16 @@ function InterfacePageClientInternal({
       if (!res.ok) throw new Error('Failed to load blocks')
       
       const data = await res.json()
+      
+      // CRITICAL: Log API response for debugging
+      console.log(`[loadBlocks] API returned: pageId=${page.id}, page_type=${page.page_type}`, {
+        apiResponseBlocksCount: data.blocks?.length || 0,
+        apiResponseBlockIds: data.blocks?.map((b: any) => b.id) || [],
+        forceReload,
+        currentBlocksCount: blocks.length,
+        currentBlockIds: blocks.map(b => b.id),
+      })
+      
       // Convert view_blocks format to PageBlock format
       // CRITICAL: Preserve actual database values - API already maps position_x/position_y/width/height to x/y/w/h
       // Only default if values are explicitly null/undefined (new blocks)
@@ -638,13 +658,14 @@ function InterfacePageClientInternal({
       }
       
       // Replace state entirely - database is source of truth
-      if (process.env.NODE_ENV === 'development' && forceReload) {
-        console.log('[Blocks] Force reload: replacing blocks', {
-          oldCount: blocks.length,
-          newCount: pageBlocks.length,
-          pageId: page.id
-        })
-      }
+      console.log(`[loadBlocks] setBlocks CALLED: pageId=${page.id}, page_type=${page.page_type}`, {
+        forceReload,
+        oldBlocksCount: blocks.length,
+        newBlocksCount: pageBlocks.length,
+        oldBlockIds: blocks.map(b => b.id),
+        newBlockIds: pageBlocks.map(b => b.id),
+        willReplace: true,
+      })
       setBlocks(pageBlocks)
       blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } catch (error) {
