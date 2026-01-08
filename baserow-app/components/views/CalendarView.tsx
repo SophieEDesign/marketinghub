@@ -20,6 +20,7 @@ import type { EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
+import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWarn } from '@/lib/interface/debug-flags'
 
 interface CalendarViewProps {
   tableId: string
@@ -432,7 +433,7 @@ export default function CalendarView({
       const supabase = createClient()
       
       // DEBUG logging - always log if debug flag is set
-      if (debugEnabled || process.env.NODE_ENV === 'development') {
+      if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
         console.log(`[Calendar] Loading rows from table`, {
           tableId: resolvedTableId,
           supabaseTableName,
