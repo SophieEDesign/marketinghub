@@ -44,7 +44,6 @@ export default function InterfacePageClient({
   
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
-  const [redirecting, setRedirecting] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
   const [formSettingsOpen, setFormSettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
@@ -69,7 +68,7 @@ export default function InterfacePageClient({
   const isEditing = isPageEditing || isBlockEditing
 
   useEffect(() => {
-    if (!initialPage && !redirecting && !loading) {
+    if (!initialPage && !loading) {
       loadPage()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,16 +164,16 @@ export default function InterfacePageClient({
   }, [page?.id, page?.page_type, isBlockEditing])
 
   async function loadPage() {
-    if (redirecting || loading) return // Prevent multiple redirect attempts or concurrent loads
+    if (loading) return // Prevent concurrent loads
     
     setLoading(true)
     try {
       const res = await fetch(`/api/interface-pages/${pageId}`)
       if (!res.ok) {
         if (res.status === 404) {
-          // Page not found - redirect to first available page or home
-          setRedirecting(true)
-          router.replace('/')
+          // Page not found - set page to null so UI shows "not found" message
+          // DO NOT redirect - let the component render the error state
+          setPage(null)
           return
         }
         throw new Error('Failed to load page')
@@ -184,11 +183,9 @@ export default function InterfacePageClient({
       setPage(pageData)
     } catch (error) {
       console.error("Error loading page:", error)
-      // Redirect on error to prevent infinite loading state
-      if (!redirecting) {
-        setRedirecting(true)
-        router.replace('/')
-      }
+      // Set page to null on error - component will show error UI
+      // DO NOT redirect - always render UI
+      setPage(null)
     } finally {
       setLoading(false)
     }
@@ -482,16 +479,10 @@ export default function InterfacePageClient({
     }
   }
 
-  // Reload blocks when entering edit mode to ensure blocks are fresh
-  useEffect(() => {
-    if (isBlockEditing && page && (page.page_type === 'dashboard' || page.page_type === 'overview' || page.page_type === 'content' || page.page_type === 'record_review')) {
-      // Reload blocks when entering edit mode to ensure we have the latest
-      if (!blocksLoading) {
-        loadBlocks()
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlockEditing])
+  // CRITICAL: Do NOT reload blocks when entering edit mode
+  // Layout hydration should only happen on initial mount or when block IDs change
+  // Reloading blocks on edit mode entry causes layout resets
+  // Blocks are already loaded in the useEffect above based on page/page_type
 
   const handleGridToggle = () => {
     setIsGridMode(!isGridMode)
@@ -592,11 +583,8 @@ export default function InterfacePageClient({
     }
   }, [])
 
-  if (redirecting) {
-    return <div className="h-screen flex items-center justify-center">Redirecting...</div>
-  }
-
-  if (loading) {
+  // ALWAYS render UI - never return null or redirect
+  if (loading && !page) {
     return <div className="h-screen flex items-center justify-center">Loading interface page...</div>
   }
 
@@ -863,7 +851,9 @@ export default function InterfacePageClient({
               hideHeader={true}
             />
           )
-        ) : (
+        ) : page ? (
+          // Always render PageRenderer - it will show setup UI if page is invalid
+          // NEVER redirect - invalid pages show setup UI instead
           <PageRenderer
             page={pageWithConfig}
             data={data}
@@ -871,8 +861,16 @@ export default function InterfacePageClient({
             onGridToggle={showGridToggle ? handleGridToggle : undefined}
             showGridToggle={showGridToggle}
             blocks={(isDashboardOrOverview || page?.page_type === 'record_review' || page?.page_type === 'content') ? blocks : undefined}
+            isAdmin={isAdmin}
+            onOpenSettings={() => {
+              if (page?.page_type === 'form') {
+                setFormSettingsOpen(true)
+              } else {
+                setDisplaySettingsOpen(true)
+              }
+            }}
           />
-        )}
+        ) : null}
       </div>
 
       {/* Page Display Settings Panel - Only for pages with saved_view_id or base_table, not dashboard/overview/content pages */}

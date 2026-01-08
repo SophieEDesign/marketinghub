@@ -216,6 +216,19 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       filters: [],
     },
   },
+  field: {
+    type: 'field',
+    label: 'Field',
+    icon: 'FileText',
+    defaultWidth: 6,
+    defaultHeight: 3,
+    minWidth: 2,
+    minHeight: 2,
+    defaultConfig: {
+      title: 'Field',
+      field_id: '',
+    },
+  },
 }
 
 export function getBlockDefinition(type: BlockType): BlockDefinition {

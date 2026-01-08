@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import GridView from '@/components/grid/GridView'
 import { assertPageIsValid, shouldShowSetupUI } from '@/lib/interface/assertPageIsValid'
 import { shouldShowSetupUIForDataWiring } from '@/lib/interface/data-wiring-guards'
+import PageSetupState from './PageSetupState'
 
 // Lazy load view components
 const AirtableViewPage = dynamic(() => import('@/components/grid/AirtableViewPage'), { ssr: false })
@@ -32,6 +33,11 @@ interface PageRendererProps {
   blocks?: any[] // Blocks for dashboard/overview/content pages
 }
 
+interface PageRendererWithSetupProps extends PageRendererProps {
+  isAdmin?: boolean
+  onOpenSettings?: () => void
+}
+
 export default function PageRenderer({
   page,
   data = [],
@@ -39,7 +45,9 @@ export default function PageRenderer({
   onGridToggle,
   showGridToggle = false,
   blocks = [],
-}: PageRendererProps) {
+  isAdmin = false,
+  onOpenSettings,
+}: PageRendererWithSetupProps) {
   const config = page.config || {}
   // For Record Review pages, always use 'record_review' as visualisation (ignore config)
   // Record Review pages are record-based, not view-based, so they shouldn't use view types
@@ -101,20 +109,27 @@ export default function PageRenderer({
       )
     }
 
-    // Pre-deployment guard: Validate page before rendering (diagnostics only)
-    // NEVER block rendering - always render the page
-    // Pages will show their own setup UI if needed
-    if (process.env.NODE_ENV === 'development') {
-      const pageValidity = assertPageIsValid(page, {
-        hasBlocks: blocks.length > 0,
-        hasTableId: !!pageTableId,
-        hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
-      })
-      
-      if (!pageValidity.valid) {
-        // Log warning but continue rendering
-        console.warn(`[PageGuard] Page ${page.id} validation issue (rendering anyway):`, pageValidity.reason)
+    // Pre-deployment guard: Validate page before rendering
+    // Invalid pages (missing anchors) show setup UI instead of redirecting
+    const pageValidity = assertPageIsValid(page, {
+      hasBlocks: blocks.length > 0,
+      hasTableId: !!pageTableId,
+      hasDateField: !!config.date_field || !!config.start_date_field, // Calendar pages
+    })
+    
+    // If page is invalid due to missing anchor, show setup UI
+    // DO NOT redirect - always render UI
+    if (!pageValidity.valid && pageValidity.missingAnchor) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[PageGuard] Page ${page.id} missing anchor - showing setup UI:`, pageValidity.reason)
       }
+      // Show PageSetupState for invalid pages - provides contextual setup guidance
+      return <PageSetupState page={page} isAdmin={isAdmin} onOpenSettings={onOpenSettings} />
+    }
+    
+    // Log other validation issues in dev mode but continue rendering
+    if (process.env.NODE_ENV === 'development' && !pageValidity.valid) {
+      console.warn(`[PageGuard] Page ${page.id} validation issue (rendering anyway):`, pageValidity.reason)
     }
 
     switch (visualisation) {
@@ -299,12 +314,32 @@ export default function PageRenderer({
 
       default:
         // Invalid page type or missing configuration
+        // ALWAYS return UI - never return null
         return (
           <div className="p-4">
-            <InvalidPageState page={page} />
+            <InvalidPageState page={page} reason="Invalid page type or missing configuration" />
           </div>
         )
     }
+  }
+
+  // ALWAYS return UI - never return null
+  // Get content from renderContent - it should never return null
+  const content = renderContent()
+  
+  // Fallback UI if renderContent somehow returns null (defensive)
+  if (!content) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[PageRenderer] renderContent returned null - this should never happen')
+    }
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Unable to render page</h2>
+          <p className="text-sm text-gray-500">The page could not be rendered. Please check the configuration.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -326,7 +361,7 @@ export default function PageRenderer({
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {renderContent()}
+        {content}
       </div>
     </div>
   )

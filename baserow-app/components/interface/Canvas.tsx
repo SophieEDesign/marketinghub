@@ -73,10 +73,17 @@ export default function Canvas({
   /**
    * Hydrates react-grid-layout from Supabase on page load
    * 
-   * CRITICAL: Only syncs from blocks prop when:
+   * CRITICAL RULES:
+   * 1. Database values (position_x, position_y, width, height) are the single source of truth
+   * 2. ALWAYS hydrate layout from database values
+   * 3. NEVER regenerate layout if position_x/y/w/h exist
+   * 4. Default layout generation is ONLY allowed when ALL of position_x, position_y, width, height are NULL
+   * 5. This applies per block, not per page
+   * 6. Edit/view transitions do NOT trigger layout writes
+   * 
+   * Only syncs from blocks prop when:
    * 1. First load (not yet initialized)
    * 2. Block IDs changed (block added or removed)
-   * 3. Entering edit mode (to ensure fresh layout from database)
    * 
    * After hydration, layout state is managed locally and only updates via:
    * - User drag/resize (handleLayoutChange)
@@ -84,6 +91,7 @@ export default function Canvas({
    * This prevents layout resets when:
    * - Parent component re-renders
    * - Block config updates (but positions unchanged)
+   * - Edit/view mode transitions
    * - Other state changes in parent
    * - During active resize/drag operations
    */
@@ -95,35 +103,78 @@ export default function Canvas({
 
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
-    const wasEditing = previousIsEditingRef.current
-    const nowEditing = isEditing
-    
-    // Detect if we're entering edit mode (transitioning from false to true)
-    const enteringEditMode = !wasEditing && nowEditing
     
     // Only hydrate layout from blocks prop if:
     // 1. First load (not yet initialized)
     // 2. Block IDs changed (block added or removed)
-    // 3. Entering edit mode (blocks were reloaded, need to rehydrate from saved layout)
+    // CRITICAL: Do NOT rehydrate on edit mode entry - layout persists across mode changes
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
-    if (!layoutHydratedRef.current || blockIdsChanged || enteringEditMode) {
+    if (!layoutHydratedRef.current || blockIdsChanged) {
       // Convert blocks to layout format - use saved positions from Supabase
-      // CRITICAL: Always use saved x/y/w/h from blocks prop, never defaults unless missing
-      const newLayout: Layout[] = blocks.map((block) => ({
-        i: block.id,
-        x: block.x ?? 0,
-        y: block.y ?? 0,
-        w: block.w ?? 4,
-        h: block.h ?? 4,
-        minW: 2,
-        minH: 2,
-      }))
+      // CRITICAL: Database values (position_x, position_y, width, height) are single source of truth
+      // Only apply defaults when ALL position values are NULL (newly created block)
+      const newLayout: Layout[] = blocks.map((block) => {
+        // Check if block has persisted layout values from database
+        // If ALL of x, y, w, h are null/undefined, then apply defaults
+        // Otherwise, use database values (even if they're default values like 0, 0, 4, 4)
+        const allNull = 
+          (block.x == null) && 
+          (block.y == null) && 
+          (block.w == null) && 
+          (block.h == null)
+        
+        let x: number, y: number, w: number, h: number
+        
+        if (allNull) {
+          // ALL position values are NULL - apply defaults (newly created block)
+          x = 0
+          y = 0
+          w = 4
+          h = 4
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("[Layout hydrate]", {
+              blockId: block.id,
+              fromDB: { x: null, y: null, w: null, h: null },
+              defaultsApplied: true
+            })
+          }
+        } else {
+          // Block has persisted layout - use database values, never regenerate
+          x = block.x ?? 0
+          y = block.y ?? 0
+          w = block.w ?? 4
+          h = block.h ?? 4
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("[Layout hydrate]", {
+              blockId: block.id,
+              fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
+              defaultsApplied: false
+            })
+          }
+        }
+        
+        return {
+          i: block.id,
+          x,
+          y,
+          w,
+          h,
+          minW: 2,
+          minH: 2,
+        }
+      })
+      
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
-      previousIsEditingRef.current = nowEditing
+      previousIsEditingRef.current = isEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
+    } else {
+      // Update edit mode ref without rehydrating
+      previousIsEditingRef.current = isEditing
     }
     // If block IDs haven't changed and already hydrated, preserve current layout state
   }, [blocks, isEditing])
@@ -375,11 +426,20 @@ export default function Canvas({
             {/* Edit Mode Controls - Only visible in edit mode */}
             {isEditing && (
               <>
-                {/* Drag Handle - Only visible on hover */}
+                {/* Drag Handle - Only visible on hover, hidden when block is editing (via CSS) */}
                 <div className="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity drag-handle">
                   <div
                     className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
                     title="Drag to reorder"
+                    onMouseDown={(e) => {
+                      // Prevent dragging if TextBlock is editing
+                      const blockContent = e.currentTarget.closest('.react-grid-item')?.querySelector('[data-block-editing="true"]')
+                      if (blockContent) {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        return false
+                      }
+                    }}
                   >
                     <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 12h16M4 16h16" />
@@ -457,7 +517,10 @@ export default function Canvas({
             )}
 
             {/* Block Content */}
-            <div className={`h-full w-full min-h-0 ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}>
+            <div 
+              className={`h-full w-full min-h-0 ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              data-block-id={block.id}
+            >
               <BlockAppearanceWrapper 
                 block={block}
                 className={isEditing ? "pointer-events-auto" : ""}

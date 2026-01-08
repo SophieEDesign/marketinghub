@@ -57,15 +57,22 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   
   // CRITICAL: Read content ONLY from config.content_json
   // No fallbacks, no other sources
-  const contentJson = config?.content_json || null
+  const contentJson = config?.content_json
   
-  // Track if content_json exists (for setup state)
+  // Track if config is still loading (content_json is undefined, not null)
+  const isConfigLoading = config !== undefined && contentJson === undefined
+  
+  // Track if content_json exists and is valid (for setup state)
   const hasContent = contentJson !== null && 
+                     contentJson !== undefined &&
                      typeof contentJson === 'object' && 
                      contentJson.type === 'doc' &&
                      Array.isArray(contentJson.content) &&
                      contentJson.content.length > 0
 
+  // Internal editing state - tracks when user is actively editing text
+  // This is separate from isEditing prop (which is page-level edit mode)
+  const [isBlockEditing, setIsBlockEditing] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [toolbarPosition, setToolbarPosition] = useState<'top' | 'bottom'>('top')
@@ -74,6 +81,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const toolbarRef = useRef<HTMLDivElement>(null)
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedContentRef = useRef<string>("") // Track last saved content to prevent duplicate saves
+  
+  // Track block.id and config reference to detect when to rehydrate
+  const previousBlockIdRef = useRef<string>(block.id)
+  const previousConfigRef = useRef<any>(config)
+  const editorInitializedRef = useRef<boolean>(false)
 
   /**
    * Get initial content for editor
@@ -95,6 +107,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   /**
    * TipTap Editor Instance
    * CRITICAL: Editor is always mounted, editable state changes based on isEditing prop
+   * Content is initialized from config.content_json and rehydrated when config changes
    */
   const editor = useEditor({
     extensions: [
@@ -112,7 +125,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       TextStyle,
       Color,
     ],
-    content: getInitialContent(),
+    // Initialize with empty content if config is loading, otherwise use actual content
+    // Content will be set via setContent when config loads (handled in useEffect)
+    content: isConfigLoading ? { type: 'doc', content: [] } : getInitialContent(),
     editable: isEditing,
     editorProps: {
       attributes: {
@@ -148,6 +163,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         blurTimeoutRef.current = null
       }
       setIsFocused(true)
+      // Enter block editing mode when editor receives focus
+      if (isEditing) {
+        setIsBlockEditing(true)
+      }
     },
     onBlur: ({ event }) => {
       const relatedTarget = (event as FocusEvent).relatedTarget as HTMLElement
@@ -168,6 +187,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       
       blurTimeoutRef.current = setTimeout(() => {
         setIsFocused(false)
+        // Exit block editing mode when editor loses focus
+        setIsBlockEditing(false)
       }, 150)
     },
     onUpdate: ({ editor }) => {
@@ -192,6 +213,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   /**
    * Save content to database
    * CRITICAL: Saves ONLY to config.content_json
+   * Prevents duplicate saves by checking against lastSavedContentRef
    */
   const handleSaveContent = useCallback((json: any) => {
     if (!onUpdate || !editor) return
@@ -199,18 +221,23 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     const jsonStr = JSON.stringify(json)
     
     // CRITICAL: Only save if content actually changed
+    // This prevents duplicate saves when editor rehydrates or updates
     if (jsonStr === lastSavedContentRef.current) {
       setSaveStatus("idle")
       return
     }
 
+    // Update last saved content reference BEFORE calling onUpdate
+    // This prevents race conditions where multiple saves could be triggered
+    lastSavedContentRef.current = jsonStr
+
     // Save ONLY to content_json
+    // The parent (InterfaceBuilder) will reload blocks from API after this
+    // which will trigger rehydration with fresh config
     onUpdate(block.id, {
       content_json: json, // ONLY field - no other content fields
     })
 
-    // Update last saved content reference
-    lastSavedContentRef.current = jsonStr
     setSaveStatus("saved")
     
     // Reset to idle after 2 seconds
@@ -220,36 +247,72 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [block.id, onUpdate, editor])
 
   /**
-   * Sync editor content when config.content_json changes externally
-   * CRITICAL: Only updates if content actually changed and editor is not focused
+   * Rehydrate editor when block.id or block.config reference changes
+   * CRITICAL: This ensures editor content matches fresh config from API
+   * Treats block.config as immutable - rehydrate on reference change
    */
   useEffect(() => {
-    if (!editor || !isEditing) return
+    if (!editor) return
     
-    const newContent = getInitialContent()
-    const currentContent = editor.getJSON()
+    const blockIdChanged = previousBlockIdRef.current !== block.id
+    const configReferenceChanged = previousConfigRef.current !== config
     
-    // Compare stringified versions to detect real changes
-    const currentStr = JSON.stringify(currentContent)
-    const newStr = JSON.stringify(newContent)
+    // Update refs
+    previousBlockIdRef.current = block.id
+    previousConfigRef.current = config
     
-    // Only update if content changed AND editor is not focused (to avoid interrupting typing)
-    if (currentStr !== newStr && !isFocused) {
+    // If block ID changed, this is a different block - always rehydrate
+    if (blockIdChanged) {
+      const newContent = getInitialContent()
       editor.commands.setContent(newContent, false) // false = don't emit update event
-      // Update last saved reference to prevent immediate re-save
+      const newStr = JSON.stringify(newContent)
       lastSavedContentRef.current = newStr
+      editorInitializedRef.current = true
+      return
     }
-  }, [contentJson, editor, isEditing, isFocused, getInitialContent])
+    
+    // If config reference changed (immutable update), rehydrate if content changed
+    if (configReferenceChanged) {
+      const newContent = getInitialContent()
+      const currentContent = editor.getJSON()
+      
+      // Compare stringified versions to detect real changes
+      const currentStr = JSON.stringify(currentContent)
+      const newStr = JSON.stringify(newContent)
+      
+      // Only update if content actually changed AND editor is not focused (to avoid interrupting typing)
+      if (currentStr !== newStr && !isFocused) {
+        editor.commands.setContent(newContent, false) // false = don't emit update event
+        // Update last saved reference to prevent immediate re-save
+        lastSavedContentRef.current = newStr
+      }
+    }
+  }, [block.id, config, editor, isFocused, getInitialContent])
 
   /**
-   * Initialize lastSavedContentRef when editor is created
+   * Initialize editor content and lastSavedContentRef when editor is first created
    */
   useEffect(() => {
-    if (editor) {
+    if (editor && !editorInitializedRef.current && !isConfigLoading) {
       const initialContent = editor.getJSON()
       lastSavedContentRef.current = JSON.stringify(initialContent)
+      editorInitializedRef.current = true
     }
-  }, [editor])
+  }, [editor, isConfigLoading])
+  
+  /**
+   * Handle config loading state - reinitialize editor when config becomes available
+   */
+  useEffect(() => {
+    if (editor && isConfigLoading === false && !editorInitializedRef.current) {
+      // Config just finished loading, initialize editor content
+      const initialContent = getInitialContent()
+      editor.commands.setContent(initialContent, false)
+      const initialStr = JSON.stringify(initialContent)
+      lastSavedContentRef.current = initialStr
+      editorInitializedRef.current = true
+    }
+  }, [editor, isConfigLoading, getInitialContent])
 
   // Calculate toolbar position
   useEffect(() => {
@@ -477,10 +540,26 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
+  // Show loading state if config is still loading
+  if (isConfigLoading) {
+    return (
+      <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm p-4" style={blockStyle}>
+        <div className="text-center">
+          <div className="animate-pulse mb-2">Loading...</div>
+          <p className="text-xs text-gray-400">Loading block content</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state if editor is not ready yet
   if (!editor) {
     return (
-      <div className="h-full w-full flex items-center justify-center text-gray-400">
-        Loading editor...
+      <div className="h-full w-full flex items-center justify-center text-gray-400 text-sm p-4" style={blockStyle}>
+        <div className="text-center">
+          <div className="animate-pulse mb-2">Initializing editor...</div>
+          <p className="text-xs text-gray-400">Setting up text editor</p>
+        </div>
       </div>
     )
   }
@@ -500,40 +579,45 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
+  // Empty state hint: Show when empty and not editing (subtle hint)
+  const showEmptyHint = !hasContent && isEditing && !isBlockEditing
+
   return (
     <div 
       ref={containerRef}
+      data-block-editing={isBlockEditing ? "true" : "false"}
       className={cn(
         "h-full w-full overflow-auto flex flex-col relative",
-        isEditing && isFocused && "ring-2 ring-blue-500 ring-opacity-50 rounded-lg",
-        isEditing && !isFocused && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all"
+        // Visual editing state: blue ring when actively editing
+        isBlockEditing && "ring-2 ring-blue-500 ring-offset-2 rounded-lg",
+        // Subtle hover state when not editing
+        isEditing && !isBlockEditing && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all",
+        // Prevent dragging/resizing while editing
+        isBlockEditing && "pointer-events-auto"
       )}
       style={{
         ...blockStyle,
         minHeight: '100px',
       }}
-      onClick={(e) => {
-        const target = e.target as HTMLElement
-        if (
-          isEditing && 
-          !isFocused && 
-          editor &&
-          !target.closest('button') &&
-          !target.closest('[role="button"]') &&
-          !target.closest('.ProseMirror-focused')
-        ) {
-          editor.commands.focus()
+      // Prevent drag/resize events from propagating when editing
+      onMouseDown={(e) => {
+        if (isBlockEditing) {
+          e.stopPropagation()
         }
       }}
-      onMouseDown={(e) => {
-        if (isEditing && editor && !editor.isFocused) {
+      onClick={(e) => {
+        // Only enter edit mode when page is in edit mode
+        if (isEditing && !isBlockEditing && editor) {
           const target = e.target as HTMLElement
+          // Don't focus if clicking buttons or toolbar
           if (
             !target.closest('button') &&
             !target.closest('[role="button"]') &&
-            containerRef.current?.contains(target)
+            !target.closest('.drag-handle') &&
+            !target.closest('.react-resizable-handle')
           ) {
-            editor.commands.focus()
+            setIsBlockEditing(true)
+            editor.commands.focus('end')
           }
         }
       }}
@@ -554,22 +638,31 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         className={cn(
           "flex-1 w-full",
           !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
-          isEditing && "cursor-text",
+          // Cursor cues: text cursor when editable, pointer when clickable, default when not
+          isBlockEditing && "cursor-text",
+          isEditing && !isBlockEditing && "cursor-pointer",
           !isEditing && "cursor-default"
         )}
         style={{
           color: appearance.text_color || 'inherit',
         }}
         onClick={(e) => {
-          if (isEditing && editor) {
+          // Only enter edit mode when page is in edit mode
+          if (isEditing && !isBlockEditing && editor) {
             e.stopPropagation()
-            editor.commands.focus()
+            setIsBlockEditing(true)
+            editor.commands.focus('end')
           }
         }}
         onMouseDown={(e) => {
+          // Prevent drag/resize when clicking to edit
+          if (isBlockEditing) {
+            e.stopPropagation()
+          }
           if (isEditing && editor && !editor.isFocused) {
             e.stopPropagation()
-            editor.commands.focus()
+            setIsBlockEditing(true)
+            editor.commands.focus('end')
           }
         }}
       >
@@ -593,7 +686,14 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
             textSize === 'xl' && "prose-xl",
           )}
         >
-          <EditorContent editor={editor} />
+          {/* Use block.id as key to force EditorContent re-render when block changes */}
+          <EditorContent key={block.id} editor={editor} />
+          {/* Empty state hint - only show when empty and not actively editing */}
+          {showEmptyHint && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <p className="text-sm text-gray-400 italic">Click to add text…</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

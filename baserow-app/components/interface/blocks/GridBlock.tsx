@@ -273,6 +273,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             fieldIds={fieldIds}
             tableFields={tableFields}
             filters={allFilters}
+            blockConfig={config} // Pass block config so CalendarView can read date_field from page settings
             // onRecordClick is handled internally by CalendarView using modal
           />
         )

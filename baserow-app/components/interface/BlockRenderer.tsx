@@ -17,6 +17,7 @@ import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import TabsBlock from "./blocks/TabsBlock"
 import FilterBlock from "./blocks/FilterBlock"
+import FieldBlock from "./blocks/FieldBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 
@@ -154,6 +155,10 @@ export default function BlockRenderer({
       case "filter":
         // Filter block emits filter state via context
         return <FilterBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} onUpdate={onUpdate} />
+
+      case "field":
+        // Field block displays field label + value from recordId context
+        return <FieldBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
 
       case "text":
         return <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />

@@ -2,7 +2,10 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import { resolveLandingPage } from "@/lib/interfaces"
+import { getAllInterfacePages } from "@/lib/interface/pages"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
+
+const isDev = process.env.NODE_ENV === 'development'
 
 export default async function HomePage({
   searchParams,
@@ -32,30 +35,50 @@ export default async function HomePage({
   
   const admin = await isAdmin()
 
+  // CRITICAL: Load accessible pages FIRST before any redirect logic
+  // This ensures we have data before making redirect decisions
+  let accessiblePages: Array<{ id: string }> = []
+  try {
+    const allPages = await getAllInterfacePages()
+    accessiblePages = allPages.map(p => ({ id: p.id }))
+    
+    if (isDev) {
+      console.log(`[Redirect] Loaded ${accessiblePages.length} accessible pages`)
+    }
+  } catch (error) {
+    if (isDev) {
+      console.warn('[Redirect] Error loading pages:', error)
+    }
+  }
+
   // Resolve landing page with priority order and validation
+  // Only redirect if user is authenticated AND no pageId in URL AND valid default exists
   try {
     const { pageId, reason } = await resolveLandingPage()
     
-    if (pageId) {
-      // Redirect to resolved page
+    if (pageId && accessiblePages.some(p => p.id === pageId)) {
+      // Valid page resolved - safe to redirect
+      if (isDev) {
+        console.warn('[Redirect]', { reason, pageId, resolved: true })
+      }
       redirect(`/pages/${pageId}`)
     }
     
-    // Fallback: Try to get first page directly from interface_pages table
-    const { data: firstPage } = await supabase
-      .from('interface_pages')
-      .select('id')
-      .order('order_index', { ascending: true })
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
-    
-    if (firstPage?.id) {
-      redirect(`/pages/${firstPage.id}`)
+    // Fallback: Use first accessible page if available
+    if (accessiblePages.length > 0) {
+      const firstPageId = accessiblePages[0].id
+      if (isDev) {
+        console.warn('[Redirect]', { reason: 'first_accessible_fallback', pageId: firstPageId, resolved: true })
+      }
+      redirect(`/pages/${firstPageId}`)
     }
     
     // No accessible pages found - show empty state instead of redirecting
     // Redirecting to "/" creates a loop, so we render an empty state here
+    if (isDev) {
+      console.warn('[Redirect]', { reason: 'no_pages_available', pageId: null, resolved: false })
+    }
+    
     if (admin) {
       redirect("/settings?tab=pages")
     } else {
@@ -79,7 +102,6 @@ export default async function HomePage({
     }
   } catch (error) {
     // Error resolving landing page - fallback to old system
-    const isDev = process.env.NODE_ENV === 'development'
     if (isDev) {
       console.warn('[Landing Page] Error resolving landing page, falling back:', error)
       if (error instanceof Error) {
@@ -103,30 +125,37 @@ export default async function HomePage({
 
       const { data: firstInterface } = await firstQuery.maybeSingle()
       if (firstInterface) {
+        if (isDev) {
+          console.warn('[Redirect]', { reason: 'fallback_views_table', pageId: firstInterface.id, resolved: true })
+        }
         redirect(`/pages/${firstInterface.id}`)
       }
     } catch (fallbackError) {
-      // Last resort fallback - show empty state instead of redirecting
-      if (admin) {
-        redirect("/settings?tab=pages")
-      } else {
-        // Show empty state instead of redirecting to avoid loop
-        return (
-          <WorkspaceShellWrapper title="Welcome">
-            <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
-              <div className="max-w-md text-center space-y-4">
-                <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
-                <p className="text-gray-600">
-                  No pages are available yet. Please contact an administrator to create pages.
-                </p>
-                <p className="text-sm text-gray-500">
-                  If you&#39;re an administrator, you can create pages in Settings.
-                </p>
-              </div>
-            </div>
-          </WorkspaceShellWrapper>
-        )
+      if (isDev) {
+        console.warn('[Redirect]', { reason: 'fallback_error', pageId: null, resolved: false })
       }
+    }
+    
+    // Last resort fallback - show empty state instead of redirecting
+    if (admin) {
+      redirect("/settings?tab=pages")
+    } else {
+      // Show empty state instead of redirecting to avoid loop
+      return (
+        <WorkspaceShellWrapper title="Welcome">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+            <div className="max-w-md text-center space-y-4">
+              <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
+              <p className="text-gray-600">
+                No pages are available yet. Please contact an administrator to create pages.
+              </p>
+              <p className="text-sm text-gray-500">
+                If you&#39;re an administrator, you can create pages in Settings.
+              </p>
+            </div>
+          </div>
+        </WorkspaceShellWrapper>
+      )
     }
   }
 }

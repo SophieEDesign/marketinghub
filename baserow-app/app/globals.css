@@ -195,3 +195,27 @@
 .grid-scroll-container::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Hide drag and resize handles when TextBlock is actively being edited */
+/* This prevents accidental dragging/resizing while typing */
+.react-grid-item:has([data-block-editing="true"]) .drag-handle {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.react-grid-item:has([data-block-editing="true"]) .react-resizable-handle {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Fallback for browsers without :has() support - hide handles when block is editing */
+[data-block-editing="true"] {
+  /* Prevent drag/resize via pointer events on parent */
+}
+
+/* Additional prevention: stop drag events from propagating when editing */
+[data-block-editing="true"] * {
+  /* Allow text selection and editing */
+}

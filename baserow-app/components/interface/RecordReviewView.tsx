@@ -453,94 +453,36 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 <p className="text-sm text-gray-500">Loading blocks...</p>
               </div>
             </div>
-          ) : loadedBlocks.length === 0 ? (
-            <div className="p-6">
-              {/* Simple detail view when no blocks configured */}
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-2xl font-semibold text-gray-900 mb-6">
-                    {selectedRecord[nameField] || selectedRecord.id || 'Untitled'}
-                  </h1>
-                </div>
-                
-                {/* Basic Fields */}
-                <div className="space-y-4">
-                  {Array.isArray(columns) && columns.length > 0 ? columns.slice(0, 5).map((col: string) => {
-                    const value = selectedRecord[col]
-                    const isNotes = col.toLowerCase().includes('note') || col.toLowerCase().includes('description')
-                    const fieldDisplayName = getFieldDisplayName(col)
-                    
-                    return (
-                      <div key={col} className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">{fieldDisplayName}</label>
-                        {isNotes ? (
-                          <Textarea
-                            value={value || ''}
-                            readOnly={!allowEditing}
-                            className="min-h-[120px]"
-                          />
-                        ) : col.toLowerCase().includes('status') ? (
-                          <Select value={value || ''} disabled={!allowEditing}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.keys(groupedRecords).map((status) => (
-                                <SelectItem key={status} value={status}>
-                                  {status}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : col.toLowerCase().includes('assign') ? (
-                          <Select value={value || ''} disabled={!allowEditing}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select assignee" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="unassigned">Unassigned</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input value={value || ''} readOnly={!allowEditing} />
-                        )}
-                      </div>
-                    )
-                  }) : (
-                    <div className="text-sm text-gray-500">No fields available to display</div>
-                  )}
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-4 border-t">
-                  <Button variant="outline" size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add content
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add record
-                  </Button>
-                </div>
-              </div>
-            </div>
           ) : (
             <div className="h-full">
-              {/* Render blocks with record context */}
-              <InterfaceBuilder
-                key={`record-${selectedRecordId || 'none'}`}
-                page={{
-                  id: page.id,
-                  name: page.name,
-                  settings: { layout_template: 'record_review' },
-                  description: 'Record detail view'
-                } as any}
-                initialBlocks={loadedBlocks}
-                isViewer={!isEditing}
-                hideHeader={true}
-                pageTableId={pageTableId}
-                recordId={selectedRecordId || null}
-              />
+              {/* Render blocks with record context - Always use Canvas/BlockRenderer */}
+              {loadedBlocks.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                  <div className="text-center">
+                    <p className="mb-2 font-medium">Add fields or blocks to design this view</p>
+                    <p className="text-xs text-gray-400">
+                      {isEditing 
+                        ? "Click 'Edit Page' to add fields from Settings, or add blocks to customize the layout."
+                        : "Edit this page to add fields and blocks."}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <InterfaceBuilder
+                  key={`record-${selectedRecordId || 'none'}`}
+                  page={{
+                    id: page.id,
+                    name: page.name,
+                    settings: { layout_template: 'record_review' },
+                    description: 'Record detail view'
+                  } as any}
+                  initialBlocks={loadedBlocks}
+                  isViewer={!isEditing}
+                  hideHeader={true}
+                  pageTableId={pageTableId}
+                  recordId={selectedRecordId || null}
+                />
+              )}
             </div>
           )}
         </div>

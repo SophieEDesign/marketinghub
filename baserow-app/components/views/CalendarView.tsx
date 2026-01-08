@@ -30,6 +30,7 @@ interface CalendarViewProps {
   tableFields?: any[]
   filters?: FilterConfig[] // Dynamic filters from config
   onRecordClick?: (recordId: string) => void // Emit recordId on click
+  blockConfig?: Record<string, any> // Block/page config for reading date_field from page settings
 }
 
 export default function CalendarView({ 
@@ -40,7 +41,8 @@ export default function CalendarView({
   searchQuery = "",
   tableFields = [],
   filters = [],
-  onRecordClick
+  onRecordClick,
+  blockConfig = {}
 }: CalendarViewProps) {
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -174,9 +176,9 @@ export default function CalendarView({
     const allFilters: FilterConfig[] = [...(filters || [])]
     
     // Add date range filter if dates are set
-    if (dateFieldId && (dateFrom || dateTo)) {
+    if (resolvedDateFieldId && (dateFrom || dateTo)) {
       allFilters.push({
-        field: dateFieldId,
+        field: resolvedDateFieldId,
         operator: 'date_range',
         value: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
         value2: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
@@ -184,7 +186,7 @@ export default function CalendarView({
     }
     
     return allFilters
-  }, [filters, dateFieldId, dateFrom, dateTo])
+  }, [filters, resolvedDateFieldId, dateFrom, dateTo])
 
   // Memoize loadedTableFields key to prevent unnecessary re-renders
   const loadedTableFieldsKey = useMemo(() => {
@@ -421,17 +423,66 @@ export default function CalendarView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
 
-  // Resolve date field from view config or fallback to dateFieldId prop
+  // Resolve date field from page config, view config, or fallback to dateFieldId prop
+  // Priority: block/page config > view config > dateFieldId prop
   const resolvedDateFieldId = useMemo(() => {
-    // Priority: view config calendar_date_field > view config calendar_start_field > dateFieldId prop
+    // 1. Check block/page config first (from page settings)
+    const pageDateField = blockConfig?.start_date_field || blockConfig?.date_field || blockConfig?.calendar_date_field
+    if (pageDateField) {
+      // Validate it exists in table fields and is a date field
+      const field = loadedTableFields.find(f => 
+        (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from page config:', field.name)
+        }
+        return field.name
+      }
+    }
+    
+    // 2. Check view config
     if (viewConfig?.calendar_date_field) {
-      return viewConfig.calendar_date_field
+      const field = loadedTableFields.find(f => 
+        (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from view config:', field.name)
+        }
+        return field.name
+      }
     }
     if (viewConfig?.calendar_start_field) {
-      return viewConfig.calendar_start_field
+      const field = loadedTableFields.find(f => 
+        (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using start date field from view config:', field.name)
+        }
+        return field.name
+      }
     }
-    return dateFieldId
-  }, [viewConfig, dateFieldId])
+    
+    // 3. Fallback to dateFieldId prop
+    if (dateFieldId) {
+      const field = loadedTableFields.find(f => 
+        (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
+      )
+      if (field) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Calendar: Using date field from prop:', field.name)
+        }
+        return field.name
+      }
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Calendar: No valid date field found. Block config:', blockConfig, 'View config:', viewConfig, 'Prop:', dateFieldId)
+    }
+    return ''
+  }, [blockConfig, viewConfig, dateFieldId, loadedTableFields])
 
   // Find date field in loadedTableFields to validate it exists and is a date type
   const dateField = useMemo(() => {
@@ -480,25 +531,69 @@ export default function CalendarView({
     const effectiveDateField = dateField
     const effectiveDateFieldId = resolvedDateFieldId
     
+    // Defensive check: ensure we have a valid date field
     if (!effectiveDateFieldId || !isValidDateField) {
-      console.log('Calendar: Cannot generate events - resolvedDateFieldId:', resolvedDateFieldId, 'isValidDateField:', isValidDateField, 'dateField:', dateField)
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Calendar: Cannot generate events - missing or invalid date field', {
+          resolvedDateFieldId,
+          isValidDateField,
+          dateField,
+          blockConfig,
+          viewConfig
+        })
+      }
       return []
     }
     
+    // Defensive check: ensure we have rows
     if (!filteredRows || filteredRows.length === 0) {
-      console.log('Calendar: No rows to generate events from. Total rows:', rows.length, 'Filtered rows:', filteredRows?.length)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Calendar: No rows to generate events from', {
+          totalRows: rows.length,
+          filteredRows: filteredRows?.length || 0,
+          searchQuery,
+          filtersCount: filters.length
+        })
+      }
       return []
+    }
+    
+    // Defensive check: log if rows exist but events will be empty
+    if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
+      console.log('Calendar: Processing events', {
+        rowCount: filteredRows.length,
+        dateField: effectiveDateFieldId,
+        sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
+      })
     }
     
     try {
       // Find the actual field name to use (could be name or id)
+      // Priority: block config > view config > resolved field
       const actualFieldName = effectiveDateField?.name || effectiveDateFieldId
-      const actualStartFieldName = startField?.name || viewConfig?.calendar_start_field
-      const actualEndFieldName = endField?.name || viewConfig?.calendar_end_field
       
-      // Only log in development and when there might be issues
-      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0 && !effectiveDateFieldId) {
-        console.warn('Calendar: No date field configured, cannot generate events')
+      // Resolve start field: block config > view config > null
+      const blockStartField = blockConfig?.start_date_field || blockConfig?.calendar_start_field
+      const resolvedStartField = blockStartField 
+        ? loadedTableFields.find(f => (f.name === blockStartField || f.id === blockStartField) && f.type === 'date')
+        : null
+      const actualStartFieldName = resolvedStartField?.name || startField?.name || viewConfig?.calendar_start_field || null
+      
+      // Resolve end field: block config > view config > null
+      const blockEndField = blockConfig?.end_date_field || blockConfig?.calendar_end_field
+      const resolvedEndField = blockEndField
+        ? loadedTableFields.find(f => (f.name === blockEndField || f.id === blockEndField) && f.type === 'date')
+        : null
+      const actualEndFieldName = resolvedEndField?.name || endField?.name || viewConfig?.calendar_end_field || null
+      
+      if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
+        console.log('Calendar: Date field resolution', {
+          actualFieldName,
+          actualStartFieldName,
+          actualEndFieldName,
+          blockConfig: { start_date_field: blockConfig?.start_date_field, end_date_field: blockConfig?.end_date_field },
+          viewConfig: { calendar_start_field: viewConfig?.calendar_start_field, calendar_end_field: viewConfig?.calendar_end_field }
+        })
       }
       
       const events = filteredRows
@@ -508,12 +603,15 @@ export default function CalendarView({
           }
           
           // Check for date value - prefer start field if configured, otherwise use date field
-          const dateValue = actualStartFieldName 
-            ? (row.data[actualStartFieldName] || (viewConfig?.calendar_start_field ? row.data[viewConfig.calendar_start_field] : null))
-            : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
+          let dateValue: any = null
+          if (actualStartFieldName) {
+            dateValue = row.data[actualStartFieldName]
+          } else if (actualFieldName) {
+            dateValue = row.data[actualFieldName]
+          }
           
           // Skip if no date value
-          if (!dateValue || dateValue === null || dateValue === undefined) {
+          if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
             return false
           }
           
@@ -528,13 +626,14 @@ export default function CalendarView({
         })
         .map((row) => {
           // Get date values - support both single date field and start/end fields
-          const dateValue = actualStartFieldName 
-            ? (row.data[actualStartFieldName] || (viewConfig?.calendar_start_field ? row.data[viewConfig.calendar_start_field] : null))
-            : (row.data[actualFieldName] || row.data[effectiveDateFieldId])
+          let dateValue: any = null
+          if (actualStartFieldName) {
+            dateValue = row.data[actualStartFieldName]
+          } else if (actualFieldName) {
+            dateValue = row.data[actualFieldName]
+          }
           
-          const endDateValue = actualEndFieldName 
-            ? (row.data[actualEndFieldName] || (viewConfig?.calendar_end_field ? row.data[viewConfig.calendar_end_field] : null))
-            : null
+          const endDateValue = actualEndFieldName ? row.data[actualEndFieldName] : null
           
           // Parse date values
           let parsedStartDate: Date
@@ -639,9 +738,21 @@ export default function CalendarView({
           }
         })
       
-      // Only log warnings when no events are generated but rows exist
-      if (events.length === 0 && filteredRows.length > 0 && process.env.NODE_ENV === 'development') {
-        console.warn('Calendar: No events generated from', filteredRows.length, 'rows. Check date field configuration.')
+      // Defensive check: log warning if rows exist but no events generated
+      if (events.length === 0 && filteredRows.length > 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Calendar: No events generated from', filteredRows.length, 'rows', {
+            dateField: effectiveDateFieldId,
+            sampleRowData: filteredRows[0]?.data ? {
+              id: filteredRows[0].id,
+              dateFieldValue: filteredRows[0].data[effectiveDateFieldId],
+              allKeys: Object.keys(filteredRows[0].data)
+            } : null,
+            check: 'Ensure date field is correctly configured and rows have valid date values'
+          })
+        }
+      } else if (events.length > 0 && process.env.NODE_ENV === 'development') {
+        console.log('Calendar: Generated', events.length, 'events successfully')
       }
       return events
     } catch (error) {
@@ -669,16 +780,17 @@ export default function CalendarView({
   }
 
   // Handle missing or invalid date field - show setup state
-  if (!dateFieldId || !isValidDateField) {
+  // Use resolvedDateFieldId instead of dateFieldId prop to check all sources
+  if (!resolvedDateFieldId || !isValidDateField) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
         <div className="text-sm mb-2 text-center font-medium">
           Calendar view requires a date field.
         </div>
         <div className="text-xs text-gray-400 text-center">
-          {!dateFieldId 
-            ? "Please select a date field in block settings."
-            : `The selected field "${dateFieldId}" is not a date field. Please select a date field in block settings.`
+          {!resolvedDateFieldId 
+            ? "Please select a date field in Page Settings or block settings."
+            : `The selected field "${resolvedDateFieldId}" is not a date field. Please select a date field in Page Settings.`
           }
         </div>
       </div>
@@ -722,14 +834,38 @@ export default function CalendarView({
     )
   }
 
+  // Get events for rendering
+  const calendarEvents = getEvents()
+
+  // Empty state: rows exist but no events generated (likely missing/invalid date values)
+  if (!loading && rows.length > 0 && calendarEvents.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center font-medium">
+          No calendar events found
+        </div>
+        <div className="text-xs text-gray-400 text-center max-w-md">
+          {rows.length} {rows.length === 1 ? 'record' : 'records'} found, but none have valid date values in the selected date field &quot;{resolvedDateFieldId}&quot;.
+          <br />
+          <br />
+          Please ensure:
+          <ul className="list-disc list-inside mt-2 text-left">
+            <li>The date field is correctly configured in Page Settings</li>
+            <li>Records have valid date values in the selected field</li>
+          </ul>
+        </div>
+      </div>
+    )
+  }
+
   // Render date range filters and other filters above calendar
   const renderFilters = () => {
     const hasOtherFilters = filters && filters.length > 0
     
     return (
       <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-        {/* Date Range Filters - Always show if dateFieldId is available */}
-        {dateFieldId && (
+        {/* Date Range Filters - Always show if resolvedDateFieldId is available */}
+        {resolvedDateFieldId && (
           <div className="space-y-2">
             <div className="text-xs font-semibold text-gray-600">Date Range</div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -853,7 +989,7 @@ export default function CalendarView({
         {renderFilters()}
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
-          events={getEvents()}
+          events={calendarEvents}
           editable={true}
           headerToolbar={{
             left: "prev,next today",

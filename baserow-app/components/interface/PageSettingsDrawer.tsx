@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
 import type { Page } from "@/lib/interface/types"
+import type { TableField } from "@/types/fields"
+import { Plus } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
 
 interface PageSettingsDrawerProps {
   page: Page
@@ -74,13 +77,22 @@ export default function PageSettingsDrawer({
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
   const previousPageIdRef = useRef<string | null>(null)
   const isInitialMountRef = useRef(true)
+  const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [loadingFields, setLoadingFields] = useState(false)
+  const [existingFieldBlocks, setExistingFieldBlocks] = useState<string[]>([]) // field_ids already used
+  const { toast } = useToast()
 
   useEffect(() => {
     if (open) {
       loadGroups()
       loadViews()
+      // Load fields if this is a Record Review page (has primary_table_id)
+      if (page.settings?.primary_table_id) {
+        loadTableFields()
+        loadExistingFieldBlocks()
+      }
     }
-  }, [open, page.id])
+  }, [open, page.id, page.settings?.primary_table_id])
 
   // Only update form state when drawer opens or page ID changes
   // This prevents flickering when page object reference changes but content is the same
@@ -137,6 +149,86 @@ export default function PageSettingsDrawer({
       setViews((viewsData || []) as View[])
     } catch (error) {
       console.error('Error loading views:', error)
+    }
+  }
+
+  async function loadTableFields() {
+    const tableId = page.settings?.primary_table_id
+    if (!tableId) return
+
+    setLoadingFields(true)
+    try {
+      const supabase = createClient()
+      const { data: fieldsData } = await supabase
+        .from('table_fields')
+        .select('*')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+      
+      setTableFields((fieldsData || []) as TableField[])
+    } catch (error) {
+      console.error('Error loading table fields:', error)
+      setTableFields([])
+    } finally {
+      setLoadingFields(false)
+    }
+  }
+
+  async function loadExistingFieldBlocks() {
+    try {
+      const response = await fetch(`/api/pages/${page.id}/blocks`)
+      if (!response.ok) return
+      
+      const data = await response.json()
+      const blocks = data.blocks || []
+      const fieldIds = blocks
+        .filter((block: any) => block.type === 'field' && block.config?.field_id)
+        .map((block: any) => block.config.field_id)
+      
+      setExistingFieldBlocks(fieldIds)
+    } catch (error) {
+      console.error('Error loading existing field blocks:', error)
+    }
+  }
+
+  async function handleAddFieldBlock(fieldId: string) {
+    try {
+      const response = await fetch(`/api/pages/${page.id}/blocks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: 'field',
+          x: 0,
+          y: 0, // Will be positioned by user
+          w: 6,
+          h: 3,
+          config: {
+            field_id: fieldId,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create field block' }))
+        throw new Error(errorData.error || 'Failed to create field block')
+      }
+
+      toast({
+        variant: "success",
+        title: "Field added",
+        description: "The field has been added to the page. Enter edit mode to position it.",
+      })
+
+      // Reload existing field blocks to update UI
+      await loadExistingFieldBlocks()
+      onPageUpdate() // Refresh page to show new block
+    } catch (error: any) {
+      console.error("Failed to add field block:", error)
+      toast({
+        variant: "destructive",
+        title: "Failed to add field",
+        description: error.message || "Please try again",
+      })
     }
   }
 
@@ -335,6 +427,56 @@ export default function PageSettingsDrawer({
                 If enabled, only admins will be able to see this interface
               </p>
             </div>
+
+            {/* Fields Section - For Record Review pages */}
+            {page.settings?.primary_table_id && (
+              <div className="pt-4 border-t space-y-4">
+                <div className="space-y-2">
+                  <Label>Fields</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add fields to display in the record detail panel. Fields are added as blocks that you can arrange visually.
+                  </p>
+                  
+                  {loadingFields ? (
+                    <div className="text-sm text-gray-500 py-2">Loading fields...</div>
+                  ) : tableFields.length === 0 ? (
+                    <div className="text-sm text-gray-500 py-2">No fields available</div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-auto">
+                      {tableFields.map((field) => {
+                        const isAlreadyAdded = existingFieldBlocks.includes(field.id)
+                        return (
+                          <div
+                            key={field.id}
+                            className="flex items-center justify-between p-2 border border-gray-200 rounded-md hover:bg-gray-50"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">
+                                {field.name}
+                              </div>
+                              <div className="text-xs text-gray-500">{field.type}</div>
+                            </div>
+                            {isAlreadyAdded ? (
+                              <span className="text-xs text-gray-400 px-2">Added</span>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddFieldBlock(field.id)}
+                                className="ml-2"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="pt-4 border-t">
               <Button
