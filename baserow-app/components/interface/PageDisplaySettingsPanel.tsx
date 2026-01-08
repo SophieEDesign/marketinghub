@@ -95,11 +95,14 @@ export default function PageDisplaySettingsPanel({
 
   async function loadInitialData() {
     if (!page) return
+    
+    // TypeScript guard: page is non-null after the check above
+    const currentPage = page
 
     // UNIFIED: All pages use blocks - settings panel is for page metadata only
     // Block-specific settings are handled in block settings panels
     // Content pages don't need view-specific settings
-    if (page.page_type === 'content') {
+    if (currentPage.page_type === 'content') {
       return
     }
 
@@ -140,16 +143,16 @@ export default function PageDisplaySettingsPanel({
       let tableIdToUse: string | null = null
       
       // Check base_table first (primary source for pages)
-      if ((page as any).base_table) {
-        const baseTable = (page as any).base_table
+      if ((currentPage as any).base_table) {
+        const baseTable = (currentPage as any).base_table
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(baseTable)) {
           tableIdToUse = baseTable
         }
       }
       
       // Fallback: Check page config for table_id (from block config)
-      if (!tableIdToUse && page.config?.table_id) {
-        tableIdToUse = page.config.table_id
+      if (!tableIdToUse && currentPage.config?.table_id) {
+        tableIdToUse = currentPage.config.table_id
       }
 
       if (tableIdToUse) {
@@ -159,15 +162,16 @@ export default function PageDisplaySettingsPanel({
         
         // Load grouping field from page config (blocks store config in page.config)
         // UNIFIED: Grouping is handled by blocks
-        if (false && page) {
-          const groupByFromConfig = page.config?.group_by || page.config?.group_by_field || ''
+        // Disabled: This code is not used in unified architecture
+        if (false) {
+          const groupByFromConfig = currentPage.config?.group_by || currentPage.config?.group_by_field || ''
           if (groupByFromConfig) {
             setGroupBy(groupByFromConfig)
           }
         }
 
         // Load filters from page config (blocks store filters in page.config)
-        const filtersFromConfig = page.config?.filters || []
+        const filtersFromConfig = currentPage.config?.filters || []
         if (Array.isArray(filtersFromConfig) && filtersFromConfig.length > 0) {
           // Convert block filter format to ViewFilter format for UI
           const configFilters = filtersFromConfig.map((f: any) => ({
@@ -182,7 +186,7 @@ export default function PageDisplaySettingsPanel({
         }
 
         // Load sorts from page config (blocks store sorts in page.config)
-        const sortsFromConfig = page.config?.sorts || []
+        const sortsFromConfig = currentPage.config?.sorts || []
         if (Array.isArray(sortsFromConfig) && sortsFromConfig.length > 0) {
           const configSorts = sortsFromConfig.map((s: any, idx: number) => ({
             id: s.id || undefined,
@@ -197,8 +201,8 @@ export default function PageDisplaySettingsPanel({
       }
 
       // Load page config
-      const config = page.config || {}
-      setLayout(config.visualisation || page.page_type)
+      const config = currentPage.config || {}
+      setLayout(config.visualisation || currentPage.page_type)
       setRecordPreview(config.record_panel !== 'none')
       setDensity(config.row_height || 'medium')
       setReadOnly(config.read_only || false)
@@ -271,6 +275,9 @@ export default function PageDisplaySettingsPanel({
   // Pages now use blocks, so we save to page config and update/create blocks
   const saveSettings = useCallback(async () => {
     if (!page) return
+    
+    // TypeScript guard: page is non-null after the check above
+    const currentPage = page
 
     try {
       const supabase = createClient()
@@ -280,7 +287,7 @@ export default function PageDisplaySettingsPanel({
         await supabase
           .from('interface_pages')
           .update({ base_table: selectedTableId })
-          .eq('id', page.id)
+          .eq('id', currentPage.id)
       }
 
       // Convert filters and sorts to block format
@@ -302,7 +309,7 @@ export default function PageDisplaySettingsPanel({
 
       // Update page config with all settings
       const config = {
-        ...page.config,
+        ...currentPage.config,
         table_id: selectedTableId || undefined,
         visualisation: layout,
         record_panel: recordPreview ? 'side' : 'none',
@@ -321,14 +328,14 @@ export default function PageDisplaySettingsPanel({
       await supabase
         .from('interface_pages')
         .update({ config })
-        .eq('id', page.id)
+        .eq('id', currentPage.id)
 
       // Ensure page has a grid block with this config
       // Load existing blocks
       const { data: existingBlocks } = await supabase
         .from('view_blocks')
         .select('*')
-        .eq('page_id', page.id)
+        .eq('page_id', currentPage.id)
         .eq('type', 'grid')
 
       if (existingBlocks && existingBlocks.length > 0) {
@@ -353,7 +360,7 @@ export default function PageDisplaySettingsPanel({
         await supabase
           .from('view_blocks')
           .insert({
-            page_id: page.id,
+            page_id: currentPage.id,
             type: 'grid',
             position_x: 0,
             position_y: 0,
@@ -431,11 +438,14 @@ export default function PageDisplaySettingsPanel({
 
   if (!page) return null
 
-  const pageDefinition = getPageTypeDefinition(page.page_type)
+  // TypeScript guard: page is non-null after the check above
+  const currentPage = page
+
+  const pageDefinition = getPageTypeDefinition(currentPage.page_type)
   const isDataBacked = pageDefinition.requiresSourceView || pageDefinition.requiresBaseTable
   
   // Content pages don't show data settings - they're block-based only
-  if (page.page_type === 'content') {
+  if (currentPage.page_type === 'content') {
     return (
       <Sheet open={isOpen} onOpenChange={onClose}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
@@ -718,7 +728,8 @@ export default function PageDisplaySettingsPanel({
               )}
 
               {/* UNIFIED: Calendar configuration moved to CalendarBlock */}
-              {false && page && page.page_type === 'calendar' && (
+              {/* Note: 'calendar' is not a valid PageType - removed invalid comparison */}
+              {false && page && (
                 <>
                   <div className="space-y-2">
                     <Label>Start Date Field</Label>
@@ -973,7 +984,7 @@ export default function PageDisplaySettingsPanel({
               )}
 
               {/* UNIFIED: Panel layout configuration moved to blocks */}
-              {false && page.page_type === 'record_view' && (
+              {false && page && page.page_type === 'record_view' && (
                 <div className="space-y-2">
                   <Label>Record Panel Layout</Label>
                   <div className="text-sm text-gray-500 mb-2">
