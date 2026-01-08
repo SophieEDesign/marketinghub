@@ -18,37 +18,26 @@ export async function GET(
     const { pageId } = await params
     const supabase = await createClient()
 
-    // Check if this is an interface_pages.id or views.id
-    // Try interface_pages first (new system)
-    const { data: page } = await supabase
-      .from('interface_pages')
-      .select('id')
-      .eq('id', pageId)
-      .maybeSingle()
-
-    let query
-    if (page) {
-      // This is an interface_pages.id - use page_id
-      query = supabase
-        .from('view_blocks')
-        .select('*')
-        .eq('page_id', pageId)
-    } else {
-      // This is a views.id - use view_id (backward compatibility)
-      query = supabase
-        .from('view_blocks')
-        .select('*')
-        .eq('view_id', pageId)
-    }
-
-    const { data, error } = await query.order('order_index', { ascending: true })
+    // CRITICAL FIX: Query blocks where EITHER page_id OR view_id matches
+    // This handles:
+    // 1. Blocks with page_id set (new interface_pages system)
+    // 2. Blocks with view_id set (legacy views system)
+    // 3. Blocks that might have been migrated or created in different contexts
+    // 
+    // We use .or() to match either column, preventing silent filtering failures
+    const { data, error } = await supabase
+      .from('view_blocks')
+      .select('*')
+      .or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
+      .order('order_index', { ascending: true })
 
     // CRITICAL: Log query results for debugging
     console.log(`[API GET /blocks] pageId=${pageId}`, {
-      isInterfacePage: !!page,
-      queryType: page ? 'page_id' : 'view_id',
+      queryType: 'page_id OR view_id (both checked)',
       dbRowCount: data?.length || 0,
       blockIds: data?.map((b: any) => b.id) || [],
+      blocksWithPageId: data?.filter((b: any) => b.page_id === pageId).length || 0,
+      blocksWithViewId: data?.filter((b: any) => b.view_id === pageId).length || 0,
       error: error?.message,
     })
 
@@ -56,7 +45,7 @@ export async function GET(
       console.error(`[API GET /blocks] ERROR: pageId=${pageId}`, {
         error: error.message,
         errorCode: error.code,
-        isInterfacePage: !!page,
+        queryType: 'page_id OR view_id',
       })
       return NextResponse.json(
         { error: error.message },
@@ -117,8 +106,7 @@ export async function GET(
 
     // CRITICAL: Log final response for debugging
     console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
-      isInterfacePage: !!page,
-      queryType: page ? 'page_id' : 'view_id',
+      queryType: 'page_id OR view_id (both checked)',
       dbRowCount: data?.length || 0,
       blocksCount: blocks.length,
       blockIds: blocks.map(b => b.id),

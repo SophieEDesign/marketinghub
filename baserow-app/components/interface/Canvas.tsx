@@ -305,7 +305,17 @@ export default function Canvas({
   }, [])
 
   // Empty state: Show template-specific guidance
+  // Log blocks received by Canvas
+  useEffect(() => {
+    console.log(`[Canvas] blocks prop changed: pageId=${pageId}, blocksCount=${blocks.length}`, {
+      blockIds: blocks.map(b => b.id),
+      blockTypes: blocks.map(b => b.type),
+      isEditing,
+    })
+  }, [blocks.length, pageId, isEditing])
+
   if (blocks.length === 0) {
+    console.log(`[Canvas] Rendering empty state: pageId=${pageId}, isEditing=${isEditing}`)
     // Template-specific empty state content
     const getEmptyStateContent = () => {
       switch (layoutTemplate) {
@@ -452,45 +462,53 @@ export default function Canvas({
           allowOverlap={false}
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
         >
-          {blocks.map((block) => (
-            <div
-              key={block.id}
-              className={`relative ${
-                isEditing
-                  ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
-                      selectedBlockId === block.id
-                        ? "ring-2 ring-blue-500 border-blue-500"
-                        : ""
-                    }`
-                  : "bg-transparent border-0 shadow-none"
-              }`}
-            onClick={(e) => {
-              // Only allow selection in edit mode, and not if clicking:
-              // - buttons
-              // - inside editor content (quill, textarea, input)
-              // - inside any interactive element
-              // - inside text block editor (prevent settings panel from opening while typing)
-              // CRITICAL: Settings panel should ONLY open when clicking the settings icon, not on block selection
-              if (isEditing) {
-                const target = e.target as HTMLElement
-                const isEditorContent = target.closest('.ql-editor') || 
-                                       target.closest('textarea') || 
-                                       target.closest('input') ||
-                                       target.closest('[contenteditable="true"]') ||
-                                       target.closest('button') ||
-                                       target.closest('.ql-toolbar') ||
-                                       target.closest('[role="textbox"]') ||
-                                       target.closest('.ql-container') ||
-                                       target.closest('.ql-snow')
-                
-                // Only select block if not clicking editor content
-                // This prevents settings panel from opening when clicking inside text blocks
-                if (!isEditorContent) {
-                  onBlockClick?.(block.id)
-                }
-              }
-            }}
-          >
+          {blocks.map((block) => {
+            // Log each block being rendered
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
+                block,
+                layoutItem: layout.find(l => l.i === block.id),
+              })
+            }
+            return (
+              <div
+                key={block.id}
+                className={`relative ${
+                  isEditing
+                    ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
+                        selectedBlockId === block.id
+                          ? "ring-2 ring-blue-500 border-blue-500"
+                          : ""
+                      }`
+                    : "bg-transparent border-0 shadow-none"
+                }`}
+                onClick={(e) => {
+                  // Only allow selection in edit mode, and not if clicking:
+                  // - buttons
+                  // - inside editor content (quill, textarea, input)
+                  // - inside any interactive element
+                  // - inside text block editor (prevent settings panel from opening while typing)
+                  // CRITICAL: Settings panel should ONLY open when clicking the settings icon, not on block selection
+                  if (isEditing) {
+                    const target = e.target as HTMLElement
+                    const isEditorContent = target.closest('.ql-editor') || 
+                                           target.closest('textarea') || 
+                                           target.closest('input') ||
+                                           target.closest('[contenteditable="true"]') ||
+                                           target.closest('button') ||
+                                           target.closest('.ql-toolbar') ||
+                                           target.closest('[role="textbox"]') ||
+                                           target.closest('.ql-container') ||
+                                           target.closest('.ql-snow')
+                    
+                    // Only select block if not clicking editor content
+                    // This prevents settings panel from opening when clicking inside text blocks
+                    if (!isEditorContent) {
+                      onBlockClick?.(block.id)
+                    }
+                  }
+                }}
+              >
             {/* Edit Mode Controls - Only visible in edit mode */}
             {isEditing && (
               <>
@@ -609,8 +627,9 @@ export default function Canvas({
                 </div>
               </BlockAppearanceWrapper>
             </div>
-            </div>
-          ))}
+          </div>
+            )
+          })}
         </ResponsiveGridLayout>
       </div>
     </ErrorBoundary>

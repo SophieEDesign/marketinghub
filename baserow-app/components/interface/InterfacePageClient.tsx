@@ -747,7 +747,15 @@ function InterfacePageClientInternal({
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
-  const memoizedBlocks = useMemo(() => blocks || [], [blocks])
+  const memoizedBlocks = useMemo(() => {
+    const result = blocks || []
+    console.log(`[InterfacePageClient] memoizedBlocks: pageId=${page?.id}, page_type=${page?.page_type}`, {
+      blocksCount: result.length,
+      blockIds: result.map(b => b.id),
+      rawBlocksCount: blocks.length,
+    })
+    return result
+  }, [blocks, page?.id, page?.page_type])
   
   // CRITICAL: Memoize blocks prop for PageRenderer to prevent remounts
   // Conditionally creating array/undefined on every render causes remounts
@@ -1093,17 +1101,28 @@ function InterfacePageClientInternal({
           // This prevents remount storms when switching between edit and view modes
           (isDashboardOrOverview || page.page_type === 'content') ? (
             interfaceBuilderPage ? (
-              <InterfaceBuilder
-                key={`interface-builder-${page.id}`}
-                page={interfaceBuilderPage}
-                initialBlocks={memoizedBlocks}
-                // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                // URL-based viewer mode takes precedence (force read-only)
-                // Otherwise, viewer mode = not in block editing mode
-                isViewer={isViewer || !isBlockEditing}
-                hideHeader={true}
-                pageTableId={pageTableId}
-              />
+              (() => {
+                console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
+                  initialBlocksCount: memoizedBlocks.length,
+                  initialBlockIds: memoizedBlocks.map(b => b.id),
+                  isViewer,
+                  isBlockEditing,
+                  effectiveIsViewer: isViewer || !isBlockEditing,
+                })
+                return (
+                  <InterfaceBuilder
+                    key={`interface-builder-${page.id}`}
+                    page={interfaceBuilderPage}
+                    initialBlocks={memoizedBlocks}
+                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                    // URL-based viewer mode takes precedence (force read-only)
+                    // Otherwise, viewer mode = not in block editing mode
+                    isViewer={isViewer || !isBlockEditing}
+                    hideHeader={true}
+                    pageTableId={pageTableId}
+                  />
+                )
+              })()
             ) : null
           ) : (
             // For other page types, use PageRenderer
