@@ -542,10 +542,6 @@ function InterfacePageClientInternal({
     }
   }
 
-  // CRITICAL: Track if blocks have been loaded to prevent overwrites
-  // Track both the loaded state and the pageId to ensure we reset when page changes
-  const blocksLoadedRef = useRef<{ pageId: string | null; loaded: boolean }>({ pageId: null, loaded: false })
-  
   async function loadBlocks(forceReload = false) {
     console.log('🔥 loadBlocks CALLED', { pageId: page?.id || 'NO_PAGE', forceReload })
     if (!page) return

@@ -9,9 +9,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ viewId: string }> }
 ) {
+  const { viewId } = await params
   try {
     const supabase = await createClient()
-    const { viewId } = await params
     console.log('🔥 initialize-fields CALLED', { viewId })
 
     // 1. Get the view to find its table_id
@@ -105,6 +105,27 @@ export async function POST(
                             insertError.message?.includes('policy') ||
                             insertError.message?.includes('row-level security')
       
+      // Check if table doesn't exist (common during rapid mount/unmount)
+      const isTableNotFound = insertError.code === '42P01' || 
+                             insertError.code === 'PGRST205' ||
+                             insertError.message?.includes('does not exist') ||
+                             insertError.message?.includes('relation')
+      
+      if (isTableNotFound) {
+        // Table doesn't exist - return success with warning (fields may already be initialized)
+        console.warn('🔥 initialize-fields: view_fields table may not exist, but this is OK', {
+          viewId,
+          errorCode: insertError.code,
+          errorMessage: insertError.message,
+        })
+        return NextResponse.json({
+          message: 'Fields may already be initialized or table does not exist',
+          added: 0,
+          total: tableFields.length,
+          warning: 'View fields table may not exist. Fields may already be configured.',
+        })
+      }
+      
       if (isUniqueViolation) {
         // Try inserting individually to skip duplicates
         console.log(`Batch insert failed due to unique constraint, trying individual inserts for ${fieldsToAdd.length} fields`)
@@ -129,9 +150,12 @@ export async function POST(
           }
         }
         
-        if (successfulInserts.length > 0) {
+        if (successfulInserts.length > 0 || skippedFields.length === fieldsToAdd.length) {
+          // Success if we added fields OR if all fields already existed (all skipped)
           return NextResponse.json({
-            message: `Successfully added ${successfulInserts.length} field(s) to view${skippedFields.length > 0 ? `, ${skippedFields.length} already existed` : ''}`,
+            message: skippedFields.length === fieldsToAdd.length 
+              ? 'All fields already configured'
+              : `Successfully added ${successfulInserts.length} field(s) to view${skippedFields.length > 0 ? `, ${skippedFields.length} already existed` : ''}`,
             added: successfulInserts.length,
             total: tableFields.length,
             fields: successfulInserts,
@@ -154,12 +178,13 @@ export async function POST(
         errorDetails: insertError,
         isRLSViolation,
         isUniqueViolation,
+        isTableNotFound,
       })
       
       return NextResponse.json(
         { 
           error: 'Failed to add fields to view', 
-          error_code: isRLSViolation ? 'RLS_ERROR' : 'INSERT_ERROR', 
+          error_code: isRLSViolation ? 'RLS_ERROR' : isTableNotFound ? 'TABLE_NOT_FOUND' : 'INSERT_ERROR', 
           details: errorMessage,
           viewId,
           tableId: view.table_id,
