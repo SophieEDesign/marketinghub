@@ -251,11 +251,17 @@ function InterfacePageClientInternal({
           const currentUpdatedAt = view.updated_at
           const previousUpdatedAt = savedViewUpdatedAtRef.current
           
-          // If view was updated, reload data
+          // If view was updated, reload data AND blocks
+          // This ensures that blocks using the view are refreshed immediately
           if (previousUpdatedAt && currentUpdatedAt !== previousUpdatedAt) {
-            console.log(`[InterfacePageClient] View updated detected - reloading data: viewId=${page.saved_view_id}`)
+            console.log(`[InterfacePageClient] View updated detected - reloading data and blocks: viewId=${page.saved_view_id}`)
             savedViewUpdatedAtRef.current = currentUpdatedAt
+            // Reload both data and blocks to ensure everything reflects the saved view
             loadListViewData()
+            // Force reload blocks to pick up any changes in view configuration
+            if (page && blocksLoadedRef.current.pageId === page.id) {
+              loadBlocks(true) // forceReload = true
+            }
           } else if (!previousUpdatedAt) {
             // First check - just store the timestamp
             savedViewUpdatedAtRef.current = currentUpdatedAt
@@ -1142,6 +1148,7 @@ function InterfacePageClientInternal({
                   hideHeader={true}
                   pageTableId={pageTableId}
                   recordId={isRecordView ? (page.config?.record_id || null) : null}
+                  mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
                 />
               )
             })()

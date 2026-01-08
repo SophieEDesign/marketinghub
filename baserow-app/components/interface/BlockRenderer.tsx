@@ -33,6 +33,7 @@ interface BlockRendererProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
@@ -46,6 +47,7 @@ export default function BlockRenderer({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  mode = 'view', // Default to view mode
   filters = [],
   onRecordClick,
   aggregateData,

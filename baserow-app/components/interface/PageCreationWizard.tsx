@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isRecordViewPage } from "@/lib/interface/page-types"
+import { createRecordReviewTwoColumnLayout } from "@/lib/interface/record-review-layout"
 import { FileCheck, BookOpen } from "lucide-react"
 
 interface PageCreationWizardProps {
@@ -324,6 +325,45 @@ export default function PageCreationWizard({
         if (updateError) {
           console.error('Error updating dashboard_layout_id:', updateError)
           // Don't throw - record_view pages can work without dashboard_layout_id
+        }
+
+        // Seed two-column layout blocks for record_view pages
+        if (tableId && tableId.trim()) {
+          try {
+            const layoutBlocks = createRecordReviewTwoColumnLayout({
+              primaryTableId: tableId.trim(),
+              mode: 'review',
+            })
+
+            // Create blocks sequentially via API (POST endpoint creates one block at a time)
+            for (const blockDef of layoutBlocks) {
+              try {
+                const blockResponse = await fetch(`/api/pages/${page.id}/blocks`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: blockDef.type,
+                    x: blockDef.x,
+                    y: blockDef.y,
+                    w: blockDef.w,
+                    h: blockDef.h,
+                    config: blockDef.config,
+                  }),
+                })
+
+                if (!blockResponse.ok) {
+                  console.error(`Error creating block ${blockDef.type}:`, await blockResponse.text())
+                  // Continue with next block
+                }
+              } catch (blockError) {
+                console.error(`Error creating block ${blockDef.type}:`, blockError)
+                // Continue with next block
+              }
+            }
+          } catch (layoutError) {
+            console.error('Error seeding two-column layout blocks:', layoutError)
+            // Continue anyway - blocks can be added manually
+          }
         }
       }
 

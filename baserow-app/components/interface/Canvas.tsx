@@ -40,6 +40,7 @@ interface CanvasProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages
+  mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
@@ -63,6 +64,7 @@ export default function Canvas({
   pageTableId = null,
   pageId = null,
   recordId = null,
+  mode = 'view', // Default to view mode
   onRecordClick,
 }: CanvasProps) {
   // Get filters from filter blocks for this block
@@ -529,6 +531,10 @@ export default function Canvas({
           layouts={{ lg: layout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
           cols={{ lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+          // Canvas uses a fixed 12-column grid for two-column record review layouts
+          // Left column: x=0, w=4 (4 cols)
+          // Right column: x=4, w=8 (8 cols)
+          // Blocks don't know about columns - they only have x/y/w/h coordinates
           rowHeight={layoutSettings.rowHeight || 30}
           margin={layoutSettings.margin || [10, 10]}
           isDraggable={isEditing}
@@ -699,6 +705,7 @@ export default function Canvas({
                     pageTableId={pageTableId}
                     pageId={pageId}
                     recordId={recordId}
+                    mode={mode}
                     filters={getFiltersForBlock(block.id)}
                     onRecordClick={onRecordClick}
                     aggregateData={aggregateData[block.id]}

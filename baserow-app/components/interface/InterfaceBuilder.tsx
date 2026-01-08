@@ -31,6 +31,7 @@ interface InterfaceBuilderProps {
   hideHeader?: boolean
   pageTableId?: string | null // Table ID from the page
   recordId?: string | null // Record ID for record review pages
+  mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
 }
 
@@ -43,6 +44,7 @@ export default function InterfaceBuilder({
   hideHeader = false,
   pageTableId = null,
   recordId = null,
+  mode = 'view', // Default to view mode
   onRecordClick,
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
@@ -985,6 +987,7 @@ export default function InterfaceBuilder({
               pageTableId={pageTableId}
               pageId={page.id}
               recordId={recordId}
+              mode={mode}
               onRecordClick={onRecordClick}
             />
           </FilterStateProvider>

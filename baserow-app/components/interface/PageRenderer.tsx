@@ -139,6 +139,7 @@ export default function PageRenderer({
         hideHeader={true}
         pageTableId={pageTableId}
         recordId={recordId}
+        mode={page.page_type === 'record_view' ? 'view' : 'view'}
       />
     )
   }
