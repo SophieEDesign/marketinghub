@@ -33,6 +33,8 @@ import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { PAGE_TYPE_DEFINITIONS, isRecordReviewPage } from "@/lib/interface/page-types"
 import RecordReviewLeftPanelSettings from "./RecordReviewLeftPanelSettings"
+import RecordViewLeftPanelSettings from "./RecordViewLeftPanelSettings"
+import { createBlock } from "@/lib/pages/saveBlocks"
 
 interface InterfacePageSettingsDrawerProps {
   pageId: string
@@ -66,13 +68,24 @@ export default function InterfacePageSettingsDrawer({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [loading, setLoading] = useState(true)
-  // Left panel settings for record_review pages
+  // Left panel settings for record_review pages (full field list)
   const [leftPanelSettings, setLeftPanelSettings] = useState<{
     visibleFieldIds: string[]
     fieldOrder: string[]
     showLabels: boolean
     compact: boolean
   } | null>(null)
+  
+  // Left panel settings for record_view pages (simplified: title, subtitle, additional)
+  const [recordViewSettings, setRecordViewSettings] = useState<{
+    titleFieldId: string | null
+    subtitleFieldId: string | null
+    additionalFieldId: string | null
+  } | null>(null)
+  
+  // Right panel field selection for record_view pages (fields to auto-create as blocks)
+  const [rightPanelFields, setRightPanelFields] = useState<string[]>([])
+  const [availableFields, setAvailableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
 
   useEffect(() => {
     if (isOpen && pageId) {
@@ -113,18 +126,40 @@ export default function InterfacePageSettingsDrawer({
       setInterfaceId(pageData.group_id || "") // Interface is required, no "__none__" option
       setIsAdminOnly(pageData.is_admin_only || false)
       
-      // Load left panel settings for record_review pages
-      if (isRecordReviewPage(pageData.page_type as any)) {
-        // InterfacePage stores settings in config field
-        const config = pageData.config || {}
+      // Load left panel settings based on page type
+      const config = pageData.config || {}
+      const pageType = pageData.page_type as any
+      
+      if (pageType === 'record_review') {
+        // Full field list configuration for record_review
         setLeftPanelSettings({
           visibleFieldIds: config.leftPanel?.visibleFieldIds || [],
           fieldOrder: config.leftPanel?.fieldOrder || [],
           showLabels: config.leftPanel?.showLabels ?? true,
           compact: config.leftPanel?.compact ?? false,
         })
+        setRecordViewSettings(null)
+      } else if (pageType === 'record_view') {
+        // Simplified 3-field configuration for record_view
+        setRecordViewSettings({
+          titleFieldId: config.leftPanel?.titleFieldId || null,
+          subtitleFieldId: config.leftPanel?.subtitleFieldId || null,
+          additionalFieldId: config.leftPanel?.additionalFieldId || null,
+        })
+        setLeftPanelSettings(null)
+        
+        // Load right panel field selection
+        setRightPanelFields(config.rightPanelFields || [])
+        
+        // Load available fields from the table
+        const tableId = pageData.base_table || config.tableId
+        if (tableId) {
+          loadAvailableFields(tableId)
+        }
       } else {
         setLeftPanelSettings(null)
+        setRecordViewSettings(null)
+        setRightPanelFields([])
       }
       
       setLoading(false)
@@ -200,14 +235,26 @@ export default function InterfacePageSettingsDrawer({
       }
       // If unchanged, don't include base_table in updates (preserves existing value)
       
-      // For record_review pages, update config with leftPanel configuration
-      if (isRecordReviewPage(page.page_type as any) && leftPanelSettings) {
-        const currentConfig = page.config || {}
+      // Update config with leftPanel configuration based on page type
+      const currentConfig = page.config || {}
+      const pageType = page.page_type as any
+      
+      if (pageType === 'record_review' && leftPanelSettings) {
+        // Full field list configuration for record_review
         updates.config = {
           ...currentConfig,
           tableId: currentSelection || currentConfig.tableId || currentConfig.primary_table_id,
           leftPanel: leftPanelSettings,
         }
+      } else if (pageType === 'record_view' && recordViewSettings) {
+        // Simplified 3-field configuration for record_view
+        updates.config = {
+          ...currentConfig,
+          tableId: currentSelection || currentConfig.tableId || currentConfig.primary_table_id,
+          leftPanel: recordViewSettings,
+          rightPanelFields: rightPanelFields, // Store selected fields for right panel
+        }
+        
       }
       
       const res = await fetch(`/api/interface-pages/${pageId}`, {
@@ -221,6 +268,17 @@ export default function InterfacePageSettingsDrawer({
         throw new Error(error.error || 'Failed to update page')
       }
 
+      // Create field blocks for record_view pages after page is saved
+      if (pageType === 'record_view' && rightPanelFields.length > 0) {
+        const tableId = currentSelection || baseTable || page.base_table
+        if (tableId) {
+          await createFieldBlocks(pageId, rightPanelFields, tableId)
+        }
+      }
+      
+      // Reload page to get updated data
+      await loadPage()
+
       const updatedPage = await res.json()
       onUpdate(updatedPage)
       onClose()
@@ -229,6 +287,69 @@ export default function InterfacePageSettingsDrawer({
       alert(error.message || 'Failed to save page')
     } finally {
       setSaving(false)
+    }
+  }
+  
+  // Create field blocks for selected fields
+  async function createFieldBlocks(pageId: string, fieldIds: string[], tableId: string | null) {
+    if (!tableId) return
+    
+    try {
+      // Get existing blocks to determine starting position
+      const blocksResponse = await fetch(`/api/pages/${pageId}/blocks`)
+      const blocksData = blocksResponse.ok ? await blocksResponse.json() : { blocks: [] }
+      const existingBlocks = blocksData.blocks || []
+      
+      // Get existing field block field IDs to avoid duplicates
+      const existingFieldIds = existingBlocks
+        .filter((b: any) => b.type === 'field' && b.config?.field_id)
+        .map((b: any) => b.config.field_id)
+      
+      // Filter out fields that already have blocks
+      const fieldsToCreate = fieldIds.filter(id => !existingFieldIds.includes(id))
+      
+      if (fieldsToCreate.length === 0) {
+        return // All fields already have blocks
+      }
+      
+      // Calculate grid layout: 2 columns, 6 wide each (half of 12-column grid)
+      const colsPerRow = 2
+      const blockWidth = 6 // 6 columns each (half of 12-column grid)
+      const blockHeight = 3 // Default height
+      const marginY = 1 // Vertical spacing
+      
+      // Find the maximum Y position to start below existing blocks
+      const maxY = existingBlocks.length > 0
+        ? Math.max(...existingBlocks.map((b: any) => (b.y || 0) + (b.h || 4)))
+        : 0
+      
+      let startY = maxY + marginY
+      
+      // Create blocks in grid layout
+      for (let i = 0; i < fieldsToCreate.length; i++) {
+        const fieldId = fieldsToCreate[i]
+        const row = Math.floor(i / colsPerRow)
+        const col = i % colsPerRow
+        
+        const x = col * blockWidth
+        const y = startY + (row * (blockHeight + marginY))
+        
+        await createBlock(
+          pageId,
+          'field',
+          x,
+          y,
+          blockWidth,
+          blockHeight,
+          {
+            field_id: fieldId,
+            table_id: tableId,
+          }
+        )
+      }
+    } catch (error) {
+      console.error('Error creating field blocks:', error)
+      // Don't throw - allow page save to complete even if block creation fails
     }
   }
 
@@ -368,8 +489,8 @@ export default function InterfacePageSettingsDrawer({
               </div>
             </div>
 
-            {/* Record Review Left Panel Settings */}
-            {isRecordReviewPage(pageType as any) && baseTable && leftPanelSettings !== null && (
+            {/* Record Review Left Panel Settings (full field list) */}
+            {pageType === 'record_review' && baseTable && leftPanelSettings !== null && (
               <div className="pt-4 border-t space-y-4">
                 <div>
                   <Label className="text-sm font-semibold">Left Panel Fields</Label>
@@ -381,6 +502,89 @@ export default function InterfacePageSettingsDrawer({
                     currentSettings={leftPanelSettings}
                     onSettingsChange={setLeftPanelSettings}
                   />
+                </div>
+              </div>
+            )}
+
+            {/* Record View Left Panel Settings (simplified: title, subtitle, additional) */}
+            {pageType === 'record_view' && baseTable && recordViewSettings !== null && (
+              <div className="pt-4 border-t space-y-4">
+                <div>
+                  <Label className="text-sm font-semibold">Left Panel Fields</Label>
+                  <p className="text-xs text-gray-500 mt-1 mb-3">
+                    Configure which fields appear in the left column for each record.
+                  </p>
+                  <RecordViewLeftPanelSettings
+                    tableId={baseTable}
+                    currentSettings={recordViewSettings}
+                    onSettingsChange={setRecordViewSettings}
+                  />
+                </div>
+                
+                {/* Right Panel Field Selection */}
+                <div className="pt-4 border-t">
+                  <Label className="text-sm font-semibold">Right Panel Fields</Label>
+                  <p className="text-xs text-gray-500 mt-1 mb-3">
+                    Select fields to automatically add as blocks to the right panel. You can reorganize them after adding.
+                  </p>
+                  
+                  {availableFields.length === 0 ? (
+                    <p className="text-sm text-gray-500">Loading fields...</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Select All / None buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRightPanelFields(availableFields.map(f => f.id))}
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRightPanelFields([])}
+                        >
+                          Select None
+                        </Button>
+                      </div>
+                      
+                      {/* Field checkboxes */}
+                      <div className="max-h-64 overflow-y-auto border rounded-md p-3 space-y-2">
+                        {availableFields.map((field) => (
+                          <label
+                            key={field.id}
+                            className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-2 rounded"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={rightPanelFields.includes(field.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setRightPanelFields([...rightPanelFields, field.id])
+                                } else {
+                                  setRightPanelFields(rightPanelFields.filter(id => id !== field.id))
+                                }
+                              }}
+                              className="rounded"
+                            />
+                            <span className="text-gray-700">{field.name}</span>
+                            <span className="text-xs text-gray-500">({field.type})</span>
+                          </label>
+                        ))}
+                      </div>
+                      
+                      {rightPanelFields.length > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {rightPanelFields.length} field{rightPanelFields.length !== 1 ? 's' : ''} selected. 
+                          These will be added as blocks when you save.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

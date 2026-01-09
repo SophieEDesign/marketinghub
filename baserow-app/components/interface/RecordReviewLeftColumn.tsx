@@ -25,11 +25,17 @@ interface RecordReviewLeftColumnProps {
   selectedRecordId: string | null
   onRecordSelect: (recordId: string) => void
   leftPanelSettings?: {
-    visibleFieldIds: string[] // From page.settings.leftPanel.visibleFieldIds
-    fieldOrder?: string[] // From page.settings.leftPanel.fieldOrder
-    showLabels?: boolean // From page.settings.leftPanel.showLabels
-    compact?: boolean // From page.settings.leftPanel.compact
+    // For record_review pages: full field list
+    visibleFieldIds?: string[]
+    fieldOrder?: string[]
+    showLabels?: boolean
+    compact?: boolean
+    // For record_view pages: simplified 3-field configuration
+    titleFieldId?: string | null
+    subtitleFieldId?: string | null
+    additionalFieldId?: string | null
   }
+  pageType?: 'record_view' | 'record_review' // To determine which settings format to use
 }
 
 export default function RecordReviewLeftColumn({
@@ -37,6 +43,7 @@ export default function RecordReviewLeftColumn({
   selectedRecordId,
   onRecordSelect,
   leftPanelSettings,
+  pageType = 'record_review', // Default to record_review for backward compatibility
 }: RecordReviewLeftColumnProps) {
   const [records, setRecords] = useState<any[]>([])
   const [fields, setFields] = useState<TableField[]>([])
@@ -44,11 +51,20 @@ export default function RecordReviewLeftColumn({
   const [searchQuery, setSearchQuery] = useState("")
   const [tableName, setTableName] = useState<string | null>(null)
   
-  // Get visible field IDs from page settings (single source of truth)
-  const visibleFieldIds = leftPanelSettings?.visibleFieldIds || []
-  const fieldOrder = leftPanelSettings?.fieldOrder || []
-  const showLabels = leftPanelSettings?.showLabels ?? true
-  const compact = leftPanelSettings?.compact ?? false
+  // Get settings based on page type
+  const isRecordView = pageType === 'record_view'
+  const isRecordReview = pageType === 'record_review'
+  
+  // For record_review: full field list configuration
+  const visibleFieldIds = isRecordReview ? (leftPanelSettings?.visibleFieldIds || []) : []
+  const fieldOrder = isRecordReview ? (leftPanelSettings?.fieldOrder || []) : []
+  const showLabels = isRecordReview ? (leftPanelSettings?.showLabels ?? true) : false
+  const compact = isRecordReview ? (leftPanelSettings?.compact ?? false) : false
+  
+  // For record_view: simplified 3-field configuration
+  const titleFieldId = isRecordView ? (leftPanelSettings?.titleFieldId || null) : null
+  const subtitleFieldId = isRecordView ? (leftPanelSettings?.subtitleFieldId || null) : null
+  const additionalFieldId = isRecordView ? (leftPanelSettings?.additionalFieldId || null) : null
 
   // Load table name and fields
   useEffect(() => {
@@ -132,16 +148,24 @@ export default function RecordReviewLeftColumn({
 
   // Get ordered fields based on page settings
   const orderedFields = useMemo(() => {
-    if (fieldOrder.length > 0) {
-      // Use fieldOrder from settings
-      return fieldOrder
-        .map(id => fields.find(f => f.id === id))
-        .filter((f): f is TableField => f !== undefined)
-        .concat(fields.filter(f => !fieldOrder.includes(f.id)))
+    if (isRecordView) {
+      // For record_view: return fields in order: title, subtitle, additional
+      const titleField = titleFieldId ? fields.find(f => f.id === titleFieldId) : null
+      const subtitleField = subtitleFieldId ? fields.find(f => f.id === subtitleFieldId) : null
+      const additionalField = additionalFieldId ? fields.find(f => f.id === additionalFieldId) : null
+      
+      return [titleField, subtitleField, additionalField].filter((f): f is TableField => f !== null)
+    } else {
+      // For record_review: use fieldOrder or table field order
+      if (fieldOrder.length > 0) {
+        return fieldOrder
+          .map(id => fields.find(f => f.id === id))
+          .filter((f): f is TableField => f !== undefined)
+          .concat(fields.filter(f => !fieldOrder.includes(f.id)))
+      }
+      return fields
     }
-    // If no fieldOrder, use table field order
-    return fields
-  }, [fields, fieldOrder])
+  }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId])
 
   if (!tableId) {
     return (
@@ -181,40 +205,85 @@ export default function RecordReviewLeftColumn({
             {records.map((record) => {
               const isSelected = record.id === selectedRecordId
               
-              // Get display value from first visible field (from page settings)
-              // If no visibleFieldIds specified, show all fields
-              const displayFields = visibleFieldIds.length === 0
-                ? orderedFields
-                : orderedFields.filter(f => visibleFieldIds.includes(f.id))
-              
-              const displayField = displayFields[0]
-              const displayValue = displayField 
-                ? record[displayField.name] || record.id
-                : record.name || record.id
+              if (isRecordView) {
+                // For record_view: display title, subtitle, and additional field
+                const titleField = titleFieldId ? fields.find(f => f.id === titleFieldId) : null
+                const subtitleField = subtitleFieldId ? fields.find(f => f.id === subtitleFieldId) : null
+                const additionalField = additionalFieldId ? fields.find(f => f.id === additionalFieldId) : null
+                
+                const titleValue = titleField ? (record[titleField.name] || record.id) : record.id
+                const subtitleValue = subtitleField ? record[subtitleField.name] : null
+                const additionalValue = additionalField ? record[additionalField.name] : null
 
-              return (
-                <button
-                  key={record.id}
-                  onClick={() => onRecordSelect(record.id)}
-                  className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
-                    isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
-                  } ${compact ? "py-2" : ""}`}
-                >
-                  <div className={`font-medium text-gray-900 truncate ${compact ? "text-xs" : "text-sm"}`}>
-                    {String(displayValue || record.id)}
-                  </div>
-                  {showLabels && displayField && (
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {displayField.name}
+                return (
+                  <button
+                    key={record.id}
+                    onClick={() => onRecordSelect(record.id)}
+                    className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
+                      isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
+                    }`}
+                  >
+                    {/* Title */}
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {String(titleValue || record.id)}
                     </div>
-                  )}
-                  {isSelected && (
-                    <Badge variant="secondary" className="mt-1 text-xs">
-                      Selected
-                    </Badge>
-                  )}
-                </button>
-              )
+                    
+                    {/* Subtitle */}
+                    {subtitleValue && (
+                      <div className="text-xs text-gray-600 truncate mt-0.5">
+                        {String(subtitleValue)}
+                      </div>
+                    )}
+                    
+                    {/* Additional Field */}
+                    {additionalValue && (
+                      <div className="text-xs text-gray-500 truncate mt-0.5">
+                        {String(additionalValue)}
+                      </div>
+                    )}
+                    
+                    {isSelected && (
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        Selected
+                      </Badge>
+                    )}
+                  </button>
+                )
+              } else {
+                // For record_review: use full field list configuration
+                const displayFields = visibleFieldIds.length === 0
+                  ? orderedFields
+                  : orderedFields.filter(f => visibleFieldIds.includes(f.id))
+                
+                const displayField = displayFields[0]
+                const displayValue = displayField 
+                  ? record[displayField.name] || record.id
+                  : record.name || record.id
+
+                return (
+                  <button
+                    key={record.id}
+                    onClick={() => onRecordSelect(record.id)}
+                    className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
+                      isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
+                    } ${compact ? "py-2" : ""}`}
+                  >
+                    <div className={`font-medium text-gray-900 truncate ${compact ? "text-xs" : "text-sm"}`}>
+                      {String(displayValue || record.id)}
+                    </div>
+                    {showLabels && displayField && (
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {displayField.name}
+                      </div>
+                    )}
+                    {isSelected && (
+                      <Badge variant="secondary" className="mt-1 text-xs">
+                        Selected
+                      </Badge>
+                    )}
+                  </button>
+                )
+              }
             })}
           </div>
         )}

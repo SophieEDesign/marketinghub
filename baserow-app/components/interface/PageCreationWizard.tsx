@@ -171,6 +171,11 @@ export default function PageCreationWizard({
   }
 
   const handleAnchorConfigured = () => {
+    // Validate table is required for record_view pages
+    if (pageType === 'record_view' && (!tableId || !tableId.trim())) {
+      alert('Please select a table. The table is required to display records in the left column.')
+      return
+    }
     setStep('name')
   }
 
@@ -186,8 +191,15 @@ export default function PageCreationWizard({
     }
 
     // Unified architecture: Pages don't require anchors - blocks define their own data sources
-    // Record view pages may optionally use a table for context, but it's not required
+    // Record view pages REQUIRE a table for the left column record list
     // Content pages don't require any data sources
+    
+    // Validate table is required for record_view pages
+    if (pageType === 'record_view' && (!tableId || !tableId.trim())) {
+      alert('Please select a table for the Record View page. The table is required to display records in the left column.')
+      setCreating(false)
+      return
+    }
 
     setCreating(true)
     try {
@@ -204,8 +216,11 @@ export default function PageCreationWizard({
 
       // Unified architecture: Pages don't require anchors
       // Blocks define their own data sources
-      // Optional: Store base_table if provided for record_view pages (for block context)
-      if (tableId && tableId.trim() && pageType === 'record_view') {
+      // Required: Store base_table for record_view pages (for left column record list)
+      if (pageType === 'record_view') {
+        if (!tableId || !tableId.trim()) {
+          throw new Error('Table is required for Record View pages')
+        }
         base_table = tableId.trim()
         
         // Create a grid view for data access (optional - blocks can use their own views)
@@ -280,6 +295,11 @@ export default function PageCreationWizard({
       }
 
       // Create interface page in interface_pages table
+      // For record_view pages, store tableId in both base_table and config.tableId
+      const pageConfig = pageType === 'record_view' && base_table
+        ? { tableId: base_table }
+        : {}
+      
       const { data: page, error } = await supabase
         .from('interface_pages')
         .insert([
@@ -292,7 +312,7 @@ export default function PageCreationWizard({
             form_config_id,
             record_config_id,
             group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null, // Required
-            config: {},
+            config: pageConfig, // Store tableId in config for record_view pages
             created_by: user?.id,
           },
         ])
@@ -452,13 +472,13 @@ export default function PageCreationWizard({
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Select Table (Optional)</Label>
+            <Label>Select Table *</Label>
             <p className="text-sm text-gray-500 mb-2">
-              This page will show records. Select a table to provide context for blocks. Blocks can define their own data sources.
+              The table is required to display records in the left column. Select the table that contains the records you want to review.
             </p>
-            <Select value={tableId} onValueChange={setTableId}>
+            <Select value={tableId} onValueChange={setTableId} required>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a table" />
+                <SelectValue placeholder="Choose a table (required)" />
               </SelectTrigger>
               <SelectContent>
                 {tables.map((table) => (
@@ -469,7 +489,10 @@ export default function PageCreationWizard({
               </SelectContent>
             </Select>
             {tables.length === 0 && (
-              <p className="text-sm text-gray-500">No tables available. Create a table first in Settings → Data.</p>
+              <p className="text-sm text-red-500">No tables available. Create a table first in Settings → Data.</p>
+            )}
+            {!tableId && tables.length > 0 && (
+              <p className="text-sm text-red-500">Please select a table to continue.</p>
             )}
           </div>
           <Button

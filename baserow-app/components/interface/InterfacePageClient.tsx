@@ -833,6 +833,7 @@ function InterfacePageClientInternal({
     return {
       id: page.id,
       name: page.name,
+      page_type: page.page_type, // Preserve page type for RecordReviewPage
       settings: {
         layout_template: 'content' as const,
         // Map config to settings for RecordReviewPage
@@ -842,7 +843,7 @@ function InterfacePageClientInternal({
         primary_table_id: page.base_table || pageTableId || null,
       }
     } as any
-  }, [page?.id, page?.name, page?.config, page?.base_table, pageTableId])
+  }, [page?.id, page?.name, page?.page_type, page?.config, page?.base_table, pageTableId])
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed

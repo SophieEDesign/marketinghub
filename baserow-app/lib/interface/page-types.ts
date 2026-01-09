@@ -37,7 +37,7 @@ export const PAGE_TYPE_DEFINITIONS: Record<PageType, PageTypeDefinition> = {
     label: 'Record View',
     description: 'Canvas page with injected recordId - blocks may opt-in to record context',
     requiresSourceView: false,
-    requiresBaseTable: false, // Optional - blocks define their own data sources
+    requiresBaseTable: true, // Required - needs tableId for left column record list
     supportsGridToggle: false,
     allowsInlineEditing: false,
   },

@@ -51,6 +51,9 @@ export default function RecordReviewPage({
   const pageConfig = (page as any).config || page.settings || {}
   const pageTableId = pageConfig.tableId || pageConfig.primary_table_id || page.settings?.tableId || page.settings?.primary_table_id || null
   const leftPanelSettings = pageConfig.leftPanel || page.settings?.leftPanel
+  
+  // Determine page type from page object (for record_view vs record_review)
+  const pageType = (page as any).page_type || (page as any).type || 'record_review'
 
   // Handle record selection
   // CRITICAL: This does NOT trigger block reloads - blocks just re-render with new context
@@ -72,6 +75,7 @@ export default function RecordReviewPage({
         selectedRecordId={selectedRecordId}
         onRecordSelect={handleRecordSelect}
         leftPanelSettings={leftPanelSettings}
+        pageType={pageType as 'record_view' | 'record_review'}
       />
 
       {/* Right Canvas - Blocks Only */}
