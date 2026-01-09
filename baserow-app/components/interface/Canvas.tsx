@@ -192,42 +192,44 @@ export default function Canvas({
     // CRITICAL: Always compare blocks with CURRENT LAYOUT state (source of truth)
     // When returning to page, blocks have saved positions from DB, layout might be empty or stale
     // We need to sync if blocks differ from current layout OR if layout is empty (first load after navigation)
-    const blockPositionsChanged = layoutHydratedRef.current && (
-      // If layout is empty, we definitely need to sync (returning to page after navigation)
-      layout.length === 0 ||
-      // Or if any block position differs from current layout
-      blocks.some((block) => {
-        const currentLayoutItem = layout.find(l => l.i === block.id)
-        if (!currentLayoutItem) {
-          // Block not in layout - need to sync (new block or layout was cleared)
-          return true
-        }
-        // Check if positions differ (allowing for small floating point differences)
-        const positionsDiffer = 
-          Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) > 0.01 ||
-          Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) > 0.01 ||
-          Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) > 0.01 ||
-          Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) > 0.01
-        
-        if (!positionsDiffer) {
-          // Positions match - update ref to track this state
-          previousBlockPositionsRef.current.set(block.id, {
-            x: block.x || 0,
-            y: block.y || 0,
-            w: block.w || 4,
-            h: block.h || 4,
-          })
-        }
-        
-        return positionsDiffer
-      })
-    )
+    
+    // CRITICAL: If layout is empty but we have blocks, we MUST sync (first load or returning to page)
+    // This handles the case when returning to a page - layout is empty, blocks have saved positions
+    const layoutIsEmpty = layout.length === 0 && blocks.length > 0
+    
+    // Check if positions differ (only if layout is already hydrated)
+    const blockPositionsChanged = layoutHydratedRef.current && !layoutIsEmpty && blocks.some((block) => {
+      const currentLayoutItem = layout.find(l => l.i === block.id)
+      if (!currentLayoutItem) {
+        // Block not in layout - need to sync (new block or layout was cleared)
+        return true
+      }
+      // Check if positions differ (allowing for small floating point differences)
+      const positionsDiffer = 
+        Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) > 0.01 ||
+        Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) > 0.01 ||
+        Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) > 0.01 ||
+        Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) > 0.01
+      
+      if (!positionsDiffer) {
+        // Positions match - update ref to track this state
+        previousBlockPositionsRef.current.set(block.id, {
+          x: block.x || 0,
+          y: block.y || 0,
+          w: block.w || 4,
+          h: block.h || 4,
+        })
+      }
+      
+      return positionsDiffer
+    })
     
     // Sync layout from blocks if:
     // 1. First load (blockIdsChanged and previousBlockIds is empty)
     // 2. Block IDs changed (blocks added/removed)
-    // 3. Block positions changed (blocks reloaded with updated positions from DB)
-    const shouldSync = blockIdsChanged || blockPositionsChanged
+    // 3. Layout is empty but we have blocks (returning to page after navigation)
+    // 4. Block positions changed (blocks reloaded with updated positions from DB)
+    const shouldSync = blockIdsChanged || layoutIsEmpty || blockPositionsChanged
     
     if (process.env.NODE_ENV === 'development') {
       console.log('[Canvas] Layout sync check', {
@@ -236,6 +238,7 @@ export default function Canvas({
         currentBlockIds,
         previousBlockIds,
         blockIdsChanged,
+        layoutIsEmpty,
         blockPositionsChanged,
         shouldSync,
         layoutLength: layout.length,

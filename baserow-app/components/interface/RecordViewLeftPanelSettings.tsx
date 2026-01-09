@@ -100,13 +100,15 @@ export default function RecordViewLeftPanelSettings({
   }
 
   const handleSubtitleChange = (fieldId: string) => {
-    setSubtitleFieldId(fieldId)
-    notifyChange(titleFieldId, fieldId, additionalFieldId)
+    const value = fieldId === "__none__" ? null : fieldId
+    setSubtitleFieldId(value)
+    notifyChange(titleFieldId, value, additionalFieldId)
   }
 
   const handleAdditionalChange = (fieldId: string) => {
-    setAdditionalFieldId(fieldId)
-    notifyChange(titleFieldId, subtitleFieldId, fieldId)
+    const value = fieldId === "__none__" ? null : fieldId
+    setAdditionalFieldId(value)
+    notifyChange(titleFieldId, subtitleFieldId, value)
   }
 
   if (!tableId) {
@@ -166,14 +168,14 @@ export default function RecordViewLeftPanelSettings({
           Optional secondary field displayed below the title
         </p>
         <Select
-          value={subtitleFieldId || ""}
-          onValueChange={handleSubtitleChange}
+          value={subtitleFieldId || "__none__"}
+          onValueChange={(value) => handleSubtitleChange(value === "__none__" ? "" : value)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select subtitle field (optional)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none__">None</SelectItem>
             {getAvailableFields(titleFieldId).map((field) => (
               <SelectItem key={field.id} value={field.id}>
                 {field.name} ({field.type})
@@ -190,14 +192,14 @@ export default function RecordViewLeftPanelSettings({
           Optional third field displayed below the subtitle
         </p>
         <Select
-          value={additionalFieldId || ""}
+          value={additionalFieldId || "__none__"}
           onValueChange={handleAdditionalChange}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select additional field (optional)" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none__">None</SelectItem>
             {getAvailableFields(
               titleFieldId === subtitleFieldId ? titleFieldId : null
             )
