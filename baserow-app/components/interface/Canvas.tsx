@@ -469,79 +469,21 @@ export default function Canvas({
 
   if (blocks.length === 0) {
     console.log(`[Canvas] Rendering empty state: pageId=${pageId}, isEditing=${isEditing}`)
-    // Template-specific empty state content
-    const getEmptyStateContent = () => {
-      switch (layoutTemplate) {
-        case 'dashboard':
-          return {
-            icon: '📈',
-            title: 'Build your dashboard',
-            description: interfaceDescription || 'Add KPIs, charts, and data grids to create a comprehensive overview.',
-            suggestedBlocks: [
-              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Show key metrics' },
-              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize trends' },
-              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
-            ],
-          }
-        case 'planning':
-          return {
-            icon: '📋',
-            title: 'Set up your planning board',
-            description: interfaceDescription || 'Organize your work with grids, KPIs, and progress tracking.',
-            suggestedBlocks: [
-              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'View all items' },
-              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Track progress' },
-              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize status' },
-            ],
-          }
-        case 'form':
-          return {
-            icon: '📝',
-            title: 'Create your form',
-            description: interfaceDescription || 'Add a form block to collect data and text blocks for instructions.',
-            suggestedBlocks: [
-              { type: 'form' as BlockType, label: 'Form', icon: '📝', description: 'Collect data' },
-              { type: 'text' as BlockType, label: 'Text', icon: '📄', description: 'Add instructions' },
-            ],
-          }
-        case 'record-management':
-          return {
-            icon: '📄',
-            title: 'Set up record management',
-            description: interfaceDescription || 'Add a grid to browse records and a record panel to view details.',
-            suggestedBlocks: [
-              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Browse records' },
-              { type: 'record' as BlockType, label: 'Record Panel', icon: '📄', description: 'View details' },
-            ],
-          }
-        case 'content':
-          return {
-            icon: '📄',
-            title: 'This is a content page',
-            description: interfaceDescription || 'Add blocks to build your page. Use text, headings, images, and links to create documentation and resources.',
-            suggestedBlocks: [
-              { type: 'text' as BlockType, label: 'Text', icon: '📝', description: 'Add content' },
-              { type: 'image' as BlockType, label: 'Image', icon: '🖼️', description: 'Add images' },
-              { type: 'divider' as BlockType, label: 'Divider', icon: '➖', description: 'Separate sections' },
-              { type: 'html' as BlockType, label: 'HTML', icon: '🌐', description: 'Rich content' },
-            ],
-          }
-        default:
-          return {
-            icon: '🎨',
-            title: 'Build your interface',
-            description: interfaceDescription || 'Get started by adding your first block.',
-            suggestedBlocks: [
-              { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
-              { type: 'form' as BlockType, label: 'Form', icon: '📝', description: 'Collect data' },
-              { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize data' },
-              { type: 'kpi' as BlockType, label: 'KPI', icon: '📊', description: 'Show metrics' },
-            ],
-          }
-      }
+    // CRITICAL: Empty state is universal - no page-type-specific logic
+    // Layout is determined by blocks only, not by page type, template, saved_view_id, or any page config
+    // All pages use the same empty state - blocks define behavior, not pages
+    const emptyStateContent = {
+      icon: '📄',
+      title: 'Add blocks to get started',
+      description: interfaceDescription || 'Add blocks to build your page. Blocks define layout and behavior.',
+      suggestedBlocks: [
+        { type: 'text' as BlockType, label: 'Text', icon: '📝', description: 'Add content' },
+        { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
+        { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize data' },
+      ],
     }
-
-    const emptyState = getEmptyStateContent()
+    
+    const emptyState = emptyStateContent
 
     return (
       <div className="w-full h-full flex items-center justify-center p-8">

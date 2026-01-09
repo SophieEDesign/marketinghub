@@ -202,7 +202,9 @@ export default function PageDisplaySettingsPanel({
 
       // Load page config
       const config = currentPage.config || {}
-      setLayout(config.visualisation || currentPage.page_type)
+      // CRITICAL: Layout is determined by blocks only, not by page type or visualisation
+      // This setting is informational only - it does NOT affect layout
+      setLayout(config.visualisation || 'content')
       setRecordPreview(config.record_panel !== 'none')
       setDensity(config.row_height || 'medium')
       setReadOnly(config.read_only || false)
@@ -269,7 +271,9 @@ export default function PageDisplaySettingsPanel({
   }, [selectedTableId])
 
   // Determine if page supports grouping (needed before saveSettings callback)
-  const supportsGrouping = ['list', 'kanban'].includes(page?.page_type || '')
+  // CRITICAL: Grouping is determined by blocks, not by page type
+  // This check is removed - blocks define behavior, not pages
+  const supportsGrouping = false // Always false - blocks handle grouping, not pages
 
   // Auto-save function - called whenever settings change
   // Pages now use blocks, so we save to page config and update/create blocks

@@ -788,7 +788,7 @@ function InterfacePageClientInternal({
       ...page,
       config: {
         ...page.config,
-        visualisation: isGridMode ? 'grid' : (page.config?.visualisation || page.page_type),
+        visualisation: isGridMode ? 'grid' : (page.config?.visualisation || 'content'),
       },
     }
   }, [page, isGridMode])
@@ -805,6 +805,8 @@ function InterfacePageClientInternal({
       name: page.name,
       page_type: page.page_type, // Preserve page type for RecordReviewPage
       settings: {
+        // CRITICAL: layout_template is informational only - it does NOT affect layout
+        // Layout is determined by blocks only, not by page type or template
         layout_template: 'content' as const,
         // Map config to settings for RecordReviewPage
         // For record_view/record_review pages, tableId comes from base_table or config.tableId

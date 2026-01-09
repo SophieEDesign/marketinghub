@@ -501,7 +501,7 @@ export default function AirtableGridView({
       {/* Header */}
       <div
         ref={headerScrollRef}
-        className="flex-shrink-0 border-b border-gray-300 bg-white shadow-sm overflow-x-auto overflow-y-hidden grid-scroll-container"
+        className="flex-shrink-0 border-b border-gray-300 bg-white shadow-sm overflow-x-hidden overflow-y-hidden"
         style={{ height: HEADER_HEIGHT }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
