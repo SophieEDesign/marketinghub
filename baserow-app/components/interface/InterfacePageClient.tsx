@@ -1106,7 +1106,9 @@ function InterfacePageClientInternal({
       )}
 
       {/* Content Area */}
-      <div className="flex-1 overflow-hidden">
+      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse in nested flex layouts */}
+      {/* This ensures content pages get full width, not constrained by parent flex containers */}
+      <div className="flex-1 overflow-hidden min-w-0 w-full">
         {/* CRITICAL: Always render the same component tree to prevent remount storms */}
         {/* Show loading/error states as overlays, not separate trees */}
         {loading && !page ? (
@@ -1131,7 +1133,7 @@ function InterfacePageClientInternal({
           ) : (
             // CRITICAL: Always render the same component tree to prevent remounts
             // Record Review pages use RecordReviewPage wrapper (fixed left + right canvas)
-            // Content pages use InterfaceBuilder directly
+            // Content pages use InterfaceBuilder directly with full-width wrapper
             // But both must use stable keys based ONLY on page.id
             // Mode, isViewer, recordId must NEVER be in keys
             useRecordReviewLayout ? (
@@ -1146,20 +1148,23 @@ function InterfacePageClientInternal({
               // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
               // Use isViewer prop to control edit/view mode instead of switching components
               // This prevents remount storms when switching between edit and view modes
+              // CRITICAL: Content pages need full-width container - wrap in div with proper flex constraints
               interfaceBuilderPage ? (
-                <InterfaceBuilder
-                  key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
-                  page={interfaceBuilderPage}
-                  initialBlocks={memoizedBlocks}
-                  // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                  // URL-based viewer mode takes precedence (force read-only)
-                  // Otherwise, viewer mode = not in block editing mode
-                  isViewer={isViewer || !isBlockEditing}
-                  hideHeader={true}
-                  pageTableId={pageTableId}
-                  recordId={isRecordView ? (page.config?.record_id || null) : null}
-                  mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
-                />
+                <div className="h-full w-full min-w-0 flex flex-col">
+                  <InterfaceBuilder
+                    key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
+                    page={interfaceBuilderPage}
+                    initialBlocks={memoizedBlocks}
+                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                    // URL-based viewer mode takes precedence (force read-only)
+                    // Otherwise, viewer mode = not in block editing mode
+                    isViewer={isViewer || !isBlockEditing}
+                    hideHeader={true}
+                    pageTableId={pageTableId}
+                    recordId={isRecordView ? (page.config?.record_id || null) : null}
+                    mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
+                  />
+                </div>
               ) : null
             )
           )

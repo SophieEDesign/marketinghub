@@ -79,7 +79,8 @@ export default function RecordReviewPage({
       />
 
       {/* Right Canvas - Blocks Only */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 w-full">
         {/* CRITICAL: Use stable key based on page.id only - NOT recordId
             This ensures blocks don't remount when record changes, they just re-render with new context */}
         {/* CRITICAL: Key is ONLY page.id - never include recordId, mode, or isViewer */}

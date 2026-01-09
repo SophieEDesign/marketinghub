@@ -383,9 +383,6 @@ export default function Canvas({
     previousIsEditingRef.current = isEditing
   }, [blocks]) // Removed isEditing - mode changes don't trigger syncs
 
-  // Track if this is the first layout change after mount (to ignore grid's initial "normalization")
-  const isFirstLayoutChangeRef = useRef(true)
-  
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
       // CRITICAL: Ignore layout changes when not in edit mode
@@ -649,9 +646,20 @@ export default function Canvas({
     console.error('[Canvas] Grid Layout Signature log failed:', error)
   }
 
+  // Log container width for debugging (temporary)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (containerRef.current && process.env.NODE_ENV === 'development') {
+      const width = containerRef.current.offsetWidth
+      console.log(`[Canvas] Container width: ${width}px (pageId=${pageId}, isEditing=${isEditing})`)
+    }
+  }, [pageId, isEditing, layout.length])
+
   return (
     <ErrorBoundary>
-      <div className="w-full h-full">
+      {/* CRITICAL: Canvas wrapper must have min-width: 0 to prevent flex collapse */}
+      {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
+      <div ref={containerRef} className="w-full h-full min-w-0">
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}

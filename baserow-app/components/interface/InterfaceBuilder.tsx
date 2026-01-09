@@ -963,9 +963,10 @@ export default function InterfaceBuilder({
   }, [effectiveIsEditing, selectedBlockId, handleDeleteBlock, handleDuplicateBlock, handleExitEditMode])
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-full w-full bg-gray-50 min-w-0">
       {/* Main Canvas - Full width when not editing */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* CRITICAL: Container must have min-width: 0 to prevent flex collapse */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0 w-full">
         {/* Toolbar / Interface Header */}
         {!hideHeader && (
         <div className="h-auto min-h-[56px] bg-white border-b border-gray-200 flex flex-col px-4 py-2">
@@ -1069,7 +1070,9 @@ export default function InterfaceBuilder({
         )}
 
         {/* Canvas */}
-        <div className="flex-1 overflow-auto p-4">
+        {/* CRITICAL: Canvas container must have min-width: 0 to prevent flex collapse */}
+        {/* Without min-width: 0, flex children can overflow and cause grid width issues */}
+        <div className="flex-1 overflow-auto p-4 min-w-0 w-full">
           <FilterStateProvider>
             {/* CRITICAL: Hydration lock - never render Canvas until blocks are loaded */}
             {/* This prevents Canvas from committing empty layout state before blocks arrive */}
