@@ -100,6 +100,9 @@ export default function Canvas({
   // This prevents sync effect from overwriting user changes
   const blocksUpdatedFromUserRef = useRef(false)
   
+  // Track if this is the first layout change after mount (to ignore grid's initial "normalization")
+  const isFirstLayoutChangeRef = useRef(true)
+  
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
   useEffect(() => {
@@ -111,6 +114,7 @@ export default function Canvas({
       layoutHydratedRef.current = false
       isInitializedRef.current = false
       blocksUpdatedFromUserRef.current = false
+      isFirstLayoutChangeRef.current = true // Reset first layout change flag on page change
       setLayout([]) // Clear layout when page changes
       if (process.env.NODE_ENV === 'development') {
         console.log('[Canvas] Page changed - resetting hydration state', {
@@ -379,8 +383,36 @@ export default function Canvas({
     previousIsEditingRef.current = isEditing
   }, [blocks]) // Removed isEditing - mode changes don't trigger syncs
 
+  // Track if this is the first layout change after mount (to ignore grid's initial "normalization")
+  const isFirstLayoutChangeRef = useRef(true)
+  
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
+      // CRITICAL: Ignore layout changes when not in edit mode
+      // React-Grid-Layout may call onLayoutChange on mount even with compactType: null
+      // We only want to handle user-initiated drag/resize, not grid's internal normalization
+      if (!isEditing) {
+        if (process.env.NODE_ENV === 'development' && isFirstLayoutChangeRef.current) {
+          console.log('[Canvas] Ignoring layout change - not in edit mode (grid normalization)')
+        }
+        isFirstLayoutChangeRef.current = false
+        return
+      }
+      
+      // Ignore first layout change after mount (grid normalization)
+      // Even with compactType: null, RGL may call onLayoutChange once on mount
+      if (isFirstLayoutChangeRef.current) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Canvas] Ignoring first layout change (grid normalization on mount)', {
+            pageId,
+            layoutCount: newLayout.length,
+            isEditing,
+          })
+        }
+        isFirstLayoutChangeRef.current = false
+        return
+      }
+      
       // Mark that we're resizing/dragging
       isResizingRef.current = true
       
@@ -432,8 +464,15 @@ export default function Canvas({
         resizeTimeoutRef.current = null
       }, 300)
     },
-    [onLayoutChange]
+    [onLayoutChange, isEditing, pageId]
   )
+  
+  // Reset first layout change flag when entering edit mode
+  useEffect(() => {
+    if (isEditing) {
+      isFirstLayoutChangeRef.current = true
+    }
+  }, [isEditing])
 
   // Reset resize flag when edit mode changes (user exits edit mode)
   useEffect(() => {
