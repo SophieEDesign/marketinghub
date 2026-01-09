@@ -92,8 +92,16 @@ export default function InterfaceBuilder({
   // Pattern: Check if we have initialBlocks and haven't initialized yet
   // Only depends on pageId - initialBlocks is checked inside, not in dependencies
   // This ensures effect only runs on pageId change, not on initialBlocks prop changes
-  // 
-  // We check on mount AND on pageId change to catch initialBlocks whenever it arrives
+  const prevInitialBlocksLengthRef = useRef<number>(initialBlocks?.length || 0)
+  
+  // Reset ref when pageId changes (for new pages)
+  useEffect(() => {
+    if (prevPageIdRef.current !== page.id) {
+      prevInitialBlocksLengthRef.current = initialBlocks?.length || 0
+    }
+  }, [page.id])
+  
+  // Check on mount and pageId change
   useEffect(() => {
     // Only initialize if:
     // 1. We have initialBlocks
@@ -111,6 +119,7 @@ export default function InterfaceBuilder({
       })
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
+      prevInitialBlocksLengthRef.current = initialBlocks.length
     }
     // CRITICAL: Do NOT update blocks if already initialized
     // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
@@ -118,20 +127,29 @@ export default function InterfaceBuilder({
     // This prevents the "edit vs publish" drift issue
   }, [page.id]) // ONLY pageId - NOT initialBlocks, NOT hash, NOT mode, NOT props
   
-  // Also check on mount (in case initialBlocks arrives immediately on first render)
+  // Also check when initialBlocks arrives asynchronously
+  // This handles the case where blocks load after mount
+  // Runs on every render to catch async initialBlocks without dependencies
   useEffect(() => {
-    if (!initialBlocks || initialBlocks.length === 0) {
+    // Skip if already initialized
+    if (hasInitializedRef.current) {
       return
     }
-    if (!hasInitializedRef.current) {
-      console.log(`[InterfaceBuilder] Mount-time initialization (one-way gate): pageId=${page.id}`, {
+    
+    const currentLength = initialBlocks?.length || 0
+    
+    // If we have blocks and haven't initialized, initialize now
+    // This catches both immediate and async arrival
+    if (currentLength > 0 && initialBlocks) {
+      console.log(`[InterfaceBuilder] Async initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
         initialBlockIds: initialBlocks.map(b => b.id),
       })
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
+      prevInitialBlocksLengthRef.current = currentLength
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }) // No dependencies - runs on every render to catch async initialBlocks
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
