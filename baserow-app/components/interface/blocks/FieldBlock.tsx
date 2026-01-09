@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK, cn } from "@/lib/utils"
-import { getUserRole } from "@/lib/roles"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
 import { Input } from "@/components/ui/input"
@@ -73,8 +72,43 @@ export default function FieldBlock({
 
   async function loadUserRole() {
     try {
-      const role = await getUserRole()
-      setUserRole(role || 'member')
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        setUserRole('member')
+        return
+      }
+      
+      // Try profiles table first (new system)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      
+      if (!profileError && profile) {
+        setUserRole(profile.role as 'admin' | 'member')
+        return
+      }
+      
+      // Fallback to user_roles table (legacy support)
+      if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
+        const { data: legacyRole, error: legacyError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        
+        if (!legacyError && legacyRole) {
+          // Map legacy roles: admin/editor -> admin, viewer -> member
+          setUserRole(legacyRole.role === 'admin' || legacyRole.role === 'editor' ? 'admin' : 'member')
+          return
+        }
+      }
+      
+      // Default to member if no profile found
+      setUserRole('member')
     } catch (error) {
       console.error("Error loading user role:", error)
       setUserRole('member')
