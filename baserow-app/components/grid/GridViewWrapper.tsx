@@ -316,7 +316,7 @@ export default function GridViewWrapper({
           .eq("view_id", viewId)
 
         if (error) {
-          if (error.code === 'PGRST205' || error.code === '42P01' || error.status === 406) {
+          if (error.code === 'PGRST205' || error.code === '42P01') {
             console.warn("grid_view_settings table does not exist. Run migration to create it.")
             setGroupBy(fieldName || undefined)
             return
@@ -340,7 +340,7 @@ export default function GridViewWrapper({
           ])
 
         if (error) {
-          if (error.code === 'PGRST205' || error.code === '42P01' || error.status === 406) {
+          if (error.code === 'PGRST205' || error.code === '42P01') {
             console.warn("grid_view_settings table does not exist. Run migration to create it.")
             setGroupBy(fieldName || undefined)
             return

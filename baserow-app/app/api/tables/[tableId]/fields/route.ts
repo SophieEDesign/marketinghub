@@ -116,7 +116,7 @@ export async function POST(
       .from('table_fields')
       .insert([
         {
-          table_id: params.tableId,
+          table_id: tableId,
           name: finalSanitizedName,
           type: type as FieldType,
           position,
@@ -480,11 +480,12 @@ export async function PATCH(
 // DELETE: Delete a field
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   const supabase = await createClient()
 
   try {
+    const { tableId } = await params
     const { searchParams } = new URL(request.url)
     const fieldId = searchParams.get('fieldId')
 
