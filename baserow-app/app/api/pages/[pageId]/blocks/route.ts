@@ -24,12 +24,21 @@ export async function GET(
     // 2. Blocks with view_id set (legacy views system)
     // 3. Blocks that might have been migrated or created in different contexts
     // 
+    // CRITICAL: Do NOT filter by status - public and edit must load the same blocks
+    // Only filter by:
+    // - is_archived = false (exclude archived blocks)
+    // - page_id = pageId OR view_id = pageId
+    // Order by: order_index, then position_y, then position_x
+    // 
     // We use .or() to match either column, preventing silent filtering failures
     const { data, error } = await supabase
       .from('view_blocks')
       .select('*')
       .or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
+      .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
       .order('order_index', { ascending: true })
+      .order('position_y', { ascending: true })
+      .order('position_x', { ascending: true })
 
     // CRITICAL: Log query results for debugging
     console.log(`[API GET /blocks] pageId=${pageId}`, {

@@ -71,15 +71,22 @@ export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
       .from('view_blocks')
       .select('*')
       .eq('page_id', pageId)
+      .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
   } else {
     // This is a views.id - use view_id (backward compatibility)
     query = supabase
       .from('view_blocks')
       .select('*')
       .eq('view_id', pageId)
+      .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
   }
 
-  const { data, error } = await query.order('order_index', { ascending: true })
+  // CRITICAL: Order by order_index, then position_y, then position_x
+  // This ensures consistent ordering for public and edit view
+  const { data, error } = await query
+    .order('order_index', { ascending: true })
+    .order('position_y', { ascending: true })
+    .order('position_x', { ascending: true })
 
   if (error) {
     console.error('Error loading page blocks:', error)

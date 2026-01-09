@@ -75,12 +75,14 @@ function InterfacePageClientInternal({
     
     // Only clear blocks if pageId actually changed (navigation occurred)
     if (previousPageIdRef.current !== null && previousPageIdRef.current !== currentPageId) {
-      // Page actually changed - reset blocks and loaded state
-      console.log(`[loadBlocks] Page changed — clearing blocks: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
+      // Page actually changed - mark as not loaded but DO NOT clear blocks
+      // CRITICAL: Keep current blocks until new load completes to prevent flicker
+      // Blocks will be replaced in one setState when new page loads
+      console.log(`[loadBlocks] Page changed — keeping blocks until new load: oldPageId=${previousPageIdRef.current}, newPageId=${currentPageId}`, {
         previousBlocksCount: blocks.length,
         previousBlockIds: blocks.map(b => b.id),
       })
-      setBlocks([])
+      // DO NOT call setBlocks([]) - this causes flicker
       blocksLoadedRef.current = { pageId: currentPageId || '', loaded: false }
       
       // CRITICAL: Exit edit modes when navigating to a different page
