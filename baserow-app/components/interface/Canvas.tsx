@@ -537,29 +537,84 @@ export default function Canvas({
     )
   }
 
+  // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
+  // isEditing ONLY controls interactivity (isDraggable, isResizable)
+  // All layout-affecting props (cols, rowHeight, margin, compactType, etc.) must be identical
+  // This ensures identical grid math → identical layout → edit === public
+  const gridConfig = useMemo(() => {
+    const config = {
+      cols: { lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 },
+      rowHeight: layoutSettings.rowHeight || 30,
+      margin: layoutSettings.margin || [10, 10],
+      compactType: "vertical" as const,
+      isBounded: true,
+      preventCollision: false,
+      allowOverlap: false,
+      containerPadding: [0, 0] as [number, number],
+      useCSSTransforms: true,
+    }
+    
+    // CRITICAL: Log grid configuration signature to verify it's identical in edit and public
+    // This signature should be EXACTLY the same regardless of isEditing
+    if (process.env.NODE_ENV === 'development') {
+      const layoutSignature = layout.map(item => ({
+        id: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+      })).sort((a, b) => a.id.localeCompare(b.id))
+      
+      console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
+        // Grid configuration (must be identical)
+        cols: JSON.stringify(config.cols),
+        rowHeight: config.rowHeight,
+        margin: JSON.stringify(config.margin),
+        compactType: config.compactType,
+        isBounded: config.isBounded,
+        preventCollision: config.preventCollision,
+        allowOverlap: config.allowOverlap,
+        containerPadding: JSON.stringify(config.containerPadding),
+        useCSSTransforms: config.useCSSTransforms,
+        // Layout state (must be identical)
+        layoutLength: layout.length,
+        blocksCount: blocks.length,
+        layoutSignature: JSON.stringify(layoutSignature),
+        // Interactivity (can differ - this is OK)
+        isDraggable: isEditing,
+        isResizable: isEditing,
+      })
+    }
+    
+    return config
+  }, [layoutSettings.cols, layoutSettings.rowHeight, layoutSettings.margin, pageId, layout, blocks.length])
+  // CRITICAL: isEditing is NOT in dependencies - grid config must be identical regardless of edit mode
+
   return (
     <ErrorBoundary>
       <div className="w-full h-full">
         <ResponsiveGridLayout
-          className={`layout ${isEditing ? "" : "view-mode"}`}
+          className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-          cols={{ lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+          cols={gridConfig.cols}
           // Canvas uses a fixed 12-column grid for two-column record review layouts
           // Left column: x=0, w=4 (4 cols)
           // Right column: x=4, w=8 (8 cols)
           // Blocks don't know about columns - they only have x/y/w/h coordinates
-          rowHeight={layoutSettings.rowHeight || 30}
-          margin={layoutSettings.margin || [10, 10]}
-          isDraggable={isEditing}
-          isResizable={isEditing}
-          isBounded={true}
-          preventCollision={false}
+          rowHeight={gridConfig.rowHeight}
+          margin={gridConfig.margin}
+          isDraggable={isEditing} // CRITICAL: Only interactivity, not layout
+          isResizable={isEditing} // CRITICAL: Only interactivity, not layout
+          isBounded={gridConfig.isBounded}
+          preventCollision={gridConfig.preventCollision}
           onLayoutChange={handleLayoutChange}
-          compactType="vertical"
+          compactType={gridConfig.compactType}
           draggableHandle=".drag-handle"
-          allowOverlap={false}
+          allowOverlap={gridConfig.allowOverlap}
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
+          containerPadding={gridConfig.containerPadding}
+          useCSSTransforms={gridConfig.useCSSTransforms}
         >
           {blocks.map((block) => {
             // Log each block being rendered
