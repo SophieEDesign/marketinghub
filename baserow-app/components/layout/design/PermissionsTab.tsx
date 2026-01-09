@@ -129,15 +129,15 @@ const PermissionsTab = memo(function PermissionsTab({ tableId, tableName }: Perm
             </div>
           </div>
 
-          <div className="p-4 border rounded-lg">
+          <div className="p-4 border rounded-lg bg-gray-50">
             <div className="flex items-center justify-between">
               <div>
                 <Label>Member</Label>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Can view and edit this table
+                  Core data is admin-only by default
                 </p>
               </div>
-              <Badge variant="outline">Enabled</Badge>
+              <Badge variant="secondary">Not available</Badge>
             </div>
           </div>
         </div>

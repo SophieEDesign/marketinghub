@@ -17,10 +17,11 @@ import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 // GET: Get all fields for a table
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   try {
-    const fields = await getTableFields(params.tableId)
+    const { tableId } = await params
+    const fields = await getTableFields(tableId)
     
     // Cache fields for 5 minutes (they don't change frequently)
     // Use stale-while-revalidate for better UX
@@ -32,7 +33,8 @@ export async function GET(
   } catch (error: any) {
     // If table doesn't exist, return empty array (graceful degradation)
     if (isTableNotFoundError(error)) {
-      console.warn(`table_fields table may not exist for table ${params.tableId}, returning empty fields array`)
+      const { tableId } = await params
+      console.warn(`table_fields table may not exist for table ${tableId}, returning empty fields array`)
       return cachedJsonResponse({ fields: [] }, CACHE_DURATIONS.SHORT)
     }
     
@@ -44,11 +46,12 @@ export async function GET(
 // POST: Create a new field
 export async function POST(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   const supabase = await createClient()
 
   try {
+    const { tableId } = await params
     const body = await request.json()
     const { name, type, required, default_value, options } = body
 
@@ -60,7 +63,7 @@ export async function POST(
     }
 
     // Get table to find supabase_table name
-    const table = await getTable(params.tableId)
+    const table = await getTable(tableId)
     if (!table) {
       return NextResponse.json(
         { error: 'Table not found' },
@@ -69,7 +72,7 @@ export async function POST(
     }
 
     // Get existing fields to validate uniqueness
-    const existingFields = await getTableFields(params.tableId)
+    const existingFields = await getTableFields(tableId)
     const existingNames = existingFields.map(f => f.name.toLowerCase())
 
     // Sanitize field name first (handles reserved words)
@@ -205,7 +208,7 @@ export async function POST(
     const { data: views } = await supabase
       .from('views')
       .select('id')
-      .eq('table_id', params.tableId)
+      .eq('table_id', tableId)
 
     if (views && views.length > 0) {
       const viewFields = views.map((view: { id: string }) => ({
@@ -232,11 +235,12 @@ export async function POST(
 // PATCH: Update a field (rename, change type, or update options)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   const supabase = await createClient()
 
   try {
+    const { tableId } = await params
     const body = await request.json()
     const { fieldId, name, type, required, default_value, options, group_name } = body
 
@@ -262,7 +266,7 @@ export async function PATCH(
     }
 
     // Get table
-    const table = await getTable(params.tableId)
+    const table = await getTable(tableId)
     if (!table) {
       return NextResponse.json(
         { error: 'Table not found' },
@@ -276,7 +280,7 @@ export async function PATCH(
 
     // Handle name change
     if (name && name !== existingField.name) {
-      const existingFields = await getTableFields(params.tableId)
+      const existingFields = await getTableFields(tableId)
       const existingNames = existingFields
         .filter(f => f.id !== fieldId)
         .map(f => f.name.toLowerCase())
@@ -303,7 +307,7 @@ export async function PATCH(
       const { data: views } = await supabase
         .from('views')
         .select('id')
-        .eq('table_id', params.tableId)
+        .eq('table_id', tableId)
       
       if (views && views.length > 0) {
         for (const view of views) {
@@ -509,7 +513,7 @@ export async function DELETE(
     const { data: linkedFields } = await supabase
       .from('table_fields')
       .select('id, name, options')
-      .eq('table_id', params.tableId)
+      .eq('table_id', tableId)
       .or('type.eq.link_to_table,type.eq.lookup')
 
     const isReferenced = linkedFields?.some((f: any) => {
@@ -525,7 +529,7 @@ export async function DELETE(
     }
 
     // Get table
-    const table = await getTable(params.tableId)
+    const table = await getTable(tableId)
     if (!table) {
       return NextResponse.json(
         { error: 'Table not found' },

@@ -270,6 +270,13 @@ export default function UsersTab() {
         updatePayload.name = editName.trim()
       }
 
+      // Double-check: ensure at least one field is provided
+      if (Object.keys(updatePayload).length === 0) {
+        alert('No changes to save')
+        setUpdating(false)
+        return
+      }
+
       const response = await fetch(`/api/users/${editingUser.user_id}`, {
         method: 'PATCH',
         headers: {

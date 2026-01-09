@@ -100,8 +100,9 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
 
       // Search for the record in the lookup table that matches the value
       // Use type assertion to avoid TypeScript's "excessively deep" error with dynamic table names
+      const tableName = lookupTable.supabase_table as string
       const { data: records, error: searchError } = await supabase
-        .from(lookupTable.supabase_table as any)
+        .from(tableName)
         .select('id')
         .eq(lookupField.name, displayValue)
         .limit(1)
@@ -180,7 +181,11 @@ export default function LookupCell({
     )
   }
 
-  if (!field.options?.lookup_table_id || !field.options?.lookup_field_id) {
+  // Type guard: ensure lookup config exists
+  const lookupTableId = field.options?.lookup_table_id
+  const lookupFieldId = field.options?.lookup_field_id
+
+  if (!lookupTableId || !lookupFieldId) {
     // If lookup config is missing, just display the value(s)
     return (
       <div className="w-full h-full px-2 flex items-center gap-1 flex-wrap">
@@ -209,8 +214,8 @@ export default function LookupCell({
         <LookupPill
           key={index}
           item={item}
-          lookupTableId={field.options.lookup_table_id}
-          lookupFieldId={field.options.lookup_field_id}
+          lookupTableId={lookupTableId}
+          lookupFieldId={lookupFieldId}
           onOpenRecord={openRecord}
         />
       ))}
