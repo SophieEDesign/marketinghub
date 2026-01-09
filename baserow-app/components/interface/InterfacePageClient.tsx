@@ -836,12 +836,13 @@ function InterfacePageClientInternal({
       settings: {
         layout_template: 'content' as const,
         // Map config to settings for RecordReviewPage
-        tableId: pageConfig.tableId || page.base_table || null,
+        // For record_view/record_review pages, tableId comes from base_table or config.tableId
+        tableId: pageConfig.tableId || page.base_table || pageTableId || null,
         leftPanel: pageConfig.leftPanel || null,
-        primary_table_id: page.base_table || null,
+        primary_table_id: page.base_table || pageTableId || null,
       }
     } as any
-  }, [page?.id, page?.name, page?.config, page?.base_table])
+  }, [page?.id, page?.name, page?.config, page?.base_table, pageTableId])
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
@@ -941,6 +942,10 @@ function InterfacePageClientInternal({
   const isViewer = searchParams?.get("view") === "true"
   const isRecordView = page?.page_type === 'record_view'
   const isRecordReview = page?.page_type === 'record_review'
+  
+  // Both record_view and record_review use the RecordReviewPage layout
+  // record_view is legacy, record_review is the new corrected model
+  const useRecordReviewLayout = isRecordReview || isRecordView
   
   // Check if page has a valid anchor
   const pageHasAnchor = page ? hasPageAnchor(page) : false
@@ -1134,7 +1139,9 @@ function InterfacePageClientInternal({
         ) : page ? (
           // Record Review pages use special layout: fixed left column + right canvas
           // Left column reads from page.settings.leftPanel (page-owned, not block-owned)
-          isRecordReview ? (
+          // Supports both record_review (new) and record_view (legacy) page types
+          // Both types use the same layout: fixed left column + right canvas
+          useRecordReviewLayout ? (
             <RecordReviewPage
               key={`record-review-${page.id}`}
               page={interfaceBuilderPage as any}
