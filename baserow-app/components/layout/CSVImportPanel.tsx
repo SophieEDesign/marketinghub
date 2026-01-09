@@ -56,11 +56,32 @@ export default function CSVImportPanel({
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load table fields
+  // Load table fields and verify table exists
   useEffect(() => {
     loadFields()
+    verifyTableExists()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId])
+  }, [tableId, supabaseTableName])
+
+  async function verifyTableExists() {
+    try {
+      const { error: tableCheckError } = await supabase
+        .from(supabaseTableName)
+        .select('id')
+        .limit(1)
+      
+      if (tableCheckError) {
+        if (tableCheckError.code === '42P01' || tableCheckError.code === 'PGRST116' || tableCheckError.message?.includes('does not exist')) {
+          setError(
+            `Table "${supabaseTableName}" does not exist. ` +
+            `The table may have been deleted. Please create a new table or use the "Import CSV" feature to create a new table from your CSV file.`
+          )
+        }
+      }
+    } catch (error) {
+      console.error("Error verifying table exists:", error)
+    }
+  }
 
   async function loadFields() {
     try {
@@ -139,9 +160,19 @@ export default function CSVImportPanel({
       const autoDetectedTypes: Record<string, FieldType> = {}
       
       headers.forEach((header) => {
-        const matchingField = tableFields.find(
+        // First try exact match (case-insensitive)
+        let matchingField = tableFields.find(
           (f) => f.name.toLowerCase() === header.toLowerCase()
         )
+        
+        // If no exact match, try sanitized match (handles "Notes/Detail" -> "notes_detail")
+        if (!matchingField) {
+          const sanitizedHeader = sanitizeFieldName(header)
+          matchingField = tableFields.find(
+            (f) => sanitizeFieldName(f.name) === sanitizedHeader
+          )
+        }
+        
         if (matchingField) {
           mappings[header] = matchingField.name
         } else {
@@ -342,6 +373,23 @@ export default function CSVImportPanel({
     setError(null)
 
     try {
+      // First, verify the table exists
+      const { error: tableCheckError } = await supabase
+        .from(supabaseTableName)
+        .select('id')
+        .limit(1)
+      
+      if (tableCheckError) {
+        if (tableCheckError.code === '42P01' || tableCheckError.code === 'PGRST116' || tableCheckError.message?.includes('does not exist')) {
+          throw new Error(
+            `Table "${supabaseTableName}" does not exist. ` +
+            `The table may have been deleted. Please create a new table or use the "Import CSV" feature to create a new table from your CSV file.`
+          )
+        }
+        // For other errors, continue but log a warning
+        console.warn('Table check warning:', tableCheckError)
+      }
+
       // First, create any new fields
       // Parse full CSV to extract choices for select fields
       const file = fileInputRef.current?.files?.[0]

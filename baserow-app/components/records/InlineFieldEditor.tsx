@@ -269,8 +269,31 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
-            {selectedValues.length > 0 ? selectedValues.join(", ") : "—"}
+          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm min-h-[38px] flex items-center flex-wrap gap-2">
+            {selectedValues.length > 0 ? (
+              selectedValues.map((val: string) => {
+                const choiceColor = field.options?.choiceColors?.[val]
+                const getTextColor = (hexColor?: string) => {
+                  if (!hexColor) return 'text-blue-800'
+                  const r = parseInt(hexColor.slice(1, 3), 16)
+                  const g = parseInt(hexColor.slice(3, 5), 16)
+                  const b = parseInt(hexColor.slice(5, 7), 16)
+                  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                  return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+                }
+                return (
+                  <span
+                    key={val}
+                    className={`px-2 py-1 rounded text-xs font-medium ${getTextColor(choiceColor)}`}
+                    style={choiceColor ? { backgroundColor: choiceColor } : undefined}
+                  >
+                    {val}
+                  </span>
+                )
+              })
+            ) : (
+              <span className="text-gray-400 italic">—</span>
+            )}
           </div>
         ) : (
           <div

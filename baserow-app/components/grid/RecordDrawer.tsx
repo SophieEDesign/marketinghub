@@ -196,11 +196,27 @@ export default function RecordDrawer({
                   const tableField = tableFields.find(f => f.name === fieldName)
                   const isFormula = tableField?.type === 'formula'
                   const isVirtual = isFormula || tableField?.type === 'lookup'
+                  const isSelect = tableField?.type === 'single_select' || tableField?.type === 'multi_select'
                   const inputType = getInputType(fieldName, value)
                   const isLongText = fieldName.toLowerCase().includes("description") ||
                                     fieldName.toLowerCase().includes("notes") ||
                                     fieldName.toLowerCase().includes("comment")
                   const isError = typeof value === 'string' && value.startsWith('#')
+
+                  // Helper for select field pill rendering
+                  const getSelectPillColor = (choiceValue: string) => {
+                    const choiceColor = tableField?.options?.choiceColors?.[choiceValue]
+                    if (!choiceColor) return { bg: 'bg-blue-100', text: 'text-blue-800', style: undefined }
+                    const r = parseInt(choiceColor.slice(1, 3), 16)
+                    const g = parseInt(choiceColor.slice(3, 5), 16)
+                    const b = parseInt(choiceColor.slice(5, 7), 16)
+                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                    return {
+                      bg: '',
+                      text: luminance > 0.5 ? 'text-gray-900' : 'text-white',
+                      style: { backgroundColor: choiceColor }
+                    }
+                  }
 
                   return (
                     <div key={fieldName} className="space-y-2">
@@ -222,6 +238,33 @@ export default function RecordDrawer({
                               = {tableField.options.formula}
                             </div>
                           )}
+                        </div>
+                      ) : isSelect ? (
+                        <div className="px-3 py-2 border border-gray-300 rounded-md bg-white min-h-[38px] flex items-center flex-wrap gap-2">
+                          {(() => {
+                            const choices = tableField?.options?.choices || []
+                            const isMulti = tableField?.type === 'multi_select'
+                            const selectedValues = isMulti
+                              ? (Array.isArray(value) ? value : value ? [value] : [])
+                              : value ? [value] : []
+                            
+                            if (selectedValues.length === 0) {
+                              return <span className="text-sm text-gray-400">Select...</span>
+                            }
+                            
+                            return selectedValues.map((val: string) => {
+                              const colorInfo = getSelectPillColor(val)
+                              return (
+                                <span
+                                  key={val}
+                                  className={`px-2 py-1 rounded text-xs font-medium ${colorInfo.text}`}
+                                  style={colorInfo.style}
+                                >
+                                  {val}
+                                </span>
+                              )
+                            })
+                          })()}
                         </div>
                       ) : inputType === "checkbox" ? (
                         <div className="flex items-center">

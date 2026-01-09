@@ -285,10 +285,18 @@ export default function CSVImportModal({
       const autoDetectedTypes: Record<string, FieldType> = {}
       
       parsed.columns.forEach((col) => {
-        const sanitizedColName = sanitizeFieldNameSafe(col.name)
-        const existingField = tableFields.find(
-          (f) => f.name.toLowerCase() === sanitizedColName.toLowerCase()
+        // First try exact match (case-insensitive)
+        let existingField = tableFields.find(
+          (f) => f.name.toLowerCase() === col.name.toLowerCase()
         )
+        
+        // If no exact match, try sanitized match (handles "Notes/Detail" -> "notes_detail")
+        if (!existingField) {
+          const sanitizedColName = sanitizeFieldNameSafe(col.name)
+          existingField = tableFields.find(
+            (f) => sanitizeFieldNameSafe(f.name) === sanitizedColName
+          )
+        }
         
         if (existingField) {
           mappings[col.name] = existingField.name
