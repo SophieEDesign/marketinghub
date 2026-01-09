@@ -82,8 +82,10 @@ export default function RecordReviewPage({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* CRITICAL: Use stable key based on page.id only - NOT recordId
             This ensures blocks don't remount when record changes, they just re-render with new context */}
+        {/* CRITICAL: Key is ONLY page.id - never include recordId, mode, or isViewer */}
+        {/* This ensures InterfaceBuilder never remounts when record changes or mode toggles */}
         <InterfaceBuilder
-          key={`record-review-canvas-${page.id}`}
+          key={page.id} // CRITICAL: ONLY page.id - recordId changes don't cause remounts
           page={page}
           initialBlocks={initialBlocks}
           isViewer={isViewer}

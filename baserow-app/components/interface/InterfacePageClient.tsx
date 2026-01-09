@@ -797,6 +797,8 @@ function InterfacePageClientInternal({
   // Creating new object on every render causes component remounts
   // UNIFIED: All pages use the same structure - no page-type-specific config
   // Map InterfacePage.config to Page.settings for RecordReviewPage
+  // CRITICAL: Only depend on page.id and essential props - NOT page_type, NOT config changes
+  // This ensures the page object reference is stable and doesn't cause remounts
   const interfaceBuilderPage = useMemo(() => {
     if (!page) return null
     const pageConfig = page.config || {}
@@ -815,10 +817,11 @@ function InterfacePageClientInternal({
         primary_table_id: page.base_table || pageTableId || null,
       }
     } as any
-  }, [page?.id, page?.name, page?.page_type, page?.config, page?.base_table, pageTableId])
+  }, [page?.id, page?.name, page?.base_table, pageTableId]) // CRITICAL: NOT page?.page_type, NOT page?.config
 
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
+  // CRITICAL: Do NOT include page?.page_type in dependencies - it causes remounts when page type changes
   const memoizedBlocks = useMemo(() => {
     const result = blocks || []
     console.log(`[InterfacePageClient] memoizedBlocks: pageId=${page?.id}, page_type=${page?.page_type}`, {
@@ -827,7 +830,7 @@ function InterfacePageClientInternal({
       rawBlocksCount: blocks.length,
     })
     return result
-  }, [blocks, page?.id, page?.page_type])
+  }, [blocks, page?.id]) // ONLY page.id - NOT page_type, NOT mode, NOT isViewer
   
 
   // Save page title with debouncing - MUST be before early returns (React Hooks rule)
@@ -1116,49 +1119,47 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // Record Review pages use special layout: fixed left column + right canvas
-          // Left column reads from page.settings.leftPanel (page-owned, not block-owned)
-          // Supports both record_review (new) and record_view (legacy) page types
-          // Both types use the same layout: fixed left column + right canvas
-          useRecordReviewLayout ? (
-            <RecordReviewPage
-              key={`record-review-${page.id}`}
-              page={interfaceBuilderPage as any}
-              initialBlocks={memoizedBlocks}
-              isViewer={isViewer || !isBlockEditing}
-              hideHeader={true}
-            />
+          // CRITICAL: Never mount InterfaceBuilder with blocks=0
+          // This prevents empty layout state from being committed before blocks arrive
+          // Wait for blocks to load before rendering (hydration lock at component level)
+          !blocksLoadedRef.current.loaded && blocks.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-gray-500">Loading blocks...</div>
+            </div>
           ) : (
-            // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
-            // Use isViewer prop to control edit/view mode instead of switching components
-            // This prevents remount storms when switching between edit and view modes
-            interfaceBuilderPage ? (
-              (() => {
-                console.log(`[InterfacePageClient] Rendering InterfaceBuilder: pageId=${page.id}, page_type=${page.page_type}`, {
-                  initialBlocksCount: memoizedBlocks.length,
-                  initialBlockIds: memoizedBlocks.map(b => b.id),
-                  isViewer,
-                  isBlockEditing,
-                  effectiveIsViewer: isViewer || !isBlockEditing,
-                  recordId: isRecordView ? (page.config?.record_id || null) : null,
-                })
-                return (
-                  <InterfaceBuilder
-                    key={`interface-builder-${page.id}`}
-                    page={interfaceBuilderPage}
-                    initialBlocks={memoizedBlocks}
-                    // CRITICAL: Respect both URL-based viewer mode and edit mode state
-                    // URL-based viewer mode takes precedence (force read-only)
-                    // Otherwise, viewer mode = not in block editing mode
-                    isViewer={isViewer || !isBlockEditing}
-                    hideHeader={true}
-                    pageTableId={pageTableId}
-                    recordId={isRecordView ? (page.config?.record_id || null) : null}
-                    mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
-                  />
-                )
-              })()
-            ) : null
+            // CRITICAL: Always render the same component tree to prevent remounts
+            // Record Review pages use RecordReviewPage wrapper (fixed left + right canvas)
+            // Content pages use InterfaceBuilder directly
+            // But both must use stable keys based ONLY on page.id
+            // Mode, isViewer, recordId must NEVER be in keys
+            useRecordReviewLayout ? (
+              <RecordReviewPage
+                key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
+                page={interfaceBuilderPage as any}
+                initialBlocks={memoizedBlocks}
+                isViewer={isViewer || !isBlockEditing}
+                hideHeader={true}
+              />
+            ) : (
+              // UNIFIED: All other pages render InterfaceBuilder (which wraps Canvas)
+              // Use isViewer prop to control edit/view mode instead of switching components
+              // This prevents remount storms when switching between edit and view modes
+              interfaceBuilderPage ? (
+                <InterfaceBuilder
+                  key={page.id} // CRITICAL: ONLY page.id - never include mode, isViewer, or recordId
+                  page={interfaceBuilderPage}
+                  initialBlocks={memoizedBlocks}
+                  // CRITICAL: Respect both URL-based viewer mode and edit mode state
+                  // URL-based viewer mode takes precedence (force read-only)
+                  // Otherwise, viewer mode = not in block editing mode
+                  isViewer={isViewer || !isBlockEditing}
+                  hideHeader={true}
+                  pageTableId={pageTableId}
+                  recordId={isRecordView ? (page.config?.record_id || null) : null}
+                  mode={isRecordView ? (isBlockEditing ? 'edit' : 'view') : 'view'}
+                />
+              ) : null
+            )
           )
         ) : null}
       </div>
