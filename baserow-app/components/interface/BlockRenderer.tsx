@@ -195,9 +195,10 @@ export default function BlockRenderer({
       case "text":
         // Lazy-load TextBlock to improve initial page load performance
         // Disable lazy loading in edit mode so users can see all blocks immediately
+        // CRITICAL: key={block.id} ONLY - no index, no compound keys, no pageId
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <TextBlock block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
+            <TextBlock key={block.id} block={safeBlock} isEditing={canEdit} onUpdate={onUpdate} />
           </LazyBlockWrapper>
         )
 

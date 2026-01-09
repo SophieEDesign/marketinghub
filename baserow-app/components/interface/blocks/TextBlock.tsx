@@ -50,11 +50,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const isViewer = typeof window !== 'undefined' && window.location.search.includes('view=true')
   const readOnly = isViewer || !isEditing
   
-  // Lifecycle logging
+  // Lifecycle logging - SANITY TEST for remount detection
+  // If you see MOUNT -> UNMOUNT -> MOUNT on save, that's a remount issue (not TipTap)
   useEffect(() => {
-    console.log(`[Lifecycle] TextBlock MOUNT: blockId=${block.id}`)
+    console.log(`[TextBlock] MOUNT: blockId=${block.id}`)
     return () => {
-      console.log(`[Lifecycle] TextBlock UNMOUNT: blockId=${block.id}`)
+      console.log(`[TextBlock] UNMOUNT: blockId=${block.id}`)
     }
   }, [])
   
@@ -112,10 +113,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedContentRef = useRef<string>("") // Track last saved content to prevent duplicate saves
   
-  // Track block.id and config reference to detect when to rehydrate
+  // Track block.id to detect when to rehydrate (only on block ID change)
   const previousBlockIdRef = useRef<string>(block.id)
-  const previousConfigRef = useRef<any>(config)
   const editorInitializedRef = useRef<boolean>(false)
+  // CRITICAL: Track if editor has been initialized for this block ID
+  // Only set content on first mount, never again unless block ID changes
+  const hasInitialised = useRef<boolean>(false)
   
   // Cache serialized config content_json to avoid repeated JSON.stringify calls
   // This ref is updated only when config.content_json actually changes
@@ -328,138 +331,53 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [block.id, onUpdate, editor])
 
   /**
-   * Rehydrate editor when block.id or block.config reference changes
-   * CRITICAL: This ensures editor content matches fresh config from API
-   * Treats block.config as immutable - rehydrate on reference change
-   * CRITICAL: Only rehydrate when editor is not focused to avoid interrupting typing
+   * CRITICAL: Only set content on first mount or when block ID changes
+   * Never call setContent again after initialization unless block ID changes
+   * This prevents editor from being reset after saves
    */
   useEffect(() => {
     if (!editor) return
     
     const blockIdChanged = previousBlockIdRef.current !== block.id
-    const configReferenceChanged = previousConfigRef.current !== config
     
-    // DEBUG_TEXT: Log config changes
-    if (blockIdChanged || configReferenceChanged) {
-      debugLog('TEXT', `Block ${block.id}: CONFIG CHANGED`, {
-        blockId: block.id,
-        blockIdChanged,
-        configReferenceChanged,
-        previousBlockId: previousBlockIdRef.current,
-        currentConfig: config,
-        currentContentJson: config?.content_json,
-        previousConfig: previousConfigRef.current,
-        previousContentJson: previousConfigRef.current?.content_json,
-        isFocused,
-        isBlockEditing,
-      })
-    }
-    
-    // Update refs
-    previousBlockIdRef.current = block.id
-    previousConfigRef.current = config
-    
-    // If block ID changed, this is a different block - always rehydrate (unless editing)
+    // If block ID changed, reset initialization flag and rehydrate
     if (blockIdChanged) {
-      // CRITICAL: Don't rehydrate if user is actively editing this block
-      if (isBlockEditing && isFocused) {
-        debugLog('TEXT', `Block ${block.id}: SKIPPED (user editing)`, {
-          blockId: block.id,
-          isBlockEditing,
-          isFocused
-        })
-        return
-      }
+      previousBlockIdRef.current = block.id
+      hasInitialised.current = false
+      editorInitializedRef.current = false
       
       const newContent = getInitialContent()
-      
-      // DEBUG_TEXT: Log editor initialization
-      debugLog('TEXT', `Block ${block.id}: EDITOR INIT (block ID changed)`, {
-        blockId: block.id,
-        editorInitialContent: newContent,
-        configContentJson: config?.content_json,
-        matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
-      })
-      
       editor.commands.setContent(newContent, false) // false = don't emit update event
-      // Use cached serialized content from config instead of stringifying again
       lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(newContent)
+      hasInitialised.current = true
       editorInitializedRef.current = true
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TextBlock] Block ID changed - rehydrated: blockId=${block.id}`)
+      }
       return
     }
     
-    // If config reference changed (immutable update), rehydrate if content changed
-    // CRITICAL: Compare using cached serialized content to avoid JSON.stringify in hot path
-    // CRITICAL: Only rehydrate when editor is not focused to avoid interrupting typing
-    if (configReferenceChanged) {
-      // CRITICAL: Don't rehydrate if user is actively editing
-      if (isBlockEditing && isFocused) {
-        debugLog('TEXT', `Block ${block.id}: SKIPPED (user editing)`, {
-          blockId: block.id,
-          isBlockEditing,
-          isFocused
-        })
-        return
-      }
+    // Only initialize content on first mount (when hasInitialised is false)
+    if (!hasInitialised.current && contentJson) {
+      const initialContent = getInitialContent()
+      editor.commands.setContent(initialContent, false) // false = don't emit update event
+      lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(initialContent)
+      hasInitialised.current = true
+      editorInitializedRef.current = true
       
-      // Get current editor content once
-      const currentContent = editor.getJSON()
-      const currentStr = JSON.stringify(currentContent)
-      
-      // Use cached config content string (updated in separate effect when config changes)
-      const newStr = cachedConfigContentStrRef.current
-      
-      // DEBUG_TEXT: Log rehydration decision
-      debugLog('TEXT', `Block ${block.id}: REHYDRATION CHECK`, {
-        blockId: block.id,
-        currentEditorContent: currentContent,
-        currentEditorContentStr: currentStr,
-        configContentJson: config?.content_json,
-        configContentStr: newStr,
-        contentChanged: currentStr !== newStr,
-        isFocused,
-        isBlockEditing,
-        willRehydrate: currentStr !== newStr && !isFocused && !isBlockEditing,
-      })
-      
-      // Only update if content actually changed AND editor is not focused (to avoid interrupting typing)
-      if (currentStr !== newStr && !isFocused && !isBlockEditing) {
-        const newContent = getInitialContent()
-        
-        // DEBUG_TEXT: Log actual rehydration
-        debugLog('TEXT', `Block ${block.id}: REHYDRATING`, {
-          blockId: block.id,
-          oldContent: currentContent,
-          newContent,
-          configContentJson: config?.content_json,
-          matches: JSON.stringify(newContent) === JSON.stringify(config?.content_json),
-        })
-        
-        editor.commands.setContent(newContent, false) // false = don't emit update event
-        // Update last saved reference to prevent immediate re-save
-        lastSavedContentRef.current = newStr
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[TextBlock] Initialized content on first mount: blockId=${block.id}`)
       }
     }
-  }, [block.id, config, editor, isFocused, isBlockEditing, getInitialContent])
+  }, [editor, block.id, contentJson, getInitialContent])
 
   /**
-   * Initialize editor content and lastSavedContentRef when editor is first created
-   * CRITICAL: Use cached serialized content to avoid JSON.stringify
+   * Initialize lastSavedContentRef when editor is first created
+   * CRITICAL: Only runs once per block ID
    */
   useEffect(() => {
     if (editor && !editorInitializedRef.current && !isConfigLoading) {
-      // PHASE 2 - TextBlock rehydration audit: Log initial editor setup
-      if (process.env.NODE_ENV === 'development') {
-        const initialContent = editor.getJSON()
-        console.log(`[TextBlock Rehydration] Block ${block.id}: INITIAL EDITOR SETUP`, {
-          blockId: block.id,
-          editorInitialContent: initialContent,
-          configContentJson: config?.content_json,
-          cachedConfigContentStr: cachedConfigContentStrRef.current,
-          matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
-        })
-      }
-
       // Use cached config content string if available, otherwise stringify current content
       if (cachedConfigContentStrRef.current) {
         lastSavedContentRef.current = cachedConfigContentStrRef.current
@@ -469,31 +387,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }
       editorInitializedRef.current = true
     }
-  }, [editor, isConfigLoading, block.id, config])
-  
-  /**
-   * Handle config loading state - reinitialize editor when config becomes available
-   * CRITICAL: Use cached serialized content to avoid JSON.stringify
-   */
-  useEffect(() => {
-    if (editor && isConfigLoading === false && !editorInitializedRef.current) {
-      // Config just finished loading, initialize editor content
-      const initialContent = getInitialContent()
-      
-      // DEBUG_TEXT: Log config load completion
-      debugLog('TEXT', `Block ${block.id}: CONFIG LOADED`, {
-        blockId: block.id,
-        configContentJson: config?.content_json,
-        editorInitialContent: initialContent,
-        matches: JSON.stringify(initialContent) === JSON.stringify(config?.content_json),
-      })
-      
-      editor.commands.setContent(initialContent, false)
-      // Use cached config content string if available
-      lastSavedContentRef.current = cachedConfigContentStrRef.current || JSON.stringify(initialContent)
-      editorInitializedRef.current = true
-    }
-  }, [editor, isConfigLoading, getInitialContent, block.id, config])
+  }, [editor, isConfigLoading, block.id])
 
   // Calculate toolbar position
   useEffect(() => {
@@ -907,8 +801,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Show when in edit mode (editor check handled inside Toolbar) */}
-      {isEditing && <Toolbar />}
+      {/* Toolbar - Always visible when in edit mode (not hover-dependent) */}
+      {/* CRITICAL: Toolbar must NOT depend on hover - force it visible for debugging */}
+      {editor && isEditing && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (

@@ -91,19 +91,54 @@ export async function DELETE(
       )
     }
 
-    // 0. Disconnect pages from this table (set base_table to null) instead of deleting them
-    // This allows pages to be reconnected to a different table later
-    const { error: pagesDisconnectError } = await supabase
-      .from('interface_pages')
-      .update({ base_table: null })
-      .eq('base_table', params.tableId)
+    // 0. Before deleting views, identify and handle pages that will lose their anchor
+    // Pages with saved_view_id pointing to views from this table will have their anchor
+    // set to NULL when views are deleted (ON DELETE CASCADE). We need to handle these pages.
+    
+    // Find views that will be deleted
+    const { data: viewsToDelete, error: viewsFetchError } = await supabase
+      .from('views')
+      .select('id')
+      .eq('table_id', params.tableId)
 
-    if (pagesDisconnectError) {
-      console.error('Error disconnecting pages from table:', pagesDisconnectError)
-      // Continue anyway - we'll try to clean up what we can
+    if (viewsFetchError) {
+      console.error('Error fetching views to delete:', viewsFetchError)
+      // Continue anyway
+    }
+
+    const viewIdsToDelete = viewsToDelete?.map(v => v.id) || []
+
+    // Find pages that depend on these views via saved_view_id
+    // These pages will lose their anchor when views are deleted
+    if (viewIdsToDelete.length > 0) {
+      const { data: orphanedPages, error: orphanedPagesError } = await supabase
+        .from('interface_pages')
+        .select('id, saved_view_id')
+        .in('saved_view_id', viewIdsToDelete)
+
+      if (orphanedPagesError) {
+        console.error('Error finding orphaned pages:', orphanedPagesError)
+      } else if (orphanedPages && orphanedPages.length > 0) {
+        // Delete pages that will lose their anchor
+        // These pages are invalid without their anchor view
+        const orphanedPageIds = orphanedPages.map(p => p.id)
+        const { error: deleteOrphanedError } = await supabase
+          .from('interface_pages')
+          .delete()
+          .in('id', orphanedPageIds)
+
+        if (deleteOrphanedError) {
+          console.error('Error deleting orphaned pages:', deleteOrphanedError)
+          return NextResponse.json(
+            { error: `Failed to delete table: Cannot delete pages that depend on this table's views: ${deleteOrphanedError.message}` },
+            { status: 500 }
+          )
+        }
+      }
     }
 
     // 1. Delete all views associated with this table
+    // This will now work because we've already deleted pages that depended on these views
     const { error: viewsError } = await supabase
       .from('views')
       .delete()
@@ -114,7 +149,29 @@ export async function DELETE(
       // Continue anyway - we'll try to clean up what we can
     }
 
-    // 2. Delete all fields associated with this table
+    // 2. Disconnect remaining pages from this table (set base_table to null)
+    // This allows pages to be reconnected to a different table later
+    // Only do this after views are deleted to avoid anchor validation trigger issues
+    // Note: Pages that depended on deleted views were already deleted in step 0
+    const { error: pagesDisconnectError } = await supabase
+      .from('interface_pages')
+      .update({ base_table: null })
+      .eq('base_table', params.tableId)
+
+    if (pagesDisconnectError) {
+      // If this is an anchor validation error, provide a clearer message
+      if (pagesDisconnectError.message?.includes('exactly one anchor')) {
+        console.error('Error disconnecting pages from table (anchor validation):', pagesDisconnectError)
+        return NextResponse.json(
+          { error: `Failed to delete table: Some pages associated with this table are in an invalid state. Please delete those pages manually first. ${pagesDisconnectError.message}` },
+          { status: 500 }
+        )
+      }
+      console.error('Error disconnecting pages from table:', pagesDisconnectError)
+      // Continue anyway - we'll try to clean up what we can
+    }
+
+    // 3. Delete all fields associated with this table
     const { error: fieldsError } = await supabase
       .from('table_fields')
       .delete()
@@ -125,11 +182,11 @@ export async function DELETE(
       // Continue anyway
     }
 
-    // 3. Delete view_fields that reference fields from this table
+    // 4. Delete view_fields that reference fields from this table
     // (This is a cleanup step - view_fields reference field names, not table_id)
     // We'll let cascade handle this if there's a foreign key, otherwise it's okay
 
-    // 4. Drop the actual Supabase table if it exists
+    // 5. Drop the actual Supabase table if it exists
     if (table.supabase_table) {
       try {
         const dropTableSQL = `DROP TABLE IF EXISTS "${table.supabase_table}" CASCADE;`
@@ -147,7 +204,7 @@ export async function DELETE(
       }
     }
 
-    // 5. Delete the table metadata record
+    // 6. Delete the table metadata record
     const { error: deleteError } = await supabase
       .from('tables')
       .delete()
