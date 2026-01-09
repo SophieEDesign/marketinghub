@@ -201,6 +201,26 @@ export default function InterfacePageSettingsDrawer({
     }
   }
 
+  async function loadAvailableFields(tableId: string) {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('table_fields')
+        .select('id, name, type')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+      
+      if (data) {
+        setAvailableFields(data)
+      } else {
+        setAvailableFields([])
+      }
+    } catch (error) {
+      console.error('Error loading available fields:', error)
+      setAvailableFields([])
+    }
+  }
+
   async function handleSave() {
     if (!name.trim() || !page) {
       return
