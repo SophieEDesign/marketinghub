@@ -497,10 +497,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
   // Calculate toolbar position
   useEffect(() => {
-    if (!isEditing || !containerRef.current || !toolbarRef.current) return
+    if (!isEditing || readOnly || !containerRef.current) return
 
     const checkPosition = () => {
-      if (!containerRef.current || !toolbarRef.current) return
+      if (!containerRef.current) return
       
       const containerRect = containerRef.current.getBoundingClientRect()
       const toolbarHeight = 40
@@ -515,15 +515,17 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
 
     // Check position immediately and on changes
-    checkPosition()
+    // Use a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(checkPosition, 50)
     window.addEventListener('scroll', checkPosition, true)
     window.addEventListener('resize', checkPosition)
 
     return () => {
+      clearTimeout(timeoutId)
       window.removeEventListener('scroll', checkPosition, true)
       window.removeEventListener('resize', checkPosition)
     }
-  }, [isEditing, isFocused, isBlockEditing])
+  }, [isEditing, readOnly])
 
   // Cleanup timeouts
   useEffect(() => {
@@ -609,28 +611,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   const Toolbar = () => {
     if (!editor || readOnly) return null
 
-    // Always show toolbar when editing (make it more visible)
-    const isToolbarActive = isBlockEditing || isFocused
+    // Toolbar is always visible when in edit mode
+    // Position it above or below the block based on available space
+    const toolbarOffset = toolbarPosition === 'top' 
+      ? "-translate-y-[calc(100%+8px)]" 
+      : "translate-y-[calc(100%+8px)]"
 
     return (
       <div 
         ref={toolbarRef}
         data-toolbar="true"
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[100] transition-all duration-200",
-          toolbarPosition === 'top' 
-            ? cn(
-                "top-0",
-                isToolbarActive
-                  ? "-translate-y-[calc(100%+8px)] opacity-100 scale-100" 
-                  : "-translate-y-[calc(100%+4px)] opacity-90 scale-100 hover:opacity-100"
-              )
-            : cn(
-                "bottom-0",
-                isToolbarActive
-                  ? "translate-y-[calc(100%+8px)] opacity-100 scale-100" 
-                  : "translate-y-[calc(100%+4px)] opacity-90 scale-100 hover:opacity-100"
-              )
+          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[100] transition-all duration-200 opacity-100",
+          toolbarPosition === 'top' ? "top-0" : "bottom-0",
+          toolbarOffset
         )}
         style={{
           marginTop: toolbarPosition === 'top' ? '-8px' : '0',
@@ -873,7 +867,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode
-          if (isEditing && editor) {
+          if (isEditing && !readOnly && editor) {
             const target = e.target as HTMLElement
             // Don't focus if clicking buttons or toolbar
             if (
@@ -883,6 +877,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
               !target.closest('.react-resizable-handle') &&
               !target.closest('[data-toolbar]')
             ) {
+              e.stopPropagation()
               setIsBlockEditing(true)
               // Small delay to ensure DOM is ready
               setTimeout(() => {
@@ -892,8 +887,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Always show when editing */}
-      {isEditing && editor && <Toolbar />}
+      {/* Toolbar - Always show when editing and not read-only */}
+      {isEditing && !readOnly && editor && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
@@ -915,7 +910,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         )}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode
-          if (isEditing && !isBlockEditing && editor) {
+          if (isEditing && !readOnly && !isBlockEditing && editor) {
             e.stopPropagation()
             setIsBlockEditing(true)
             editor.commands.focus('end')
@@ -926,7 +921,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           if (isBlockEditing) {
             e.stopPropagation()
           }
-          if (isEditing && editor && !editor.isFocused) {
+          if (isEditing && !readOnly && editor && !editor.isFocused) {
             e.stopPropagation()
             setIsBlockEditing(true)
             editor.commands.focus('end')

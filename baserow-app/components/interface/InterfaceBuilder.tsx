@@ -430,6 +430,65 @@ export default function InterfaceBuilder({
     setSettingsPanelOpen(false)
   }, [blocks, pendingLayout, saveLayout, exitBlockEdit, page.id, toast])
 
+  // CRITICAL: Save layout when exiting edit mode (even if exitBlockEdit is called from parent)
+  // This ensures layout is saved regardless of where "Done Editing" is clicked
+  // Must be after saveLayout and pendingLayout are declared
+  const prevIsEditingRef = useRef(effectiveIsEditing)
+  useEffect(() => {
+    // Detect when exiting edit mode (isEditing changes from true to false)
+    if (prevIsEditingRef.current && !effectiveIsEditing) {
+      // User just exited edit mode - save layout immediately
+      // This handles the case where exitBlockEdit() is called from InterfacePageClient
+      // We need to save layout even though handleExitEditMode wasn't called
+      const currentLayout: LayoutItem[] = blocks.map((block) => ({
+        i: block.id,
+        x: block.x,
+        y: block.y,
+        w: block.w,
+        h: block.h,
+      }))
+      
+      if (currentLayout.length > 0) {
+        // Use pendingLayout if it exists (has the latest drag/resize changes)
+        // Otherwise use currentLayout from blocks state
+        const layoutToSave = pendingLayout || currentLayout
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[InterfaceBuilder] Auto-saving layout on edit mode exit:', {
+            pageId: page.id,
+            layoutCount: layoutToSave.length,
+            hasPendingLayout: !!pendingLayout,
+            layoutItems: layoutToSave.map(item => ({
+              id: item.i,
+              x: item.x,
+              y: item.y,
+              w: item.w,
+              h: item.h,
+            })),
+          })
+        }
+        
+        // CRITICAL: Mark as modified and save immediately (bypass guards since this is user-initiated exit)
+        // Clear any pending debounced save since we're saving now
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current)
+          saveTimeoutRef.current = null
+        }
+        
+        layoutModifiedByUserRef.current = true
+        saveLayout(layoutToSave, true).catch((error: any) => {
+          console.error("Failed to auto-save layout on exit:", error)
+          toast({
+            variant: "destructive",
+            title: "Failed to save layout",
+            description: error instanceof Error ? error.message : "Please try again",
+          })
+        })
+      }
+    }
+    prevIsEditingRef.current = effectiveIsEditing
+  }, [effectiveIsEditing, blocks, pendingLayout, saveLayout, page.id, toast])
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -956,6 +1015,8 @@ export default function InterfaceBuilder({
               onRecordClick={onRecordClick}
             />
           </FilterStateProvider>
+          {/* Footer spacer to ensure bottom content is visible */}
+          <div className="h-32 w-full" />
         </div>
       </div>
 

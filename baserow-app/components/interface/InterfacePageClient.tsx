@@ -12,6 +12,7 @@ import { hasPageAnchor, getPageAnchor } from "@/lib/interface/page-utils"
 import PageRenderer from "./PageRenderer"
 import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
+import InterfacePageSettingsDrawer from "./InterfacePageSettingsDrawer"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 
@@ -53,6 +54,7 @@ function InterfacePageClientInternal({
   const [blocks, setBlocks] = useState<any[]>([])
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [displaySettingsOpen, setDisplaySettingsOpen] = useState(false)
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [dataLoading, setDataLoading] = useState(false)
   const [pageTableId, setPageTableId] = useState<string | null>(null)
   
@@ -963,7 +965,13 @@ function InterfacePageClientInternal({
   
   // Handler to open page settings drawer
   const handleOpenPageSettings = () => {
-    setDisplaySettingsOpen(true)
+    // For record_view and record_review pages, use InterfacePageSettingsDrawer (has left panel settings)
+    // For other pages, use PageDisplaySettingsPanel
+    if (page?.page_type === 'record_view' || page?.page_type === 'record_review') {
+      setPageSettingsOpen(true)
+    } else {
+      setDisplaySettingsOpen(true)
+    }
   }
 
   async function handlePageUpdate() {
@@ -1185,8 +1193,21 @@ function InterfacePageClientInternal({
         ) : null}
       </div>
 
-      {/* Page Display Settings Panel - Available for all page types */}
-      {page && (
+      {/* Page Settings Drawer - For record_view and record_review pages (has left panel settings) */}
+      {page && (page.page_type === 'record_view' || page.page_type === 'record_review') && (
+        <InterfacePageSettingsDrawer
+          pageId={page.id}
+          isOpen={pageSettingsOpen}
+          onClose={() => setPageSettingsOpen(false)}
+          onUpdate={(updatedPage) => {
+            setPage(updatedPage)
+            handlePageUpdate()
+          }}
+        />
+      )}
+
+      {/* Page Display Settings Panel - For other page types */}
+      {page && page.page_type !== 'record_view' && page.page_type !== 'record_review' && (
         <PageDisplaySettingsPanel
           page={page}
           isOpen={displaySettingsOpen}
