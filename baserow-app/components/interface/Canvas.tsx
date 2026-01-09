@@ -535,6 +535,16 @@ export default function Canvas({
     })
   }, [blocks.length, pageId]) // Removed isEditing - mode changes don't affect block rendering
 
+  // Log container width for debugging (temporary)
+  // CRITICAL: Must be declared before any early returns (Rules of Hooks)
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (containerRef.current && process.env.NODE_ENV === 'development') {
+      const width = containerRef.current.offsetWidth
+      console.log(`[Canvas] Container width: ${width}px (pageId=${pageId}, isEditing=${isEditing})`)
+    }
+  }, [pageId, isEditing, layout.length])
+
   if (blocks.length === 0) {
     console.log(`[Canvas] Rendering empty state: pageId=${pageId}, isEditing=${isEditing}`)
     // CRITICAL: Empty state is universal - no page-type-specific logic
@@ -645,15 +655,6 @@ export default function Canvas({
     // If log fails, at least log that it failed
     console.error('[Canvas] Grid Layout Signature log failed:', error)
   }
-
-  // Log container width for debugging (temporary)
-  const containerRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (containerRef.current && process.env.NODE_ENV === 'development') {
-      const width = containerRef.current.offsetWidth
-      console.log(`[Canvas] Container width: ${width}px (pageId=${pageId}, isEditing=${isEditing})`)
-    }
-  }, [pageId, isEditing, layout.length])
 
   return (
     <ErrorBoundary>
