@@ -115,6 +115,8 @@ export interface BlockConfig {
   field_id?: string
   allowed_fields?: string[]
   allowed_operators?: string[]
+  allow_inline_edit?: boolean // Enable inline editing for field block
+  inline_edit_permission?: 'admin' | 'member' | 'both' // Who can edit inline (default: 'both')
   // Appearance settings
   appearance?: {
     // Airtable-style appearance (new)

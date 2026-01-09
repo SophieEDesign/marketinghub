@@ -3,8 +3,15 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK, cn } from "@/lib/utils"
+import { getUserRole } from "@/lib/roles"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { Save, X } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -32,8 +39,47 @@ export default function FieldBlock({
   const fieldId = config?.field_id
   const [field, setField] = useState<TableField | null>(null)
   const [fieldValue, setFieldValue] = useState<any>(null)
+  const [editingValue, setEditingValue] = useState<any>(null)
+  const [isEditingValue, setIsEditingValue] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [tableName, setTableName] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<'admin' | 'member' | null>(null)
+  const [canEditInline, setCanEditInline] = useState(false)
+  const { toast } = useToast()
+
+  const allowInlineEdit = config?.allow_inline_edit || false
+  const editPermission = config?.inline_edit_permission || 'both'
+
+  // Load user role
+  useEffect(() => {
+    loadUserRole()
+  }, [])
+
+  // Determine if user can edit inline
+  useEffect(() => {
+    if (!allowInlineEdit || !userRole) {
+      setCanEditInline(false)
+      return
+    }
+
+    const canEdit = 
+      editPermission === 'both' ||
+      (editPermission === 'admin' && userRole === 'admin') ||
+      (editPermission === 'member' && userRole === 'member')
+    
+    setCanEditInline(canEdit)
+  }, [allowInlineEdit, editPermission, userRole])
+
+  async function loadUserRole() {
+    try {
+      const role = await getUserRole()
+      setUserRole(role || 'member')
+    } catch (error) {
+      console.error("Error loading user role:", error)
+      setUserRole('member')
+    }
+  }
 
   // Load table name and field info
   useEffect(() => {
@@ -48,8 +94,17 @@ export default function FieldBlock({
       loadFieldValue()
     } else {
       setFieldValue(null)
+      setEditingValue(null)
     }
   }, [recordId, tableName, field])
+
+  // Reset editing state when field value changes (but not when actively editing)
+  useEffect(() => {
+    if (!isEditingValue && fieldValue !== editingValue) {
+      setEditingValue(fieldValue)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldValue, isEditingValue])
 
   async function loadFieldInfo() {
     if (!pageTableId || !fieldId) return
@@ -187,25 +242,195 @@ export default function FieldBlock({
     }
   }
 
+  async function handleSaveValue() {
+    if (!recordId || !tableName || !field || editingValue === fieldValue) {
+      setIsEditingValue(false)
+      return
+    }
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const updateData: Record<string, any> = {
+        [field.name]: editingValue
+      }
+
+      const { error } = await supabase
+        .from(tableName)
+        .update(updateData)
+        .eq("id", recordId)
+
+      if (error) throw error
+
+      // Reload field value
+      await loadFieldValue()
+      setIsEditingValue(false)
+      
+      toast({
+        title: "Saved",
+        description: "Field value updated successfully",
+      })
+    } catch (error: any) {
+      console.error("Error saving field value:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save field value",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancelEdit() {
+    setEditingValue(fieldValue)
+    setIsEditingValue(false)
+  }
+
+  function handleStartEdit() {
+    setEditingValue(fieldValue)
+    setIsEditingValue(true)
+  }
+
   const displayValue = formatValue(fieldValue, field.type, field.options)
+  const isEditable = canEditInline && !isEditing // Can't edit when in block edit mode
 
   return (
     <div className="h-full flex flex-col p-4">
       {/* Field Label */}
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {field.name}
-        {field.required && <span className="text-red-500 ml-1">*</span>}
-      </label>
-      
-      {/* Field Value */}
-      <div className={cn(
-        "flex-1 text-sm text-gray-900",
-        field.type === 'long_text' && "whitespace-pre-wrap",
-        field.type === 'checkbox' && "text-lg"
-      )}>
-        {displayValue}
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-gray-700">
+          {field.name}
+          {field.required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        {isEditable && !isEditingValue && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleStartEdit}
+            className="h-6 px-2 text-xs"
+          >
+            Edit
+          </Button>
+        )}
       </div>
+      
+      {/* Field Value - Editable or Display */}
+      {isEditable && isEditingValue ? (
+        <div className="flex-1 space-y-2">
+          {renderEditableField()}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleSaveValue}
+              disabled={saving}
+              className="h-7"
+            >
+              <Save className="h-3 w-3 mr-1" />
+              {saving ? "Saving..." : "Save"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCancelEdit}
+              disabled={saving}
+              className="h-7"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className={cn(
+            "flex-1 text-sm text-gray-900",
+            field.type === 'long_text' && "whitespace-pre-wrap",
+            field.type === 'checkbox' && "text-lg",
+            isEditable && "cursor-pointer hover:bg-gray-50 rounded p-1 -m-1",
+            isEditable && !isEditingValue && "transition-colors"
+          )}
+          onClick={isEditable && !isEditingValue ? handleStartEdit : undefined}
+          title={isEditable && !isEditingValue ? "Click to edit" : undefined}
+        >
+          {displayValue}
+        </div>
+      )}
     </div>
   )
+
+  function renderEditableField() {
+    if (!field) return null
+
+    switch (field.type) {
+      case 'text':
+      case 'number':
+      case 'currency':
+      case 'percent':
+        return (
+          <Input
+            type={field.type === 'number' ? 'number' : 'text'}
+            value={editingValue ?? ''}
+            onChange={(e) => {
+              const value = field.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
+              setEditingValue(value)
+            }}
+            placeholder={field.required ? "Required" : "Enter value"}
+            className="w-full"
+          />
+        )
+      
+      case 'long_text':
+        return (
+          <Textarea
+            value={editingValue ?? ''}
+            onChange={(e) => setEditingValue(e.target.value)}
+            placeholder={field.required ? "Required" : "Enter text"}
+            className="w-full min-h-[100px]"
+          />
+        )
+      
+      case 'checkbox':
+        return (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`field-${field.id}`}
+              checked={editingValue === true}
+              onCheckedChange={(checked) => setEditingValue(checked === true)}
+            />
+            <label
+              htmlFor={`field-${field.id}`}
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              {editingValue ? "Checked" : "Unchecked"}
+            </label>
+          </div>
+        )
+      
+      case 'date':
+        return (
+          <Input
+            type="date"
+            value={editingValue ? new Date(editingValue).toISOString().split('T')[0] : ''}
+            onChange={(e) => {
+              const dateValue = e.target.value ? new Date(e.target.value).toISOString() : null
+              setEditingValue(dateValue)
+            }}
+            className="w-full"
+          />
+        )
+      
+      default:
+        return (
+          <Input
+            type="text"
+            value={editingValue ?? ''}
+            onChange={(e) => setEditingValue(e.target.value)}
+            placeholder={field.required ? "Required" : "Enter value"}
+            className="w-full"
+          />
+        )
+    }
+  }
 }
 

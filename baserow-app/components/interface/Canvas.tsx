@@ -351,7 +351,6 @@ export default function Canvas({
           h: layoutItem.h || 4,
         })
       })
-      previousIsEditingRef.current = isEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
       
@@ -363,12 +362,12 @@ export default function Canvas({
           blocksCount: blocks.length,
         })
       }
-    } else {
-      // No changes detected - layout is already in sync with blocks
-      // Update edit mode ref
-      previousIsEditingRef.current = isEditing
     }
-  }, [blocks, isEditing])
+    // CRITICAL: Mode changes must NEVER trigger layout syncs
+    // isEditing is only used to control drag/resize capabilities, not state
+    // Update ref separately without triggering effect
+    previousIsEditingRef.current = isEditing
+  }, [blocks]) // Removed isEditing - mode changes don't trigger syncs
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
@@ -456,7 +455,7 @@ export default function Canvas({
       blockTypes: blocks.map(b => b.type),
       isEditing,
     })
-  }, [blocks.length, pageId, isEditing])
+  }, [blocks.length, pageId]) // Removed isEditing - mode changes don't affect block rendering
 
   if (blocks.length === 0) {
     console.log(`[Canvas] Rendering empty state: pageId=${pageId}, isEditing=${isEditing}`)

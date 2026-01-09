@@ -48,6 +48,8 @@ import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
 import TabsDataSettings from "./settings/TabsDataSettings"
 import TabsAppearanceSettings from "./settings/TabsAppearanceSettings"
 import FilterBlockSettings from "./settings/FilterBlockSettings"
+import FieldDataSettings from "./settings/FieldDataSettings"
+import FieldAppearanceSettings from "./settings/FieldAppearanceSettings"
 import AdvancedSettings from "./settings/AdvancedSettings"
 import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
 
@@ -59,6 +61,7 @@ interface SettingsPanelProps {
   onMoveToTop?: (blockId: string) => void
   onMoveToBottom?: (blockId: string) => void
   onLock?: (blockId: string, locked: boolean) => void
+  pageTableId?: string | null // Table ID from the page (for field blocks on record_view pages)
 }
 
 export default function SettingsPanel({
@@ -69,6 +72,7 @@ export default function SettingsPanel({
   onMoveToTop,
   onMoveToBottom,
   onLock,
+  pageTableId = null,
 }: SettingsPanelProps) {
   const [tables, setTables] = useState<Table[]>([])
   const [views, setViews] = useState<View[]>([])
@@ -381,6 +385,8 @@ export default function SettingsPanel({
         )
       case "filter":
         return <FilterBlockSettings {...commonProps} allBlocks={[]} />
+      case "field":
+        return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
       default:
         return (
           <div className="text-sm text-gray-500">
@@ -474,6 +480,13 @@ export default function SettingsPanel({
         return (
           <>
             <GridAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "field":
+        return (
+          <>
+            <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )

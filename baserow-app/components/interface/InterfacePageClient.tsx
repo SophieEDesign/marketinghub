@@ -319,42 +319,10 @@ function InterfacePageClientInternal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.id])
 
-  // CRITICAL: Reload blocks when exiting edit mode to ensure preview shows latest saved content
-  // This fixes the issue where content saved in edit mode doesn't appear in preview
-  // UNIFIED: All pages use blocks, so reload for all pages
-  const prevIsBlockEditingRef = useRef<boolean>(isBlockEditing)
-  const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  useEffect(() => {
-    // Detect when exiting edit mode (isBlockEditing changes from true to false)
-    if (prevIsBlockEditingRef.current && !isBlockEditing && page) {
-      // User just exited edit mode - reload blocks to get latest saved content
-      // CRITICAL: Do NOT clear blocks before reload - preserve them to prevent empty state flicker
-      // Canvas must always render blocks when they exist, regardless of edit/viewer mode
-      // Clear any pending reload timeout
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current)
-      }
-      console.log(`[InterfacePageClient] Exiting edit mode - scheduling block reload: pageId=${page.id}`)
-      // Longer delay to ensure database transaction is fully committed
-      // This prevents race condition where reload happens before save completes
-      reloadTimeoutRef.current = setTimeout(() => {
-        console.log(`[InterfacePageClient] Executing block reload after exit edit mode: pageId=${page.id}`)
-        // CRITICAL: Force reload but preserve existing blocks during reload
-        // This prevents Canvas from rendering empty state during the reload delay
-        loadBlocks(true) // Force reload to get latest saved content
-        reloadTimeoutRef.current = null
-      }, 750) // Increased delay to ensure save completes and database is consistent
-    }
-    prevIsBlockEditingRef.current = isBlockEditing
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (reloadTimeoutRef.current) {
-        clearTimeout(reloadTimeoutRef.current)
-        reloadTimeoutRef.current = null
-      }
-    }
-  }, [isBlockEditing, page?.id])
+  // CRITICAL: Mode changes must NEVER trigger block reloads
+  // Edit mode is a capability flag only - it controls drag/resize/settings, not block state
+  // Blocks are already correct after save - no reload needed
+  // Removing block reload on exit edit mode - this was causing flicker and layout resets
 
   async function loadPage() {
     // CRITICAL: Only load if not already loaded (prevent overwriting initial data)

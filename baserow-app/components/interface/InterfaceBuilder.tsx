@@ -66,80 +66,72 @@ export default function InterfaceBuilder({
     onEditModeChange?.(effectiveIsEditing)
   }, [effectiveIsEditing, onEditModeChange])
 
-  // CRITICAL: View mode is READ-ONLY - never update blocks on mode changes
-  // Only initialize blocks once on page load or when initialBlocks actually change from API
-  // Use hash-based guard to prevent unnecessary updates
-  const lastLoadedBlockHashRef = useRef<string | null>(null)
+  // CRITICAL: One-way gate - blocks are set from initialBlocks ONCE per pageId, then never replaced
+  // After first load, initialBlocks must NEVER overwrite live state
+  // This prevents edit/view drift, layout resets, and state loss
+  // 
+  // Rules:
+  // - Blocks set from initialBlocks ONLY on first load (hasInitializedRef.current === false)
+  // - After initialization, blocks are managed by user actions only (drag, resize, config, add, remove)
+  // - Hash comparisons, revalidation, navigation back to page - none of these replace blocks
+  // - Only pageId change resets the gate (allows initialization for new page)
   const hasInitializedRef = useRef<boolean>(false)
   const prevPageIdRef = useRef<string>(page.id)
   
-  // Helper to create stable hash from blocks
-  const hashBlocks = useCallback((blocks: PageBlock[]) => {
-    const blocksArray = blocks.map((b: PageBlock) => ({
-      id: b.id,
-      type: b.type,
-      x: b.x,
-      y: b.y,
-      w: b.w,
-      h: b.h,
-      config: b.config,
-      updated_at: (b as any).updated_at,
-    }))
-    return JSON.stringify(blocksArray, (key, value) => {
-      // Sort object keys for consistent comparison
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-        return Object.keys(value).sort().reduce((acc, k) => {
-          acc[k] = value[k]
-          return acc
-        }, {} as any)
-      }
-      return value
-    })
-  }, [])
-  
-  // Reset initialization when page changes
+  // Reset initialization flag ONLY when pageId changes (navigation to different page)
   useEffect(() => {
     if (prevPageIdRef.current !== page.id) {
       prevPageIdRef.current = page.id
       hasInitializedRef.current = false
-      lastLoadedBlockHashRef.current = null
     }
   }, [page.id])
   
-  // CRITICAL: Only initialize blocks once on page load or when data actually changes
-  // View mode must never write to block state - it's READ-ONLY
+  // CRITICAL: One-way gate - initialize blocks ONCE per pageId, never replace after
+  // This is the final fix to prevent edit/view drift
+  // 
+  // Pattern: Check if we have initialBlocks and haven't initialized yet
+  // Only depends on pageId - initialBlocks is checked inside, not in dependencies
+  // This ensures effect only runs on pageId change, not on initialBlocks prop changes
+  // 
+  // We check on mount AND on pageId change to catch initialBlocks whenever it arrives
   useEffect(() => {
-    const safeInitialBlocks = initialBlocks || []
-    const newHash = hashBlocks(safeInitialBlocks)
-    
-    // Only update if:
-    // 1. Not yet initialized (first load)
-    // 2. Data actually changed (hash differs)
-    // NEVER update based on mode changes (effectiveIsEditing)
-    const shouldUpdate = !hasInitializedRef.current || newHash !== lastLoadedBlockHashRef.current
-    
-    if (!shouldUpdate) {
-      return // No actual change - do nothing (view mode is passive)
+    // Only initialize if:
+    // 1. We have initialBlocks
+    // 2. We haven't initialized yet for this pageId
+    if (!initialBlocks || initialBlocks.length === 0) {
+      return
     }
     
-    // Update only when data actually changed
-    const hashChanged = newHash !== lastLoadedBlockHashRef.current
-    const wasInitialized = hasInitializedRef.current
-    lastLoadedBlockHashRef.current = newHash
-    hasInitializedRef.current = true
-    
-    console.log(`[InterfaceBuilder] Initializing/updating blocks from API: pageId=${page.id}`, {
-      isInitialization: !wasInitialized,
-      oldBlocksCount: blocks.length,
-      newBlocksCount: safeInitialBlocks.length,
-      oldBlockIds: blocks.map(b => b.id),
-      newBlockIds: safeInitialBlocks.map(b => b.id),
-      hashChanged,
-    })
-    
-    setBlocks(safeInitialBlocks)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialBlocks, page.id, hashBlocks]) // NO effectiveIsEditing dependency!
+    // One-way gate: only set blocks if we haven't initialized for this pageId
+    // After this, blocks are managed by user actions only, never replaced by initialBlocks
+    if (!hasInitializedRef.current) {
+      console.log(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
+        initialBlocksCount: initialBlocks.length,
+        initialBlockIds: initialBlocks.map(b => b.id),
+      })
+      setBlocks(initialBlocks)
+      hasInitializedRef.current = true
+    }
+    // CRITICAL: Do NOT update blocks if already initialized
+    // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
+    // Live state takes precedence after first load
+    // This prevents the "edit vs publish" drift issue
+  }, [page.id]) // ONLY pageId - NOT initialBlocks, NOT hash, NOT mode, NOT props
+  
+  // Also check on mount (in case initialBlocks arrives immediately on first render)
+  useEffect(() => {
+    if (!initialBlocks || initialBlocks.length === 0) {
+      return
+    }
+    if (!hasInitializedRef.current) {
+      console.log(`[InterfaceBuilder] Mount-time initialization (one-way gate): pageId=${page.id}`, {
+        initialBlocksCount: initialBlocks.length,
+        initialBlockIds: initialBlocks.map(b => b.id),
+      })
+      setBlocks(initialBlocks)
+      hasInitializedRef.current = true
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
   const [settingsPanelOpen, setSettingsPanelOpen] = useState(false)
@@ -499,56 +491,53 @@ export default function InterfaceBuilder({
   }, [])
 
   const handleBlockUpdate = useCallback(
-    async (blockId: string, config: Partial<PageBlock["config"]>) => {
-      try {
-        // PHASE 1 - TextBlock write verification: Log API payload
-        if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
-          console.log(`[TextBlock Write] Block ${blockId}: API PAYLOAD`, {
-            blockId,
-            payload: {
-              id: blockId,
-              config: {
-                content_json: (config as any).content_json,
-              }
-            },
-            contentJson: (config as any).content_json,
-            contentJsonStr: JSON.stringify((config as any).content_json),
-          })
-        }
+    async (blockId: string, configPatch: Partial<PageBlock["config"]>) => {
+      // 1) Optimistic in-place update (does not remount TipTap)
+      // This preserves the same array length, same objects for other blocks,
+      // and the same TextBlock instance - TipTap keeps focus + cursor
+      setBlocks((prev) =>
+        prev.map((b) =>
+          b.id === blockId
+            ? { ...b, config: { ...(b.config ?? {}), ...configPatch } }
+            : b
+        )
+      )
 
-        const response = await fetch(`/api/pages/${page.id}/blocks`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            blockUpdates: [{ id: blockId, config }],
-          }),
+      // PHASE 1 - TextBlock write verification: Log API payload
+      if (process.env.NODE_ENV === 'development' && (configPatch as any).content_json) {
+        console.log(`[TextBlock Write] Block ${blockId}: API PAYLOAD`, {
+          blockId,
+          payload: {
+            id: blockId,
+            config: {
+              content_json: (configPatch as any).content_json,
+            }
+          },
+          contentJson: (configPatch as any).content_json,
+          contentJsonStr: JSON.stringify((configPatch as any).content_json),
         })
+      }
 
-        if (!response.ok) {
-          throw new Error("Failed to update block")
-        }
+      // 2) Persist to API
+      const res = await fetch(`/api/pages/${page.id}/blocks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blockUpdates: [{ id: blockId, config: configPatch }],
+        }),
+      })
 
-        const responseData = await response.json()
-
-        // PHASE 1 - TextBlock write verification: Log API response
-        if (process.env.NODE_ENV === 'development' && (config as any).content_json) {
-          console.log(`[TextBlock Write] Block ${blockId}: API RESPONSE`, {
-            blockId,
-            responseData,
-            returnedBlocks: responseData.blocks,
-            hasContentJson: responseData.blocks?.find((b: PageBlock) => b.id === blockId)?.config?.content_json ? true : false,
-          })
-        }
-
-        console.log('🔥 handleBlockUpdate COMPLETE – reloading from DB')
-        // CRITICAL: After successful save, reload blocks from database and replace state entirely
-        // Database is the source of truth - preview state is only valid before save completes
+      // 3) Only recover/reload on error
+      if (!res.ok) {
+        // Re-sync from server if save failed
+        console.error(`[InterfaceBuilder] Block update failed, reloading from server: blockId=${blockId}`)
         const blocksResponse = await fetch(`/api/pages/${page.id}/blocks`, {
-          cache: 'no-store', // Ensure fresh data
+          cache: "no-store",
         })
+        
         if (blocksResponse.ok) {
           const blocksData = await blocksResponse.json()
-          const reloadedBlocks: PageBlock[] = (blocksData.blocks || []).map((block: any) => ({
+          const reloadedBlocks: PageBlock[] = (blocksData.blocks || blocksData || []).map((block: any) => ({
             id: block.id,
             page_id: block.page_id || page.id,
             type: block.type,
@@ -561,30 +550,33 @@ export default function InterfaceBuilder({
             created_at: block.created_at,
             updated_at: block.updated_at,
           }))
-          // Replace state entirely - database is source of truth
-          console.log(`[InterfaceBuilder] setBlocks after block update reload: pageId=${page.id}`, {
-            oldBlocksCount: blocks.length,
-            newBlocksCount: reloadedBlocks.length,
-            oldBlockIds: blocks.map(b => b.id),
-            newBlockIds: reloadedBlocks.map(b => b.id),
-          })
           setBlocks(reloadedBlocks)
-        } else {
-          // Fallback: update local state optimistically if reload fails
-          setBlocks((prev) =>
-            prev.map((b) => (b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b))
-          )
         }
-      } catch (error: any) {
-        console.error("Failed to update block:", error)
-        // Fallback: update local state optimistically on error
-        setBlocks((prev) =>
-          prev.map((b) => (b.id === blockId ? { ...b, config: { ...b.config, ...config } } : b))
-        )
+        
         toast({
           variant: "destructive",
           title: "Failed to save changes",
-          description: error.message || "Please try again",
+          description: `Failed to update block ${blockId}. State has been synced with server.`,
+        })
+        
+        throw new Error(`Failed to update block ${blockId}`)
+      }
+
+      // PHASE 1 - TextBlock write verification: Log API response
+      if (process.env.NODE_ENV === 'development' && (configPatch as any).content_json) {
+        const responseData = await res.json().catch(() => ({}))
+        console.log(`[TextBlock Write] Block ${blockId}: API RESPONSE`, {
+          blockId,
+          responseData,
+          returnedBlocks: responseData.blocks,
+          hasContentJson: responseData.blocks?.find((b: PageBlock) => b.id === blockId)?.config?.content_json ? true : false,
+        })
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[InterfaceBuilder] Block updated successfully (optimistic): blockId=${blockId}`, {
+          pageId: page.id,
+          updatedConfig: configPatch,
         })
       }
     },
@@ -1032,6 +1024,7 @@ export default function InterfaceBuilder({
           onSave={handleSaveSettings}
           onMoveToTop={handleMoveBlockToTop}
           onMoveToBottom={handleMoveBlockToBottom}
+          pageTableId={pageTableId}
           onLock={handleLockBlock}
         />
       )}

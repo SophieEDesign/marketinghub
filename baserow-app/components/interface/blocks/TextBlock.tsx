@@ -609,7 +609,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // Toolbar component
   // CRITICAL: Only show toolbar when editor is editable (not read-only)
   const Toolbar = () => {
-    if (!editor || readOnly) return null
+    if (!editor || readOnly) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[TextBlock Toolbar] Not rendering:', { hasEditor: !!editor, readOnly, isEditing })
+      }
+      return null
+    }
 
     // Toolbar is always visible when in edit mode
     // Position it above or below the block based on available space
@@ -617,19 +622,32 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       ? "-translate-y-[calc(100%+8px)]" 
       : "translate-y-[calc(100%+8px)]"
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[TextBlock Toolbar] Rendering:', { 
+        blockId: block.id, 
+        isEditing, 
+        readOnly, 
+        toolbarPosition,
+        hasEditor: !!editor 
+      })
+    }
+
     return (
       <div 
         ref={toolbarRef}
         data-toolbar="true"
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[100] transition-all duration-200 opacity-100",
+          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[9999] transition-all duration-200 opacity-100",
           toolbarPosition === 'top' ? "top-0" : "bottom-0",
           toolbarOffset
         )}
-        style={{
-          marginTop: toolbarPosition === 'top' ? '-8px' : '0',
-          marginBottom: toolbarPosition === 'bottom' ? '-8px' : '0',
-        }}
+      style={{
+        marginTop: toolbarPosition === 'top' ? '-8px' : '0',
+        marginBottom: toolbarPosition === 'bottom' ? '-8px' : '0',
+        // Ensure toolbar is always visible
+        visibility: 'visible',
+        display: 'flex',
+      }}
         onMouseDown={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -856,8 +874,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       style={{
         ...blockStyle,
         minHeight: '100px',
-        // Ensure toolbar can overflow
+        // Ensure toolbar can overflow - critical for toolbar visibility
         overflow: isEditing ? 'visible' : 'auto',
+        // Ensure relative positioning for absolute toolbar
+        position: 'relative',
       }}
       // Prevent drag/resize events from propagating when editing
       onMouseDown={(e) => {
