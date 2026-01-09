@@ -457,6 +457,60 @@ export default function Canvas({
     }
   }, [])
 
+  // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
+  // isEditing ONLY controls interactivity (isDraggable, isResizable)
+  // All layout-affecting props (cols, rowHeight, margin, compactType, etc.) must be identical
+  // This ensures identical grid math → identical layout → edit === public
+  // CRITICAL: This hook MUST be called before any early returns (React Hooks rules)
+  const gridConfig = useMemo(() => {
+    return {
+      cols: { lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 },
+      rowHeight: layoutSettings.rowHeight || 30,
+      margin: layoutSettings.margin || [10, 10],
+      compactType: "vertical" as const,
+      isBounded: true,
+      preventCollision: false,
+      allowOverlap: false,
+      containerPadding: [0, 0] as [number, number],
+      useCSSTransforms: true,
+    }
+  }, [layoutSettings.cols, layoutSettings.rowHeight, layoutSettings.margin])
+  // CRITICAL: isEditing, pageId, layout, blocks.length are NOT in dependencies - grid config must be identical regardless of edit mode
+
+  // CRITICAL: Log grid configuration signature to verify it's identical in edit and public
+  // This signature should be EXACTLY the same regardless of isEditing
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const layoutSignature = layout.map(item => ({
+        id: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+      })).sort((a, b) => a.id.localeCompare(b.id))
+      
+      console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
+        // Grid configuration (must be identical)
+        cols: JSON.stringify(gridConfig.cols),
+        rowHeight: gridConfig.rowHeight,
+        margin: JSON.stringify(gridConfig.margin),
+        compactType: gridConfig.compactType,
+        isBounded: gridConfig.isBounded,
+        preventCollision: gridConfig.preventCollision,
+        allowOverlap: gridConfig.allowOverlap,
+        containerPadding: JSON.stringify(gridConfig.containerPadding),
+        useCSSTransforms: gridConfig.useCSSTransforms,
+        // Layout state (must be identical)
+        layoutLength: layout.length,
+        blocksCount: blocks.length,
+        layoutSignature: JSON.stringify(layoutSignature),
+        // Interactivity (can differ - this is OK)
+        isDraggable: isEditing,
+        isResizable: isEditing,
+      })
+    }
+  }, [gridConfig, layout, blocks.length, pageId, isEditing])
+
   // Empty state: Show template-specific guidance
   // Log blocks received by Canvas
   useEffect(() => {
@@ -536,59 +590,6 @@ export default function Canvas({
       </div>
     )
   }
-
-  // CRITICAL: Grid configuration must be IDENTICAL for edit and public view
-  // isEditing ONLY controls interactivity (isDraggable, isResizable)
-  // All layout-affecting props (cols, rowHeight, margin, compactType, etc.) must be identical
-  // This ensures identical grid math → identical layout → edit === public
-  const gridConfig = useMemo(() => {
-    const config = {
-      cols: { lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 },
-      rowHeight: layoutSettings.rowHeight || 30,
-      margin: layoutSettings.margin || [10, 10],
-      compactType: "vertical" as const,
-      isBounded: true,
-      preventCollision: false,
-      allowOverlap: false,
-      containerPadding: [0, 0] as [number, number],
-      useCSSTransforms: true,
-    }
-    
-    // CRITICAL: Log grid configuration signature to verify it's identical in edit and public
-    // This signature should be EXACTLY the same regardless of isEditing
-    if (process.env.NODE_ENV === 'development') {
-      const layoutSignature = layout.map(item => ({
-        id: item.i,
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      })).sort((a, b) => a.id.localeCompare(b.id))
-      
-      console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
-        // Grid configuration (must be identical)
-        cols: JSON.stringify(config.cols),
-        rowHeight: config.rowHeight,
-        margin: JSON.stringify(config.margin),
-        compactType: config.compactType,
-        isBounded: config.isBounded,
-        preventCollision: config.preventCollision,
-        allowOverlap: config.allowOverlap,
-        containerPadding: JSON.stringify(config.containerPadding),
-        useCSSTransforms: config.useCSSTransforms,
-        // Layout state (must be identical)
-        layoutLength: layout.length,
-        blocksCount: blocks.length,
-        layoutSignature: JSON.stringify(layoutSignature),
-        // Interactivity (can differ - this is OK)
-        isDraggable: isEditing,
-        isResizable: isEditing,
-      })
-    }
-    
-    return config
-  }, [layoutSettings.cols, layoutSettings.rowHeight, layoutSettings.margin, pageId, layout, blocks.length])
-  // CRITICAL: isEditing is NOT in dependencies - grid config must be identical regardless of edit mode
 
   return (
     <ErrorBoundary>
