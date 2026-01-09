@@ -474,9 +474,13 @@ export default function Canvas({
       cols: { lg: cols, md: 10, sm: 6, xs: 4, xxs: 2 },
       rowHeight,
       margin,
-      compactType: "vertical" as const,
-      isBounded: true,
-      preventCollision: false,
+      // CRITICAL: Disable compaction - we store absolute positions in DB
+      // compactType="vertical" causes React-Grid-Layout to reflow blocks on mount
+      // This makes saved positions "snap back" even though DB is correct
+      // Airtable, Notion, Linear, Retool all disable compaction for DB-authoritative layouts
+      compactType: null, // Disabled - use explicit coordinates from DB
+      isBounded: false, // Disabled - don't push items back inside bounds
+      preventCollision: true, // Enabled - prevent overlapping (but don't auto-reflow)
       allowOverlap: false,
       containerPadding: [0, 0] as [number, number],
       useCSSTransforms: true,
@@ -577,14 +581,19 @@ export default function Canvas({
       h: item.h,
     })).sort((a, b) => a.id.localeCompare(b.id))
     
+    // Sanity log: layout BEFORE grid (to verify DB positions match what we're passing to grid)
+    console.log(`[Canvas] layout BEFORE grid: pageId=${pageId}`, 
+      layout.map(l => `${l.i}:${l.x},${l.y}`).join(' | ')
+    )
+    
     console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
       // Grid configuration (MUST be identical - if these differ, layout will diverge)
       cols: JSON.stringify(GRID_CONFIG.cols),
       rowHeight: GRID_CONFIG.rowHeight,
       margin: JSON.stringify(GRID_CONFIG.margin),
-      compactType: GRID_CONFIG.compactType,
-      isBounded: GRID_CONFIG.isBounded,
-      preventCollision: GRID_CONFIG.preventCollision,
+      compactType: GRID_CONFIG.compactType, // CRITICAL: Should be null (disabled)
+      isBounded: GRID_CONFIG.isBounded, // CRITICAL: Should be false (disabled)
+      preventCollision: GRID_CONFIG.preventCollision, // CRITICAL: Should be true (enabled)
       allowOverlap: GRID_CONFIG.allowOverlap,
       containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
       useCSSTransforms: GRID_CONFIG.useCSSTransforms,

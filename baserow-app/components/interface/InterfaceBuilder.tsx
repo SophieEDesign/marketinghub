@@ -771,25 +771,38 @@ export default function InterfaceBuilder({
 
   const handleMoveBlockToTop = useCallback(
     async (blockId: string) => {
-      const blockToMove = blocks.find((b) => b.id === blockId)
-      if (!blockToMove) return
+      // CRITICAL: Use latestLayoutRef as source of truth, fallback to blocks if ref is empty
+      const currentLayout = latestLayoutRef.current || blocks.map((b) => ({
+        i: b.id,
+        x: b.x || 0,
+        y: b.y || 0,
+        w: b.w || 4,
+        h: b.h || 4,
+      }))
+      
+      const layoutItemToMove = currentLayout.find((item) => item.i === blockId)
+      if (!layoutItemToMove) return
 
-      // Find minimum Y position
-      const minY = Math.min(...blocks.map((b) => b.y || 0))
+      // Find minimum Y position from current layout
+      const minY = Math.min(...currentLayout.map((item) => item.y || 0))
       
       // Move block to top (y = minY - 1 or 0)
       const newY = Math.max(0, minY - 1)
 
       try {
-        const layout: LayoutItem[] = blocks.map((b) => ({
-          i: b.id,
-          x: b.id === blockId ? blockToMove.x : b.x,
-          y: b.id === blockId ? newY : b.y,
-          w: b.w,
-          h: b.h,
+        // Create new layout with moved block
+        const newLayout: LayoutItem[] = currentLayout.map((item) => ({
+          i: item.i,
+          x: item.x,
+          y: item.i === blockId ? newY : item.y,
+          w: item.w,
+          h: item.h,
         }))
 
-        await saveLayout(layout)
+        // CRITICAL: Update latestLayoutRef before saving (ref → ref comparison)
+        latestLayoutRef.current = newLayout
+
+        await saveLayout(newLayout)
         
         // Update local state
         setBlocks((prev) =>
@@ -815,25 +828,38 @@ export default function InterfaceBuilder({
 
   const handleMoveBlockToBottom = useCallback(
     async (blockId: string) => {
-      const blockToMove = blocks.find((b) => b.id === blockId)
-      if (!blockToMove) return
+      // CRITICAL: Use latestLayoutRef as source of truth, fallback to blocks if ref is empty
+      const currentLayout = latestLayoutRef.current || blocks.map((b) => ({
+        i: b.id,
+        x: b.x || 0,
+        y: b.y || 0,
+        w: b.w || 4,
+        h: b.h || 4,
+      }))
+      
+      const layoutItemToMove = currentLayout.find((item) => item.i === blockId)
+      if (!layoutItemToMove) return
 
-      // Find maximum Y position
-      const maxY = Math.max(...blocks.map((b) => (b.y || 0) + (b.h || 4)))
+      // Find maximum Y position from current layout
+      const maxY = Math.max(...currentLayout.map((item) => (item.y || 0) + (item.h || 4)))
       
       // Move block to bottom
       const newY = maxY
 
       try {
-        const layout: LayoutItem[] = blocks.map((b) => ({
-          i: b.id,
-          x: b.id === blockId ? blockToMove.x : b.x,
-          y: b.id === blockId ? newY : b.y,
-          w: b.w,
-          h: b.h,
+        // Create new layout with moved block
+        const newLayout: LayoutItem[] = currentLayout.map((item) => ({
+          i: item.i,
+          x: item.x,
+          y: item.i === blockId ? newY : item.y,
+          w: item.w,
+          h: item.h,
         }))
 
-        await saveLayout(layout)
+        // CRITICAL: Update latestLayoutRef before saving (ref → ref comparison)
+        latestLayoutRef.current = newLayout
+
+        await saveLayout(newLayout)
         
         // Update local state
         setBlocks((prev) =>
