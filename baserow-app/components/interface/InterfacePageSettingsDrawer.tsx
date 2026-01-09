@@ -34,7 +34,6 @@ import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { PAGE_TYPE_DEFINITIONS, isRecordReviewPage } from "@/lib/interface/page-types"
 import RecordReviewLeftPanelSettings from "./RecordReviewLeftPanelSettings"
 import RecordViewLeftPanelSettings from "./RecordViewLeftPanelSettings"
-import { createBlock } from "@/lib/pages/saveBlocks"
 
 interface InterfacePageSettingsDrawerProps {
   pageId: string
@@ -345,7 +344,7 @@ export default function InterfacePageSettingsDrawer({
       
       let startY = maxY + marginY
       
-      // Create blocks in grid layout
+      // Create blocks in grid layout via API
       for (let i = 0; i < fieldsToCreate.length; i++) {
         const fieldId = fieldsToCreate[i]
         const row = Math.floor(i / colsPerRow)
@@ -354,18 +353,26 @@ export default function InterfacePageSettingsDrawer({
         const x = col * blockWidth
         const y = startY + (row * (blockHeight + marginY))
         
-        await createBlock(
-          pageId,
-          'field',
-          x,
-          y,
-          blockWidth,
-          blockHeight,
-          {
-            field_id: fieldId,
-            table_id: tableId,
-          }
-        )
+        const response = await fetch(`/api/pages/${pageId}/blocks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'field',
+            x,
+            y,
+            w: blockWidth,
+            h: blockHeight,
+            config: {
+              field_id: fieldId,
+              table_id: tableId,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to create block')
+        }
       }
     } catch (error) {
       console.error('Error creating field blocks:', error)
