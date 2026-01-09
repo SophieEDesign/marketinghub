@@ -89,12 +89,16 @@ export default function Canvas({
   
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
+  const previousBlockPositionsRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map())
   const previousIsEditingRef = useRef<boolean>(isEditing)
   const isInitializedRef = useRef(false)
   const layoutHydratedRef = useRef(false)
   const isResizingRef = useRef(false)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const prevPageIdRef = useRef<string | null>(pageId || null)
+  // Track when blocks are updated from user interaction (drag/resize) vs database reload
+  // This prevents sync effect from overwriting user changes
+  const blocksUpdatedFromUserRef = useRef(false)
   
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
@@ -103,6 +107,7 @@ export default function Canvas({
       const oldPageId = prevPageIdRef.current
       prevPageIdRef.current = pageId
       previousBlockIdsRef.current = ""
+      previousBlockPositionsRef.current.clear()
       layoutHydratedRef.current = false
       isInitializedRef.current = false
       setLayout([]) // Clear layout when page changes
@@ -124,37 +129,37 @@ export default function Canvas({
   }, [])
 
   /**
-   * Hydrates react-grid-layout from Supabase on page load
+   * Syncs layout state from blocks prop - single source of truth
    * 
    * CRITICAL RULES:
-   * 1. Database values (position_x, position_y, width, height) are the single source of truth FOR INITIAL LOAD ONLY
-   * 2. After initial hydration, layout state becomes locally authoritative
-   * 3. NEVER regenerate layout if position_x/y/w/h exist (except on first load)
-   * 4. Default layout generation is ONLY allowed when ALL of position_x, position_y, width, height are NULL
-   * 5. This applies per block, not per page
-   * 6. Edit/view transitions do NOT trigger layout writes
+   * 1. Blocks prop (from database) is the single source of truth for layout positions
+   * 2. Layout state is derived from blocks, not stored separately
+   * 3. Layout state only persists during active drag/resize operations
+   * 4. After drag/resize completes, layout syncs back to blocks (via onLayoutChange)
+   * 5. When blocks are reloaded from DB, layout syncs from blocks
    * 
-   * Only syncs from blocks prop when:
-   * 1. First load (not yet initialized) - ONCE ONLY
+   * Syncs layout from blocks when:
+   * 1. First load (not yet initialized)
    * 2. Block IDs changed (block added or removed)
+   * 3. Block positions changed (blocks reloaded with updated positions from DB)
    * 
-   * After hydration, layout state is managed locally and only updates via:
-   * - User drag/resize (handleLayoutChange)
+   * Preserves layout during:
+   * - Active drag/resize operations (isResizingRef.current = true)
    * 
-   * This prevents layout resets when:
-   * - Parent component re-renders
-   * - Block config updates (but positions unchanged)
-   * - Edit/view mode transitions
-   * - Save + reload cycles (blocks arrive with stale positions)
-   * - Other state changes in parent
-   * - During active resize/drag operations
-   * 
-   * KEY INSIGHT: After initial hydration, blocks.x/y/w/h may lag behind saved layout.
-   * Layout state is the source of truth after first load.
+   * This ensures layout always reflects the database state, except during user interactions.
    */
   useEffect(() => {
     // Don't reset layout if user is currently resizing/dragging
     if (isResizingRef.current) {
+      return
+    }
+    
+    // Don't sync if blocks were just updated from user interaction (drag/resize)
+    // This prevents overwriting user changes when InterfaceBuilder updates blocks to match layout
+    if (blocksUpdatedFromUserRef.current) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Sync skipped - blocks updated from user interaction')
+      }
       return
     }
 
@@ -163,6 +168,7 @@ export default function Canvas({
       // Reset refs when blocks are cleared (page change, etc.) to allow rehydration when blocks load
       if (previousBlockIdsRef.current !== "") {
         previousBlockIdsRef.current = ""
+        previousBlockPositionsRef.current.clear()
         layoutHydratedRef.current = false
         if (process.env.NODE_ENV === 'development') {
           console.log('[Canvas] Blocks cleared - resetting hydration state', {
@@ -171,47 +177,65 @@ export default function Canvas({
           })
         }
       }
+      setLayout([])
       return
     }
 
     const currentBlockIds = blocks.map(b => b.id).sort().join(",")
     const previousBlockIds = previousBlockIdsRef.current
     
-    // Only hydrate layout from blocks prop if block IDs changed (block added or removed)
-    // CRITICAL: Do NOT rehydrate after initial hydration - layout state is authoritative
-    // CRITICAL: Do NOT rehydrate on edit mode entry - layout persists across mode changes
+    // Check if block IDs changed (blocks added/removed)
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
+    // Check if block positions changed (blocks reloaded with new positions from DB)
+    // CRITICAL: Compare blocks positions with CURRENT LAYOUT positions (not just ref)
+    // This ensures we only sync when blocks come from DB and differ from current layout
+    // If current layout already matches blocks, no sync needed (layout is already correct)
+    const blockPositionsChanged = layoutHydratedRef.current && blocks.some((block) => {
+      // First check if current layout matches blocks (most accurate check)
+      const currentLayoutItem = layout.find(l => l.i === block.id)
+      if (currentLayoutItem) {
+        // If current layout matches blocks, no sync needed
+        const layoutMatches = Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) <= 0.01 &&
+                              Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) <= 0.01 &&
+                              Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) <= 0.01 &&
+                              Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) <= 0.01
+        if (layoutMatches) return false // Layout already matches, no sync needed
+      }
+      
+      // If no current layout item, check against previous positions
+      const prevLayoutPos = previousBlockPositionsRef.current.get(block.id)
+      if (!prevLayoutPos) return true // New block or not yet tracked
+      
+      // Check if block positions differ from previous layout positions
+      return Math.abs((prevLayoutPos.x || 0) - (block.x || 0)) > 0.01 ||
+             Math.abs((prevLayoutPos.y || 0) - (block.y || 0)) > 0.01 ||
+             Math.abs((prevLayoutPos.w || 4) - (block.w || 4)) > 0.01 ||
+             Math.abs((prevLayoutPos.h || 4) - (block.h || 4)) > 0.01
+    })
+    
+    // Sync layout from blocks if:
+    // 1. First load (blockIdsChanged and previousBlockIds is empty)
+    // 2. Block IDs changed (blocks added/removed)
+    // 3. Block positions changed (blocks reloaded with updated positions from DB)
+    const shouldSync = blockIdsChanged || blockPositionsChanged
+    
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Hydration check', {
+      console.log('[Canvas] Layout sync check', {
         pageId,
         blocksCount: blocks.length,
         currentBlockIds,
         previousBlockIds,
         blockIdsChanged,
+        blockPositionsChanged,
+        shouldSync,
         layoutLength: layout.length,
         layoutHydrated: layoutHydratedRef.current,
       })
     }
     
-    // Safety guard: If layout exists and block IDs haven't changed, preserve local layout
-    if (layout.length > 0 && !blockIdsChanged) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Hydration skipped – preserving local layout', {
-          layoutLength: layout.length,
-          blockIdsChanged,
-          previousBlockIds,
-          currentBlockIds,
-          blocksCount: blocks.length,
-        })
-      }
-      // Update edit mode ref without rehydrating
-      previousIsEditingRef.current = isEditing
-      return
-    }
-    
-    // Only hydrate when block IDs change (first load or block added/removed)
-    if (blockIdsChanged) {
+    // Sync layout from blocks
+    if (shouldSync) {
       // PHASE 2 - Layout rehydration audit: Log before hydration
       if (process.env.NODE_ENV === 'development') {
         console.log(`[Canvas] BEFORE HYDRATION`, {
@@ -302,36 +326,46 @@ export default function Canvas({
       
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
+      // CRITICAL: Update position tracking ref with LAYOUT positions (not block positions)
+      // This ensures we only sync when blocks come from DB, not when blocks are updated locally
+      // When user drags/resizes, layout changes, blocks are updated to match layout,
+      // but previousBlockPositionsRef tracks layout positions, so sync won't detect a change
+      previousBlockPositionsRef.current.clear()
+      newLayout.forEach(layoutItem => {
+        previousBlockPositionsRef.current.set(layoutItem.i, {
+          x: layoutItem.x || 0,
+          y: layoutItem.y || 0,
+          w: layoutItem.w || 4,
+          h: layoutItem.h || 4,
+        })
+      })
       previousIsEditingRef.current = isEditing
       layoutHydratedRef.current = true
       isInitializedRef.current = true
       
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Layout hydrated', {
+        console.log('[Canvas] Layout synced from blocks', {
           isFirstLoad: previousBlockIds === "",
           blockIdsChanged,
+          blockPositionsChanged,
           blocksCount: blocks.length,
         })
       }
     } else {
-      // Block IDs haven't changed and layout already hydrated - preserve local layout
-      // This is the normal state after initial load - layout is managed locally
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Hydration skipped – preserving local layout (block IDs unchanged)', {
-          layoutHydrated: layoutHydratedRef.current,
-          blockIdsChanged,
-          layoutLength: layout.length,
-        })
-      }
-      // Update edit mode ref without rehydrating
+      // No changes detected - layout is already in sync with blocks
+      // Update edit mode ref
       previousIsEditingRef.current = isEditing
     }
-  }, [blocks, isEditing, layout.length])
+  }, [blocks, isEditing])
 
   const handleLayoutChange = useCallback(
     (newLayout: Layout[]) => {
       // Mark that we're resizing/dragging
       isResizingRef.current = true
+      
+      // Mark that blocks will be updated from user interaction (not database)
+      // This prevents sync effect from overwriting user changes
+      blocksUpdatedFromUserRef.current = true
       
       // Clear any existing timeout
       if (resizeTimeoutRef.current) {
@@ -340,6 +374,18 @@ export default function Canvas({
       
       // Update local layout state immediately for responsive UI
       setLayout(newLayout)
+      
+      // CRITICAL: Update position tracking ref with new layout positions
+      // This ensures that when blocks are updated locally to match layout,
+      // the sync effect won't detect a change and overwrite the layout
+      newLayout.forEach(layoutItem => {
+        previousBlockPositionsRef.current.set(layoutItem.i, {
+          x: layoutItem.x || 0,
+          y: layoutItem.y || 0,
+          w: layoutItem.w || 4,
+          h: layoutItem.h || 4,
+        })
+      })
       
       // Notify parent of layout change (for debounced save)
       if (onLayoutChange) {
@@ -357,6 +403,11 @@ export default function Canvas({
       // This allows the layout to persist and prevents useEffect from resetting it during resize
       resizeTimeoutRef.current = setTimeout(() => {
         isResizingRef.current = false
+        // Reset user update flag after a delay to allow blocks to update
+        // This gives InterfaceBuilder time to update blocks to match layout
+        setTimeout(() => {
+          blocksUpdatedFromUserRef.current = false
+        }, 100)
         resizeTimeoutRef.current = null
       }, 300)
     },

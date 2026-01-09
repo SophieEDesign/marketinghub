@@ -1,6 +1,6 @@
 "use client"
 
-import { format } from 'date-fns'
+import { format, isValid } from 'date-fns'
 import { cn, formatDateUK } from '@/lib/utils'
 import type { CalendarEvent } from './CalendarView'
 import type { TableField } from '@/types/fields'
@@ -23,9 +23,9 @@ export default function EventCard({
   tableFields = []
 }: EventCardProps) {
   const timeStr =
-    event.start_date && event.end_date
+    event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date)
       ? `${format(event.start_date, 'HH:mm')} - ${format(event.end_date, 'HH:mm')}`
-      : event.date
+      : event.date && isValid(event.date)
       ? format(event.date, 'HH:mm')
       : ''
 

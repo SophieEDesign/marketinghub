@@ -6,6 +6,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { createClient } from "@/lib/supabase/client"
+import { validateFieldOptions } from "@/lib/fields/validation"
 import type { FieldType, TableField, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
@@ -34,6 +37,10 @@ export default function FieldBuilderModal({
   const [options, setOptions] = useState<FieldOptions>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingTables, setLoadingTables] = useState(false)
+  const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [loadingLookupFields, setLoadingLookupFields] = useState(false)
 
   const isEdit = !!field
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
@@ -56,9 +63,72 @@ export default function FieldBuilderModal({
     setError(null)
   }, [field, isOpen])
 
+  // Load tables for lookup fields
+  useEffect(() => {
+    if (isOpen && type === 'lookup') {
+      loadTables()
+    }
+  }, [isOpen, type])
+
+  // Load fields from lookup table when lookup_table_id changes
+  useEffect(() => {
+    if (isOpen && type === 'lookup' && options.lookup_table_id) {
+      loadLookupTableFields(options.lookup_table_id)
+    } else {
+      setLookupTableFields([])
+    }
+  }, [isOpen, type, options.lookup_table_id])
+
+  async function loadTables() {
+    setLoadingTables(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('tables')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (!error && data) {
+        setTables(data)
+      }
+    } catch (error) {
+      console.error('Error loading tables:', error)
+    } finally {
+      setLoadingTables(false)
+    }
+  }
+
+  async function loadLookupTableFields(tableId: string) {
+    setLoadingLookupFields(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('table_fields')
+        .select('id, name, type')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+
+      if (!error && data) {
+        setLookupTableFields(data)
+      }
+    } catch (error) {
+      console.error('Error loading lookup table fields:', error)
+      setLookupTableFields([])
+    } finally {
+      setLoadingLookupFields(false)
+    }
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       setError("Field name is required")
+      return
+    }
+
+    // Validate field options based on type
+    const validation = validateFieldOptions(type, options)
+    if (!validation.valid) {
+      setError(validation.error || "Invalid field configuration")
       return
     }
 
@@ -206,6 +276,72 @@ export default function FieldBuilderModal({
             }
             tableFields={tableFields.filter(f => f.id !== field?.id && f.type !== 'formula')}
           />
+        )
+
+      case "lookup":
+        return (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="lookup-table">Lookup Table *</Label>
+              <Select
+                value={options.lookup_table_id || undefined}
+                onValueChange={(tableId) =>
+                  setOptions({ 
+                    ...options, 
+                    lookup_table_id: tableId || undefined,
+                    // Reset field when table changes
+                    lookup_field_id: undefined,
+                  })
+                }
+              >
+                <SelectTrigger id="lookup-table">
+                  <SelectValue placeholder="Select a table" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingTables ? (
+                    <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
+                  ) : (
+                    tables
+                      .filter(t => t.id !== tableId)
+                      .map((table) => (
+                        <SelectItem key={table.id} value={table.id}>
+                          {table.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            {options.lookup_table_id && (
+              <div className="space-y-2">
+                <Label htmlFor="lookup-field">Lookup Field *</Label>
+                <Select
+                  value={options.lookup_field_id || undefined}
+                  onValueChange={(fieldId) =>
+                    setOptions({ ...options, lookup_field_id: fieldId || undefined })
+                  }
+                >
+                  <SelectTrigger id="lookup-field">
+                    <SelectValue placeholder="Select a field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingLookupFields ? (
+                      <SelectItem value="__loading__" disabled>Loading fields...</SelectItem>
+                    ) : (
+                      lookupTableFields.map((field) => (
+                        <SelectItem key={field.id} value={field.id}>
+                          {field.name} ({field.type})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Select the field from the lookup table to display
+                </p>
+              </div>
+            )}
+          </div>
         )
 
       case "number":

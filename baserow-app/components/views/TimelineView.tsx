@@ -40,10 +40,12 @@ export default function TimelineView({
   startDateFieldId,
   endDateFieldId,
   dateFieldId,
-  fieldIds,
+  fieldIds: fieldIdsProp,
   searchQuery = "",
   tableFields = [],
 }: TimelineViewProps) {
+  // Ensure fieldIds is always an array
+  const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -126,6 +128,9 @@ export default function TimelineView({
 
   // Convert rows to timeline events
   const events = useMemo<TimelineEvent[]>(() => {
+    // Ensure filteredRows is an array
+    if (!Array.isArray(filteredRows)) return []
+    
     return filteredRows
       .filter((row) => {
         if (startDateFieldId && endDateFieldId) {
@@ -141,17 +146,34 @@ export default function TimelineView({
         let end: Date
 
         if (startDateFieldId && endDateFieldId) {
-          start = row.data[startDateFieldId]
-            ? new Date(row.data[startDateFieldId])
-            : row.data[endDateFieldId]
-            ? new Date(row.data[endDateFieldId])
-            : new Date()
-          end = row.data[endDateFieldId]
-            ? new Date(row.data[endDateFieldId])
-            : start
+          const startDateValue = row.data[startDateFieldId]
+          const endDateValue = row.data[endDateFieldId]
+          const parsedStart = startDateValue ? new Date(startDateValue) : null
+          const parsedEnd = endDateValue ? new Date(endDateValue) : null
+          
+          if (parsedStart && !isNaN(parsedStart.getTime())) {
+            start = parsedStart
+          } else if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+            start = parsedEnd
+          } else {
+            start = new Date()
+          }
+          
+          if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+            end = parsedEnd
+          } else {
+            end = start
+          }
         } else if (dateFieldId) {
-          start = new Date(row.data[dateFieldId])
-          end = new Date(row.data[dateFieldId])
+          const dateValue = row.data[dateFieldId]
+          const parsedDate = dateValue ? new Date(dateValue) : null
+          if (parsedDate && !isNaN(parsedDate.getTime())) {
+            start = parsedDate
+            end = parsedDate
+          } else {
+            start = new Date()
+            end = new Date()
+          }
         } else {
           start = new Date()
           end = new Date()
@@ -534,42 +556,66 @@ function addTime(date: Date, increment: number, zoom: ZoomLevel): Date {
 }
 
 function formatDateForZoom(date: Date, zoom: ZoomLevel): string {
-  switch (zoom) {
-    case "day":
-      // Time format: HH:mm (24-hour clock, UK standard)
-      return format(date, "HH:mm")
-    case "week":
-      // Day name and day number: "Mon 08"
-      return format(date, "EEE d")
-    case "month":
-      // Day number only: "08"
-      return format(date, "d")
-    case "quarter":
-      // Month abbreviation and day: "Jan 08"
-      return format(date, "MMM d")
-    case "year":
-      // Month abbreviation only: "Jan"
-      return format(date, "MMM")
+  // Validate date before formatting
+  if (!date || isNaN(date.getTime())) {
+    return "Invalid Date"
+  }
+  
+  try {
+    switch (zoom) {
+      case "day":
+        // Time format: HH:mm (24-hour clock, UK standard)
+        return format(date, "HH:mm")
+      case "week":
+        // Day name and day number: "Mon 08"
+        return format(date, "EEE d")
+      case "month":
+        // Day number only: "08"
+        return format(date, "d")
+      case "quarter":
+        // Month abbreviation and day: "Jan 08"
+        return format(date, "MMM d")
+      case "year":
+        // Month abbreviation only: "Jan"
+        return format(date, "MMM")
+      default:
+        return format(date, "dd/MM/yyyy")
+    }
+  } catch (error) {
+    console.error('Error formatting date:', error, date)
+    return "Invalid Date"
   }
 }
 
 function formatDateRange(start: Date, end: Date, zoom: ZoomLevel): string {
-  switch (zoom) {
-    case "day":
-      // Full date: "08 January 2026" (UK format)
-      return format(start, "d MMMM yyyy")
-    case "week":
-      // Date range: "08 Jan - 14 Jan" (UK format)
-      return `${format(start, "d MMM")} - ${format(end, "d MMM")}`
-    case "month":
-      // Month and year: "January 2026"
-      return format(start, "MMMM yyyy")
-    case "quarter":
-      // Month range: "Jan - Mar 2026"
-      return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`
-    case "year":
+  // Validate dates before formatting
+  if (!start || isNaN(start.getTime()) || !end || isNaN(end.getTime())) {
+    return "Invalid Date Range"
+  }
+  
+  try {
+    switch (zoom) {
+      case "day":
+        // Full date: "08 January 2026" (UK format)
+        return format(start, "d MMMM yyyy")
+      case "week":
+        // Date range: "08 Jan - 14 Jan" (UK format)
+        return `${format(start, "d MMM")} - ${format(end, "d MMM")}`
+      case "month":
+        // Month and year: "January 2026"
+        return format(start, "MMMM yyyy")
+      case "quarter":
+        // Month range: "Jan - Mar 2026"
+        return `${format(start, "MMM")} - ${format(end, "MMM yyyy")}`
+      case "year":
       // Year only: "2026"
       return start.getFullYear().toString()
+    default:
+      return `${format(start, "dd/MM/yyyy")} - ${format(end, "dd/MM/yyyy")}`
+    }
+  } catch (error) {
+    console.error('Error formatting date range:', error, { start, end })
+    return "Invalid Date Range"
   }
 }
 

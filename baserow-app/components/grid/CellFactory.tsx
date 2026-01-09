@@ -13,6 +13,7 @@ import AttachmentCell from './cells/AttachmentCell'
 import UrlCell from './cells/UrlCell'
 import EmailCell from './cells/EmailCell'
 import JsonCell from './cells/JsonCell'
+import LookupCell from './cells/LookupCell'
 
 interface CellFactoryProps {
   field: TableField
@@ -102,9 +103,18 @@ export function CellFactory({
 
     case 'link_to_table':
     case 'formula':
-    case 'lookup':
       // These are read-only or need special handling
       return <TextCell {...commonProps} editable={false} />
+
+    case 'lookup':
+      return (
+        <LookupCell
+          value={value}
+          fieldName={field.name}
+          field={field}
+          rowId={rowId}
+        />
+      )
 
     default:
       // Fallback: try to infer type from value

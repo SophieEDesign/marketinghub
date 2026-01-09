@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, isValid } from 'date-fns'
 import { formatDateUK, toISODateString } from '@/lib/utils'
 
 interface DateCellProps {
@@ -20,9 +20,17 @@ export default function DateCell({
   placeholder = '—',
 }: DateCellProps) {
   const [editing, setEditing] = useState(false)
-  const [editValue, setEditValue] = useState(
-    value ? format(parseISO(value), 'yyyy-MM-dd') : ''
-  )
+  const getInitialEditValue = () => {
+    if (!value) return ''
+    try {
+      const date = parseISO(value)
+      if (!isValid(date)) return ''
+      return format(date, 'yyyy-MM-dd')
+    } catch {
+      return ''
+    }
+  }
+  const [editValue, setEditValue] = useState(getInitialEditValue())
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 

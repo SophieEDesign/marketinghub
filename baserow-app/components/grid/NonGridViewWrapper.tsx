@@ -26,10 +26,12 @@ export default function NonGridViewWrapper({
   viewName,
   tableId,
   viewId,
-  fieldIds,
+  fieldIds: fieldIdsProp,
   groupingFieldId,
   dateFieldId,
 }: NonGridViewWrapperProps) {
+  // Ensure fieldIds is always an array
+  const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
   const router = useRouter()
   const searchParams = useSearchParams()
   const searchQuery = searchParams.get("q") || ""

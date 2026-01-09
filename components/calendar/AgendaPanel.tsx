@@ -1,6 +1,6 @@
 "use client"
 
-import { format, isSameDay } from 'date-fns'
+import { format, isSameDay, isValid } from 'date-fns'
 import { formatDateObjectUK } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
@@ -19,9 +19,9 @@ interface AgendaPanelProps {
 
 export default function AgendaPanel({ selectedDate, events, onEventClick, onCreateEvent, displayFields = [], tableFields = [] }: AgendaPanelProps) {
   const groupedEvents = events.reduce((acc, event) => {
-    const dateKey = event.start_date
+    const dateKey = event.start_date && isValid(event.start_date)
       ? format(event.start_date, 'yyyy-MM-dd')
-      : event.date
+      : event.date && isValid(event.date)
       ? format(event.date, 'yyyy-MM-dd')
       : 'no-date'
 
@@ -53,7 +53,9 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
         {Object.entries(groupedEvents)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([dateKey, dayEvents]) => {
+            if (dateKey === 'no-date') return null
             const date = new Date(dateKey)
+            if (!isValid(date)) return null
             return (
               <div key={dateKey}>
                 <div className="sticky top-0 bg-white z-10 pb-2 mb-2 border-b border-gray-200">
@@ -62,8 +64,8 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                 <div className="space-y-2">
                   {dayEvents
                     .sort((a, b) => {
-                      const timeA = a.start_date || a.date || new Date(0)
-                      const timeB = b.start_date || b.date || new Date(0)
+                      const timeA = (a.start_date && isValid(a.start_date)) ? a.start_date : (a.date && isValid(a.date)) ? a.date : new Date(0)
+                      const timeB = (b.start_date && isValid(b.start_date)) ? b.start_date : (b.date && isValid(b.date)) ? b.date : new Date(0)
                       return timeA.getTime() - timeB.getTime()
                     })
                     .map((event) => (
@@ -79,7 +81,7 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                           displayFields={displayFields}
                           tableFields={tableFields}
                         />
-                        {event.start_date && event.end_date && (
+                        {event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date) && (
                           <p className="text-xs text-gray-500 mt-1">
                             {format(event.start_date, 'HH:mm')} - {format(event.end_date, 'HH:mm')}
                           </p>

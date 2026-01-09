@@ -38,13 +38,15 @@ export default function CalendarView({
   tableId, 
   viewId, 
   dateFieldId, 
-  fieldIds,
+  fieldIds: fieldIdsProp,
   searchQuery = "",
   tableFields = [],
   filters = [],
   onRecordClick,
   blockConfig = {}
 }: CalendarViewProps) {
+  // Ensure fieldIds is always an array
+  const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -241,7 +243,9 @@ export default function CalendarView({
   // Memoize filters to prevent unnecessary re-renders
   // Include date range filters in the key
   const filtersKey = useMemo(() => {
-    const dateRangeKey = dateFrom || dateTo ? `${dateFrom?.toISOString()}|${dateTo?.toISOString()}` : ''
+    const dateRangeKey = (dateFrom && !isNaN(dateFrom.getTime())) || (dateTo && !isNaN(dateTo.getTime())) 
+      ? `${dateFrom && !isNaN(dateFrom.getTime()) ? dateFrom.toISOString() : ''}|${dateTo && !isNaN(dateTo.getTime()) ? dateTo.toISOString() : ''}` 
+      : ''
     return JSON.stringify(filters || []) + dateRangeKey
   }, [filters, dateFrom, dateTo])
   
@@ -254,8 +258,8 @@ export default function CalendarView({
       allFilters.push({
         field: resolvedDateFieldId,
         operator: 'date_range',
-        value: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
-        value2: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
+        value: dateFrom && !isNaN(dateFrom.getTime()) ? dateFrom.toISOString().split('T')[0] : undefined,
+        value2: dateTo && !isNaN(dateTo.getTime()) ? dateTo.toISOString().split('T')[0] : undefined,
       })
     }
     
@@ -499,7 +503,9 @@ export default function CalendarView({
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
-    if (!searchQuery || !loadedTableFields.length) return rows
+    // Ensure rows is an array
+    if (!Array.isArray(rows)) return []
+    if (!searchQuery || !Array.isArray(loadedTableFields) || !loadedTableFields.length) return rows
     
     // Convert TableRow format to flat format for search
     const flatRows = rows.map((row) => ({
@@ -509,6 +515,8 @@ export default function CalendarView({
     
     // Filter using search helper
     const filtered = filterRowsBySearch(flatRows, loadedTableFields, searchQuery, fieldIds)
+    // Ensure filtered is an array before calling map
+    if (!Array.isArray(filtered)) return rows
     const filteredIds = new Set(filtered.map((r) => r._rowId))
     
     // Map back to TableRow format
@@ -715,6 +723,8 @@ export default function CalendarView({
             return false
           }
         })
+        // Ensure we have an array before mapping
+        .filter((row): row is TableRow => row !== null && row !== undefined)
         .map((row) => {
           // Get date values - support both single date field and start/end fields
           const dateFieldToUse = actualStartFieldName || actualFieldName
@@ -1033,7 +1043,7 @@ export default function CalendarView({
                       className="w-[140px] justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFrom ? format(dateFrom, "PPP") : "Select date"}
+                      {dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, "PPP") : "Select date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1070,7 +1080,7 @@ export default function CalendarView({
                       className="w-[140px] justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateTo ? format(dateTo, "PPP") : "Select date"}
+                      {dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, "PPP") : "Select date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
