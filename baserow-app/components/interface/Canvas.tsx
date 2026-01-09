@@ -567,8 +567,9 @@ export default function Canvas({
 
   // GUARDRAIL LOG: Log grid signature RIGHT BEFORE rendering grid
   // This MUST fire on every render to verify grid config is identical in edit/public
-  if (process.env.NODE_ENV === 'development') {
-    const layoutSignature = layout.map(item => ({
+  // CRITICAL: Always log (not just in dev) to catch production issues
+  try {
+    const layoutSignature = (layout || []).map(item => ({
       id: item.i,
       x: item.x,
       y: item.y,
@@ -595,6 +596,9 @@ export default function Canvas({
       isDraggable: isEditing,
       isResizable: isEditing,
     })
+  } catch (error) {
+    // If log fails, at least log that it failed
+    console.error('[Canvas] Grid Layout Signature log failed:', error)
   }
 
   return (
