@@ -52,6 +52,12 @@ export default function InterfaceBuilder({
   const [blocks, setBlocks] = useState<PageBlock[]>(initialBlocks)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
   
+  // CRITICAL: Hydration lock - prevent Canvas from rendering until blocks are loaded
+  // This prevents Canvas from committing empty layout state before blocks arrive
+  // There are three states: Loading (undefined), Hydrated (≥0 blocks), Editing (≥0 blocks)
+  // Canvas must NOT run until hydration is complete
+  const [hasHydrated, setHasHydrated] = useState<boolean>(false)
+  
   // Use unified editing context for block editing
   const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   
@@ -78,13 +84,22 @@ export default function InterfaceBuilder({
   const hasInitializedRef = useRef<boolean>(false)
   const prevPageIdRef = useRef<string>(page.id)
   
-  // Reset initialization flag ONLY when pageId changes (navigation to different page)
+  // Reset initialization flag and hydration state ONLY when pageId changes (navigation to different page)
   useEffect(() => {
     if (prevPageIdRef.current !== page.id) {
       prevPageIdRef.current = page.id
       hasInitializedRef.current = false
+      setHasHydrated(false) // Reset hydration lock on page change
     }
   }, [page.id])
+  
+  // Also check if initialBlocks was already populated on mount (synchronous load)
+  // This handles the case where blocks are available immediately
+  useEffect(() => {
+    if (initialBlocks && initialBlocks.length > 0 && !hasHydrated) {
+      setHasHydrated(true)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   
   // CRITICAL: One-way gate - initialize blocks ONCE per pageId, never replace after
   // This is the final fix to prevent edit/view drift
@@ -120,6 +135,8 @@ export default function InterfaceBuilder({
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
       prevInitialBlocksLengthRef.current = initialBlocks.length
+      // Mark as hydrated when blocks are set (even if empty - that's valid saved data)
+      setHasHydrated(true)
     }
     // CRITICAL: Do NOT update blocks if already initialized
     // Even if initialBlocks changes (navigation, revalidation, re-render, etc.)
@@ -148,6 +165,8 @@ export default function InterfaceBuilder({
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
       prevInitialBlocksLengthRef.current = currentLength
+      // Mark as hydrated when blocks arrive asynchronously
+      setHasHydrated(true)
     }
   }) // No dependencies - runs on every render to catch async initialBlocks
 
@@ -1000,6 +1019,13 @@ export default function InterfaceBuilder({
         {/* Canvas */}
         <div className="flex-1 overflow-auto p-4">
           <FilterStateProvider>
+            {/* CRITICAL: Hydration lock - never render Canvas until blocks are loaded */}
+            {/* This prevents Canvas from committing empty layout state before blocks arrive */}
+            {!hasHydrated ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-gray-500">Loading blocks...</div>
+              </div>
+            ) : (
             <Canvas
               blocks={blocks}
               isEditing={effectiveIsEditing}
@@ -1024,6 +1050,7 @@ export default function InterfaceBuilder({
               mode={mode}
               onRecordClick={onRecordClick}
             />
+            )}
           </FilterStateProvider>
           {/* Footer spacer to ensure bottom content is visible */}
           <div className="h-32 w-full" />

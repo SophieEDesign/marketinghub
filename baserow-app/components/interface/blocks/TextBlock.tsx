@@ -183,7 +183,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     // Initialize with empty content if config is loading, otherwise use actual content
     // Content will be set via setContent when config loads (handled in useEffect)
     content: isConfigLoading ? { type: 'doc', content: [] } : getInitialContent(),
-    editable: !readOnly, // CRITICAL: Editor is editable when NOT in read-only mode
+    editable: true, // CRITICAL: Editor must ALWAYS be editable for toolbar commands to work
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px] w-full',
@@ -607,11 +607,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   }, [editor, readOnly, appearance.text_color, textAlign, block.id, isEditing, isViewer])
 
   // Toolbar component
-  // CRITICAL: Only show toolbar when editor is editable (not read-only)
+  // CRITICAL: Only check for editor existence - visibility controlled by isEditing prop
   const Toolbar = () => {
-    if (!editor || readOnly) {
+    if (!editor) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[TextBlock Toolbar] Not rendering:', { hasEditor: !!editor, readOnly, isEditing })
+        console.log('[TextBlock Toolbar] Not rendering: editor not ready')
       }
       return null
     }
@@ -907,8 +907,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Always show when editing and not read-only */}
-      {isEditing && !readOnly && editor && <Toolbar />}
+      {/* Toolbar - Show when in edit mode (editor check handled inside Toolbar) */}
+      {isEditing && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
@@ -926,7 +926,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",
           isEditing && !isBlockEditing && "cursor-pointer",
-          !isEditing && "cursor-default"
+          !isEditing && "cursor-default",
+          // Read-only mode: disable pointer events but keep editor alive
+          readOnly && "pointer-events-none"
         )}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode

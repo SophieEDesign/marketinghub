@@ -150,6 +150,16 @@ export default function Canvas({
    * This ensures layout always reflects the database state, except during user interactions.
    */
   useEffect(() => {
+    // CRITICAL: Never sync before hydration is complete
+    // This prevents Canvas from committing empty layout state before blocks arrive
+    // InterfaceBuilder should prevent Canvas from rendering until hydrated, but this is a safety net
+    if (!layoutHydratedRef.current && blocks.length === 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Sync skipped - not hydrated yet, blocks.length=0')
+      }
+      return
+    }
+    
     // Don't reset layout if user is currently resizing/dragging
     if (isResizingRef.current) {
       return
