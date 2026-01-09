@@ -249,7 +249,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return groups
   }, [filteredData, statusField])
 
-  // Auto-select first record if none selected (use filtered data)
+  // CRITICAL: Auto-select first record if none selected (use filtered data)
+  // Record Review must NEVER have null recordId - always select first record if available
   useEffect(() => {
     if (!selectedRecordId && filteredData.length > 0) {
       const firstRecordId = filteredData[0].id
@@ -268,12 +269,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           filteredDataLength: filteredData.length,
         })
         setSelectedRecordId(newRecordId)
-      } else {
-        debugLog('RECORD', 'No records available, clearing selection', {
-          oldRecordId: selectedRecordId,
-        })
-        setSelectedRecordId(null)
       }
+      // CRITICAL: Do NOT set to null - keep previous selection if no records available
+      // This ensures recordId is never null when passed to InterfaceBuilder
     }
     
     // DEBUG_RECORD: Log record selection state

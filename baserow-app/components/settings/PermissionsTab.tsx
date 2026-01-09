@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
+import { formatDateUK } from '@/lib/utils'
 
 interface UserRole {
   id: string
@@ -129,7 +130,7 @@ export default function SettingsPermissionsTab() {
                 </div>
                 <div className="col-span-3 text-sm text-gray-500">
                   {user.created_at
-                    ? new Date(user.created_at).toLocaleDateString()
+                    ? formatDateUK(user.created_at)
                     : '—'}
                 </div>
               </div>

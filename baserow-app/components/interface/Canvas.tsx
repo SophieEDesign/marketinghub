@@ -485,42 +485,6 @@ export default function Canvas({
   // CRITICAL: isEditing, pageId, layout, blocks.length, isViewer, mode are NOT in dependencies
   // Grid config must be identical regardless of edit mode
 
-  // CRITICAL: Log grid configuration signature to verify it's identical in edit and public
-  // This signature should be EXACTLY the same regardless of isEditing
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const layoutSignature = layout.map(item => ({
-        id: item.i,
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      })).sort((a, b) => a.id.localeCompare(b.id))
-      
-      // GUARDRAIL LOG: This signature MUST be identical in edit and public view
-      // If anything differs → that's the bug
-      console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
-        // Grid configuration (MUST be identical - if these differ, layout will diverge)
-        cols: JSON.stringify(GRID_CONFIG.cols),
-        rowHeight: GRID_CONFIG.rowHeight,
-        margin: JSON.stringify(GRID_CONFIG.margin),
-        compactType: GRID_CONFIG.compactType,
-        isBounded: GRID_CONFIG.isBounded,
-        preventCollision: GRID_CONFIG.preventCollision,
-        allowOverlap: GRID_CONFIG.allowOverlap,
-        containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
-        useCSSTransforms: GRID_CONFIG.useCSSTransforms,
-        // Layout state (must be identical)
-        layoutLength: layout.length,
-        blocksCount: blocks.length,
-        layoutSignature: JSON.stringify(layoutSignature),
-        // Interactivity (can differ - this is OK, only affects drag/resize)
-        isDraggable: isEditing,
-        isResizable: isEditing,
-      })
-    }
-  }, [GRID_CONFIG, layout, blocks.length, pageId, isEditing])
-
   // Empty state: Show template-specific guidance
   // Log blocks received by Canvas
   useEffect(() => {
@@ -599,6 +563,38 @@ export default function Canvas({
         </div>
       </div>
     )
+  }
+
+  // GUARDRAIL LOG: Log grid signature RIGHT BEFORE rendering grid
+  // This MUST fire on every render to verify grid config is identical in edit/public
+  if (process.env.NODE_ENV === 'development') {
+    const layoutSignature = layout.map(item => ({
+      id: item.i,
+      x: item.x,
+      y: item.y,
+      w: item.w,
+      h: item.h,
+    })).sort((a, b) => a.id.localeCompare(b.id))
+    
+    console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
+      // Grid configuration (MUST be identical - if these differ, layout will diverge)
+      cols: JSON.stringify(GRID_CONFIG.cols),
+      rowHeight: GRID_CONFIG.rowHeight,
+      margin: JSON.stringify(GRID_CONFIG.margin),
+      compactType: GRID_CONFIG.compactType,
+      isBounded: GRID_CONFIG.isBounded,
+      preventCollision: GRID_CONFIG.preventCollision,
+      allowOverlap: GRID_CONFIG.allowOverlap,
+      containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
+      useCSSTransforms: GRID_CONFIG.useCSSTransforms,
+      // Layout state (must be identical)
+      layoutLength: layout.length,
+      blocksCount: blocks.length,
+      layoutSignature: JSON.stringify(layoutSignature),
+      // Interactivity (can differ - this is OK, only affects drag/resize)
+      isDraggable: isEditing,
+      isResizable: isEditing,
+    })
   }
 
   return (

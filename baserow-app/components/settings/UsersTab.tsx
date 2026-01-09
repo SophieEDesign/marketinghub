@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, X, UserX, Trash2, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Switch } from '@/components/ui/switch'
+import { formatDateUK } from '@/lib/utils'
 
 interface User {
   id: string
@@ -408,7 +409,7 @@ export default function UsersTab() {
     if (diffMins < 60) return `${diffMins}m ago`
     if (diffHours < 24) return `${diffHours}h ago`
     if (diffDays < 7) return `${diffDays}d ago`
-    return d.toLocaleDateString()
+    return formatDateUK(d.toISOString())
   }
 
   if (loading) {

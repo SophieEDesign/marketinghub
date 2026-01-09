@@ -89,6 +89,26 @@ export async function saveBlockLayout(
         throw new Error(`Failed to update block ${update.id}: Update was blocked or block not found. Check RLS policies and block ownership.`)
       }
 
+      // CRITICAL: Server-side logging - print updated rows returned from Supabase
+      // This confirms the exact values persisted to the database
+      console.log(`[saveBlockLayout] Updated block ${update.id} for pageId=${pageId}`, {
+        blockId: update.id,
+        pageId,
+        updatedRows: data.map((row: any) => ({
+          id: row.id,
+          position_x: row.position_x,
+          position_y: row.position_y,
+          width: row.width,
+          height: row.height,
+        })),
+        sentValues: {
+          position_x: update.position_x,
+          position_y: update.position_y,
+          width: update.width,
+          height: update.height,
+        },
+      })
+
       // DEBUG_LAYOUT: Verify DB actually persisted the values
       const persisted = data[0]
       const matches = 

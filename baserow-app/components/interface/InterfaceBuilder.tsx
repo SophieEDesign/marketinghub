@@ -13,6 +13,7 @@ import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 import { useToast } from "@/components/ui/use-toast"
+import { formatDateTimeUK } from "@/lib/utils"
 import {
   registerMount,
   guardAgainstMountSave,
@@ -89,6 +90,8 @@ export default function InterfaceBuilder({
     if (prevPageIdRef.current !== page.id) {
       prevPageIdRef.current = page.id
       hasInitializedRef.current = false
+      latestLayoutRef.current = null // Reset layout ref on page change
+      lastSavedLayoutRef.current = null // Reset saved layout hash on page change
       setHasHydrated(false) // Reset hydration lock on page change
     }
   }, [page.id])
@@ -135,6 +138,14 @@ export default function InterfaceBuilder({
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
       prevInitialBlocksLengthRef.current = initialBlocks.length
+      // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
+      latestLayoutRef.current = initialBlocks.map((block) => ({
+        i: block.id,
+        x: block.x || 0,
+        y: block.y || 0,
+        w: block.w || 4,
+        h: block.h || 4,
+      }))
       // Mark as hydrated when blocks are set (even if empty - that's valid saved data)
       setHasHydrated(true)
     }
@@ -165,6 +176,14 @@ export default function InterfaceBuilder({
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
       prevInitialBlocksLengthRef.current = currentLength
+      // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
+      latestLayoutRef.current = initialBlocks.map((block) => ({
+        i: block.id,
+        x: block.x || 0,
+        y: block.y || 0,
+        w: block.w || 4,
+        h: block.h || 4,
+      }))
       // Mark as hydrated when blocks arrive asynchronously
       setHasHydrated(true)
     }
@@ -175,7 +194,11 @@ export default function InterfaceBuilder({
   const [isSaving, setIsSaving] = useState(false)
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState<Page>(page)
-  const [pendingLayout, setPendingLayout] = useState<LayoutItem[] | null>(null)
+  // CRITICAL: Store latest grid layout in ref (source of truth during editing)
+  // The grid library (react-grid-layout) has the authoritative layout
+  // Blocks state is derived and may lag behind grid interactions
+  // Never reconstruct layout from blocks - always use this ref
+  const latestLayoutRef = useRef<LayoutItem[] | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const componentIdRef = useRef(`interface-builder-${page.id}`)
 
@@ -210,6 +233,9 @@ export default function InterfaceBuilder({
    * IMPORTANT: Does NOT update blocks state to prevent layout resets.
    * Canvas manages its own layout state and only hydrates from blocks on mount.
    */
+  // Track last saved layout hash to prevent duplicate saves
+  const lastSavedLayoutRef = useRef<string | null>(null)
+
   const saveLayout = useCallback(
     async (layout: LayoutItem[], hasUserInteraction = false) => {
       // Only save in edit mode - view mode must never mutate layout
@@ -230,6 +256,19 @@ export default function InterfaceBuilder({
       if (!layoutModifiedByUserRef.current) {
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save blocked: no user modification")
+        }
+        return
+      }
+
+      // Diff check: Skip save if layout hasn't changed
+      // Create a stable hash of layout positions (ignore order, only positions matter)
+      const layoutHash = JSON.stringify(
+        layout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h })).sort((a, b) => a.i.localeCompare(b.i))
+      )
+
+      if (layoutHash === lastSavedLayoutRef.current) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug("[Layout] Save skipped: no diff (layout unchanged)")
         }
         return
       }
@@ -285,7 +324,9 @@ export default function InterfaceBuilder({
           }
 
           setSaveStatus("saved")
-          setPendingLayout(null)
+          
+          // Update last saved layout hash to prevent duplicate saves
+          lastSavedLayoutRef.current = layoutHash
           
           // CRITICAL: Do NOT reload blocks after save
           // Blocks are already correct locally - reloading causes flicker/resets
@@ -323,8 +364,9 @@ export default function InterfaceBuilder({
    * 
    * Debounce delay: 500ms - prevents hammering the API during rapid drag/resize operations.
    * 
-   * CRITICAL: Only saves if layout was actually modified by user interaction.
-   * Prevents saving on mount/hydration when layout is just being initialized from saved state.
+   * CRITICAL: The grid is the source of truth for layout at the moment of interaction.
+   * Blocks state is derived, not authoritative, during editing.
+   * Always store the latest grid layout in latestLayoutRef - never reconstruct from blocks.
    */
   const handleLayoutChange = useCallback(
     (layout: LayoutItem[]) => {
@@ -336,6 +378,10 @@ export default function InterfaceBuilder({
 
       // Mark that layout has been modified by user
       layoutModifiedByUserRef.current = true
+
+      // CRITICAL: Store latest grid layout in ref (source of truth)
+      // The grid library has the authoritative layout - blocks state may lag
+      latestLayoutRef.current = layout
 
       // Update local state immediately for responsive UI
       // This gives instant feedback while dragging/resizing
@@ -354,9 +400,6 @@ export default function InterfaceBuilder({
           return block
         })
       })
-
-      // Store pending layout for debounced save
-      setPendingLayout(layout)
 
       // Clear existing timeout to reset debounce timer
       if (saveTimeoutRef.current) {
@@ -393,33 +436,20 @@ export default function InterfaceBuilder({
     // Mark user interaction (exiting edit mode is a user action)
     markUserInteraction()
 
-    // Get current layout from blocks state and save before exiting edit mode
-    // This ensures any unsaved drag/resize changes are persisted
-    // CRITICAL: Always save layout when exiting edit mode to ensure positions are persisted
-    // Even if user didn't explicitly drag/resize, blocks might have been moved programmatically
-    const currentLayout: LayoutItem[] = blocks.map((block) => ({
-      i: block.id,
-      x: block.x,
-      y: block.y,
-      w: block.w,
-      h: block.h,
-    }))
+    // CRITICAL: Always use latestLayoutRef (grid's authoritative layout)
+    // Never reconstruct from blocks state - blocks may be stale
+    // The grid is the source of truth during editing
+    const layoutToSave = latestLayoutRef.current
 
-    // CRITICAL: Always save layout when exiting edit mode if we have blocks
-    // This ensures block positions are persisted even if user didn't explicitly drag/resize
-    if (currentLayout.length > 0) {
+    // Only save if we have a layout from the grid
+    if (layoutToSave && layoutToSave.length > 0) {
       setIsSaving(true)
       try {
-        // Use pendingLayout if it exists (has the latest drag/resize changes)
-        // Otherwise fall back to currentLayout from blocks state
-        const layoutToSave = pendingLayout || currentLayout
-        
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Layout] Saving layout on exit:', {
+          console.log('[Layout] Saving layout on exit (from grid ref):', {
             pageId: page.id,
             layoutCount: layoutToSave.length,
             layoutItems: layoutToSave,
-            hasPendingLayout: !!pendingLayout,
             layoutModifiedByUser: layoutModifiedByUserRef.current,
           })
         }
@@ -449,6 +479,8 @@ export default function InterfaceBuilder({
       } finally {
         setIsSaving(false)
       }
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log('[Layout] No layout to save on exit (grid ref is empty)')
     }
 
     // Reset modification flag after save
@@ -457,11 +489,11 @@ export default function InterfaceBuilder({
     exitBlockEdit()
     setSelectedBlockId(null)
     setSettingsPanelOpen(false)
-  }, [blocks, pendingLayout, saveLayout, exitBlockEdit, page.id, toast])
+  }, [saveLayout, exitBlockEdit, page.id, toast])
 
   // CRITICAL: Save layout when exiting edit mode (even if exitBlockEdit is called from parent)
   // This ensures layout is saved regardless of where "Done Editing" is clicked
-  // Must be after saveLayout and pendingLayout are declared
+  // Must be after saveLayout and latestLayoutRef are declared
   const prevIsEditingRef = useRef(effectiveIsEditing)
   useEffect(() => {
     // Detect when exiting edit mode (isEditing changes from true to false)
@@ -469,24 +501,16 @@ export default function InterfaceBuilder({
       // User just exited edit mode - save layout immediately
       // This handles the case where exitBlockEdit() is called from InterfacePageClient
       // We need to save layout even though handleExitEditMode wasn't called
-      const currentLayout: LayoutItem[] = blocks.map((block) => ({
-        i: block.id,
-        x: block.x,
-        y: block.y,
-        w: block.w,
-        h: block.h,
-      }))
       
-      if (currentLayout.length > 0) {
-        // Use pendingLayout if it exists (has the latest drag/resize changes)
-        // Otherwise use currentLayout from blocks state
-        const layoutToSave = pendingLayout || currentLayout
-        
+      // CRITICAL: Always use latestLayoutRef (grid's authoritative layout)
+      // Never reconstruct from blocks state - blocks may be stale
+      const layoutToSave = latestLayoutRef.current
+      
+      if (layoutToSave && layoutToSave.length > 0) {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[InterfaceBuilder] Auto-saving layout on edit mode exit:', {
+          console.log('[InterfaceBuilder] Auto-saving layout on edit mode exit (from grid ref):', {
             pageId: page.id,
             layoutCount: layoutToSave.length,
-            hasPendingLayout: !!pendingLayout,
             layoutItems: layoutToSave.map(item => ({
               id: item.i,
               x: item.x,
@@ -513,10 +537,12 @@ export default function InterfaceBuilder({
             description: error instanceof Error ? error.message : "Please try again",
           })
         })
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log('[InterfaceBuilder] No layout to auto-save on exit (grid ref is empty)')
       }
     }
     prevIsEditingRef.current = effectiveIsEditing
-  }, [effectiveIsEditing, blocks, pendingLayout, saveLayout, page.id, toast])
+  }, [effectiveIsEditing, saveLayout, page.id, toast])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -933,7 +959,7 @@ export default function InterfaceBuilder({
                 )}
                 {currentPage.updated_at && !effectiveIsEditing && (
                   <p className="text-xs text-gray-400 mt-1" suppressHydrationWarning>
-                    Last updated {new Date(currentPage.updated_at).toLocaleString()}
+                    Last updated {formatDateTimeUK(currentPage.updated_at)}
                   </p>
                 )}
               </div>

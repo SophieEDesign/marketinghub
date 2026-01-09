@@ -1098,7 +1098,7 @@ function InterfacePageClientInternal({
             </span>
             {page.updated_at && (
               <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
-                Updated {new Date(page.updated_at).toLocaleDateString()}
+                Updated {formatDateUK(page.updated_at)}
               </span>
             )}
           </div>

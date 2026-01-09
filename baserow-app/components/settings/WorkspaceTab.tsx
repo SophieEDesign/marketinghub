@@ -9,6 +9,7 @@ import { Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { IconPicker } from '@/components/ui/icon-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { formatDateTimeUK } from '@/lib/utils'
 
 export default function SettingsWorkspaceTab() {
   const [workspaceName, setWorkspaceName] = useState('Marketing Hub')
@@ -416,7 +417,7 @@ export default function SettingsWorkspaceTab() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
                 <span className="text-muted-foreground">
-                  {new Date(createdAt).toLocaleDateString()} at {new Date(createdAt).toLocaleTimeString()}
+                  {formatDateTimeUK(createdAt)}
                 </span>
               </div>
             )}
