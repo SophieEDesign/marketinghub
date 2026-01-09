@@ -50,14 +50,16 @@ export default function FieldBlock({
   const allowInlineEdit = config?.allow_inline_edit || false
   const editPermission = config?.inline_edit_permission || 'both'
 
-  // Load user role
+  // Load user role (only if field is configured)
   useEffect(() => {
-    loadUserRole()
-  }, [])
+    if (fieldId) {
+      loadUserRole()
+    }
+  }, [fieldId])
 
   // Determine if user can edit inline
   useEffect(() => {
-    if (!allowInlineEdit || !userRole) {
+    if (!allowInlineEdit || !userRole || !fieldId) {
       setCanEditInline(false)
       return
     }
@@ -68,7 +70,7 @@ export default function FieldBlock({
       (editPermission === 'member' && userRole === 'member')
     
     setCanEditInline(canEdit)
-  }, [allowInlineEdit, editPermission, userRole])
+  }, [allowInlineEdit, editPermission, userRole, fieldId])
 
   async function loadUserRole() {
     try {
@@ -134,11 +136,11 @@ export default function FieldBlock({
 
   // Reset editing state when field value changes (but not when actively editing)
   useEffect(() => {
-    if (!isEditingValue && fieldValue !== editingValue) {
+    if (!isEditingValue && fieldValue !== undefined) {
       setEditingValue(fieldValue)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fieldValue, isEditingValue])
+  }, [fieldValue])
 
   async function loadFieldInfo() {
     if (!pageTableId || !fieldId) return
@@ -326,8 +328,8 @@ export default function FieldBlock({
     setIsEditingValue(true)
   }
 
-  const displayValue = formatValue(fieldValue, field.type, field.options)
-  const isEditable = canEditInline && !isEditing // Can't edit when in block edit mode
+  const displayValue = field ? formatValue(fieldValue, field.type, field.options) : "—"
+  const isEditable = canEditInline && !isEditing && field // Can't edit when in block edit mode or if field not loaded
 
   return (
     <div className="h-full flex flex-col p-4">
