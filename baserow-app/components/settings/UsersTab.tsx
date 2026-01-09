@@ -29,7 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Edit, X, UserX } from 'lucide-react'
+import { Plus, Edit, X, UserX, Trash2, Mail } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Switch } from '@/components/ui/switch'
 
@@ -52,6 +52,10 @@ export default function UsersTab() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false)
   const [userToDeactivate, setUserToDeactivate] = useState<User | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [userToDelete, setUserToDelete] = useState<User | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [reinviting, setReinviting] = useState<string | null>(null)
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('')
@@ -237,8 +241,17 @@ export default function UsersTab() {
   async function handleUpdateUser() {
     if (!editingUser) return
 
+    // Check if anything has changed
+    const emailChanged = editEmail.trim() !== editingUser.email
+    const nameChanged = editName.trim() !== (editingUser.name || '')
+
+    if (!emailChanged && !nameChanged) {
+      alert('No changes to save')
+      return
+    }
+
     // Validate email format if changed
-    if (editEmail !== editingUser.email) {
+    if (emailChanged) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(editEmail.trim())) {
         alert('Please enter a valid email address')
@@ -248,15 +261,21 @@ export default function UsersTab() {
 
     setUpdating(true)
     try {
+      // Build update payload with only changed fields
+      const updatePayload: { email?: string; name?: string } = {}
+      if (emailChanged) {
+        updatePayload.email = editEmail.trim()
+      }
+      if (nameChanged) {
+        updatePayload.name = editName.trim()
+      }
+
       const response = await fetch(`/api/users/${editingUser.user_id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          email: editEmail.trim() !== editingUser.email ? editEmail.trim() : undefined,
-          name: editName.trim() !== (editingUser.name || '') ? editName.trim() : undefined,
-        }),
+        body: JSON.stringify(updatePayload),
       })
 
       const data = await response.json()
@@ -288,17 +307,17 @@ export default function UsersTab() {
     if (!userToDeactivate) return
 
     try {
-      const supabase = createClient()
-      
-      // Deactivate user in auth (ban)
-      const { error: banError } = await supabase.auth.admin.updateUserById(
-        userToDeactivate.user_id,
-        { ban_duration: '876000h' } // ~100 years
-      )
+      const response = await fetch(`/api/users/${userToDeactivate.user_id}/deactivate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-      if (banError) {
-        console.error('Error deactivating user:', banError)
-        // Continue anyway - we can track deactivation in profiles table
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to deactivate user')
       }
 
       setDeactivateDialogOpen(false)
@@ -307,6 +326,61 @@ export default function UsersTab() {
     } catch (error: any) {
       console.error('Error deactivating user:', error)
       alert(error.message || 'Failed to deactivate user')
+    }
+  }
+
+  async function handleDelete() {
+    if (!userToDelete) return
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/users/${userToDelete.user_id}/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete user')
+      }
+
+      setDeleteDialogOpen(false)
+      setUserToDelete(null)
+      loadUsers()
+    } catch (error: any) {
+      console.error('Error deleting user:', error)
+      alert(error.message || 'Failed to delete user')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleReinvite(user: User) {
+    setReinviting(user.user_id)
+    try {
+      const response = await fetch(`/api/users/${user.user_id}/reinvite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reinvite user')
+      }
+
+      alert(`Invitation sent successfully to ${user.email}`)
+      loadUsers()
+    } catch (error: any) {
+      console.error('Error reinviting user:', error)
+      alert(error.message || 'Failed to reinvite user')
+    } finally {
+      setReinviting(null)
     }
   }
 
@@ -426,6 +500,17 @@ export default function UsersTab() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+                            {user.is_pending && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleReinvite(user)}
+                                disabled={reinviting === user.user_id}
+                                title="Resend invitation"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -437,6 +522,18 @@ export default function UsersTab() {
                               title="Deactivate user"
                             >
                               <UserX className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setUserToDelete(user)
+                                setDeleteDialogOpen(true)
+                              }}
+                              title="Delete user"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -573,11 +670,37 @@ export default function UsersTab() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeactivateDialogOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setDeactivateDialogOpen(false)
+              setUserToDeactivate(null)
+            }}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeactivate}>
               Deactivate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete {userToDelete?.email}? This action cannot be undone. The user will be removed from the system completely.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setDeleteDialogOpen(false)
+              setUserToDelete(null)
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete User'}
             </Button>
           </DialogFooter>
         </DialogContent>
