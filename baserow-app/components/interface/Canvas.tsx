@@ -461,12 +461,19 @@ export default function Canvas({
   // isEditing ONLY controls interactivity (isDraggable, isResizable)
   // All layout-affecting props (cols, rowHeight, margin, compactType, etc.) must be identical
   // This ensures identical grid math → identical layout → edit === public
+  // CRITICAL: This is a CONSTANT - never depends on props that could differ between edit/public
   // CRITICAL: This hook MUST be called before any early returns (React Hooks rules)
-  const gridConfig = useMemo(() => {
+  const GRID_CONFIG = useMemo(() => {
+    // Use layoutSettings if provided, otherwise use defaults
+    // CRITICAL: These defaults must be the same in edit and public view
+    const cols = layoutSettings?.cols || 12
+    const rowHeight = layoutSettings?.rowHeight || 30
+    const margin = layoutSettings?.margin || [10, 10]
+    
     return {
-      cols: { lg: layoutSettings.cols || 12, md: 10, sm: 6, xs: 4, xxs: 2 },
-      rowHeight: layoutSettings.rowHeight || 30,
-      margin: layoutSettings.margin || [10, 10],
+      cols: { lg: cols, md: 10, sm: 6, xs: 4, xxs: 2 },
+      rowHeight,
+      margin,
       compactType: "vertical" as const,
       isBounded: true,
       preventCollision: false,
@@ -474,8 +481,9 @@ export default function Canvas({
       containerPadding: [0, 0] as [number, number],
       useCSSTransforms: true,
     }
-  }, [layoutSettings.cols, layoutSettings.rowHeight, layoutSettings.margin])
-  // CRITICAL: isEditing, pageId, layout, blocks.length are NOT in dependencies - grid config must be identical regardless of edit mode
+  }, [layoutSettings?.cols, layoutSettings?.rowHeight, layoutSettings?.margin])
+  // CRITICAL: isEditing, pageId, layout, blocks.length, isViewer, mode are NOT in dependencies
+  // Grid config must be identical regardless of edit mode
 
   // CRITICAL: Log grid configuration signature to verify it's identical in edit and public
   // This signature should be EXACTLY the same regardless of isEditing
@@ -489,27 +497,29 @@ export default function Canvas({
         h: item.h,
       })).sort((a, b) => a.id.localeCompare(b.id))
       
+      // GUARDRAIL LOG: This signature MUST be identical in edit and public view
+      // If anything differs → that's the bug
       console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
-        // Grid configuration (must be identical)
-        cols: JSON.stringify(gridConfig.cols),
-        rowHeight: gridConfig.rowHeight,
-        margin: JSON.stringify(gridConfig.margin),
-        compactType: gridConfig.compactType,
-        isBounded: gridConfig.isBounded,
-        preventCollision: gridConfig.preventCollision,
-        allowOverlap: gridConfig.allowOverlap,
-        containerPadding: JSON.stringify(gridConfig.containerPadding),
-        useCSSTransforms: gridConfig.useCSSTransforms,
+        // Grid configuration (MUST be identical - if these differ, layout will diverge)
+        cols: JSON.stringify(GRID_CONFIG.cols),
+        rowHeight: GRID_CONFIG.rowHeight,
+        margin: JSON.stringify(GRID_CONFIG.margin),
+        compactType: GRID_CONFIG.compactType,
+        isBounded: GRID_CONFIG.isBounded,
+        preventCollision: GRID_CONFIG.preventCollision,
+        allowOverlap: GRID_CONFIG.allowOverlap,
+        containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
+        useCSSTransforms: GRID_CONFIG.useCSSTransforms,
         // Layout state (must be identical)
         layoutLength: layout.length,
         blocksCount: blocks.length,
         layoutSignature: JSON.stringify(layoutSignature),
-        // Interactivity (can differ - this is OK)
+        // Interactivity (can differ - this is OK, only affects drag/resize)
         isDraggable: isEditing,
         isResizable: isEditing,
       })
     }
-  }, [gridConfig, layout, blocks.length, pageId, isEditing])
+  }, [GRID_CONFIG, layout, blocks.length, pageId, isEditing])
 
   // Empty state: Show template-specific guidance
   // Log blocks received by Canvas
@@ -598,24 +608,23 @@ export default function Canvas({
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}
           breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-          cols={gridConfig.cols}
-          // Canvas uses a fixed 12-column grid for two-column record review layouts
-          // Left column: x=0, w=4 (4 cols)
-          // Right column: x=4, w=8 (8 cols)
-          // Blocks don't know about columns - they only have x/y/w/h coordinates
-          rowHeight={gridConfig.rowHeight}
-          margin={gridConfig.margin}
-          isDraggable={isEditing} // CRITICAL: Only interactivity, not layout
-          isResizable={isEditing} // CRITICAL: Only interactivity, not layout
-          isBounded={gridConfig.isBounded}
-          preventCollision={gridConfig.preventCollision}
+          // CRITICAL: All layout-affecting props come from GRID_CONFIG constant
+          // isEditing MUST NOT appear in any of these props
+          cols={GRID_CONFIG.cols}
+          rowHeight={GRID_CONFIG.rowHeight}
+          margin={GRID_CONFIG.margin}
+          compactType={GRID_CONFIG.compactType}
+          isBounded={GRID_CONFIG.isBounded}
+          preventCollision={GRID_CONFIG.preventCollision}
+          allowOverlap={GRID_CONFIG.allowOverlap}
+          containerPadding={GRID_CONFIG.containerPadding}
+          useCSSTransforms={GRID_CONFIG.useCSSTransforms}
+          // CRITICAL: isEditing ONLY controls interactivity (never layout geometry)
+          isDraggable={isEditing}
+          isResizable={isEditing}
           onLayoutChange={handleLayoutChange}
-          compactType={gridConfig.compactType}
           draggableHandle=".drag-handle"
-          allowOverlap={gridConfig.allowOverlap}
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
-          containerPadding={gridConfig.containerPadding}
-          useCSSTransforms={gridConfig.useCSSTransforms}
         >
           {blocks.map((block) => {
             // Log each block being rendered
