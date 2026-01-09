@@ -110,6 +110,7 @@ export default function Canvas({
       previousBlockPositionsRef.current.clear()
       layoutHydratedRef.current = false
       isInitializedRef.current = false
+      blocksUpdatedFromUserRef.current = false
       setLayout([]) // Clear layout when page changes
       if (process.env.NODE_ENV === 'development') {
         console.log('[Canvas] Page changed - resetting hydration state', {
@@ -188,31 +189,39 @@ export default function Canvas({
     const blockIdsChanged = previousBlockIds === "" || currentBlockIds !== previousBlockIds
     
     // Check if block positions changed (blocks reloaded with new positions from DB)
-    // CRITICAL: Compare blocks positions with CURRENT LAYOUT positions (not just ref)
-    // This ensures we only sync when blocks come from DB and differ from current layout
-    // If current layout already matches blocks, no sync needed (layout is already correct)
-    const blockPositionsChanged = layoutHydratedRef.current && blocks.some((block) => {
-      // First check if current layout matches blocks (most accurate check)
-      const currentLayoutItem = layout.find(l => l.i === block.id)
-      if (currentLayoutItem) {
-        // If current layout matches blocks, no sync needed
-        const layoutMatches = Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) <= 0.01 &&
-                              Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) <= 0.01 &&
-                              Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) <= 0.01 &&
-                              Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) <= 0.01
-        if (layoutMatches) return false // Layout already matches, no sync needed
-      }
-      
-      // If no current layout item, check against previous positions
-      const prevLayoutPos = previousBlockPositionsRef.current.get(block.id)
-      if (!prevLayoutPos) return true // New block or not yet tracked
-      
-      // Check if block positions differ from previous layout positions
-      return Math.abs((prevLayoutPos.x || 0) - (block.x || 0)) > 0.01 ||
-             Math.abs((prevLayoutPos.y || 0) - (block.y || 0)) > 0.01 ||
-             Math.abs((prevLayoutPos.w || 4) - (block.w || 4)) > 0.01 ||
-             Math.abs((prevLayoutPos.h || 4) - (block.h || 4)) > 0.01
-    })
+    // CRITICAL: Always compare blocks with CURRENT LAYOUT state (source of truth)
+    // When returning to page, blocks have saved positions from DB, layout might be empty or stale
+    // We need to sync if blocks differ from current layout OR if layout is empty (first load after navigation)
+    const blockPositionsChanged = layoutHydratedRef.current && (
+      // If layout is empty, we definitely need to sync (returning to page after navigation)
+      layout.length === 0 ||
+      // Or if any block position differs from current layout
+      blocks.some((block) => {
+        const currentLayoutItem = layout.find(l => l.i === block.id)
+        if (!currentLayoutItem) {
+          // Block not in layout - need to sync (new block or layout was cleared)
+          return true
+        }
+        // Check if positions differ (allowing for small floating point differences)
+        const positionsDiffer = 
+          Math.abs((currentLayoutItem.x || 0) - (block.x || 0)) > 0.01 ||
+          Math.abs((currentLayoutItem.y || 0) - (block.y || 0)) > 0.01 ||
+          Math.abs((currentLayoutItem.w || 4) - (block.w || 4)) > 0.01 ||
+          Math.abs((currentLayoutItem.h || 4) - (block.h || 4)) > 0.01
+        
+        if (!positionsDiffer) {
+          // Positions match - update ref to track this state
+          previousBlockPositionsRef.current.set(block.id, {
+            x: block.x || 0,
+            y: block.y || 0,
+            w: block.w || 4,
+            h: block.h || 4,
+          })
+        }
+        
+        return positionsDiffer
+      })
+    )
     
     // Sync layout from blocks if:
     // 1. First load (blockIdsChanged and previousBlockIds is empty)
