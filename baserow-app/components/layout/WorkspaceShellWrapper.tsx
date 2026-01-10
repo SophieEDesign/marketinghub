@@ -143,7 +143,7 @@ export default async function WorkspaceShellWrapper({
         updated_at: page.updated_at,
         group_id: page.group_id || null,
         order_index: page.order_index || 0,
-        is_admin_only: page.is_admin_only || false,
+        is_admin_only: page.is_admin_only ?? true,
         is_new_system: true, // Flag to indicate this is from new system
       }))
     }
@@ -180,7 +180,7 @@ export default async function WorkspaceShellWrapper({
           updated_at: view.updated_at,
           group_id: view.group_id || null,
           order_index: view.order_index || 0,
-          is_admin_only: view.is_admin_only || false,
+          is_admin_only: view.is_admin_only ?? true,
           is_new_system: false, // Flag to indicate this is from old system
         }))
       

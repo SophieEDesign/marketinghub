@@ -98,8 +98,10 @@ export default function InterfaceBuilder({
   
   // Also check if initialBlocks was already populated on mount (synchronous load)
   // This handles the case where blocks are available immediately
+  // CRITICAL: Empty blocks is a valid state - we should hydrate even with 0 blocks
+  // This allows users to add blocks to empty pages
   useEffect(() => {
-    if (initialBlocks && initialBlocks.length > 0 && !hasHydrated) {
+    if (initialBlocks !== undefined && !hasHydrated) {
       setHasHydrated(true)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -121,10 +123,10 @@ export default function InterfaceBuilder({
   
   // Check on mount and pageId change
   useEffect(() => {
-    // Only initialize if:
-    // 1. We have initialBlocks
-    // 2. We haven't initialized yet for this pageId
-    if (!initialBlocks || initialBlocks.length === 0) {
+    // CRITICAL: Empty blocks is a valid state - a page might have no blocks yet
+    // We should still initialize (hydrate) even with empty blocks to allow adding blocks
+    if (initialBlocks === undefined) {
+      // initialBlocks not yet provided (still loading)
       return
     }
     
@@ -134,11 +136,13 @@ export default function InterfaceBuilder({
       console.log(`[InterfaceBuilder] First-time initialization (one-way gate): pageId=${page.id}`, {
         initialBlocksCount: initialBlocks.length,
         initialBlockIds: initialBlocks.map(b => b.id),
+        isEmpty: initialBlocks.length === 0,
       })
       setBlocks(initialBlocks)
       hasInitializedRef.current = true
       prevInitialBlocksLengthRef.current = initialBlocks.length
       // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
+      // Empty array is valid - means no blocks yet
       latestLayoutRef.current = initialBlocks.map((block) => ({
         i: block.id,
         x: block.x || 0,
@@ -147,6 +151,7 @@ export default function InterfaceBuilder({
         h: block.h || 4,
       }))
       // Mark as hydrated when blocks are set (even if empty - that's valid saved data)
+      // This allows users to add blocks to empty pages
       setHasHydrated(true)
     }
     // CRITICAL: Do NOT update blocks if already initialized
@@ -164,29 +169,37 @@ export default function InterfaceBuilder({
       return
     }
     
-    const currentLength = initialBlocks?.length || 0
-    
-    // If we have blocks and haven't initialized, initialize now
-    // This catches both immediate and async arrival
-    if (currentLength > 0 && initialBlocks) {
-      console.log(`[InterfaceBuilder] Async initialization (one-way gate): pageId=${page.id}`, {
-        initialBlocksCount: initialBlocks.length,
-        initialBlockIds: initialBlocks.map(b => b.id),
-      })
-      setBlocks(initialBlocks)
-      hasInitializedRef.current = true
-      prevInitialBlocksLengthRef.current = currentLength
-      // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
-      latestLayoutRef.current = initialBlocks.map((block) => ({
-        i: block.id,
-        x: block.x || 0,
-        y: block.y || 0,
-        w: block.w || 4,
-        h: block.h || 4,
-      }))
-      // Mark as hydrated when blocks arrive asynchronously
-      setHasHydrated(true)
+    // CRITICAL: Empty blocks is a valid state - we should hydrate even with 0 blocks
+    // This allows users to add blocks to empty pages
+    // Only skip if initialBlocks is undefined (still loading)
+    if (initialBlocks === undefined) {
+      return
     }
+    
+    const currentLength = initialBlocks.length
+    
+    // Initialize now (even if empty - that's a valid state)
+    // This catches both immediate and async arrival, including empty blocks
+    console.log(`[InterfaceBuilder] Async initialization (one-way gate): pageId=${page.id}`, {
+      initialBlocksCount: currentLength,
+      initialBlockIds: initialBlocks.map(b => b.id),
+      isEmpty: currentLength === 0,
+    })
+    setBlocks(initialBlocks)
+    hasInitializedRef.current = true
+    prevInitialBlocksLengthRef.current = currentLength
+    // Initialize latestLayoutRef from initialBlocks (grid's source of truth)
+    // Empty array is valid - means no blocks yet
+    latestLayoutRef.current = initialBlocks.map((block) => ({
+      i: block.id,
+      x: block.x || 0,
+      y: block.y || 0,
+      w: block.w || 4,
+      h: block.h || 4,
+    }))
+    // Mark as hydrated when blocks arrive asynchronously (even if empty)
+    // This allows users to add blocks to empty pages
+    setHasHydrated(true)
   }) // No dependencies - runs on every render to catch async initialBlocks
 
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS page_type_templates (
   description TEXT,
   icon TEXT,
   category TEXT NOT NULL, -- 'browse_plan', 'create_review', 'insights', 'advanced', 'other'
-  admin_only BOOLEAN DEFAULT FALSE,
+  admin_only BOOLEAN DEFAULT TRUE,
   default_blocks JSONB DEFAULT '[]'::jsonb, -- Array of block definitions
   allowed_blocks JSONB DEFAULT '[]'::jsonb, -- Array of allowed block types (empty = all allowed)
   order_index INTEGER DEFAULT 0,

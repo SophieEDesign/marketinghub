@@ -55,7 +55,7 @@ export default function AirtableSidebar({
   userRole = null
 }: AirtableSidebarProps) {
   const pathname = usePathname()
-  const { brandName, logoUrl, primaryColor } = useBranding()
+  const { brandName, logoUrl, primaryColor, sidebarColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
   // Interfaces expanded by default
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -96,7 +96,10 @@ export default function AirtableSidebar({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center py-2">
+      <div 
+        className="w-12 border-r border-gray-200 flex flex-col items-center py-2"
+        style={{ backgroundColor: sidebarColor }}
+      >
         <button
           onClick={() => setIsCollapsed(false)}
           className="p-2 hover:bg-gray-100 rounded transition-colors"
@@ -109,7 +112,10 @@ export default function AirtableSidebar({
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen shadow-sm">
+    <div 
+      className="w-64 border-r border-gray-200 flex flex-col h-screen shadow-sm"
+      style={{ backgroundColor: sidebarColor }}
+    >
       {/* Header with Branding */}
       <div className="p-3 border-b border-gray-200 flex items-center justify-between" style={{ borderBottomColor: primaryColor + '20' }}>
         <Link href="/" className="flex items-center gap-2">

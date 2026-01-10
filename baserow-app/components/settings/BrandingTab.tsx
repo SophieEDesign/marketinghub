@@ -18,6 +18,7 @@ export default function SettingsBrandingTab() {
   const [logoUrl, setLogoUrl] = useState(settings?.logo_url || "")
   const [primaryColor, setPrimaryColor] = useState(settings?.primary_color || "hsl(222.2, 47.4%, 11.2%)")
   const [accentColor, setAccentColor] = useState(settings?.accent_color || "hsl(210, 40%, 96.1%)")
+  const [sidebarColor, setSidebarColor] = useState(settings?.sidebar_color || "#ffffff")
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -27,6 +28,7 @@ export default function SettingsBrandingTab() {
       setLogoUrl(settings.logo_url || "")
       setPrimaryColor(settings.primary_color || "hsl(222.2, 47.4%, 11.2%)")
       setAccentColor(settings.accent_color || "hsl(210, 40%, 96.1%)")
+      setSidebarColor(settings.sidebar_color || "#ffffff")
     }
   }, [settings])
 
@@ -111,6 +113,7 @@ export default function SettingsBrandingTab() {
           logo_url: logoUrl || null,
           primary_color: primaryColor || null,
           accent_color: accentColor || null,
+          sidebar_color: sidebarColor || null,
         }),
       })
 
@@ -282,6 +285,27 @@ export default function SettingsBrandingTab() {
               Used for secondary elements and backgrounds
             </p>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sidebar-color">Sidebar Color</Label>
+          <div className="flex gap-2">
+            <Input
+              id="sidebar-color"
+              value={sidebarColor}
+              onChange={(e) => setSidebarColor(e.target.value)}
+              placeholder="#ffffff"
+            />
+            <input
+              type="color"
+              value={sidebarColor.startsWith('#') ? sidebarColor : '#ffffff'}
+              onChange={(e) => setSidebarColor(e.target.value)}
+              className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Background color for the sidebar (use hex format, e.g., #ffffff)
+          </p>
         </div>
 
         <div className="pt-4 border-t">

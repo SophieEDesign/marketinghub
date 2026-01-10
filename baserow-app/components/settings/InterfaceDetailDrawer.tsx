@@ -91,7 +91,7 @@ export default function InterfaceDetailDrawer({
         setName(page.name)
         setIcon(page.config?.settings?.icon || '')
         setDescription(page.config?.description || '')
-        setIsAdminOnly(page.is_admin_only || false)
+        setIsAdminOnly(page.is_admin_only ?? true)
         setGroup(page.group_id || '')
         return
       }
@@ -107,7 +107,7 @@ export default function InterfaceDetailDrawer({
         setName(view.name)
         setIcon(view.config?.settings?.icon || '')
         setDescription(view.config?.description || '')
-        setIsAdminOnly(view.is_admin_only || false)
+        setIsAdminOnly(view.is_admin_only ?? true)
         setGroup(view.group_id || '')
       }
     } catch (error) {

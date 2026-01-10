@@ -280,26 +280,37 @@ export default function CSVImportModal({
       const parsed = await parseCSV(selectedFile)
       setParsedData(parsed)
       
+      // Refresh table fields to ensure we have the latest state
+      await loadTableFields()
+      const refreshFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const refreshFieldsData = refreshFieldsResponse.ok ? await refreshFieldsResponse.json() : { fields: [] }
+      const currentTableFields = refreshFieldsData.fields || []
+      setTableFields(currentTableFields)
+      
       // Auto-map headers to existing fields and auto-detect types for new fields
       const mappings: Record<string, string> = {}
       const autoDetectedTypes: Record<string, FieldType> = {}
       
       parsed.columns.forEach((col) => {
         // First try exact match (case-insensitive)
-        let existingField = tableFields.find(
+        let existingField = currentTableFields.find(
           (f) => f.name.toLowerCase() === col.name.toLowerCase()
         )
         
         // If no exact match, try sanitized match (handles "Notes/Detail" -> "notes_detail")
         if (!existingField) {
           const sanitizedColName = sanitizeFieldNameSafe(col.name)
-          existingField = tableFields.find(
-            (f) => sanitizeFieldNameSafe(f.name) === sanitizedColName
+          existingField = currentTableFields.find(
+            (f) => sanitizeFieldNameSafe(f.name) === sanitizedColName ||
+                   f.name.toLowerCase() === sanitizedColName.toLowerCase()
           )
         }
         
         if (existingField) {
           mappings[col.name] = existingField.name
+          console.log(`Auto-mapped CSV column "${col.name}" to existing field "${existingField.name}"`)
         } else {
           // Extract sample values from across the dataset for better detection
           // Check up to 200 rows to find patterns even if some rows are empty
@@ -406,6 +417,15 @@ export default function CSVImportModal({
       // Phase 1: Use user's field mappings and create new fields as specified
       setProgress('Mapping columns to fields...')
       
+      // Refresh fields to ensure we have the latest state (important after previous imports)
+      await loadTableFields()
+      const freshFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const freshFieldsData = freshFieldsResponse.ok ? await freshFieldsResponse.json() : { fields: [] }
+      const freshTableFields = freshFieldsData.fields || []
+      setTableFields(freshTableFields)
+      
       const columnMappings: Record<string, string> = { ...fieldMappings } // CSV column name -> field name
       const fieldsToCreate: Array<{ name: string; type: FieldType; options?: any }> = []
 
@@ -413,6 +433,25 @@ export default function CSVImportModal({
       parsedData.columns.forEach((col) => {
         // If column is mapped to existing field, skip
         if (columnMappings[col.name]) {
+          return
+        }
+        
+        // Check if field already exists before trying to create it
+        // Try exact match first
+        const sanitizedColName = sanitizeFieldNameSafe(col.name)
+        let existingField = freshTableFields.find(f => f.name.toLowerCase() === sanitizedColName.toLowerCase())
+        
+        // If no exact match, try sanitized match
+        if (!existingField) {
+          existingField = freshTableFields.find(f => 
+            sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedColName.toLowerCase()
+          )
+        }
+        
+        // If field already exists, map to it instead of creating
+        if (existingField) {
+          columnMappings[col.name] = existingField.name
+          console.log(`Field "${col.name}" already exists as "${existingField.name}", mapping to existing field`)
           return
         }
         
@@ -508,14 +547,46 @@ export default function CSVImportModal({
       })
 
       // Phase 2: Create new fields with user-selected types
+      // Store created field info for immediate use (avoids race condition with field reload)
+      const createdFieldsMap: Record<string, { name: string; type: FieldType; options?: any }> = {}
+      
       if (fieldsToCreate.length > 0) {
         setProgress(`Creating ${fieldsToCreate.length} new fields...`)
         
+        // Refresh fields one more time right before creating to catch any that were created concurrently
+        const preCreateFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+        const preCreateFieldsData = preCreateFieldsResponse.ok ? await preCreateFieldsResponse.json() : { fields: [] }
+        const preCreateFields = preCreateFieldsData.fields || []
+        
         for (const fieldInfo of fieldsToCreate) {
+          // Calculate what the sanitized name will be (matching API logic)
           const sanitizedName = sanitizeFieldNameSafe(fieldInfo.name)
           
+          // Double-check field doesn't already exist before creating
+          // Check multiple ways: exact match, sanitized match, case-insensitive
+          let existingField = preCreateFields.find(f => 
+            f.name.toLowerCase() === sanitizedName.toLowerCase() ||
+            sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedName.toLowerCase() ||
+            f.name.toLowerCase() === fieldInfo.name.toLowerCase()
+          )
+          
+          if (existingField) {
+            // Field already exists - map to it instead of creating
+            console.log(`Field "${fieldInfo.name}" (would be sanitized to "${sanitizedName}") already exists as "${existingField.name}", mapping to existing field`)
+            columnMappings[fieldInfo.name] = existingField.name
+            createdFieldsMap[existingField.name] = {
+              name: existingField.name,
+              type: existingField.type,
+              options: existingField.options || {},
+            }
+            continue // Skip creation, move to next field
+          }
+          
+          // Send original name to API - it will sanitize consistently
           const requestBody: any = {
-            name: sanitizedName,
+            name: fieldInfo.name, // Send original name, API will sanitize
             type: fieldInfo.type,
             required: false,
           }
@@ -553,27 +624,130 @@ export default function CSVImportModal({
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-            throw new Error(`Failed to create field "${fieldInfo.name}": ${errorData.error || 'Unknown error'}`)
+            const errorMessage = errorData.error || 'Unknown error'
+            
+            // Check if error is due to field already existing
+            if (errorMessage.includes('already exists') || errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+              // Field was created concurrently - reload fields and try to map to existing
+              console.warn(`Field "${fieldInfo.name}" already exists (likely created concurrently), reloading fields...`)
+              const retryFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+                cache: 'no-store',
+              })
+              const retryFieldsData = retryFieldsResponse.ok ? await retryFieldsResponse.json() : { fields: [] }
+              const retryFields = retryFieldsData.fields || []
+              
+              const foundField = retryFields.find(f => 
+                f.name.toLowerCase() === sanitizedName.toLowerCase() ||
+                sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedName.toLowerCase()
+              )
+              
+              if (foundField) {
+                console.log(`Found existing field "${foundField.name}", mapping to it`)
+                columnMappings[fieldInfo.name] = foundField.name
+                createdFieldsMap[foundField.name] = {
+                  name: foundField.name,
+                  type: foundField.type,
+                  options: foundField.options || {},
+                }
+                continue // Skip creation, already mapped
+              }
+            }
+            
+            throw new Error(`Failed to create field "${fieldInfo.name}": ${errorMessage}`)
           }
 
           const createdField = await response.json().catch(() => null)
-          if (createdField?.field?.name) {
-            columnMappings[fieldInfo.name] = createdField.field.name
+          if (createdField?.field) {
+            const fieldName = createdField.field.name
+            columnMappings[fieldInfo.name] = fieldName
+            // Store the full field info including type for immediate use
+            createdFieldsMap[fieldName] = {
+              name: fieldName,
+              type: fieldInfo.type,
+              options: fieldInfo.options,
+            }
+          } else {
+            // Fallback: use sanitized name if API response format is unexpected
+            columnMappings[fieldInfo.name] = sanitizedName
+            createdFieldsMap[sanitizedName] = {
+              name: sanitizedName,
+              type: fieldInfo.type,
+              options: fieldInfo.options,
+            }
           }
         }
 
-        // Reload fields after creation
-        await loadTableFields()
-        const response = await fetch(`/api/tables/${tableId}/fields`)
-        const fieldsData = await response.ok ? await response.json() : { fields: [] }
-        const updatedFields = fieldsData.fields || []
-        setTableFields(updatedFields)
+        // Wait for fields to be available - retry with exponential backoff
+        setProgress('Verifying created fields are ready...')
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Initial wait
+        
+        // Reload fields and verify all created fields are present
+        let allFields: TableField[] = []
+        let allFieldsVerified = false
+        
+        for (let attempt = 0; attempt < 10; attempt++) {
+          await loadTableFields()
+          const response = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+            cache: 'no-store', // Bypass cache
+          })
+          const fieldsData = response.ok ? await response.json() : { fields: [] }
+          allFields = fieldsData.fields || []
+          setTableFields(allFields)
+          
+          // Check if all created fields are present
+          const createdFieldNames = Object.keys(createdFieldsMap)
+          const allCreatedFieldsFound = createdFieldNames.every(fieldName => 
+            allFields.some((f: TableField) => f.name === fieldName)
+          )
+          
+          if (allCreatedFieldsFound && allFields.length > 0) {
+            allFieldsVerified = true
+            console.log(`All ${createdFieldNames.length} created fields verified after ${attempt + 1} attempt(s)`)
+            break
+          }
+          
+          if (attempt < 9) {
+            // Exponential backoff: 500ms, 1000ms, 1500ms, etc.
+            await new Promise(resolve => setTimeout(resolve, 500 + (attempt * 500)))
+          }
+        }
+        
+        if (!allFieldsVerified && fieldsToCreate.length > 0) {
+          console.warn('Not all created fields were found after retries, but proceeding with stored field info')
+        }
       }
 
-      // Reload fields one more time to ensure we have the latest
-      const finalFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
-      const finalFieldsData = finalFieldsResponse.ok ? await finalFieldsResponse.json() : { fields: [] }
-      const allFields = finalFieldsData.fields || tableFields
+      // Get final field list (either from reload or existing tableFields)
+      if (allFields.length === 0) {
+        const finalFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+          cache: 'no-store', // Bypass cache
+        })
+        const finalFieldsData = finalFieldsResponse.ok ? await finalFieldsResponse.json() : { fields: [] }
+        allFields = finalFieldsData.fields || tableFields
+      }
+      
+      // Build a comprehensive field map: use created fields first, then fall back to loaded fields
+      const fieldMap = new Map<string, TableField>()
+      
+      // Add all loaded fields
+      allFields.forEach((f: TableField) => {
+        fieldMap.set(f.name, f)
+      })
+      
+      // Override/add created fields with their info (in case they're not in allFields yet)
+      Object.entries(createdFieldsMap).forEach(([fieldName, fieldInfo]) => {
+        if (!fieldMap.has(fieldName)) {
+          // Create a TableField-like object from the creation response
+          fieldMap.set(fieldName, {
+            id: '', // Not needed for type conversion
+            name: fieldInfo.name,
+            type: fieldInfo.type,
+            position: 0,
+            required: false,
+            options: fieldInfo.options || {},
+          } as TableField)
+        }
+      })
 
       // Phase 3: Prepare rows for insertion
       setProgress('Preparing rows for insertion...')
@@ -586,9 +760,10 @@ export default function CSVImportModal({
             const fieldName = columnMappings[col.name]
             if (!fieldName) return // Skip unmapped columns (user chose not to import this column)
 
-            const field = allFields.find((f: TableField) => f.name === fieldName)
+            // Use fieldMap which has both loaded and created fields
+            const field = fieldMap.get(fieldName)
             if (!field) {
-              console.warn(`Field "${fieldName}" not found, skipping column "${col.name}"`)
+              console.warn(`Field "${fieldName}" not found in field map, skipping column "${col.name}". Available fields: ${Array.from(fieldMap.keys()).join(', ')}`)
               return
             }
 

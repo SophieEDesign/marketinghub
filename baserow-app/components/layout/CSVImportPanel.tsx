@@ -16,8 +16,23 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { sanitizeFieldName } from "@/lib/fields/validation"
+import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
+
+/**
+ * Sanitize field name and handle reserved words
+ */
+function sanitizeFieldNameSafe(name: string): string {
+  let sanitized = sanitizeFieldName(name)
+  
+  // If sanitized name is a reserved word, add suffix
+  if (RESERVED_WORDS.includes(sanitized.toLowerCase())) {
+    sanitized = `${sanitized}_field`
+  }
+  
+  return sanitized
+}
 
 interface CSVImportPanelProps {
   tableId: string
@@ -428,9 +443,40 @@ export default function CSVImportPanel({
         allRows.push(row)
       }
 
+      // Refresh fields to ensure we have the latest state (important after previous imports)
+      await loadFields()
+      const preCheckFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const preCheckFieldsData = preCheckFieldsResponse.ok ? await preCheckFieldsResponse.json() : { fields: [] }
+      const preCheckFields = preCheckFieldsData.fields || []
+      setTableFields(preCheckFields)
+      
       const fieldsToCreate: Array<{ name: string; type: FieldType; options?: any }> = []
+      const autoMappedFields: Record<string, string> = {} // CSV header -> existing field name
+      
       csvHeaders.forEach((header) => {
         if (!fieldMappings[header] && newFields[header]) {
+          // Before creating, check if field already exists
+          const sanitizedHeader = sanitizeFieldNameSafe(header)
+          
+          // Try exact match
+          let existingField = preCheckFields.find(f => f.name.toLowerCase() === sanitizedHeader.toLowerCase())
+          
+          // Try sanitized match
+          if (!existingField) {
+            existingField = preCheckFields.find(f => 
+              sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedHeader.toLowerCase()
+            )
+          }
+          
+          // If field exists, map to it instead of creating
+          if (existingField) {
+            autoMappedFields[header] = existingField.name
+            console.log(`Field "${header}" already exists as "${existingField.name}", auto-mapping to existing field`)
+            return // Skip creation
+          }
+          
           const fieldType = newFields[header]
           const fieldData: { name: string; type: FieldType; options?: any } = {
             name: header,
@@ -463,88 +509,207 @@ export default function CSVImportPanel({
           fieldsToCreate.push(fieldData)
         }
       })
-
+      
       // Create new fields and wait for them to be created
       const createdFieldNames: Record<string, string> = {} // Maps CSV header to sanitized field name
+      const createdFieldsInfo: Record<string, { name: string; type: FieldType; options?: any }> = {} // Maps sanitized name to field info
+      
+      // Refresh fields one more time right before creating to catch any that were created concurrently
+      const preCreateFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      const preCreateFieldsData = preCreateFieldsResponse.ok ? await preCreateFieldsResponse.json() : { fields: [] }
+      const preCreateFields = preCreateFieldsData.fields || []
       
       for (const fieldData of fieldsToCreate) {
+        // Calculate what the sanitized name will be (matching API logic)
+        const sanitizedFieldName = sanitizeFieldNameSafe(fieldData.name)
+        
+        // Double-check field doesn't already exist before creating
+        // Check multiple ways: exact match, sanitized match, case-insensitive
+        let existingField = preCreateFields.find(f => 
+          f.name.toLowerCase() === sanitizedFieldName.toLowerCase() ||
+          sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedFieldName.toLowerCase() ||
+          f.name.toLowerCase() === fieldData.name.toLowerCase()
+        )
+        
+        if (existingField) {
+          // Field already exists - map to it instead of creating
+          console.log(`Field "${fieldData.name}" (would be sanitized to "${sanitizedFieldName}") already exists as "${existingField.name}", mapping to existing field`)
+          createdFieldNames[fieldData.name] = existingField.name
+          createdFieldsInfo[existingField.name] = {
+            name: existingField.name,
+            type: existingField.type,
+            options: existingField.options || {},
+          }
+          continue // Skip creation, move to next field
+        }
+        
+        // Send original name to API - it will sanitize consistently
+        // The API will return the actual sanitized field name in the response
         const response = await fetch(`/api/tables/${tableId}/fields`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fieldData),
+          body: JSON.stringify(fieldData), // fieldData.name is the original name
         })
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(`Failed to create field "${fieldData.name}": ${errorData.error || 'Unknown error'}`)
+          const errorMessage = errorData.error || 'Unknown error'
+          
+          // Check if error is due to field already existing
+          if (errorMessage.includes('already exists') || errorMessage.includes('duplicate') || errorMessage.includes('unique')) {
+            // Field was created concurrently - reload fields and try to map to existing
+            console.warn(`Field "${fieldData.name}" already exists (likely created concurrently), reloading fields...`)
+            const retryFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+              cache: 'no-store',
+            })
+            const retryFieldsData = retryFieldsResponse.ok ? await retryFieldsResponse.json() : { fields: [] }
+            const retryFields = retryFieldsData.fields || []
+            
+            const foundField = retryFields.find(f => 
+              f.name.toLowerCase() === sanitizedFieldName.toLowerCase() ||
+              sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedFieldName.toLowerCase()
+            )
+            
+            if (foundField) {
+              console.log(`Found existing field "${foundField.name}", mapping to it`)
+              createdFieldNames[fieldData.name] = foundField.name
+              createdFieldsInfo[foundField.name] = {
+                name: foundField.name,
+                type: foundField.type,
+                options: foundField.options || {},
+              }
+              continue // Skip creation, already mapped
+            }
+          }
+          
+          throw new Error(`Failed to create field "${fieldData.name}": ${errorMessage}`)
         }
         
         // Get the created field data to know the exact sanitized name
         const createdField = await response.json().catch(() => null)
+        let sanitizedFieldName: string
+        
         if (createdField?.field?.name) {
-          // API returns { field: { name: "...", ... } }
-          createdFieldNames[fieldData.name] = createdField.field.name
+          // API returns { field: { name: "...", type: "...", ... } }
+          sanitizedFieldName = createdField.field.name
+          createdFieldNames[fieldData.name] = sanitizedFieldName
+          // Store full field info including type for immediate use
+          createdFieldsInfo[sanitizedFieldName] = {
+            name: sanitizedFieldName,
+            type: fieldData.type,
+            options: fieldData.options,
+          }
         } else if (createdField?.name) {
           // Sometimes API might return field directly
-          createdFieldNames[fieldData.name] = createdField.name
+          sanitizedFieldName = createdField.name
+          createdFieldNames[fieldData.name] = sanitizedFieldName
+          createdFieldsInfo[sanitizedFieldName] = {
+            name: sanitizedFieldName,
+            type: fieldData.type,
+            options: fieldData.options,
+          }
         } else {
           // Fallback: sanitize the name ourselves (should match API)
-          const sanitized = sanitizeFieldName(fieldData.name)
-          createdFieldNames[fieldData.name] = sanitized
-          console.warn(`Field creation response format unexpected for "${fieldData.name}", using sanitized name: ${sanitized}`)
+          sanitizedFieldName = sanitizeFieldNameSafe(fieldData.name)
+          createdFieldNames[fieldData.name] = sanitizedFieldName
+          createdFieldsInfo[sanitizedFieldName] = {
+            name: sanitizedFieldName,
+            type: fieldData.type,
+            options: fieldData.options,
+          }
+          console.warn(`Field creation response format unexpected for "${fieldData.name}", using sanitized name: ${sanitizedFieldName}`)
         }
       }
 
-      // Wait longer for schema cache to update and reload fields
+      // Wait for fields to be available - retry with exponential backoff
       // Supabase schema cache can take a moment to refresh
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Initial wait
       await loadFields()
       
       // Fetch updated fields multiple times to ensure we have the latest
       let updatedFields: TableField[] = []
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const updatedFieldsResponse = await fetch(`/api/tables/${tableId}/fields`)
+      let allFieldsVerified = false
+      
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const updatedFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
+          cache: 'no-store', // Bypass cache
+        })
         if (updatedFieldsResponse.ok) {
           const data = await updatedFieldsResponse.json()
           updatedFields = data.fields || []
           
           // Verify all created fields are present
-          const allCreatedFieldsFound = fieldsToCreate.every(fieldData => {
-            const sanitizedName = createdFieldNames[fieldData.name]
-            return updatedFields.some((f: TableField) => f.name === sanitizedName)
-          })
+          const createdFieldNamesList = Object.values(createdFieldNames)
+          const allCreatedFieldsFound = createdFieldNamesList.length === 0 || createdFieldNamesList.every(sanitizedName => 
+            updatedFields.some((f: TableField) => f.name === sanitizedName)
+          )
           
-          if (updatedFields.length > 0 && allCreatedFieldsFound) {
+          if (updatedFields.length > 0 && (createdFieldNamesList.length === 0 || allCreatedFieldsFound)) {
+            allFieldsVerified = true
+            console.log(`All ${createdFieldNamesList.length} created fields verified after ${attempt + 1} attempt(s)`)
             break
           }
         }
-        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        if (attempt < 9) {
+          // Exponential backoff: 500ms, 1000ms, 1500ms, etc.
+          await new Promise(resolve => setTimeout(resolve, 500 + (attempt * 500)))
+        }
       }
       
       if (updatedFields.length === 0) {
         throw new Error('No fields found in table. Please ensure the table has at least one field.')
       }
       
+      if (!allFieldsVerified && fieldsToCreate.length > 0) {
+        console.warn('Not all created fields were found after retries, but proceeding with stored field info')
+      }
+      
+      // Build a comprehensive field map: use created fields first, then fall back to loaded fields
+      const fieldMap = new Map<string, TableField>()
+      
+      // Add all loaded fields
+      updatedFields.forEach((f: TableField) => {
+        fieldMap.set(f.name, f)
+      })
+      
+      // Override/add created fields with their info (in case they're not in updatedFields yet)
+      Object.entries(createdFieldsInfo).forEach(([fieldName, fieldInfo]) => {
+        if (!fieldMap.has(fieldName)) {
+          // Create a TableField-like object from the creation response
+          fieldMap.set(fieldName, {
+            id: '', // Not needed for type conversion
+            name: fieldInfo.name,
+            type: fieldInfo.type,
+            position: 0,
+            required: false,
+            options: fieldInfo.options || {},
+          } as TableField)
+        }
+      })
+      
+      // Build comprehensive field mapping: merge original mappings, auto-mapped fields, and created fields
+      const allFieldMappings: Record<string, string> = { ...fieldMappings, ...autoMappedFields }
+      
+      // Add created field names to mappings
+      Object.entries(createdFieldNames).forEach(([csvHeader, fieldName]) => {
+        allFieldMappings[csvHeader] = fieldName
+      })
+      
       // Log created field mappings for debugging
       console.log('Created field mappings:', createdFieldNames)
+      console.log('Auto-mapped fields:', autoMappedFields)
+      console.log('All field mappings:', allFieldMappings)
       console.log('Available fields:', updatedFields.map((f: TableField) => f.name))
-
-      // Create a set of valid field names (these should match column names in Supabase)
-      // Field names are sanitized when created, so they match the actual column names
-      const validFieldNames = new Set(updatedFields.map((f: TableField) => f.name))
-      
-      // Also include standard columns that always exist
-      validFieldNames.add('id')
-      validFieldNames.add('created_at')
-      validFieldNames.add('updated_at')
+      console.log('Field map size:', fieldMap.size, 'Fields in map:', Array.from(fieldMap.keys()))
 
       // Use already parsed CSV data (allRows was created above)
 
       // Check for unmapped headers (warn but don't block - they'll be skipped)
       const unmappedHeaders = csvHeaders.filter(header => {
-        const mappedField = fieldMappings[header]
-        const hasNewField = newFields[header]
-        return !mappedField && !hasNewField
+        return !allFieldMappings[header] && !newFields[header]
       })
 
       if (unmappedHeaders.length > 0) {
@@ -553,7 +718,7 @@ export default function CSVImportPanel({
 
       // Ensure at least one column is mapped
       const mappedHeaders = csvHeaders.filter(header => {
-        return fieldMappings[header] || newFields[header]
+        return allFieldMappings[header] || newFields[header]
       })
 
       if (mappedHeaders.length === 0) {
@@ -565,8 +730,8 @@ export default function CSVImportPanel({
       // Map and insert rows - only include columns that exist in the table
       console.log(`📊 Mapping ${allRows.length} CSV rows to database format`)
       console.log(`📋 CSV headers:`, csvHeaders)
-      console.log(`🗺️ Mapped headers:`, csvHeaders.filter(h => fieldMappings[h] || newFields[h]))
-      console.log(`📝 Field mappings:`, fieldMappings)
+      console.log(`🗺️ Mapped headers:`, mappedHeaders)
+      console.log(`📝 All field mappings:`, allFieldMappings)
       console.log(`🆕 New fields:`, newFields)
       console.log(`📑 Updated fields:`, updatedFields.map((f: TableField) => ({ name: f.name, type: f.type })))
       
@@ -577,7 +742,7 @@ export default function CSVImportPanel({
         csvHeaders.forEach((csvHeader) => {
           // Determine the field name: either from mapping or from new field creation
           // When a new field is created, it uses the CSV header name (sanitized)
-          const mappedFieldName = fieldMappings[csvHeader]
+          const mappedFieldName = allFieldMappings[csvHeader]
           const isNewField = !mappedFieldName && newFields[csvHeader]
           
           // Skip if this column is not mapped and not a new field
@@ -587,71 +752,65 @@ export default function CSVImportPanel({
           
           // Find the field - either by mapped name or by CSV header name (for new fields)
           let field: TableField | undefined
+          let fieldNameToUse: string | undefined
+          
           if (mappedFieldName) {
-            field = updatedFields.find((f: TableField) => f.name === mappedFieldName)
+            fieldNameToUse = mappedFieldName
+            field = fieldMap.get(mappedFieldName)
           } else if (isNewField) {
             // For new fields, use the sanitized name we tracked during creation
-            const sanitizedFieldName = createdFieldNames[csvHeader] || sanitizeFieldName(csvHeader)
-            field = updatedFields.find((f: TableField) => f.name === sanitizedFieldName)
+            const sanitizedFieldName = createdFieldNames[csvHeader] || sanitizeFieldNameSafe(csvHeader)
+            fieldNameToUse = sanitizedFieldName
+            field = fieldMap.get(sanitizedFieldName)
             
             // If still not found, try case-insensitive match as fallback
             if (!field) {
-              field = updatedFields.find((f: TableField) => 
-                f.name.toLowerCase() === sanitizedFieldName.toLowerCase()
-              )
-            }
-            
-            // Last resort: try exact match with original CSV header (in case it's already sanitized)
-            if (!field) {
-              field = updatedFields.find((f: TableField) => f.name === csvHeader)
-            }
-            
-            // If still not found, this is a critical error
-            if (!field) {
-              throw new Error(
-                `Field "${sanitizedFieldName}" (from CSV column "${csvHeader}") was created but not found in the table. ` +
-                `This may be a schema cache issue. Please try again in a few seconds. ` +
-                `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}`
-              )
+              for (const [mapFieldName, mapField] of fieldMap.entries()) {
+                if (mapFieldName.toLowerCase() === sanitizedFieldName.toLowerCase()) {
+                  field = mapField
+                  fieldNameToUse = mapFieldName
+                  break
+                }
+              }
             }
           }
           
-          if (!field) {
-            // Field not found - this should not happen for mapped fields
+          // If still not found, this is a critical error
+          if (!field || !fieldNameToUse) {
+            const attemptedName = mappedFieldName || createdFieldNames[csvHeader] || sanitizeFieldNameSafe(csvHeader)
+            const availableFields = Array.from(fieldMap.keys()).join(', ')
             throw new Error(
-              `Field not found for CSV column "${csvHeader}" (mapped to: ${mappedFieldName || 'new field'}). ` +
-              `Available fields: ${updatedFields.map((f: TableField) => f.name).join(', ')}`
+              `Field "${attemptedName}" (from CSV column "${csvHeader}") was not found in the field map. ` +
+              `This may be a schema cache issue. Please try again in a few seconds. ` +
+              `Available fields in map: ${availableFields || 'none'}`
             )
           }
 
-          // Verify the field name is valid (should match column name in Supabase)
-          if (!validFieldNames.has(field.name)) {
-            console.warn(`Field ${field.name} is not in valid fields list, skipping`)
-            return // Skip this field
-          }
-          
           let value: any = csvRow[csvHeader]
           
           // Convert empty strings to null for consistency
-          if (value === '') {
+          if (value === '' || value === null || value === undefined) {
             value = null
           }
           
-          // Skip if value is null/undefined and field is not required
-          if ((value === null || value === undefined) && !field.required) {
-            return // Skip this field
-          }
-          
-          // Type conversion
-          if (field.type === "number" || field.type === "currency" || field.type === "percent") {
-            value = value === '' || value === null ? null : (parseFloat(value) || 0)
-          } else if (field.type === "checkbox") {
-            value = value === '' || value === null ? false : (value.toLowerCase() === "true" || value === "1" || value.toLowerCase() === "yes")
-          } else if (field.type === "date") {
-            // Try to parse date - handle various formats
-            if (value === '' || value === null) {
-              value = null
+          // Type conversion based on field type
+          if (value === null || value === undefined || value === '') {
+            // Handle null/empty values based on field type
+            if (field.type === "checkbox") {
+              value = false
+            } else if (field.type === "multi_select") {
+              value = []
             } else {
+              value = null
+            }
+          } else {
+            // Perform type conversion for non-null values
+            if (field.type === "number" || field.type === "currency" || field.type === "percent") {
+              value = parseFloat(value) || 0
+            } else if (field.type === "checkbox") {
+              value = (String(value).toLowerCase() === "true" || value === "1" || String(value).toLowerCase() === "yes")
+            } else if (field.type === "date") {
+              // Try to parse date - handle various formats
               const date = new Date(value)
               if (isNaN(date.getTime())) {
                 value = null
@@ -659,26 +818,22 @@ export default function CSVImportPanel({
                 // Return ISO string for timestamptz
                 value = date.toISOString()
               }
-            }
-          } else if (field.type === "multi_select") {
-            // Convert comma/semicolon-separated values to array
-            if (value === '' || value === null) {
-              value = []
-            } else {
+            } else if (field.type === "multi_select") {
+              // Convert comma/semicolon-separated values to array
               const parts = String(value).split(/[,;]/).map(p => p.trim()).filter(p => p)
               value = parts
+            } else if (field.type === "single_select") {
+              // Single select is just a string
+              value = String(value).trim()
+            } else {
+              // For text fields, convert to string
+              value = String(value).trim()
             }
-          } else if (field.type === "single_select") {
-            // Single select is just a string
-            value = value === '' || value === null ? null : String(value).trim()
-          } else {
-            // For text fields, convert to string or null
-            value = value === '' || value === null ? null : String(value)
           }
           
-          // Use field.name which should match the sanitized column name in Supabase
+          // Use fieldNameToUse which should match the sanitized column name in Supabase
           // Field names are sanitized when created, so they match column names
-          mappedRow[field.name] = value
+          mappedRow[fieldNameToUse] = value
           fieldsAdded++
         })
         
@@ -704,7 +859,7 @@ export default function CSVImportPanel({
       
       // Validate we have rows to insert
       if (rowsToInsert.length === 0) {
-        const mappedCount = csvHeaders.filter(h => fieldMappings[h] || newFields[h]).length
+        const mappedCount = mappedHeaders.length
         const sampleRow = allRows[0] || {}
         const sampleValues = csvHeaders.map(h => `${h}: "${sampleRow[h]}"`).join(', ')
         
@@ -724,7 +879,7 @@ export default function CSVImportPanel({
         throw new Error('CSV file has no columns')
       }
 
-      const primaryKeyField = fieldMappings[firstColumn] || createdFieldNames[firstColumn]
+      const primaryKeyField = allFieldMappings[firstColumn]
       if (!primaryKeyField) {
         throw new Error(
           `The first column "${firstColumn}" must be mapped to a field for duplicate detection. ` +

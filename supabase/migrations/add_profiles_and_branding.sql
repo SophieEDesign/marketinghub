@@ -22,7 +22,7 @@ BEGIN
     AND column_name = 'is_admin_only'
   ) THEN
     ALTER TABLE public.views
-      ADD COLUMN is_admin_only boolean NOT NULL DEFAULT false;
+      ADD COLUMN is_admin_only boolean NOT NULL DEFAULT true;
   END IF;
 END $$;
 

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS interface_pages (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id),
-  is_admin_only BOOLEAN DEFAULT FALSE
+  is_admin_only BOOLEAN DEFAULT TRUE
 );
 
 -- Indexes
@@ -75,7 +75,7 @@ SELECT
   v.created_at,
   v.updated_at,
   v.owner_id,
-  COALESCE(v.is_admin_only, FALSE)
+  COALESCE(v.is_admin_only, TRUE)
 FROM views v
 WHERE v.type = 'interface'
 ON CONFLICT (id) DO NOTHING;

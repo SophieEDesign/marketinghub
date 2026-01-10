@@ -65,7 +65,7 @@ export default function PageSettingsDrawer({
   const [name, setName] = useState(page.name)
   const [description, setDescription] = useState(page.description || "")
   const [icon, setIcon] = useState("")
-  const [isAdminOnly, setIsAdminOnly] = useState(page.is_admin_only || false)
+  const [isAdminOnly, setIsAdminOnly] = useState(page.is_admin_only ?? true)
   const [groupId, setGroupId] = useState<string | null>(null)
   const [defaultView, setDefaultView] = useState<string | null>(null)
   const [hideViewSwitcher, setHideViewSwitcher] = useState(false)
@@ -106,7 +106,7 @@ export default function PageSettingsDrawer({
       // Extract icon from settings if it exists
       const pageIcon = page.settings?.icon || ""
       setIcon(pageIcon)
-      setIsAdminOnly(page.is_admin_only || false)
+      setIsAdminOnly(page.is_admin_only ?? true)
       // Load group_id and other settings from page
       // Note: These might be in the page object or need to be fetched
       setGroupId((page as any).group_id || null)

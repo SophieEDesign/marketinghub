@@ -744,7 +744,9 @@ function InterfacePageClientInternal({
       console.error("Error loading blocks:", error)
       // CRITICAL: Never clear blocks on error - preserve existing blocks
       // This prevents remount storms when errors occur during reload
-      // Only set loading to false so UI can show error state
+      // Set loaded to true even on error so we don't get stuck in loading state
+      // This allows the UI to render and show error state or allow adding blocks
+      blocksLoadedRef.current = { pageId: page.id, loaded: true }
     } finally {
       setBlocksLoading(false)
     }
@@ -779,7 +781,7 @@ function InterfacePageClientInternal({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         created_by: null,
-        is_admin_only: false,
+        is_admin_only: true,
         saved_view_id: null,
         dashboard_layout_id: null,
         form_config_id: null,
@@ -1123,10 +1125,11 @@ function InterfacePageClientInternal({
             </div>
           </div>
         ) : page ? (
-          // CRITICAL: Never mount InterfaceBuilder with blocks=0
-          // This prevents empty layout state from being committed before blocks arrive
-          // Wait for blocks to load before rendering (hydration lock at component level)
-          !blocksLoadedRef.current.loaded && blocks.length === 0 ? (
+          // CRITICAL: Show loading only while blocks are actively loading
+          // Once loading completes (even if empty or on error), render InterfaceBuilder
+          // Empty blocks is a valid state - a page might have no blocks yet
+          // We should always attempt to render InterfaceBuilder after loading completes
+          blocksLoading ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-gray-500">Loading blocks...</div>
             </div>

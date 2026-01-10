@@ -335,18 +335,10 @@ export default function PageCreationWizard({
         }
       }
       
-      // For record_view pages, optionally update dashboard_layout_id if we want blocks
+      // For record_view pages, seed two-column layout blocks
+      // Note: record_view pages use saved_view_id as their anchor, not dashboard_layout_id
+      // Blocks are stored via page_id in view_blocks table, so dashboard_layout_id is not needed
       if (pageType === 'record_view' && page) {
-        const { error: updateError } = await supabase
-          .from('interface_pages')
-          .update({ dashboard_layout_id: page.id })
-          .eq('id', page.id)
-        
-        if (updateError) {
-          console.error('Error updating dashboard_layout_id:', updateError)
-          // Don't throw - record_view pages can work without dashboard_layout_id
-        }
-
         // Seed two-column layout blocks for record_view pages
         if (tableId && tableId.trim()) {
           try {

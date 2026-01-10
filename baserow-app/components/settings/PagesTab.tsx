@@ -74,7 +74,7 @@ export default function SettingsPagesTab() {
   const [newPageName, setNewPageName] = useState('')
   const [newPageType, setNewPageType] = useState<'interface' | 'grid' | 'kanban' | 'calendar' | 'form'>('interface')
   const [newPageTableId, setNewPageTableId] = useState<string>('')
-  const [newPageIsAdminOnly, setNewPageIsAdminOnly] = useState(false)
+  const [newPageIsAdminOnly, setNewPageIsAdminOnly] = useState(true)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [creating, setCreating] = useState(false)
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)

@@ -225,10 +225,11 @@ export default function FieldSettingsDrawer({
       }
 
       // Query all records to get unique values from this field
+      // CRITICAL: Reduced limit from 10000 to 2000 to prevent memory exhaustion
       const { data: records, error: recordsError } = await supabase
         .from(table.supabase_table)
         .select(field.name)
-        .limit(10000) // Limit to prevent performance issues
+        .limit(2000) // Reduced limit to prevent crashes
 
       if (recordsError) {
         console.error('Error loading records:', recordsError)

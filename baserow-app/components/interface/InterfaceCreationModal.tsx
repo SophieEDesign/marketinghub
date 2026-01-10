@@ -29,14 +29,14 @@ export default function InterfaceCreationModal({
   onCreated,
 }: InterfaceCreationModalProps) {
   const [name, setName] = useState("")
-  const [isAdminOnly, setIsAdminOnly] = useState(false)
+  const [isAdminOnly, setIsAdminOnly] = useState(true)
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (open) {
       // Reset form when modal opens
       setName("")
-      setIsAdminOnly(false)
+      setIsAdminOnly(true)
     }
   }, [open])
 
@@ -73,6 +73,7 @@ export default function InterfaceCreationModal({
             name: name.trim(),
             order_index: orderIndex,
             collapsed: false,
+            is_admin_only: isAdminOnly,
           },
         ])
         .select()
@@ -84,7 +85,7 @@ export default function InterfaceCreationModal({
 
       // Reset form
       setName("")
-      setIsAdminOnly(false)
+      setIsAdminOnly(true)
       setCreating(false)
       onOpenChange(false)
 

@@ -3,6 +3,64 @@
 import { useState, useRef, useEffect } from "react"
 import { Calculator } from "lucide-react"
 
+// Default color scheme for select options (vibrant, accessible colors)
+const DEFAULT_COLORS = [
+  '#3B82F6', // Blue
+  '#10B981', // Green
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#8B5CF6', // Purple
+  '#EC4899', // Pink
+  '#06B6D4', // Cyan
+  '#84CC16', // Lime
+  '#F97316', // Orange
+  '#6366F1', // Indigo
+  '#14B8A6', // Teal
+  '#A855F7', // Violet
+]
+
+// Helper function to get a consistent color for a choice
+const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
+  if (customColors?.[choice]) {
+    return customColors[choice]
+  }
+  
+  // Try case-insensitive match
+  if (customColors) {
+    const matchingKey = Object.keys(customColors).find(
+      key => key.toLowerCase() === choice.toLowerCase()
+    )
+    if (matchingKey) {
+      return customColors[matchingKey]
+    }
+  }
+  
+  // Generate consistent color from choice name (hash-based)
+  let hash = 0
+  for (let i = 0; i < choice.length; i++) {
+    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
+}
+
+// Calculate text color based on background luminance
+const getTextColor = (hexColor: string): string => {
+  try {
+    const r = parseInt(hexColor.slice(1, 3), 16)
+    const g = parseInt(hexColor.slice(3, 5), 16)
+    const b = parseInt(hexColor.slice(5, 7), 16)
+    
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return 'text-gray-900'
+    }
+    
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+  } catch {
+    return 'text-gray-900'
+  }
+}
+
 interface CellProps {
   value: any
   fieldName: string
@@ -136,69 +194,60 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       )
     }
     
-    // Display with color coding
-    const choiceColor = fieldOptions.choiceColors?.[value as string]
-    const getTextColor = (hexColor?: string) => {
-      if (!hexColor) return 'text-blue-800'
-      const r = parseInt(hexColor.slice(1, 3), 16)
-      const g = parseInt(hexColor.slice(3, 5), 16)
-      const b = parseInt(hexColor.slice(5, 7), 16)
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+    // Display with pill styling
+    if (!value) {
+      return (
+        <div
+          onClick={handleStartEdit}
+          className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
+          title="Click to edit"
+        >
+          <span className="text-gray-400 italic text-sm">—</span>
+        </div>
+      )
     }
+    
+    const hexColor = getColorForChoiceName(value as string, fieldOptions.choiceColors)
+    const textColorClass = getTextColor(hexColor)
+    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
     
     return (
       <div
         onClick={handleStartEdit}
-        className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+        className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
         title="Click to edit"
       >
-        {value ? (
-          <span 
-            className={`px-2 py-0.5 rounded text-xs font-medium ${getTextColor(choiceColor)}`}
-            style={choiceColor ? { backgroundColor: choiceColor } : undefined}
-          >
-            {value}
-          </span>
-        ) : (
-          <span className="text-gray-400 italic text-sm">Empty</span>
-        )}
+        <span 
+          className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
+          style={{ backgroundColor: bgColor }}
+        >
+          {value}
+        </span>
       </div>
     )
   }
   
   if (fieldType === "multi_select" && fieldOptions?.choices) {
-    const getColorForChoice = (choice: string) => {
-      const hexColor = fieldOptions.choiceColors?.[choice]
-      if (!hexColor) return { bg: 'bg-blue-100', text: 'text-blue-800' }
-      const r = parseInt(hexColor.slice(1, 3), 16)
-      const g = parseInt(hexColor.slice(3, 5), 16)
-      const b = parseInt(hexColor.slice(5, 7), 16)
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      return {
-        style: { backgroundColor: hexColor },
-        text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
-      }
-    }
-    
     const displayValues = Array.isArray(value) ? value : []
     
     return (
       <div
         onClick={handleStartEdit}
-        className="min-h-[32px] flex items-center flex-wrap gap-1 px-2 py-1 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+        className="min-h-[32px] flex items-center flex-wrap gap-1.5 px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
         title="Click to edit"
       >
         {displayValues.length === 0 ? (
-          <span className="text-gray-400 italic text-sm">Empty</span>
+          <span className="text-gray-400 italic text-sm">—</span>
         ) : (
           displayValues.map((val: string) => {
-            const colorInfo = getColorForChoice(val)
+            const hexColor = getColorForChoiceName(val, fieldOptions.choiceColors)
+            const textColorClass = getTextColor(hexColor)
+            const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
             return (
               <span
                 key={val}
-                className={`px-2 py-0.5 rounded text-xs font-medium ${colorInfo.text}`}
-                style={colorInfo.style}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
+                style={{ backgroundColor: bgColor }}
               >
                 {val}
               </span>

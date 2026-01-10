@@ -152,7 +152,7 @@ export default function InterfacesTab() {
             .order('order_index', { ascending: true })
           
           if (!fallbackError && fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only || false }))
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only ?? true }))
           } else if (fallbackError) {
             console.error('Error loading interface_groups (fallback):', fallbackError)
           }
@@ -166,7 +166,7 @@ export default function InterfacesTab() {
             .order('order_index', { ascending: true })
           
           if (fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only || false }))
+            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only ?? true }))
           }
         }
       }
@@ -183,7 +183,7 @@ export default function InterfacesTab() {
         id: g.id,
         name: g.name,
         order_index: g.order_index || 0,
-        is_admin_only: g.is_admin_only || false,
+        is_admin_only: g.is_admin_only ?? true,
         is_system: g.is_system || false,
       }))
 
@@ -199,7 +199,7 @@ export default function InterfacesTab() {
         type: 'interface' as const,
         group_id: groupId,
         order_index: page.order_index || 0,
-        is_admin_only: page.is_admin_only || false,
+        is_admin_only: page.is_admin_only ?? true,
         created_at: page.created_at,
       }
       
@@ -228,7 +228,7 @@ export default function InterfacesTab() {
           id: 'ungrouped-system-virtual',
           name: 'Ungrouped',
           order_index: 9999,
-          is_admin_only: false,
+          is_admin_only: true,
           is_system: true,
         }
         allGroups.push(virtualUngroupedGroup)
@@ -245,7 +245,7 @@ export default function InterfacesTab() {
     const grouped: InterfaceGroup[] = allGroups.map(group => ({
       id: group.id,
       name: group.name,
-      is_admin_only: group.is_admin_only || false,
+      is_admin_only: group.is_admin_only ?? true,
       interfaces: pagesByGroup.get(group.id) || [],
     }))
 
@@ -692,8 +692,8 @@ export default function InterfacesTab() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Admin only</span>
               <Switch
-                checked={group.is_admin_only || false}
-                onCheckedChange={() => handleToggleInterfaceAccess(group.id, group.is_admin_only || false)}
+                checked={group.is_admin_only ?? true}
+                onCheckedChange={() => handleToggleInterfaceAccess(group.id, group.is_admin_only ?? true)}
               />
             </div>
             <Button

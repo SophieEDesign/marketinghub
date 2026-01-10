@@ -450,14 +450,18 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const visibleFields = useMemo(() => {
     if (!tableFields.length) return []
     
-    const detailFields = config.detail_fields || []
+    // Check if detail_fields is explicitly configured (not undefined/null/empty)
+    const detailFields = config.detail_fields
+    const hasDetailFieldsConfig = detailFields && Array.isArray(detailFields) && detailFields.length > 0
     
-    // If detail_fields is configured, filter by it
-    if (detailFields.length > 0) {
+    // If detail_fields is explicitly configured with field names, filter to only those fields
+    // (and filter out any that don't exist in the table anymore)
+    if (hasDetailFieldsConfig) {
       return tableFields.filter(field => detailFields.includes(field.name))
     }
     
-    // Otherwise show all fields
+    // Otherwise (undefined, null, or empty array), show ALL fields from the table
+    // This ensures new fields added to the table automatically appear
     return tableFields
   }, [tableFields, config.detail_fields])
 

@@ -60,7 +60,7 @@ export default function InterfacePageSettingsDrawer({
   const [sourceTable, setSourceTable] = useState<string>("") // Changed from sourceView - users select tables, not SQL views
   const [baseTable, setBaseTable] = useState<string>("")
   const [interfaceId, setInterfaceId] = useState<string>("") // Changed from groupId - terminology fix
-  const [isAdminOnly, setIsAdminOnly] = useState(false)
+  const [isAdminOnly, setIsAdminOnly] = useState(true)
   const [interfaces, setInterfaces] = useState<InterfaceGroup[]>([]) // Changed from groups - terminology fix
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
@@ -101,7 +101,7 @@ export default function InterfacePageSettingsDrawer({
       setSourceTable("")
       setBaseTable("")
       setInterfaceId("")
-      setIsAdminOnly(false)
+      setIsAdminOnly(true)
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +123,7 @@ export default function InterfacePageSettingsDrawer({
       setSourceTable(pageData.base_table || "")
       setBaseTable(pageData.base_table || "")
       setInterfaceId(pageData.group_id || "") // Interface is required, no "__none__" option
-      setIsAdminOnly(pageData.is_admin_only || false)
+      setIsAdminOnly(pageData.is_admin_only ?? true)
       
       // Load left panel settings based on page type
       const config = pageData.config || {}

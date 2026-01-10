@@ -164,14 +164,27 @@ export default function CalendarView({
 
   useEffect(() => {
     if (resolvedTableId) {
-      // Load table fields if not provided
-      if (!tableFields || tableFields.length === 0) {
-        loadTableFields()
-      } else {
+      // If tableFields prop is provided and not empty, use it
+      if (tableFields && tableFields.length > 0) {
+        // Ensure fields are in correct format (TableField[])
+        const formattedFields = tableFields.map((f: any) => ({
+          id: f.id || f.field_id,
+          table_id: f.table_id,
+          name: f.name || f.field_name,
+          type: f.type || f.field_type,
+          position: f.position || 0,
+          created_at: f.created_at,
+          options: f.options || f.field_options || {}
+        }))
         // Only update if fields actually changed
         if (prevTableFieldsRef.current !== tableFieldsKey) {
-          setLoadedTableFields(tableFields)
+          setLoadedTableFields(formattedFields)
           prevTableFieldsRef.current = tableFieldsKey
+        }
+      } else {
+        // Load table fields if not provided or empty
+        if (loadedTableFields.length === 0) {
+          loadTableFields()
         }
       }
     }
@@ -277,8 +290,9 @@ export default function CalendarView({
       return
     }
     
-    // Early return if prerequisites aren't met
-    if (!resolvedTableId || !supabaseTableName || loadedTableFields.length === 0) {
+    // Early return if critical prerequisites aren't met
+    // Note: loadedTableFields are only needed for filtering, not for loading rows
+    if (!resolvedTableId || !supabaseTableName) {
       if (process.env.NODE_ENV === 'development') {
         console.log('Calendar: Skipping loadRows - prerequisites not met', {
           resolvedTableId: !!resolvedTableId,
@@ -1219,7 +1233,7 @@ export default function CalendarView({
       </div>
 
       {/* Record Modal */}
-      {resolvedTableId && (
+      {selectedRecordId && resolvedTableId && (
         <RecordModal
           open={selectedRecordId !== null}
           onClose={() => setSelectedRecordId(null)}

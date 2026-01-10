@@ -120,10 +120,11 @@ export async function aggregateTableData(
     }
 
     // Fallback: Load data and aggregate client-side
+    // CRITICAL: Reduced limit from 10000 to 2000 to prevent memory exhaustion
     let query: any = supabase
       .from(supabaseTable)
       .select(fieldName)
-      .limit(10000) // Reasonable limit
+      .limit(2000) // Reduced limit to prevent crashes
 
     // Apply filters
     if (filters && filters.length > 0) {

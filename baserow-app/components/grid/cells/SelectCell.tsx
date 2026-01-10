@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 interface SelectCellProps {
@@ -11,6 +11,64 @@ interface SelectCellProps {
   placeholder?: string
   choices?: string[]
   choiceColors?: Record<string, string>
+}
+
+// Default color scheme for select options (vibrant, accessible colors)
+const DEFAULT_COLORS = [
+  '#3B82F6', // Blue
+  '#10B981', // Green
+  '#F59E0B', // Amber
+  '#EF4444', // Red
+  '#8B5CF6', // Purple
+  '#EC4899', // Pink
+  '#06B6D4', // Cyan
+  '#84CC16', // Lime
+  '#F97316', // Orange
+  '#6366F1', // Indigo
+  '#14B8A6', // Teal
+  '#A855F7', // Violet
+]
+
+// Helper function to get a consistent color for a choice
+const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
+  if (customColors?.[choice]) {
+    return customColors[choice]
+  }
+  
+  // Try case-insensitive match
+  if (customColors) {
+    const matchingKey = Object.keys(customColors).find(
+      key => key.toLowerCase() === choice.toLowerCase()
+    )
+    if (matchingKey) {
+      return customColors[matchingKey]
+    }
+  }
+  
+  // Generate consistent color from choice name (hash-based)
+  let hash = 0
+  for (let i = 0; i < choice.length; i++) {
+    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
+}
+
+// Calculate text color based on background luminance
+const getTextColor = (hexColor: string): string => {
+  try {
+    const r = parseInt(hexColor.slice(1, 3), 16)
+    const g = parseInt(hexColor.slice(3, 5), 16)
+    const b = parseInt(hexColor.slice(5, 7), 16)
+    
+    if (isNaN(r) || isNaN(g) || isNaN(b)) {
+      return 'text-gray-900'
+    }
+    
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
+  } catch {
+    return 'text-gray-900'
+  }
 }
 
 export default function SelectCell({
@@ -87,109 +145,40 @@ export default function SelectCell({
     )
   }
 
-  const displayValue = value || placeholder
-  const isPlaceholder = !value
-  
-  // Normalize value for color lookup (trim whitespace, handle null/undefined)
-  const normalizedValue = value ? String(value).trim() : null
-  
-  // Get color for the selected value
-  const getColorForChoice = (choice: string | null): { bg: string; text: string } => {
-    if (!choice || !choiceColors) {
-      return { bg: 'bg-blue-100', text: 'text-blue-800' }
+  // Get color styling for the current value
+  const pillStyle = useMemo(() => {
+    if (!value) return null
+    
+    const normalizedValue = String(value).trim()
+    const hexColor = getColorForChoiceName(normalizedValue, choiceColors)
+    const textColorClass = getTextColor(hexColor)
+    
+    // Ensure hex color has # prefix
+    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+    
+    return {
+      backgroundColor: bgColor,
+      textColor: textColorClass,
     }
-    
-    // Try exact match first
-    let hexColor = choiceColors[choice]
-    
-    // If no exact match, try case-insensitive match
-    if (!hexColor && choiceColors) {
-      const matchingKey = Object.keys(choiceColors).find(
-        key => key.toLowerCase() === choice.toLowerCase()
-      )
-      if (matchingKey) {
-        hexColor = choiceColors[matchingKey]
-      }
-    }
-    
-    if (!hexColor) {
-      return { bg: 'bg-blue-100', text: 'text-blue-800' }
-    }
-    
-    // Ensure hex color is valid format
-    if (!hexColor.startsWith('#')) {
-      hexColor = `#${hexColor}`
-    }
-    
-    // Convert hex to RGB for better contrast calculation
-    try {
-      const r = parseInt(hexColor.slice(1, 3), 16)
-      const g = parseInt(hexColor.slice(3, 5), 16)
-      const b = parseInt(hexColor.slice(5, 7), 16)
-      
-      if (isNaN(r) || isNaN(g) || isNaN(b)) {
-        return { bg: 'bg-blue-100', text: 'text-blue-800' }
-      }
-      
-      // Calculate luminance to determine if we need light or dark text
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-      
-      return {
-        bg: '', // Will use inline style
-        text: luminance > 0.5 ? 'text-gray-900' : 'text-white'
-      }
-    } catch (error) {
-      console.warn('Error parsing color:', hexColor, error)
-      return { bg: 'bg-blue-100', text: 'text-blue-800' }
-    }
-  }
-  
-  // Find the matching color key (with fallback to case-insensitive)
-  const getColorKey = (val: string | null): string | null => {
-    if (!val || !choiceColors) return null
-    
-    const normalized = String(val).trim()
-    
-    // Try exact match first
-    if (choiceColors[normalized]) {
-      return normalized
-    }
-    
-    // Try case-insensitive match
-    const matchingKey = Object.keys(choiceColors).find(
-      key => key.toLowerCase() === normalized.toLowerCase()
-    )
-    
-    return matchingKey || null
-  }
-  
-  const colorKey = getColorKey(normalizedValue)
-  const colorValue = colorKey && choiceColors?.[colorKey]
-  const colorStyle = colorValue
-    ? { 
-        backgroundColor: colorValue.startsWith('#') 
-          ? colorValue 
-          : `#${colorValue}` 
-      }
-    : undefined
-  const textColor = normalizedValue ? getColorForChoice(normalizedValue).text : ''
+  }, [value, choiceColors])
 
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 flex items-center gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group"
+      className="w-full h-full px-2 flex items-center gap-1.5 text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors group min-h-[32px]"
     >
-      {value && (
+      {value && pillStyle ? (
         <span 
-          className={`px-2 py-0.5 rounded text-xs font-medium ${textColor}`}
-          style={colorStyle}
+          className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${pillStyle.textColor} shadow-sm`}
+          style={{ backgroundColor: pillStyle.backgroundColor }}
         >
           {value}
         </span>
+      ) : (
+        <span className="text-gray-400 italic">{placeholder}</span>
       )}
-      {!value && <span className="text-gray-400">{placeholder}</span>}
-      {editable && (
-        <ChevronDown className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+      {editable && value && (
+        <ChevronDown className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
       )}
     </div>
   )

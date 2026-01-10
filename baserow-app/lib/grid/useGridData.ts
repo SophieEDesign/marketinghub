@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 
@@ -25,34 +25,72 @@ export interface UseGridDataReturn {
   deleteRow: (rowId: string) => Promise<void>
 }
 
+// CRITICAL: Reduced default limit from 10000 to 500 to prevent memory exhaustion and crashes
+// Large datasets should use pagination instead of loading everything at once
+const DEFAULT_LIMIT = 500
+const MAX_SAFE_LIMIT = 2000 // Hard cap to prevent crashes
+
 export function useGridData({
   tableName,
   fields = [],
   filters = [],
   sorts = [],
-  limit = 10000,
+  limit = DEFAULT_LIMIT,
 }: UseGridDataOptions): UseGridDataReturn {
   const [rows, setRows] = useState<GridRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const filtersString = JSON.stringify(filters)
-  const sortsString = JSON.stringify(sorts)
+  
+  // Prevent concurrent loads that could cause memory issues
+  const isLoadingRef = useRef(false)
+  
+  // Store filters and sorts in refs to avoid dependency issues
+  // Only update when content actually changes (via stringified comparison)
+  const filtersRef = useRef(filters)
+  const sortsRef = useRef(sorts)
+  
+  // Memoize filters and sorts strings to detect actual content changes
+  // Only re-compute when the actual content changes, not when references change
+  const filtersString = useMemo(() => JSON.stringify(filters), [filters])
+  const sortsString = useMemo(() => JSON.stringify(sorts), [sorts])
+  
+  // Update refs when content changes (but not on every render)
+  useEffect(() => {
+    filtersRef.current = filters
+  }, [filtersString])
+  
+  useEffect(() => {
+    sortsRef.current = sorts
+  }, [sortsString])
+  
+  // Cap limit to prevent memory exhaustion
+  const safeLimit = limit > MAX_SAFE_LIMIT ? MAX_SAFE_LIMIT : limit
 
   const loadData = useCallback(async () => {
     if (!tableName) {
       setLoading(false)
       return
     }
+    
+    // Prevent concurrent loads
+    if (isLoadingRef.current) {
+      console.warn('[useGridData] Load already in progress, skipping duplicate request')
+      return
+    }
 
+    isLoadingRef.current = true
     setLoading(true)
     setError(null)
 
     try {
+      // Use refs to get current filters/sorts without causing dependency issues
+      const currentFilters = filtersRef.current
+      const currentSorts = sortsRef.current
+      
       let query: any = supabase.from(tableName).select('*')
 
       // Apply filters
-      filters.forEach((filter) => {
+      currentFilters.forEach((filter) => {
         const { field, operator, value } = filter
         switch (operator) {
           case 'eq':
@@ -88,13 +126,15 @@ export function useGridData({
       })
 
       // Apply sorts
-      sorts.forEach((sort) => {
+      currentSorts.forEach((sort) => {
         query = query.order(sort.field, { ascending: sort.direction === 'asc' })
       })
 
-      // Apply limit
-      if (limit) {
-        query = query.limit(limit)
+      // Apply limit with safety cap
+      query = query.limit(safeLimit)
+      
+      if (limit > MAX_SAFE_LIMIT) {
+        console.warn(`[useGridData] Limit ${limit} exceeds safe maximum ${MAX_SAFE_LIMIT}, capping to ${MAX_SAFE_LIMIT} to prevent crashes`)
       }
 
       const { data, error: queryError } = await query
@@ -110,9 +150,11 @@ export function useGridData({
       setRows([])
     } finally {
       setLoading(false)
+      isLoadingRef.current = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableName, filtersString, sortsString, limit])
+    // CRITICAL: Only depend on stringified versions to prevent infinite loops
+    // Refs ensure we always use latest values without causing re-renders
+  }, [tableName, filtersString, sortsString, safeLimit])
 
   useEffect(() => {
     loadData()

@@ -11,10 +11,10 @@ BEGIN
     AND column_name = 'is_admin_only'
   ) THEN
     ALTER TABLE public.interface_groups
-      ADD COLUMN is_admin_only boolean NOT NULL DEFAULT false;
+      ADD COLUMN is_admin_only boolean NOT NULL DEFAULT true;
     
     -- Add comment
-    COMMENT ON COLUMN public.interface_groups.is_admin_only IS 'If true, only admins can see and access this interface. If false, all authenticated users can access it.';
+    COMMENT ON COLUMN public.interface_groups.is_admin_only IS 'If true, only admins can see and access this interface. If false, all authenticated users can access it. Defaults to true (admin-only).';
   END IF;
 END $$;
 
