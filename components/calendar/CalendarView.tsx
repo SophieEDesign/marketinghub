@@ -42,6 +42,7 @@ export interface CalendarConfig {
   calendar_end_field: string | null
   calendar_color_field: string | null
   calendar_display_fields: string[] // Fields to display on calendar entries
+  user_dropdown_filters: string[] // Field names to show as dropdown filters at the top
   first_day_of_week: number
   show_weekends: boolean
   event_density: 'compact' | 'expanded'
@@ -70,10 +71,12 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
     calendar_end_field: null,
     calendar_color_field: null,
     calendar_display_fields: [], // Fields to show on calendar entries
+    user_dropdown_filters: [], // Fields to show as dropdown filters
     first_day_of_week: 1, // Monday
     show_weekends: true,
     event_density: 'compact',
   })
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -92,7 +95,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       processEvents()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, config.calendar_date_field, config.calendar_start_field, config.calendar_end_field, config.calendar_color_field, config.calendar_display_fields, config.show_weekends, config.first_day_of_week, config.event_density, tableFields, searchQuery])
+  }, [rows, config.calendar_date_field, config.calendar_start_field, config.calendar_end_field, config.calendar_color_field, config.calendar_display_fields, config.show_weekends, config.first_day_of_week, config.event_density, tableFields, searchQuery, activeFilters])
 
   async function loadFields() {
     try {
@@ -117,16 +120,20 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         .single()
 
       if (view?.config) {
-        setConfig({
+        const newConfig = {
           calendar_date_field: view.config.calendar_date_field || null,
           calendar_start_field: view.config.calendar_start_field || null,
           calendar_end_field: view.config.calendar_end_field || null,
           calendar_color_field: view.config.calendar_color_field || null,
-          calendar_display_fields: view.config.calendar_display_fields || [],
+          calendar_display_fields: Array.isArray(view.config.calendar_display_fields) ? view.config.calendar_display_fields : [],
+          user_dropdown_filters: Array.isArray(view.config.user_dropdown_filters) ? view.config.user_dropdown_filters : [],
           first_day_of_week: view.config.first_day_of_week ?? 1,
           show_weekends: view.config.show_weekends ?? true,
           event_density: view.config.event_density || 'compact',
-        })
+        }
+        setConfig(newConfig)
+        // Reset active filters when config changes
+        setActiveFilters({})
       } else {
         // Auto-detect date fields
         const dateFields = tableFields.filter(
@@ -143,6 +150,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
             calendar_end_field: endField?.name || null,
             calendar_color_field: null,
             calendar_display_fields: [], // Default: show only title
+            user_dropdown_filters: [], // Default: no filters
             first_day_of_week: 1,
             show_weekends: true,
             event_density: 'compact',
@@ -198,6 +206,25 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       // Filter by search query
       if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) {
         return
+      }
+
+      // Filter by user dropdown filters
+      for (const [fieldName, filterValue] of Object.entries(activeFilters)) {
+        if (filterValue && filterValue !== 'all') {
+          const rowValue = row[fieldName]
+          // Handle both single and multi-select fields
+          if (Array.isArray(rowValue)) {
+            // Multi-select: check if filter value is in array
+            if (!rowValue.includes(filterValue)) {
+              return
+            }
+          } else {
+            // Single-select: exact match
+            if (rowValue !== filterValue) {
+              return
+            }
+          }
+        }
       }
 
       // Get color from select field if configured
@@ -364,33 +391,56 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       {/* Toolbar */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3">
         <div className="flex items-center justify-between mb-3">
-          {/* Filters */}
-          <div className="flex items-center gap-3">
-            <Select value="all" onValueChange={() => {}}>
-              <SelectTrigger className="w-[140px] h-8 text-sm">
-                <SelectValue placeholder="Content Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value="all" onValueChange={() => {}}>
-              <SelectTrigger className="w-[120px] h-8 text-sm">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value="all" onValueChange={() => {}}>
-              <SelectTrigger className="w-[120px] h-8 text-sm">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* User Dropdown Filters */}
+          {config.user_dropdown_filters && config.user_dropdown_filters.length > 0 && (
+            <div className="flex items-center gap-3">
+              {config.user_dropdown_filters.map((fieldName) => {
+                const field = tableFields.find((f) => f.name === fieldName)
+                if (!field || (field.type !== 'single_select' && field.type !== 'multi_select')) {
+                  return null
+                }
+                
+                const choices = field.options?.choices || []
+                const currentValue = activeFilters[fieldName] || 'all'
+                
+                // Get unique values from rows for this field
+                const availableValues = new Set<string>()
+                rows.forEach((row) => {
+                  const value = row[fieldName]
+                  if (Array.isArray(value)) {
+                    value.forEach((v) => availableValues.add(v))
+                  } else if (value) {
+                    availableValues.add(value)
+                  }
+                })
+                
+                return (
+                  <Select
+                    key={fieldName}
+                    value={currentValue}
+                    onValueChange={(value) => {
+                      setActiveFilters((prev) => ({
+                        ...prev,
+                        [fieldName]: value,
+                      }))
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-sm min-w-[120px]">
+                      <SelectValue placeholder={fieldName} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All {fieldName}</SelectItem>
+                      {Array.from(availableValues).map((value) => (
+                        <SelectItem key={value} value={value}>
+                          {value}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )
+              })}
+            </div>
+          )}
 
           {/* Right side actions */}
           <div className="flex items-center gap-2">
@@ -497,7 +547,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
                 setSelectedRecordId(event.id)
               }}
               onCreateEvent={() => setCreateModalOpen(true)}
-              displayFields={config.calendar_display_fields}
+              displayFields={Array.isArray(config.calendar_display_fields) ? config.calendar_display_fields : []}
               tableFields={tableFields}
             />
           </div>

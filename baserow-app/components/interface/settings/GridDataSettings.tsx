@@ -337,19 +337,133 @@ export default function GridDataSettings({
                     <SelectItem value="is_not_empty">Is not empty</SelectItem>
                   </SelectContent>
                 </Select>
-                {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' && (
-                  <Input
-                    value={filter.value || ''}
-                    onChange={(e) => {
-                      const currentFilters = config.filters || []
-                      const updated = [...currentFilters]
-                      updated[index] = { ...updated[index], value: e.target.value }
-                      onUpdate({ filters: updated })
-                    }}
-                    placeholder="Value"
-                    className="h-8 flex-1"
-                  />
-                )}
+                {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' && (() => {
+                  // Find the selected field
+                  const selectedField = fields.find(f => f.name === filter.field)
+                  const fieldType = selectedField?.type
+                  
+                  // For single_select or multi_select fields, show dropdown with choices
+                  if (fieldType === 'single_select' || fieldType === 'multi_select') {
+                    const choices = selectedField?.options?.choices || []
+                    return (
+                      <Select
+                        value={filter.value || ''}
+                        onValueChange={(value) => {
+                          const currentFilters = config.filters || []
+                          const updated = [...currentFilters]
+                          updated[index] = { ...updated[index], value }
+                          onUpdate({ filters: updated })
+                        }}
+                      >
+                        <SelectTrigger className="h-8 flex-1">
+                          <SelectValue placeholder="Select value" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {choices.length > 0 ? (
+                            choices.map((choice: string) => (
+                              <SelectItem key={choice} value={choice}>
+                                {choice}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>No options available</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )
+                  }
+                  
+                  // For date fields, show date input with quick options
+                  if (fieldType === 'date') {
+                    const getDateValue = (option: string): string => {
+                      const today = new Date()
+                      today.setHours(0, 0, 0, 0)
+                      
+                      switch (option) {
+                        case 'today':
+                          return today.toISOString().split('T')[0]
+                        case 'tomorrow':
+                          const tomorrow = new Date(today)
+                          tomorrow.setDate(tomorrow.getDate() + 1)
+                          return tomorrow.toISOString().split('T')[0]
+                        case 'yesterday':
+                          const yesterday = new Date(today)
+                          yesterday.setDate(yesterday.getDate() - 1)
+                          return yesterday.toISOString().split('T')[0]
+                        case 'this_week_start':
+                          const weekStart = new Date(today)
+                          weekStart.setDate(today.getDate() - today.getDay())
+                          return weekStart.toISOString().split('T')[0]
+                        case 'this_week_end':
+                          const weekEnd = new Date(today)
+                          weekEnd.setDate(today.getDate() - today.getDay() + 6)
+                          return weekEnd.toISOString().split('T')[0]
+                        case 'this_month_start':
+                          return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
+                        case 'this_month_end':
+                          return new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
+                        default:
+                          return option
+                      }
+                    }
+                    
+                    return (
+                      <div className="flex gap-2 flex-1">
+                        <Input
+                          type="date"
+                          value={filter.value || ''}
+                          onChange={(e) => {
+                            const currentFilters = config.filters || []
+                            const updated = [...currentFilters]
+                            updated[index] = { ...updated[index], value: e.target.value }
+                            onUpdate({ filters: updated })
+                          }}
+                          className="h-8 flex-1"
+                        />
+                        <Select
+                          value=""
+                          onValueChange={(value) => {
+                            if (value) {
+                              const dateValue = getDateValue(value)
+                              const currentFilters = config.filters || []
+                              const updated = [...currentFilters]
+                              updated[index] = { ...updated[index], value: dateValue }
+                              onUpdate({ filters: updated })
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-32">
+                            <SelectValue placeholder="Quick..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="today">Today</SelectItem>
+                            <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                            <SelectItem value="yesterday">Yesterday</SelectItem>
+                            <SelectItem value="this_week_start">This week start</SelectItem>
+                            <SelectItem value="this_week_end">This week end</SelectItem>
+                            <SelectItem value="this_month_start">This month start</SelectItem>
+                            <SelectItem value="this_month_end">This month end</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )
+                  }
+                  
+                  // For other field types, show regular text input
+                  return (
+                    <Input
+                      value={filter.value || ''}
+                      onChange={(e) => {
+                        const currentFilters = config.filters || []
+                        const updated = [...currentFilters]
+                        updated[index] = { ...updated[index], value: e.target.value }
+                        onUpdate({ filters: updated })
+                      }}
+                      placeholder="Value"
+                      className="h-8 flex-1"
+                    />
+                  )
+                })()}
                 {(filter.operator === 'is_empty' || filter.operator === 'is_not_empty') && (
                   <div className="h-8 flex-1 flex items-center text-xs text-gray-500 px-2">
                     No value needed

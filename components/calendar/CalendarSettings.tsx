@@ -252,6 +252,55 @@ export default function CalendarSettings({
               <p className="text-xs text-gray-400 italic">No fields available to display</p>
             )}
           </div>
+
+          {/* User Dropdown Filters */}
+          <div className="space-y-2 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>User Dropdown Filters</Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Select fields to show as dropdown filters at the top of the calendar
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+              {selectFields.length > 0 ? (
+                selectFields.map((field) => {
+                  const isSelected = (localConfig.user_dropdown_filters || []).includes(field.name)
+                  return (
+                    <label
+                      key={field.id}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => {
+                          const currentFilters = localConfig.user_dropdown_filters || []
+                          if (e.target.checked) {
+                            setLocalConfig({
+                              ...localConfig,
+                              user_dropdown_filters: [...currentFilters, field.name],
+                            })
+                          } else {
+                            setLocalConfig({
+                              ...localConfig,
+                              user_dropdown_filters: currentFilters.filter((f) => f !== field.name),
+                            })
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-sm text-gray-700">{field.name}</span>
+                      <span className="text-xs text-gray-400">({field.type})</span>
+                    </label>
+                  )
+                })
+              ) : (
+                <p className="text-xs text-gray-400 italic">No select fields available. Add single-select or multi-select fields to enable filters.</p>
+              )}
+            </div>
+          </div>
         </div>
 
         <SheetFooter>

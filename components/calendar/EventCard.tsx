@@ -22,6 +22,8 @@ export default function EventCard({
   displayFields = [],
   tableFields = []
 }: EventCardProps) {
+  // Ensure displayFields is always an array
+  const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
   const timeStr =
     event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date)
       ? `${format(event.start_date, 'HH:mm')} - ${format(event.end_date, 'HH:mm')}`
@@ -31,7 +33,7 @@ export default function EventCard({
 
   // Get display text based on configured fields
   const getDisplayText = () => {
-    if (displayFields.length === 0) {
+    if (safeDisplayFields.length === 0) {
       // Default: show only title
       return event.title
     }
@@ -39,7 +41,7 @@ export default function EventCard({
     // Show title + selected fields
     const parts: string[] = [event.title]
     
-    displayFields.forEach((fieldName) => {
+    safeDisplayFields.forEach((fieldName) => {
       const value = event.rowData?.[fieldName]
       if (value !== null && value !== undefined && value !== '') {
         const field = tableFields.find(f => f.name === fieldName)

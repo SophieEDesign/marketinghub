@@ -8,14 +8,16 @@ import type { CalendarEvent, CalendarConfig } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
 // Helper function to format display text (same logic as EventCard)
-function formatDisplayText(event: CalendarEvent, displayFields: string[], tableFields: TableField[]): string {
-  if (displayFields.length === 0) {
+function formatDisplayText(event: CalendarEvent, displayFields: string[] | null | undefined, tableFields: TableField[]): string {
+  // Ensure displayFields is always an array
+  const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
+  if (safeDisplayFields.length === 0) {
     return event.title
   }
 
   const parts: string[] = [event.title]
   
-  displayFields.forEach((fieldName) => {
+  safeDisplayFields.forEach((fieldName) => {
     const value = event.rowData?.[fieldName]
     if (value !== null && value !== undefined && value !== '') {
       const field = tableFields.find(f => f.name === fieldName)
@@ -66,7 +68,11 @@ export default function MonthGrid({
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null)
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const adjustedWeekDays = [...weekDays.slice(config.first_day_of_week), ...weekDays.slice(0, config.first_day_of_week)]
+  // Ensure first_day_of_week is a valid number
+  const firstDay = typeof config.first_day_of_week === 'number' && !isNaN(config.first_day_of_week) 
+    ? Math.max(0, Math.min(6, config.first_day_of_week)) 
+    : 1
+  const adjustedWeekDays = [...weekDays.slice(firstDay), ...weekDays.slice(0, firstDay)]
 
   const getEventsForDay = useCallback(
     (day: Date) => {
@@ -252,11 +258,11 @@ export default function MonthGrid({
                             e.stopPropagation()
                             onEventClick?.(event)
                           }}
-                          title={formatDisplayText(event, config.calendar_display_fields, tableFields)}
+                          title={formatDisplayText(event, Array.isArray(config.calendar_display_fields) ? config.calendar_display_fields : [], tableFields)}
                         >
                           {(isStart || daysDiff === 0) && (
                             <span className="truncate">
-                              {formatDisplayText(event, config.calendar_display_fields, tableFields)}
+                              {formatDisplayText(event, Array.isArray(config.calendar_display_fields) ? config.calendar_display_fields : [], tableFields)}
                             </span>
                           )}
                         </div>
@@ -292,7 +298,7 @@ export default function MonthGrid({
                       onDragStart={(e) => handleDragStart(event.id, e)}
                       compact={config.event_density === 'compact'}
                       onClick={() => onEventClick?.(event)}
-                      displayFields={config.calendar_display_fields}
+                      displayFields={Array.isArray(config.calendar_display_fields) ? config.calendar_display_fields : []}
                       tableFields={tableFields}
                     />
                   ))}

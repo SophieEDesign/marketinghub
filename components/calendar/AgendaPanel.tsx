@@ -18,6 +18,8 @@ interface AgendaPanelProps {
 }
 
 export default function AgendaPanel({ selectedDate, events, onEventClick, onCreateEvent, displayFields = [], tableFields = [] }: AgendaPanelProps) {
+  // Ensure displayFields is always an array
+  const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
   const groupedEvents = events.reduce((acc, event) => {
     const dateKey = event.start_date && isValid(event.start_date)
       ? format(event.start_date, 'yyyy-MM-dd')
@@ -78,7 +80,7 @@ export default function AgendaPanel({ selectedDate, events, onEventClick, onCrea
                           event={event} 
                           onDragStart={() => {}} 
                           onClick={() => onEventClick(event)}
-                          displayFields={displayFields}
+                          displayFields={safeDisplayFields}
                           tableFields={tableFields}
                         />
                         {event.start_date && event.end_date && isValid(event.start_date) && isValid(event.end_date) && (
