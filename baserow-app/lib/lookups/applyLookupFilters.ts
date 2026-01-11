@@ -34,7 +34,8 @@ export interface ApplyLookupFiltersResult {
 export async function applyLookupFilters(
   options: ApplyLookupFiltersOptions
 ): Promise<ApplyLookupFiltersResult> {
-  const { query, filters, lookupTableFields, context } = options
+  const { filters, lookupTableFields, context } = options
+  let query = options.query
   
   if (!filters || filters.length === 0) {
     return { query, activeFilters: [], skippedFilters: [] }
