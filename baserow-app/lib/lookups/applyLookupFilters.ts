@@ -1,8 +1,8 @@
 /**
  * Apply Lookup Field Filters to Supabase Query
  * 
- * Applies lookup field filters to a Supabase query builder with support for
- * static values, current record values, and context values.
+ * Applies lookup field filters to a Supabase query builder,
+ * resolving dynamic values and returning information about active/skipped filters
  */
 
 import type { LookupFieldFilter } from '@/types/fields'
@@ -42,13 +42,12 @@ export async function applyLookupFilters(
   
   const activeFilters: ActiveFilter[] = []
   const skippedFilters: LookupFieldFilter[] = []
-  let currentQuery = query
   
   for (const filter of filters) {
     // Resolve filter value
     const { value, value2, shouldApply } = await resolveFilterValue(filter, context)
     
-    if (!shouldApply || value === null) {
+    if (!shouldApply || (value === null && filter.operator !== 'is_empty')) {
       skippedFilters.push(filter)
       continue
     }
@@ -68,48 +67,51 @@ export async function applyLookupFilters(
     try {
       switch (filter.operator) {
         case 'equal':
-          currentQuery = currentQuery.eq(fieldName, value)
+          query = query.eq(fieldName, value)
           break
         case 'not_equal':
-          currentQuery = currentQuery.neq(fieldName, value)
+          query = query.neq(fieldName, value)
           break
         case 'contains':
           if (fieldType === 'text' || fieldType === 'long_text') {
-            currentQuery = currentQuery.ilike(fieldName, `%${value}%`)
+            query = query.ilike(fieldName, `%${value}%`)
           } else {
             // For other types, convert to string for contains
-            currentQuery = currentQuery.ilike(fieldName, `%${String(value)}%`)
+            query = query.ilike(fieldName, `%${String(value)}%`)
           }
           break
         case 'not_contains':
-          currentQuery = currentQuery.not(fieldName, 'ilike', `%${value}%`)
+          query = query.not(fieldName, 'ilike', `%${value}%`)
           break
         case 'greater_than':
-          currentQuery = currentQuery.gt(fieldName, value)
+          query = query.gt(fieldName, value)
           break
         case 'less_than':
-          currentQuery = currentQuery.lt(fieldName, value)
+          query = query.lt(fieldName, value)
           break
         case 'greater_than_or_equal':
-          currentQuery = currentQuery.gte(fieldName, value)
+          query = query.gte(fieldName, value)
           break
         case 'less_than_or_equal':
-          currentQuery = currentQuery.lte(fieldName, value)
+          query = query.lte(fieldName, value)
           break
         case 'is_empty':
-          currentQuery = currentQuery.or(`${fieldName}.is.null,${fieldName}.eq.`)
+          query = query.or(`${fieldName}.is.null,${fieldName}.eq.`)
           break
         case 'is_not_empty':
-          currentQuery = currentQuery.not(fieldName, 'is', null)
-          currentQuery = currentQuery.neq(fieldName, '')
+          query = query.not(fieldName, 'is', null)
+          query = query.neq(fieldName, '')
           break
         case 'date_range':
           if (value && value2) {
-            currentQuery = currentQuery.gte(fieldName, value).lte(fieldName, value2)
+            query = query.gte(fieldName, value).lte(fieldName, value2)
           } else if (value) {
-            currentQuery = currentQuery.gte(fieldName, value)
+            query = query.gte(fieldName, value)
           } else if (value2) {
-            currentQuery = currentQuery.lte(fieldName, value2)
+            query = query.lte(fieldName, value2)
+          } else {
+            skippedFilters.push(filter)
+            continue
           }
           break
         default:
@@ -118,20 +120,12 @@ export async function applyLookupFilters(
           continue
       }
       
-      activeFilters.push({ 
-        filter, 
-        resolvedValue: value,
-        resolvedValue2: value2
-      })
+      activeFilters.push({ filter, resolvedValue: value, resolvedValue2: value2 })
     } catch (error) {
       console.error(`Error applying lookup filter:`, error)
       skippedFilters.push(filter)
     }
   }
   
-  return { 
-    query: currentQuery, 
-    activeFilters, 
-    skippedFilters 
-  }
+  return { query, activeFilters, skippedFilters }
 }

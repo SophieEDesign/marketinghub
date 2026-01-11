@@ -10,6 +10,13 @@ import type { TableField } from "@/types/fields"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 
+interface BlockPermissions {
+  mode?: 'view' | 'edit'
+  allowInlineCreate?: boolean
+  allowInlineDelete?: boolean
+  allowOpenRecord?: boolean
+}
+
 interface GridViewProps {
   tableId: string
   viewId: string
@@ -37,6 +44,7 @@ interface GridViewProps {
   isEditing?: boolean // When false, hide builder controls (add row, add field)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   rowHeight?: string // Row height: 'compact', 'medium', 'comfortable'
+  permissions?: BlockPermissions // Block-level permissions
 }
 
 const ITEMS_PER_PAGE = 100
@@ -57,6 +65,7 @@ export default function GridView({
   isEditing = false,
   onRecordClick,
   rowHeight = 'medium',
+  permissions,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -201,6 +210,8 @@ export default function GridView({
   }
 
   async function handleCellSave(rowId: string, fieldName: string, value: any) {
+    // Don't allow saving if view-only
+    if (isViewOnly) return
     if (!rowId || !supabaseTableName) return
 
     try {
@@ -266,7 +277,17 @@ export default function GridView({
     }
   }
 
+  // Determine permissions
+  const isViewOnly = permissions?.mode === 'view'
+  const allowInlineCreate = permissions?.allowInlineCreate ?? true
+  const allowInlineDelete = permissions?.allowInlineDelete ?? true
+  const allowOpenRecord = permissions?.allowOpenRecord ?? true
+  const canEdit = !isViewOnly && isEditing
+
   function handleRowClick(rowId: string) {
+    // Don't open record if not allowed
+    if (!allowOpenRecord) return
+
     // If onRecordClick callback provided, use it (for blocks)
     if (onRecordClick) {
       onRecordClick(rowId)
@@ -474,13 +495,16 @@ export default function GridView({
       {isEditing && (
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleAddRow}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Row
-            </button>
+            {/* Only show Add Row button if inline create is allowed */}
+            {allowInlineCreate && (
+              <button
+                onClick={handleAddRow}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </button>
+            )}
             {onAddField && (
               <button
                 onClick={onAddField}
@@ -583,7 +607,7 @@ export default function GridView({
                           return (
                           <tr
                             key={row.id}
-                            className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${rowHeightClass}`}
+                            className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
                             onClick={() => handleRowClick(row.id)}
                           >
                             {visibleFields.map((field) => (
@@ -595,6 +619,7 @@ export default function GridView({
                                 <Cell
                                   value={row[field.field_name]}
                                   fieldName={field.field_name}
+                                  editable={canEdit}
                                   onSave={async (value) => {
                                     await handleCellSave(row.id, field.field_name, value)
                                   }}
@@ -614,7 +639,7 @@ export default function GridView({
                   return (
                   <tr
                     key={row.id}
-                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors cursor-pointer ${rowHeightClass}`}
+                    className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
                     onClick={() => handleRowClick(row.id)}
                   >
                     {visibleFields.map((field) => {
@@ -632,6 +657,7 @@ export default function GridView({
                             fieldType={tableField?.type}
                             fieldOptions={tableField?.options}
                             isVirtual={isVirtual}
+                            editable={canEdit && !isVirtual}
                             onSave={async (value) => {
                               if (!isVirtual) {
                                 await handleCellSave(row.id, field.field_name, value)

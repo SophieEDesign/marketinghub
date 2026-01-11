@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
+import { canOpenRecords } from "@/lib/interface/block-permissions"
 
 interface RecordBlockProps {
   block: PageBlock
@@ -71,13 +72,17 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId, isEditing])
 
+  // Check permissions
+  const canOpen = canOpenRecords(config)
+
   // Open record panel when recordId changes (for record review pages)
+  // Only open if permissions allow
   useEffect(() => {
-    if (tableId && recordId && tableName) {
+    if (tableId && recordId && tableName && canOpen) {
       openRecord(tableId, recordId, tableName)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, recordId, tableName])
+  }, [tableId, recordId, tableName, canOpen])
 
   async function loadTableName() {
     if (!tableId) return
@@ -186,6 +191,18 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
 
   // Record block now opens the global record panel
   // The panel will handle displaying the record
+  // But check permissions first
+  if (!canOpen) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+        <div className="text-center">
+          <p className="mb-2">Record details access is disabled</p>
+          <p className="text-xs text-gray-500">This block does not allow opening record details</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex items-center justify-center text-gray-400 text-sm">
       <div className="text-center">

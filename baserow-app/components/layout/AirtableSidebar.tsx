@@ -55,7 +55,7 @@ export default function AirtableSidebar({
   userRole = null
 }: AirtableSidebarProps) {
   const pathname = usePathname()
-  const { brandName, logoUrl, primaryColor, sidebarColor } = useBranding()
+  const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
   // Interfaces expanded by default
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -152,13 +152,14 @@ export default function AirtableSidebar({
           <div className="px-3 mb-1 flex items-center justify-between gap-2">
             <button
               onClick={() => toggleSection("interfaces")}
-              className="flex-1 flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              className="flex-1 flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              style={{ color: sidebarTextColor }}
             >
               <span>Interfaces</span>
               {expandedSections.has("interfaces") ? (
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
               )}
             </button>
             {expandedSections.has("interfaces") && (
@@ -201,7 +202,7 @@ export default function AirtableSidebar({
 
 
         {/* Recents & Favorites */}
-        <RecentsFavoritesSection primaryColor={primaryColor} />
+        <RecentsFavoritesSection primaryColor={primaryColor} sidebarTextColor={sidebarTextColor} />
 
         {/* Core Data Section - Collapsed by default */}
         {tables.length > 0 && (
@@ -209,13 +210,14 @@ export default function AirtableSidebar({
             <div className="px-3 mb-1">
               <button
                 onClick={() => toggleSection("core-data")}
-                className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+                className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+                style={{ color: sidebarTextColor }}
               >
                 <span>Core Data</span>
                 {expandedSections.has("core-data") ? (
-                  <ChevronDown className="h-3 w-3" />
+                  <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
                 ) : (
-                  <ChevronRight className="h-3 w-3" />
+                  <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
                 )}
               </button>
             </div>
@@ -228,13 +230,13 @@ export default function AirtableSidebar({
                     <Link
                       key={table.id}
                       href={`/tables/${table.id}`}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100"
                       style={isTableActive ? { 
                         backgroundColor: primaryColor + '15', 
                         color: primaryColor 
-                      } : {}}
+                      } : { color: sidebarTextColor }}
                     >
-                      <Database className="h-4 w-4 flex-shrink-0" />
+                      <Database className="h-4 w-4 flex-shrink-0" style={{ color: isTableActive ? primaryColor : sidebarTextColor }} />
                       <span className="text-sm truncate">{table.name}</span>
                     </Link>
                   )
@@ -249,14 +251,10 @@ export default function AirtableSidebar({
         <div className="py-2 border-t border-gray-100">
           <Link
             href="/settings"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
-              isSettings
-                ? "bg-blue-50 text-blue-700"
-                : "text-gray-600 hover:bg-gray-100"
-            }`}
-            style={isSettings ? { backgroundColor: primaryColor + '15', color: primaryColor } : {}}
+            className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100"
+            style={isSettings ? { backgroundColor: primaryColor + '15', color: primaryColor } : { color: sidebarTextColor }}
           >
-            <Settings className="h-4 w-4 flex-shrink-0" />
+            <Settings className="h-4 w-4 flex-shrink-0" style={{ color: isSettings ? primaryColor : sidebarTextColor }} />
             <span className="text-sm">Settings</span>
           </Link>
         </div>

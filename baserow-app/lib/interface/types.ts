@@ -117,6 +117,13 @@ export interface BlockConfig {
   allowed_operators?: string[]
   allow_inline_edit?: boolean // Enable inline editing for field block
   inline_edit_permission?: 'admin' | 'member' | 'both' // Who can edit inline (default: 'both')
+  // Block-level permissions
+  permissions?: {
+    mode?: 'view' | 'edit' // Access mode: view-only or editable
+    allowInlineCreate?: boolean // Allow users to add records inline
+    allowInlineDelete?: boolean // Allow users to delete records inline
+    allowOpenRecord?: boolean // Allow users to open record details
+  }
   // Appearance settings
   appearance?: {
     // Airtable-style appearance (new)

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     
     const { data: settings, error } = await supabase
       .from('workspace_settings')
-      .select('brand_name, logo_url, primary_color, accent_color, sidebar_color')
+      .select('brand_name, logo_url, primary_color, accent_color, sidebar_color, sidebar_text_color')
       .maybeSingle()
 
     if (error) {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { brand_name, logo_url, primary_color, accent_color, sidebar_color } = body
+    const { brand_name, logo_url, primary_color, accent_color, sidebar_color, sidebar_text_color } = body
 
     const settings = await updateWorkspaceSettings({
       brand_name: brand_name || null,
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       primary_color: primary_color || null,
       accent_color: accent_color || null,
       sidebar_color: sidebar_color || null,
+      sidebar_text_color: sidebar_text_color || null,
     })
 
     return NextResponse.json({ settings })

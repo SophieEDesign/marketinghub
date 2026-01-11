@@ -1,5 +1,5 @@
 /**
- * Filter Value Resolution for Lookup Fields
+ * Lookup Field Filter Value Resolution
  * 
  * Resolves filter values based on their source type (static, current_record, context)
  */
@@ -51,7 +51,7 @@ export async function resolveFilterValue(
       value = currentRecord?.[filter.currentRecordField]
       value2 = filter.currentRecordField2 ? currentRecord?.[filter.currentRecordField2] : undefined
       
-      // Skip if value is null/empty (unless applyOnlyWhenFieldHasValue handles it)
+      // Skip if value is null/empty (unless applyOnlyWhenFieldHasValue is false)
       if (!filter.applyOnlyWhenFieldHasValue && (value === null || value === undefined || value === '')) {
         return { value: null, shouldApply: false }
       }
@@ -74,9 +74,16 @@ export async function resolveFilterValue(
         default:
           return { value: null, shouldApply: false }
       }
-      // Handle value2 for context (e.g., date ranges)
+      
+      // Handle value2 for date_range with context
       if (filter.operator === 'date_range' && filter.contextType2) {
         switch (filter.contextType2) {
+          case 'current_user_id':
+            value2 = currentUserId
+            break
+          case 'current_user_email':
+            value2 = currentUserEmail
+            break
           case 'current_date':
             value2 = new Date().toISOString().split('T')[0]
             break

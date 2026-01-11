@@ -77,7 +77,7 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
-  const { primaryColor } = useBranding()
+  const { primaryColor, sidebarTextColor } = useBranding()
   // Filter out any null/undefined groups (safety check)
   const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
   const [pages, setPages] = useState<InterfacePage[]>(interfacePages)
@@ -595,14 +595,15 @@ export default function GroupedInterfaces({
         <div className="px-2 py-1">
           <button
             onClick={() => toggleGroup(group.id)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-gray-50 rounded transition-colors"
+            style={{ color: sidebarTextColor }}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-4 w-4 text-gray-500" />
+              <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
             ) : (
-              <ChevronDown className="h-4 w-4 text-gray-500" />
+              <ChevronDown className="h-4 w-4" style={{ color: sidebarTextColor }} />
             )}
-            <Folder className="h-4 w-4 text-gray-500" />
+            <Folder className="h-4 w-4" style={{ color: sidebarTextColor }} />
             <span className="flex-1 text-left truncate">{group.name}</span>
           </button>
           {!isCollapsed && (
@@ -695,7 +696,7 @@ export default function GroupedInterfaces({
     return (
       <Link
         href={`/pages/${page.id}`}
-        className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-50"
+        className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-50"
         onClick={(e) => {
           // Only navigate, don't toggle edit mode
           e.stopPropagation()
@@ -703,9 +704,9 @@ export default function GroupedInterfaces({
         style={isActive ? { 
           backgroundColor: primaryColor + '10', 
           color: primaryColor 
-        } : {}}
+        } : { color: sidebarTextColor }}
       >
-        <Layers className="h-4 w-4 flex-shrink-0" />
+        <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
         <span className="text-sm truncate">{page.name}</span>
       </Link>
     )
@@ -773,13 +774,13 @@ export default function GroupedInterfaces({
           ) : (
             <Link
               href={`/pages/${page.id}`}
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100"
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100"
               style={isActive ? { 
                 backgroundColor: primaryColor + '15', 
                 color: primaryColor 
-              } : {}}
+              } : { color: sidebarTextColor }}
             >
-              <Layers className="h-4 w-4 flex-shrink-0" />
+              <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
               <span className="text-sm truncate">{page.name}</span>
             </Link>
           )}

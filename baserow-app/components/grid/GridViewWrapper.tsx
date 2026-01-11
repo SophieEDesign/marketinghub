@@ -22,6 +22,13 @@ interface Sort {
   direction: string
 }
 
+interface BlockPermissions {
+  mode?: 'view' | 'edit'
+  allowInlineCreate?: boolean
+  allowInlineDelete?: boolean
+  allowOpenRecord?: boolean
+}
+
 interface GridViewWrapperProps {
   tableId: string
   viewId: string
@@ -54,6 +61,7 @@ interface GridViewWrapperProps {
     show_sort?: boolean
     row_height?: string
   }
+  permissions?: BlockPermissions // Block-level permissions
 }
 
 export default function GridViewWrapper({
@@ -69,6 +77,7 @@ export default function GridViewWrapper({
   isEditing = false,
   onRecordClick,
   appearance = {},
+  permissions,
 }: GridViewWrapperProps) {
   const [filters, setFilters] = useState<Filter[]>(initialFilters)
   const [sorts, setSorts] = useState<Sort[]>(initialSorts)
@@ -451,6 +460,7 @@ export default function GridViewWrapper({
         isEditing={isEditing}
         onRecordClick={onRecordClick}
         rowHeight={appearance.row_height || 'medium'}
+        permissions={permissions}
       />
       <FieldBuilderDrawer
         isOpen={fieldBuilderOpen}

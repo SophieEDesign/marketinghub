@@ -6,6 +6,7 @@ import type { PageBlock } from "@/lib/interface/types"
 import type { TableField as FieldType } from "@/types/database"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import { useToast } from "@/components/ui/use-toast"
+import { canCreateRecords, canEditBlock } from "@/lib/interface/block-permissions"
 
 interface FormBlockProps {
   block: PageBlock
@@ -26,6 +27,11 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
   const [loading, setLoading] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState<string>('')
+
+  // Check block permissions
+  const canEdit = canEditBlock(config)
+  const canCreate = canCreateRecords(config)
+  const isViewOnly = !canEdit
 
   useEffect(() => {
     if (tableId) {
@@ -81,6 +87,14 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!tableId) return
+
+    // Check permissions
+    if (isViewOnly || !canCreate) {
+      setSubmitStatus('error')
+      setErrorMessage('This form is view-only. You cannot submit data.')
+      setTimeout(() => setSubmitStatus('idle'), 5000)
+      return
+    }
 
     // Validate required fields
     const missingRequired = visibleFields
@@ -179,7 +193,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
                 onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows={4}
-                disabled={isEditing}
+                disabled={isEditing || isViewOnly}
               />
             ) : (
               <input
@@ -187,7 +201,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
                 value={value}
                 onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                disabled={isEditing}
+                disabled={isEditing || isViewOnly}
               />
             )}
           </div>
@@ -219,7 +233,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
                 checked={value || false}
                 onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
                 className="w-4 h-4"
-                disabled={isEditing}
+                disabled={isEditing || isViewOnly}
                 required={isRequired}
               />
               <span className="text-sm font-medium">
@@ -353,7 +367,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
                 value={value}
                 onChange={(newValue) => setFormData({ ...formData, [field.name]: newValue })}
                 config={lookupConfig}
-                disabled={isEditing}
+                disabled={isEditing || isViewOnly}
                 placeholder={`Select ${field.name}...`}
                 onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
               />
@@ -448,11 +462,16 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
         {!isEditing && (
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isViewOnly || !canCreate}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {loading ? "Submitting..." : "Submit"}
           </button>
+        )}
+        {isViewOnly && (
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
+            This form is view-only. You cannot submit data.
+          </div>
         )}
       </form>
     </div>

@@ -67,11 +67,12 @@ interface CellProps {
   fieldType?: string
   fieldOptions?: any
   isVirtual?: boolean
+  editable?: boolean // Whether the cell can be edited
   onSave: (value: any) => Promise<void>
   onCancel?: () => void
 }
 
-export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirtual, onSave, onCancel }: CellProps) {
+export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirtual, editable = true, onSave, onCancel }: CellProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value ?? "")
   const [saving, setSaving] = useState(false)
@@ -91,6 +92,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   }, [editing])
 
   const handleStartEdit = () => {
+    if (!editable || isVirtual) return
     setEditing(true)
     setEditValue(value ?? "")
   }
@@ -199,8 +201,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       return (
         <div
           onClick={handleStartEdit}
-          className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
-          title="Click to edit"
+          className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
+            editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+          }`}
+          title={editable ? "Click to edit" : "Read-only"}
         >
           <span className="text-gray-400 italic text-sm">—</span>
         </div>
@@ -214,8 +218,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className="min-h-[32px] flex items-center px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
-        title="Click to edit"
+        className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
+          editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+        }`}
+        title={editable ? "Click to edit" : "Read-only"}
       >
         <span 
           className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
@@ -233,8 +239,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className="min-h-[32px] flex items-center flex-wrap gap-1.5 px-2 py-1 cursor-pointer hover:bg-gray-50 rounded transition-colors"
-        title="Click to edit"
+        className={`min-h-[32px] flex items-center flex-wrap gap-1.5 px-2 py-1 rounded transition-colors ${
+          editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+        }`}
+        title={editable ? "Click to edit" : "Read-only"}
       >
         {displayValues.length === 0 ? (
           <span className="text-gray-400 italic text-sm">—</span>
@@ -330,13 +338,13 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
 
   return (
     <div
-      onClick={isVirtual ? undefined : handleStartEdit}
+      onClick={isVirtual || !editable ? undefined : handleStartEdit}
       className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
-        isVirtual 
-          ? "text-gray-500 italic cursor-default" 
+        isVirtual || !editable
+          ? "text-gray-500 cursor-default" 
           : "cursor-pointer hover:bg-blue-50"
       }`}
-      title={isVirtual ? "Virtual field (read-only)" : "Click to edit"}
+      title={isVirtual ? "Virtual field (read-only)" : editable ? "Click to edit" : "Read-only"}
     >
       {displayValue || (
         <span className="text-gray-400 italic text-sm">Empty</span>

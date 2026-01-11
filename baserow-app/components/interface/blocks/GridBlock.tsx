@@ -427,6 +427,23 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       
       case 'grid':
       default:
+        // Read block permissions
+        const permissions = config.permissions || {}
+        const isViewOnly = permissions.mode === 'view'
+        const allowInlineCreate = permissions.allowInlineCreate ?? true
+        const allowInlineDelete = permissions.allowInlineDelete ?? true
+        const allowOpenRecord = permissions.allowOpenRecord ?? true
+
+        // Determine if record clicks should be enabled
+        const handleRecordClick = allowOpenRecord
+          ? (onRecordClick || ((recordId) => {
+              // Default: navigate to record page if no callback provided
+              if (tableId) {
+                window.location.href = `/tables/${tableId}/records/${recordId}`
+              }
+            }))
+          : undefined // Disable record clicks if not allowed
+
         return (
           <GridViewWrapper
             tableId={tableId!}
@@ -439,13 +456,14 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             initialGroupBy={groupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}
-            onRecordClick={onRecordClick || ((recordId) => {
-              // Default: navigate to record page if no callback provided
-              if (tableId) {
-                window.location.href = `/tables/${tableId}/records/${recordId}`
-              }
-            })}
+            onRecordClick={handleRecordClick}
             appearance={appearance}
+            permissions={{
+              mode: permissions.mode || 'edit',
+              allowInlineCreate: isViewOnly ? false : allowInlineCreate,
+              allowInlineDelete: isViewOnly ? false : allowInlineDelete,
+              allowOpenRecord,
+            }}
           />
         )
     }

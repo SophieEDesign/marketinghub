@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { ArrowUp, ArrowDown, Lock, Unlock } from "lucide-react"
 import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import PermissionsSettings from "./PermissionsSettings"
 
 interface AdvancedSettingsProps {
   block: PageBlock
@@ -25,8 +26,18 @@ export default function AdvancedSettings({
 }: AdvancedSettingsProps) {
   const isLocked = config.locked || false
 
+  // Only show permissions for blocks that can have records (grid, form, record, table_snapshot)
+  const showPermissions = ['grid', 'form', 'record', 'table_snapshot'].includes(block.type)
+
   return (
     <div className="space-y-6">
+      {/* Permissions - Only for data blocks */}
+      {showPermissions && (
+        <div className="border-b pb-6">
+          <PermissionsSettings config={config} onUpdate={onUpdate} />
+        </div>
+      )}
+
       {/* Block Locking */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -49,7 +60,6 @@ export default function AdvancedSettings({
       </div>
 
       {/* Visibility Rules - Hidden until implemented */}
-      {/* Permissions - Hidden until implemented */}
 
       {/* Block Actions */}
       {(onMoveToTop || onMoveToBottom) && (

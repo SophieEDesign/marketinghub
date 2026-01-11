@@ -107,24 +107,32 @@ export default function SettingsBrandingTab() {
   async function handleSave() {
     setIsSaving(true)
     try {
+      const payload = {
+        brand_name: brandName || null,
+        logo_url: logoUrl || null,
+        primary_color: primaryColor || null,
+        accent_color: accentColor || null,
+        sidebar_color: sidebarColor || null,
+        sidebar_text_color: sidebarTextColor || null,
+      }
+      
+      console.log('Saving branding settings:', payload)
+      
       const response = await fetch('/api/workspace-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          brand_name: brandName || null,
-          logo_url: logoUrl || null,
-          primary_color: primaryColor || null,
-          accent_color: accentColor || null,
-          sidebar_color: sidebarColor || null,
-          sidebar_text_color: sidebarTextColor || null,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
         const error = await response.json()
+        console.error('Save failed with response:', error)
         throw new Error(error.error || 'Failed to save settings')
       }
 
+      const result = await response.json()
+      console.log('Save successful:', result)
+      
       // Refresh to apply changes
       router.refresh()
     } catch (error) {

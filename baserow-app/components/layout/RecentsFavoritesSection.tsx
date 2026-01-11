@@ -10,9 +10,10 @@ import type { RecentItem, Favorite } from "@/lib/recents/recents"
 
 interface RecentsFavoritesSectionProps {
   primaryColor: string
+  sidebarTextColor: string
 }
 
-export default function RecentsFavoritesSection({ primaryColor }: RecentsFavoritesSectionProps) {
+export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor }: RecentsFavoritesSectionProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [recents, setRecents] = useState<RecentItem[]>([])
@@ -94,13 +95,14 @@ export default function RecentsFavoritesSection({ primaryColor }: RecentsFavorit
           <div className="px-3 mb-1">
             <button
               onClick={() => toggleSection('recents')}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              style={{ color: sidebarTextColor }}
             >
               <span>Recently Viewed</span>
               {expandedSections.has('recents') ? (
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
               )}
             </button>
           </div>
@@ -112,13 +114,13 @@ export default function RecentsFavoritesSection({ primaryColor }: RecentsFavorit
                   <button
                     key={`recent-${item.entity_type}-${item.entity_id}`}
                     onClick={() => navigateToEntity(item)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100 text-sm"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100 text-sm"
                     style={isActive ? {
                       backgroundColor: primaryColor + '15',
                       color: primaryColor
-                    } : {}}
+                    } : { color: sidebarTextColor }}
                   >
-                    <Clock className="h-3 w-3 flex-shrink-0" />
+                    <Clock className="h-3 w-3 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
                     <span className="truncate flex-1 text-left">{item.name || item.entity_id}</span>
                   </button>
                 )
@@ -134,13 +136,14 @@ export default function RecentsFavoritesSection({ primaryColor }: RecentsFavorit
           <div className="px-3 mb-1">
             <button
               onClick={() => toggleSection('favorites')}
-              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+              style={{ color: sidebarTextColor }}
             >
               <span>Starred</span>
               {expandedSections.has('favorites') ? (
-                <ChevronDown className="h-3 w-3" />
+                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" />
+                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
               )}
             </button>
           </div>
@@ -152,11 +155,11 @@ export default function RecentsFavoritesSection({ primaryColor }: RecentsFavorit
                   <button
                     key={`favorite-${item.entity_type}-${item.entity_id}`}
                     onClick={() => navigateToEntity(item)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-gray-600 hover:bg-gray-100 text-sm"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100 text-sm"
                     style={isActive ? {
                       backgroundColor: primaryColor + '15',
                       color: primaryColor
-                    } : {}}
+                    } : { color: sidebarTextColor }}
                   >
                     <Star className="h-3 w-3 flex-shrink-0 fill-yellow-400 text-yellow-400" />
                     <span className="truncate flex-1 text-left">{item.name || item.entity_id}</span>
