@@ -377,7 +377,7 @@ export default function GridDataSettings({
               variant="outline"
               size="sm"
               onClick={() => {
-                const currentSorts = config.sorts || []
+                const currentSorts = Array.isArray(config.sorts) ? config.sorts : []
                 // Only allow one sort for now
                 if (currentSorts.length === 0) {
                   onUpdate({
@@ -385,7 +385,7 @@ export default function GridDataSettings({
                   })
                 }
               }}
-              disabled={(config.sorts || []).length > 0}
+              disabled={(Array.isArray(config.sorts) ? config.sorts : []).length > 0}
               className="h-7 text-xs"
             >
               <Plus className="h-3 w-3 mr-1" />
@@ -393,12 +393,12 @@ export default function GridDataSettings({
             </Button>
           </div>
           <div className="space-y-2">
-            {(config.sorts || []).slice(0, 1).map((sort: any, index: number) => (
+            {(Array.isArray(config.sorts) ? config.sorts : []).slice(0, 1).map((sort: any, index: number) => (
               <div key={index} className="flex gap-2 items-center p-2 border rounded-md">
                 <Select
                   value={sort.field || ''}
                   onValueChange={(value) => {
-                    const currentSorts = config.sorts || []
+                    const currentSorts = Array.isArray(config.sorts) ? config.sorts : []
                     const updated = [...currentSorts]
                     updated[index] = { ...updated[index], field: value }
                     onUpdate({ sorts: updated })
@@ -418,7 +418,7 @@ export default function GridDataSettings({
                 <Select
                   value={sort.direction || 'asc'}
                   onValueChange={(value) => {
-                    const currentSorts = config.sorts || []
+                    const currentSorts = Array.isArray(config.sorts) ? config.sorts : []
                     const updated = [...currentSorts]
                     updated[index] = { ...updated[index], direction: value as 'asc' | 'desc' }
                     onUpdate({ sorts: updated })
@@ -445,7 +445,7 @@ export default function GridDataSettings({
                 </Button>
               </div>
             ))}
-            {(!config.sorts || config.sorts.length === 0) && (
+            {(!Array.isArray(config.sorts) || config.sorts.length === 0) && (
               <p className="text-xs text-gray-400 italic">No sort configured</p>
             )}
           </div>
@@ -580,7 +580,7 @@ export default function GridDataSettings({
             <div className="space-y-2">
               <Label className="text-xs font-medium text-gray-700">Sort</Label>
               <Select
-                value={(config.sorts && config.sorts.length > 0) ? config.sorts[0].field + ':' + config.sorts[0].direction : "__none__"}
+                value={(Array.isArray(config.sorts) && config.sorts.length > 0) ? config.sorts[0].field + ':' + config.sorts[0].direction : "__none__"}
                 onValueChange={(value) => {
                   if (value === "__none__") {
                     onUpdate({ sorts: [] })

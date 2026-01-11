@@ -15,7 +15,8 @@ import type { TableField } from "@/types/fields"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { GripVertical, Eye, EyeOff } from "lucide-react"
+import { GripVertical, Eye, EyeOff, Settings } from "lucide-react"
+import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
 import {
   DndContext,
   closestCenter,
@@ -65,6 +66,8 @@ export default function RecordReviewLeftPanelSettings({
   )
   const [showLabels, setShowLabels] = useState(currentSettings?.showLabels ?? true)
   const [compact, setCompact] = useState(currentSettings?.compact ?? false)
+  const [editingField, setEditingField] = useState<TableField | null>(null)
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
 
   // Load fields from table
   useEffect(() => {
@@ -223,6 +226,10 @@ export default function RecordReviewLeftPanelSettings({
                     field={field}
                     isVisible={isVisible}
                     onToggle={() => handleFieldToggle(field.id)}
+                    onConfigure={() => {
+                      setEditingField(field)
+                      setSettingsDrawerOpen(true)
+                    }}
                   />
                 )
               })}
@@ -254,6 +261,34 @@ export default function RecordReviewLeftPanelSettings({
           />
         </div>
       </div>
+
+      {tableId && (
+        <FieldSettingsDrawer
+          field={editingField}
+          open={settingsDrawerOpen}
+          onOpenChange={(open) => {
+            setSettingsDrawerOpen(open)
+            if (!open) {
+              setEditingField(null)
+            }
+          }}
+          tableId={tableId}
+          tableFields={fields}
+          onSave={async () => {
+            // Reload fields after saving
+            const supabase = createClient()
+            const { data } = await supabase
+              .from("table_fields")
+              .select("*")
+              .eq("table_id", tableId)
+              .order("order_index", { ascending: true })
+            
+            if (data) {
+              setFields(data as TableField[])
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -263,10 +298,12 @@ function SortableFieldItem({
   field,
   isVisible,
   onToggle,
+  onConfigure,
 }: {
   field: TableField
   isVisible: boolean
   onToggle: () => void
+  onConfigure: () => void
 }) {
   const {
     attributes,
@@ -307,6 +344,20 @@ function SortableFieldItem({
         </div>
         <div className="text-xs text-gray-500">{field.type}</div>
       </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          onConfigure()
+        }}
+        className="h-7 px-2 text-xs"
+        title="Configure field"
+      >
+        <Settings className="h-3.5 w-3.5" />
+      </Button>
       
       {isVisible ? (
         <Eye className="h-4 w-4 text-gray-400" />

@@ -88,6 +88,12 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     tabs: { tabs: [] },
     filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
     field: { field_id: '' },
+    relatedList: { table_id: '', related_table_id: '', display_mode: 'compact' },
+    calendar: { table_id: '', view_type: 'calendar' },
+    kanban: { table_id: '', view_type: 'kanban' },
+    timeline: { table_id: '', view_type: 'timeline' },
+    list: { table_id: '', view_type: 'grid' },
+    number: { table_id: '', field_id: '' },
   }
 
   return defaults[blockType] || {}

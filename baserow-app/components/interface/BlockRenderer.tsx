@@ -18,6 +18,12 @@ import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import TabsBlock from "./blocks/TabsBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
+import RelatedRecordsListBlock from "./blocks/RelatedRecordsListBlock"
+import CalendarBlock from "./blocks/CalendarBlock"
+import KanbanBlock from "./blocks/KanbanBlock"
+import TimelineBlock from "./blocks/TimelineBlock"
+import ListBlock from "./blocks/ListBlock"
+import NumberBlock from "./blocks/NumberBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
 import LazyBlockWrapper from "./LazyBlockWrapper"
@@ -234,6 +240,54 @@ export default function BlockRenderer({
             childBlocks={[]} // TODO: Pass actual child blocks from parent
           />
         )
+
+      case "relatedList":
+        // Related Records List block - shows related records from a linked table
+        return (
+          <RelatedRecordsListBlock
+            block={safeBlock}
+            isEditing={canEdit}
+            recordId={recordId}
+            pageTableId={pageTableId}
+            onRecordClick={onRecordClick}
+          />
+        )
+
+      case "calendar":
+        // Calendar block - wrapper around GridBlock with view_type='calendar'
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <CalendarBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+          </LazyBlockWrapper>
+        )
+
+      case "kanban":
+        // Kanban block - wrapper around GridBlock with view_type='kanban'
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <KanbanBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+          </LazyBlockWrapper>
+        )
+
+      case "timeline":
+        // Timeline block - wrapper around GridBlock with view_type='timeline'
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <TimelineBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+          </LazyBlockWrapper>
+        )
+
+      case "list":
+        // List block - wrapper around GridBlock with view_type='grid'
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <ListBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+          </LazyBlockWrapper>
+        )
+
+      case "number":
+        // Number block - displays a single number field value
+        return <NumberBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
 
       default:
         return (

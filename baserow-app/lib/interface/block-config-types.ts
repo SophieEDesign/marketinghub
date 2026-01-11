@@ -417,6 +417,43 @@ export function validateBlockConfig(
       // Filters can be added dynamically
       break
 
+    case 'calendar':
+    case 'kanban':
+    case 'timeline':
+    case 'list':
+      // These blocks are wrappers around GridBlock, so they need table_id
+      if (!config.table_id) {
+        errors.push(`${blockType} block requires table_id`)
+      }
+      break
+
+    case 'number':
+      // Number block requires table_id and field_id
+      if (!config.table_id) {
+        errors.push('Number block requires table_id')
+      }
+      if (!config.field_id) {
+        errors.push('Number block requires field_id')
+      }
+      break
+
+    case 'field':
+      // Field block requires field_id
+      if (!config.field_id) {
+        errors.push('Field block requires field_id')
+      }
+      break
+
+    case 'relatedList':
+      // Related list block requires table_id and related_table_id
+      if (!config.table_id) {
+        errors.push('Related list block requires table_id')
+      }
+      if (!config.related_table_id) {
+        errors.push('Related list block requires related_table_id')
+      }
+      break
+
     // divider, button, link_preview have no required fields
   }
 

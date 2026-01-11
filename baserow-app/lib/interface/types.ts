@@ -14,6 +14,12 @@ export type BlockType =
   | 'link_preview'
   | 'filter'
   | 'field'
+  | 'relatedList'
+  | 'calendar'
+  | 'kanban'
+  | 'timeline'
+  | 'list'
+  | 'number'
 
 export type ChartType = 'bar' | 'line' | 'pie' | 'area' | 'stacked_bar'
 export type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max'

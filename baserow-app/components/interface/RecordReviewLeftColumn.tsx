@@ -146,6 +146,16 @@ export default function RecordReviewLeftColumn({
     }
   }, [tableId, loadRecords])
 
+  // Auto-select first record when records are loaded and no record is selected
+  useEffect(() => {
+    if (records.length > 0 && !selectedRecordId && !loading) {
+      const firstRecord = records[0]
+      if (firstRecord?.id) {
+        onRecordSelect(firstRecord.id)
+      }
+    }
+  }, [records, selectedRecordId, loading, onRecordSelect])
+
   // Get ordered fields based on page settings
   const orderedFields = useMemo(() => {
     if (isRecordView) {

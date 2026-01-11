@@ -195,6 +195,8 @@ export default function SettingsPanel({
       // Update previous config ref to prevent re-saving
       previousConfigRef.current = configToSaveJson
       setTimeout(() => setSaved(false), 2000)
+      // Refresh the page after save
+      window.location.reload()
     } catch (error) {
       console.error("Failed to save block settings:", error)
       alert("Failed to save settings. Please try again.")

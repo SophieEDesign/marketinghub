@@ -391,6 +391,8 @@ export default function PageDisplaySettingsPanel({
       }
 
       onUpdate()
+      // Refresh the page after save
+      window.location.reload()
     } catch (error: any) {
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
