@@ -516,8 +516,8 @@ export default function Canvas({
       // Airtable, Notion, Linear, Retool all disable compaction for DB-authoritative layouts
       compactType: null, // Disabled - use explicit coordinates from DB
       isBounded: false, // Disabled - don't push items back inside bounds
-      preventCollision: true, // Enabled - prevent overlapping (but don't auto-reflow)
-      allowOverlap: false,
+      preventCollision: false, // Disabled - allow blocks to adjust into grid during drag/resize
+      allowOverlap: false, // Still prevent final overlap
       containerPadding: [0, 0] as [number, number],
       useCSSTransforms: true,
     }
