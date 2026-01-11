@@ -25,11 +25,13 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock, Settings, Plus, X } from "lucide-react"
 import type { PageConfig } from "@/lib/interface/page-config"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import FieldPickerModal from "../FieldPickerModal"
 
 interface RecordViewPageSettingsProps {
   pageId: string
@@ -58,6 +60,7 @@ export default function RecordViewPageSettings({
   )
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
+  const [fieldPickerOpen, setFieldPickerOpen] = useState(false)
   
   // Parse field configurations from config
   const fieldConfigs = useCallback((): FieldConfig[] => {
@@ -287,6 +290,17 @@ export default function RecordViewPageSettings({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Visible Fields</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFieldPickerOpen(true)}
+                  className="h-7 text-xs"
+                >
+                  <Settings className="h-3 w-3 mr-1.5" />
+                  Pick elements
+                </Button>
+              </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -447,6 +461,207 @@ export default function RecordViewPageSettings({
               )}
             </div>
           )}
+
+          {/* Left Panel Settings */}
+          {selectedTableId && (
+            <>
+              <Separator className="my-6" />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Left Panel Settings</h3>
+                  <p className="text-xs text-gray-500">
+                    Configure how records appear in the left panel (record list).
+                  </p>
+                </div>
+
+                {/* Data Options */}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-700 uppercase mb-3">Data</h4>
+                    
+                    {/* Filter by */}
+                    <div className="space-y-2">
+                      <Label>Filter by</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Filter records in the left panel (coming soon).
+                      </p>
+                    </div>
+
+                    {/* Sort by */}
+                    <div className="space-y-2">
+                      <Label>Sort by</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Default sort order for records (coming soon).
+                      </p>
+                    </div>
+
+                    {/* Group by */}
+                    <div className="space-y-2">
+                      <Label>Group by</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Group records by field (coming soon).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* List Item Display */}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-700 uppercase mb-3">List Item</h4>
+                    
+                    {/* Color */}
+                    <div className="space-y-2">
+                      <Label>Color</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Field to use for item color (coming soon).
+                      </p>
+                    </div>
+
+                    {/* Image field */}
+                    <div className="space-y-2">
+                      <Label>Image field</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Field to display as image in list items (coming soon).
+                      </p>
+                    </div>
+
+                    {/* Title */}
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Select
+                        value={config.title_field || ""}
+                        onValueChange={(value) =>
+                          onUpdate({ title_field: value || undefined })
+                        }
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a field" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Field to use as the primary title in list items.
+                      </p>
+                    </div>
+
+                    {/* Field 1 */}
+                    <div className="space-y-2">
+                      <Label>Field 1</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        First additional field to display (coming soon).
+                      </p>
+                    </div>
+
+                    {/* Field 2 */}
+                    <div className="space-y-2">
+                      <Label>Field 2</Label>
+                      <Select value="" onValueChange={() => {}} disabled>
+                        <SelectTrigger>
+                          <SelectValue placeholder="None" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500">
+                        Second additional field to display (coming soon).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Actions */}
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-700 uppercase mb-3">User Actions</h4>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Enable or disable user actions in the left panel (coming soon).
+                    </p>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-normal">Sort</Label>
+                        <Switch checked={false} onCheckedChange={() => {}} disabled />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-normal">Filter</Label>
+                        <Switch checked={false} onCheckedChange={() => {}} disabled />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-normal">Group</Label>
+                        <Switch checked={false} onCheckedChange={() => {}} disabled />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-normal">Add records through a form</Label>
+                        <Switch checked={false} onCheckedChange={() => {}} disabled />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-normal">Buttons</Label>
+                        <Switch checked={false} onCheckedChange={() => {}} disabled />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* Permissions Tab */}
@@ -539,6 +754,23 @@ export default function RecordViewPageSettings({
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Field Picker Modal */}
+      <FieldPickerModal
+        open={fieldPickerOpen}
+        onOpenChange={setFieldPickerOpen}
+        tableId={selectedTableId}
+        selectedFields={fieldConfigList.filter((f) => f.visible).map((f) => f.field)}
+        onFieldsChange={(fieldNames) => {
+          // Update field configs based on selected fields
+          const updated = fieldConfigList.map((fc) => ({
+            ...fc,
+            visible: fieldNames.includes(fc.field),
+          }))
+          setFieldConfigList(updated)
+          saveFieldConfigs(updated)
+        }}
+      />
     </div>
   )
 }

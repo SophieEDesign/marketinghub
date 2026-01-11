@@ -24,7 +24,6 @@ import { Plus, X, ArrowUp, ArrowDown, Save, Edit2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import { getPageTypeDefinition, validatePageAnchor, isRecordReviewPage } from "@/lib/interface/page-types"
-import RecordPanelEditor from "./RecordPanelEditor"
 import RecordViewPageSettings from "./settings/RecordViewPageSettings"
 
 interface PageDisplaySettingsPanelProps {
@@ -85,7 +84,6 @@ export default function PageDisplaySettingsPanel({
   const [recordReviewGroupBy, setRecordReviewGroupBy] = useState<string>("") // Group field for record review pages
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
-  const [panelEditorOpen, setPanelEditorOpen] = useState(false)
   const [addingFields, setAddingFields] = useState(false)
 
   // Load initial data
@@ -1079,24 +1077,6 @@ export default function PageDisplaySettingsPanel({
                 </div>
               )}
 
-              {/* UNIFIED: Panel layout configuration moved to blocks */}
-              {false && currentPage && currentPage.page_type === 'record_view' && (
-                <div className="space-y-2">
-                  <Label>Record Panel Layout</Label>
-                  <div className="text-sm text-gray-500 mb-2">
-                    Configure which fields and blocks appear in the record detail panel. Drag items to reorder them.
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setPanelEditorOpen(true)}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit Panel Layout
-                  </Button>
-                </div>
-              )}
 
               {/* Density */}
               <div className="space-y-2">
@@ -1154,20 +1134,6 @@ export default function PageDisplaySettingsPanel({
       </SheetContent>
       </Sheet>
 
-      {/* UNIFIED: Record panel editor moved to block settings */}
-      {false && currentPage && currentPage.page_type === 'record_view' && (
-        <RecordPanelEditor
-          page={currentPage}
-          isOpen={panelEditorOpen}
-          onClose={() => setPanelEditorOpen(false)}
-          onSave={() => {
-            // Reload page data after saving
-            if (onUpdate) {
-              onUpdate()
-            }
-          }}
-        />
-      )}
     </>
   )
 }

@@ -340,14 +340,18 @@ export default function AirtableKanbanView({
 
   // Get card fields to display
   const displayCardFields = useMemo(() => {
-    if (cardFields.length > 0) {
-      return cardFields
-        .map((fieldName) => tableFields.find((f) => f.name === fieldName))
-        .filter((f): f is TableField => f !== undefined)
+    // Ensure cardFields and tableFields are arrays
+    const safeCardFields = Array.isArray(cardFields) ? cardFields : []
+    const safeTableFields = Array.isArray(tableFields) ? tableFields : []
+    
+    if (safeCardFields.length > 0) {
+      return safeCardFields
+        .map((fieldName) => safeTableFields.find((f) => f && f.name === fieldName))
+        .filter((f): f is TableField => f !== undefined && f !== null)
     }
     // Default: show first 3 visible fields (excluding group field)
-    return tableFields
-      .filter((f) => f.name !== groupField?.name)
+    return safeTableFields
+      .filter((f) => f && f.name !== groupField?.name)
       .slice(0, 3)
   }, [cardFields, tableFields, groupField])
 
@@ -670,7 +674,8 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
                 {primaryValue || "Untitled"}
               </div>
             )}
-            {displayFields.slice(1).map((field) => {
+            {Array.isArray(displayFields) && displayFields.slice(1).map((field) => {
+              if (!field || !field.name) return null
               const value = row[field.name]
               return (
                 <div key={field.name} className="text-xs text-gray-600 truncate">

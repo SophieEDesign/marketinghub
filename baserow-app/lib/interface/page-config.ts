@@ -55,6 +55,30 @@ export interface PageConfig {
   show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
   show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
   
+  // Left Panel (Record List) settings
+  left_panel?: {
+    // Data options
+    filter_by?: Array<{ field: string; operator: string; value: any }>
+    sort_by?: Array<{ field: string; direction: 'asc' | 'desc' }>
+    group_by?: string // Field name to group by
+    
+    // List item display
+    color_field?: string // Field name for color
+    image_field?: string // Field name for image
+    title_field?: string // Field name for title (in list item)
+    field_1?: string // Field name for first additional field
+    field_2?: string // Field name for second additional field
+    
+    // User actions (enabled/disabled)
+    user_actions?: {
+      sort?: boolean // Allow user to sort
+      filter?: boolean // Allow user to filter
+      group?: boolean // Allow user to group
+      add_records?: boolean // Allow adding records through form
+      buttons?: Array<{ label: string; action: string }> // Custom buttons
+    }
+  }
+  
   // General
   [key: string]: any
 }

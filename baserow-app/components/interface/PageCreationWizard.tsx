@@ -26,6 +26,7 @@ import { createClient } from "@/lib/supabase/client"
 import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isRecordViewPage } from "@/lib/interface/page-types"
 import { createRecordReviewTwoColumnLayout } from "@/lib/interface/record-review-layout"
 import { FileCheck, BookOpen } from "lucide-react"
+import FieldPickerModal from "./FieldPickerModal"
 
 interface PageCreationWizardProps {
   open: boolean
@@ -33,7 +34,7 @@ interface PageCreationWizardProps {
   defaultGroupId?: string | null
 }
 
-type WizardStep = 'interface' | 'purpose' | 'anchor' | 'name'
+type WizardStep = 'interface' | 'purpose' | 'anchor' | 'fields' | 'name'
 
 export default function PageCreationWizard({
   open,
@@ -47,6 +48,7 @@ export default function PageCreationWizard({
   const [pageType, setPageType] = useState<PageType | ''>('')
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
+  const [selectedFields, setSelectedFields] = useState<string[]>([]) // Fields selected for structured field list
   const [creating, setCreating] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
@@ -63,6 +65,7 @@ export default function PageCreationWizard({
       setPageType('')
       setTableId('')
       setPageName('')
+      setSelectedFields([])
     }
   }, [open, defaultGroupId])
 
@@ -176,6 +179,16 @@ export default function PageCreationWizard({
       alert('Please select a table. The table is required to display records in the left column.')
       return
     }
+    // For record_view pages, show field picker step
+    if (pageType === 'record_view') {
+      setStep('fields')
+    } else {
+      setStep('name')
+    }
+  }
+
+  const handleFieldsSelectedAndContinue = (fieldNames: string[]) => {
+    setSelectedFields(fieldNames)
     setStep('name')
   }
 
@@ -296,8 +309,12 @@ export default function PageCreationWizard({
 
       // Create interface page in interface_pages table
       // For record_view pages, store tableId in both base_table and config.tableId
+      // Also store selected fields in config.visible_fields
       const pageConfig = pageType === 'record_view' && base_table
-        ? { tableId: base_table }
+        ? {
+            tableId: base_table,
+            visible_fields: selectedFields.length > 0 ? selectedFields : undefined,
+          }
         : {}
       
       const { data: page, error } = await supabase
@@ -386,6 +403,7 @@ export default function PageCreationWizard({
       setPageType('')
       setTableId('')
       setPageName('')
+      setSelectedFields([])
       setCreating(false)
       onOpenChange(false)
 
@@ -542,6 +560,24 @@ export default function PageCreationWizard({
     </div>
   )
 
+  // Render FieldPickerModal as a separate dialog when on fields step
+  if (step === 'fields') {
+    return (
+      <FieldPickerModal
+        open={open && step === 'fields'}
+        onOpenChange={(isOpen) => {
+          if (!isOpen && step === 'fields') {
+            // If closing without saving (e.g., Cancel or X button), go back to anchor step
+            setStep('anchor')
+          }
+        }}
+        tableId={tableId}
+        selectedFields={selectedFields}
+        onFieldsChange={handleFieldsSelectedAndContinue}
+      />
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
@@ -550,21 +586,38 @@ export default function PageCreationWizard({
             {step === 'interface' && 'Select Interface'}
             {step === 'purpose' && 'Create New Page'}
             {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Create Record View Page' : 'Configure Page')}
+            {step === 'fields' && 'Pick elements'}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
           <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
             {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Select a table to provide context for blocks (optional)' : 'Set up the data source or layout')}
+            {step === 'fields' && 'Select which fields appear in the record details panel'}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4">
-          {step === 'interface' && renderInterfaceStep()}
-          {step === 'purpose' && renderPurposeStep()}
-          {step === 'anchor' && renderAnchorStep()}
-          {step === 'name' && renderNameStep()}
-        </div>
+        {step === 'fields' ? (
+          <FieldPickerModal
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) {
+                // If closing without saving, go back to anchor step
+                setStep('anchor')
+              }
+            }}
+            tableId={tableId}
+            selectedFields={selectedFields}
+            onFieldsChange={handleFieldsSelected}
+          />
+        ) : (
+          <div className="py-4">
+            {step === 'interface' && renderInterfaceStep()}
+            {step === 'purpose' && renderPurposeStep()}
+            {step === 'anchor' && renderAnchorStep()}
+            {step === 'name' && renderNameStep()}
+          </div>
+        )}
         {step === 'interface' && (
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -575,6 +628,27 @@ export default function PageCreationWizard({
         {step === 'purpose' && (
           <DialogFooter>
             <Button variant="outline" onClick={() => setStep('interface')}>
+              Back
+            </Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        )}
+        {step === 'name' && (
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // For record_view pages, go back to fields step
+                // For content pages, go back to purpose
+                if (pageType === 'record_view') {
+                  setStep('fields')
+                } else {
+                  setStep('purpose')
+                }
+              }}
+            >
               Back
             </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -2,18 +2,19 @@
 
 /**
  * Record Review View Component
- * Master-detail layout: Left column shows record list with search/filters, right panel shows blocks for selected record
  * 
- * NOTE: This component renders a complete layout (not just a wrapper).
- * Future consideration: Could this layout be migrated to blocks?
- * However, this is often quietly depended on - do not rush migration.
+ * Two-panel Airtable-style layout:
+ * - Left: Record list (choose record)
+ * - Right: Record Details Panel (fields + blocks combined - single source of truth, persistent, no modal)
+ * 
+ * This replaces the slide-out modal approach. The right panel is the ONLY record detail surface.
+ * Clicking a record updates the right panel (does NOT open a modal).
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Search, Filter, List, Plus, ChevronDown, MessageSquare, Edit2, ChevronUp } from 'lucide-react'
+import { Search, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -24,7 +25,7 @@ import type { TableField } from '@/types/fields'
 import InterfaceBuilder from './InterfaceBuilder'
 import { useBlockEditMode } from '@/contexts/EditModeContext'
 import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters'
-import RecordFields from '@/components/records/RecordFields'
+import RecordDetailsPanel from './RecordDetailsPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
 
@@ -98,12 +99,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [recordListCollapsed, setRecordListCollapsed] = useState(false)
+  const [tableName, setTableName] = useState<string>('')
   const { isEditing, enter: enterBlockEdit, exit: exitBlockEdit } = useBlockEditMode(page.id)
   const { toast } = useToast()
   
   const allowEditing = config.allow_editing || false
-  const recordPanel = config.record_panel || 'side'
-  const [showComments, setShowComments] = useState(true)
 
   // Get columns from config or data - ensure it's always an array
   const columns = useMemo(() => {
@@ -331,7 +331,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     })
   }, [filteredData, data, selectedRecordId, loadedBlocks.length, blocksLoading, recordDebugEnabled])
 
-  // Load table fields
+  // Load table fields and table name
   useEffect(() => {
     if (pageTableId) {
       debugLog('RECORD', 'Loading table fields', {
@@ -339,12 +339,43 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       })
       loadTableFields()
       loadFieldGroups()
+      loadTableName()
     } else {
       debugWarn('RECORD', 'No pageTableId provided, cannot load fields', {
         pageId: page.id,
       })
     }
   }, [pageTableId])
+
+  async function loadTableName() {
+    if (!pageTableId) return
+    
+    try {
+      const supabase = createClient()
+      const { data: table, error } = await supabase
+        .from('tables')
+        .select('name, supabase_table')
+        .eq('id', pageTableId)
+        .single()
+      
+      if (error) {
+        debugError('RECORD', 'Error loading table name', {
+          pageTableId,
+          error: error.message,
+        })
+        return
+      }
+      
+      if (table) {
+        setTableName(table.supabase_table || '')
+      }
+    } catch (error: any) {
+      debugError('RECORD', 'Exception loading table name', {
+        pageTableId,
+        error: error.message,
+      })
+    }
+  }
   
   async function loadTableFields() {
     if (!pageTableId) return
@@ -533,7 +564,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   
   // Layout toggles (page-level)
   const showFieldList = config.show_field_list !== false // Default to true
-  const showBlocksSection = config.show_blocks_section !== false // Default to true
 
   // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
   // Creating new objects on every render causes component remounts and canvas resets
@@ -627,10 +657,28 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return 'bg-gray-100 text-gray-800 border-gray-200'
   }
 
+  // Handle record delete - switch to first available record
+  const handleRecordDelete = useCallback((recordId: string) => {
+    // If deleted record is selected, switch to first available
+    if (recordId === selectedRecordId) {
+      const remainingRecords = filteredData.filter(r => r.id !== recordId)
+      if (remainingRecords.length > 0) {
+        setSelectedRecordId(remainingRecords[0].id)
+      } else {
+        setSelectedRecordId(null)
+      }
+    }
+  }, [selectedRecordId, filteredData])
+
+  // Handle record duplicate - switch to duplicated record
+  const handleRecordDuplicate = useCallback((recordId: string) => {
+    setSelectedRecordId(recordId)
+  }, [])
+
   return (
     <div className="h-full flex bg-white">
-      {/* Left Column - Record List + Record Fields */}
-      <div className={recordPanel === 'side' ? 'w-96 border-r flex flex-col overflow-hidden bg-white' : 'w-full flex flex-col overflow-hidden'}>
+      {/* Left Column - Record List Only */}
+      <div className="w-96 border-r flex flex-col overflow-hidden bg-white">
         {/* Record List Section - Collapsible */}
         <div className="border-b bg-white">
           <button
@@ -767,178 +815,39 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
             </>
           )}
         </div>
-
-        {/* Structured Field List Section (Page-level, fixed block) */}
-        {showFieldList && (
-          <div className="flex-1 overflow-auto border-t">
-            {!selectedRecordId ? (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                <div className="text-center">
-                  <p className="text-xs mb-1 font-medium">Select a record</p>
-                  <p className="text-xs text-gray-400">Choose a record from the list above to view its fields.</p>
-                </div>
-              </div>
-            ) : !selectedRecord ? (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                <div className="text-center">
-                  <p className="text-xs mb-1 font-medium">Loading record...</p>
-                </div>
-              </div>
-            ) : visibleFields.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                <div className="text-center">
-                  <p className="text-xs mb-1 font-medium">No fields configured</p>
-                  <p className="text-xs text-gray-400">Configure fields to display in Page Settings.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4">
-                {/* Helper text if page is view-only but some fields are editable */}
-                {!pageEditable && editableFieldNames.length > 0 && (
-                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-xs text-yellow-800">
-                      Some fields are configured as editable, but the page is view-only. All fields are displayed as view-only.
-                    </p>
-                  </div>
-                )}
-                <RecordFields
-                  fields={visibleFields}
-                  formData={formData}
-                  onFieldChange={pageEditable ? handleFieldChange : () => {}}
-                  fieldGroups={fieldGroups}
-                  tableId={pageTableId || ''}
-                  recordId={selectedRecordId}
-                />
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Blocks Section (Flexible, block-level) */}
-      {showBlocksSection && (
-        <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto bg-white flex flex-col' : 'w-full border-t overflow-auto flex flex-col'}>
-          {/* Edit Mode Toggle - Only show when record is selected */}
-          {selectedRecordId && (
-            <div className="border-b bg-gray-50 px-4 py-2 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                {isEditing ? 'Editing panel layout' : 'View mode'}
-              </div>
-              <Button
-                variant={isEditing ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  if (isEditing) {
-                    exitBlockEdit()
-                  } else {
-                    enterBlockEdit()
-                  }
-                }}
-                className="h-8"
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                {isEditing ? 'Done' : 'Edit Panel'}
-              </Button>
-            </div>
-          )}
-          
-          <div className="flex-1 overflow-auto">
-            {!selectedRecordId ? (
-              // Setup state: No record selected
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                <div className="text-center">
-                  <p className="mb-2 font-medium">Select a record to see details</p>
-                  <p className="text-xs text-gray-400">Click on a record in the list to view its details.</p>
-                </div>
-              </div>
-            ) : blocksLoading ? (
-              // Loading state: Blocks are being loaded
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Loading blocks...</p>
-                </div>
-              </div>
-            ) : (
-              // Render blocks with record context - Always render something
-              <div className="h-full">
-                {loadedBlocks.length === 0 ? (
-                  // Setup state: No blocks configured
-                  <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-                    <div className="text-center">
-                      <p className="mb-2 font-medium">Add fields or blocks to design this view</p>
-                      <p className="text-xs text-gray-400">
-                        {isEditing 
-                          ? "Click 'Edit Page' to add fields from Settings, or add blocks to customize the layout."
-                          : "Click 'Edit Panel' above to add fields and blocks."}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  // Render InterfaceBuilder with recordId
-                  // Key ensures blocks re-render with new recordId when record changes
-                  // Canvas preserves layout across remounts (layoutHydratedRef guards against resets)
-                  // CRITICAL: Do NOT pass isViewer prop - let InterfaceBuilder use useBlockEditMode directly
-                  // This ensures the right panel is editable exactly like Content pages
-                  // Use memoized page object to prevent unnecessary remounts
-                  <InterfaceBuilder
-                    key={`record-${selectedRecordId}`}
-                    page={recordReviewPage as any}
-                    initialBlocks={loadedBlocks}
-                    hideHeader={true}
-                    pageTableId={pageTableId}
-                    recordId={selectedRecordId}
-                    onRecordClick={(recordId) => {
-                      // CRITICAL: When calendar event is clicked, update selected record
-                      // This allows calendar blocks in RecordReview to switch records
-                      debugLog('RECORD', 'Calendar event clicked, switching record', {
-                        recordId,
-                        previousRecordId: selectedRecordId,
-                        hasBlocks: loadedBlocks.length > 0,
-                      })
-                      setSelectedRecordId(recordId)
-                    }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* Comments Sidebar - Right Column (Optional) */}
-      {showComments && recordPanel !== 'none' && (
-        <div className="w-80 border-l flex flex-col overflow-hidden bg-white">
-          <div className="border-b p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">All comments</h3>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex-1 overflow-auto p-4">
-            <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm">
-              <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
-              <p className="text-xs text-center max-w-[200px]">
-                Start a conversation. Ask questions and collaborate with your team.
-              </p>
-            </div>
-          </div>
-          
-          <div className="border-t p-4">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-sm font-medium">
-                S
-              </div>
-              <Input
-                placeholder="Leave a comment"
-                className="flex-1 h-8 text-sm"
-              />
-            </div>
-          </div>
-        </div>
+      {/* Right Panel - Record Details (Fields + Blocks combined) */}
+      {showFieldList && (
+        <RecordDetailsPanel
+          record={selectedRecord}
+          tableId={pageTableId || ''}
+          recordId={selectedRecordId}
+          tableName={tableName}
+          fields={tableFields}
+          formData={formData}
+          fieldGroups={fieldGroups}
+          visibleFields={visibleFields}
+          pageEditable={pageEditable}
+          editableFieldNames={editableFieldNames}
+          titleField={config.title_field}
+          onFieldChange={handleFieldChange}
+          onRecordDelete={handleRecordDelete}
+          onRecordDuplicate={handleRecordDuplicate}
+          loading={!selectedRecord && selectedRecordId !== null}
+          blocks={loadedBlocks}
+          page={recordReviewPage}
+          pageTableId={pageTableId}
+          isEditing={isEditing}
+          onRecordClick={(recordId) => {
+            debugLog('RECORD', 'Record clicked from block', {
+              recordId,
+              previousRecordId: selectedRecordId,
+            })
+            setSelectedRecordId(recordId)
+          }}
+          blocksLoading={blocksLoading}
+        />
       )}
     </div>
   )

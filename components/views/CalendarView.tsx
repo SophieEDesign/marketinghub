@@ -34,16 +34,30 @@ export default function CalendarView({
   function getEvents(): EventInput[] {
     if (!dateField) return []
 
+    // Ensure rows is an array
+    if (!Array.isArray(rows)) {
+      console.warn('CalendarView: rows is not an array', typeof rows, rows)
+      return []
+    }
+
     return rows
-      .filter((row) => row[dateField])
+      .filter((row) => row && row[dateField])
       .map((row) => {
         const dateValue = row[dateField]
         // Filter and get title from first non-date field
         // safeVisibleFields is already validated as an array above
-        const filteredFields = safeVisibleFields.filter((f) => f && f.field_name !== dateField)
-        const title = filteredFields.length > 0
-          ? filteredFields.slice(0, 1)
-              .map((f) => String(row[f.field_name] || 'Untitled'))
+        const filteredFields = Array.isArray(safeVisibleFields) 
+          ? safeVisibleFields.filter((f) => f && f.field_name !== dateField)
+          : []
+        
+        // Ensure filteredFields is an array before calling slice
+        const slicedFields = Array.isArray(filteredFields) ? filteredFields.slice(0, 1) : []
+        const title = slicedFields.length > 0
+          ? slicedFields
+              .map((f) => {
+                if (!f || !f.field_name) return 'Untitled'
+                return String(row[f.field_name] || 'Untitled')
+              })
               .join(' ')
           : 'Untitled'
 
