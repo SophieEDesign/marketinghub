@@ -104,11 +104,12 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
       
       // Cast supabase client to any to break the type chain and prevent deep type instantiation
       type QueryResult = { data: Array<{ id: string }> | null; error: any }
-      const { data: records, error: searchError } = await ((supabase as any)
+      const result = await ((supabase as any)
         .from(tableName)
         .select('id')
         .eq(lookupField.name, displayValue)
-        .limit(1)) as Promise<QueryResult>
+        .limit(1)) as QueryResult
+      const { data: records, error: searchError } = result
 
       if (searchError) {
         console.error('Error searching for record:', searchError)
