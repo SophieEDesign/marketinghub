@@ -1188,7 +1188,6 @@ export default function CalendarView({
           eventTextColor="#1f2937"
           eventBorderColor="transparent"
           eventBackgroundColor="#f3f4f6"
-          eventMarginBottom={4}
           dayHeaderFormat={{ weekday: 'short' }}
           firstDay={1}
           viewDidMount={(view) => {
