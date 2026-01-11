@@ -566,9 +566,13 @@ export default function PageCreationWizard({
       <FieldPickerModal
         open={open && step === 'fields'}
         onOpenChange={(isOpen) => {
-          if (!isOpen && step === 'fields') {
-            // If closing without saving (e.g., Cancel or X button), go back to anchor step
-            setStep('anchor')
+          if (!isOpen) {
+            // Use functional setState to check current step value
+            // If step is still 'fields', it means modal was cancelled (not saved)
+            // If step changed to 'name', handleFieldsSelectedAndContinue was called, so don't revert
+            setStep((currentStep) => {
+              return currentStep === 'fields' ? 'anchor' : currentStep
+            })
           }
         }}
         tableId={tableId}

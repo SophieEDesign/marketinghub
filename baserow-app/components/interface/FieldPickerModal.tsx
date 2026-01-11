@@ -167,7 +167,9 @@ export default function FieldPickerModal({
   }
 
   const handleSave = () => {
+    // Call onFieldsChange first to update parent state (which changes step to 'name')
     onFieldsChange(localSelectedFields)
+    // Close the modal - the functional setState in parent will prevent revert if step already changed
     onOpenChange(false)
   }
 
