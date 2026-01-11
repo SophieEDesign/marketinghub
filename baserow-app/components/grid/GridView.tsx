@@ -78,11 +78,25 @@ export default function GridView({
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
-  const safeViewFields = asArray(viewFields)
+  type ViewFieldType = {
+    field_name: string
+    visible: boolean
+    position: number
+  }
+  const safeViewFields = asArray<ViewFieldType>(viewFields)
   const safeTableFields = asArray<TableField>(tableFields)
-  const safeViewFilters = asArray(viewFilters)
+  type ViewFilterType = {
+    field_name: string
+    operator: string
+    value?: string
+  }
+  const safeViewFilters = asArray<ViewFilterType>(viewFilters)
   const safeFilters = asArray<FilterConfig>(filters)
-  const safeViewSorts = asArray(viewSorts)
+  type ViewSortType = {
+    field_name: string
+    direction: string
+  }
+  const safeViewSorts = asArray<ViewSortType>(viewSorts)
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -139,8 +153,14 @@ export default function GridView({
         query = applyFiltersToQuery(query, legacyFilters, normalizedFields)
       }
 
-      // Apply sorting at query level
-      if (safeViewSorts.length > 0) {
+      // Check if we need client-side sorting (for single_select by order, multi_select by first value)
+      const needsClientSideSort = safeViewSorts.length > 0 && shouldUseClientSideSorting(
+        safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+        safeTableFields
+      )
+
+      // Apply sorting at query level (for fields that don't need client-side sorting)
+      if (safeViewSorts.length > 0 && !needsClientSideSort) {
         // Apply multiple sorts if needed
         for (let i = 0; i < safeViewSorts.length; i++) {
           const sort = safeViewSorts[i]
@@ -156,13 +176,20 @@ export default function GridView({
             })
           }
         }
-      } else {
+      } else if (safeViewSorts.length === 0) {
         // Default sort by id descending
         query = query.order("id", { ascending: false })
       }
+      // If needsClientSideSort is true, we'll sort after fetching (don't apply DB sorting)
 
-      // Limit results
-      query = query.limit(ITEMS_PER_PAGE)
+      // For client-side sorting, we need to fetch more rows to sort properly
+      // Otherwise, limit results for performance
+      if (!needsClientSideSort) {
+        query = query.limit(ITEMS_PER_PAGE)
+      } else {
+        // Fetch more rows for client-side sorting (will limit after sorting)
+        query = query.limit(ITEMS_PER_PAGE * 2)
+      }
 
       const { data, error } = await query
 
@@ -214,13 +241,25 @@ export default function GridView({
         setRows([])
       } else {
         // CRITICAL: Normalize data to array - API might return single record or null
-        const dataArray = asArray(data)
+        let dataArray = asArray(data)
         
         // Compute formula fields for each row
         const formulaFields = safeTableFields.filter(f => f.type === 'formula')
-        const computedRows = dataArray.map(row => 
+        let computedRows = dataArray.map(row => 
           computeFormulaFields(row, formulaFields, safeTableFields)
         )
+        
+        // Apply client-side sorting if needed (for single_select by order, multi_select by first value)
+        if (needsClientSideSort && safeViewSorts.length > 0) {
+          computedRows = sortRowsByFieldType(
+            computedRows,
+            safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+            safeTableFields
+          )
+          // Limit after sorting
+          computedRows = computedRows.slice(0, ITEMS_PER_PAGE)
+        }
+        
         setTableError(null)
         setRows(computedRows)
       }
@@ -322,7 +361,7 @@ export default function GridView({
 
   // Apply client-side search
   // CRITICAL: Normalize rows to array before filtering
-  const safeRows = asArray(rows)
+  const safeRows = asArray<Record<string, any>>(rows)
   const filteredRows = useMemo(() => {
     if (!searchTerm.trim()) return safeRows
 
@@ -600,10 +639,10 @@ export default function GridView({
                 </tr>
               ) : groupBy && groupedRows && Array.isArray(groupedRows) ? (
                 // Render grouped rows
-                // CRITICAL: Guard groupedRows.map() with asArray
-                asArray(groupedRows).map((group) => {
+                // CRITICAL: groupedRows is already verified as array, but use type annotation for safety
+                (groupedRows as Array<{ key: string; value: any; rows: Record<string, any>[] }>).map((group) => {
                   const isCollapsed = collapsedGroups.has(group.key)
-                  const groupRows = asArray(group.rows)
+                  const groupRows = asArray<Record<string, any>>(group.rows)
                   return (
                     <React.Fragment key={group.key}>
                       {/* Group header */}

@@ -750,7 +750,7 @@ export default function GridDataSettings({
               </SelectTrigger>
               <SelectContent>
                 {fields
-                  .filter(field => field.type === 'single_select' || field.type === 'multi_select' || field.type === 'select')
+                  .filter(field => field.type === 'single_select' || field.type === 'multi_select')
                   .map((field) => (
                     <SelectItem key={field.id} value={field.name}>
                       {field.name}
@@ -758,7 +758,7 @@ export default function GridDataSettings({
                   ))}
               </SelectContent>
             </Select>
-            {fields.filter(f => f.type === 'single_select' || f.type === 'multi_select' || f.type === 'select').length === 0 && (
+            {fields.filter(f => f.type === 'single_select' || f.type === 'multi_select').length === 0 && (
               <p className="text-xs text-amber-600 mt-1">
                 No select fields found. Please add a single-select or multi-select field to the table.
               </p>

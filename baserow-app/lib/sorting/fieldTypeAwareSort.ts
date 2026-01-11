@@ -31,9 +31,18 @@ export function sortRowsByFieldType(
   // Create a copy to avoid mutating the original
   let sortedRows = [...rows]
 
-  // Apply sorts in reverse order (last sort is primary)
-  for (let i = sorts.length - 1; i >= 0; i--) {
-    const sort = sorts[i]
+  // Sort the sorts by order_index if available (to ensure correct sort order)
+  const sortedSorts = [...sorts].sort((a, b) => {
+    const aOrder = (a as any).order_index ?? 0
+    const bOrder = (b as any).order_index ?? 0
+    return aOrder - bOrder
+  })
+
+  // Apply sorts in reverse order (last sort applied becomes primary)
+  // We want the sort with lowest order_index (first in sortedSorts) to be primary,
+  // so we apply sorts with highest order_index first, then lowest order_index last
+  for (let i = sortedSorts.length - 1; i >= 0; i--) {
+    const sort = sortedSorts[i]
     const field = tableFields.find(f => f.name === sort.field_name)
 
     if (!field) {
@@ -42,12 +51,14 @@ export function sortRowsByFieldType(
     }
 
     sortedRows = sortedRows.sort((a, b) => {
-      return compareValues(
+      const comparison = compareValues(
         a[sort.field_name],
         b[sort.field_name],
         field,
         sort.direction === 'asc'
       )
+      // If values are equal, maintain previous sort order (stable sort)
+      return comparison !== 0 ? comparison : 0
     })
   }
 

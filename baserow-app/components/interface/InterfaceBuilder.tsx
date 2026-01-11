@@ -1056,7 +1056,7 @@ export default function InterfaceBuilder({
                     <span className="text-xs text-red-600">Save failed</span>
                   )}
                   <button
-                    onClick={handleSave}
+                    onClick={() => handleSave()}
                     disabled={isSaving}
                     className="px-3 py-1.5 text-sm font-medium text-white rounded-md flex items-center gap-2 disabled:opacity-50"
                     style={{ 

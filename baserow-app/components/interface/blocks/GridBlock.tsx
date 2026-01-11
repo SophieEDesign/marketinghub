@@ -11,6 +11,7 @@ import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { asArray } from "@/lib/utils/asArray"
+import type { TableField } from "@/types/fields"
 
 interface GridBlockProps {
   block: PageBlock
@@ -63,17 +64,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
-  const safeTableFields = asArray(tableFields)
-  
-  // Defensive logging (temporary - remove after fixing all upstream issues)
-  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('GridBlock input types', {
-      tableFields: Array.isArray(tableFields),
-      viewFields: Array.isArray(viewFields),
-      tableId,
-      viewId,
-    })
-  }
+  const safeTableFields = asArray<TableField>(tableFields)
   
   // Convert cached metadata to component state format
   const viewFields = useMemo(() => {
@@ -216,7 +207,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
   // Ensure all values are arrays to prevent runtime errors
-  const safeViewFields = asArray(viewFields)
+  type ViewFieldType = {
+    field_name: string
+    visible: boolean
+    position: number
+  }
+  const safeViewFields = asArray<ViewFieldType>(viewFields)
   const visibleFields = visibleFieldsConfig.length > 0
     ? visibleFieldsConfig.map((fieldName: string) => {
         const field = safeTableFields.find(f => f.name === fieldName || f.id === fieldName)

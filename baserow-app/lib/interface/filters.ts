@@ -37,11 +37,12 @@ export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfi
 /**
  * Applies filters to a Supabase query builder
  * This is the shared filter logic used by all blocks
+ * Field-type aware: handles multi-select arrays, dates, and other field types appropriately
  */
 export function applyFiltersToQuery(
   query: any,
   filters: FilterConfig[],
-  tableFields: Array<{ name: string; type: string; id?: string }> = []
+  tableFields: Array<{ name: string; type: string; id?: string; options?: any }> = []
 ): any {
   if (!filters || filters.length === 0) return query
 
@@ -57,20 +58,44 @@ export function applyFiltersToQuery(
     }
 
     const fieldName = field?.name || filter.field
+    const fieldType = field?.type
     const fieldValue = filter.value
 
+    // Apply field-type aware filtering
     switch (filter.operator) {
       case 'equal':
-        query = query.eq(fieldName, fieldValue)
+        if (fieldType === 'multi_select') {
+          // For multi-select arrays (text[]), check if array contains the value
+          // Use filter with 'cs' operator for array contains
+          query = query.filter(fieldName, 'cs', `{${String(fieldValue)}}`)
+        } else {
+          query = query.eq(fieldName, fieldValue)
+        }
         break
       case 'not_equal':
-        query = query.neq(fieldName, fieldValue)
+        if (fieldType === 'multi_select') {
+          // For multi-select, check if array does NOT contain the value
+          query = query.not(fieldName, 'cs', `{${String(fieldValue)}}`)
+        } else {
+          query = query.neq(fieldName, fieldValue)
+        }
         break
       case 'contains':
-        query = query.ilike(fieldName, `%${fieldValue}%`)
+        if (fieldType === 'multi_select') {
+          // For multi-select arrays, check if array contains the value
+          query = query.filter(fieldName, 'cs', `{${String(fieldValue)}}`)
+        } else {
+          // For text fields, use case-insensitive like
+          query = query.ilike(fieldName, `%${fieldValue}%`)
+        }
         break
       case 'not_contains':
-        query = query.not(fieldName, 'ilike', `%${fieldValue}%`)
+        if (fieldType === 'multi_select') {
+          // For multi-select, check if array does NOT contain the value
+          query = query.not(fieldName, 'cs', `{${String(fieldValue)}}`)
+        } else {
+          query = query.not(fieldName, 'ilike', `%${fieldValue}%`)
+        }
         break
       case 'greater_than':
         query = query.gt(fieldName, fieldValue)
@@ -85,10 +110,21 @@ export function applyFiltersToQuery(
         query = query.lte(fieldName, fieldValue)
         break
       case 'is_empty':
-        query = query.or(`${fieldName}.is.null,${fieldName}.eq.`)
+        if (fieldType === 'multi_select') {
+          // For multi-select arrays, check if array is null or empty array
+          // Use OR to check for null OR empty array
+          query = query.or(`${fieldName}.is.null,${fieldName}.eq.{}`)
+        } else {
+          query = query.or(`${fieldName}.is.null,${fieldName}.eq.`)
+        }
         break
       case 'is_not_empty':
-        query = query.not(fieldName, 'is', null)
+        if (fieldType === 'multi_select') {
+          // For multi-select arrays, check if array is not null and not empty
+          query = query.not(fieldName, 'is', null).neq(fieldName, '{}')
+        } else {
+          query = query.not(fieldName, 'is', null)
+        }
         break
       case 'date_range':
         if (filter.value && filter.value2) {

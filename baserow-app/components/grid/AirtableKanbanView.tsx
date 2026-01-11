@@ -47,6 +47,7 @@ import ColumnManagementDialog from "./ColumnManagementDialog"
 import RecordDrawer from "./RecordDrawer"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
+import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 
 interface AirtableKanbanViewProps {
   tableId: string
@@ -170,14 +171,20 @@ export default function AirtableKanbanView({
         }
       }
 
-      // Apply sorting
-      if (viewSorts.length > 0) {
+      // Check if we need client-side sorting (for single_select by order, multi_select by first value)
+      const needsClientSideSort = viewSorts.length > 0 && shouldUseClientSideSorting(
+        viewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+        tableFields
+      )
+
+      // Apply sorting at query level (for fields that don't need client-side sorting)
+      if (viewSorts.length > 0 && !needsClientSideSort) {
         for (const sort of viewSorts) {
           query = query.order(sort.field_name, {
             ascending: sort.direction === "asc",
           })
         }
-      } else {
+      } else if (viewSorts.length === 0) {
         query = query.order("id", { ascending: false })
       }
 
@@ -187,7 +194,18 @@ export default function AirtableKanbanView({
         console.error("Error loading rows:", error)
         setRows([])
       } else {
-        setRows(data || [])
+        let rowsData = data || []
+        
+        // Apply client-side sorting if needed
+        if (needsClientSideSort && viewSorts.length > 0) {
+          rowsData = sortRowsByFieldType(
+            rowsData,
+            viewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+            tableFields
+          )
+        }
+        
+        setRows(rowsData)
       }
     } catch (error) {
       console.error("Error loading rows:", error)

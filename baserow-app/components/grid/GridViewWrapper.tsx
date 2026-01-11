@@ -81,10 +81,15 @@ export default function GridViewWrapper({
   permissions,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
-  const safeInitialFilters = asArray(initialFilters)
-  const safeInitialSorts = asArray(initialSorts)
+  const safeInitialFilters = asArray<Filter>(initialFilters)
+  const safeInitialSorts = asArray<Sort>(initialSorts)
   const safeInitialTableFields = asArray<TableField>(initialTableFields)
-  const safeViewFields = asArray(viewFields)
+  type ViewFieldType = {
+    field_name: string
+    visible: boolean
+    position: number
+  }
+  const safeViewFields = asArray<ViewFieldType>(viewFields)
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
