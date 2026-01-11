@@ -10,6 +10,7 @@ import type { TableField } from "@/types/fields"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
+import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'

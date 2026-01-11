@@ -18,7 +18,7 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { Plus, ChevronDown, ChevronRight, Check } from 'lucide-react'
-import { useGridData } from '@/lib/grid/useGridData'
+import { useGridData, type GridRow } from '@/lib/grid/useGridData'
 import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
 import BulkActionBar from './BulkActionBar'
@@ -27,6 +27,8 @@ import { useRecordPanel } from '@/contexts/RecordPanelContext'
 import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
+
+type Sort = { field: string; direction: 'asc' | 'desc' }
 
 interface AirtableGridViewProps {
   tableName: string
@@ -137,9 +139,9 @@ export default function AirtableGridView({
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
-  const safeRows = asArray(allRows)
+  const safeRows = asArray<GridRow>(allRows)
   const safeFields = asArray<TableField>(fields)
-  const safeSorts = asArray(sorts)
+  const safeSorts = asArray<Sort>(sorts)
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -161,7 +163,8 @@ export default function AirtableGridView({
 
     if (savedWidths) {
       try {
-        setColumnWidths(JSON.parse(savedWidths))
+        const parsed = JSON.parse(savedWidths) as Record<string, number>
+        setColumnWidths(parsed)
       } catch {
         // Fallback to defaults
       }
@@ -193,7 +196,8 @@ export default function AirtableGridView({
     
     if (savedWrapText) {
       try {
-        setColumnWrapText(JSON.parse(savedWrapText))
+        const parsed = JSON.parse(savedWrapText) as Record<string, boolean>
+        setColumnWrapText(parsed)
       } catch {
         // Fallback to defaults
       }
@@ -274,8 +278,8 @@ export default function AirtableGridView({
   const groupedRows = useMemo(() => {
     if (!groupBy) return null
 
-    const safeFilteredRows = asArray(filteredRows)
-    const groups: Record<string, typeof safeFilteredRows> = {}
+    const safeFilteredRows = asArray<GridRow>(filteredRows)
+    const groups: Record<string, GridRow[]> = {}
 
     safeFilteredRows.forEach((row) => {
       if (!row) return // Skip null/undefined rows
@@ -293,7 +297,7 @@ export default function AirtableGridView({
     return sortedGroupKeys.map((key) => ({
       key,
       value: groups[key][0]?.[groupBy],
-      rows: asArray(groups[key]), // Ensure rows is always an array
+      rows: groups[key], // Already an array
     }))
   }, [filteredRows, groupBy])
 
@@ -334,8 +338,8 @@ export default function AirtableGridView({
       const start = Math.min(lastSelectedIndex, index)
       const end = Math.max(lastSelectedIndex, index)
       // CRITICAL: Normalize rows before slicing
-      const rowsArray = asArray(filteredRows)
-      const rangeIds = rowsArray.slice(start, end + 1).map((row: any) => row?.id).filter(Boolean)
+      const rowsArray = asArray<GridRow>(filteredRows)
+      const rangeIds = rowsArray.slice(start, end + 1).map((row) => row?.id).filter((id): id is string => Boolean(id))
       setSelectedRowIds((prev) => {
         const next = new Set(prev)
         rangeIds.forEach(id => next.add(id))
