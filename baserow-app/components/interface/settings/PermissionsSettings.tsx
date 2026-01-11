@@ -76,28 +76,35 @@ export default function PermissionsSettings({
     <div className="space-y-6">
       <div>
         <h3 className="text-sm font-semibold mb-4">Permissions</h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Control how users can interact with records inside this block.
-        </p>
       </div>
 
-      {/* Access Mode */}
-      <div className="space-y-2">
-        <Label htmlFor="access-mode">Access Mode</Label>
-        <Select value={mode} onValueChange={handleModeChange}>
-          <SelectTrigger id="access-mode">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="view">View-only</SelectItem>
-            <SelectItem value="edit">Editable</SelectItem>
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          {mode === 'view'
-            ? 'Users cannot modify data in this block'
-            : 'Users can modify data in this block'}
-        </p>
+      {/* Access Mode - Simplified toggle matching the image */}
+      <div className="flex items-center justify-between">
+        <Label htmlFor="access-mode" className="text-sm text-gray-700">Permissions</Label>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
+          <button
+            type="button"
+            onClick={() => handleModeChange('view')}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              mode === 'view'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            View-only
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeChange('edit')}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              mode === 'edit'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Editable
+          </button>
+        </div>
       </div>
 
       {/* Inline Editing */}

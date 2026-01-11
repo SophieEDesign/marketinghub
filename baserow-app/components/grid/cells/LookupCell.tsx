@@ -102,10 +102,10 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
       // Use type assertion to avoid TypeScript's "excessively deep" error with dynamic table names
       const tableName = lookupTable.supabase_table as string
       const { data: records, error: searchError } = await (supabase
-        .from(tableName)
+        .from(tableName as any)
         .select('id')
         .eq(lookupField.name, displayValue)
-        .limit(1) as any)
+        .limit(1)) as { data: Array<{ id: string }> | null; error: any }
 
       if (searchError) {
         console.error('Error searching for record:', searchError)
