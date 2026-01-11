@@ -33,13 +33,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
@@ -137,7 +130,7 @@ export default function RecordDataSettings({
         </Select>
         <p className="text-xs text-gray-500">
           The table containing the record to display in this block. This is independent from the
-          page's source table (configured in Page Settings).
+          page&apos;s source table (configured in Page Settings).
         </p>
       </div>
 
@@ -225,7 +218,7 @@ export default function RecordDataSettings({
           </div>
           <p className="text-xs text-gray-500">
             Which fields to display in this record block. This is block-specific and independent
-            from the page's visible fields (configured in Page Settings).
+            from the page&apos;s visible fields (configured in Page Settings).
           </p>
           <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
             {fields.length === 0 ? (

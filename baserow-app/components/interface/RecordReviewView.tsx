@@ -104,12 +104,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const allowEditing = config.allow_editing || false
   const recordPanel = config.record_panel || 'side'
   const [showComments, setShowComments] = useState(true)
-  
-  // Determine if a field is editable (respects both page-level and field-level permissions)
-  const isFieldEditable = useCallback((fieldName: string): boolean => {
-    if (!pageEditable) return false // Page-level view-only
-    return editableFieldNames.includes(fieldName) // Field-level editable setting
-  }, [pageEditable, editableFieldNames])
 
   // Get columns from config or data - ensure it's always an array
   const columns = useMemo(() => {
@@ -499,6 +493,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }
 
+  // Page-level permissions (declare before use in callbacks)
+  const pageEditable = config.allow_editing !== false
+  
+  // Get editable fields from page-level config (declare before use in callbacks)
+  const editableFieldNames = useMemo(() => {
+    return config.editable_fields || []
+  }, [config.editable_fields])
+  
   // Get fields to display in structured field list (page-level config)
   // Uses config.visible_fields (new) or config.detail_fields (backward compatibility)
   const visibleFields = useMemo(() => {
@@ -523,13 +525,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return tableFields
   }, [tableFields, config.visible_fields, config.detail_fields])
   
-  // Get editable fields from page-level config
-  const editableFieldNames = useMemo(() => {
-    return config.editable_fields || []
-  }, [config.editable_fields])
-  
-  // Page-level permissions
-  const pageEditable = config.allow_editing !== false
+  // Determine if a field is editable (respects both page-level and field-level permissions)
+  const isFieldEditable = useCallback((fieldName: string): boolean => {
+    if (!pageEditable) return false // Page-level view-only
+    return editableFieldNames.includes(fieldName) // Field-level editable setting
+  }, [pageEditable, editableFieldNames])
   
   // Layout toggles (page-level)
   const showFieldList = config.show_field_list !== false // Default to true
@@ -804,7 +804,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                 <RecordFields
                   fields={visibleFields}
                   formData={formData}
-                  onFieldChange={isFieldEditable ? handleFieldChange : undefined}
+                  onFieldChange={pageEditable ? handleFieldChange : () => {}}
                   fieldGroups={fieldGroups}
                   tableId={pageTableId || ''}
                   recordId={selectedRecordId}

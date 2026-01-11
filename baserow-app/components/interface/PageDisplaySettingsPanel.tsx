@@ -513,7 +513,7 @@ export default function PageDisplaySettingsPanel({
             <RecordViewPageSettings
               pageId={currentPage.id}
               config={currentPage.config || {}}
-              tables={tables}
+              tables={tables as any}
               onUpdate={async (updates) => {
                 const supabase = createClient()
                 const newConfig = {
