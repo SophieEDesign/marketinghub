@@ -10,6 +10,7 @@ import TimelineView from "@/components/views/TimelineView"
 import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
+import { asArray } from "@/lib/utils/asArray"
 
 interface GridBlockProps {
   block: PageBlock
@@ -59,6 +60,20 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
   
   // Use cached metadata hook (serialized, no parallel requests)
   const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
+
+  // CRITICAL: Normalize all inputs at grid entry point
+  // Never trust upstream to pass correct types - always normalize
+  const safeTableFields = asArray(tableFields)
+  
+  // Defensive logging (temporary - remove after fixing all upstream issues)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('GridBlock input types', {
+      tableFields: Array.isArray(tableFields),
+      viewFields: Array.isArray(viewFields),
+      tableId,
+      viewId,
+    })
+  }
   
   // Convert cached metadata to component state format
   const viewFields = useMemo(() => {
@@ -153,9 +168,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           .eq("table_id", tableId)
           .order("position", { ascending: true })
 
-        if (tableFieldsRes.data) {
-          setTableFields(tableFieldsRes.data)
-        }
+        // CRITICAL: Normalize tableFields to array before setting state
+        const normalizedFields = asArray(tableFieldsRes.data)
+        setTableFields(normalizedFields)
 
         // Load view config if viewId provided (separate from metadata)
         if (viewId) {
@@ -201,10 +216,10 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   // Determine visible fields: use config.visible_fields if provided, otherwise use view_fields
   // Ensure all values are arrays to prevent runtime errors
-  const safeViewFields = Array.isArray(viewFields) ? viewFields : []
+  const safeViewFields = asArray(viewFields)
   const visibleFields = visibleFieldsConfig.length > 0
     ? visibleFieldsConfig.map((fieldName: string) => {
-        const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+        const field = safeTableFields.find(f => f.name === fieldName || f.id === fieldName)
         return field ? { field_name: field.name, visible: true, position: 0 } : null
       }).filter(Boolean) as Array<{ field_name: string; visible: boolean; position: number }>
     : safeViewFields.filter(f => f && f.visible)
@@ -278,7 +293,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         // Calendar will load its own config from the view, but we can provide a fallback dateFieldId
         // Find ALL date fields in the table (not just visibleFields) to ensure we can find the configured field
-        const allDateFieldsInTable = tableFields
+        const allDateFieldsInTable = safeTableFields
           .filter(field => field.type === 'date')
           .map(field => ({ field }))
         
@@ -299,7 +314,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         if (dateFieldFromConfig) {
           // If config has a field ID/name, find the actual field to validate it exists and is a date field
-          const resolvedField = tableFields.find(tf => 
+          const resolvedField = safeTableFields.find(tf => 
             (tf.name === dateFieldFromConfig || tf.id === dateFieldFromConfig) && tf.type === 'date'
           )
           if (resolvedField) {
@@ -347,7 +362,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         
         const groupByFieldFromConfig = config.group_by_field || config.kanban_group_field
         const groupByFieldFromFields = visibleFields.find(f => {
-          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+          const field = safeTableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
           return field && (field.type === 'select' || field.type === 'single_select')
         })
         const groupByFieldId = groupByFieldFromConfig || groupByFieldFromFields?.field_name || ''
@@ -381,7 +396,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         // Timeline requires a date field
         const dateFieldFromConfig = config.timeline_date_field || config.start_date_field || config.calendar_date_field
         const dateFieldFromFields = visibleFields.find(f => {
-          const field = tableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
+          const field = safeTableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
           return field && field.type === 'date'
         })
         const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''

@@ -546,72 +546,8 @@ export default function Canvas({
   }, [pageId, isEditing, layout.length])
 
   if (blocks.length === 0) {
-    console.log(`[Canvas] Rendering empty state: pageId=${pageId}, isEditing=${isEditing}`)
-    // CRITICAL: Empty state is universal - no page-type-specific logic
-    // Layout is determined by blocks only, not by page type, template, saved_view_id, or any page config
-    // All pages use the same empty state - blocks define behavior, not pages
-    const emptyStateContent = {
-      icon: '📄',
-      title: 'Add blocks to get started',
-      description: interfaceDescription || 'Add blocks to build your page. Blocks define layout and behavior.',
-      suggestedBlocks: [
-        { type: 'text' as BlockType, label: 'Text', icon: '📝', description: 'Add content' },
-        { type: 'grid' as BlockType, label: 'Table View', icon: '📊', description: 'Display data' },
-        { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize data' },
-      ],
-    }
-    
-    const emptyState = emptyStateContent
-
     return (
-      <div className="w-full h-full flex items-center justify-center p-8">
-        <div className="text-center max-w-2xl">
-          <div className="text-6xl mb-4">{emptyState.icon}</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {emptyState.title}
-          </h3>
-          <p className="text-sm text-gray-500 mb-6">
-            {isEditing
-              ? emptyState.description
-              : "Edit this interface to add blocks and customize it."}
-          </p>
-          
-          {isEditing && onAddBlock && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-              {emptyState.suggestedBlocks.map((block) => (
-                <button
-                  key={block.type}
-                  onClick={() => onAddBlock(block.type)}
-                  className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors group"
-                >
-                  <span className="text-2xl">{block.icon}</span>
-                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-700">
-                    {block.label}
-                  </div>
-                  <div className="text-xs text-gray-500">{block.description}</div>
-                </button>
-              ))}
-            </div>
-          )}
-          
-          {!isEditing && (
-            <div className="mt-4">
-              <p className="text-xs text-gray-400 mb-2">
-                Switch to edit mode to add blocks
-              </p>
-              <button
-                onClick={() => {
-                  // Trigger edit mode via custom event
-                  window.dispatchEvent(new CustomEvent('interface-edit-mode-toggle'))
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Edit interface
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <div className="w-full h-full" />
     )
   }
 
@@ -696,7 +632,7 @@ export default function Canvas({
                 key={block.id}
                 className={`relative ${
                   isEditing
-                    ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg overflow-hidden ${
+                    ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg ${
                         selectedBlockId === block.id
                           ? "ring-2 ring-blue-500 border-blue-500"
                           : ""
@@ -825,7 +761,7 @@ export default function Canvas({
 
             {/* Block Content */}
             <div 
-              className={`h-full w-full min-h-0 ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
             >
               <BlockAppearanceWrapper 

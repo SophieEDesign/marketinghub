@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, MoreVertical, ArrowUpDown, WrapText } from 'lucide-react'
+import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText } from 'lucide-react'
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 
@@ -18,6 +18,7 @@ interface GridColumnHeaderProps {
   onEdit?: (fieldName: string) => void
   onToggleWrapText?: (fieldName: string) => void
   sortDirection?: 'asc' | 'desc' | null
+  sortOrder?: number | null // Sort order number (1, 2, 3) for multi-sort
   onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
 }
 
@@ -32,6 +33,7 @@ export default function GridColumnHeader({
   onEdit,
   onToggleWrapText,
   sortDirection,
+  sortOrder = null,
   onSort,
 }: GridColumnHeaderProps) {
   const {
@@ -139,14 +141,25 @@ export default function GridColumnHeader({
       {onSort && (
         <button
           onClick={handleSortClick}
-          className={`p-1 rounded transition-colors ${
+          className={`p-1 rounded transition-colors flex items-center gap-0.5 ${
             sortDirection
               ? 'text-blue-600 bg-blue-50'
               : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
           }`}
-          title={`Sort ${sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none'}`}
+          title={`Sort ${sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none'}${sortOrder !== null ? ` (${sortOrder})` : ''}`}
         >
-          <ArrowUpDown className="h-3 w-3" />
+          {sortDirection === 'asc' ? (
+            <ArrowUp className="h-3 w-3" />
+          ) : sortDirection === 'desc' ? (
+            <ArrowDown className="h-3 w-3" />
+          ) : (
+            <ArrowUpDown className="h-3 w-3" />
+          )}
+          {sortOrder !== null && (
+            <span className="text-[10px] font-semibold leading-none">
+              {sortOrder}
+            </span>
+          )}
         </button>
       )}
 

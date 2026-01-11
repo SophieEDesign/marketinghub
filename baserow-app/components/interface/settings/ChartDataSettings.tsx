@@ -141,21 +141,28 @@ export default function ChartDataSettings({
       {/* Metric Field */}
       <div className="space-y-2">
         <Label>Metric Field *</Label>
-        <Select
-          value={config.metric_field || config.chart_y_axis || ""}
-          onValueChange={(value) => onUpdate({ metric_field: value, chart_y_axis: value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select numeric field" />
-          </SelectTrigger>
-          <SelectContent>
-            {numericFields.map((field) => (
-              <SelectItem key={field.id} value={field.name}>
-                {field.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {config.table_id && numericFields.length === 0 ? (
+          <div className="text-sm text-gray-500 p-2 border border-gray-200 rounded-md bg-gray-50">
+            No numeric fields found in this table. Add a number, currency, percent, or rating field to use charts.
+          </div>
+        ) : (
+          <Select
+            value={config.metric_field || config.chart_y_axis || ""}
+            onValueChange={(value) => onUpdate({ metric_field: value, chart_y_axis: value })}
+            disabled={!config.table_id || numericFields.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={config.table_id ? "Select numeric field" : "Select a table first"} />
+            </SelectTrigger>
+            <SelectContent>
+              {numericFields.map((field) => (
+                <SelectItem key={field.id} value={field.name}>
+                  {field.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Time Field (for time series) */}

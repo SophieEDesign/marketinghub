@@ -24,8 +24,6 @@ import KPIDataSettings from "./settings/KPIDataSettings"
 import KPIAppearanceSettings from "./settings/KPIAppearanceSettings"
 import ChartDataSettings from "./settings/ChartDataSettings"
 import ChartAppearanceSettings from "./settings/ChartAppearanceSettings"
-import TableSnapshotDataSettings from "./settings/TableSnapshotDataSettings"
-import TableSnapshotAppearanceSettings from "./settings/TableSnapshotAppearanceSettings"
 import TextDataSettings from "./settings/TextDataSettings"
 import TextAppearanceSettings from "./settings/TextAppearanceSettings"
 import ActionDataSettings from "./settings/ActionDataSettings"
@@ -50,8 +48,11 @@ import TabsAppearanceSettings from "./settings/TabsAppearanceSettings"
 import FilterBlockSettings from "./settings/FilterBlockSettings"
 import FieldDataSettings from "./settings/FieldDataSettings"
 import FieldAppearanceSettings from "./settings/FieldAppearanceSettings"
+import ButtonDataSettings from "./settings/ButtonDataSettings"
+import ButtonAppearanceSettings from "./settings/ButtonAppearanceSettings"
 import AdvancedSettings from "./settings/AdvancedSettings"
 import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
+import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 
 interface SettingsPanelProps {
   block: PageBlock | null
@@ -89,6 +90,14 @@ export default function SettingsPanel({
   useEffect(() => {
     if (block && isOpen) {
       const blockConfig = block.config || {}
+      // Ensure calendar/kanban/timeline blocks have the correct view_type
+      if (block.type === 'calendar' && !blockConfig.view_type) {
+        blockConfig.view_type = 'calendar'
+      } else if (block.type === 'kanban' && !blockConfig.view_type) {
+        blockConfig.view_type = 'kanban'
+      } else if (block.type === 'timeline' && !blockConfig.view_type) {
+        blockConfig.view_type = 'timeline'
+      }
       setConfig(blockConfig)
       // Store initial config as JSON for comparison
       previousConfigRef.current = JSON.stringify(blockConfig)
@@ -234,17 +243,26 @@ export default function SettingsPanel({
     })
   }
 
+  const blockTypeLabel = block ? BLOCK_REGISTRY[block.type]?.label || block.type : ''
+
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
       {/* Header */}
-      <div className="h-14 border-b border-gray-200 flex items-center justify-between px-4">
-        <h2 className="text-lg font-semibold">Block Settings</h2>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
-        >
-          <X className="h-5 w-5" />
-        </button>
+      <div className="border-b border-gray-200 px-4 py-3">
+        {blockTypeLabel && (
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+            {blockTypeLabel}
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Block Settings</h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Tabs - All blocks have three tabs */}
@@ -359,8 +377,6 @@ export default function SettingsPanel({
         return <KPIDataSettings {...commonProps} />
       case "chart":
         return <ChartDataSettings {...commonProps} />
-      case "table_snapshot":
-        return <TableSnapshotDataSettings {...commonProps} />
       case "text":
         return <TextDataSettings {...commonProps} />
       case "action":
@@ -389,6 +405,17 @@ export default function SettingsPanel({
         return <FilterBlockSettings {...commonProps} allBlocks={[]} />
       case "field":
         return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
+      case "number":
+        return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
+      case "button":
+        return <ButtonDataSettings {...commonProps} />
+      case "list":
+      case "calendar":
+      case "kanban":
+      case "timeline":
+        // List, Calendar, Kanban, and Timeline blocks use the same settings as Grid blocks
+        // They're grid blocks with different view_type values
+        return <GridDataSettings {...commonProps} />
       default:
         return (
           <div className="text-sm text-gray-500">
@@ -416,13 +443,6 @@ export default function SettingsPanel({
         return (
           <>
             <ChartAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
-          </>
-        )
-      case "table_snapshot":
-        return (
-          <>
-            <TableSnapshotAppearanceSettings {...commonProps} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )
@@ -489,6 +509,31 @@ export default function SettingsPanel({
         return (
           <>
             <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "number":
+        return (
+          <>
+            <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "button":
+        return (
+          <>
+            <ButtonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonProps} />
+          </>
+        )
+      case "list":
+      case "calendar":
+      case "kanban":
+      case "timeline":
+        // List, Calendar, Kanban, and Timeline blocks use the same appearance settings as Grid blocks
+        return (
+          <>
+            <GridAppearanceSettings {...commonProps} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )

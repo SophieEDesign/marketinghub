@@ -12,13 +12,11 @@ import TextBlock from "./blocks/TextBlock"
 import ImageBlock from "./blocks/ImageBlock"
 import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
-import TableSnapshotBlock from "./blocks/TableSnapshotBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import TabsBlock from "./blocks/TabsBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
-import RelatedRecordsListBlock from "./blocks/RelatedRecordsListBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
 import TimelineBlock from "./blocks/TimelineBlock"
@@ -208,9 +206,6 @@ export default function BlockRenderer({
           </LazyBlockWrapper>
         )
 
-      case "table_snapshot":
-        return <TableSnapshotBlock block={safeBlock} isEditing={canEdit} />
-
       case "action":
         return <ActionBlock block={safeBlock} isEditing={canEdit} />
 
@@ -238,18 +233,6 @@ export default function BlockRenderer({
             block={safeBlock}
             isEditing={canEdit}
             childBlocks={[]} // TODO: Pass actual child blocks from parent
-          />
-        )
-
-      case "relatedList":
-        // Related Records List block - shows related records from a linked table
-        return (
-          <RelatedRecordsListBlock
-            block={safeBlock}
-            isEditing={canEdit}
-            recordId={recordId}
-            pageTableId={pageTableId}
-            onRecordClick={onRecordClick}
           />
         )
 

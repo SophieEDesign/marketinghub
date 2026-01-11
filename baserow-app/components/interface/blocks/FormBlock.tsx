@@ -443,7 +443,7 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
   }
 
   return (
-    <div className="h-full overflow-auto p-4">
+    <div className="h-full w-full overflow-auto p-4">
       <form onSubmit={handleSubmit} className="space-y-4">
         {visibleFields.map((field) => renderField(field))}
         

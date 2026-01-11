@@ -675,7 +675,7 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
                 {primaryValue || "Untitled"}
               </div>
             )}
-            {Array.isArray(displayFields) && displayFields.slice(1).map((field) => {
+            {(Array.isArray(displayFields) ? displayFields : []).slice(1).map((field) => {
               if (!field || !field.name) return null
               const value = row[field.name]
               return (

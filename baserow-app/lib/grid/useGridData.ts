@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
+import { asArray } from '@/lib/utils/asArray'
 
 export interface GridRow {
   id: string
@@ -143,7 +144,10 @@ export function useGridData({
         throw queryError
       }
 
-      setRows(data || [])
+      // CRITICAL: Normalize data to array - API might return single record, null, or object
+      // Never trust API response format - always normalize
+      const normalizedRows = asArray<GridRow>(data)
+      setRows(normalizedRows)
     } catch (err: any) {
       console.error('Error loading grid data:', err)
       setError(err.message || 'Failed to load data')

@@ -170,24 +170,6 @@ export interface ButtonBlockConfig extends BaseBlockConfig {
   button_automation_id?: string
 }
 
-// Table Snapshot Block Config
-export interface TableSnapshotBlockConfig extends BaseBlockConfig {
-  table_id: string // Required
-  view_id: string // Required
-  row_limit?: number
-  highlight_rules?: Array<{
-    field: string
-    operator: 'eq' | 'neq' | 'gt' | 'lt' | 'contains'
-    value: any
-    background_color?: string
-    text_color?: string
-  }>
-  appearance?: BaseBlockConfig['appearance'] & {
-    row_height?: string
-    show_headers?: boolean
-  }
-}
-
 // Action Block Config
 export interface ActionBlockConfig extends BaseBlockConfig {
   action_type: 'navigate' | 'create_record' | 'redirect' // Required
@@ -260,7 +242,6 @@ export type BlockConfigUnion =
   | (ImageBlockConfig & { _type: 'image' })
   | (DividerBlockConfig & { _type: 'divider' })
   | (ButtonBlockConfig & { _type: 'button' })
-  | (TableSnapshotBlockConfig & { _type: 'table_snapshot' })
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
   | (TabsBlockConfig & { _type: 'tabs' })
@@ -293,10 +274,6 @@ export function isImageBlockConfig(config: any): config is ImageBlockConfig {
 
 export function isActionBlockConfig(config: any): config is ActionBlockConfig {
   return config && config.action_type !== undefined && typeof config.label === 'string'
-}
-
-export function isTableSnapshotBlockConfig(config: any): config is TableSnapshotBlockConfig {
-  return config && typeof config.table_id === 'string' && typeof config.view_id === 'string'
 }
 
 export function isTabsBlockConfig(config: any): config is TabsBlockConfig {
@@ -388,15 +365,6 @@ export function validateBlockConfig(
       }
       break
 
-    case 'table_snapshot':
-      if (!config.table_id) {
-        errors.push('Table snapshot block requires table_id')
-      }
-      if (!config.view_id) {
-        errors.push('Table snapshot block requires view_id')
-      }
-      break
-
     case 'tabs':
       if (!Array.isArray(config.tabs) || config.tabs.length === 0) {
         errors.push('Tabs block requires at least one tab')
@@ -441,16 +409,6 @@ export function validateBlockConfig(
       // Field block requires field_id
       if (!config.field_id) {
         errors.push('Field block requires field_id')
-      }
-      break
-
-    case 'relatedList':
-      // Related list block requires table_id and related_table_id
-      if (!config.table_id) {
-        errors.push('Related list block requires table_id')
-      }
-      if (!config.related_table_id) {
-        errors.push('Related list block requires related_table_id')
       }
       break
 

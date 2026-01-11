@@ -438,15 +438,15 @@ export default function InterfaceBuilder({
     }
   }, [effectiveIsEditing])
 
-  // Save layout immediately when exiting edit mode
-  const handleExitEditMode = useCallback(async () => {
+  // Save layout without exiting edit mode
+  const handleSave = useCallback(async (exitAfterSave = false) => {
     // Clear any pending debounced save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current)
       saveTimeoutRef.current = null
     }
 
-    // Mark user interaction (exiting edit mode is a user action)
+    // Mark user interaction (save is a user action)
     markUserInteraction()
 
     // CRITICAL: Always use latestLayoutRef (grid's authoritative layout)
@@ -459,50 +459,65 @@ export default function InterfaceBuilder({
       setIsSaving(true)
       try {
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Layout] Saving layout on exit (from grid ref):', {
+          console.log('[Layout] Saving layout (from grid ref):', {
             pageId: page.id,
             layoutCount: layoutToSave.length,
             layoutItems: layoutToSave,
             layoutModifiedByUser: layoutModifiedByUserRef.current,
+            exitAfterSave,
           })
         }
         
-        // CRITICAL: Pass hasUserInteraction=true to bypass guards when exiting edit mode
+        // CRITICAL: Pass hasUserInteraction=true to bypass guards
         // This ensures layout is saved even if layoutModifiedByUserRef was reset
         // Also mark as modified to ensure save goes through
         layoutModifiedByUserRef.current = true
         await saveLayout(layoutToSave, true)
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('[Layout] Layout saved successfully on exit')
+          console.log('[Layout] Layout saved successfully')
         }
         
-        // Longer delay to ensure database transaction is fully committed before reload
-        // This prevents race condition where blocks reload before save completes
-        await new Promise(resolve => setTimeout(resolve, 300))
+        setSaveStatus("saved")
+        toast({
+          variant: "default",
+          title: "Saved",
+          description: "All changes have been saved",
+        })
+        
+        // Reset status after 2 seconds (only if not exiting)
+        if (!exitAfterSave) {
+          setTimeout(() => setSaveStatus("idle"), 2000)
+        }
       } catch (error) {
-        console.error("Failed to save layout on exit:", error)
+        console.error("Failed to save layout:", error)
+        setSaveStatus("error")
         toast({
           variant: "destructive",
-          title: "Failed to save layout",
+          title: "Failed to save",
           description: error instanceof Error ? error.message : "Please try again",
         })
-        // Don't exit edit mode if save failed - user should see the error
+        // Don't exit if save failed
         return
       } finally {
         setIsSaving(false)
       }
     } else if (process.env.NODE_ENV === 'development') {
-      console.log('[Layout] No layout to save on exit (grid ref is empty)')
+      console.log('[Layout] No layout to save (grid ref is empty)')
     }
 
-    // Reset modification flag after save
-    layoutModifiedByUserRef.current = false
+    // Exit edit mode if requested
+    if (exitAfterSave) {
+      exitBlockEdit()
+      setSelectedBlockId(null)
+      setSettingsPanelOpen(false)
+    }
+  }, [saveLayout, page.id, toast, exitBlockEdit])
 
-    exitBlockEdit()
-    setSelectedBlockId(null)
-    setSettingsPanelOpen(false)
-  }, [saveLayout, exitBlockEdit, page.id, toast])
+  // Save layout and exit edit mode
+  const handleExitEditMode = useCallback(async () => {
+    await handleSave(true)
+  }, [handleSave])
 
   // CRITICAL: Save layout when exiting edit mode (even if exitBlockEdit is called from parent)
   // This ensures layout is saved regardless of where "Done Editing" is clicked
@@ -1041,7 +1056,7 @@ export default function InterfaceBuilder({
                     <span className="text-xs text-red-600">Save failed</span>
                   )}
                   <button
-                    onClick={handleExitEditMode}
+                    onClick={handleSave}
                     disabled={isSaving}
                     className="px-3 py-1.5 text-sm font-medium text-white rounded-md flex items-center gap-2 disabled:opacity-50"
                     style={{ 
@@ -1063,7 +1078,14 @@ export default function InterfaceBuilder({
                       e.currentTarget.style.backgroundColor = primaryColor
                     }}
                   >
-                    {isSaving ? "Saving..." : "Done"}
+                    {isSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    onClick={handleExitEditMode}
+                    disabled={isSaving}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Done
                   </button>
                 </div>
               </>

@@ -9,6 +9,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { asArray } from "@/lib/utils/asArray"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -74,13 +75,31 @@ export default function GridView({
   const [tableError, setTableError] = useState<string | null>(null)
   const [initializingFields, setInitializingFields] = useState(false)
 
+  // CRITICAL: Normalize all inputs at grid entry point
+  // Never trust upstream to pass correct types - always normalize
+  const safeViewFields = asArray(viewFields)
+  const safeTableFields = asArray<TableField>(tableFields)
+  const safeViewFilters = asArray(viewFilters)
+  const safeFilters = asArray<FilterConfig>(filters)
+  const safeViewSorts = asArray(viewSorts)
+
+  // Defensive logging (temporary - remove after fixing all upstream issues)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('GridView input types', {
+      rows: Array.isArray(rows),
+      viewFields: Array.isArray(viewFields),
+      tableFields: Array.isArray(tableFields),
+      viewFilters: Array.isArray(viewFilters),
+      filters: Array.isArray(filters),
+      viewSorts: Array.isArray(viewSorts),
+    })
+  }
+
   // Get visible fields ordered by order_index (from table_fields) or position
-  // Ensure viewFields is always an array to prevent runtime errors
-  const safeViewFields = Array.isArray(viewFields) ? viewFields : []
   const visibleFields = safeViewFields
     .filter((f) => f && f.visible)
     .map((vf) => {
-      const tableField = tableFields.find((tf) => tf.name === vf.field_name)
+      const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
       return {
         ...vf,
         order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
@@ -104,26 +123,26 @@ export default function GridView({
       let query = supabase.from(supabaseTableName).select("*")
 
       // Use standardized filters if provided, otherwise fall back to viewFilters format
-      if (filters.length > 0) {
+      if (safeFilters.length > 0) {
         // Convert tableFields to format expected by applyFiltersToQuery
-        const normalizedFields = tableFields.map(f => ({ name: f.name, type: f.type }))
-        query = applyFiltersToQuery(query, filters, normalizedFields)
-      } else if (viewFilters.length > 0) {
+        const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
+        query = applyFiltersToQuery(query, safeFilters, normalizedFields)
+      } else if (safeViewFilters.length > 0) {
         // Legacy: Convert viewFilters format to FilterConfig format
-        const legacyFilters: FilterConfig[] = viewFilters.map(f => ({
+        const legacyFilters: FilterConfig[] = safeViewFilters.map(f => ({
           field: f.field_name,
           operator: f.operator as FilterConfig['operator'],
           value: f.value,
         }))
-        const normalizedFields = tableFields.map(f => ({ name: f.name, type: f.type }))
+        const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
         query = applyFiltersToQuery(query, legacyFilters, normalizedFields)
       }
 
       // Apply sorting at query level
-      if (viewSorts.length > 0) {
+      if (safeViewSorts.length > 0) {
         // Apply multiple sorts if needed
-        for (let i = 0; i < viewSorts.length; i++) {
-          const sort = viewSorts[i]
+        for (let i = 0; i < safeViewSorts.length; i++) {
+          const sort = safeViewSorts[i]
           if (i === 0) {
             query = query.order(sort.field_name, {
               ascending: sort.direction === "asc",
@@ -193,10 +212,13 @@ export default function GridView({
         }
         setRows([])
       } else {
+        // CRITICAL: Normalize data to array - API might return single record or null
+        const dataArray = asArray(data)
+        
         // Compute formula fields for each row
-        const formulaFields = tableFields.filter(f => f.type === 'formula')
-        const computedRows = (data || []).map(row => 
-          computeFormulaFields(row, formulaFields, tableFields)
+        const formulaFields = safeTableFields.filter(f => f.type === 'formula')
+        const computedRows = dataArray.map(row => 
+          computeFormulaFields(row, formulaFields, safeTableFields)
         )
         setTableError(null)
         setRows(computedRows)
@@ -298,26 +320,31 @@ export default function GridView({
   }
 
   // Apply client-side search
+  // CRITICAL: Normalize rows to array before filtering
+  const safeRows = asArray(rows)
   const filteredRows = useMemo(() => {
-    if (!searchTerm.trim()) return rows
+    if (!searchTerm.trim()) return safeRows
 
     const searchLower = searchTerm.toLowerCase()
-    return rows.filter((row) => {
+    return safeRows.filter((row) => {
       return visibleFields.some((field) => {
         const value = row[field.field_name]
         if (value === null || value === undefined) return false
         return String(value).toLowerCase().includes(searchLower)
       })
     })
-  }, [rows, searchTerm, visibleFields])
+  }, [safeRows, searchTerm, visibleFields])
 
   // Group rows if groupBy is set
+  // CRITICAL: Normalize filteredRows before grouping
   const groupedRows = useMemo(() => {
     if (!groupBy) return null
 
     const groups: Record<string, Record<string, any>[]> = {}
 
+    // filteredRows is already normalized, but guard for safety
     filteredRows.forEach((row) => {
+      if (!row) return // Skip null/undefined rows
       const groupValue = row[groupBy] ?? "Uncategorized"
       const groupKey = String(groupValue)
       if (!groups[groupKey]) {
@@ -331,8 +358,8 @@ export default function GridView({
 
     return sortedGroupKeys.map((key) => ({
       key,
-      value: groups[key][0][groupBy],
-      rows: groups[key],
+      value: groups[key][0]?.[groupBy],
+      rows: asArray(groups[key]), // Ensure rows is always an array
     }))
   }, [filteredRows, groupBy])
 
@@ -455,7 +482,7 @@ export default function GridView({
             This view has no visible fields configured. Add fields to the view to display data.
           </p>
           <div className="flex flex-col gap-2 items-center">
-            {tableFields.length > 0 && (
+            {safeTableFields.length > 0 && (
               <button
                 onClick={handleInitializeFields}
                 disabled={initializingFields}
@@ -469,7 +496,7 @@ export default function GridView({
                 ) : (
                   <>
                     <Plus className="h-4 w-4" />
-                    Add All Fields ({tableFields.length})
+                    Add All Fields ({safeTableFields.length})
                   </>
                 )}
               </button>
@@ -517,8 +544,8 @@ export default function GridView({
           </div>
           <div className="text-sm text-gray-500">
             {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
-            {searchTerm && filteredRows.length !== rows.length && (
-              <span className="ml-1">(filtered from {rows.length})</span>
+            {searchTerm && filteredRows.length !== safeRows.length && (
+              <span className="ml-1">(filtered from {safeRows.length})</span>
             )}
           </div>
         </div>
@@ -531,7 +558,7 @@ export default function GridView({
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {visibleFields.map((field) => {
-                  const tableField = tableFields.find(f => f.name === field.field_name)
+                  const tableField = safeTableFields.find(f => f.name === field.field_name)
                   const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
                   return (
                     <th
@@ -570,10 +597,12 @@ export default function GridView({
                     {searchTerm ? "No rows match your search" : "No rows found"}
                   </td>
                 </tr>
-              ) : groupBy && groupedRows ? (
+              ) : groupBy && groupedRows && Array.isArray(groupedRows) ? (
                 // Render grouped rows
-                groupedRows.map((group) => {
+                // CRITICAL: Guard groupedRows.map() with asArray
+                asArray(groupedRows).map((group) => {
                   const isCollapsed = collapsedGroups.has(group.key)
+                  const groupRows = asArray(group.rows)
                   return (
                     <React.Fragment key={group.key}>
                       {/* Group header */}
@@ -595,14 +624,14 @@ export default function GridView({
                               {groupBy}: {String(group.value ?? "Uncategorized")}
                             </span>
                             <span className="text-gray-500 ml-2">
-                              ({group.rows.length} {group.rows.length === 1 ? "row" : "rows"})
+                              ({groupRows.length} {groupRows.length === 1 ? "row" : "rows"})
                             </span>
                           </button>
                         </td>
                       </tr>
                       {/* Group rows */}
                       {!isCollapsed &&
-                        group.rows.map((row) => {
+                        groupRows.map((row) => {
                           const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
                           return (
                           <tr
@@ -634,6 +663,7 @@ export default function GridView({
                 })
               ) : (
                 // Render ungrouped rows
+                // CRITICAL: filteredRows is already normalized, but guard for safety
                 filteredRows.map((row) => {
                   const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
                   return (
@@ -643,7 +673,7 @@ export default function GridView({
                     onClick={() => handleRowClick(row.id)}
                   >
                     {visibleFields.map((field) => {
-                      const tableField = tableFields.find(f => f.name === field.field_name)
+                      const tableField = safeTableFields.find(f => f.name === field.field_name)
                       const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
                       return (
                         <td

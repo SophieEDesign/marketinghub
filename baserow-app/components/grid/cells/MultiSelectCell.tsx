@@ -13,8 +13,25 @@ interface MultiSelectCellProps {
   choiceColors?: Record<string, string>
 }
 
-// Default color scheme for select options (vibrant, accessible colors)
-const DEFAULT_COLORS = [
+// Muted color palette for multi-select tags (Airtable-style)
+// These are desaturated, calmer colors suitable for tags
+const MUTED_COLORS = [
+  '#94A3B8', // Slate (muted blue-gray)
+  '#86EFAC', // Light green
+  '#FCD34D', // Light amber
+  '#FCA5A5', // Light red
+  '#C4B5FD', // Light purple
+  '#F9A8D4', // Light pink
+  '#67E8F9', // Light cyan
+  '#D9F99D', // Light lime
+  '#FED7AA', // Light orange
+  '#A5B4FC', // Light indigo
+  '#5EEAD4', // Light teal
+  '#C084FC', // Light violet
+]
+
+// Primary color palette for single-select status (more vibrant)
+const PRIMARY_COLORS = [
   '#3B82F6', // Blue
   '#10B981', // Green
   '#F59E0B', // Amber
@@ -29,8 +46,8 @@ const DEFAULT_COLORS = [
   '#A855F7', // Violet
 ]
 
-// Helper function to get a consistent color for a choice
-const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
+// Helper function to get a consistent muted color for multi-select tags
+const getColorForChoiceName = (choice: string, customColors?: Record<string, string>, useMuted = true): string => {
   if (customColors?.[choice]) {
     return customColors[choice]
   }
@@ -46,11 +63,13 @@ const getColorForChoiceName = (choice: string, customColors?: Record<string, str
   }
   
   // Generate consistent color from choice name (hash-based)
+  // Use muted palette for tags, primary for status
   let hash = 0
   for (let i = 0; i < choice.length; i++) {
     hash = choice.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
+  const colors = useMuted ? MUTED_COLORS : PRIMARY_COLORS
+  return colors[Math.abs(hash) % colors.length]
 }
 
 // Calculate text color based on background luminance
@@ -145,9 +164,9 @@ export default function MultiSelectCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, selectedValues, value])
 
-  // Helper to get color styling for a choice
+  // Helper to get color styling for a choice (using muted palette for tags)
   const getColorForChoice = (choice: string): { backgroundColor: string; textColor: string } => {
-    const hexColor = getColorForChoiceName(choice, choiceColors)
+    const hexColor = getColorForChoiceName(choice, choiceColors, true) // true = use muted colors
     const textColorClass = getTextColor(hexColor)
     const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
     
@@ -207,27 +226,38 @@ export default function MultiSelectCell({
 
   const displayValues = value || []
   const isEmpty = displayValues.length === 0
+  const MAX_VISIBLE_PILLS = 2
+  const visiblePills = displayValues.slice(0, MAX_VISIBLE_PILLS)
+  const remainingCount = Math.max(0, displayValues.length - MAX_VISIBLE_PILLS)
 
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 py-1 flex flex-wrap gap-1.5 items-center text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors min-h-[32px] group"
+      className="w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors min-h-[32px] group"
+      title={isEmpty ? undefined : displayValues.join(', ')}
     >
       {isEmpty ? (
         <span className="text-gray-400 italic">{placeholder}</span>
       ) : (
-        displayValues.map((val) => {
-          const colorInfo = getColorForChoice(val)
-          return (
-            <span
-              key={val}
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${colorInfo.textColor}`}
-              style={{ backgroundColor: colorInfo.backgroundColor }}
-            >
-              {val}
+        <>
+          {visiblePills.map((val) => {
+            const colorInfo = getColorForChoice(val)
+            return (
+              <span
+                key={val}
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${colorInfo.textColor}`}
+                style={{ backgroundColor: colorInfo.backgroundColor }}
+              >
+                {val}
+              </span>
+            )
+          })}
+          {remainingCount > 0 && (
+            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
+              +{remainingCount} more
             </span>
-          )
-        })
+          )}
+        </>
       )}
     </div>
   )

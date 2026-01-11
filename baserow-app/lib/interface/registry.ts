@@ -153,21 +153,6 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       tabs: [],
     },
   },
-  table_snapshot: {
-    type: 'table_snapshot',
-    label: 'Table Snapshot',
-    icon: 'Table2',
-    defaultWidth: 12,
-    defaultHeight: 8,
-    minWidth: 4,
-    minHeight: 4,
-    defaultConfig: {
-      title: 'Table Snapshot',
-      table_id: '',
-      view_id: '',
-      row_limit: 10,
-    },
-  },
   action: {
     type: 'action',
     label: 'Action',
@@ -227,28 +212,6 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     defaultConfig: {
       title: 'Field',
       field_id: '',
-    },
-  },
-  relatedList: {
-    type: 'relatedList',
-    label: 'Related Records List',
-    icon: 'List',
-    defaultWidth: 12,
-    defaultHeight: 6,
-    minWidth: 4,
-    minHeight: 4,
-    defaultConfig: {
-      title: 'Related Records',
-      table_id: '',
-      related_table_id: '',
-      link_field_name: '',
-      display_mode: 'compact',
-      filters: [],
-      permissions: {
-        allowInlineCreate: false,
-        allowInlineDelete: false,
-        allowOpenRecord: true,
-      },
     },
   },
   calendar: {

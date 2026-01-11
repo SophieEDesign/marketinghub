@@ -13,8 +13,8 @@ interface SelectCellProps {
   choiceColors?: Record<string, string>
 }
 
-// Default color scheme for select options (vibrant, accessible colors)
-const DEFAULT_COLORS = [
+// Primary color palette for single-select status (more vibrant)
+const PRIMARY_COLORS = [
   '#3B82F6', // Blue
   '#10B981', // Green
   '#F59E0B', // Amber
@@ -29,7 +29,7 @@ const DEFAULT_COLORS = [
   '#A855F7', // Violet
 ]
 
-// Helper function to get a consistent color for a choice
+// Helper function to get a consistent primary color for a single-select choice
 const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
   if (customColors?.[choice]) {
     return customColors[choice]
@@ -46,11 +46,12 @@ const getColorForChoiceName = (choice: string, customColors?: Record<string, str
   }
   
   // Generate consistent color from choice name (hash-based)
+  // Use primary colors for single-select status
   let hash = 0
   for (let i = 0; i < choice.length; i++) {
     hash = choice.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
+  return PRIMARY_COLORS[Math.abs(hash) % PRIMARY_COLORS.length]
 }
 
 // Calculate text color based on background luminance

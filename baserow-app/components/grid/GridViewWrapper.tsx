@@ -8,6 +8,7 @@ import Toolbar from "./Toolbar"
 import FieldBuilderDrawer from "./FieldBuilderDrawer"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
+import { asArray } from "@/lib/utils/asArray"
 
 interface Filter {
   id?: string
@@ -79,11 +80,27 @@ export default function GridViewWrapper({
   appearance = {},
   permissions,
 }: GridViewWrapperProps) {
-  const [filters, setFilters] = useState<Filter[]>(initialFilters)
-  const [sorts, setSorts] = useState<Sort[]>(initialSorts)
+  // CRITICAL: Normalize all inputs at wrapper entry point
+  const safeInitialFilters = asArray(initialFilters)
+  const safeInitialSorts = asArray(initialSorts)
+  const safeInitialTableFields = asArray<TableField>(initialTableFields)
+  const safeViewFields = asArray(viewFields)
+
+  // Defensive logging (temporary - remove after fixing all upstream issues)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('GridViewWrapper input types', {
+      viewFields: Array.isArray(viewFields),
+      initialFilters: Array.isArray(initialFilters),
+      initialSorts: Array.isArray(initialSorts),
+      initialTableFields: Array.isArray(initialTableFields),
+    })
+  }
+
+  const [filters, setFilters] = useState<Filter[]>(safeInitialFilters)
+  const [sorts, setSorts] = useState<Sort[]>(safeInitialSorts)
   const [groupBy, setGroupBy] = useState<string | undefined>(initialGroupBy)
   const [searchTerm, setSearchTerm] = useState("")
-  const [fields, setFields] = useState<TableField[]>(initialTableFields)
+  const [fields, setFields] = useState<TableField[]>(safeInitialTableFields)
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
 
@@ -93,20 +110,20 @@ export default function GridViewWrapper({
   
   // Sync filters and sorts when initial props change (e.g., from block config)
   useEffect(() => {
-    const filtersKey = JSON.stringify(initialFilters)
+    const filtersKey = JSON.stringify(safeInitialFilters)
     if (prevInitialFiltersRef.current !== filtersKey) {
       prevInitialFiltersRef.current = filtersKey
-      setFilters(initialFilters)
+      setFilters(safeInitialFilters)
     }
-  }, [initialFilters])
+  }, [safeInitialFilters])
 
   useEffect(() => {
-    const sortsKey = JSON.stringify(initialSorts)
+    const sortsKey = JSON.stringify(safeInitialSorts)
     if (prevInitialSortsRef.current !== sortsKey) {
       prevInitialSortsRef.current = sortsKey
-      setSorts(initialSorts)
+      setSorts(safeInitialSorts)
     }
-  }, [initialSorts])
+  }, [safeInitialSorts])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
@@ -428,7 +445,7 @@ export default function GridViewWrapper({
       {showToolbar && (
         <Toolbar
           viewId={viewId}
-          fields={viewFields}
+          fields={safeViewFields as any}
           tableFields={fields}
           filters={filters}
           sorts={sorts}
@@ -448,10 +465,10 @@ export default function GridViewWrapper({
         tableId={tableId}
         viewId={viewId}
         supabaseTableName={supabaseTableName}
-        viewFields={Array.isArray(viewFields) ? viewFields : []}
-        viewFilters={Array.isArray(initialFilters) ? initialFilters : []}
+        viewFields={safeViewFields}
+        viewFilters={safeInitialFilters}
         filters={gridViewFilters}
-        viewSorts={Array.isArray(sorts) ? sorts : []}
+        viewSorts={asArray(sorts)}
         searchTerm={searchTerm}
         groupBy={groupBy}
         tableFields={fields}

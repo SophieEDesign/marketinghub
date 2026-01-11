@@ -26,6 +26,7 @@ import { filterRowsBySearch } from '@/lib/search/filterRows'
 import { useRecordPanel } from '@/contexts/RecordPanelContext'
 import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
+import { asArray } from '@/lib/utils/asArray'
 
 interface AirtableGridViewProps {
   tableName: string
@@ -134,9 +135,24 @@ export default function AirtableGridView({
     sorts,
   })
 
+  // CRITICAL: Normalize all inputs at grid entry point
+  // Never trust upstream to pass correct types - always normalize
+  const safeRows = asArray(allRows)
+  const safeFields = asArray<TableField>(fields)
+  const safeSorts = asArray(sorts)
+
+  // Defensive logging (temporary - remove after fixing all upstream issues)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('AirtableGridView input types', {
+      rows: Array.isArray(allRows),
+      fields: Array.isArray(fields),
+      sorts: Array.isArray(sorts),
+    })
+  }
+
   // Initialize column widths and order from localStorage or defaults
   useEffect(() => {
-    if (fields.length === 0) return
+    if (safeFields.length === 0) return
 
     const storageKey = `grid_${tableName}_${viewName}`
     const savedWidths = localStorage.getItem(`${storageKey}_widths`)
@@ -155,18 +171,18 @@ export default function AirtableGridView({
       try {
         const order = JSON.parse(savedOrder)
         // Validate order contains all fields
-        const allFieldNames = fields.map((f) => f.name)
-        if (order.every((name: string) => allFieldNames.includes(name))) {
+        const allFieldNames = safeFields.map((f) => f.name)
+        if (Array.isArray(order) && order.every((name: string) => allFieldNames.includes(name))) {
           setColumnOrder(order)
         } else {
           setColumnOrder(allFieldNames)
         }
       } catch {
-        setColumnOrder(fields.map((f) => f.name))
+        setColumnOrder(safeFields.map((f) => f.name))
       }
     } else {
       // Sort fields by order_index, then by position, then by name
-      const sortedFields = [...fields].sort((a, b) => {
+      const sortedFields = [...safeFields].sort((a, b) => {
         const aOrder = a.order_index ?? a.position ?? 0
         const bOrder = b.order_index ?? b.position ?? 0
         if (aOrder !== bOrder) return aOrder - bOrder
@@ -186,14 +202,14 @@ export default function AirtableGridView({
     // Set default widths for fields without saved widths
     setColumnWidths((prev) => {
       const newWidths = { ...prev }
-      fields.forEach((field) => {
+      safeFields.forEach((field) => {
         if (!newWidths[field.name]) {
           newWidths[field.name] = COLUMN_DEFAULT_WIDTH
         }
       })
       return newWidths
     })
-  }, [fields, tableName, viewName])
+  }, [safeFields, tableName, viewName])
 
   // Save column widths and order to localStorage
   useEffect(() => {
@@ -238,10 +254,11 @@ export default function AirtableGridView({
   // Get visible fields in order (needed for search filtering and rendering)
   const visibleFields = useMemo(() => {
     if (columnOrder.length === 0) return []
-    return columnOrder
-      .map((fieldName) => fields.find((f) => f.name === fieldName))
+    const safeColumnOrder = asArray(columnOrder)
+    return safeColumnOrder
+      .map((fieldName) => safeFields.find((f) => f.name === fieldName))
       .filter((f): f is TableField => f !== undefined)
-  }, [columnOrder, fields])
+  }, [columnOrder, safeFields])
 
   // Filter rows by search query (only visible fields)
   const visibleFieldNames = useMemo(() => {
@@ -249,16 +266,19 @@ export default function AirtableGridView({
   }, [visibleFields])
 
   const filteredRows = useMemo(() => {
-    return filterRowsBySearch(allRows, fields, searchQuery, visibleFieldNames)
-  }, [allRows, fields, searchQuery, visibleFieldNames])
+    return filterRowsBySearch(safeRows, safeFields, searchQuery, visibleFieldNames)
+  }, [safeRows, safeFields, searchQuery, visibleFieldNames])
 
   // Group rows if groupBy is set
+  // CRITICAL: Normalize filteredRows before grouping
   const groupedRows = useMemo(() => {
     if (!groupBy) return null
 
-    const groups: Record<string, typeof filteredRows> = {}
+    const safeFilteredRows = asArray(filteredRows)
+    const groups: Record<string, typeof safeFilteredRows> = {}
 
-    filteredRows.forEach((row) => {
+    safeFilteredRows.forEach((row) => {
+      if (!row) return // Skip null/undefined rows
       const groupValue = row[groupBy] ?? "Uncategorized"
       const groupKey = String(groupValue)
       if (!groups[groupKey]) {
@@ -272,8 +292,8 @@ export default function AirtableGridView({
 
     return sortedGroupKeys.map((key) => ({
       key,
-      value: groups[key][0][groupBy],
-      rows: groups[key],
+      value: groups[key][0]?.[groupBy],
+      rows: asArray(groups[key]), // Ensure rows is always an array
     }))
   }, [filteredRows, groupBy])
 
@@ -313,8 +333,9 @@ export default function AirtableGridView({
       // Range selection
       const start = Math.min(lastSelectedIndex, index)
       const end = Math.max(lastSelectedIndex, index)
-      const rowsArray = Array.isArray(filteredRows) ? filteredRows : []
-      const rangeIds = rowsArray.slice(start, end + 1).map((row: any) => row.id)
+      // CRITICAL: Normalize rows before slicing
+      const rowsArray = asArray(filteredRows)
+      const rangeIds = rowsArray.slice(start, end + 1).map((row: any) => row?.id).filter(Boolean)
       setSelectedRowIds((prev) => {
         const next = new Set(prev)
         rangeIds.forEach(id => next.add(id))
@@ -545,24 +566,27 @@ export default function AirtableGridView({
           {/* Column headers */}
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={columnOrder} strategy={horizontalListSortingStrategy}>
-              {visibleFields.map((field) => (
-                <GridColumnHeader
-                  key={field.name}
-                  field={field}
-                  width={columnWidths[field.name] || COLUMN_DEFAULT_WIDTH}
-                  isResizing={resizingColumn === field.name}
-                  wrapText={columnWrapText[field.name] || false}
-                  onResizeStart={handleResizeStart}
-                  onResize={handleResize}
-                  onResizeEnd={handleResizeEnd}
-                  onEdit={onEditField}
-                  onToggleWrapText={handleToggleWrapText}
-                  sortDirection={
-                    sorts.find((s) => s.field === field.name)?.direction || null
-                  }
-                  onSort={handleSort}
-                />
-              ))}
+              {visibleFields.map((field) => {
+                const sortIndex = sorts.findIndex((s) => s.field === field.name)
+                const sort = sortIndex >= 0 ? sorts[sortIndex] : null
+                return (
+                  <GridColumnHeader
+                    key={field.name}
+                    field={field}
+                    width={columnWidths[field.name] || COLUMN_DEFAULT_WIDTH}
+                    isResizing={resizingColumn === field.name}
+                    wrapText={columnWrapText[field.name] || false}
+                    onResizeStart={handleResizeStart}
+                    onResize={handleResize}
+                    onResizeEnd={handleResizeEnd}
+                    onEdit={onEditField}
+                    onToggleWrapText={handleToggleWrapText}
+                    sortDirection={sort?.direction || null}
+                    sortOrder={sortIndex >= 0 ? sortIndex + 1 : null}
+                    onSort={handleSort}
+                  />
+                )
+              })}
             </SortableContext>
           </DndContext>
 
@@ -636,9 +660,6 @@ export default function AirtableGridView({
               const isSelected = selectedRowIds.has(row.id)
               const rowIndex = filteredRows.findIndex((r: any) => r.id === row.id)
               
-              // Check if any column in this row has wrap text enabled
-              const hasWrapText = visibleFields.some((field) => columnWrapText[field.name])
-              
               return (
                 <div
                   key={row.id}
@@ -647,7 +668,7 @@ export default function AirtableGridView({
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/50'
                   } ${isSelected ? 'bg-blue-100' : ''}`}
-                  style={{ minHeight: ROW_HEIGHT, height: hasWrapText ? 'auto' : ROW_HEIGHT }}
+                  style={{ height: ROW_HEIGHT }}
                   onClick={(e) => {
                     // Don't open panel if clicking checkbox or cell editor
                     const target = e.target as HTMLElement
@@ -659,7 +680,7 @@ export default function AirtableGridView({
                   {/* Checkbox */}
                   <div
                     className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, minHeight: ROW_HEIGHT, height: hasWrapText ? '100%' : ROW_HEIGHT }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRowSelect(row.id, rowIndex, e)
@@ -681,7 +702,7 @@ export default function AirtableGridView({
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
                     className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium sticky left-[50px] z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, minHeight: ROW_HEIGHT, height: hasWrapText ? '100%' : ROW_HEIGHT }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
                   >
                     {actualIndex + 1}
                   </div>
@@ -689,19 +710,16 @@ export default function AirtableGridView({
                   {/* Cells */}
                   {visibleFields.map((field) => {
                     const width = columnWidths[field.name] || COLUMN_DEFAULT_WIDTH
-                    const wrapText = columnWrapText[field.name] || false
                     const isSelected =
                       selectedCell?.rowId === row.id && selectedCell?.fieldName === field.name
 
                     return (
                       <div
                         key={field.name}
-                        className={`border-r border-gray-100 relative ${
-                          wrapText ? 'flex items-start' : 'flex items-center'
-                        } ${
+                        className={`border-r border-gray-100 relative flex items-center ${
                           isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
                         }`}
-                        style={{ width, minHeight: ROW_HEIGHT, height: wrapText ? 'auto' : ROW_HEIGHT }}
+                        style={{ width, height: ROW_HEIGHT }}
                         onClick={() => setSelectedCell({ rowId: row.id, fieldName: field.name })}
                       >
                         <CellFactory
@@ -710,7 +728,6 @@ export default function AirtableGridView({
                           rowId={row.id}
                           tableName={tableName}
                           editable={editable && !field.options?.read_only}
-                          wrapText={wrapText}
                           onSave={(value) => handleCellSave(row.id, field.name, value)}
                         />
                       </div>

@@ -35,7 +35,7 @@ interface ViewTypeOption {
   requiredFields: FieldType[] // Field types required for this view
 }
 
-// Only show Table and Calendar - others are not yet functional
+// Show Table, Calendar, Kanban, and Timeline view types
 const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
   {
     type: 'grid',
@@ -51,27 +51,27 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     description: 'Month/week calendar view',
     requiredFields: ['date'] as FieldType[],
   },
-  // TODO: Kanban, Timeline, Gallery - not yet implemented
-  // {
-  //   type: 'kanban',
-  //   label: 'Kanban',
-  //   icon: Columns,
-  //   description: 'Board view with columns',
-  //   requiredFields: [],
-  // },
+  {
+    type: 'kanban',
+    label: 'Kanban',
+    icon: Columns,
+    description: 'Board view with columns',
+    requiredFields: [],
+  },
+  {
+    type: 'timeline',
+    label: 'Timeline',
+    icon: GitBranch,
+    description: 'Chronological timeline view',
+    requiredFields: ['date'] as FieldType[],
+  },
+  // TODO: Gallery - not yet implemented
   // {
   //   type: 'gallery',
   //   label: 'Gallery',
   //   icon: ImageIcon,
   //   description: 'Card-based visual layout',
   //   requiredFields: [],
-  // },
-  // {
-  //   type: 'timeline',
-  //   label: 'Timeline',
-  //   icon: GitBranch,
-  //   description: 'Chronological timeline view',
-  //   requiredFields: ['date'] as FieldType[],
   // },
 ]
 
@@ -193,7 +193,7 @@ export default function GridDataSettings({
           })}
         </div>
         <p className="text-xs text-gray-500">
-          Table view is fully supported. Calendar view is in progress.
+          Table, Calendar, Kanban, and Timeline views are supported.
         </p>
       </div>
 
@@ -267,8 +267,8 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Filters (optional) - For Table and Calendar views */}
-      {(currentViewType === 'grid' || currentViewType === 'calendar') && config.table_id && fields.length > 0 && (
+      {/* Filters (optional) - For Table, Calendar, Kanban, and Timeline views */}
+      {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline') && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Filters (optional)</Label>
@@ -731,6 +731,43 @@ export default function GridDataSettings({
             </div>
           </div>
         </>
+      )}
+
+      {/* Kanban-Specific Settings - Airtable Style */}
+      {currentViewType === 'kanban' && config.table_id && fields.length > 0 && (
+        <div className="space-y-3 pt-2 border-t border-gray-200">
+          <Label className="text-sm font-semibold">Options</Label>
+          
+          {/* Grouping Field Settings */}
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-gray-700">Group by *</Label>
+            <Select
+              value={config.group_by_field || config.group_by || config.kanban_group_field || ""}
+              onValueChange={(value) => onUpdate({ group_by_field: value, group_by: value, kanban_group_field: value })}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select a select field" />
+              </SelectTrigger>
+              <SelectContent>
+                {fields
+                  .filter(field => field.type === 'single_select' || field.type === 'multi_select' || field.type === 'select')
+                  .map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {fields.filter(f => f.type === 'single_select' || f.type === 'multi_select' || f.type === 'select').length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                No select fields found. Please add a single-select or multi-select field to the table.
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Select a single-select or multi-select field to group cards into columns.
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )

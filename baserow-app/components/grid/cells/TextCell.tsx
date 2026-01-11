@@ -6,7 +6,7 @@ interface TextCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
-  wrapText?: boolean
+  wrapText?: boolean // Deprecated: kept for compatibility but ignored
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -15,7 +15,7 @@ export default function TextCell({
   value,
   fieldName,
   editable = true,
-  wrapText = false,
+  wrapText = false, // Deprecated
   onSave,
   placeholder = '—',
 }: TextCellProps) {
@@ -78,15 +78,17 @@ export default function TextCell({
     )
   }
 
+  const displayValue = value || placeholder
+  const isPlaceholder = !value
+
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className={`w-full h-full px-2 text-sm text-gray-900 cursor-pointer hover:bg-blue-50 rounded transition-colors ${
-        wrapText ? 'py-1 flex items-start' : 'flex items-center'
-      }`}
+      className="w-full h-full px-2 text-sm text-gray-900 cursor-pointer hover:bg-blue-50 rounded transition-colors flex items-center"
+      title={value || undefined}
     >
-      <span className={wrapText ? 'whitespace-pre-wrap break-words' : 'truncate'}>
-        {value || <span className="text-gray-400">{placeholder}</span>}
+      <span className={`truncate ${isPlaceholder ? 'text-gray-400 italic' : ''}`}>
+        {displayValue}
       </span>
     </div>
   )

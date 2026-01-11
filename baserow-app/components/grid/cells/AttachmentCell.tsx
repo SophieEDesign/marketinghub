@@ -155,60 +155,26 @@ export default function AttachmentCell({
       />
 
       <div
-        className={`w-full h-full px-2 py-1 flex items-center gap-1 text-sm ${
+        className={`w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm ${
           editable ? 'cursor-pointer hover:bg-blue-50' : ''
         } rounded transition-colors`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onClick={openFilePicker}
+        title={attachments.length > 0 ? `${attachments.length} attachment${attachments.length !== 1 ? 's' : ''}` : undefined}
       >
         {attachments.length === 0 ? (
-          <span className="text-gray-400 flex items-center gap-1">
-            <Paperclip className="h-3 w-3" />
+          <span className="text-gray-400 flex items-center gap-1.5">
+            <Paperclip className="h-3.5 w-3.5" />
             {placeholder}
           </span>
         ) : (
-          <div className="flex items-center gap-1 flex-wrap">
-            {attachments.slice(0, 3).map((file, index) => (
-              <div
-                key={index}
-                className="relative group"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPreviewIndex(index)
-                }}
-              >
-                {isImage(file.type) ? (
-                  <div className="w-8 h-8 rounded border border-gray-300 overflow-hidden bg-gray-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={file.url}
-                      alt={file.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded border border-gray-300 bg-gray-100 flex items-center justify-center text-xs text-gray-600">
-                    {file.name.split('.').pop()?.toUpperCase().slice(0, 3)}
-                  </div>
-                )}
-                {editable && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(index)
-                    }}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="h-2 w-2" />
-                  </button>
-                )}
-              </div>
-            ))}
-            {attachments.length > 3 && (
-              <span className="text-xs text-gray-500">+{attachments.length - 3}</span>
-            )}
+          <div className="flex items-center gap-1.5">
+            <Paperclip className="h-3.5 w-3.5 text-gray-600 flex-shrink-0" />
+            <span className="text-gray-700 font-medium text-xs">
+              {attachments.length}
+            </span>
             {uploading && <span className="text-xs text-gray-500">Uploading...</span>}
           </div>
         )}

@@ -26,8 +26,8 @@ export default function AdvancedSettings({
 }: AdvancedSettingsProps) {
   const isLocked = config.locked || false
 
-  // Only show permissions for blocks that can have records (grid, form, record, table_snapshot)
-  const showPermissions = ['grid', 'form', 'record', 'table_snapshot'].includes(block.type)
+  // Only show permissions for blocks that can have records (grid, form, record)
+  const showPermissions = ['grid', 'form', 'record'].includes(block.type)
 
   return (
     <div className="space-y-6">
