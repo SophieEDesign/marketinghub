@@ -59,7 +59,8 @@ function rowMatchesQuery(
   const searchTerms = normalizedQuery.split(/\s+/).filter((term) => term.length > 0)
 
   // Filter to only visible fields if provided
-  const fieldsToSearch = visibleFieldNames
+  // Ensure visibleFieldNames is an array (defensive check)
+  const fieldsToSearch = visibleFieldNames && Array.isArray(visibleFieldNames)
     ? fields.filter((f) => visibleFieldNames.includes(f.name))
     : fields
 

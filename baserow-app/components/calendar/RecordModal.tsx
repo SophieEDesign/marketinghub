@@ -204,8 +204,8 @@ export default function RecordModal({
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {tableFields
-              .filter((field) => field.name !== 'id' && field.name !== 'created_at' && field.name !== 'updated_at')
+            {Array.isArray(tableFields) && tableFields
+              .filter((field) => field && field.name !== 'id' && field.name !== 'created_at' && field.name !== 'updated_at')
               .map((field) => {
                 const inputType = getInputType(field)
                 const value = formData[field.name]

@@ -528,8 +528,9 @@ export default function CalendarView({
       _rowId: row.id, // Preserve row ID
     }))
     
-    // Filter using search helper
-    const filtered = filterRowsBySearch(flatRows, loadedTableFields, searchQuery, fieldIds)
+    // Filter using search helper - ensure fieldIds is an array
+    const safeFieldIds = Array.isArray(fieldIds) ? fieldIds : []
+    const filtered = filterRowsBySearch(flatRows, loadedTableFields, searchQuery, safeFieldIds)
     // Ensure filtered is an array before calling map
     if (!Array.isArray(filtered)) return rows
     const filteredIds = new Set(filtered.map((r) => r._rowId))
@@ -1256,7 +1257,7 @@ export default function CalendarView({
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
           recordId={selectedRecordId}
-          tableFields={loadedTableFields}
+          tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           onSave={() => {
             // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
