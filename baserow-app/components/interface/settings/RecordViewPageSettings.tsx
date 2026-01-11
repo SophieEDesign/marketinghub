@@ -25,8 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock, Settings, Plus, X } from "lucide-react"
+import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock, Settings } from "lucide-react"
 import type { PageConfig } from "@/lib/interface/page-config"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
@@ -301,38 +300,37 @@ export default function RecordViewPageSettings({
                   Pick elements
                 </Button>
               </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allVisible = fieldConfigList.map((f) => ({
-                        ...f,
-                        visible: true,
-                        order: f.order === -1 ? fieldConfigList.length : f.order,
-                      }))
-                      setFieldConfigList(allVisible)
-                      saveFieldConfigs(allVisible)
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-700 underline"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-xs text-gray-300">|</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allHidden = fieldConfigList.map((f) => ({
-                        ...f,
-                        visible: false,
-                      }))
-                      setFieldConfigList(allHidden)
-                      saveFieldConfigs(allHidden)
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-700 underline"
-                  >
-                    Select None
-                  </button>
-                </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allVisible = fieldConfigList.map((f) => ({
+                      ...f,
+                      visible: true,
+                      order: f.order === -1 ? fieldConfigList.length : f.order,
+                    }))
+                    setFieldConfigList(allVisible)
+                    saveFieldConfigs(allVisible)
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select All
+                </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allHidden = fieldConfigList.map((f) => ({
+                      ...f,
+                      visible: false,
+                    }))
+                    setFieldConfigList(allHidden)
+                    saveFieldConfigs(allHidden)
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select None
+                </button>
               </div>
               <p className="text-xs text-gray-500">
                 Select which fields appear in the structured field list. Drag to reorder, and set
@@ -465,7 +463,7 @@ export default function RecordViewPageSettings({
           {/* Left Panel Settings */}
           {selectedTableId && (
             <>
-              <Separator className="my-6" />
+              <div className="border-t my-6"></div>
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1">Left Panel Settings</h3>

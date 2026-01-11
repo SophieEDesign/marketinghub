@@ -206,6 +206,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
+    if (!pageTableId) return []
+    
     let result = [...data]
 
     // Apply search query
@@ -248,7 +250,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
 
     return result
-  }, [data, searchQuery, filters, columns])
+  }, [data, searchQuery, filters, columns, pageTableId])
 
   // Find selected record from filtered data (or fallback to full data if not in filtered)
   const selectedRecord = useMemo(() => {
@@ -636,18 +638,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }
 
-  // Setup state: No table selected
-  if (!pageTableId) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-500 p-4">
-        <div className="text-center max-w-md">
-          <div className="text-sm mb-2 font-medium">Select a table to review records.</div>
-          <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
-        </div>
-      </div>
-    )
-  }
-
   // Get status colors
   const getStatusColor = (status: string) => {
     const statusLower = String(status).toLowerCase()
@@ -674,6 +664,18 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const handleRecordDuplicate = useCallback((recordId: string) => {
     setSelectedRecordId(recordId)
   }, [])
+
+  // Setup state: No table selected
+  if (!pageTableId) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-500 p-4">
+        <div className="text-center max-w-md">
+          <div className="text-sm mb-2 font-medium">Select a table to review records.</div>
+          <div className="text-xs text-gray-400">This page isn&apos;t connected to a table. Please configure it in Settings.</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex bg-white">
