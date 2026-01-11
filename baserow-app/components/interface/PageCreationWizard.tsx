@@ -586,38 +586,21 @@ export default function PageCreationWizard({
             {step === 'interface' && 'Select Interface'}
             {step === 'purpose' && 'Create New Page'}
             {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Create Record View Page' : 'Configure Page')}
-            {step === 'fields' && 'Pick elements'}
             {step === 'name' && 'Name Your Page'}
           </DialogTitle>
           <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
             {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Select a table to provide context for blocks (optional)' : 'Set up the data source or layout')}
-            {step === 'fields' && 'Select which fields appear in the record details panel'}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>
-        {step === 'fields' ? (
-          <FieldPickerModal
-            open={true}
-            onOpenChange={(open) => {
-              if (!open) {
-                // If closing without saving, go back to anchor step
-                setStep('anchor')
-              }
-            }}
-            tableId={tableId}
-            selectedFields={selectedFields}
-            onFieldsChange={handleFieldsSelected}
-          />
-        ) : (
-          <div className="py-4">
-            {step === 'interface' && renderInterfaceStep()}
-            {step === 'purpose' && renderPurposeStep()}
-            {step === 'anchor' && renderAnchorStep()}
-            {step === 'name' && renderNameStep()}
-          </div>
-        )}
+        <div className="py-4">
+          {step === 'interface' && renderInterfaceStep()}
+          {step === 'purpose' && renderPurposeStep()}
+          {step === 'anchor' && renderAnchorStep()}
+          {step === 'name' && renderNameStep()}
+        </div>
         {step === 'interface' && (
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
