@@ -575,7 +575,7 @@ export default function Canvas({
       margin: JSON.stringify(GRID_CONFIG.margin),
       compactType: GRID_CONFIG.compactType, // CRITICAL: Should be null (disabled)
       isBounded: GRID_CONFIG.isBounded, // CRITICAL: Should be false (disabled)
-      preventCollision: GRID_CONFIG.preventCollision, // CRITICAL: Should be true (enabled)
+      preventCollision: GRID_CONFIG.preventCollision, // CRITICAL: Set to false to allow blocks to adjust into grid
       allowOverlap: GRID_CONFIG.allowOverlap,
       containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
       useCSSTransforms: GRID_CONFIG.useCSSTransforms,
