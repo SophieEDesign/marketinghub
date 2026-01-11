@@ -93,9 +93,7 @@ export default function RelatedRecordsListBlock({
           .eq("table_id", relatedTableId)
           .order("order_index", { ascending: true })
 
-        if (tableFields) {
-          setFields(tableFields)
-        }
+        setFields(Array.isArray(tableFields) ? tableFields : [])
 
         // Build query
         let query = supabase.from(table.supabase_table).select("*")
@@ -244,7 +242,7 @@ export default function RelatedRecordsListBlock({
               )
             } else if (displayMode === "table") {
               // Table view - show first few fields as columns
-              const visibleFields = fields.slice(0, 4)
+              const visibleFields = Array.isArray(fields) ? fields.slice(0, 4) : []
               
               return (
                 <div
@@ -273,7 +271,7 @@ export default function RelatedRecordsListBlock({
                   onClick={() => handleRecordClick(record.id)}
                 >
                   <div className="space-y-2">
-                    {fields.slice(0, 3).map((field) => (
+                    {(Array.isArray(fields) ? fields : []).slice(0, 3).map((field) => (
                       <div key={field.id}>
                         <div className="text-xs text-gray-500 mb-0.5">{field.name}</div>
                         <div className="text-sm text-gray-900">

@@ -65,7 +65,7 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
           .eq("visible", true)
           .order("position")
 
-        fieldNames = (viewFields || []).map((vf: any) => vf.field_name)
+        fieldNames = (Array.isArray(viewFields) ? viewFields : []).map((vf: any) => vf.field_name)
       }
 
       // Load table fields if no view fields
@@ -76,8 +76,9 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
           .eq("table_id", tableId)
           .order("position")
 
-        fieldNames = (tableFields || []).slice(0, 5).map((tf: any) => tf.name)
-        setFields(tableFields || [])
+        const fieldsArray = Array.isArray(tableFields) ? tableFields : []
+        fieldNames = fieldsArray.slice(0, 5).map((tf: any) => tf.name)
+        setFields(fieldsArray)
       } else {
         // Get field metadata
         const { data: tableFields } = await supabase
@@ -86,7 +87,7 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
           .eq("table_id", tableId)
           .in("name", fieldNames)
 
-        setFields(tableFields || [])
+        setFields(Array.isArray(tableFields) ? tableFields : [])
       }
 
       // Load rows
@@ -235,7 +236,7 @@ export default function TableSnapshotBlock({ block, isEditing = false }: TableSn
   const title = appearance.title || config.title
   const showTitle = appearance.show_title !== false && title
 
-  const displayFields = fields.slice(0, 5) // Limit to 5 columns for readability
+  const displayFields = Array.isArray(fields) ? fields.slice(0, 5) : [] // Limit to 5 columns for readability
 
   return (
     <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>

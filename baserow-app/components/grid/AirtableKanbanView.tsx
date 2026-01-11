@@ -206,7 +206,8 @@ export default function AirtableKanbanView({
 
   // Filter rows by search query
   const visibleFieldNames = useMemo(() => {
-    return viewFields.filter((f) => f.visible).map((f) => f.field_name)
+    const fieldsArray = Array.isArray(viewFields) ? viewFields : []
+    return fieldsArray.filter((f) => f.visible).map((f) => f.field_name)
   }, [viewFields])
 
   const filteredRows = useMemo(() => {
