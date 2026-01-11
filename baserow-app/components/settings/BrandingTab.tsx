@@ -19,6 +19,7 @@ export default function SettingsBrandingTab() {
   const [primaryColor, setPrimaryColor] = useState(settings?.primary_color || "hsl(222.2, 47.4%, 11.2%)")
   const [accentColor, setAccentColor] = useState(settings?.accent_color || "hsl(210, 40%, 96.1%)")
   const [sidebarColor, setSidebarColor] = useState(settings?.sidebar_color || "#ffffff")
+  const [sidebarTextColor, setSidebarTextColor] = useState(settings?.sidebar_text_color || "#4b5563")
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
@@ -29,6 +30,7 @@ export default function SettingsBrandingTab() {
       setPrimaryColor(settings.primary_color || "hsl(222.2, 47.4%, 11.2%)")
       setAccentColor(settings.accent_color || "hsl(210, 40%, 96.1%)")
       setSidebarColor(settings.sidebar_color || "#ffffff")
+      setSidebarTextColor(settings.sidebar_text_color || "#4b5563")
     }
   }, [settings])
 
@@ -114,6 +116,7 @@ export default function SettingsBrandingTab() {
           primary_color: primaryColor || null,
           accent_color: accentColor || null,
           sidebar_color: sidebarColor || null,
+          sidebar_text_color: sidebarTextColor || null,
         }),
       })
 
@@ -287,25 +290,48 @@ export default function SettingsBrandingTab() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="sidebar-color">Sidebar Color</Label>
-          <div className="flex gap-2">
-            <Input
-              id="sidebar-color"
-              value={sidebarColor}
-              onChange={(e) => setSidebarColor(e.target.value)}
-              placeholder="#ffffff"
-            />
-            <input
-              type="color"
-              value={sidebarColor.startsWith('#') ? sidebarColor : '#ffffff'}
-              onChange={(e) => setSidebarColor(e.target.value)}
-              className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
-            />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="sidebar-color">Sidebar Background Color</Label>
+            <div className="flex gap-2">
+              <Input
+                id="sidebar-color"
+                value={sidebarColor}
+                onChange={(e) => setSidebarColor(e.target.value)}
+                placeholder="#ffffff"
+              />
+              <input
+                type="color"
+                value={sidebarColor.startsWith('#') ? sidebarColor : '#ffffff'}
+                onChange={(e) => setSidebarColor(e.target.value)}
+                className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Background color for the sidebar (use hex format, e.g., #ffffff)
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Background color for the sidebar (use hex format, e.g., #ffffff)
-          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="sidebar-text-color">Sidebar Text Color</Label>
+            <div className="flex gap-2">
+              <Input
+                id="sidebar-text-color"
+                value={sidebarTextColor}
+                onChange={(e) => setSidebarTextColor(e.target.value)}
+                placeholder="#4b5563"
+              />
+              <input
+                type="color"
+                value={sidebarTextColor.startsWith('#') ? sidebarTextColor : '#4b5563'}
+                onChange={(e) => setSidebarTextColor(e.target.value)}
+                className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Text color for sidebar navigation items (use hex format, e.g., #4b5563)
+            </p>
+          </div>
         </div>
 
         <div className="pt-4 border-t">

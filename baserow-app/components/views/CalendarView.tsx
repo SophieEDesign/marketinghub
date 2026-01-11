@@ -46,8 +46,14 @@ export default function CalendarView({
   onRecordClick,
   blockConfig = {}
 }: CalendarViewProps) {
-  // Ensure fieldIds is always an array
-  const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
+  // Ensure fieldIds is always an array (defensive check for any edge cases)
+  const fieldIds = useMemo(() => {
+    if (!fieldIdsProp) return []
+    if (Array.isArray(fieldIdsProp)) return fieldIdsProp
+    // Fallback: if somehow not an array, return empty array
+    console.warn('CalendarView: fieldIdsProp is not an array:', typeof fieldIdsProp, fieldIdsProp)
+    return []
+  }, [fieldIdsProp])
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)

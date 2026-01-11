@@ -164,7 +164,7 @@ export default function FieldSettingsDrawer({
     }
   }, [field, open])
 
-  // Check for type change warnings and detect physical-to-virtual conversions
+  // Check for type change warnings (but duplicate dialog is handled in onValueChange)
   useEffect(() => {
     if (field && open && type !== field.type) {
       const typeCheck = canChangeType(field.type, type)
@@ -175,16 +175,11 @@ export default function FieldSettingsDrawer({
         field.type !== 'lookup' && 
         (type === 'formula' || type === 'lookup')
       
-      if (!typeCheck.canChange && isPhysicalToVirtual && !hasPromptedForDuplicateRef.current) {
-        // Show duplicate dialog instead of warning
-        setPendingLookupType(type)
-        setShowDuplicateDialog(true)
-        hasPromptedForDuplicateRef.current = true
-        // Revert type to original to prevent invalid state
-        setType(field.type)
-      } else if (!typeCheck.canChange) {
+      // Duplicate dialog is handled in Select onValueChange, so skip it here
+      if (!typeCheck.canChange && !isPhysicalToVirtual) {
         setTypeChangeWarning(typeCheck.warning || 'Cannot change field type')
-      } else if (typeCheck.warning) {
+        setType(field.type)
+      } else if (typeCheck.warning && !isPhysicalToVirtual) {
         setTypeChangeWarning(typeCheck.warning)
       } else {
         setTypeChangeWarning(null)
@@ -194,7 +189,7 @@ export default function FieldSettingsDrawer({
     }
     
     // Reset duplicate prompt flag when type changes away from lookup/formula
-    if (type !== 'lookup' && type !== 'formula' && previousTypeRef.current !== type) {
+    if (type !== 'lookup' && type !== 'formula' && type === field?.type) {
       hasPromptedForDuplicateRef.current = false
     }
   }, [type, field, open])
@@ -627,7 +622,25 @@ export default function FieldSettingsDrawer({
           {/* Field Type */}
           <div className="space-y-2">
             <Label htmlFor="field-type">Field Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as FieldType)}>
+            <Select 
+              value={type} 
+              onValueChange={(v) => {
+                const newType = v as FieldType
+                // Check if this is a physical-to-virtual conversion before setting type
+                if (field && field.type !== 'formula' && field.type !== 'lookup' && 
+                    (newType === 'formula' || newType === 'lookup')) {
+                  const typeCheck = canChangeType(field.type, newType)
+                  if (!typeCheck.canChange && !hasPromptedForDuplicateRef.current) {
+                    setPendingLookupType(newType)
+                    setShowDuplicateDialog(true)
+                    hasPromptedForDuplicateRef.current = true
+                    // Don't change type - dialog will handle it
+                    return
+                  }
+                }
+                setType(newType)
+              }}
+            >
               <SelectTrigger id="field-type">
                 <SelectValue />
               </SelectTrigger>

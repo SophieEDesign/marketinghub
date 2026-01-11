@@ -24,6 +24,7 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [tableFields, setTableFields] = useState<TableField[]>([])
   
   // Track previous tableId to prevent unnecessary reloads when config reference changes
   // but tableId value remains the same
@@ -46,12 +47,17 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   useEffect(() => {
     if (!tableId) {
       prevTableIdRef.current = null
+      setTableFields([])
       return
     }
 
     // CRITICAL: Skip reload if tableId hasn't actually changed
     // This prevents unnecessary reloads when config reference changes but value is the same
     if (prevTableIdRef.current === tableId) {
+      // If tableId is same but isEditing changed to true and we don't have fields, reload for preview
+      if (isEditing && tableFields.length === 0 && !loadingRef.current) {
+        loadTableName()
+      }
       return
     }
 
@@ -62,7 +68,8 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
 
     prevTableIdRef.current = tableId
     loadTableName()
-  }, [tableId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId, isEditing])
 
   // Open record panel when recordId changes (for record review pages)
   useEffect(() => {
@@ -87,6 +94,20 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
 
       if (table?.supabase_table) {
         setTableName(table.supabase_table)
+      }
+
+      // Load table fields for preview in edit mode
+      if (isEditing) {
+        const { data: fields } = await supabase
+          .from("table_fields")
+          .select("id, name, type")
+          .eq("table_id", tableId)
+          .order("position", { ascending: true })
+          .limit(10) // Limit to first 10 fields for preview
+
+        if (fields) {
+          setTableFields(fields as TableField[])
+        }
       }
     } catch (error) {
       console.error("Error loading table:", error)
@@ -114,8 +135,32 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   }
   
   // For Record Review pages: if recordId is missing, show setup state (not blank)
-  // This ensures the panel always renders something
+  // In edit mode, show field preview if table is configured
   if (!recordId) {
+    if (isEditing && tableFields.length > 0) {
+      // Show field preview in edit mode
+      return (
+        <div className="h-full overflow-auto p-4">
+          <div className="space-y-4">
+            <div className="text-sm font-medium text-gray-700 mb-2">Record Fields Preview</div>
+            {tableFields.map((field) => (
+              <div key={field.id} className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  {field.name}
+                  {field.type && (
+                    <span className="ml-2 text-xs text-gray-400 font-normal">({field.type})</span>
+                  )}
+                </label>
+                <div className="text-sm text-gray-400 italic border border-dashed border-gray-300 rounded p-2 bg-gray-50">
+                  Field value will appear here when a record is selected
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+    
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">

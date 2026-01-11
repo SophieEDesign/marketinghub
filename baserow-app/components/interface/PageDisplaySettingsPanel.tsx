@@ -81,6 +81,7 @@ export default function PageDisplaySettingsPanel({
   const [previewFields, setPreviewFields] = useState<string[]>([])
   const [detailFields, setDetailFields] = useState<string[]>([])
   const [selectedFieldsForBlocks, setSelectedFieldsForBlocks] = useState<string[]>([]) // Fields selected for blocks
+  const [recordReviewGroupBy, setRecordReviewGroupBy] = useState<string>("") // Group field for record review pages
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [panelEditorOpen, setPanelEditorOpen] = useState(false)
@@ -210,6 +211,11 @@ export default function PageDisplaySettingsPanel({
       setReadOnly(config.read_only || false)
       setDefaultFocus(config.default_focus || 'first')
       
+      // Load record review group field from config
+      if (currentPage.page_type === 'record_review' && config.group_by_field) {
+        setRecordReviewGroupBy(config.group_by_field || '')
+      }
+      
       // UNIFIED: Blocks handle their own configuration
       // Page config only stores basic metadata
       // Load grouping field from config if present
@@ -325,6 +331,8 @@ export default function PageDisplaySettingsPanel({
         sorts: blockSorts,
         // Store grouping field for kanban/list pages
         ...(supportsGrouping && groupBy ? { group_by: groupBy, group_by_field: groupBy } : {}),
+        // Store group_by_field for record review pages
+        ...(currentPage.page_type === 'record_review' ? { group_by_field: recordReviewGroupBy || undefined } : {}),
         // UNIFIED: Blocks handle their own view type and configuration
         // Page config only stores basic metadata
       }
@@ -387,7 +395,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, detailFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, recordReviewGroupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, detailFields, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -874,6 +882,35 @@ export default function PageDisplaySettingsPanel({
                   onCheckedChange={setRecordPreview}
                 />
               </div>
+
+              {/* Group By Field - Record Review pages only */}
+              {currentPage && currentPage.page_type === 'record_review' && (
+                <div className="space-y-2">
+                  <Label>Group Records By</Label>
+                  <Select
+                    value={recordReviewGroupBy || "__none__"}
+                    onValueChange={(value) => setRecordReviewGroupBy(value === "__none__" ? "" : value)}
+                    disabled={!selectedTableId || tableFields.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a select field to group by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No grouping</SelectItem>
+                      {tableFields
+                        .filter((f) => f.type === 'single_select' || f.type === 'multi_select')
+                        .map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    Group records in the left panel by a select field. Records will be organized by their select field values.
+                  </p>
+                </div>
+              )}
 
               {/* UNIFIED: Preview fields configuration moved to blocks */}
               {false && currentPage && currentPage.page_type === 'record_view' && (

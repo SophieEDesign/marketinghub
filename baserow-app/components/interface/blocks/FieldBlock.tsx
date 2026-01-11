@@ -218,7 +218,23 @@ export default function FieldBlock({
   }
 
   // Setup state: Missing recordId
+  // In edit mode, show field name preview if field is loaded
   if (!recordId) {
+    if (isEditing && field) {
+      // Show field name preview in edit mode
+      return (
+        <div className="h-full flex flex-col p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            {field.name}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <div className="flex-1 text-sm text-gray-400 italic border border-dashed border-gray-300 rounded p-3 flex items-center">
+            <span>Field value will appear here when a record is selected</span>
+          </div>
+        </div>
+      )
+    }
+    
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">

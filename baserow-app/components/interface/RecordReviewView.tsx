@@ -82,7 +82,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }, [blocks.length, recordDebugEnabled])
   
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
+  // Initialize with first record ID if data is available on mount
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(() => {
+    // If data is available on mount, select first record immediately
+    if (data && data.length > 0 && data[0]?.id) {
+      return data[0].id
+    }
+    return null
+  })
   const [loadedBlocks, setLoadedBlocks] = useState<PageBlock[]>(blocks)
   const [blocksLoading, setBlocksLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -166,7 +173,24 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return statusField ? [nameField, statusField] : [nameField]
   }, [config.preview_fields, columns])
   
-  // Get status field for grouping (still needed for grouping logic)
+  // Get group field for grouping - use config.group_by_field if set
+  const groupField = useMemo(() => {
+    // Only use configured group_by_field from config (must be a select field)
+    if (config.group_by_field) {
+      const configuredField = tableFields.find(f => 
+        (f.name === config.group_by_field || f.id === config.group_by_field) && 
+        (f.type === 'single_select' || f.type === 'multi_select')
+      )
+      if (configuredField) {
+        return configuredField.name
+      }
+    }
+    
+    // If no group field configured, return null (no grouping)
+    return null
+  }, [config.group_by_field, tableFields])
+  
+  // Keep statusField for backward compatibility (used in display)
   const statusField = columns.find((col: string) => 
     col.toLowerCase().includes('status') || 
     col.toLowerCase() === 'state' ||
@@ -236,32 +260,54 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return data.find(record => record.id === selectedRecordId) || null
   }, [selectedRecordId, filteredData, data])
 
-  // Group records by status
+  // Group records by configured group field (select field)
   const groupedRecords = useMemo(() => {
     const groups: Record<string, any[]> = {}
+    
+    if (!groupField) {
+      // No group field configured - return all records in a single ungrouped list
+      return { '': filteredData }
+    }
+    
     filteredData.forEach((record) => {
-      const status = record[statusField] || 'No Status'
-      if (!groups[status]) {
-        groups[status] = []
+      const groupValue = record[groupField]
+      // Handle null/undefined values
+      const groupKey = groupValue !== null && groupValue !== undefined && groupValue !== '' 
+        ? String(groupValue) 
+        : 'No ' + groupField
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = []
       }
-      groups[status].push(record)
+      groups[groupKey].push(record)
     })
+    
     return groups
-  }, [filteredData, statusField])
+  }, [filteredData, groupField])
 
-  // CRITICAL: Auto-select first record if none selected (use filtered data)
+  // CRITICAL: Auto-select first record if none selected (use filtered data, fallback to data)
   // Record Review must NEVER have null recordId - always select first record if available
   useEffect(() => {
-    if (!selectedRecordId && filteredData.length > 0) {
-      const firstRecordId = filteredData[0].id
+    // Priority: filteredData first (what user sees), then fallback to data (all records)
+    const recordsToCheck = filteredData.length > 0 ? filteredData : data
+    
+    if (!selectedRecordId && recordsToCheck.length > 0 && recordsToCheck[0]?.id) {
+      const firstRecordId = recordsToCheck[0].id
       debugLog('RECORD', 'Auto-selecting first record', {
         recordId: firstRecordId,
         filteredDataLength: filteredData.length,
+        dataLength: data.length,
+        usingFilteredData: filteredData.length > 0,
       })
       setSelectedRecordId(firstRecordId)
-    } else if (selectedRecordId && !filteredData.find(r => r.id === selectedRecordId)) {
-      // If selected record is filtered out, select first available
-      if (filteredData.length > 0) {
+    } else if (selectedRecordId) {
+      // Check if selected record exists in filtered data
+      const recordExists = filteredData.length > 0 
+        ? filteredData.find(r => r.id === selectedRecordId)
+        : data.find(r => r.id === selectedRecordId)
+      
+      // If selected record is filtered out, select first available from filtered data
+      if (!recordExists && filteredData.length > 0) {
         const newRecordId = filteredData[0].id
         debugLog('RECORD', 'Selected record filtered out, selecting new record', {
           oldRecordId: selectedRecordId,
@@ -278,11 +324,12 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     debugLog('RECORD', 'Record selection state', {
       selectedRecordId,
       filteredDataLength: filteredData.length,
+      dataLength: data.length,
       blocksLength: loadedBlocks.length,
       blocksLoading,
       renderPath: selectedRecordId ? 'view' : 'setup',
     })
-  }, [filteredData, selectedRecordId, loadedBlocks.length, blocksLoading, recordDebugEnabled])
+  }, [filteredData, data, selectedRecordId, loadedBlocks.length, blocksLoading, recordDebugEnabled])
 
   // Load table fields
   useEffect(() => {
@@ -609,16 +656,18 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   </div>
                 ) : (
                   <div className="p-2">
-                    {Object.entries(groupedRecords).map(([status, records]) => (
-                      <div key={status} className="mb-4">
-                        {/* Status Header */}
-                        <div className="flex items-center gap-2 mb-1 px-2">
-                          <Badge className={cn('text-xs font-medium', getStatusColor(status))}>
-                            {status}
-                          </Badge>
-                        </div>
+                    {Object.entries(groupedRecords).map(([groupValue, records]) => (
+                      <div key={groupValue} className={groupField ? "mb-4" : ""}>
+                        {/* Group Header - only show if grouping is enabled */}
+                        {groupField && groupValue && (
+                          <div className="flex items-center gap-2 mb-1 px-2">
+                            <Badge className={cn('text-xs font-medium', getStatusColor(groupValue))}>
+                              {groupValue}
+                            </Badge>
+                          </div>
+                        )}
                         
-                        {/* Records in this status */}
+                        {/* Records in this group */}
                         <div className="space-y-1">
                           {records.map((record) => {
                             const isSelected = record.id === selectedRecordId

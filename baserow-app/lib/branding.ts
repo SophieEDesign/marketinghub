@@ -8,6 +8,7 @@ export interface WorkspaceSettings {
   primary_color: string | null
   accent_color: string | null
   sidebar_color: string | null
+  sidebar_text_color: string | null
   default_interface_id?: string | null
   created_at: string
   updated_at?: string

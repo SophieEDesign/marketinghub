@@ -64,8 +64,44 @@ export interface FieldOptions {
   max_selections?: number // For multi-select lookups
   allow_create?: boolean // Allow creating new related records
   
+  // Lookup field filters (array of filters with AND logic)
+  lookup_filters?: LookupFieldFilter[]
+  
   // For read-only (stored in options since not in schema)
   read_only?: boolean
+}
+
+export interface LookupFieldFilter {
+  // Field in the lookup table to filter on
+  field: string
+  
+  // Filter operator
+  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' | 
+            'greater_than' | 'less_than' | 'greater_than_or_equal' | 
+            'less_than_or_equal' | 'is_empty' | 'is_not_empty' | 
+            'date_range'
+  
+  // Value source type
+  valueSource: 'static' | 'current_record' | 'context'
+  
+  // Static value (when valueSource === 'static')
+  value?: any
+  
+  // Reference to current record field (when valueSource === 'current_record')
+  // Format: field_name
+  currentRecordField?: string
+  
+  // Context value type (when valueSource === 'context')
+  contextType?: 'current_user_id' | 'current_user_email' | 'current_date' | 'current_datetime'
+  
+  // Optional: Apply filter only when referenced field has a value
+  // When true, skip this filter if the referenced field (currentRecordField) is null/empty
+  applyOnlyWhenFieldHasValue?: boolean
+  
+  // For date_range operator
+  value2?: any
+  currentRecordField2?: string
+  contextType2?: string
 }
 
 export interface FieldTypeInfo {

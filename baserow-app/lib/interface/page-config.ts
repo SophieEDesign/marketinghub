@@ -108,6 +108,7 @@ export function getDefaultPageConfig(pageType: string): PageConfig {
       allow_editing: false,
       detail_fields: [],
       preview_fields: [], // Default: empty array means use name/status fields
+      group_by_field: '', // Select field to group records by in left panel
     },
     blank: {
       visualisation: 'blank',
