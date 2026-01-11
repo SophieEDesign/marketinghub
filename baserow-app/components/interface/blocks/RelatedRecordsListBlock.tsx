@@ -102,7 +102,8 @@ export default function RelatedRecordsListBlock({
 
         // Apply link field filter if recordId and linkFieldName are provided
         if (recordId && linkFieldName) {
-          query = query.eq(linkFieldName, recordId)
+          // Use type assertion to avoid "excessively deep" type error with dynamic field names
+          query = (query as any).eq(linkFieldName, recordId)
         }
 
         // Apply additional filters

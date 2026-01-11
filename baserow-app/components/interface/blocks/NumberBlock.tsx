@@ -90,7 +90,7 @@ export default function NumberBlock({ block, isEditing = false, pageTableId = nu
         .maybeSingle()
 
       if (data) {
-        const value = data[field.name]
+        const value = (data as Record<string, any>)[field.name]
         setFieldValue(typeof value === 'number' ? value : (value ? parseFloat(String(value)) : null))
       }
     } catch (error) {
