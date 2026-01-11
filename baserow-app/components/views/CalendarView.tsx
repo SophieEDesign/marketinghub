@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CalendarIcon, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
@@ -1159,13 +1160,16 @@ export default function CalendarView({
   }
 
   return (
-    <div className="w-full h-full p-6 bg-gray-50">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        {renderFilters()}
+    <div className="w-full h-full bg-white">
+      {/* Airtable-style Header - FullCalendar handles this with headerToolbar */}
+
+      {renderFilters()}
+      
+      <div className="p-6 bg-white">
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           events={calendarEvents}
-          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`} // CRITICAL: Stable key - don't include events.length to prevent remounts
+          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`}
           editable={true}
           headerToolbar={{
             left: "prev,next today",
@@ -1173,6 +1177,20 @@ export default function CalendarView({
             right: viewMode === 'month' ? "dayGridWeek,dayGridMonth" : "dayGridMonth,dayGridWeek",
           }}
           initialView={viewMode === 'month' ? "dayGridMonth" : "dayGridWeek"}
+          height="auto"
+          aspectRatio={1.35}
+          dayMaxEvents={3}
+          moreLinkClick="popover"
+          eventDisplay="block"
+          eventClassNames="cursor-pointer hover:opacity-80 transition-opacity rounded-md"
+          dayCellClassNames="hover:bg-gray-50 transition-colors"
+          dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
+          eventTextColor="#1f2937"
+          eventBorderColor="transparent"
+          eventBackgroundColor="#f3f4f6"
+          eventMarginBottom={4}
+          dayHeaderFormat={{ weekday: 'short' }}
+          firstDay={1}
           viewDidMount={(view) => {
             // Update view mode when user changes view
             if (view.view.type === 'dayGridMonth') {
@@ -1231,6 +1249,7 @@ export default function CalendarView({
           }}
         />
       </div>
+    </div>
 
       {/* Record Modal */}
       {selectedRecordId && resolvedTableId && (

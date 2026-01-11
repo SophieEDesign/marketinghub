@@ -23,7 +23,7 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minWidth: 4,
     minHeight: 4,
     defaultConfig: {
-      title: 'Grid View',
+      title: 'Table View',
       table_id: '',
     },
   },

@@ -120,6 +120,23 @@ export default function SelectCell({
     }
   }
 
+  // Get color styling for the current value (must be before conditional return)
+  const pillStyle = useMemo(() => {
+    if (!value) return null
+    
+    const normalizedValue = String(value).trim()
+    const hexColor = getColorForChoiceName(normalizedValue, choiceColors)
+    const textColorClass = getTextColor(hexColor)
+    
+    // Ensure hex color has # prefix
+    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+    
+    return {
+      backgroundColor: bgColor,
+      textColor: textColorClass,
+    }
+  }, [value, choiceColors])
+
   if (editing && editable) {
     return (
       <select
@@ -144,23 +161,6 @@ export default function SelectCell({
       </select>
     )
   }
-
-  // Get color styling for the current value
-  const pillStyle = useMemo(() => {
-    if (!value) return null
-    
-    const normalizedValue = String(value).trim()
-    const hexColor = getColorForChoiceName(normalizedValue, choiceColors)
-    const textColorClass = getTextColor(hexColor)
-    
-    // Ensure hex color has # prefix
-    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
-    
-    return {
-      backgroundColor: bgColor,
-      textColor: textColorClass,
-    }
-  }, [value, choiceColors])
 
   return (
     <div

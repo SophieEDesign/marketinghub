@@ -35,11 +35,11 @@ interface ViewTypeOption {
   requiredFields: FieldType[] // Field types required for this view
 }
 
-// Only show Grid and Calendar - others are not yet functional
+// Only show Table and Calendar - others are not yet functional
 const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
   {
     type: 'grid',
-    label: 'Grid',
+    label: 'Table',
     icon: Grid,
     description: 'Spreadsheet-style table view',
     requiredFields: [],
@@ -120,11 +120,11 @@ export default function GridDataSettings({
           </SelectContent>
         </Select>
         <p className="text-xs text-gray-500">
-          Grid blocks require a table connection. Select a table to configure visible fields.
+          Table blocks require a table connection. Select a table to configure visible fields.
         </p>
       </div>
 
-      {/* View Selection (optional) - Only for Grid view, not Calendar */}
+      {/* View Selection (optional) - Only for Table view, not Calendar */}
       {currentViewType === 'grid' && config.table_id && views.length > 0 && (
         <div className="space-y-2">
           <Label>View (optional)</Label>
@@ -193,7 +193,7 @@ export default function GridDataSettings({
           })}
         </div>
         <p className="text-xs text-gray-500">
-          Grid is fully supported. Calendar support is in progress.
+          Table view is fully supported. Calendar view is in progress.
         </p>
       </div>
 
@@ -262,12 +262,12 @@ export default function GridDataSettings({
             })}
           </div>
           <p className="text-xs text-gray-500">
-            Select which fields to display in the grid. At least one field must be selected.
+            Select which fields to display in the table. At least one field must be selected.
           </p>
         </div>
       )}
 
-      {/* Filters (optional) - For Grid and Calendar views */}
+      {/* Filters (optional) - For Table and Calendar views */}
       {(currentViewType === 'grid' || currentViewType === 'calendar') && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -367,7 +367,7 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Sorts (optional) - Only for Grid view */}
+      {/* Sorts (optional) - Only for Table view */}
       {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -455,65 +455,220 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Date Fields (for Calendar) */}
+      {/* Calendar-Specific Settings - Airtable Style */}
       {currentViewType === 'calendar' && config.table_id && fields.length > 0 && (
-        <div className="space-y-4">
-          {/* From Date Field */}
-          <div className="space-y-2">
-            <Label>From Date Field *</Label>
-            <Select
-              value={config.start_date_field || config.calendar_date_field || config.from_date_field || ""}
-              onValueChange={(value) => onUpdate({ start_date_field: value, from_date_field: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a date field" />
-              </SelectTrigger>
-              <SelectContent>
-                {fields
-                  .filter(field => field.type === 'date')
-                  .map((field) => (
-                    <SelectItem key={field.id} value={field.name}>
-                      {field.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {fields.filter(f => f.type === 'date').length === 0 && (
-              <p className="text-xs text-amber-600">
-                No date fields found. Please add a date field to the table.
-              </p>
-            )}
-            <p className="text-xs text-gray-500">
-              Select the start date field for calendar events.
-            </p>
+        <>
+          {/* Records Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Records</Label>
+              <button
+                type="button"
+                onClick={() => {
+                  // Copy settings from a view (placeholder for future)
+                  console.log('Copy settings from view')
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Copy settings from a view
+              </button>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="records-all"
+                  name="records-filter"
+                  checked={true}
+                  onChange={() => {}}
+                  className="h-4 w-4 text-blue-600"
+                />
+                <Label htmlFor="records-all" className="text-sm font-normal cursor-pointer">
+                  All records
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="records-viewer"
+                  name="records-filter"
+                  checked={false}
+                  onChange={() => {}}
+                  className="h-4 w-4 text-blue-600"
+                />
+                <Label htmlFor="records-viewer" className="text-sm font-normal cursor-pointer">
+                  Viewer&apos;s records only
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  id="records-specific"
+                  name="records-filter"
+                  checked={false}
+                  onChange={() => {}}
+                  className="h-4 w-4 text-blue-600"
+                />
+                <Label htmlFor="records-specific" className="text-sm font-normal cursor-pointer">
+                  Specific records
+                </Label>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:text-blue-700 underline ml-6"
+              >
+                Edit conditions
+              </button>
+            </div>
           </div>
 
-          {/* To Date Field */}
-          <div className="space-y-2">
-            <Label>To Date Field (optional)</Label>
-            <Select
-              value={config.end_date_field || config.to_date_field || ""}
-              onValueChange={(value) => onUpdate({ end_date_field: value === "__none__" ? undefined : value, to_date_field: value === "__none__" ? undefined : value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a date field (optional)" />
-              </SelectTrigger>
+          {/* Options Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Options</Label>
+            
+            {/* Date Settings */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Date settings</Label>
+              <Select
+                value={config.start_date_field || config.calendar_date_field || config.from_date_field || ""}
+                onValueChange={(value) => onUpdate({ start_date_field: value, from_date_field: value, calendar_date_field: value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select a date field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fields
+                    .filter(field => field.type === 'date')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {fields.filter(f => f.type === 'date').length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No date fields found. Please add a date field to the table.
+                </p>
+              )}
+            </div>
+
+            {/* End Date Field (optional) */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">End date (optional)</Label>
+              <Select
+                value={config.end_date_field || config.to_date_field || "__none__"}
+                onValueChange={(value) => onUpdate({ end_date_field: value === "__none__" ? undefined : value, to_date_field: value === "__none__" ? undefined : value })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select end date field (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (single date events)</SelectItem>
+                  {fields
+                    .filter(field => field.type === 'date')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Sort</Label>
+              <Select
+                value={(config.sorts && config.sorts.length > 0) ? config.sorts[0].field + ':' + config.sorts[0].direction : "__none__"}
+                onValueChange={(value) => {
+                  if (value === "__none__") {
+                    onUpdate({ sorts: [] })
+                  } else {
+                    const [field, direction] = value.split(':')
+                    onUpdate({ sorts: [{ field, direction: direction as 'asc' | 'desc' }] })
+                  }
+                }}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">None (single date events)</SelectItem>
-                {fields
-                  .filter(field => field.type === 'date')
-                  .map((field) => (
-                    <SelectItem key={field.id} value={field.name}>
-                      {field.name}
-                    </SelectItem>
-                  ))}
+                <SelectItem value="__none__">None</SelectItem>
+                {fields.flatMap((field) => [
+                  <SelectItem key={`${field.id}-asc`} value={`${field.name}:asc`}>
+                    {field.name} (Ascending)
+                  </SelectItem>,
+                  <SelectItem key={`${field.id}-desc`} value={`${field.name}:desc`}>
+                    {field.name} (Descending)
+                  </SelectItem>
+                ])}
               </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              Optional: Select an end date field for multi-day events. Leave empty for single-day events.
-            </p>
+              </Select>
+            </div>
           </div>
-        </div>
+
+          {/* Fields Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Fields</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allFieldNames = fields.map(f => f.name)
+                    onUpdate({ visible_fields: allFieldNames })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select All
+                </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdate({ visible_fields: [] })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select None
+                </button>
+              </div>
+            </div>
+            <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
+              {fields.map((field) => {
+                const visibleFields = config.visible_fields || []
+                const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
+                return (
+                  <label
+                    key={field.id}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
+                  >
+                    <Checkbox
+                      checked={isVisible}
+                      onCheckedChange={(checked) => {
+                        const currentFields = config.visible_fields || []
+                        if (checked) {
+                          if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
+                            onUpdate({ visible_fields: [...currentFields, field.name] })
+                          }
+                        } else {
+                          onUpdate({
+                            visible_fields: currentFields.filter(
+                              (f: string) => f !== field.name && f !== field.id
+                            ),
+                          })
+                        }
+                      }}
+                    />
+                    <span className="text-sm flex-1">{field.name}</span>
+                    <span className="text-xs text-gray-400 capitalize">{field.type.replace('_', ' ')}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

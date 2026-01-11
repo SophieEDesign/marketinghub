@@ -556,7 +556,7 @@ export default function Canvas({
       description: interfaceDescription || 'Add blocks to build your page. Blocks define layout and behavior.',
       suggestedBlocks: [
         { type: 'text' as BlockType, label: 'Text', icon: '📝', description: 'Add content' },
-        { type: 'grid' as BlockType, label: 'Grid View', icon: '📊', description: 'Display data' },
+        { type: 'grid' as BlockType, label: 'Table View', icon: '📊', description: 'Display data' },
         { type: 'chart' as BlockType, label: 'Chart', icon: '📈', description: 'Visualize data' },
       ],
     }

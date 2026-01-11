@@ -461,11 +461,11 @@ export default function CSVImportPanel({
           const sanitizedHeader = sanitizeFieldNameSafe(header)
           
           // Try exact match
-          let existingField = preCheckFields.find(f => f.name.toLowerCase() === sanitizedHeader.toLowerCase())
+          let existingField = preCheckFields.find((f: TableField) => f.name.toLowerCase() === sanitizedHeader.toLowerCase())
           
           // Try sanitized match
           if (!existingField) {
-            existingField = preCheckFields.find(f => 
+            existingField = preCheckFields.find((f: TableField) => 
               sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedHeader.toLowerCase()
             )
           }
@@ -523,19 +523,19 @@ export default function CSVImportPanel({
       
       for (const fieldData of fieldsToCreate) {
         // Calculate what the sanitized name will be (matching API logic)
-        const sanitizedFieldName = sanitizeFieldNameSafe(fieldData.name)
+        const expectedSanitizedName = sanitizeFieldNameSafe(fieldData.name)
         
         // Double-check field doesn't already exist before creating
         // Check multiple ways: exact match, sanitized match, case-insensitive
-        let existingField = preCreateFields.find(f => 
-          f.name.toLowerCase() === sanitizedFieldName.toLowerCase() ||
-          sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedFieldName.toLowerCase() ||
+        let existingField = preCreateFields.find((f: TableField) => 
+          f.name.toLowerCase() === expectedSanitizedName.toLowerCase() ||
+          sanitizeFieldNameSafe(f.name).toLowerCase() === expectedSanitizedName.toLowerCase() ||
           f.name.toLowerCase() === fieldData.name.toLowerCase()
         )
         
         if (existingField) {
           // Field already exists - map to it instead of creating
-          console.log(`Field "${fieldData.name}" (would be sanitized to "${sanitizedFieldName}") already exists as "${existingField.name}", mapping to existing field`)
+          console.log(`Field "${fieldData.name}" (would be sanitized to "${expectedSanitizedName}") already exists as "${existingField.name}", mapping to existing field`)
           createdFieldNames[fieldData.name] = existingField.name
           createdFieldsInfo[existingField.name] = {
             name: existingField.name,
@@ -567,9 +567,9 @@ export default function CSVImportPanel({
             const retryFieldsData = retryFieldsResponse.ok ? await retryFieldsResponse.json() : { fields: [] }
             const retryFields = retryFieldsData.fields || []
             
-            const foundField = retryFields.find(f => 
-              f.name.toLowerCase() === sanitizedFieldName.toLowerCase() ||
-              sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedFieldName.toLowerCase()
+            const foundField = retryFields.find((f: TableField) => 
+              f.name.toLowerCase() === expectedSanitizedName.toLowerCase() ||
+              sanitizeFieldNameSafe(f.name).toLowerCase() === expectedSanitizedName.toLowerCase()
             )
             
             if (foundField) {
@@ -589,37 +589,37 @@ export default function CSVImportPanel({
         
         // Get the created field data to know the exact sanitized name
         const createdField = await response.json().catch(() => null)
-        let sanitizedFieldName: string
+        let actualSanitizedName: string
         
         if (createdField?.field?.name) {
           // API returns { field: { name: "...", type: "...", ... } }
-          sanitizedFieldName = createdField.field.name
-          createdFieldNames[fieldData.name] = sanitizedFieldName
+          actualSanitizedName = createdField.field.name
+          createdFieldNames[fieldData.name] = actualSanitizedName
           // Store full field info including type for immediate use
-          createdFieldsInfo[sanitizedFieldName] = {
-            name: sanitizedFieldName,
+          createdFieldsInfo[actualSanitizedName] = {
+            name: actualSanitizedName,
             type: fieldData.type,
             options: fieldData.options,
           }
         } else if (createdField?.name) {
           // Sometimes API might return field directly
-          sanitizedFieldName = createdField.name
-          createdFieldNames[fieldData.name] = sanitizedFieldName
-          createdFieldsInfo[sanitizedFieldName] = {
-            name: sanitizedFieldName,
+          actualSanitizedName = createdField.name
+          createdFieldNames[fieldData.name] = actualSanitizedName
+          createdFieldsInfo[actualSanitizedName] = {
+            name: actualSanitizedName,
             type: fieldData.type,
             options: fieldData.options,
           }
         } else {
           // Fallback: sanitize the name ourselves (should match API)
-          sanitizedFieldName = sanitizeFieldNameSafe(fieldData.name)
-          createdFieldNames[fieldData.name] = sanitizedFieldName
-          createdFieldsInfo[sanitizedFieldName] = {
-            name: sanitizedFieldName,
+          actualSanitizedName = sanitizeFieldNameSafe(fieldData.name)
+          createdFieldNames[fieldData.name] = actualSanitizedName
+          createdFieldsInfo[actualSanitizedName] = {
+            name: actualSanitizedName,
             type: fieldData.type,
             options: fieldData.options,
           }
-          console.warn(`Field creation response format unexpected for "${fieldData.name}", using sanitized name: ${sanitizedFieldName}`)
+          console.warn(`Field creation response format unexpected for "${fieldData.name}", using sanitized name: ${actualSanitizedName}`)
         }
       }
 

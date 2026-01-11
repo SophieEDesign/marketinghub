@@ -296,14 +296,14 @@ export default function CSVImportModal({
       parsed.columns.forEach((col) => {
         // First try exact match (case-insensitive)
         let existingField = currentTableFields.find(
-          (f) => f.name.toLowerCase() === col.name.toLowerCase()
+          (f: TableField) => f.name.toLowerCase() === col.name.toLowerCase()
         )
         
         // If no exact match, try sanitized match (handles "Notes/Detail" -> "notes_detail")
         if (!existingField) {
           const sanitizedColName = sanitizeFieldNameSafe(col.name)
           existingField = currentTableFields.find(
-            (f) => sanitizeFieldNameSafe(f.name) === sanitizedColName ||
+            (f: TableField) => sanitizeFieldNameSafe(f.name) === sanitizedColName ||
                    f.name.toLowerCase() === sanitizedColName.toLowerCase()
           )
         }
@@ -439,11 +439,11 @@ export default function CSVImportModal({
         // Check if field already exists before trying to create it
         // Try exact match first
         const sanitizedColName = sanitizeFieldNameSafe(col.name)
-        let existingField = freshTableFields.find(f => f.name.toLowerCase() === sanitizedColName.toLowerCase())
+        let existingField = freshTableFields.find((f: TableField) => f.name.toLowerCase() === sanitizedColName.toLowerCase())
         
         // If no exact match, try sanitized match
         if (!existingField) {
-          existingField = freshTableFields.find(f => 
+          existingField = freshTableFields.find((f: TableField) => 
             sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedColName.toLowerCase()
           )
         }
@@ -566,7 +566,7 @@ export default function CSVImportModal({
           
           // Double-check field doesn't already exist before creating
           // Check multiple ways: exact match, sanitized match, case-insensitive
-          let existingField = preCreateFields.find(f => 
+          let existingField = preCreateFields.find((f: TableField) => 
             f.name.toLowerCase() === sanitizedName.toLowerCase() ||
             sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedName.toLowerCase() ||
             f.name.toLowerCase() === fieldInfo.name.toLowerCase()
@@ -636,7 +636,7 @@ export default function CSVImportModal({
               const retryFieldsData = retryFieldsResponse.ok ? await retryFieldsResponse.json() : { fields: [] }
               const retryFields = retryFieldsData.fields || []
               
-              const foundField = retryFields.find(f => 
+              const foundField = retryFields.find((f: TableField) => 
                 f.name.toLowerCase() === sanitizedName.toLowerCase() ||
                 sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedName.toLowerCase()
               )
@@ -682,7 +682,6 @@ export default function CSVImportModal({
         await new Promise(resolve => setTimeout(resolve, 1000)) // Initial wait
         
         // Reload fields and verify all created fields are present
-        let allFields: TableField[] = []
         let allFieldsVerified = false
         
         for (let attempt = 0; attempt < 10; attempt++) {
@@ -691,16 +690,16 @@ export default function CSVImportModal({
             cache: 'no-store', // Bypass cache
           })
           const fieldsData = response.ok ? await response.json() : { fields: [] }
-          allFields = fieldsData.fields || []
-          setTableFields(allFields)
+          const verifiedFields = fieldsData.fields || []
+          setTableFields(verifiedFields)
           
           // Check if all created fields are present
           const createdFieldNames = Object.keys(createdFieldsMap)
           const allCreatedFieldsFound = createdFieldNames.every(fieldName => 
-            allFields.some((f: TableField) => f.name === fieldName)
+            verifiedFields.some((f: TableField) => f.name === fieldName)
           )
           
-          if (allCreatedFieldsFound && allFields.length > 0) {
+          if (allCreatedFieldsFound && verifiedFields.length > 0) {
             allFieldsVerified = true
             console.log(`All ${createdFieldNames.length} created fields verified after ${attempt + 1} attempt(s)`)
             break
@@ -718,12 +717,13 @@ export default function CSVImportModal({
       }
 
       // Get final field list (either from reload or existing tableFields)
+      let allFields: TableField[] = tableFields
       if (allFields.length === 0) {
         const finalFieldsResponse = await fetch(`/api/tables/${tableId}/fields?t=${Date.now()}`, {
           cache: 'no-store', // Bypass cache
         })
         const finalFieldsData = finalFieldsResponse.ok ? await finalFieldsResponse.json() : { fields: [] }
-        allFields = finalFieldsData.fields || tableFields
+        allFields = finalFieldsData.fields || []
       }
       
       // Build a comprehensive field map: use created fields first, then fall back to loaded fields
