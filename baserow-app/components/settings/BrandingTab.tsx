@@ -11,6 +11,32 @@ import { createClient } from "@/lib/supabase/client"
 import { Upload, Save } from "lucide-react"
 import { useRouter } from "next/navigation"
 
+// Helper function to convert HSL to hex
+function hslToHex(hsl: string): string {
+  if (hsl.startsWith('#')) {
+    return hsl
+  }
+  
+  // Parse HSL string: hsl(h, s%, l%)
+  const match = hsl.match(/hsl\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?)%,\s*(\d+(?:\.\d+)?)%\)/)
+  if (!match) {
+    return '#f1f5f9' // Default fallback
+  }
+  
+  const h = parseFloat(match[1]) / 360
+  const s = parseFloat(match[2]) / 100
+  const l = parseFloat(match[3]) / 100
+  
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+    return Math.round(255 * color).toString(16).padStart(2, '0')
+  }
+  
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+
 export default function SettingsBrandingTab() {
   const router = useRouter()
   const { settings } = useBranding()
@@ -223,7 +249,7 @@ export default function SettingsBrandingTab() {
               />
               <input
                 type="color"
-                value={primaryColor.startsWith('#') ? primaryColor : '#1e293b'}
+                value={hslToHex(primaryColor)}
                 onChange={(e) => {
                   // Convert hex to HSL for consistency
                   const hex = e.target.value
@@ -266,7 +292,7 @@ export default function SettingsBrandingTab() {
               />
               <input
                 type="color"
-                value={accentColor.startsWith('#') ? accentColor : '#f1f5f9'}
+                value={hslToHex(accentColor)}
                 onChange={(e) => {
                   const hex = e.target.value
                   const r = parseInt(hex.slice(1, 3), 16) / 255
