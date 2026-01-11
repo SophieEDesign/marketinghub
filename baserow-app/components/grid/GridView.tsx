@@ -241,7 +241,7 @@ export default function GridView({
         setRows([])
       } else {
         // CRITICAL: Normalize data to array - API might return single record or null
-        let dataArray = asArray(data)
+        let dataArray = asArray<Record<string, any>>(data)
         
         // Compute formula fields for each row
         const formulaFields = safeTableFields.filter(f => f.type === 'formula')

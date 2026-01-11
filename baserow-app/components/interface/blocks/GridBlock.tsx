@@ -359,7 +359,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         const groupByFieldFromConfig = config.group_by_field || config.kanban_group_field
         const groupByFieldFromFields = visibleFields.find(f => {
           const field = safeTableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
-          return field && (field.type === 'select' || field.type === 'single_select')
+          return field && (field.type === 'single_select' || field.type === 'multi_select')
         })
         const groupByFieldId = groupByFieldFromConfig || groupByFieldFromFields?.field_name || ''
         
