@@ -147,9 +147,7 @@ async function checkBlockConfigs() {
     // Check required config per block type
     switch (blockType) {
       case 'grid':
-      case 'calendar':
       case 'chart':
-      case 'kpi':
         if (!config.table_id && !config.source_view) {
           errors.push({
             type: 'block_missing_config',
@@ -157,6 +155,13 @@ async function checkBlockConfigs() {
             message: `Block ${block.id} (${blockType}) is missing required table_id or source_view.`,
           })
         }
+        break
+
+      case 'calendar':
+      case 'kpi':
+        // Calendar and KPI blocks can inherit table_id from page context (page.base_table)
+        // So we allow them to be missing table_id/source_view
+        // They will get the table from the page they're on
         break
 
       case 'record':
