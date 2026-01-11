@@ -192,7 +192,7 @@ export default function CSVImportPanel({
           mappings[header] = matchingField.name
         } else {
           // Auto-detect field type from sample data
-          const sampleValues = rows.slice(0, 10).map(row => row[header]).filter(v => v && v.trim())
+          const sampleValues = (Array.isArray(rows) ? rows : []).slice(0, 10).map(row => row[header]).filter(v => v && v.trim())
           if (sampleValues.length > 0) {
             const detectedType = detectFieldType(sampleValues)
             autoDetectedTypes[header] = detectedType
@@ -1222,7 +1222,7 @@ export default function CSVImportPanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {csvRows.slice(0, 10).map((row, idx) => (
+                  {(Array.isArray(csvRows) ? csvRows : []).slice(0, 10).map((row, idx) => (
                     <tr key={idx} className="border-b border-gray-100">
                       {csvHeaders.map((header) => (
                         <td key={header} className="px-2 py-2 text-gray-900">
