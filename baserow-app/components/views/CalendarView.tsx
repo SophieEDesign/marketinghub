@@ -1249,7 +1249,6 @@ export default function CalendarView({
           }}
         />
       </div>
-    </div>
 
       {/* Record Modal */}
       {selectedRecordId && resolvedTableId && (
