@@ -324,25 +324,37 @@ export default function GridDataSettings({
                     onUpdate({ filters: updated })
                   }}
                 >
-                  <SelectTrigger className="h-8 w-32">
+                  <SelectTrigger className="h-8 w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="equal">Equals</SelectItem>
+                    <SelectItem value="not_equal">Not equals</SelectItem>
                     <SelectItem value="contains">Contains</SelectItem>
+                    <SelectItem value="greater_than">Greater than</SelectItem>
+                    <SelectItem value="less_than">Less than</SelectItem>
+                    <SelectItem value="is_empty">Is empty</SelectItem>
+                    <SelectItem value="is_not_empty">Is not empty</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input
-                  value={filter.value || ''}
-                  onChange={(e) => {
-                    const currentFilters = config.filters || []
-                    const updated = [...currentFilters]
-                    updated[index] = { ...updated[index], value: e.target.value }
-                    onUpdate({ filters: updated })
-                  }}
-                  placeholder="Value"
-                  className="h-8 flex-1"
-                />
+                {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' && (
+                  <Input
+                    value={filter.value || ''}
+                    onChange={(e) => {
+                      const currentFilters = config.filters || []
+                      const updated = [...currentFilters]
+                      updated[index] = { ...updated[index], value: e.target.value }
+                      onUpdate({ filters: updated })
+                    }}
+                    placeholder="Value"
+                    className="h-8 flex-1"
+                  />
+                )}
+                {(filter.operator === 'is_empty' || filter.operator === 'is_not_empty') && (
+                  <div className="h-8 flex-1 flex items-center text-xs text-gray-500 px-2">
+                    No value needed
+                  </div>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
@@ -362,7 +374,7 @@ export default function GridDataSettings({
             )}
           </div>
           <p className="text-xs text-gray-500">
-            Filter rows by field values. Supports equals and contains operators.
+            Filter rows by field values. Supports equals, contains, comparison, and empty checks.
           </p>
         </div>
       )}
@@ -458,70 +470,6 @@ export default function GridDataSettings({
       {/* Calendar-Specific Settings - Airtable Style */}
       {currentViewType === 'calendar' && config.table_id && fields.length > 0 && (
         <>
-          {/* Records Section - Airtable Style */}
-          <div className="space-y-3 pt-2 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Records</Label>
-              <button
-                type="button"
-                onClick={() => {
-                  // Copy settings from a view (placeholder for future)
-                  console.log('Copy settings from view')
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Copy settings from a view
-              </button>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="records-all"
-                  name="records-filter"
-                  checked={true}
-                  onChange={() => {}}
-                  className="h-4 w-4 text-blue-600"
-                />
-                <Label htmlFor="records-all" className="text-sm font-normal cursor-pointer">
-                  All records
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="records-viewer"
-                  name="records-filter"
-                  checked={false}
-                  onChange={() => {}}
-                  className="h-4 w-4 text-blue-600"
-                />
-                <Label htmlFor="records-viewer" className="text-sm font-normal cursor-pointer">
-                  Viewer&apos;s records only
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="radio"
-                  id="records-specific"
-                  name="records-filter"
-                  checked={false}
-                  onChange={() => {}}
-                  className="h-4 w-4 text-blue-600"
-                />
-                <Label htmlFor="records-specific" className="text-sm font-normal cursor-pointer">
-                  Specific records
-                </Label>
-              </div>
-              <button
-                type="button"
-                className="text-xs text-blue-600 hover:text-blue-700 underline ml-6"
-              >
-                Edit conditions
-              </button>
-            </div>
-          </div>
-
           {/* Options Section - Airtable Style */}
           <div className="space-y-3 pt-2 border-t border-gray-200">
             <Label className="text-sm font-semibold">Options</Label>

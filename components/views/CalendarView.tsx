@@ -38,11 +38,14 @@ export default function CalendarView({
       .filter((row) => row[dateField])
       .map((row) => {
         const dateValue = row[dateField]
-        const title = safeVisibleFields
-          .filter((f) => f && f.field_name !== dateField)
-          .slice(0, 1)
-          .map((f) => String(row[f.field_name] || 'Untitled'))
-          .join(' ')
+        // Filter and get title from first non-date field
+        // safeVisibleFields is already validated as an array above
+        const filteredFields = safeVisibleFields.filter((f) => f && f.field_name !== dateField)
+        const title = filteredFields.length > 0
+          ? filteredFields.slice(0, 1)
+              .map((f) => String(row[f.field_name] || 'Untitled'))
+              .join(' ')
+          : 'Untitled'
 
         return {
           id: row.id,
