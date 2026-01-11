@@ -36,26 +36,39 @@ export default function RecordModal({
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
 
-  // Load table info and record data
+  // Load table info when modal opens
   useEffect(() => {
-    if (open && recordId && tableId) {
+    if (open && tableId) {
       loadTableInfo()
-      loadRecord()
     } else {
+      setSupabaseTableName(null)
       setFormData({})
     }
-  }, [open, recordId, tableId])
+  }, [open, tableId])
+
+  // Load record data when table name is available
+  useEffect(() => {
+    if (open && recordId && supabaseTableName) {
+      loadRecord()
+    }
+  }, [open, recordId, supabaseTableName])
 
   async function loadTableInfo() {
+    if (!tableId) return
+    
     try {
       const supabase = createClient()
-      const { data: table } = await supabase
+      // Sanitize tableId (remove any suffix after colon)
+      const sanitizedTableId = tableId.split(':')[0]
+      const { data: table, error } = await supabase
         .from('tables')
         .select('supabase_table')
-        .eq('id', tableId)
+        .eq('id', sanitizedTableId)
         .single()
       
-      if (table) {
+      if (error) {
+        console.error('Error loading table info:', error)
+      } else if (table) {
         setSupabaseTableName(table.supabase_table)
       }
     } catch (error) {

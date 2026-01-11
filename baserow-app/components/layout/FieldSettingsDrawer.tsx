@@ -67,8 +67,12 @@ export default function FieldSettingsDrawer({
   const [showAddOptionsDialog, setShowAddOptionsDialog] = useState(false)
   const [foundOptions, setFoundOptions] = useState<string[]>([])
   const [loadingOptions, setLoadingOptions] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [pendingLookupType, setPendingLookupType] = useState<FieldType | null>(null)
+  const [duplicating, setDuplicating] = useState(false)
   const previousTypeRef = useRef<FieldType | null>(null)
   const hasPromptedForOptionsRef = useRef(false)
+  const hasPromptedForDuplicateRef = useRef(false)
 
   // Load tables for link_to_table fields
   useEffect(() => {
@@ -152,16 +156,33 @@ export default function FieldSettingsDrawer({
       setTypeChangeWarning(null)
       previousTypeRef.current = null
       hasPromptedForOptionsRef.current = false
+      hasPromptedForDuplicateRef.current = false
       setShowAddOptionsDialog(false)
       setFoundOptions([])
+      setShowDuplicateDialog(false)
+      setPendingLookupType(null)
     }
   }, [field, open])
 
-  // Check for type change warnings
+  // Check for type change warnings and detect physical-to-virtual conversions
   useEffect(() => {
     if (field && open && type !== field.type) {
       const typeCheck = canChangeType(field.type, type)
-      if (!typeCheck.canChange) {
+      
+      // Check if trying to convert physical field to lookup/formula
+      const isPhysicalToVirtual = 
+        field.type !== 'formula' && 
+        field.type !== 'lookup' && 
+        (type === 'formula' || type === 'lookup')
+      
+      if (!typeCheck.canChange && isPhysicalToVirtual && !hasPromptedForDuplicateRef.current) {
+        // Show duplicate dialog instead of warning
+        setPendingLookupType(type)
+        setShowDuplicateDialog(true)
+        hasPromptedForDuplicateRef.current = true
+        // Revert type to original to prevent invalid state
+        setType(field.type)
+      } else if (!typeCheck.canChange) {
         setTypeChangeWarning(typeCheck.warning || 'Cannot change field type')
       } else if (typeCheck.warning) {
         setTypeChangeWarning(typeCheck.warning)
@@ -170,6 +191,11 @@ export default function FieldSettingsDrawer({
       }
     } else {
       setTypeChangeWarning(null)
+    }
+    
+    // Reset duplicate prompt flag when type changes away from lookup/formula
+    if (type !== 'lookup' && type !== 'formula' && previousTypeRef.current !== type) {
+      hasPromptedForDuplicateRef.current = false
     }
   }, [type, field, open])
 
@@ -283,6 +309,134 @@ export default function FieldSettingsDrawer({
     setFoundOptions([])
   }
 
+  async function duplicateFieldAndConvert() {
+    if (!field || !pendingLookupType) return
+
+    setDuplicating(true)
+    try {
+      const supabase = createClient()
+      
+      // Get table info
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('supabase_table')
+        .eq('id', tableId)
+        .single()
+
+      if (tableError || !table) {
+        alert('Failed to load table information')
+        return
+      }
+
+      // Generate duplicate field name
+      let duplicateName = `${field.name}_copy`
+      let counter = 1
+      
+      // Ensure unique name
+      const existingFieldNames = tableFields.map(f => f.name.toLowerCase())
+      while (existingFieldNames.includes(duplicateName.toLowerCase())) {
+        duplicateName = `${field.name}_copy_${counter}`
+        counter++
+      }
+      
+      // Step 1: Create duplicate field via API
+      const createResponse = await fetch(`/api/tables/${tableId}/fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: duplicateName,
+          type: field.type,
+          required: field.required || false,
+          default_value: field.default_value || null,
+          options: field.options || {},
+        }),
+      })
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json()
+        alert(errorData.error || 'Failed to create duplicate field')
+        return
+      }
+
+      const duplicateFieldData = await createResponse.json()
+      
+      // Step 2: Copy data from original column to duplicate column
+      // Only if it's a physical field (has a SQL column)
+      if (field.type !== 'formula' && field.type !== 'lookup') {
+        const sanitizedOrigName = field.name.replace(/"/g, '""')
+        const sanitizedDupName = duplicateFieldData.field.name.replace(/"/g, '""')
+        const sanitizedTableName = table.supabase_table.replace(/"/g, '""')
+        const copySQL = `UPDATE "${sanitizedTableName}" SET "${sanitizedDupName}" = "${sanitizedOrigName}"`
+        
+        const { error: copyError } = await supabase.rpc('execute_sql_safe', {
+          sql_text: copySQL
+        })
+
+        if (copyError) {
+          console.error('Error copying data:', copyError)
+          // Don't fail - field is created, data copy is best-effort
+        }
+      }
+
+      // Step 3: Delete the original field (it's been backed up to duplicate)
+      const deleteResponse = await fetch(`/api/tables/${tableId}/fields`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fieldId: field.id }),
+      })
+
+      if (!deleteResponse.ok) {
+        const errorData = await deleteResponse.json()
+        console.error('Failed to delete original field:', errorData)
+        // Continue anyway - duplicate is created
+      }
+
+      // Step 4: Create new lookup/formula field with original name
+      const newFieldResponse = await fetch(`/api/tables/${tableId}/fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: field.name,
+          type: pendingLookupType,
+          required: false, // Virtual fields can't be required
+          options: pendingLookupType === 'lookup' ? {} : (field.options || {}),
+        }),
+      })
+
+      if (!newFieldResponse.ok) {
+        const errorData = await newFieldResponse.json()
+        alert(`Duplicate field "${duplicateName}" was created, but failed to create new ${pendingLookupType} field: ${errorData.error}`)
+        // Reload to show the duplicate
+        onSave()
+        onOpenChange(false)
+        return
+      }
+
+      // Success! Reload fields
+      onSave()
+      onOpenChange(false)
+      
+      // Show success message
+      setTimeout(() => {
+        alert(`✓ Conversion complete!\n\n- Created "${duplicateName}" with your original data\n- Converted "${field.name}" to a ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field\n\nYou can configure the ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field settings now.`)
+      }, 100)
+    } catch (error) {
+      console.error('Error duplicating field:', error)
+      alert('Failed to duplicate field: ' + (error instanceof Error ? error.message : String(error)))
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  function handleCancelDuplicate() {
+    setShowDuplicateDialog(false)
+    setPendingLookupType(null)
+    hasPromptedForDuplicateRef.current = false
+    if (field) {
+      setType(field.type) // Reset to original type
+    }
+  }
+
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
 
@@ -386,6 +540,50 @@ export default function FieldSettingsDrawer({
             </Button>
             <Button onClick={handleAddOptions}>
               Add {foundOptions.length} {foundOptions.length === 1 ? 'Option' : 'Options'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDuplicateDialog} onOpenChange={(open) => {
+        if (!open && !duplicating) {
+          handleCancelDuplicate()
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convert to {pendingLookupType === 'lookup' ? 'Lookup' : 'Formula'} Field</DialogTitle>
+            <DialogDescription>
+              Physical fields cannot be directly converted to virtual fields ({pendingLookupType === 'lookup' ? 'lookup' : 'formula'}). 
+              We'll automatically:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+              <li>Create a backup copy "{field?.name}_copy" with all your original data</li>
+              <li>Delete the original "{field?.name}" field</li>
+              <li>Create a new {pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field named "{field?.name}"</li>
+            </ol>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Your original data is safely preserved in the "{field?.name}_copy" field. 
+                You can delete it later if you don't need it.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={handleCancelDuplicate}
+              disabled={duplicating}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={duplicateFieldAndConvert}
+              disabled={duplicating}
+            >
+              {duplicating ? 'Converting...' : `Create Backup & Convert`}
             </Button>
           </DialogFooter>
         </DialogContent>
