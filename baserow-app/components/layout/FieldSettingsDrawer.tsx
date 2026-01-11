@@ -555,19 +555,19 @@ export default function FieldSettingsDrawer({
             <DialogTitle>Convert to {pendingLookupType === 'lookup' ? 'Lookup' : 'Formula'} Field</DialogTitle>
             <DialogDescription>
               Physical fields cannot be directly converted to virtual fields ({pendingLookupType === 'lookup' ? 'lookup' : 'formula'}). 
-              We'll automatically:
+              We&apos;ll automatically:
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
-              <li>Create a backup copy "{field?.name}_copy" with all your original data</li>
-              <li>Delete the original "{field?.name}" field</li>
-              <li>Create a new {pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field named "{field?.name}"</li>
+              <li>Create a backup copy &quot;{field?.name}_copy&quot; with all your original data</li>
+              <li>Delete the original &quot;{field?.name}&quot; field</li>
+              <li>Create a new {pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field named &quot;{field?.name}&quot;</li>
             </ol>
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Your original data is safely preserved in the "{field?.name}_copy" field. 
-                You can delete it later if you don't need it.
+                <strong>Note:</strong> Your original data is safely preserved in the &quot;{field?.name}_copy&quot; field. 
+                You can delete it later if you don&apos;t need it.
               </p>
             </div>
           </div>

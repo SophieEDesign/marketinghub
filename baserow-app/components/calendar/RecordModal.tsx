@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -36,24 +36,7 @@ export default function RecordModal({
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
 
-  // Load table info when modal opens
-  useEffect(() => {
-    if (open && tableId) {
-      loadTableInfo()
-    } else {
-      setSupabaseTableName(null)
-      setFormData({})
-    }
-  }, [open, tableId])
-
-  // Load record data when table name is available
-  useEffect(() => {
-    if (open && recordId && supabaseTableName) {
-      loadRecord()
-    }
-  }, [open, recordId, supabaseTableName])
-
-  async function loadTableInfo() {
+  const loadTableInfo = useCallback(async () => {
     if (!tableId) return
     
     try {
@@ -74,9 +57,9 @@ export default function RecordModal({
     } catch (error) {
       console.error('Error loading table info:', error)
     }
-  }
+  }, [tableId])
 
-  async function loadRecord() {
+  const loadRecord = useCallback(async () => {
     if (!recordId || !supabaseTableName) return
 
     setLoading(true)
@@ -98,7 +81,24 @@ export default function RecordModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [recordId, supabaseTableName])
+
+  // Load table info when modal opens
+  useEffect(() => {
+    if (open && tableId) {
+      loadTableInfo()
+    } else {
+      setSupabaseTableName(null)
+      setFormData({})
+    }
+  }, [open, tableId, loadTableInfo])
+
+  // Load record data when table name is available
+  useEffect(() => {
+    if (open && recordId && supabaseTableName) {
+      loadRecord()
+    }
+  }, [open, recordId, supabaseTableName, loadRecord])
 
   async function handleSave() {
     if (!supabaseTableName || !recordId) return
