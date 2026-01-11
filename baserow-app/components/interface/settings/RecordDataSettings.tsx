@@ -1,5 +1,25 @@
 "use client"
 
+/**
+ * Record Block Data Settings
+ * 
+ * Block-level settings for "record" blocks (blocks that display a single record).
+ * 
+ * NOTE: This is for BLOCK settings, not page-level Record View settings.
+ * Page-level settings (source table, title field, visible fields, field editability) 
+ * are configured in RecordViewPageSettings and apply to the entire Record View page.
+ * 
+ * Record blocks can:
+ * - Display a record from any table (not tied to page's source table)
+ * - Show selected fields for that specific block instance
+ * - Have block-specific permissions
+ * 
+ * Record blocks do NOT:
+ * - Define the page's source table (that's page-level)
+ * - Define the page's title field (that's page-level)
+ * - Define the page's visible core fields (that's page-level)
+ */
+
 import { useState, useEffect } from "react"
 import { Label } from "@/components/ui/label"
 import {
@@ -13,6 +33,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
@@ -90,9 +117,9 @@ export default function RecordDataSettings({
 
   return (
     <div className="space-y-4">
-      {/* Table Selection */}
+      {/* Table Selection - Block-specific table (can be different from page's source table) */}
       <div className="space-y-2">
-        <Label>Table *</Label>
+        <Label>Source Table *</Label>
         <Select
           value={config.table_id || ""}
           onValueChange={onTableChange}
@@ -108,6 +135,10 @@ export default function RecordDataSettings({
             ))}
           </SelectContent>
         </Select>
+        <p className="text-xs text-gray-500">
+          The table containing the record to display in this block. This is independent from the
+          page's source table (configured in Page Settings).
+        </p>
       </div>
 
       {/* Record Selection */}
@@ -162,11 +193,11 @@ export default function RecordDataSettings({
         </div>
       )}
 
-      {/* Field Visibility */}
+      {/* Field Visibility - Block-specific field selection (for this block instance) */}
       {config.table_id && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Visible Fields</Label>
+            <Label>Fields to Display</Label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -192,6 +223,10 @@ export default function RecordDataSettings({
               </button>
             </div>
           </div>
+          <p className="text-xs text-gray-500">
+            Which fields to display in this record block. This is block-specific and independent
+            from the page's visible fields (configured in Page Settings).
+          </p>
           <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
             {fields.length === 0 ? (
               <div className="text-sm text-gray-500 text-center py-2">
@@ -235,20 +270,33 @@ export default function RecordDataSettings({
         </div>
       )}
 
-      {/* Editing */}
-      <div className="flex items-center justify-between">
-        <div>
-          <Label>Allow Editing</Label>
-          <p className="text-xs text-gray-500">
-            Allow users to edit record fields
-          </p>
+      {/* Block Permissions - Block-level permissions (cannot exceed page-level permissions) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Block Permissions</Label>
+            <p className="text-xs text-gray-500">
+              Block-level permissions. Cannot exceed page-level permissions.
+            </p>
+          </div>
+          <Select
+            value={config.allow_editing ? "editable" : "view_only"}
+            onValueChange={(value) =>
+              onUpdate({ allow_editing: value === "editable" })
+            }
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="view_only">View-only</SelectItem>
+              <SelectItem value="editable">Editable</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Switch
-          checked={config.allow_editing || false}
-          onCheckedChange={(checked) =>
-            onUpdate({ allow_editing: checked })
-          }
-        />
+        <p className="text-xs text-gray-500">
+          If the page is view-only, this block will also be view-only regardless of this setting.
+        </p>
       </div>
     </div>
   )

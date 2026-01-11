@@ -23,8 +23,9 @@ import { Input } from "@/components/ui/input"
 import { Plus, X, ArrowUp, ArrowDown, Save, Edit2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
-import { getPageTypeDefinition, validatePageAnchor } from "@/lib/interface/page-types"
+import { getPageTypeDefinition, validatePageAnchor, isRecordReviewPage } from "@/lib/interface/page-types"
 import RecordPanelEditor from "./RecordPanelEditor"
+import RecordViewPageSettings from "./settings/RecordViewPageSettings"
 
 interface PageDisplaySettingsPanelProps {
   page: InterfacePage | null
@@ -495,6 +496,58 @@ export default function PageDisplaySettingsPanel({
   // Show settings panel for data-backed pages (requiresSourceView or requiresBaseTable)
   if (!isDataBacked) {
     return null
+  }
+
+  // Record View pages use special page-level settings
+  if (isRecordReviewPage(currentPage.page_type)) {
+    return (
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Record View Settings</SheetTitle>
+            <SheetDescription>
+              Configure page-level settings for this Record View. Block-specific settings are configured in the block settings panel.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <RecordViewPageSettings
+              pageId={currentPage.id}
+              config={currentPage.config || {}}
+              tables={tables}
+              onUpdate={async (updates) => {
+                const supabase = createClient()
+                const newConfig = {
+                  ...(currentPage.config || {}),
+                  ...updates,
+                }
+                await supabase
+                  .from('interface_pages')
+                  .update({ config: newConfig })
+                  .eq('id', currentPage.id)
+                
+                // Also update base_table if table_id is being set
+                if (updates.table_id) {
+                  await supabase
+                    .from('interface_pages')
+                    .update({ base_table: updates.table_id })
+                    .eq('id', currentPage.id)
+                }
+                
+                onUpdate()
+              }}
+              onTableChange={async (tableId) => {
+                const supabase = createClient()
+                await supabase
+                  .from('interface_pages')
+                  .update({ base_table: tableId })
+                  .eq('id', currentPage.id)
+                onUpdate()
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
   }
 
   // UNIFIED: Layout is handled by blocks, not pages

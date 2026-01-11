@@ -104,6 +104,12 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   const allowEditing = config.allow_editing || false
   const recordPanel = config.record_panel || 'side'
   const [showComments, setShowComments] = useState(true)
+  
+  // Determine if a field is editable (respects both page-level and field-level permissions)
+  const isFieldEditable = useCallback((fieldName: string): boolean => {
+    if (!pageEditable) return false // Page-level view-only
+    return editableFieldNames.includes(fieldName) // Field-level editable setting
+  }, [pageEditable, editableFieldNames])
 
   // Get columns from config or data - ensure it's always an array
   const columns = useMemo(() => {
@@ -452,9 +458,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }, [selectedRecord, loadedBlocks.length, filteredData.length, recordDebugEnabled])
 
-  // Handle field changes
+  // Handle field changes (only if field is editable based on page-level and field-level permissions)
   const handleFieldChange = async (fieldName: string, value: any) => {
-    if (!allowEditing || !selectedRecordId || !pageTableId) return
+    if (!pageEditable || !isFieldEditable(fieldName) || !selectedRecordId || !pageTableId) return
 
     setFormData(prev => ({ ...prev, [fieldName]: value }))
 
@@ -493,24 +499,41 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }
 
-  // Get fields to display in left panel (filtered by config.detail_fields)
+  // Get fields to display in structured field list (page-level config)
+  // Uses config.visible_fields (new) or config.detail_fields (backward compatibility)
   const visibleFields = useMemo(() => {
     if (!tableFields.length) return []
     
-    // Check if detail_fields is explicitly configured (not undefined/null/empty)
-    const detailFields = config.detail_fields
-    const hasDetailFieldsConfig = detailFields && Array.isArray(detailFields) && detailFields.length > 0
+    // Prefer visible_fields (new Record View setting), fallback to detail_fields (legacy)
+    const visibleFieldNames = config.visible_fields || config.detail_fields || []
+    const hasVisibleFieldsConfig = visibleFieldNames && Array.isArray(visibleFieldNames) && visibleFieldNames.length > 0
     
-    // If detail_fields is explicitly configured with field names, filter to only those fields
+    // If visible_fields is explicitly configured with field names, filter to only those fields
     // (and filter out any that don't exist in the table anymore)
-    if (hasDetailFieldsConfig) {
-      return tableFields.filter(field => detailFields.includes(field.name))
+    if (hasVisibleFieldsConfig) {
+      const filtered = tableFields.filter(field => visibleFieldNames.includes(field.name))
+      // Maintain order from config
+      return visibleFieldNames
+        .map((fieldName: string) => filtered.find(f => f.name === fieldName))
+        .filter((f): f is TableField => f !== undefined)
     }
     
     // Otherwise (undefined, null, or empty array), show ALL fields from the table
     // This ensures new fields added to the table automatically appear
     return tableFields
-  }, [tableFields, config.detail_fields])
+  }, [tableFields, config.visible_fields, config.detail_fields])
+  
+  // Get editable fields from page-level config
+  const editableFieldNames = useMemo(() => {
+    return config.editable_fields || []
+  }, [config.editable_fields])
+  
+  // Page-level permissions
+  const pageEditable = config.allow_editing !== false
+  
+  // Layout toggles (page-level)
+  const showFieldList = config.show_field_list !== false // Default to true
+  const showBlocksSection = config.show_blocks_section !== false // Default to true
 
   // CRITICAL: Memoize InterfaceBuilder page props to prevent remounts
   // Creating new objects on every render causes component remounts and canvas resets
@@ -745,46 +768,55 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           )}
         </div>
 
-        {/* Record Fields Section */}
-        <div className="flex-1 overflow-auto border-t">
-          {!selectedRecordId ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="text-xs mb-1 font-medium">Select a record</p>
-                <p className="text-xs text-gray-400">Choose a record from the list above to view its fields.</p>
+        {/* Structured Field List Section (Page-level, fixed block) */}
+        {showFieldList && (
+          <div className="flex-1 overflow-auto border-t">
+            {!selectedRecordId ? (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                <div className="text-center">
+                  <p className="text-xs mb-1 font-medium">Select a record</p>
+                  <p className="text-xs text-gray-400">Choose a record from the list above to view its fields.</p>
+                </div>
               </div>
-            </div>
-          ) : !selectedRecord ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="text-xs mb-1 font-medium">Loading record...</p>
+            ) : !selectedRecord ? (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                <div className="text-center">
+                  <p className="text-xs mb-1 font-medium">Loading record...</p>
+                </div>
               </div>
-            </div>
-          ) : visibleFields.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
-              <div className="text-center">
-                <p className="text-xs mb-1 font-medium">No fields configured</p>
-                <p className="text-xs text-gray-400">Configure fields to display in Settings.</p>
+            ) : visibleFields.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
+                <div className="text-center">
+                  <p className="text-xs mb-1 font-medium">No fields configured</p>
+                  <p className="text-xs text-gray-400">Configure fields to display in Page Settings.</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="p-4">
-              <RecordFields
-                fields={visibleFields}
-                formData={formData}
-                onFieldChange={handleFieldChange}
-                fieldGroups={fieldGroups}
-                tableId={pageTableId || ''}
-                recordId={selectedRecordId}
-              />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="p-4">
+                {/* Helper text if page is view-only but some fields are editable */}
+                {!pageEditable && editableFieldNames.length > 0 && (
+                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs text-yellow-800">
+                      Some fields are configured as editable, but the page is view-only. All fields are displayed as view-only.
+                    </p>
+                  </div>
+                )}
+                <RecordFields
+                  fields={visibleFields}
+                  formData={formData}
+                  onFieldChange={isFieldEditable ? handleFieldChange : undefined}
+                  fieldGroups={fieldGroups}
+                  tableId={pageTableId || ''}
+                  recordId={selectedRecordId}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Detail panel - Right Column - Shows blocks for selected record */}
-      {/* ALWAYS render the panel - never return null */}
-      {recordPanel !== 'none' && (
+      {/* Blocks Section (Flexible, block-level) */}
+      {showBlocksSection && (
         <div className={recordPanel === 'side' ? 'flex-1 border-r overflow-auto bg-white flex flex-col' : 'w-full border-t overflow-auto flex flex-col'}>
           {/* Edit Mode Toggle - Only show when record is selected */}
           {selectedRecordId && (
@@ -874,8 +906,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         </div>
       )}
       
-      {/* Comments Sidebar - Right Column */}
-      {recordPanel !== 'none' && showComments && (
+      {/* Comments Sidebar - Right Column (Optional) */}
+      {showComments && recordPanel !== 'none' && (
         <div className="w-80 border-l flex flex-col overflow-hidden bg-white">
           <div className="border-b p-4">
             <div className="flex items-center justify-between">

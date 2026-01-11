@@ -48,6 +48,13 @@ export interface PageConfig {
     blockConfig?: any
   }> // Layout for record detail panel (fields and blocks)
   
+  // Record View specific (page-level settings)
+  table_id?: string // Source table for Record View (page-level)
+  visible_fields?: string[] // Fields visible in structured field list (page-level)
+  editable_fields?: string[] // Fields that are editable (page-level, subset of visible_fields)
+  show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
+  show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
+  
   // General
   [key: string]: any
 }
@@ -109,6 +116,22 @@ export function getDefaultPageConfig(pageType: string): PageConfig {
       detail_fields: [],
       preview_fields: [], // Default: empty array means use name/status fields
       group_by_field: '', // Select field to group records by in left panel
+      // Record View page-level settings
+      visible_fields: [],
+      editable_fields: [],
+      show_field_list: true,
+      show_blocks_section: true,
+    },
+    record_view: {
+      visualisation: 'record_view',
+      allow_grid_toggle: false,
+      record_panel: 'none', // Record View uses structured field list + blocks, not record panel
+      allow_editing: true,
+      // Record View page-level settings
+      visible_fields: [],
+      editable_fields: [],
+      show_field_list: true,
+      show_blocks_section: true,
     },
     blank: {
       visualisation: 'blank',
