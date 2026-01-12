@@ -27,6 +27,7 @@ import { PageType, PAGE_TYPE_DEFINITIONS, getRequiredAnchorType, isRecordViewPag
 import { createRecordReviewTwoColumnLayout } from "@/lib/interface/record-review-layout"
 import { FileCheck, BookOpen } from "lucide-react"
 import FieldPickerModal from "./FieldPickerModal"
+import { IconPicker } from "@/components/ui/icon-picker"
 
 interface PageCreationWizardProps {
   open: boolean
@@ -48,6 +49,7 @@ export default function PageCreationWizard({
   const [pageType, setPageType] = useState<PageType | ''>('')
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
+  const [icon, setIcon] = useState('')
   const [selectedFields, setSelectedFields] = useState<string[]>([]) // Fields selected for structured field list
   const [leftPanelFilter, setLeftPanelFilter] = useState<string>('')
   const [leftPanelFilterOperator, setLeftPanelFilterOperator] = useState<string>('equal')
@@ -72,6 +74,7 @@ export default function PageCreationWizard({
       setPageType('')
       setTableId('')
       setPageName('')
+      setIcon('')
       setSelectedFields([])
       setLeftPanelFilter('')
       setLeftPanelFilterOperator('equal')
@@ -423,7 +426,7 @@ export default function PageCreationWizard({
       const firstNonIdField = tableFields.find(f => f.name.toLowerCase() !== 'id')
       const defaultTitleField = nameField?.name || firstNonIdField?.name || undefined
       
-      const pageConfig = pageType === 'record_view' && base_table
+      const basePageConfig = pageType === 'record_view' && base_table
         ? {
             tableId: base_table,
             visible_fields: selectedFields.length > 0 ? selectedFields : undefined,
@@ -450,6 +453,16 @@ export default function PageCreationWizard({
             }
           }
         : {}
+      
+      // Add icon to settings if provided
+      const pageConfig = icon.trim()
+        ? {
+            ...basePageConfig,
+            settings: {
+              icon: icon.trim()
+            }
+          }
+        : basePageConfig
       
       // Generate unique page name to avoid duplicate key errors
       // The constraint idx_interface_pages_group_name requires unique (group_id, name)
@@ -949,6 +962,17 @@ export default function PageCreationWizard({
             }
           }}
         />
+      </div>
+      <div className="space-y-2">
+        <Label>Icon</Label>
+        <IconPicker
+          value={icon}
+          onChange={setIcon}
+          placeholder="📄"
+        />
+        <p className="text-xs text-muted-foreground">
+          Optional: Select an icon to represent this interface
+        </p>
       </div>
       <div className="flex gap-2">
         <Button 

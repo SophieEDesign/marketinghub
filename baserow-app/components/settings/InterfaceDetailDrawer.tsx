@@ -229,16 +229,40 @@ export default function InterfaceDetailDrawer({
       // Check if page exists in interface_pages table (matches sidebar)
       const { data: pageData, error: checkError } = await supabase
         .from('interface_pages')
-        .select('id')
+        .select('id, config')
         .eq('id', iface.id)
         .maybeSingle()
 
-      const config: any = {}
-      if (icon) {
-        config.settings = { ...config.settings, icon }
+      // Get existing config to merge with
+      let existingConfig: any = {}
+      if (!checkError && pageData) {
+        existingConfig = pageData.config || {}
+      } else {
+        // Fallback: get from views table
+        const { data: viewData } = await supabase
+          .from('views')
+          .select('config')
+          .eq('id', iface.id)
+          .maybeSingle()
+        existingConfig = viewData?.config || {}
       }
-      if (description) {
-        config.description = description
+
+      // Merge icon and description with existing config
+      const config: any = {
+        ...existingConfig,
+        ...(description !== undefined ? { description } : {}),
+      }
+      
+      // Merge settings, preserving existing settings
+      if (icon || existingConfig.settings) {
+        config.settings = {
+          ...(existingConfig.settings || {}),
+          ...(icon ? { icon } : {}),
+        }
+        // Remove icon from settings if it's empty
+        if (!icon && config.settings.icon) {
+          delete config.settings.icon
+        }
       }
 
       if (!checkError && pageData) {

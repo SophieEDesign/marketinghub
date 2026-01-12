@@ -12,13 +12,14 @@ DECLARE
 BEGIN
   -- Get the page info for this block
   SELECT 
-    vb.view_id,
+    vb.page_id,
     ip.base_table,
     ip.page_type
   INTO page_id_val, page_table_id, page_type_val
   FROM view_blocks vb
-  LEFT JOIN interface_pages ip ON ip.id = vb.view_id
-  WHERE vb.id = block_id_to_fix;
+  LEFT JOIN interface_pages ip ON ip.id = vb.page_id
+  WHERE vb.id = block_id_to_fix
+    AND vb.page_id IS NOT NULL;
   
   -- If we found the block and can infer table_id, fix it
   IF page_table_id IS NOT NULL AND page_type_val = 'record_review' THEN
