@@ -547,7 +547,7 @@ export default function RecordViewPageSettings({
                           onValueChange={(value) => {
                             const fieldName = value === "__none__" ? "" : value
                             setLeftPanelSortBy(fieldName)
-                            const newSortBy = fieldName ? [{ field: fieldName, direction: leftPanelSortDirection, order_index: 0 }] : []
+                            const newSortBy = fieldName ? [{ field: fieldName, direction: leftPanelSortDirection }] : []
                             onUpdate({
                               left_panel: {
                                 ...leftPanelConfig,
