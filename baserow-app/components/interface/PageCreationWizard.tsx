@@ -49,6 +49,12 @@ export default function PageCreationWizard({
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
   const [selectedFields, setSelectedFields] = useState<string[]>([]) // Fields selected for structured field list
+  const [fieldsAsBlocks, setFieldsAsBlocks] = useState<string[]>([]) // Fields to add as blocks
+  const [leftPanelFilter, setLeftPanelFilter] = useState<string>('')
+  const [leftPanelSort, setLeftPanelSort] = useState<string>('')
+  const [leftPanelSortDirection, setLeftPanelSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [leftPanelGroup, setLeftPanelGroup] = useState<string>('')
+  const [tableFields, setTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
   const [creating, setCreating] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
@@ -66,6 +72,12 @@ export default function PageCreationWizard({
       setTableId('')
       setPageName('')
       setSelectedFields([])
+      setFieldsAsBlocks([])
+      setLeftPanelFilter('')
+      setLeftPanelSort('')
+      setLeftPanelSortDirection('asc')
+      setLeftPanelGroup('')
+      setTableFields([])
     }
   }, [open, defaultGroupId])
 
@@ -146,6 +158,37 @@ export default function PageCreationWizard({
       console.error('Error loading tables:', error)
     }
   }
+
+  async function loadTableFields() {
+    if (!tableId) {
+      setTableFields([])
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('table_fields')
+        .select('id, name, type')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+
+      if (!error && data) {
+        setTableFields(data)
+      } else {
+        setTableFields([])
+      }
+    } catch (error) {
+      console.error('Error loading table fields:', error)
+      setTableFields([])
+    }
+  }
+
+  useEffect(() => {
+    if (tableId && pageType === 'record_view') {
+      loadTableFields()
+    }
+  }, [tableId, pageType])
 
   const handleInterfaceSelect = () => {
     if (!selectedInterfaceId) {
@@ -311,10 +354,36 @@ export default function PageCreationWizard({
       // Create interface page in interface_pages table
       // For record_view pages, store tableId in both base_table and config.tableId
       // Also store selected fields in config.visible_fields
+      // Store left panel settings (filter, sort, group) in config.left_panel
+      // Default title_field to "name" if available
+      const nameField = tableFields.find(f => f.name.toLowerCase() === 'name')
+      const defaultTitleField = nameField?.name || tableFields[0]?.name || undefined
+      
       const pageConfig = pageType === 'record_view' && base_table
         ? {
             tableId: base_table,
             visible_fields: selectedFields.length > 0 ? selectedFields : undefined,
+            title_field: defaultTitleField,
+            left_panel: {
+              ...(leftPanelFilter ? {
+                filter_by: [{
+                  field: leftPanelFilter,
+                  operator: 'equal', // Default operator, can be configured later
+                  value: ''
+                }]
+              } : {}),
+              ...(leftPanelSort ? {
+                sort_by: [{
+                  field: leftPanelSort,
+                  direction: leftPanelSortDirection
+                }]
+              } : {}),
+              ...(leftPanelGroup ? {
+                group_by: leftPanelGroup
+              } : {}),
+              // Default title field to "name" if available
+              title_field: defaultTitleField,
+            }
           }
         : {}
       
@@ -410,7 +479,7 @@ export default function PageCreationWizard({
               mode: 'review',
             })
 
-            // Create blocks sequentially via API (POST endpoint creates one block at a time)
+            // Create default layout blocks sequentially via API
             for (const blockDef of layoutBlocks) {
               try {
                 const blockResponse = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -433,6 +502,44 @@ export default function PageCreationWizard({
               } catch (blockError) {
                 console.error(`Error creating block ${blockDef.type}:`, blockError)
                 // Continue with next block
+              }
+            }
+
+            // Create field blocks from fieldsAsBlocks (selected fields to add as blocks)
+            // These are placed in the right column (x=4) after the default blocks
+            if (fieldsAsBlocks.length > 0) {
+              let yOffset = 8 // Start below the default record block
+              for (const fieldName of fieldsAsBlocks) {
+                const field = tableFields.find(f => f.name === fieldName)
+                if (field) {
+                  try {
+                    const blockResponse = await fetch(`/api/pages/${page.id}/blocks`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        type: 'field',
+                        x: 4, // Right column
+                        y: yOffset,
+                        w: 8, // Full right column width
+                        h: 2, // Default height for field blocks
+                        config: {
+                          title: field.name,
+                          table_id: tableId.trim(),
+                          field_id: field.id,
+                          field_name: field.name,
+                        },
+                      }),
+                    })
+
+                    if (!blockResponse.ok) {
+                      console.error(`Error creating field block ${fieldName}:`, await blockResponse.text())
+                    } else {
+                      yOffset += 2 // Move down for next block
+                    }
+                  } catch (blockError) {
+                    console.error(`Error creating field block ${fieldName}:`, blockError)
+                  }
+                }
               }
             }
           } catch (layoutError) {
@@ -523,14 +630,14 @@ export default function PageCreationWizard({
   const renderAnchorStep = () => {
     const isRecordPage = pageType ? isRecordViewPage(pageType as PageType) : false
 
-    // Record View pages: Only show table selection (optional - blocks define their own data sources)
+    // Record View pages: Show table selection with filter/sort/group options
     if (isRecordPage) {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Select Table *</Label>
             <p className="text-sm text-gray-500 mb-2">
-              The table is required to display records in the left column. Select the table that contains the records you want to review.
+              Connect your layout to a table. Apply filters, sorts, and groups to further refine your layout.
             </p>
             <Select value={tableId} onValueChange={setTableId} required>
               <SelectTrigger>
@@ -551,12 +658,93 @@ export default function PageCreationWizard({
               <p className="text-sm text-red-500">Please select a table to continue.</p>
             )}
           </div>
-          <Button
-            onClick={handleAnchorConfigured}
-            className="w-full"
-          >
-            Continue
-          </Button>
+
+          {/* Data Options */}
+          {tableId && (
+            <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Data Options</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Filter</Label>
+                    <Select value={leftPanelFilter || "__none__"} onValueChange={(value) => setLeftPanelFilter(value === "__none__" ? "" : value)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {tableFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Sort</Label>
+                    <Select value={leftPanelSort || "__none__"} onValueChange={(value) => setLeftPanelSort(value === "__none__" ? "" : value)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {tableFields.map((field) => (
+                          <SelectItem key={field.id} value={field.name}>
+                            {field.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-gray-500">Group</Label>
+                    <Select value={leftPanelGroup || "__none__"} onValueChange={(value) => setLeftPanelGroup(value === "__none__" ? "" : value)}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {tableFields
+                          .filter(f => f.type === 'single_select' || f.type === 'multi_select')
+                          .map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {leftPanelSort && (
+                  <div className="pt-1">
+                    <Select value={leftPanelSortDirection} onValueChange={(value: 'asc' | 'desc') => setLeftPanelSortDirection(value)}>
+                      <SelectTrigger className="h-9 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="asc">Ascending</SelectItem>
+                        <SelectItem value="desc">Descending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" onClick={() => setStep('purpose')} className="flex-1">
+              Back
+            </Button>
+            <Button
+              onClick={handleAnchorConfigured}
+              disabled={!tableId}
+              className="flex-1"
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )
     }
@@ -624,6 +812,7 @@ export default function PageCreationWizard({
         tableId={tableId}
         selectedFields={selectedFields}
         onFieldsChange={handleFieldsSelectedAndContinue}
+        onAddAsBlocks={handleAddFieldsAsBlocks}
       />
     )
   }
@@ -641,7 +830,7 @@ export default function PageCreationWizard({
           <DialogDescription>
             {step === 'interface' && 'Choose which Interface this page belongs to'}
             {step === 'purpose' && 'Choose what this page will do'}
-            {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Select a table to provide context for blocks (optional)' : 'Set up the data source or layout')}
+            {step === 'anchor' && (isRecordViewPage(pageType as PageType) ? 'Connect to a table' : 'Set up the data source or layout')}
             {step === 'name' && 'Give your page a name'}
           </DialogDescription>
         </DialogHeader>

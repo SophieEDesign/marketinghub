@@ -51,6 +51,21 @@ export async function GET(request: NextRequest) {
         // Don't fail the auth flow if profile creation fails
       }
 
+      // Check if this is an invited user who needs to set up a password
+      // Invited users will have a role in user_metadata (set during invitation)
+      // If they have a role in metadata, they were invited and should set a password
+      // We check if password_setup_complete is not in metadata to avoid redirecting again
+      const isInvitedUser = userMetadata.role && !userMetadata.password_setup_complete
+
+      if (isInvitedUser) {
+        // Redirect to password setup page
+        const setupUrl = new URL('/auth/setup-password', request.url)
+        if (next && next !== '/') {
+          setupUrl.searchParams.set('next', next)
+        }
+        return NextResponse.redirect(setupUrl)
+      }
+
       // Redirect to home page
       return NextResponse.redirect(new URL(next, request.url))
     } else {
