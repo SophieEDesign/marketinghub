@@ -40,14 +40,15 @@ export default function RecordHeader({
   const [nameValue, setNameValue] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
 
-  // Find primary name field (first text field or field named "name", "title", etc.)
+  // Find primary name field (priority: "name" > "title" > "subject" > first text field excluding "id")
   const primaryNameField = fields.find(
+    (f) => f.type === "text" && f.name.toLowerCase() === "name"
+  ) || fields.find(
     (f) =>
       f.type === "text" &&
-      (f.name.toLowerCase() === "name" ||
-        f.name.toLowerCase() === "title" ||
+      (f.name.toLowerCase() === "title" ||
         f.name.toLowerCase() === "subject")
-  ) || fields.find((f) => f.type === "text")
+  ) || fields.find((f) => f.type === "text" && f.name.toLowerCase() !== "id") || fields.find((f) => f.type === "text")
 
   const recordName = primaryNameField
     ? formData[primaryNameField.name] || ""

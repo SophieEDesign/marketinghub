@@ -85,26 +85,42 @@ export default function RecordDetailsPanel({
   const previousFormDataRef = useRef<Record<string, any>>({})
 
   // Find primary name field (for editable title)
+  // Priority: titleField config > field named "name" > "title" > "subject" > first text field (excluding "id")
   const primaryNameField = useMemo(() => {
     if (titleField) {
-      return fields.find((f) => f.name === titleField) || fields.find((f) => f.type === "text")
+      return fields.find((f) => f.name === titleField) || fields.find((f) => f.type === "text" && f.name.toLowerCase() !== "id")
     }
-    return fields.find(
+    // First, try to find a field literally named "name" (case-insensitive)
+    const nameField = fields.find(
+      (f) => f.type === "text" && f.name.toLowerCase() === "name"
+    )
+    if (nameField) return nameField
+    
+    // Then try "title" or "subject"
+    const titleOrSubjectField = fields.find(
       (f) =>
         f.type === "text" &&
-        (f.name.toLowerCase() === "name" ||
-          f.name.toLowerCase() === "title" ||
+        (f.name.toLowerCase() === "title" ||
           f.name.toLowerCase() === "subject")
-    ) || fields.find((f) => f.type === "text")
+    )
+    if (titleOrSubjectField) return titleOrSubjectField
+    
+    // Finally, fallback to first text field that's not "id"
+    return fields.find((f) => f.type === "text" && f.name.toLowerCase() !== "id") || fields.find((f) => f.type === "text")
   }, [fields, titleField])
 
-  // Get record title from titleField or fallback to first text field
+  // Get record title from titleField or fallback to first text field (excluding "id")
   const recordTitle = useMemo(() => {
     if (titleField && formData[titleField]) {
       return String(formData[titleField])
     }
-    // Fallback to first text field
-    const firstTextField = fields.find((f) => f.type === "text")
+    // Try "name" field first
+    const nameField = fields.find((f) => f.type === "text" && f.name.toLowerCase() === "name")
+    if (nameField && formData[nameField.name]) {
+      return String(formData[nameField.name])
+    }
+    // Fallback to first text field that's not "id"
+    const firstTextField = fields.find((f) => f.type === "text" && f.name.toLowerCase() !== "id")
     if (firstTextField && formData[firstTextField.name]) {
       return String(formData[firstTextField.name])
     }

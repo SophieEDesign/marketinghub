@@ -158,10 +158,13 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       return config.preview_fields
     }
     // Fallback: auto-detect name and status fields
+    // Priority: field named "name" > "title" > first column (excluding "id")
     const nameField = columns.find((col: string) => 
-      col.toLowerCase().includes('name') || 
-      col.toLowerCase().includes('title') ||
-      col.toLowerCase() === 'id'
+      col.toLowerCase() === 'name'
+    ) || columns.find((col: string) => 
+      col.toLowerCase().includes('title')
+    ) || columns.find((col: string) => 
+      col.toLowerCase() !== 'id'
     ) || columns[0]
     
     const statusField = columns.find((col: string) => 
@@ -198,11 +201,14 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   ) || columns[0] // Fallback to first column
   
   // Get name/title field (for fallback display)
+  // Priority: field named "name" > "title" > first column (excluding "id")
   const nameField = columns.find((col: string) => 
-    col.toLowerCase().includes('name') || 
-    col.toLowerCase().includes('title') ||
-    col.toLowerCase() === 'id'
-  ) || columns[0] // Fallback to first column
+    col.toLowerCase() === 'name'
+  ) || columns.find((col: string) => 
+    col.toLowerCase().includes('title')
+  ) || columns.find((col: string) => 
+    col.toLowerCase() !== 'id'
+  ) || columns[0] // Fallback to first column if all else fails
   
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
