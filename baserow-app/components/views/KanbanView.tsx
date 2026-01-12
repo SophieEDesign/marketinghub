@@ -112,25 +112,6 @@ export default function KanbanView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
-  function groupRowsByField() {
-    const groups: Record<string, TableRow[]> = {}
-    filteredRows.forEach((row) => {
-      const groupValue = row.data[groupingFieldId] || "Uncategorized"
-      if (!groups[groupValue]) {
-        groups[groupValue] = []
-      }
-      groups[groupValue].push(row)
-    })
-    return groups
-  }
-
-  if (loading) {
-    return <div className="p-4">Loading...</div>
-  }
-
-  const groupedRows = groupRowsByField()
-  const groups = Object.keys(groupedRows)
-
   // Helper to get color from color field
   const getCardColor = useCallback((row: TableRow): string | null => {
     if (!colorField) return null
@@ -184,6 +165,25 @@ export default function KanbanView({
     
     return null
   }, [imageField])
+
+  function groupRowsByField() {
+    const groups: Record<string, TableRow[]> = {}
+    filteredRows.forEach((row) => {
+      const groupValue = row.data[groupingFieldId] || "Uncategorized"
+      if (!groups[groupValue]) {
+        groups[groupValue] = []
+      }
+      groups[groupValue].push(row)
+    })
+    return groups
+  }
+
+  if (loading) {
+    return <div className="p-4">Loading...</div>
+  }
+
+  const groupedRows = groupRowsByField()
+  const groups = Object.keys(groupedRows)
 
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {
