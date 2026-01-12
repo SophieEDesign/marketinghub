@@ -11,6 +11,7 @@ interface BlockPickerProps {
 
 const iconMap: Record<BlockType, React.ElementType> = {
   grid: Grid,
+  table: Grid,
   form: FileText,
   record: FileText,
   chart: BarChart3,

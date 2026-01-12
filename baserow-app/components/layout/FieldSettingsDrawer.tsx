@@ -904,11 +904,15 @@ export default function FieldSettingsDrawer({
                             value={currentValue || '__none__'}
                             onValueChange={(fieldName) => {
                               const current = options.secondary_label_fields || []
-                              const updated = [...current]
-                              updated[idx] = fieldName === '__none__' ? undefined : fieldName
+                              const updated: string[] = [...current]
+                              if (fieldName === '__none__') {
+                                updated.splice(idx, 1)
+                              } else {
+                                updated[idx] = fieldName
+                              }
                               setOptions({ 
                                 ...options, 
-                                secondary_label_fields: updated.filter(Boolean)
+                                secondary_label_fields: updated.filter(Boolean) as string[]
                               })
                             }}
                           >
@@ -1103,11 +1107,15 @@ export default function FieldSettingsDrawer({
                               value={currentValue || '__none__'}
                               onValueChange={(fieldName) => {
                                 const current = options.secondary_label_fields || []
-                                const updated = [...current]
-                                updated[idx] = fieldName === '__none__' ? undefined : fieldName
+                                const updated: string[] = [...current]
+                                if (fieldName === '__none__') {
+                                  updated.splice(idx, 1)
+                                } else {
+                                  updated[idx] = fieldName
+                                }
                                 setOptions({ 
                                   ...options, 
-                                  secondary_label_fields: updated.filter(Boolean)
+                                  secondary_label_fields: updated.filter(Boolean) as string[]
                                 })
                               }}
                             >

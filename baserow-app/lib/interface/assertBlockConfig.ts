@@ -178,7 +178,6 @@ export function assertBlockConfig(
 
     case 'filter':
     case 'divider':
-    case 'tabs':
       // These blocks don't require config
       return { valid: true }
 

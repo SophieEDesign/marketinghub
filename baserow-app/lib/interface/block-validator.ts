@@ -84,7 +84,6 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     button: { button_label: '' },
     action: { action_type: 'navigate', label: '' },
     link_preview: { link_url: '' },
-    tabs: { tabs: [] },
     filter: { target_blocks: 'all', allowed_fields: [], filters: [] },
     field: { field_id: '' },
     calendar: { table_id: '', view_type: 'calendar' },

@@ -12,6 +12,7 @@ import {
 
 const iconMap: Record<BlockType, React.ElementType> = {
   grid: Grid,
+  table: Grid,
   form: FileText,
   record: FileText,
   chart: BarChart3,
@@ -20,7 +21,6 @@ const iconMap: Record<BlockType, React.ElementType> = {
   image: Image,
   divider: Minus,
   button: Zap,
-  tabs: Layout,
   action: Zap,
   link_preview: ExternalLink,
   filter: Filter,
