@@ -157,7 +157,7 @@ export default function BlockFilterEditor({
               (field.type === "single_select" ||
                 field.type === "multi_select") &&
               field.options?.choices &&
-              field.options.choices.length > 0
+              field.options?.choices.length > 0
 
             return (
               <div
@@ -243,13 +243,13 @@ export default function BlockFilterEditor({
                               <SelectValue placeholder="Select value" />
                             </SelectTrigger>
                             <SelectContent>
-                              {field.options.choices.map((choice: string) => {
+                              {field.options?.choices?.map((choice: string) => {
                                 const hexColor = resolveChoiceColor(
                                   choice,
                                   field.type as
                                     | "single_select"
                                     | "multi_select",
-                                  field.options,
+                                  field.options || {},
                                   field.type === "single_select"
                                 )
                                 const bgColor = normalizeHexColor(hexColor)
@@ -272,8 +272,7 @@ export default function BlockFilterEditor({
                             type={
                               field?.type === "number"
                                 ? "number"
-                                : field?.type === "date" ||
-                                  field?.type === "datetime"
+                                : field?.type === "date"
                                 ? "date"
                                 : "text"
                             }

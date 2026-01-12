@@ -54,6 +54,10 @@ export default function InlineSelectDropdown({
     if (isMulti) {
       return Array.isArray(value) ? value : []
     }
+    // For single select, value should be a string, but handle array case for safety
+    if (Array.isArray(value)) {
+      return value.length > 0 ? [value[0]] : []
+    }
     return value ? [value] : []
   }, [value, isMulti])
 

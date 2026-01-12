@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { X, Save, Check } from "lucide-react"
-import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import type { PageBlock, BlockConfig, BlockType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"

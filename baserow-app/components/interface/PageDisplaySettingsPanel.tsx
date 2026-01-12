@@ -457,11 +457,6 @@ export default function PageDisplaySettingsPanel({
     setSorts(updated)
   }
 
-  if (!page) return null
-
-  // TypeScript guard: page is non-null after the check above
-  const currentPage = page
-
   // Update content page name when page changes (must be before any early returns)
   useEffect(() => {
     if (page) {
