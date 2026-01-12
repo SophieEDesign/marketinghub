@@ -510,7 +510,12 @@ export default function PageDisplaySettingsPanel({
           <div className="mt-6">
             <RecordViewPageSettings
               pageId={currentPage.id}
-              config={currentPage.config || {}}
+              config={{
+                ...(currentPage.config || {}),
+                // Ensure table_id/base_table is available from page if not in config
+                table_id: (currentPage.config as any)?.table_id || (currentPage.config as any)?.base_table || (currentPage as any)?.base_table || undefined,
+                base_table: (currentPage.config as any)?.base_table || (currentPage as any)?.base_table || undefined,
+              }}
               tables={tables as any}
               onUpdate={async (updates) => {
                 const supabase = createClient()

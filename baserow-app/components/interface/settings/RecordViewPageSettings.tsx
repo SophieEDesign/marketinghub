@@ -54,9 +54,19 @@ export default function RecordViewPageSettings({
   onUpdate,
   onTableChange,
 }: RecordViewPageSettingsProps) {
+  // Initialize from config.table_id, config.base_table, or page.base_table
+  // Also sync when config changes (e.g., when page is loaded with base_table)
   const [selectedTableId, setSelectedTableId] = useState<string>(
-    config.table_id || (config as any).base_table || ""
+    config.table_id || (config as any).base_table || (config as any).tableId || ""
   )
+  
+  // Sync selectedTableId when config changes (e.g., page loads with base_table)
+  useEffect(() => {
+    const tableIdFromConfig = config.table_id || (config as any).base_table || (config as any).tableId || ""
+    if (tableIdFromConfig && tableIdFromConfig !== selectedTableId) {
+      setSelectedTableId(tableIdFromConfig)
+    }
+  }, [config.table_id, (config as any).base_table, (config as any).tableId])
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false)

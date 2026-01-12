@@ -50,6 +50,9 @@ export function createRecordReviewTwoColumnLayout(
 ): BlockDefinition[] {
   const { primaryTableId, mode = 'review' } = options
 
+  // Only create the left column grid block (record list)
+  // The right panel uses RecordDetailsPanel which shows the structured field list
+  // Users can add additional blocks manually if needed
   return [
     // LEFT COLUMN: Record List (Context / Navigation)
     {
@@ -65,33 +68,8 @@ export function createRecordReviewTwoColumnLayout(
         // Auto-filter to same table (blocks receive pageTableId context)
       },
     },
-    // RIGHT COLUMN: Record Details (Main Content)
-    {
-      type: 'record',
-      x: 4, // Right column starts at x=4
-      y: 0,
-      w: 8, // Right column width: 8 cols
-      h: 8,
-      config: {
-        title: 'Record Details',
-        table_id: primaryTableId,
-        // record_id will be injected from page context (page.config.record_id)
-      },
-    },
-    // RIGHT COLUMN: Field Groups (Form-style editing)
-    {
-      type: 'form',
-      x: 4, // Right column
-      y: 8, // Below record block
-      w: 8, // Right column width
-      h: 6,
-      config: {
-        title: 'Edit Fields',
-        table_id: primaryTableId,
-        allow_editing: mode !== 'view',
-        // Fields will be auto-populated from table schema
-      },
-    },
+    // Note: Removed record and form blocks - RecordDetailsPanel handles record display
+    // Users can add field blocks manually from the wizard if needed
   ]
 }
 

@@ -639,7 +639,15 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   // Determine if a field is editable (respects both page-level and field-level permissions)
   const isFieldEditable = useCallback((fieldName: string): boolean => {
     if (!pageEditable) return false // Page-level view-only
-    return editableFieldNames.includes(fieldName) // Field-level editable setting
+    
+    // If page is editable and no explicit editable_fields list is provided,
+    // all fields are editable by default
+    if (editableFieldNames.length === 0) {
+      return true
+    }
+    
+    // Otherwise, check if field is in the editable list
+    return editableFieldNames.includes(fieldName)
   }, [pageEditable, editableFieldNames])
   
   // Layout toggles (page-level)

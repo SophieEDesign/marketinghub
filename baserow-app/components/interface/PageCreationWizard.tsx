@@ -510,9 +510,9 @@ export default function PageCreationWizard({
             }
 
             // Create field blocks from fieldsAsBlocks (selected fields to add as blocks)
-            // These are placed in the right column (x=4) after the default blocks
+            // These are placed in the right column (x=4)
             if (fieldsAsBlocks.length > 0) {
-              let yOffset = 8 // Start below the default record block
+              let yOffset = 0 // Start at top of right column (no default blocks anymore)
               for (const fieldName of fieldsAsBlocks) {
                 const field = tableFields.find(f => f.name === fieldName)
                 if (field) {
