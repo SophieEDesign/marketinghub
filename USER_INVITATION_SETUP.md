@@ -41,6 +41,15 @@ NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 
+**Important:** Add the following URLs to your Supabase allowed redirect URLs:
+1. Go to Supabase Dashboard → Authentication → URL Configuration
+2. Add these redirect URLs:
+   - `https://your-domain.com/auth/callback`
+   - `https://your-domain.com/auth/setup-password`
+   - `https://your-domain.com/login`
+
+This ensures that invited users can properly complete the password setup flow.
+
 ## How It Works
 
 1. **Admin invites user:**
@@ -56,7 +65,8 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
    - Clicks link in email
    - Auth callback route exchanges code for session
    - Profile is automatically created with role from invitation metadata
-   - User is redirected to the app
+   - **Invited users are redirected to `/auth/setup-password` to set their password**
+   - After setting password, user is redirected to the app
 
 ## Troubleshooting
 
@@ -81,6 +91,13 @@ Or for Vercel deployments, this is automatically set via `VERCEL_URL`.
 - **Check:** `profiles` table exists and has correct schema
 - **Check:** RLS policies allow profile creation
 - **Check:** Server logs for errors during auth callback
+
+### User redirected to login instead of password setup
+- **Check:** `/auth/setup-password` is added to Supabase allowed redirect URLs
+- **Check:** `/auth/callback` is added to Supabase allowed redirect URLs
+- **Check:** User has a role in `user_metadata` (set during invitation)
+- **Check:** User hasn't already completed password setup (`password_setup_complete` in metadata)
+- **Solution:** Ensure redirect URLs are configured in Supabase Dashboard → Authentication → URL Configuration
 
 ## Security Notes
 

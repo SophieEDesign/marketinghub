@@ -53,11 +53,19 @@ export async function GET(request: NextRequest) {
 
       // Check if this is an invited user who needs to set up a password
       // Invited users will have a role in user_metadata (set during invitation)
-      // If they have a role in metadata, they were invited and should set a password
       // We check if password_setup_complete is not in metadata to avoid redirecting again
-      const isInvitedUser = userMetadata.role && !userMetadata.password_setup_complete
+      // Also check if user was created via invite (has role but hasn't completed password setup)
+      const hasRole = !!userMetadata.role
+      const passwordSetupComplete = !!userMetadata.password_setup_complete
+      const isInvitedUser = hasRole && !passwordSetupComplete
 
-      if (isInvitedUser) {
+      // Additional check: if user was just created (recent timestamp) and has a role,
+      // they're likely an invited user who needs to set a password
+      const userCreatedAt = sessionData.user.created_at
+      const isRecentlyCreated = userCreatedAt && 
+        (new Date().getTime() - new Date(userCreatedAt).getTime()) < 5 * 60 * 1000 // Created within last 5 minutes
+
+      if (isInvitedUser || (hasRole && isRecentlyCreated && !passwordSetupComplete)) {
         // Redirect to password setup page
         const setupUrl = new URL('/auth/setup-password', request.url)
         if (next && next !== '/') {

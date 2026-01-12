@@ -54,6 +54,21 @@ function LoginForm() {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        // Check if this is an invited user who needs to set up a password
+        const userMetadata = user.user_metadata || {}
+        const hasRole = !!userMetadata.role
+        const passwordSetupComplete = !!userMetadata.password_setup_complete
+        
+        // If user has a role but hasn't completed password setup, redirect to password setup
+        if (hasRole && !passwordSetupComplete) {
+          const next = searchParams.get('next') || searchParams.get('callbackUrl')
+          const setupUrl = next && next !== '/' 
+            ? `/auth/setup-password?next=${encodeURIComponent(next)}`
+            : '/auth/setup-password'
+          window.location.href = setupUrl
+          return
+        }
+        
         // Check for redirect parameter
         let next = searchParams.get('next') || searchParams.get('callbackUrl')
         
