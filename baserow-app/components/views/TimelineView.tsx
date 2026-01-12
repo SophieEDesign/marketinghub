@@ -137,7 +137,7 @@ export default function TimelineView({
   // Resolve date_from and date_to fields from block config, props, or auto-detect
   const resolvedDateFields = useMemo(() => {
     // Resolve date_from field (default/primary): block config > props > auto-detect
-    const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field
+    const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.timeline_date_field
     let resolvedFromField = blockFromField
       ? tableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
       : null
@@ -660,7 +660,9 @@ export default function TimelineView({
     )
   }
 
-  if (!dateFieldId && !startDateFieldId) {
+  // Check if we have any date field configured (from props or blockConfig)
+  const { fromFieldName, toFieldName } = resolvedDateFields
+  if (!dateFieldId && !startDateFieldId && !fromFieldName && !toFieldName) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center text-gray-500">

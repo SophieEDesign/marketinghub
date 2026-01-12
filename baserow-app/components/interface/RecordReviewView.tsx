@@ -152,11 +152,26 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   }
   
   // Get preview fields from config, or fallback to auto-detection
+  // Priority: left_panel settings (title_field, field_1, field_2) > config.preview_fields > auto-detect
   const previewFields = useMemo(() => {
+    // Use left panel configured fields if available
+    const leftPanelTitle = config.left_panel?.title_field || config.title_field
+    const leftPanelField1 = config.left_panel?.field_1
+    const leftPanelField2 = config.left_panel?.field_2
+    
+    if (leftPanelTitle || leftPanelField1 || leftPanelField2) {
+      const fields: string[] = []
+      if (leftPanelTitle) fields.push(leftPanelTitle)
+      if (leftPanelField1) fields.push(leftPanelField1)
+      if (leftPanelField2) fields.push(leftPanelField2)
+      return fields
+    }
+    
+    // Fallback to config.preview_fields
     if (config.preview_fields && Array.isArray(config.preview_fields) && config.preview_fields.length > 0) {
-      // Use configured preview fields
       return config.preview_fields
     }
+    
     // Fallback: auto-detect name and status fields
     // Priority: field named "name" > "title" > first column (excluding "id")
     const nameField = columns.find((col: string) => 
@@ -174,14 +189,16 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     )
     
     return statusField ? [nameField, statusField] : [nameField]
-  }, [config.preview_fields, columns])
+  }, [config.left_panel?.title_field, config.left_panel?.field_1, config.left_panel?.field_2, config.title_field, config.preview_fields, columns])
   
-  // Get group field for grouping - use config.group_by_field if set
+  // Get group field for grouping - use left_panel.group_by or config.group_by_field
   const groupField = useMemo(() => {
-    // Only use configured group_by_field from config (must be a select field)
-    if (config.group_by_field) {
+    // Priority: left_panel.group_by > config.group_by_field
+    const groupByFieldName = config.left_panel?.group_by || config.group_by_field
+    
+    if (groupByFieldName) {
       const configuredField = tableFields.find(f => 
-        (f.name === config.group_by_field || f.id === config.group_by_field) && 
+        (f.name === groupByFieldName || f.id === groupByFieldName) && 
         (f.type === 'single_select' || f.type === 'multi_select')
       )
       if (configuredField) {
@@ -191,7 +208,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     
     // If no group field configured, return null (no grouping)
     return null
-  }, [config.group_by_field, tableFields])
+  }, [config.left_panel?.group_by, config.group_by_field, tableFields])
   
   // Keep statusField for backward compatibility (used in display)
   const statusField = columns.find((col: string) => 
@@ -210,7 +227,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     col.toLowerCase() !== 'id'
   ) || columns[0] // Fallback to first column if all else fails
   
-  // Filter data based on search and filters
+  // Get left panel filters and sort from config
+  const leftPanelFilters = config.left_panel?.filter_by || []
+  const leftPanelSorts = config.left_panel?.sort_by || []
+
+  // Filter data based on search, filters, and left panel filters
   const filteredData = useMemo(() => {
     if (!pageTableId) return []
     
@@ -228,7 +249,34 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       })
     }
 
-    // Apply filters
+    // Apply left panel filters (page-level configuration)
+    if (leftPanelFilters.length > 0) {
+      result = result.filter((record) => {
+        return leftPanelFilters.every((filter: any) => {
+          const fieldValue = record[filter.field]
+          switch (filter.operator) {
+            case 'equal':
+              return fieldValue === filter.value
+            case 'not_equal':
+              return fieldValue !== filter.value
+            case 'contains':
+              return String(fieldValue || '').toLowerCase().includes(String(filter.value || '').toLowerCase())
+            case 'greater_than':
+              return Number(fieldValue) > Number(filter.value)
+            case 'less_than':
+              return Number(fieldValue) < Number(filter.value)
+            case 'is_empty':
+              return fieldValue === null || fieldValue === undefined || fieldValue === ''
+            case 'is_not_empty':
+              return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
+            default:
+              return true
+          }
+        })
+      })
+    }
+
+    // Apply block-level filters (if any)
     if (filters.length > 0) {
       result = result.filter((record) => {
         return filters.every((filter) => {
@@ -255,8 +303,32 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       })
     }
 
+    // Apply left panel sort (page-level configuration)
+    if (leftPanelSorts.length > 0) {
+      result.sort((a, b) => {
+        for (const sort of leftPanelSorts) {
+          const aValue = a[sort.field]
+          const bValue = b[sort.field]
+          
+          if (aValue === bValue) continue
+          
+          const direction = sort.direction === 'desc' ? -1 : 1
+          
+          if (aValue === null || aValue === undefined) return 1 * direction
+          if (bValue === null || bValue === undefined) return -1 * direction
+          
+          if (typeof aValue === 'number' && typeof bValue === 'number') {
+            return (aValue - bValue) * direction
+          }
+          
+          return String(aValue).localeCompare(String(bValue)) * direction
+        }
+        return 0
+      })
+    }
+
     return result
-  }, [data, searchQuery, filters, columns, pageTableId])
+  }, [data, searchQuery, filters, leftPanelFilters, leftPanelSorts, columns, pageTableId])
 
   // Find selected record from filtered data (or fallback to full data if not in filtered)
   const selectedRecord = useMemo(() => {

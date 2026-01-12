@@ -769,6 +769,139 @@ export default function GridDataSettings({
           </div>
         </div>
       )}
+
+      {/* Timeline-Specific Settings - Airtable Style */}
+      {currentViewType === 'timeline' && config.table_id && fields.length > 0 && (
+        <>
+          {/* Options Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Options</Label>
+            
+            {/* Date Settings */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Date settings</Label>
+              <Select
+                value={config.start_date_field || config.date_from || config.from_date_field || config.timeline_date_field || ""}
+                onValueChange={(value) => onUpdate({ 
+                  start_date_field: value, 
+                  date_from: value, 
+                  from_date_field: value,
+                  timeline_date_field: value 
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select a date field" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fields
+                    .filter(field => field.type === 'date')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {fields.filter(f => f.type === 'date').length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No date fields found. Please add a date field to the table.
+                </p>
+              )}
+            </div>
+
+            {/* End Date Field (optional) */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">End date (optional)</Label>
+              <Select
+                value={config.end_date_field || config.date_to || config.to_date_field || "__none__"}
+                onValueChange={(value) => onUpdate({ 
+                  end_date_field: value === "__none__" ? undefined : value, 
+                  date_to: value === "__none__" ? undefined : value,
+                  to_date_field: value === "__none__" ? undefined : value 
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select end date field (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (single date events)</SelectItem>
+                  {fields
+                    .filter(field => field.type === 'date')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                Use start + end fields for date range events, or leave as "None" for single date events.
+              </p>
+            </div>
+          </div>
+
+          {/* Fields Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Fields</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allFieldNames = fields.map(f => f.name)
+                    onUpdate({ visible_fields: allFieldNames })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select All
+                </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdate({ visible_fields: [] })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select None
+                </button>
+              </div>
+            </div>
+            <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
+              {fields.map((field) => {
+                const visibleFields = config.visible_fields || []
+                const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
+                return (
+                  <label
+                    key={field.id}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
+                  >
+                    <Checkbox
+                      checked={isVisible}
+                      onCheckedChange={(checked) => {
+                        const currentFields = config.visible_fields || []
+                        if (checked) {
+                          if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
+                            onUpdate({ visible_fields: [...currentFields, field.name] })
+                          }
+                        } else {
+                          onUpdate({
+                            visible_fields: currentFields.filter(
+                              (f: string) => f !== field.name && f !== field.id
+                            ),
+                          })
+                        }
+                      }}
+                    />
+                    <span className="text-sm flex-1">{field.name}</span>
+                    <span className="text-xs text-gray-400 capitalize">{field.type.replace('_', ' ')}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

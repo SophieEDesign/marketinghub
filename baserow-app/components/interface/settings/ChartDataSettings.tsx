@@ -29,8 +29,9 @@ export default function ChartDataSettings({
   onUpdate,
   onTableChange,
 }: ChartDataSettingsProps) {
+  // Include numeric field types and formula fields (formulas can return numbers)
   const numericFields = fields.filter(f => 
-    ['number', 'currency', 'percent', 'rating'].includes(f.type)
+    ['number', 'currency', 'percent'].includes(f.type) || f.type === 'formula'
   )
 
   return (
@@ -143,7 +144,7 @@ export default function ChartDataSettings({
         <Label>Metric Field *</Label>
         {config.table_id && numericFields.length === 0 ? (
           <div className="text-sm text-gray-500 p-2 border border-gray-200 rounded-md bg-gray-50">
-            No numeric fields found in this table. Add a number, currency, percent, or rating field to use charts.
+            No numeric fields found in this table. Add a number, currency, percent, or formula field that returns a number to use charts.
           </div>
         ) : (
           <Select

@@ -75,6 +75,7 @@ interface InlineFieldEditorProps {
   onEditEnd: () => void
   onLinkedRecordClick: (tableId: string, recordId: string) => void
   onAddLinkedRecord: (field: TableField) => void
+  isReadOnly?: boolean // Override read-only state (for field-level permissions)
 }
 
 export default function InlineFieldEditor({
@@ -86,6 +87,7 @@ export default function InlineFieldEditor({
   onEditEnd,
   onLinkedRecordClick,
   onAddLinkedRecord,
+  isReadOnly: propIsReadOnly,
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
@@ -143,7 +145,8 @@ export default function InlineFieldEditor({
   }
 
   const isVirtual = field.type === "formula" || field.type === "lookup"
-  const isReadOnly = isVirtual || field.options?.read_only
+  // Use prop override first, then check field-level read-only, then virtual
+  const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (isVirtual || field.options?.read_only)
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {

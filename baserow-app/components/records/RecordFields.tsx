@@ -15,6 +15,7 @@ interface RecordFieldsProps {
   fieldGroups: Record<string, string[]>
   tableId: string
   recordId: string
+  isFieldEditable?: (fieldName: string) => boolean // Function to check if a field is editable
 }
 
 export default function RecordFields({
@@ -24,6 +25,7 @@ export default function RecordFields({
   fieldGroups,
   tableId,
   recordId,
+  isFieldEditable = () => true, // Default to all fields editable if not provided
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
@@ -133,19 +135,23 @@ export default function RecordFields({
             </button>
             {!isCollapsed && (
               <div className="p-4 space-y-4">
-                {groupFields.map((field) => (
-                  <InlineFieldEditor
-                    key={field.id}
-                    field={field}
-                    value={formData[field.name]}
-                    onChange={(value) => onFieldChange(field.name, value)}
-                    isEditing={editingField === field.id}
-                    onEditStart={() => setEditingField(field.id)}
-                    onEditEnd={() => setEditingField(null)}
-                    onLinkedRecordClick={handleLinkedRecordClick}
-                    onAddLinkedRecord={handleAddLinkedRecord}
-                  />
-                ))}
+                {groupFields.map((field) => {
+                  const fieldEditable = isFieldEditable(field.name)
+                  return (
+                    <InlineFieldEditor
+                      key={field.id}
+                      field={field}
+                      value={formData[field.name]}
+                      onChange={(value) => onFieldChange(field.name, value)}
+                      isEditing={editingField === field.id && fieldEditable}
+                      onEditStart={() => fieldEditable && setEditingField(field.id)}
+                      onEditEnd={() => setEditingField(null)}
+                      onLinkedRecordClick={handleLinkedRecordClick}
+                      onAddLinkedRecord={handleAddLinkedRecord}
+                      isReadOnly={!fieldEditable}
+                    />
+                  )
+                })}
               </div>
             )}
           </div>
@@ -155,19 +161,23 @@ export default function RecordFields({
       {/* Ungrouped Fields */}
       {ungroupedFields.length > 0 && (
         <div className="space-y-4">
-          {ungroupedFields.map((field) => (
-            <InlineFieldEditor
-              key={field.id}
-              field={field}
-              value={formData[field.name]}
-              onChange={(value) => onFieldChange(field.name, value)}
-              isEditing={editingField === field.id}
-              onEditStart={() => setEditingField(field.id)}
-              onEditEnd={() => setEditingField(null)}
-              onLinkedRecordClick={handleLinkedRecordClick}
-              onAddLinkedRecord={handleAddLinkedRecord}
-            />
-          ))}
+          {ungroupedFields.map((field) => {
+            const fieldEditable = isFieldEditable(field.name)
+            return (
+              <InlineFieldEditor
+                key={field.id}
+                field={field}
+                value={formData[field.name]}
+                onChange={(value) => onFieldChange(field.name, value)}
+                isEditing={editingField === field.id && fieldEditable}
+                onEditStart={() => fieldEditable && setEditingField(field.id)}
+                onEditEnd={() => setEditingField(null)}
+                onLinkedRecordClick={handleLinkedRecordClick}
+                onAddLinkedRecord={handleAddLinkedRecord}
+                isReadOnly={!fieldEditable}
+              />
+            )
+          })}
         </div>
       )}
 

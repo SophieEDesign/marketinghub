@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import { applyFiltersToQuery, mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
+import type { TableField } from "@/types/fields"
 import {
   BarChart,
   Bar,
@@ -52,7 +54,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tableFields, setTableFields] = useState<Array<{ name: string; type: string }>>([])
+  const [tableFields, setTableFields] = useState<TableField[]>([])
   
   // Apply filters with proper precedence:
   // 1. Block base filters (config.filters) - always applied
@@ -84,11 +86,12 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       const supabase = createClient()
       const { data: fields } = await supabase
         .from("table_fields")
-        .select("name, type")
+        .select("*")
         .eq("table_id", tableId)
+        .order("position")
       
       if (fields) {
-        setTableFields(fields.map(f => ({ name: f.name, type: f.type })))
+        setTableFields(fields as TableField[])
       }
     } catch (err) {
       console.error("Error loading table fields:", err)
@@ -115,16 +118,37 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         throw new Error("Table not found")
       }
 
-      // Load data with selected fields
-      const fieldsToSelect = [xAxis, metric]
-      if (groupBy && !fieldsToSelect.includes(groupBy)) {
-        fieldsToSelect.push(groupBy)
+      // Check if any of our target fields are formula fields
+      const xAxisField = tableFields.find(f => f.name === xAxis)
+      const metricField = tableFields.find(f => f.name === metric)
+      const groupByField = groupBy ? tableFields.find(f => f.name === groupBy) : null
+      
+      // Collect all formula fields for computation
+      const allFormulaFields = tableFields.filter(f => f.type === 'formula')
+      
+      // Determine if we need to compute formula fields
+      const needsFormulaComputation = allFormulaFields.length > 0 && 
+        (xAxisField?.type === 'formula' || metricField?.type === 'formula' || groupByField?.type === 'formula')
+      
+      // If we need formula fields, select all fields to ensure we have all dependencies
+      // Formula fields can reference other fields, so we need everything
+      // Otherwise, just select the fields we need
+      let selectFields: string
+      if (needsFormulaComputation) {
+        selectFields = '*' // Select all to ensure formula dependencies are available
+      } else {
+        // Select only the fields we need
+        const fieldsToSelect = new Set<string>()
+        if (xAxis) fieldsToSelect.add(xAxis)
+        if (metric) fieldsToSelect.add(metric)
+        if (groupBy) fieldsToSelect.add(groupBy)
+        selectFields = Array.from(fieldsToSelect).join(", ") || "*"
       }
 
       // Build query with filters
       let query = supabase
         .from(table.supabase_table)
-        .select(fieldsToSelect.join(", "))
+        .select(selectFields)
         .limit(1000)
 
       // Apply filters using shared filter system
@@ -134,14 +158,45 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
 
       if (fetchError) throw fetchError
 
-      setRawData(rows || [])
+      // Compute formula fields if needed
+      let processedRows = rows || []
+      if (needsFormulaComputation && processedRows.length > 0) {
+        processedRows = processedRows.map(row => {
+          return computeFormulaFields(row, allFormulaFields, tableFields)
+        })
+      }
+
+      setRawData(processedRows)
       
       // Process data for chart
-      const processed = processChartData(rows || [], xAxis, metric, groupBy)
+      const processed = processChartData(processedRows, xAxis, metric, groupBy)
+      
+      if (processed.length === 0 && processedRows.length > 0) {
+        // Data loaded but processing resulted in no chart data
+        // This might indicate invalid field names or data type issues
+        console.warn("Chart data processing resulted in empty dataset", {
+          xAxis,
+          metric,
+          groupBy,
+          rowCount: processedRows.length,
+          sampleRow: processedRows[0]
+        })
+      }
+      
       setChartData(processed)
     } catch (err: any) {
       console.error("Error loading chart data:", err)
-      setError(err.message || "Failed to load chart data")
+      const errorMessage = err.message || "Failed to load chart data"
+      setError(errorMessage)
+      
+      // Log additional debugging info
+      console.error("Chart block error details:", {
+        tableId,
+        xAxis,
+        metric,
+        groupBy,
+        error: errorMessage
+      })
     } finally {
       setLoading(false)
     }
@@ -155,13 +210,30 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   ): ChartDataPoint[] {
     if (!rows || rows.length === 0) return []
 
+    // Validate that required fields exist in the data
+    const sampleRow = rows[0]
+    if (!sampleRow) return []
+    
+    if (xField && !(xField in sampleRow)) {
+      console.warn(`X-axis field "${xField}" not found in data`)
+      return []
+    }
+    if (yField && !(yField in sampleRow)) {
+      console.warn(`Metric field "${yField}" not found in data`)
+      return []
+    }
+    if (groupByField && !(groupByField in sampleRow)) {
+      console.warn(`Group by field "${groupByField}" not found in data`)
+      return []
+    }
+
     // If grouping, aggregate by group
     if (groupByField) {
       const grouped: Record<string, number> = {}
       
       rows.forEach((row) => {
-        const groupValue = String(row[groupByField] || "Unknown")
-        const yValue = parseFloat(row[yField]) || 0
+        const groupValue = String(row[groupByField] ?? "Unknown")
+        const yValue = parseFloat(String(row[yField] ?? 0)) || 0
         
         if (!grouped[groupValue]) {
           grouped[groupValue] = 0
@@ -179,8 +251,8 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     const aggregated: Record<string, number> = {}
     
     rows.forEach((row) => {
-      const xValue = String(row[xField] || "Unknown")
-      const yValue = parseFloat(row[yField]) || 0
+      const xValue = String(row[xField] ?? "Unknown")
+      const yValue = parseFloat(String(row[yField] ?? 0)) || 0
       
       if (!aggregated[xValue]) {
         aggregated[xValue] = 0

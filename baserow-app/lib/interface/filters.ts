@@ -186,6 +186,8 @@ export function applySearchToFilters(
  * 3. Temporary UI filters (if any)
  * 
  * All filters are combined with AND logic - they narrow results together
+ * 
+ * Preserves source information (sourceBlockId, sourceBlockTitle) from filter blocks
  */
 export function mergeFilters(
   blockBaseFilters: BlockFilter[] = [],
@@ -201,12 +203,19 @@ export function mergeFilters(
   }
   
   // 2. Filter block filters (additive, narrows results)
+  // Preserve source information (sourceBlockId, sourceBlockTitle) if present
   for (const filterBlockFilter of filterBlockFilters) {
     // Filter blocks can add filters but cannot override base filters
     // If same field exists in base filters, skip (base filters take precedence)
     const baseFilterExists = merged.some(f => f.field === filterBlockFilter.field)
     if (!baseFilterExists) {
-      merged.push(filterBlockFilter)
+      // Preserve any source information from filter blocks
+      merged.push({
+        ...filterBlockFilter,
+        // Preserve sourceBlockId and sourceBlockTitle if they exist
+        ...(('sourceBlockId' in filterBlockFilter) && { sourceBlockId: (filterBlockFilter as any).sourceBlockId }),
+        ...(('sourceBlockTitle' in filterBlockFilter) && { sourceBlockTitle: (filterBlockFilter as any).sourceBlockTitle }),
+      })
     }
   }
   

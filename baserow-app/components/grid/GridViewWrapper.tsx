@@ -15,6 +15,7 @@ interface Filter {
   field_name: string
   operator: string
   value?: string
+  isBlockLevel?: boolean // True for block-level filters (non-deletable)
 }
 
 interface Sort {
@@ -108,6 +109,16 @@ export default function GridViewWrapper({
   const [fields, setFields] = useState<TableField[]>(safeInitialTableFields)
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
+  
+  // Map row height from database format ('short'|'medium'|'tall') to GridView format ('compact'|'medium'|'comfortable')
+  const mapRowHeight = (height: string | undefined): string => {
+    if (!height) return 'medium'
+    if (height === 'short') return 'compact'
+    if (height === 'tall') return 'comfortable'
+    return height // 'medium' or already in correct format
+  }
+  
+  const [rowHeight, setRowHeight] = useState<string>(mapRowHeight(appearance.row_height))
 
   // Track previous values to prevent infinite loops
   const prevInitialFiltersRef = useRef<string>('')
@@ -129,6 +140,34 @@ export default function GridViewWrapper({
       setSorts(safeInitialSorts)
     }
   }, [safeInitialSorts])
+
+  // Load row height from grid_view_settings if viewId is provided
+  useEffect(() => {
+    if (!viewId) return
+
+    async function loadRowHeight() {
+      try {
+        const { data, error } = await supabase
+          .from('grid_view_settings')
+          .select('row_height')
+          .eq('view_id', viewId)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading row height:', error)
+          return
+        }
+
+        if (data?.row_height) {
+          setRowHeight(mapRowHeight(data.row_height))
+        }
+      } catch (error) {
+        console.error('Error loading row height:', error)
+      }
+    }
+
+    loadRowHeight()
+  }, [viewId])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
@@ -165,11 +204,10 @@ export default function GridViewWrapper({
       const isValidUUID = uuidRegex.test(filterId)
 
       if (!isValidUUID) {
-        // If it's not a valid UUID, it's likely a temporary or block-level filter
-        // Just remove it from local state without database deletion
-        console.warn(`Filter ID "${filterId}" is not a valid UUID. Removing from local state only.`)
-        setFilters((prev) => prev.filter((f) => f.id !== filterId))
-        return
+        // If it's not a valid UUID, it's a block-level filter (from block config or filter blocks)
+        // Block-level filters cannot be deleted through the UI - they're managed in block settings
+        console.warn(`Filter ID "${filterId}" is not a valid UUID. This is a block-level filter and cannot be deleted from the toolbar.`)
+        return // Don't remove block-level filters - they're controlled by block config
       }
 
       // Valid UUID - attempt database deletion
@@ -423,18 +461,60 @@ export default function GridViewWrapper({
     window.location.reload()
   }
 
+  // Track deleted block-level filters (by field name) to prevent re-application
+  const [deletedBlockLevelFilters, setDeletedBlockLevelFilters] = useState<Set<string>>(new Set())
+
   // Convert filters state to FilterConfig[] format for GridView
-  // Use standardizedFilters if provided, otherwise convert filters state
+  // Merge standardizedFilters (block-level) with user-created filters
+  // Exclude block-level filters that have been explicitly deleted by the user
   const gridViewFilters = useMemo<FilterConfig[]>(() => {
-    if (standardizedFilters && standardizedFilters.length > 0) {
-      return standardizedFilters
-    }
-    // Convert Filter[] to FilterConfig[]
-    return filters.map(f => ({
-      field: f.field_name,
-      operator: f.operator as FilterConfig['operator'],
-      value: f.value,
-    }))
+    const blockLevelFilters = (standardizedFilters || []).filter(f => {
+      // Exclude block-level filters that the user has explicitly deleted
+      return !deletedBlockLevelFilters.has(f.field)
+    })
+    
+    const userCreatedFilters = filters
+      .filter(f => {
+        // Only include filters with valid UUID IDs (user-created filters)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        return f.id && uuidRegex.test(f.id)
+      })
+      .map(f => ({
+        field: f.field_name,
+        operator: f.operator as FilterConfig['operator'],
+        value: f.value,
+      }))
+    
+    // Merge block-level filters with user-created filters
+    // Block-level filters take precedence (they're applied first)
+    return [...blockLevelFilters, ...userCreatedFilters]
+  }, [standardizedFilters, filters, deletedBlockLevelFilters])
+
+  // Merge block-level filters with user-created filters for display in Toolbar
+  // Block-level filters are marked as non-deletable and show source information
+  const displayFilters = useMemo<Array<Filter & { isBlockLevel?: boolean; sourceBlockId?: string; sourceBlockTitle?: string }>>(() => {
+    const blockLevelFilters: Array<Filter & { isBlockLevel?: boolean; sourceBlockId?: string; sourceBlockTitle?: string }> = (standardizedFilters || []).map(f => {
+      // Check if this filter has source information (from filter blocks)
+      const filterWithSource = f as any
+      return {
+        id: f.field, // Use field name as ID for block-level filters
+        field_name: f.field,
+        operator: f.operator,
+        value: f.value,
+        isBlockLevel: true, // Mark as block-level (non-deletable)
+        sourceBlockId: filterWithSource.sourceBlockId,
+        sourceBlockTitle: filterWithSource.sourceBlockTitle,
+      }
+    })
+    
+    const userCreatedFilters = filters.filter(f => {
+      // Only include filters with valid UUID IDs (user-created filters)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      return f.id && uuidRegex.test(f.id)
+    })
+    
+    // Merge: block-level filters first, then user-created filters
+    return [...blockLevelFilters, ...userCreatedFilters]
   }, [standardizedFilters, filters])
 
   // Determine toolbar visibility based on appearance settings
@@ -453,7 +533,7 @@ export default function GridViewWrapper({
             viewId={viewId}
             fields={safeViewFields as any}
             tableFields={fields}
-            filters={filters}
+            filters={displayFilters}
             sorts={sorts}
             groupBy={groupBy}
             onSearchChange={setSearchTerm}
@@ -484,7 +564,7 @@ export default function GridViewWrapper({
         onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
         onRecordClick={onRecordClick}
-          rowHeight={appearance.row_height || 'medium'}
+          rowHeight={rowHeight}
           permissions={permissions}
         />
       </div>

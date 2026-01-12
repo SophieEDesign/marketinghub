@@ -328,8 +328,41 @@ export default function AirtableViewPage({
           setGroupBy(fieldName)
           router.refresh()
         }}
-        onRowHeightChange={(height) => {
+        onRowHeightChange={async (height) => {
           setRowHeight(height)
+          try {
+            // Save row height to grid_view_settings using client-side supabase
+            const { data: existing } = await supabase
+              .from('grid_view_settings')
+              .select('id')
+              .eq('view_id', viewId)
+              .maybeSingle()
+
+            if (existing) {
+              // Update existing settings
+              await supabase
+                .from('grid_view_settings')
+                .update({ row_height: height })
+                .eq('view_id', viewId)
+            } else {
+              // Create new settings
+              await supabase
+                .from('grid_view_settings')
+                .insert([
+                  {
+                    view_id: viewId,
+                    row_height: height,
+                    column_widths: {},
+                    column_order: [],
+                    column_wrap_text: {},
+                    frozen_columns: 0,
+                  },
+                ])
+            }
+          } catch (error) {
+            console.error("Error saving row height:", error)
+            // Still update local state even if save fails
+          }
           router.refresh()
         }}
         onHiddenFieldsChange={(fields) => {

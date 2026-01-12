@@ -236,11 +236,15 @@ export function useGridData({
     [tableName]
   )
 
+  const refresh = useCallback(async () => {
+    await loadData()
+  }, [loadData])
+
   return {
     rows,
     loading,
     error,
-    refresh: loadData,
+    refresh,
     updateCell,
     insertRow,
     deleteRow,

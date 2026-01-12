@@ -11,6 +11,9 @@ interface Filter {
   field_name: string
   operator: string
   value?: string
+  isBlockLevel?: boolean // True for block-level filters (non-deletable)
+  sourceBlockId?: string // ID of the filter block that applies this filter
+  sourceBlockTitle?: string // Title of the filter block (for display)
 }
 
 interface Sort {
@@ -212,32 +215,56 @@ export default function Toolbar({
           {filters.length > 0 && (
             <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 min-w-[200px] z-40">
               <div className="space-y-1">
-                {filters.map((filter, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between px-2 py-1.5 hover:bg-gray-50 rounded text-sm"
-                  >
-                    <span className="text-gray-700">
-                      {filter.field_name} {filter.operator} {filter.value || ""}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleEditFilter(filter)}
-                        className="p-1 hover:bg-gray-200 rounded text-gray-600"
-                        title="Edit filter"
-                      >
-                        <Plus className="h-3 w-3 rotate-45" />
-                      </button>
-                      <button
-                        onClick={() => filter.id && onFilterDelete(filter.id)}
-                        className="p-1 hover:bg-red-100 rounded text-red-600"
-                        title="Remove filter"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                {filters.map((filter, idx) => {
+                  const isBlockLevel = filter.isBlockLevel || false
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between px-2 py-1.5 rounded text-sm ${
+                        isBlockLevel ? 'bg-gray-50 opacity-75' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className={`text-gray-700 ${isBlockLevel ? 'text-xs' : ''}`}>
+                        {filter.field_name} {filter.operator} {filter.value || ""}
+                        {isBlockLevel && (
+                          <span className="ml-1 text-xs text-gray-500">
+                            {filter.sourceBlockTitle 
+                              ? `(from "${filter.sourceBlockTitle}")`
+                              : filter.sourceBlockId
+                                ? `(from filter block)`
+                                : `(block-level)`
+                            }
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {!isBlockLevel && (
+                          <>
+                            <button
+                              onClick={() => handleEditFilter(filter)}
+                              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+                              title="Edit filter"
+                            >
+                              <Plus className="h-3 w-3 rotate-45" />
+                            </button>
+                            <button
+                              onClick={() => filter.id && onFilterDelete(filter.id)}
+                              className="p-1 hover:bg-red-100 rounded text-red-600"
+                              title="Remove filter"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </>
+                        )}
+                        {isBlockLevel && (
+                          <span className="text-xs text-gray-400 px-1" title="Block-level filters cannot be deleted from the toolbar">
+                            Read-only
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

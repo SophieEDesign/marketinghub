@@ -18,9 +18,19 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
-  RemoveFormatting
+  RemoveFormatting,
+  CheckSquare,
+  Code,
+  ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
 interface TextBlockProps {
@@ -172,6 +182,16 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       StarterKit.configure({
         heading: {
           levels: [1, 2, 3],
+        },
+        taskList: {
+          HTMLAttributes: {
+            class: 'task-list',
+          },
+        },
+        codeBlock: {
+          HTMLAttributes: {
+            class: 'code-block',
+          },
         },
       }),
       Link.configure({
@@ -575,6 +595,101 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
       >
+        {/* Text Type Dropdown */}
+        <Select
+          value={
+            editor.isActive('heading', { level: 1 }) ? 'h1' :
+            editor.isActive('heading', { level: 2 }) ? 'h2' :
+            editor.isActive('heading', { level: 3 }) ? 'h3' :
+            'paragraph'
+          }
+          onValueChange={(value) => {
+            editor.chain().focus().run()
+            if (value === 'paragraph') {
+              editor.chain().focus().setParagraph().run()
+            } else if (value === 'h1') {
+              editor.chain().focus().toggleHeading({ level: 1 }).run()
+            } else if (value === 'h2') {
+              editor.chain().focus().toggleHeading({ level: 2 }).run()
+            } else if (value === 'h3') {
+              editor.chain().focus().toggleHeading({ level: 3 }).run()
+            }
+          }}
+        >
+          <SelectTrigger 
+            className="h-8 px-3 min-w-[100px] text-sm font-medium border-0 shadow-none hover:bg-gray-100 focus:ring-0 bg-transparent"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+          >
+            <SelectValue className="flex items-center gap-1">
+              <span>
+                {editor.isActive('heading', { level: 1 }) ? 'Heading 1' :
+                 editor.isActive('heading', { level: 2 }) ? 'Heading 2' :
+                 editor.isActive('heading', { level: 3 }) ? 'Heading 3' :
+                 'Paragraph'}
+              </span>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="z-[10000]">
+            <SelectItem value="paragraph">Paragraph</SelectItem>
+            <SelectItem value="h1">Heading 1</SelectItem>
+            <SelectItem value="h2">Heading 2</SelectItem>
+            <SelectItem value="h3">Heading 3</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+
+        {/* List Formatting */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleBulletList().run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-gray-100")}
+          title="Bullet List"
+        >
+          <List className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleOrderedList().run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('orderedList') && "bg-gray-100")}
+          title="Numbered List"
+        >
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().toggleTaskList().run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('taskList') && "bg-gray-100")}
+          title="Task List"
+        >
+          <CheckSquare className="h-4 w-4" />
+        </Button>
+
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+
+        {/* Text Styling */}
         <Button
           variant="ghost"
           size="sm"
@@ -614,80 +729,32 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         >
           <Strikethrough className="h-4 w-4" />
         </Button>
-        
-        <div className="w-px h-6 bg-gray-300 mx-1" />
-        
         <Button
           variant="ghost"
           size="sm"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            editor.chain().focus().toggleHeading({ level: 1 }).run()
+            // Toggle code block (for code blocks) or inline code (if text is selected)
+            if (editor.isActive('codeBlock')) {
+              editor.chain().focus().toggleCodeBlock().run()
+            } else if (editor.state.selection.empty) {
+              // No selection - toggle code block
+              editor.chain().focus().toggleCodeBlock().run()
+            } else {
+              // Text selected - toggle inline code
+              editor.chain().focus().toggleCode().run()
+            }
           }}
-          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 1 }) && "bg-gray-100")}
-          title="Heading 1"
+          className={cn("h-8 w-8 p-0", (editor.isActive('code') || editor.isActive('codeBlock')) && "bg-gray-100")}
+          title="Code Block"
         >
-          <Heading1 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            editor.chain().focus().toggleHeading({ level: 2 }).run()
-          }}
-          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 2 }) && "bg-gray-100")}
-          title="Heading 2"
-        >
-          <Heading2 className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            editor.chain().focus().toggleHeading({ level: 3 }).run()
-          }}
-          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 3 }) && "bg-gray-100")}
-          title="Heading 3"
-        >
-          <Heading3 className="h-4 w-4" />
+          <Code className="h-4 w-4" />
         </Button>
         
         <div className="w-px h-6 bg-gray-300 mx-1" />
         
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            editor.chain().focus().toggleBulletList().run()
-          }}
-          className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-gray-100")}
-          title="Bullet List"
-        >
-          <List className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            editor.chain().focus().toggleOrderedList().run()
-          }}
-          className={cn("h-8 w-8 p-0", editor.isActive('orderedList') && "bg-gray-100")}
-          title="Numbered List"
-        >
-          <ListOrdered className="h-4 w-4" />
-        </Button>
-        
-        <div className="w-px h-6 bg-gray-300 mx-1" />
-        
+        {/* Link */}
         <Button
           variant="ghost"
           size="sm"
@@ -703,19 +770,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           title="Add Link"
         >
           <LinkIcon className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            editor.chain().focus().unsetLink().run()
-          }}
-          disabled={!editor.isActive('link')}
-          title="Remove Link"
-        >
-          <RemoveFormatting className="h-4 w-4" />
         </Button>
       </div>
     )

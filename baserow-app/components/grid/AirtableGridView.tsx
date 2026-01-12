@@ -27,6 +27,8 @@ import { useRecordPanel } from '@/contexts/RecordPanelContext'
 import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
+import { useDataView } from '@/lib/dataView/useDataView'
+import type { Selection } from '@/lib/dataView/types'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -111,6 +113,7 @@ export default function AirtableGridView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set())
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
+  const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
 
   // Refs
   const gridRef = useRef<HTMLDivElement>(null)
@@ -131,11 +134,50 @@ export default function AirtableGridView({
   const searchQuery = searchParams.get("q") || ""
 
   // Load data
-  const { rows: allRows, loading, error, updateCell } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh } = useGridData({
     tableName,
     fields,
     sorts,
   })
+
+  // Data view service for copy/paste/duplicate
+  const dataView = useDataView({
+    context: {
+      tableId: tableId || '',
+      supabaseTableName: tableName,
+      rows: safeRows,
+      fields: safeFields,
+      visibleFields: visibleFields,
+      rowOrder: filteredRows.map((r: any) => r.id),
+    },
+    onChangesApplied: async (result) => {
+      // Refresh data after changes
+      await refresh()
+      
+      // Show errors if any
+      if (result.errors.length > 0) {
+        const errorMsg = result.errors
+          .slice(0, 5)
+          .map(e => `${e.fieldName}: ${e.error}`)
+          .join('\n')
+        alert(`Some values could not be pasted:\n\n${errorMsg}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`)
+      }
+    },
+    onError: (error) => {
+      console.error('Data view error:', error)
+      alert(`Error: ${error.message}`)
+    },
+  })
+
+  // Update data view context when data changes
+  useEffect(() => {
+    dataView.updateContext({
+      rows: safeRows,
+      fields: safeFields,
+      visibleFields: visibleFields,
+      rowOrder: filteredRows.map((r: any) => r.id),
+    })
+  }, [safeRows, safeFields, visibleFields, filteredRows, dataView])
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -485,6 +527,123 @@ export default function AirtableGridView({
     })
   }, [])
 
+  // Keyboard shortcuts for copy/paste
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Only handle if grid is focused or no input is focused
+      const activeElement = document.activeElement
+      const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA'
+      
+      // Copy: Ctrl/Cmd + C
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey && !isInputFocused) {
+        e.preventDefault()
+        
+        // Determine selection type (priority: column > row > cell)
+        let selection: Selection | null = null
+        
+        if (selectedColumnId) {
+          // Column selection
+          const field = safeFields.find(f => f.id === selectedColumnId)
+          if (field) {
+            selection = {
+              type: 'column',
+              columnId: field.id,
+              fieldName: field.name,
+            }
+          }
+        } else if (selectedRowIds.size > 0) {
+          // Row selection
+          selection = {
+            type: 'row',
+            rowIds: Array.from(selectedRowIds),
+          }
+        } else if (selectedCell) {
+          // Cell selection
+          const field = safeFields.find(f => f.name === selectedCell.fieldName)
+          if (field) {
+            selection = {
+              type: 'cell',
+              rowId: selectedCell.rowId,
+              columnId: field.id,
+              fieldName: selectedCell.fieldName,
+            }
+          }
+        }
+        
+        if (selection) {
+          const clipboardText = dataView.copy(selection)
+          await navigator.clipboard.writeText(clipboardText)
+        }
+      }
+      
+      // Paste: Ctrl/Cmd + V
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !e.shiftKey && !isInputFocused) {
+        e.preventDefault()
+        
+        try {
+          const clipboardText = await navigator.clipboard.readText()
+          
+          // Determine selection type (priority: column > row > cell)
+          let selection: Selection | null = null
+          
+          if (selectedColumnId) {
+            // Column selection
+            const field = safeFields.find(f => f.id === selectedColumnId)
+            if (field) {
+              selection = {
+                type: 'column',
+                columnId: field.id,
+                fieldName: field.name,
+              }
+            }
+          } else if (selectedRowIds.size > 0) {
+            // Row selection
+            selection = {
+              type: 'row',
+              rowIds: Array.from(selectedRowIds),
+            }
+          } else if (selectedCell) {
+            // Cell selection
+            const field = safeFields.find(f => f.name === selectedCell.fieldName)
+            if (field) {
+              selection = {
+                type: 'cell',
+                rowId: selectedCell.rowId,
+                columnId: field.id,
+                fieldName: selectedCell.fieldName,
+              }
+            }
+          }
+          
+          if (selection) {
+            await dataView.paste(selection, clipboardText)
+          }
+        } catch (error) {
+          console.error('Error pasting:', error)
+        }
+      }
+      
+      // Undo: Ctrl/Cmd + Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey && !isInputFocused) {
+        e.preventDefault()
+        if (dataView.canUndo) {
+          await dataView.undo()
+        }
+      }
+      
+      // Redo: Ctrl/Cmd + Shift + Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey && !isInputFocused) {
+        e.preventDefault()
+        if (dataView.canRedo) {
+          await dataView.redo()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, dataView, refresh])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -580,11 +739,17 @@ export default function AirtableGridView({
                     width={columnWidths[field.name] || COLUMN_DEFAULT_WIDTH}
                     isResizing={resizingColumn === field.name}
                     wrapText={columnWrapText[field.name] || false}
+                    isSelected={selectedColumnId === field.id}
                     onResizeStart={handleResizeStart}
                     onResize={handleResize}
                     onResizeEnd={handleResizeEnd}
                     onEdit={onEditField}
                     onToggleWrapText={handleToggleWrapText}
+                    onSelect={(fieldId) => {
+                      setSelectedColumnId(fieldId)
+                      setSelectedCell(null)
+                      setSelectedRowIds(new Set())
+                    }}
                     sortDirection={sort?.direction || null}
                     sortOrder={sortIndex >= 0 ? sortIndex + 1 : null}
                     onSort={handleSort}
@@ -688,6 +853,8 @@ export default function AirtableGridView({
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRowSelect(row.id, rowIndex, e)
+                      setSelectedColumnId(null)
+                      setSelectedCell(null)
                     }}
                   >
                     <input
@@ -724,7 +891,10 @@ export default function AirtableGridView({
                           isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
                         }`}
                         style={{ width, height: ROW_HEIGHT }}
-                        onClick={() => setSelectedCell({ rowId: row.id, fieldName: field.name })}
+                        onClick={() => {
+                          setSelectedCell({ rowId: row.id, fieldName: field.name })
+                          setSelectedColumnId(null)
+                        }}
                       >
                         <CellFactory
                           field={field}

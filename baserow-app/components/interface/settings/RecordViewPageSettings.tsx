@@ -61,6 +61,18 @@ export default function RecordViewPageSettings({
   const [loading, setLoading] = useState(false)
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false)
   
+  // Left panel settings state
+  const leftPanelConfig = config.left_panel || {}
+  const [leftPanelFilterBy, setLeftPanelFilterBy] = useState<string>(leftPanelConfig.filter_by?.[0]?.field || "")
+  const [leftPanelSortBy, setLeftPanelSortBy] = useState<string>(leftPanelConfig.sort_by?.[0]?.field || "")
+  const [leftPanelSortDirection, setLeftPanelSortDirection] = useState<'asc' | 'desc'>(leftPanelConfig.sort_by?.[0]?.direction || 'asc')
+  const [leftPanelGroupBy, setLeftPanelGroupBy] = useState<string>(leftPanelConfig.group_by || "")
+  const [leftPanelColorField, setLeftPanelColorField] = useState<string>(leftPanelConfig.color_field || "")
+  const [leftPanelImageField, setLeftPanelImageField] = useState<string>(leftPanelConfig.image_field || "")
+  const [leftPanelTitleField, setLeftPanelTitleField] = useState<string>(leftPanelConfig.title_field || config.title_field || "")
+  const [leftPanelField1, setLeftPanelField1] = useState<string>(leftPanelConfig.field_1 || "")
+  const [leftPanelField2, setLeftPanelField2] = useState<string>(leftPanelConfig.field_2 || "")
+  
   // Parse field configurations from config
   const fieldConfigs = useCallback((): FieldConfig[] => {
     const visibleFields = config.visible_fields || config.detail_fields || []
@@ -480,48 +492,131 @@ export default function RecordViewPageSettings({
                     {/* Filter by */}
                     <div className="space-y-2">
                       <Label>Filter by</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelFilterBy || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelFilterBy(fieldName)
+                          const newFilterBy = fieldName ? [{ field: fieldName, operator: 'equal', value: '' }] : []
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              filter_by: newFilterBy,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Filter records in the left panel (coming soon).
+                        Filter records in the left panel.
                       </p>
                     </div>
 
                     {/* Sort by */}
                     <div className="space-y-2">
                       <Label>Sort by</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
-                        <SelectTrigger>
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Select 
+                          value={leftPanelSortBy || "__none__"} 
+                          onValueChange={(value) => {
+                            const fieldName = value === "__none__" ? "" : value
+                            setLeftPanelSortBy(fieldName)
+                            const newSortBy = fieldName ? [{ field: fieldName, direction: leftPanelSortDirection, order_index: 0 }] : []
+                            onUpdate({
+                              left_panel: {
+                                ...leftPanelConfig,
+                                sort_by: newSortBy,
+                              }
+                            })
+                          }}
+                          disabled={!selectedTableId || fields.length === 0}
+                          className="flex-1"
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="None" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {fields.map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {leftPanelSortBy && (
+                          <Select 
+                            value={leftPanelSortDirection} 
+                            onValueChange={(value: 'asc' | 'desc') => {
+                              setLeftPanelSortDirection(value)
+                              onUpdate({
+                                left_panel: {
+                                  ...leftPanelConfig,
+                                  sort_by: [{ field: leftPanelSortBy, direction: value, order_index: 0 }],
+                                }
+                              })
+                            }}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="asc">Asc</SelectItem>
+                              <SelectItem value="desc">Desc</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">
-                        Default sort order for records (coming soon).
+                        Default sort order for records.
                       </p>
                     </div>
 
                     {/* Group by */}
                     <div className="space-y-2">
                       <Label>Group by</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelGroupBy || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelGroupBy(fieldName)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              group_by: fieldName || undefined,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields
+                            .filter(f => f.type === 'single_select' || f.type === 'multi_select')
+                            .map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Group records by field (coming soon).
+                        Group records by field (select fields only).
                       </p>
                     </div>
                   </div>
@@ -535,32 +630,72 @@ export default function RecordViewPageSettings({
                     {/* Color */}
                     <div className="space-y-2">
                       <Label>Color</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelColorField || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelColorField(fieldName)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              color_field: fieldName || undefined,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields
+                            .filter(f => f.type === 'single_select' || f.type === 'multi_select')
+                            .map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Field to use for item color (coming soon).
+                        Field to use for item color (select fields only).
                       </p>
                     </div>
 
                     {/* Image field */}
                     <div className="space-y-2">
                       <Label>Image field</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelImageField || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelImageField(fieldName)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              image_field: fieldName || undefined,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields
+                            .filter(f => f.type === 'image' || f.type === 'file' || f.type === 'url')
+                            .map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {field.name}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Field to display as image in list items (coming soon).
+                        Field to display as image in list items.
                       </p>
                     </div>
 
@@ -568,10 +703,19 @@ export default function RecordViewPageSettings({
                     <div className="space-y-2">
                       <Label>Title</Label>
                       <Select
-                        value={config.title_field || "__none__"}
-                        onValueChange={(value) =>
-                          onUpdate({ title_field: value === "__none__" ? undefined : value })
-                        }
+                        value={leftPanelTitleField || "__none__"}
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelTitleField(fieldName)
+                          // Update both left_panel.title_field and page-level title_field
+                          onUpdate({ 
+                            title_field: fieldName || undefined,
+                            left_panel: {
+                              ...leftPanelConfig,
+                              title_field: fieldName || undefined,
+                            }
+                          })
+                        }}
                         disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
@@ -594,32 +738,68 @@ export default function RecordViewPageSettings({
                     {/* Field 1 */}
                     <div className="space-y-2">
                       <Label>Field 1</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelField1 || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelField1(fieldName)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              field_1: fieldName || undefined,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        First additional field to display (coming soon).
+                        First additional field to display in list items.
                       </p>
                     </div>
 
                     {/* Field 2 */}
                     <div className="space-y-2">
                       <Label>Field 2</Label>
-                      <Select value="" onValueChange={() => {}} disabled>
+                      <Select 
+                        value={leftPanelField2 || "__none__"} 
+                        onValueChange={(value) => {
+                          const fieldName = value === "__none__" ? "" : value
+                          setLeftPanelField2(fieldName)
+                          onUpdate({
+                            left_panel: {
+                              ...leftPanelConfig,
+                              field_2: fieldName || undefined,
+                            }
+                          })
+                        }}
+                        disabled={!selectedTableId || fields.length === 0}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {fields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Second additional field to display (coming soon).
+                        Second additional field to display in list items.
                       </p>
                     </div>
                   </div>

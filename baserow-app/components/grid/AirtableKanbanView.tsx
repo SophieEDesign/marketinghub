@@ -583,11 +583,11 @@ function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-80 bg-gray-100 rounded-lg flex flex-col"
+      className="flex-shrink-0 w-80 bg-gray-100 rounded-lg flex flex-col h-full max-h-full"
       data-column-id={column.id}
     >
       {/* Column Header */}
-      <div className="p-3 bg-white rounded-t-lg border-b border-gray-200 flex items-center justify-between">
+      <div className="p-3 bg-white rounded-t-lg border-b border-gray-200 flex items-center justify-between flex-shrink-0">
         <button
           onClick={onToggle}
           className="flex items-center gap-2 flex-1 text-left hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1"
@@ -604,7 +604,7 @@ function KanbanColumn({
 
       {/* Cards */}
       {!isCollapsed && (
-        <div className="flex-1 px-2 py-2 overflow-y-auto min-h-[100px]">
+        <div className="flex-1 px-2 py-2 overflow-y-auto min-h-0">
           <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {rows.length === 0 ? (
@@ -630,7 +630,7 @@ function KanbanColumn({
 
       {/* Add Card Button */}
       {!isCollapsed && canEdit && (
-        <div className="p-2 border-t border-gray-200">
+        <div className="p-2 border-t border-gray-200 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -668,12 +668,38 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
 
   const primaryField = displayFields[0]
   const primaryValue = primaryField ? row[primaryField.name] : null
+  const otherFields = (Array.isArray(displayFields) ? displayFields : []).slice(1)
+
+  // Format field values based on type
+  const formatValue = (field: TableField, value: any): string => {
+    if (value === null || value === undefined || value === "") return "—"
+    
+    if (field.type === "date" || field.type === "datetime") {
+      if (!value) return "—"
+      try {
+        const date = new Date(value)
+        return date.toLocaleDateString()
+      } catch {
+        return String(value)
+      }
+    }
+    
+    if (field.type === "checkbox" || field.type === "boolean") {
+      return value ? "✓" : "—"
+    }
+    
+    if (Array.isArray(value)) {
+      return value.join(", ")
+    }
+    
+    return String(value)
+  }
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200"
+      className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg"
       onClick={onClick}
     >
       <CardContent className="p-3">
@@ -682,23 +708,26 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
             <div
               {...attributes}
               {...listeners}
-              className="mt-0.5 cursor-grab active:cursor-grabbing"
+              className="mt-0.5 cursor-grab active:cursor-grabbing flex-shrink-0"
             >
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <div className="flex-1 space-y-2 min-w-0">
+          <div className="flex-1 space-y-1.5 min-w-0">
             {primaryField && (
-              <div className="font-medium text-sm text-gray-900 truncate">
-                {primaryValue || "Untitled"}
+              <div className="font-medium text-sm text-gray-900 break-words">
+                {formatValue(primaryField, primaryValue) || "Untitled"}
               </div>
             )}
-            {(Array.isArray(displayFields) ? displayFields : []).slice(1).map((field) => {
+            {otherFields.map((field) => {
               if (!field || !field.name) return null
               const value = row[field.name]
+              const formattedValue = formatValue(field, value)
+              
               return (
-                <div key={field.name} className="text-xs text-gray-600 truncate">
-                  <span className="text-gray-500">{field.name}:</span> {String(value || "—")}
+                <div key={field.name} className="text-xs text-gray-600 break-words">
+                  <span className="text-gray-500 font-medium">{field.name}:</span>{" "}
+                  <span className="text-gray-700">{formattedValue}</span>
                 </div>
               )
             })}

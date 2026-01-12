@@ -34,8 +34,9 @@ export default function KPIDataSettings({
   const [showComparison, setShowComparison] = useState(!!config.comparison)
   const [showTarget, setShowTarget] = useState(config.target_value !== undefined)
 
+  // Include numeric field types and formula fields (formulas can return numbers)
   const numericFields = fields.filter(f => 
-    ['number', 'currency', 'percent', 'rating'].includes(f.type)
+    ['number', 'currency', 'percent'].includes(f.type) || f.type === 'formula'
   )
 
   return (

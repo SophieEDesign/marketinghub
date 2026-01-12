@@ -486,7 +486,11 @@ export default function RecordDetailsPanel({
                   onFieldChange={pageEditable ? onFieldChange : () => {}}
                   fieldGroups={fieldGroups}
                   tableId={tableId}
-                  recordId={recordId}
+                  recordId={recordId || ""}
+                  isFieldEditable={(fieldName: string) => {
+                    if (!pageEditable) return false
+                    return editableFieldNames.includes(fieldName)
+                  }}
                 />
               </div>
             )}

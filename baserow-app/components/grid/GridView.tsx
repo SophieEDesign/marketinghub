@@ -344,7 +344,8 @@ export default function GridView({
   const allowInlineCreate = permissions?.allowInlineCreate ?? true
   const allowInlineDelete = permissions?.allowInlineDelete ?? true
   const allowOpenRecord = permissions?.allowOpenRecord ?? true
-  const canEdit = !isViewOnly && isEditing
+  // Allow editing in live view if not view-only (even when not in edit mode)
+  const canEdit = !isViewOnly
 
   function handleRowClick(rowId: string) {
     // Don't open record if not allowed

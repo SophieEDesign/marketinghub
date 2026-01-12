@@ -12,11 +12,13 @@ interface GridColumnHeaderProps {
   width: number
   isResizing: boolean
   wrapText?: boolean
+  isSelected?: boolean
   onResizeStart: (fieldName: string) => void
   onResize: (fieldName: string, width: number) => void
   onResizeEnd: () => void
   onEdit?: (fieldName: string) => void
   onToggleWrapText?: (fieldName: string) => void
+  onSelect?: (fieldId: string) => void
   sortDirection?: 'asc' | 'desc' | null
   sortOrder?: number | null // Sort order number (1, 2, 3) for multi-sort
   onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
@@ -27,11 +29,13 @@ export default function GridColumnHeader({
   width,
   isResizing,
   wrapText = false,
+  isSelected = false,
   onResizeStart,
   onResize,
   onResizeEnd,
   onEdit,
   onToggleWrapText,
+  onSelect,
   sortDirection,
   sortOrder = null,
   onSort,
@@ -96,8 +100,20 @@ export default function GridColumnHeader({
     <div
       ref={setNodeRef}
       style={{ ...style, width, minWidth: width, maxWidth: width }}
-      className="relative flex items-center border-r border-gray-200 bg-white hover:bg-gray-50 transition-colors group"
+      className={`relative flex items-center border-r border-gray-200 bg-white hover:bg-gray-50 transition-colors group ${
+        isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
+      }`}
       onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={(e) => {
+        // Select column on click (but not when clicking sort/resize buttons)
+        if (onSelect && !e.defaultPrevented) {
+          const target = e.target as HTMLElement
+          if (!target.closest('button') && !target.closest('.resize-handle')) {
+            onSelect(field.id)
+          }
+        }
+      }}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Drag handle */}
