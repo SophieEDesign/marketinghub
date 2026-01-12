@@ -173,13 +173,14 @@ export default function PageCreationWizard({
       const supabase = createClient()
       const { data, error } = await supabase
         .from('table_fields')
-        .select('id, name, type')
+        .select('id, name, type, options')
         .eq('table_id', tableId)
         .order('position', { ascending: true })
 
       if (!error && data) {
         setTableFields(data)
       } else {
+        console.error('Error loading table fields:', error)
         setTableFields([])
       }
     } catch (error) {
@@ -193,6 +194,65 @@ export default function PageCreationWizard({
       loadTableFields()
     }
   }, [tableId, pageType])
+
+  // Get appropriate operators for a field type
+  function getOperatorsForFieldType(fieldType: string) {
+    switch (fieldType) {
+      case "text":
+      case "long_text":
+        return [
+          { value: "contains", label: "Contains" },
+          { value: "not_contains", label: "Does not contain" },
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "number":
+      case "currency":
+      case "percent":
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "greater_than", label: "Greater than" },
+          { value: "greater_than_or_equal", label: "Greater than or equal" },
+          { value: "less_than", label: "Less than" },
+          { value: "less_than_or_equal", label: "Less than or equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "date":
+        return [
+          { value: "date_equal", label: "Is" },
+          { value: "date_before", label: "Before" },
+          { value: "date_after", label: "After" },
+          { value: "date_on_or_before", label: "On or before" },
+          { value: "date_on_or_after", label: "On or after" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "single_select":
+      case "multi_select":
+        return [
+          { value: "equal", label: "Is" },
+          { value: "not_equal", label: "Is not" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "checkbox":
+        return [
+          { value: "equal", label: "Is checked" },
+          { value: "not_equal", label: "Is unchecked" },
+        ]
+      default:
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+    }
+  }
 
   const handleInterfaceSelect = () => {
     if (!selectedInterfaceId) {
@@ -678,28 +738,40 @@ export default function PageCreationWizard({
             <div className="space-y-4 pt-4 border-t">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Data Options</Label>
+                <p className="text-xs text-gray-500">
+                  Configure filters, sorting, and grouping for the record list. Select a field to filter by to see filter options.
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs text-gray-500">Filter</Label>
+                    <Label className="text-xs text-gray-500">Filter By</Label>
                     <Select value={leftPanelFilter || "__none__"} onValueChange={(value) => {
                       const newField = value === "__none__" ? "" : value
                       setLeftPanelFilter(newField)
                       // Reset filter operator and value when field changes
                       if (newField !== leftPanelFilter) {
-                        setLeftPanelFilterOperator('equal')
+                        const selectedField = tableFields.find(f => f.name === newField)
+                        const operators = selectedField 
+                          ? getOperatorsForFieldType(selectedField.type)
+                          : getOperatorsForFieldType('text')
+                        // Set to first available operator for the field type
+                        setLeftPanelFilterOperator(operators[0]?.value || 'equal')
                         setLeftPanelFilterValue('')
                       }
                     }}>
                       <SelectTrigger className="h-9">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="Select field..." />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
-                        {tableFields.map((field) => (
-                          <SelectItem key={field.id} value={field.name}>
-                            {field.name}
-                          </SelectItem>
-                        ))}
+                        {tableFields.length === 0 ? (
+                          <SelectItem value="__loading__" disabled>Loading fields...</SelectItem>
+                        ) : (
+                          tableFields.map((field) => (
+                            <SelectItem key={field.id} value={field.name}>
+                              {field.name} {field.type === 'single_select' || field.type === 'multi_select' ? '(Select)' : ''}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -739,43 +811,61 @@ export default function PageCreationWizard({
                   </div>
                 </div>
                 {leftPanelFilter && (
-                  <div className="pt-2 space-y-2 border-t">
+                  <div className="pt-3 space-y-3 border-t bg-gray-50 p-3 rounded-md">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium text-gray-700">Filter Configuration</Label>
+                      <p className="text-xs text-gray-500">Configure how to filter by "{leftPanelFilter}"</p>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs text-gray-500">Operator</Label>
-                        <Select value={leftPanelFilterOperator} onValueChange={setLeftPanelFilterOperator}>
-                          <SelectTrigger className="h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="equal">Equals</SelectItem>
-                            <SelectItem value="not_equal">Not equals</SelectItem>
-                            <SelectItem value="contains">Contains</SelectItem>
-                            <SelectItem value="not_contains">Does not contain</SelectItem>
-                            <SelectItem value="is_empty">Is empty</SelectItem>
-                            <SelectItem value="is_not_empty">Is not empty</SelectItem>
-                            <SelectItem value="greater_than">Greater than</SelectItem>
-                            <SelectItem value="less_than">Less than</SelectItem>
-                            <SelectItem value="greater_than_or_equal">Greater than or equal</SelectItem>
-                            <SelectItem value="less_than_or_equal">Less than or equal</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label className="text-xs text-gray-600">Operator</Label>
+                        {(() => {
+                          const selectedFilterField = tableFields.find(f => f.name === leftPanelFilter)
+                          const operators = selectedFilterField 
+                            ? getOperatorsForFieldType(selectedFilterField.type)
+                            : getOperatorsForFieldType('text')
+                          
+                          return (
+                            <Select 
+                              value={leftPanelFilterOperator} 
+                              onValueChange={(value) => {
+                                setLeftPanelFilterOperator(value)
+                                // Reset value when operator changes to empty operators
+                                if (['is_empty', 'is_not_empty'].includes(value)) {
+                                  setLeftPanelFilterValue('')
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {operators.map((op) => (
+                                  <SelectItem key={op.value} value={op.value}>
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )
+                        })()}
                       </div>
                       {!['is_empty', 'is_not_empty'].includes(leftPanelFilterOperator) && (
                         <div className="space-y-1">
-                          <Label className="text-xs text-gray-500">Value</Label>
+                          <Label className="text-xs text-gray-600">Value</Label>
                           {(() => {
                             const selectedFilterField = tableFields.find(f => f.name === leftPanelFilter)
                             const isSelectField = selectedFilterField && 
                               (selectedFilterField.type === 'single_select' || selectedFilterField.type === 'multi_select') &&
                               selectedFilterField.options?.choices &&
+                              Array.isArray(selectedFilterField.options.choices) &&
                               selectedFilterField.options.choices.length > 0
                             
                             if (isSelectField) {
                               return (
                                 <Select value={leftPanelFilterValue} onValueChange={setLeftPanelFilterValue}>
                                   <SelectTrigger className="h-9">
-                                    <SelectValue placeholder="Select value" />
+                                    <SelectValue placeholder={`Select ${selectedFilterField.name} value`} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {selectedFilterField.options.choices.map((choice: string) => (
@@ -788,9 +878,18 @@ export default function PageCreationWizard({
                               )
                             }
                             
+                            // Determine input type based on field type
+                            const inputType = selectedFilterField?.type === 'number' || 
+                                            selectedFilterField?.type === 'currency' || 
+                                            selectedFilterField?.type === 'percent'
+                              ? 'number'
+                              : selectedFilterField?.type === 'date'
+                              ? 'date'
+                              : 'text'
+                            
                             return (
                               <Input
-                                type="text"
+                                type={inputType}
                                 value={leftPanelFilterValue}
                                 onChange={(e) => setLeftPanelFilterValue(e.target.value)}
                                 placeholder="Enter filter value"

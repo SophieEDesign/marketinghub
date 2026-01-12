@@ -25,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock, Settings } from "lucide-react"
 import type { PageConfig } from "@/lib/interface/page-config"
 import type { Table, TableField } from "@/types/database"
@@ -74,6 +75,8 @@ export default function RecordViewPageSettings({
   // Left panel settings state
   const leftPanelConfig = config.left_panel || {}
   const [leftPanelFilterBy, setLeftPanelFilterBy] = useState<string>(leftPanelConfig.filter_by?.[0]?.field || "")
+  const [leftPanelFilterOperator, setLeftPanelFilterOperator] = useState<string>(leftPanelConfig.filter_by?.[0]?.operator || "equal")
+  const [leftPanelFilterValue, setLeftPanelFilterValue] = useState<string>(leftPanelConfig.filter_by?.[0]?.value || "")
   const [leftPanelSortBy, setLeftPanelSortBy] = useState<string>(leftPanelConfig.sort_by?.[0]?.field || "")
   const [leftPanelSortDirection, setLeftPanelSortDirection] = useState<'asc' | 'desc'>(leftPanelConfig.sort_by?.[0]?.direction || 'asc')
   const [leftPanelGroupBy, setLeftPanelGroupBy] = useState<string>(leftPanelConfig.group_by || "")
@@ -87,6 +90,8 @@ export default function RecordViewPageSettings({
   useEffect(() => {
     const leftPanel = config.left_panel || {}
     setLeftPanelFilterBy(leftPanel.filter_by?.[0]?.field || "")
+    setLeftPanelFilterOperator(leftPanel.filter_by?.[0]?.operator || "equal")
+    setLeftPanelFilterValue(leftPanel.filter_by?.[0]?.value || "")
     setLeftPanelSortBy(leftPanel.sort_by?.[0]?.field || "")
     setLeftPanelSortDirection(leftPanel.sort_by?.[0]?.direction || 'asc')
     setLeftPanelGroupBy(leftPanel.group_by || "")
@@ -156,7 +161,7 @@ export default function RecordViewPageSettings({
       const supabase = createClient()
       const { data: fieldsData, error } = await supabase
         .from("table_fields")
-        .select("*")
+        .select("*, options")
         .eq("table_id", selectedTableId)
         .order("position", { ascending: true })
 
@@ -166,6 +171,65 @@ export default function RecordViewPageSettings({
       console.error("Error loading fields:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Get appropriate operators for a field type
+  function getOperatorsForFieldType(fieldType: string) {
+    switch (fieldType) {
+      case "text":
+      case "long_text":
+        return [
+          { value: "contains", label: "Contains" },
+          { value: "not_contains", label: "Does not contain" },
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "number":
+      case "currency":
+      case "percent":
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "greater_than", label: "Greater than" },
+          { value: "greater_than_or_equal", label: "Greater than or equal" },
+          { value: "less_than", label: "Less than" },
+          { value: "less_than_or_equal", label: "Less than or equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "date":
+        return [
+          { value: "date_equal", label: "Is" },
+          { value: "date_before", label: "Before" },
+          { value: "date_after", label: "After" },
+          { value: "date_on_or_before", label: "On or before" },
+          { value: "date_on_or_after", label: "On or after" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "single_select":
+      case "multi_select":
+        return [
+          { value: "equal", label: "Is" },
+          { value: "not_equal", label: "Is not" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "checkbox":
+        return [
+          { value: "equal", label: "Is checked" },
+          { value: "not_equal", label: "Is unchecked" },
+        ]
+      default:
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Does not equal" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
     }
   }
 
@@ -521,13 +585,25 @@ export default function RecordViewPageSettings({
                         onValueChange={(value) => {
                           const fieldName = value === "__none__" ? "" : value
                           setLeftPanelFilterBy(fieldName)
-                          const newFilterBy = fieldName ? [{ field: fieldName, operator: 'equal', value: '' }] : []
-                          onUpdate({
-                            left_panel: {
-                              ...leftPanelConfig,
-                              filter_by: newFilterBy,
-                            }
-                          })
+                          
+                          // Reset operator and value when field changes
+                          if (fieldName !== leftPanelFilterBy) {
+                            const selectedField = fields.find(f => f.name === fieldName)
+                            const operators = selectedField 
+                              ? getOperatorsForFieldType(selectedField.type)
+                              : getOperatorsForFieldType('text')
+                            const defaultOperator = operators[0]?.value || 'equal'
+                            setLeftPanelFilterOperator(defaultOperator)
+                            setLeftPanelFilterValue('')
+                            
+                            const newFilterBy = fieldName ? [{ field: fieldName, operator: defaultOperator, value: '' }] : []
+                            onUpdate({
+                              left_panel: {
+                                ...leftPanelConfig,
+                                filter_by: newFilterBy,
+                              }
+                            })
+                          }
                         }}
                         disabled={!selectedTableId || fields.length === 0}
                       >
@@ -538,13 +614,142 @@ export default function RecordViewPageSettings({
                           <SelectItem value="__none__">None</SelectItem>
                           {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {field.name} {field.type === 'single_select' || field.type === 'multi_select' ? '(Select)' : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      
+                      {/* Filter Operator and Value */}
+                      {leftPanelFilterBy && (
+                        <div className="pt-2 space-y-2 border-t">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-gray-600">Operator</Label>
+                              {(() => {
+                                const selectedFilterField = fields.find(f => f.name === leftPanelFilterBy)
+                                const operators = selectedFilterField 
+                                  ? getOperatorsForFieldType(selectedFilterField.type)
+                                  : getOperatorsForFieldType('text')
+                                
+                                return (
+                                  <Select 
+                                    value={leftPanelFilterOperator} 
+                                    onValueChange={(value) => {
+                                      setLeftPanelFilterOperator(value)
+                                      // Reset value when operator changes to empty operators
+                                      if (['is_empty', 'is_not_empty'].includes(value)) {
+                                        setLeftPanelFilterValue('')
+                                      }
+                                      // Update config
+                                      const newFilterBy = leftPanelFilterBy ? [{
+                                        field: leftPanelFilterBy,
+                                        operator: value,
+                                        value: ['is_empty', 'is_not_empty'].includes(value) ? '' : leftPanelFilterValue
+                                      }] : []
+                                      onUpdate({
+                                        left_panel: {
+                                          ...leftPanelConfig,
+                                          filter_by: newFilterBy,
+                                        }
+                                      })
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {operators.map((op) => (
+                                        <SelectItem key={op.value} value={op.value}>
+                                          {op.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )
+                              })()}
+                            </div>
+                            {!['is_empty', 'is_not_empty'].includes(leftPanelFilterOperator) && (
+                              <div className="space-y-1">
+                                <Label className="text-xs text-gray-600">Value</Label>
+                                {(() => {
+                                  const selectedFilterField = fields.find(f => f.name === leftPanelFilterBy)
+                                  const isSelectField = selectedFilterField && 
+                                    (selectedFilterField.type === 'single_select' || selectedFilterField.type === 'multi_select') &&
+                                    selectedFilterField.options?.choices &&
+                                    Array.isArray(selectedFilterField.options.choices) &&
+                                    selectedFilterField.options.choices.length > 0
+                                  
+                                  if (isSelectField) {
+                                    return (
+                                      <Select 
+                                        value={leftPanelFilterValue} 
+                                        onValueChange={(value) => {
+                                          setLeftPanelFilterValue(value)
+                                          onUpdate({
+                                            left_panel: {
+                                              ...leftPanelConfig,
+                                              filter_by: [{
+                                                field: leftPanelFilterBy,
+                                                operator: leftPanelFilterOperator,
+                                                value: value
+                                              }],
+                                            }
+                                          })
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-9">
+                                          <SelectValue placeholder={`Select ${selectedFilterField.name} value`} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {selectedFilterField.options.choices.map((choice: string) => (
+                                            <SelectItem key={choice} value={choice}>
+                                              {choice}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )
+                                  }
+                                  
+                                  // Determine input type based on field type
+                                  const inputType = selectedFilterField?.type === 'number' || 
+                                                  selectedFilterField?.type === 'currency' || 
+                                                  selectedFilterField?.type === 'percent'
+                                    ? 'number'
+                                    : selectedFilterField?.type === 'date'
+                                    ? 'date'
+                                    : 'text'
+                                  
+                                  return (
+                                    <input
+                                      type={inputType}
+                                      value={leftPanelFilterValue}
+                                      onChange={(e) => {
+                                        setLeftPanelFilterValue(e.target.value)
+                                        onUpdate({
+                                          left_panel: {
+                                            ...leftPanelConfig,
+                                            filter_by: [{
+                                              field: leftPanelFilterBy,
+                                              operator: leftPanelFilterOperator,
+                                              value: e.target.value
+                                            }],
+                                          }
+                                        })
+                                      }}
+                                      placeholder="Enter filter value"
+                                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                    />
+                                  )
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <p className="text-xs text-gray-500">
-                        Filter records in the left panel.
+                        Filter records in the left panel. Select a field to configure the filter.
                       </p>
                     </div>
 

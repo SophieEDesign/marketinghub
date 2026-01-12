@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { X, Plus, Search, Loader2, GripVertical } from "lucide-react"
+import { X, Plus, Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
@@ -42,6 +40,7 @@ export interface LookupFieldPickerProps {
   placeholder?: string
   onRecordClick?: (tableId: string, recordId: string) => void
   onCreateRecord?: (tableId: string) => Promise<string | null> // Returns new record ID
+  isLookupField?: boolean // True for derived lookup fields, false for editable linked fields
 }
 
 interface RecordOption {
@@ -60,15 +59,13 @@ export default function LookupFieldPicker({
   placeholder = "Search and select...",
   onRecordClick,
   onCreateRecord,
+  isLookupField = false,
 }: LookupFieldPickerProps) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [options, setOptions] = useState<RecordOption[]>([])
   const [loading, setLoading] = useState(false)
-  const [previewRecord, setPreviewRecord] = useState<RecordOption | null>(null)
-  const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Determine if multi-select
@@ -318,26 +315,6 @@ export default function LookupFieldPicker({
     })
   }
 
-  function handlePreview(option: RecordOption, event: React.MouseEvent) {
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current)
-    }
-
-    previewTimeoutRef.current = setTimeout(() => {
-      setPreviewRecord(option)
-      setPreviewPosition({ x: event.clientX + 10, y: event.clientY + 10 })
-    }, 300)
-  }
-
-  function handlePreviewLeave() {
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current)
-    }
-    previewTimeoutRef.current = setTimeout(() => {
-      setPreviewRecord(null)
-      setPreviewPosition(null)
-    }, 200)
-  }
 
   // Get selected options
   const selectedOptions = options.filter(opt => selectedIds.includes(opt.id))
@@ -347,17 +324,66 @@ export default function LookupFieldPicker({
     ? options 
     : options.filter(opt => !selectedIds.includes(opt.id))
 
+  // For lookup fields (read-only), render as informational pills without popover
+  if (isLookupField || disabled) {
+    return (
+      <div className="space-y-2" ref={containerRef}>
+        <div
+          className={cn(
+            "min-h-[40px] w-full rounded-md border border-gray-200/50 bg-gray-50/50 px-3 py-2.5 text-sm",
+            "flex flex-wrap items-center gap-2",
+            isLookupField && "cursor-default"
+          )}
+        >
+          {selectedOptions.length > 0 ? (
+            selectedOptions.map((option) => (
+              <span
+                key={option.id}
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                  isLookupField 
+                    ? "bg-gray-100/80 text-gray-600 border border-gray-200/50" 
+                    : "bg-gray-100 text-gray-700",
+                  onRecordClick && "group"
+                )}
+                style={{ boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' }}
+              >
+                {/* Only the label text is clickable for navigation */}
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onRecordClick && lookupTableId) {
+                      onRecordClick(lookupTableId, option.id)
+                    }
+                  }}
+                  className={cn(
+                    onRecordClick && "cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                  )}
+                >
+                  {option.primaryLabel}
+                </span>
+              </span>
+            ))
+          ) : (
+            <span className="text-gray-400 italic">{placeholder}</span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // For linked fields (editable), render with popover
   return (
     <div className="space-y-2" ref={containerRef}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div
             className={cn(
-              "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm",
-              "flex flex-wrap items-center gap-2 cursor-pointer transition-colors",
-              "hover:border-gray-300 hover:bg-gray-50/50",
+              "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm",
+              "flex flex-wrap items-center gap-2 transition-colors",
+              !disabled && "cursor-pointer hover:border-blue-300 hover:bg-blue-50/30",
               "focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1",
-              disabled && "opacity-50 cursor-not-allowed"
+              disabled && "opacity-50 cursor-not-allowed bg-gray-50"
             )}
             onClick={() => !disabled && setOpen(true)}
           >
@@ -366,24 +392,34 @@ export default function LookupFieldPicker({
                 {selectedOptions.map((option) => (
                   <span
                     key={option.id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/50"
                     style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (onRecordClick && !disabled) {
-                        onRecordClick(lookupTableId!, option.id)
-                      }
+                      // Don't navigate on pill click - only on label click
                     }}
                   >
-                    <span>{option.primaryLabel}</span>
+                    {/* Only the label text is clickable for navigation */}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (onRecordClick && lookupTableId) {
+                          onRecordClick(lookupTableId, option.id)
+                        }
+                      }}
+                      className="cursor-pointer hover:text-blue-800 hover:underline transition-colors"
+                    >
+                      {option.primaryLabel}
+                    </span>
                     {!disabled && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           handleRemove(option.id)
                         }}
-                        className="ml-0.5 rounded p-0.5 hover:bg-gray-300/50 transition-colors opacity-70 hover:opacity-100"
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-blue-200/50 transition-colors opacity-70 hover:opacity-100"
                         title="Remove"
+                        aria-label="Remove"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -391,13 +427,42 @@ export default function LookupFieldPicker({
                   </span>
                 ))}
                 {isMultiSelect && selectedOptions.length > 1 && (
-                  <span className="text-gray-500 text-xs">
+                  <span className="text-gray-500 text-xs ml-1">
                     {selectedOptions.length} selected
                   </span>
                 )}
+                {/* Add button - only show when field is editable and not disabled */}
+                {!disabled && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpen(true)
+                    }}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
+                    title="Add record"
+                    aria-label="Add record"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </>
             ) : (
-              <span className="text-gray-400 italic">{placeholder}</span>
+              <div className="flex items-center justify-between w-full">
+                <span className="text-gray-400 italic">{placeholder}</span>
+                {!disabled && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpen(true)
+                    }}
+                    className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
+                    title="Add record"
+                    aria-label="Add record"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </PopoverTrigger>
@@ -444,8 +509,6 @@ export default function LookupFieldPicker({
                         isSelected && "bg-blue-50/50"
                       )}
                       onClick={() => handleSelect(option)}
-                      onMouseEnter={(e) => handlePreview(option, e)}
-                      onMouseLeave={handlePreviewLeave}
                     >
                       <div className="font-medium text-sm text-gray-900">{option.primaryLabel}</div>
                       {option.secondaryLabels && option.secondaryLabels.length > 0 && (
@@ -471,41 +534,6 @@ export default function LookupFieldPicker({
           </div>
         </PopoverContent>
       </Popover>
-
-      {/* Preview Card */}
-      {previewRecord && previewPosition && (
-        <div
-          className="fixed z-50 pointer-events-none"
-          style={{
-            left: `${previewPosition.x}px`,
-            top: `${previewPosition.y}px`,
-          }}
-        >
-          <Card className="w-64 shadow-lg">
-            <CardContent className="p-3">
-              <div className="font-medium text-sm mb-2">{previewRecord.primaryLabel}</div>
-              {previewRecord.secondaryLabels && previewRecord.secondaryLabels.length > 0 && (
-                <div className="text-xs text-muted-foreground space-y-1">
-                  {previewRecord.secondaryLabels.map((label, idx) => (
-                    <div key={idx}>{label}</div>
-                  ))}
-                </div>
-              )}
-              {onRecordClick && (
-                <button
-                  className="mt-2 text-xs text-primary hover:underline"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onRecordClick(lookupTableId!, previewRecord.id)
-                  }}
-                >
-                  View record →
-                </button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Link2, Plus, X, Calculator } from "lucide-react"
+import { Link2, Plus, X, Calculator, Link as LinkIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
@@ -144,9 +144,27 @@ export default function InlineFieldEditor({
     }
   }
 
+  // Handle paste - block for lookup fields, allow for linked fields
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (field.type === "lookup") {
+      e.preventDefault()
+      toast({
+        title: "Cannot edit derived field",
+        description: "This field is derived and can't be edited.",
+        variant: "destructive",
+      })
+      return
+    }
+    // For linked fields, paste is handled by LookupFieldPicker
+  }, [field.type, toast])
+
   const isVirtual = field.type === "formula" || field.type === "lookup"
   // Use prop override first, then check field-level read-only, then virtual
   const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (isVirtual || field.options?.read_only)
+  
+  // Determine if this is a lookup field (derived) vs linked field (editable)
+  const isLookupField = field.type === "lookup"
+  const isLinkedField = field.type === "link_to_table"
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {
@@ -218,32 +236,42 @@ export default function InlineFieldEditor({
       }
     }
 
-    if (isReadOnly && field.type === "lookup") {
-      // Lookup fields are read-only, show display value
+    // LOOKUP FIELDS (derived, read-only) - Show as informational pills
+    if (isLookupField) {
       return (
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+        <div className="space-y-2.5" onPaste={handlePaste}>
+          <label className="block text-sm font-medium text-gray-600 flex items-center gap-2">
             {field.name}
-            <span title="Lookup field (read-only)">
-              <Calculator className="h-3 w-3 text-gray-400" />
+            <span title="Derived field (read-only)" className="flex items-center gap-1 text-xs text-gray-400 font-normal">
+              <LinkIcon className="h-3 w-3" />
+              <span>Derived</span>
             </span>
           </label>
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
-            {value !== null && value !== undefined ? String(value) : "—"}
-          </div>
+          {lookupConfig ? (
+            <LookupFieldPicker
+              field={field}
+              value={value}
+              onChange={() => {}} // No-op for lookup fields
+              config={lookupConfig}
+              disabled={true}
+              placeholder="No linked records"
+              onRecordClick={onLinkedRecordClick}
+              isLookupField={true}
+            />
+          ) : (
+            <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-500 italic">
+              {value !== null && value !== undefined ? String(value) : "—"}
+            </div>
+          )}
         </div>
       )
     }
 
+    // LINKED FIELDS (editable) - Show as editable with clear affordances
     return (
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+      <div className="space-y-2.5" onPaste={handlePaste}>
+        <label className="block text-sm font-medium text-gray-700">
           {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
         </label>
         {lookupConfig ? (
           <LookupFieldPicker
@@ -252,13 +280,14 @@ export default function InlineFieldEditor({
             onChange={onChange}
             config={lookupConfig}
             disabled={isReadOnly}
-            placeholder={`Select ${field.name}...`}
+            placeholder={`Add ${field.name}...`}
             onRecordClick={onLinkedRecordClick}
             onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
+            isLookupField={false}
           />
         ) : (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
-            Configure lookup table in field settings
+          <div className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
+            Configure linked table in field settings
           </div>
         )}
       </div>
@@ -277,7 +306,7 @@ export default function InlineFieldEditor({
 
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <label className="block text-sm font-medium text-gray-700">{field.name}</label>
           <div className="space-y-2">
             {choices.map((choice: string) => {
@@ -285,7 +314,7 @@ export default function InlineFieldEditor({
               return (
                 <label
                   key={choice}
-                  className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer"
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <input
                     type={isMulti ? "checkbox" : "radio"}
@@ -310,7 +339,7 @@ export default function InlineFieldEditor({
           <div className="flex gap-2">
             <button
               onClick={handleBlur}
-              className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
             >
               Done
             </button>
@@ -320,7 +349,7 @@ export default function InlineFieldEditor({
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
           {field.name}
           {isVirtual && (
@@ -330,7 +359,7 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm min-h-[38px] flex items-center flex-wrap gap-1.5">
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm min-h-[40px] flex items-center flex-wrap gap-1.5">
             {selectedValues.length > 0 ? (
               selectedValues.map((val: string) => {
                 const hexColor = getColorForChoiceName(val, field.options?.choiceColors)
@@ -353,7 +382,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-gray-50 transition-colors cursor-pointer min-h-[38px] flex items-center flex-wrap gap-1.5"
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer min-h-[40px] flex items-center flex-wrap gap-2"
           >
             {selectedValues.length > 0 ? (
               selectedValues.map((val: string) => {
@@ -388,7 +417,7 @@ export default function InlineFieldEditor({
 
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <label className="block text-sm font-medium text-gray-700">{field.name}</label>
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
@@ -397,14 +426,14 @@ export default function InlineFieldEditor({
             onChange={(e) => handleChange(e.target.value || null)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       )
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
           {field.name}
           {isVirtual && (
@@ -414,13 +443,13 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
             {dateValueForDisplay || "—"}
           </div>
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer text-sm text-gray-900"
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
           >
             {dateValueForDisplay || <span className="text-gray-400">Click to set date...</span>}
           </div>
@@ -432,7 +461,7 @@ export default function InlineFieldEditor({
   // Checkbox
   if (field.type === "checkbox") {
     return (
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
           {field.name}
           {isVirtual && (
@@ -442,11 +471,11 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
             {value ? "Yes" : "No"}
           </div>
         ) : (
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2.5 cursor-pointer">
             <input
               type="checkbox"
               checked={!!value}
@@ -464,7 +493,7 @@ export default function InlineFieldEditor({
   if (field.type === "long_text") {
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <label className="block text-sm font-medium text-gray-700">{field.name}</label>
           <textarea
             ref={inputRef as React.RefObject<HTMLTextAreaElement>}
@@ -472,14 +501,14 @@ export default function InlineFieldEditor({
             onChange={(e) => handleChange(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             rows={4}
             placeholder="Enter text..."
           />
           <div className="flex gap-2">
             <button
               onClick={handleBlur}
-              className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
             >
               Done
             </button>
@@ -489,7 +518,7 @@ export default function InlineFieldEditor({
     }
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
           {field.name}
           {isVirtual && (
@@ -499,13 +528,13 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic whitespace-pre-wrap">
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic whitespace-pre-wrap">
             {value || "—"}
           </div>
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer text-sm text-gray-900 min-h-[60px] whitespace-pre-wrap"
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[60px] whitespace-pre-wrap"
           >
             {value || <span className="text-gray-400">Click to add text...</span>}
           </div>
@@ -526,7 +555,7 @@ export default function InlineFieldEditor({
             : "text"
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <label className="block text-sm font-medium text-gray-700">{field.name}</label>
         <input
           ref={inputRef as React.RefObject<HTMLInputElement>}
@@ -537,7 +566,7 @@ export default function InlineFieldEditor({
           }
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder={`Enter ${field.name}...`}
         />
       </div>
@@ -545,7 +574,7 @@ export default function InlineFieldEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
         {field.name}
         {isVirtual && (
@@ -555,7 +584,7 @@ export default function InlineFieldEditor({
         )}
       </label>
       {isReadOnly ? (
-        <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700 italic">
+        <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
           {value !== null && value !== undefined ? String(value) : "—"}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
@@ -566,7 +595,7 @@ export default function InlineFieldEditor({
       ) : (
         <div
           onClick={onEditStart}
-          className="px-3 py-2 border border-gray-200 rounded-md hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer text-sm text-gray-900 min-h-[38px] flex items-center"
+          className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[40px] flex items-center"
         >
           {value !== null && value !== undefined ? (
             String(value)

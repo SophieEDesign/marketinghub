@@ -116,15 +116,15 @@ export default function RecordFields({
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Grouped Fields */}
       {Object.entries(groupedFields).map(([groupName, groupFields]) => {
         const isCollapsed = collapsedGroups.has(groupName)
         return (
-          <div key={groupName} className="border border-gray-200 rounded-lg overflow-hidden">
+          <div key={groupName} className="border border-gray-200/60 rounded-lg overflow-hidden bg-white">
             <button
               onClick={() => toggleGroup(groupName)}
-              className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+              className="w-full px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors flex items-center justify-between border-b border-gray-200/60"
             >
               <span className="font-semibold text-sm text-gray-900">{groupName}</span>
               {isCollapsed ? (
@@ -134,7 +134,7 @@ export default function RecordFields({
               )}
             </button>
             {!isCollapsed && (
-              <div className="p-4 space-y-4">
+              <div className="p-5 space-y-6">
                 {groupFields.map((field) => {
                   const fieldEditable = isFieldEditable(field.name)
                   return (
@@ -160,7 +160,7 @@ export default function RecordFields({
 
       {/* Ungrouped Fields */}
       {ungroupedFields.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {ungroupedFields.map((field) => {
             const fieldEditable = isFieldEditable(field.name)
             return (
@@ -183,7 +183,7 @@ export default function RecordFields({
 
       {/* Empty State */}
       {fields.length === 0 && (
-        <div className="text-center py-8 text-gray-400 text-sm">
+        <div className="text-center py-12 text-gray-400 text-sm">
           No fields available
         </div>
       )}
