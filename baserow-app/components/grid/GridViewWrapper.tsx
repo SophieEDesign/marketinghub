@@ -445,28 +445,31 @@ export default function GridViewWrapper({
   const showSort = appearance.show_sort !== false && showToolbar
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full flex flex-col">
       {/* Show toolbar based on appearance settings */}
       {showToolbar && (
-        <Toolbar
-          viewId={viewId}
-          fields={safeViewFields as any}
-          tableFields={fields}
-          filters={filters}
-          sorts={sorts}
-          groupBy={groupBy}
-          onSearchChange={setSearchTerm}
-          onFilterCreate={handleFilterCreate}
-          onFilterDelete={handleFilterDelete}
-          onSortCreate={handleSortCreate}
-          onSortDelete={handleSortDelete}
-          onGroupByChange={handleGroupByChange}
-          showSearch={showSearch}
-          showFilter={showFilter}
-          showSort={showSort}
-        />
+        <div className="flex-shrink-0">
+          <Toolbar
+            viewId={viewId}
+            fields={safeViewFields as any}
+            tableFields={fields}
+            filters={filters}
+            sorts={sorts}
+            groupBy={groupBy}
+            onSearchChange={setSearchTerm}
+            onFilterCreate={handleFilterCreate}
+            onFilterDelete={handleFilterDelete}
+            onSortCreate={handleSortCreate}
+            onSortDelete={handleSortDelete}
+            onGroupByChange={handleGroupByChange}
+            showSearch={showSearch}
+            showFilter={showFilter}
+            showSort={showSort}
+          />
+        </div>
       )}
-      <GridView
+      <div className="flex-1 min-h-0">
+        <GridView
         tableId={tableId}
         viewId={viewId}
         supabaseTableName={supabaseTableName}
@@ -481,9 +484,10 @@ export default function GridViewWrapper({
         onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
         onRecordClick={onRecordClick}
-        rowHeight={appearance.row_height || 'medium'}
-        permissions={permissions}
-      />
+          rowHeight={appearance.row_height || 'medium'}
+          permissions={permissions}
+        />
+      </div>
       <FieldBuilderDrawer
         isOpen={fieldBuilderOpen}
         onClose={() => {

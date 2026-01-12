@@ -317,26 +317,71 @@ export default function PageCreationWizard({
           }
         : {}
       
-      const { data: page, error } = await supabase
-        .from('interface_pages')
-        .insert([
-          {
-            name: pageName.trim(),
-            page_type: pageType,
-            base_table: base_table, // Store table selection
-            saved_view_id,
-            dashboard_layout_id,
-            form_config_id,
-            record_config_id,
-            group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null, // Required
-            config: pageConfig, // Store tableId in config for record_view pages
-            created_by: user?.id,
-          },
-        ])
-        .select()
-        .single()
+      // Generate unique page name to avoid duplicate key errors
+      // The constraint idx_interface_pages_group_name requires unique (group_id, name)
+      const basePageName = pageName.trim()
+      let finalPageName = basePageName
+      let counter = 1
+      let page: any = null
+      let pageCreated = false
+      const maxAttempts = 100 // Safety limit
+      
+      // Try to create page with retry logic for duplicate names
+      while (!pageCreated && counter <= maxAttempts) {
+        // Check if page name already exists in the same group
+        const { data: existingPages } = await supabase
+          .from('interface_pages')
+          .select('id')
+          .eq('group_id', selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null)
+          .eq('name', finalPageName)
+          .is('is_archived', false)
+          .limit(1)
+        
+        // If name doesn't exist, try to create it
+        if (!existingPages || existingPages.length === 0) {
+          const { data: newPage, error: pageError } = await supabase
+            .from('interface_pages')
+            .insert([
+              {
+                name: finalPageName,
+                page_type: pageType,
+                base_table: base_table, // Store table selection
+                saved_view_id,
+                dashboard_layout_id,
+                form_config_id,
+                record_config_id,
+                group_id: selectedInterfaceId && selectedInterfaceId.trim() ? selectedInterfaceId.trim() : null, // Required
+                config: pageConfig, // Store tableId in config for record_view pages
+                created_by: user?.id,
+              },
+            ])
+            .select()
+            .single()
 
-      if (error) throw error
+          if (pageError) {
+            // If it's a duplicate key error, try next name (race condition occurred)
+            if (pageError.code === '23505' && pageError.message?.includes('idx_interface_pages_group_name')) {
+              finalPageName = `${basePageName} (${counter})`
+              counter++
+              continue // Retry with new name
+            } else {
+              // Other error - throw it
+              throw new Error(`Failed to create page: ${pageError.message || 'Unknown error'}`)
+            }
+          } else if (newPage) {
+            page = newPage
+            pageCreated = true
+          }
+        } else {
+          // Name exists, try next name
+          finalPageName = `${basePageName} (${counter})`
+          counter++
+        }
+      }
+
+      if (!pageCreated || !page) {
+        throw new Error(`Failed to create page: Could not generate unique page name after ${counter} attempts`)
+      }
 
       // For content pages, update dashboard_layout_id to the page's own ID (self-reference)
       // This allows the page to reference its own blocks in view_blocks table

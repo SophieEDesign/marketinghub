@@ -557,10 +557,10 @@ export default function GridView({
   }
 
   return (
-    <div className="w-full relative">
+    <div className="w-full h-full flex flex-col relative" style={{ paddingBottom: isEditing ? '60px' : '0' }}>
       {/* Toolbar - Only show builder controls in edit mode */}
       {isEditing && (
-        <div className="mb-4 flex items-center justify-between">
+        <div className="flex-shrink-0 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {/* Only show Add Row button if inline create is allowed */}
             {allowInlineCreate && (
@@ -591,9 +591,9 @@ export default function GridView({
         </div>
       )}
 
-      {/* Grid Table */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
-        <div className="overflow-x-auto pb-3">
+      {/* Grid Table - Takes remaining space and scrolls */}
+      <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
+        <div className="flex-1 overflow-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -745,6 +745,39 @@ export default function GridView({
           </table>
         </div>
       </div>
+
+      {/* Fixed bottom toolbar - Always visible */}
+      {isEditing && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Only show Add Row button if inline create is allowed */}
+            {allowInlineCreate && (
+              <button
+                onClick={handleAddRow}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </button>
+            )}
+            {onAddField && (
+              <button
+                onClick={onAddField}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Add Field
+              </button>
+            )}
+          </div>
+          <div className="text-sm text-gray-500">
+            {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
+            {searchTerm && filteredRows.length !== safeRows.length && (
+              <span className="ml-1">(filtered from {safeRows.length})</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Record panel is now global - no local drawer needed */}
     </div>
