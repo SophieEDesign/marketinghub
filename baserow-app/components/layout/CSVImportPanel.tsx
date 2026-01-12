@@ -320,23 +320,32 @@ export default function CSVImportPanel({
   }
 
   // Auto-detect field type from sample values
-  // Uses a threshold approach: if >60% of values match a pattern, use that type
+  // Uses a threshold approach: if >80% of values match a pattern, use that type
+  // Requires minimum sample size for more accurate detection
   function detectFieldType(sampleValues: string[]): FieldType {
     if (sampleValues.length === 0) return 'text'
     
-    const threshold = Math.max(1, Math.floor(sampleValues.length * 0.6)) // 60% threshold (lowered from 70%)
     const nonEmptyValues = sampleValues.filter(v => v != null && v.trim() !== '')
 
     if (nonEmptyValues.length === 0) return 'text'
+    
+    // Require minimum sample size for accurate detection
+    const MIN_SAMPLES = 3
+    if (nonEmptyValues.length < MIN_SAMPLES) return 'text'
+    
+    // Increased threshold to 80% for stricter detection
+    const threshold = Math.max(1, Math.ceil(nonEmptyValues.length * 0.8))
+    const totalCount = nonEmptyValues.length
 
-    // Check for JSON pattern first (most specific) - at least 60% match
+    // Check for JSON pattern first (most specific) - at least 80% match
     const jsonPattern = /^[\s]*[{\[]/
     const jsonMatches = nonEmptyValues.filter(v => {
       const trimmed = v.trim()
       if (!jsonPattern.test(trimmed)) return false
       try {
-        JSON.parse(trimmed)
-        return true
+        const parsed = JSON.parse(trimmed)
+        // Additional validation: must be object or array
+        return typeof parsed === 'object' && parsed !== null
       } catch {
         return false
       }
@@ -346,37 +355,44 @@ export default function CSVImportPanel({
       return 'json'
     }
 
-    // Check for email pattern (at least 60% match)
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    const emailMatches = nonEmptyValues.filter(v => emailPattern.test(v.trim())).length
+    // Check for email pattern (at least 80% match) - stricter validation
+    const emailPattern = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    const emailMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.trim()
+      // Must match pattern and have valid domain structure
+      return emailPattern.test(trimmed) && trimmed.includes('.') && trimmed.split('@')[1]?.includes('.')
+    }).length
     if (emailMatches >= threshold) {
       return 'email'
     }
 
-    // Check for URL pattern (at least 60% match) - improved detection
+    // Check for URL pattern (at least 80% match) - stricter detection
     const urlMatches = nonEmptyValues.filter(v => {
       const trimmed = v.trim().toLowerCase()
-      // Check for http/https
-      if (/^https?:\/\//.test(trimmed)) return true
-      // Check for www.
-      if (/^www\./.test(trimmed)) return true
-      // Check for domain pattern (has TLD)
-      if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}/.test(trimmed)) return true
-      // Check for URLs with paths (contains . and /)
-      if (trimmed.includes('.') && trimmed.includes('/') && !trimmed.includes(' ')) return true
-      // Check for common URL patterns
-      if (trimmed.match(/^[a-z]+:\/\//)) return true
+      // Require explicit protocol (http/https) or www prefix
+      if (/^https?:\/\/[^\s]+/.test(trimmed)) {
+        // Must have valid domain after protocol
+        const domain = trimmed.replace(/^https?:\/\//, '').split('/')[0]
+        return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/.test(domain)
+      }
+      // Or require www. prefix with valid domain
+      if (/^www\.[^\s]+/.test(trimmed)) {
+        const domain = trimmed.replace(/^www\./, '').split('/')[0]
+        return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/.test(domain)
+      }
       return false
     }).length
     if (urlMatches >= threshold) {
       return 'url'
     }
 
-    // Check for boolean/checkbox - at least 60% match
-    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0', 'y', 'n', 't', 'f']
-    const booleanMatches = nonEmptyValues.filter(v => 
-      booleanValues.includes(v.toLowerCase().trim())
-    ).length
+    // Check for boolean/checkbox - at least 80% match, require exact boolean values
+    const booleanValues = ['true', 'false', 'yes', 'no', '1', '0']
+    const booleanMatches = nonEmptyValues.filter(v => {
+      const trimmed = v.toLowerCase().trim()
+      // Only accept exact boolean values (removed 'y', 'n', 't', 'f' for stricter detection)
+      return booleanValues.includes(trimmed)
+    }).length
     if (booleanMatches >= threshold) {
       return 'checkbox'
     }
@@ -385,18 +401,17 @@ export default function CSVImportPanel({
     // This is important because dates/numbers might match loosely
     const uniqueValues = new Set(nonEmptyValues.map(v => v.trim().toLowerCase()))
     const uniqueCount = uniqueValues.size
-    const totalCount = nonEmptyValues.length
     
-    // Improved categorical detection: if we have few unique values relative to total
-    // Lower threshold: if uniqueCount <= 50% of totalCount OR uniqueCount <= 15
-    if (totalCount >= 3 && (uniqueCount <= Math.max(2, Math.floor(totalCount * 0.5)) || uniqueCount <= 15)) {
+    // Stricter categorical detection: require more repetition
+    // Need at least 5 samples and unique values <= 40% of total OR <= 10 unique values
+    if (totalCount >= 5 && (uniqueCount <= Math.max(2, Math.floor(totalCount * 0.4)) || uniqueCount <= 10)) {
       // Check if values contain commas or semicolons (multi-select indicator)
       const multiSelectIndicators = nonEmptyValues.filter(v => 
         /[,;]/.test(v.trim())
       ).length
       
-      if (multiSelectIndicators >= Math.floor(totalCount * 0.4)) {
-        // More than 40% have separators - likely multi-select
+      // Require at least 50% to have separators for multi-select
+      if (multiSelectIndicators >= Math.ceil(totalCount * 0.5)) {
         return 'multi_select'
       } else {
         // Likely single-select category (check if values repeat)
@@ -407,67 +422,71 @@ export default function CSVImportPanel({
           valueCounts.set(key, (valueCounts.get(key) || 0) + 1)
         })
         const maxCount = Math.max(...Array.from(valueCounts.values()))
-        // If most common value appears at least twice and we have few unique values, it's categorical
-        if (maxCount >= 2 && uniqueCount <= 15) {
+        // Require most common value to appear at least 3 times and unique values <= 10
+        if (maxCount >= 3 && uniqueCount <= 10) {
           return 'single_select'
         }
       }
     }
 
-    // Check for date pattern (common formats) - at least 60% match
-    // More comprehensive date patterns
+    // Check for date pattern (common formats) - at least 80% match, require pattern AND valid parse
     const datePatterns = [
       /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/, // YYYY-MM-DD, YYYY/MM/DD
       /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}$/, // MM/DD/YYYY, DD-MM-YYYY
-      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2}$/, // MM/DD/YY
-      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}\s+\d{1,2}:\d{2}/, // MM/DD/YYYY HH:MM
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/, // ISO datetime
-      /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}/i, // DD Mon YYYY
-      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}/i, // Mon DD, YYYY
+      /^\d{1,2}[-\/]\d{1,2}[-\/]\d{4}\s+\d{1,2}:\d{2}(?::\d{2})?/, // MM/DD/YYYY HH:MM or HH:MM:SS
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})?$/, // ISO datetime
+      /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}$/i, // DD Mon YYYY
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}$/i, // Mon DD, YYYY
     ]
     
-    // Also try parsing as Date object
+    // Stricter date detection: require pattern match AND valid parse
     const dateMatches = nonEmptyValues.filter(v => {
       const trimmed = v.trim()
-      // Check regex patterns first
-      if (datePatterns.some(p => p.test(trimmed))) {
-        return true
-      }
-      // Try parsing as date - but be more strict
-      const date = new Date(trimmed)
-      if (!isNaN(date.getTime())) {
-        // Additional validation: check if it's a reasonable date (not epoch 0)
-        const year = date.getFullYear()
-        // Also check that the parsed date actually matches the input (not just any parseable string)
-        const dateStr = date.toISOString().split('T')[0]
-        const inputMatch = trimmed.match(/\d{4}/)
-        if (inputMatch && dateStr.startsWith(inputMatch[0])) {
-          return year >= 1900 && year <= 2100
-        }
-      }
-      return false
+      // Must match a date pattern first
+      const matchesPattern = datePatterns.some(p => p.test(trimmed))
+      if (!matchesPattern) return false
+      
+      // Then verify it parses to a valid date
+      const date = parseDateFromCSV(trimmed)
+      if (!date) return false
+      
+      // Additional validation: check year is reasonable
+      const year = date.getFullYear()
+      return year >= 1900 && year <= 2100
     }).length
     
     if (dateMatches >= threshold) {
       return 'date'
     }
 
-    // Check for number (integer or decimal) - at least 60% match
+    // Check for number (integer or decimal) - at least 80% match, require consistent format
     // Remove currency symbols and percentage signs for number detection
     const cleanedValues = nonEmptyValues.map(v => v.trim().replace(/[$€£¥%,\s]/g, ''))
     const numberPattern = /^-?\d+(\.\d+)?$/
-    const numberMatches = cleanedValues.filter(v => numberPattern.test(v)).length
+    const numberMatches = cleanedValues.filter(v => {
+      // Must match number pattern
+      if (!numberPattern.test(v)) return false
+      // Additional validation: check it's a valid number
+      const num = parseFloat(v)
+      return !isNaN(num) && isFinite(num)
+    }).length
     
     if (numberMatches >= threshold) {
-      // Check if it's a percentage (contains % in original)
-      const percentCount = nonEmptyValues.filter(v => v.includes('%')).length
+      // Check if it's a percentage (contains % in original) - require 80% match
+      const percentCount = nonEmptyValues.filter(v => {
+        const trimmed = v.trim()
+        return trimmed.includes('%') && numberPattern.test(trimmed.replace(/[$€£¥%,\s]/g, ''))
+      }).length
       if (percentCount >= threshold) {
         return 'percent'
       }
-      // Check if it's currency (contains currency symbols)
-      const currencyCount = nonEmptyValues.filter(v => 
-        /[$€£¥]/.test(v) || v.toLowerCase().includes('usd') || v.toLowerCase().includes('gbp')
-      ).length
+      // Check if it's currency (contains currency symbols) - require 80% match
+      const currencyCount = nonEmptyValues.filter(v => {
+        const trimmed = v.trim()
+        const hasCurrency = /[$€£¥]/.test(trimmed) || trimmed.toLowerCase().includes('usd') || trimmed.toLowerCase().includes('gbp')
+        const isNumber = numberPattern.test(trimmed.replace(/[$€£¥%,\s]/g, ''))
+        return hasCurrency && isNumber
+      }).length
       if (currencyCount >= threshold) {
         return 'currency'
       }

@@ -32,67 +32,9 @@ export default function KanbanView({
   imageField,
   fitImageSize = false,
 }: KanbanViewProps) {
+  // All hooks must be at the top level, before any conditional returns
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadRows()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId])
-
-  async function loadRows() {
-    if (!tableId) {
-      console.warn("KanbanView: tableId is required")
-      setRows([])
-      setLoading(false)
-      return
-    }
-    
-    // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
-    const sanitizedTableId = tableId.split(':')[0]
-    
-    setLoading(true)
-    try {
-      // First, get the table to find its supabase_table name
-      const { data: table, error: tableError } = await supabase
-        .from("tables")
-        .select("supabase_table")
-        .eq("id", sanitizedTableId)
-        .single()
-
-      if (tableError || !table) {
-        console.error("Error loading table:", tableError)
-        setRows([])
-        setLoading(false)
-        return
-      }
-
-      // Load rows from the actual table (not table_rows)
-      const { data, error } = await supabase
-        .from(table.supabase_table)
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("Error loading rows:", error)
-        setRows([])
-      } else {
-        // Convert flat rows to TableRow format for compatibility
-        const tableRows = (data || []).map((row: any) => ({
-          id: row.id,
-          table_id: sanitizedTableId,
-          data: row,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-        }))
-        setRows(tableRows)
-      }
-    } catch (error) {
-      console.error("Error loading kanban rows:", error)
-      setRows([])
-    }
-    setLoading(false)
-  }
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -165,6 +107,65 @@ export default function KanbanView({
     
     return null
   }, [imageField])
+
+  useEffect(() => {
+    loadRows()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId])
+
+  async function loadRows() {
+    if (!tableId) {
+      console.warn("KanbanView: tableId is required")
+      setRows([])
+      setLoading(false)
+      return
+    }
+    
+    // Sanitize tableId - remove any trailing :X patterns (might be view ID or malformed)
+    const sanitizedTableId = tableId.split(':')[0]
+    
+    setLoading(true)
+    try {
+      // First, get the table to find its supabase_table name
+      const { data: table, error: tableError } = await supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", sanitizedTableId)
+        .single()
+
+      if (tableError || !table) {
+        console.error("Error loading table:", tableError)
+        setRows([])
+        setLoading(false)
+        return
+      }
+
+      // Load rows from the actual table (not table_rows)
+      const { data, error } = await supabase
+        .from(table.supabase_table)
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading rows:", error)
+        setRows([])
+      } else {
+        // Convert flat rows to TableRow format for compatibility
+        const tableRows = (data || []).map((row: any) => ({
+          id: row.id,
+          table_id: sanitizedTableId,
+          data: row,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        }))
+        setRows(tableRows)
+      }
+    } catch (error) {
+      console.error("Error loading kanban rows:", error)
+      setRows([])
+    }
+    setLoading(false)
+  }
 
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
