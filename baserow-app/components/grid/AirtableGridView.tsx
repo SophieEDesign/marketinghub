@@ -146,24 +146,6 @@ export default function AirtableGridView({
   const safeFields = asArray<TableField>(fields)
   const safeSorts = asArray<Sort>(sorts)
 
-  // Get visible fields in order (needed for search filtering and rendering)
-  // Initialize with empty array to avoid "used before declaration" errors
-  const visibleFields = useMemo(() => {
-    if (columnOrder.length === 0) return []
-    const safeColumnOrder = asArray(columnOrder)
-    return safeColumnOrder
-      .map((fieldName) => safeFields.find((f) => f.name === fieldName))
-      .filter((f): f is TableField => f !== undefined)
-  }, [columnOrder, safeFields])
-
-  // Filter rows by search query (only visible fields)
-  const visibleFieldNames = useMemo(() => {
-    return visibleFields.map((f) => f.name)
-  }, [visibleFields])
-
-  const filteredRows = useMemo(() => {
-    return filterRowsBySearch(safeRows, safeFields, searchQuery, visibleFieldNames)
-  }, [safeRows, safeFields, searchQuery, visibleFieldNames])
 
   // Data view service for copy/paste/duplicate
   // Initialize with empty arrays, will be updated in useEffect when visibleFields/filteredRows are ready
@@ -316,24 +298,6 @@ export default function AirtableGridView({
       })
     }
   }, [])
-
-  // Get visible fields in order (needed for search filtering and rendering)
-  const visibleFields = useMemo(() => {
-    if (columnOrder.length === 0) return []
-    const safeColumnOrder = asArray(columnOrder)
-    return safeColumnOrder
-      .map((fieldName) => safeFields.find((f) => f.name === fieldName))
-      .filter((f): f is TableField => f !== undefined)
-  }, [columnOrder, safeFields])
-
-  // Filter rows by search query (only visible fields)
-  const visibleFieldNames = useMemo(() => {
-    return visibleFields.map((f) => f.name)
-  }, [visibleFields])
-
-  const filteredRows = useMemo(() => {
-    return filterRowsBySearch(safeRows, safeFields, searchQuery, visibleFieldNames)
-  }, [safeRows, safeFields, searchQuery, visibleFieldNames])
 
   // Group rows if groupBy is set
   // CRITICAL: Normalize filteredRows before grouping

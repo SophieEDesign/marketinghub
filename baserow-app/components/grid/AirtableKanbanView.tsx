@@ -674,7 +674,7 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
   const formatValue = (field: TableField, value: any): string => {
     if (value === null || value === undefined || value === "") return "—"
     
-    if (field.type === "date" || field.type === "datetime") {
+    if (field.type === "date") {
       if (!value) return "—"
       try {
         const date = new Date(value)
