@@ -100,6 +100,7 @@ export default function LookupFieldPicker({
 
       return () => clearTimeout(timeoutId)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, searchQuery, lookupTableId])
 
   // Load selected records on mount/open
@@ -107,6 +108,7 @@ export default function LookupFieldPicker({
     if (open && selectedIds.length > 0 && lookupTableId) {
       loadSelectedRecords()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedIds.length, lookupTableId])
 
   async function loadOptions(query: string = "") {

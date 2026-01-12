@@ -680,7 +680,7 @@ export default function RecordViewPageSettings({
                                     Array.isArray(selectedFilterField.options.choices) &&
                                     selectedFilterField.options.choices.length > 0
                                   
-                                  if (isSelectField) {
+                                  if (isSelectField && selectedFilterField && selectedFilterField.options?.choices) {
                                     return (
                                       <Select 
                                         value={leftPanelFilterValue} 

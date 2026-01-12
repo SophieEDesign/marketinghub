@@ -814,7 +814,7 @@ export default function PageCreationWizard({
                   <div className="pt-3 space-y-3 border-t bg-gray-50 p-3 rounded-md">
                     <div className="space-y-1">
                       <Label className="text-xs font-medium text-gray-700">Filter Configuration</Label>
-                      <p className="text-xs text-gray-500">Configure how to filter by "{leftPanelFilter}"</p>
+                      <p className="text-xs text-gray-500">Configure how to filter by &quot;{leftPanelFilter}&quot;</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-1">
