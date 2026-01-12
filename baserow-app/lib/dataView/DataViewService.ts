@@ -355,7 +355,10 @@ export class DataViewService {
     }
 
     // Skip virtual fields
-    if (sourceField.type === 'formula' || sourceField.type === 'lookup') {
+    // Note: formula and lookup are virtual field types, but they're not in the FieldType union
+    // We check for them as strings to handle any edge cases
+    const fieldType = sourceField.type as string
+    if (fieldType === 'formula' || fieldType === 'lookup') {
       return {
         success: false,
         error: `Cannot duplicate computed field: ${sourceField.name}`,
@@ -401,7 +404,10 @@ export class DataViewService {
       }
 
       // Add column to physical table (if not virtual)
-      if (sourceField.type !== 'formula' && sourceField.type !== 'lookup') {
+      // Note: formula and lookup are virtual field types, but they're not in the FieldType union
+      // We check for them as strings to handle any edge cases
+      const fieldType = sourceField.type as string
+      if (fieldType !== 'formula' && fieldType !== 'lookup') {
         // Get PostgreSQL type from field type
         const postgresType = this.getPostgresType(sourceField.type)
 

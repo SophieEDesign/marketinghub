@@ -684,7 +684,7 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
       }
     }
     
-    if (field.type === "checkbox" || field.type === "boolean") {
+    if (field.type === "checkbox") {
       return value ? "✓" : "—"
     }
     

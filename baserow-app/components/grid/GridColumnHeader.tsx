@@ -114,7 +114,6 @@ export default function GridColumnHeader({
           }
         }
       }}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Drag handle */}
       <div

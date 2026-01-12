@@ -556,7 +556,6 @@ export default function RecordViewPageSettings({
                             })
                           }}
                           disabled={!selectedTableId || fields.length === 0}
-                          className="flex-1"
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="None" />
@@ -578,7 +577,7 @@ export default function RecordViewPageSettings({
                               onUpdate({
                                 left_panel: {
                                   ...leftPanelConfig,
-                                  sort_by: [{ field: leftPanelSortBy, direction: value, order_index: 0 }],
+                                  sort_by: [{ field: leftPanelSortBy, direction: value }],
                                 }
                               })
                             }}
@@ -700,7 +699,7 @@ export default function RecordViewPageSettings({
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
                           {fields
-                            .filter(f => f.type === 'image' || f.type === 'file' || f.type === 'url')
+                            .filter(f => f.type === 'attachment' || f.type === 'url')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
                                 {field.name}

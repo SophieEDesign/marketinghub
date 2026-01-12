@@ -84,6 +84,7 @@ function mapFilterConfigToDateOperator(operator: FilterConfig['operator'], field
 export default function FilterBlock({ block, isEditing = false, pageTableId = null, pageId = null, onUpdate }: FilterBlockProps) {
   const { config } = block
   const { updateFilterBlock, removeFilterBlock } = useFilterState()
+  const [isModalOpen, setIsModalOpen] = useState(false)
   
   // Config: target blocks and allowed fields
   const targetBlocks = config?.target_blocks || 'all'
@@ -555,7 +556,7 @@ export default function FilterBlock({ block, isEditing = false, pageTableId = nu
                             updateFilter(index, { 
                               field: value, 
                               value: '', 
-                              operator: newOperators[0]?.value || 'equal'
+                              operator: (newOperators[0]?.value || 'equal') as FilterConfig['operator']
                             })
                           }}
                         >

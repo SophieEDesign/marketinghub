@@ -835,7 +835,7 @@ export default function GridDataSettings({
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500 mt-1">
-                Use start + end fields for date range events, or leave as "None" for single date events.
+                Use start + end fields for date range events, or leave as &quot;None&quot; for single date events.
               </p>
             </div>
           </div>

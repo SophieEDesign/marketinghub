@@ -183,11 +183,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         heading: {
           levels: [1, 2, 3],
         },
-        taskList: {
-          HTMLAttributes: {
-            class: 'task-list',
-          },
-        },
         codeBlock: {
           HTMLAttributes: {
             class: 'code-block',
@@ -679,9 +674,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
-            editor.chain().focus().toggleTaskList().run()
+            editor.chain().focus().toggleBulletList().run()
           }}
-          className={cn("h-8 w-8 p-0", editor.isActive('taskList') && "bg-gray-100")}
+          className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-gray-100")}
           title="Task List"
         >
           <CheckSquare className="h-4 w-4" />

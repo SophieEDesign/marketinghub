@@ -140,7 +140,33 @@ export default function AirtableGridView({
     sorts,
   })
 
+  // CRITICAL: Normalize all inputs at grid entry point
+  // Never trust upstream to pass correct types - always normalize
+  const safeRows = asArray<GridRow>(allRows)
+  const safeFields = asArray<TableField>(fields)
+  const safeSorts = asArray<Sort>(sorts)
+
+  // Get visible fields in order (needed for search filtering and rendering)
+  // Initialize with empty array to avoid "used before declaration" errors
+  const visibleFields = useMemo(() => {
+    if (columnOrder.length === 0) return []
+    const safeColumnOrder = asArray(columnOrder)
+    return safeColumnOrder
+      .map((fieldName) => safeFields.find((f) => f.name === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [columnOrder, safeFields])
+
+  // Filter rows by search query (only visible fields)
+  const visibleFieldNames = useMemo(() => {
+    return visibleFields.map((f) => f.name)
+  }, [visibleFields])
+
+  const filteredRows = useMemo(() => {
+    return filterRowsBySearch(safeRows, safeFields, searchQuery, visibleFieldNames)
+  }, [safeRows, safeFields, searchQuery, visibleFieldNames])
+
   // Data view service for copy/paste/duplicate
+  // Initialize with empty arrays, will be updated in useEffect when visibleFields/filteredRows are ready
   const dataView = useDataView({
     context: {
       tableId: tableId || '',
@@ -178,12 +204,6 @@ export default function AirtableGridView({
       rowOrder: filteredRows.map((r: any) => r.id),
     })
   }, [safeRows, safeFields, visibleFields, filteredRows, dataView])
-
-  // CRITICAL: Normalize all inputs at grid entry point
-  // Never trust upstream to pass correct types - always normalize
-  const safeRows = asArray<GridRow>(allRows)
-  const safeFields = asArray<TableField>(fields)
-  const safeSorts = asArray<Sort>(sorts)
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

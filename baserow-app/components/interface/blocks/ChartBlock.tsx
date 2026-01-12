@@ -159,11 +159,11 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       if (fetchError) throw fetchError
 
       // Compute formula fields if needed
-      let processedRows = rows || []
+      let processedRows: any[] = rows || []
       if (needsFormulaComputation && processedRows.length > 0) {
         processedRows = processedRows.map(row => {
           return computeFormulaFields(row, allFormulaFields, tableFields)
-        })
+        }) as any[]
       }
 
       setRawData(processedRows)
