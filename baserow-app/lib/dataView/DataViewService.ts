@@ -78,16 +78,49 @@ export class DataViewService {
 
   /**
    * Resolve paste intent based on selection and clipboard data
+   * 
+   * @param selection - Current selection (cell/row/column)
+   * @param clipboardText - Clipboard text to paste
+   * @param options - Optional configuration
+   * @param options.maxRows - Maximum rows to paste (default: 10000)
+   * @param options.maxCols - Maximum columns to paste (default: 1000)
    */
   resolvePasteIntent(
     selection: Selection,
-    clipboardText: string
+    clipboardText: string,
+    options: { maxRows?: number; maxCols?: number } = {}
   ): PasteIntent | null {
     const { rows, fields } = this.context
+    const { maxRows = 10000, maxCols = 1000 } = options
     const grid = parseClipboardText(clipboardText)
 
     if (grid.length === 0) {
       return null
+    }
+
+    // Guardrail: Check paste size
+    const rowCount = grid.length
+    const colCount = Math.max(...grid.map(row => row.length), 0)
+    
+    if (rowCount > maxRows) {
+      console.warn(`[DataViewService] Paste size exceeds max rows: ${rowCount} > ${maxRows}. Truncating.`)
+      // Truncate to max rows
+      grid.splice(maxRows)
+    }
+    
+    if (colCount > maxCols) {
+      console.warn(`[DataViewService] Paste size exceeds max columns: ${colCount} > ${maxCols}. Truncating.`)
+      // Truncate each row to max columns
+      grid.forEach(row => {
+        if (row.length > maxCols) {
+          row.splice(maxCols)
+        }
+      })
+    }
+
+    // Soft warning for large pastes
+    if (rowCount * colCount > 1000) {
+      console.warn(`[DataViewService] Large paste detected: ${rowCount} rows × ${colCount} columns = ${rowCount * colCount} cells`)
     }
 
     // Get visible fields in order
@@ -126,6 +159,7 @@ export class DataViewService {
         return {
           targetCells,
           pasteMode: 'vertical',
+          warnings: warnings.length > 0 ? warnings : undefined,
         }
       }
 
@@ -196,6 +230,7 @@ export class DataViewService {
         return {
           targetCells,
           pasteMode: 'grid',
+          warnings: warnings.length > 0 ? warnings : undefined,
         }
       }
     }
@@ -204,8 +239,36 @@ export class DataViewService {
   /**
    * Apply cell changes in a batch operation
    * Returns validation errors but doesn't abort on individual failures
+   * 
+   * @param changes - Array of cell changes to apply
+   * @param options - Optional configuration
+   * @param options.dryRun - If true, validate but don't persist changes
+   * @param options.maxChanges - Maximum number of changes allowed (default: 10000)
    */
-  async applyCellChanges(changes: CellChange[]): Promise<BatchMutationResult> {
+  async applyCellChanges(
+    changes: CellChange[],
+    options: { dryRun?: boolean; maxChanges?: number } = {}
+  ): Promise<BatchMutationResult> {
+    const { dryRun = false, maxChanges = 10000 } = options
+
+    // Guardrail: Check max changes
+    if (changes.length > maxChanges) {
+      return {
+        success: false,
+        changes: [],
+        errors: [
+          {
+            rowId: '',
+            columnId: '',
+            fieldName: '',
+            value: null,
+            error: `Too many changes (${changes.length}). Maximum allowed: ${maxChanges}`,
+          },
+        ],
+        appliedCount: 0,
+        errorCount: 1,
+      }
+    }
     const { supabaseTableName, fields, rows } = this.context
     const supabase = createClient()
 
@@ -264,14 +327,14 @@ export class DataViewService {
       })
     }
 
-    // Apply valid changes in batch
-    const appliedCount = await this.applyBatchUpdates(supabase, supabaseTableName, validatedChanges)
+    // Apply valid changes in batch (unless dry run)
+    const appliedCount = dryRun ? 0 : await this.applyBatchUpdates(supabase, supabaseTableName, validatedChanges)
 
     return {
       success: errors.length === 0,
       changes: validatedChanges,
       errors,
-      appliedCount,
+      appliedCount: dryRun ? validatedChanges.length : appliedCount,
       errorCount: errors.length,
     }
   }

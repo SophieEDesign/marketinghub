@@ -203,6 +203,74 @@ Virtual fields (formula, lookup) cannot be edited.
 - Redo re-applies undone changes
 - History is cleared when new actions are performed
 
+## Why Paste Logic Lives Here (Not in the Grid)
+
+The paste logic lives in the DataViewService layer, not in the grid component, for several important reasons:
+
+1. **Reusability**: Form views, bulk editors, and other data views can all use the same paste logic without duplication
+2. **Consistency**: All views behave the same way when pasting, ensuring a predictable user experience
+3. **Testability**: Business logic is separated from UI, making it easier to unit test
+4. **Maintainability**: Changes to paste behavior only need to be made in one place
+5. **Data Integrity**: The service layer ensures all mutations go through validation and batch operations, regardless of which view triggers them
+6. **Undo/Redo**: History management works consistently across all views because it's centralized
+
+The grid is just a rendering layer that:
+- Displays data
+- Captures user input (keyboard shortcuts, clicks)
+- Delegates operations to the DataViewService
+- Updates its display based on service results
+
+This separation follows the principle: **UI components should be thin, business logic should be reusable**.
+
+## Guardrails and Safety
+
+The service includes several guardrails to prevent issues:
+
+- **Max paste size**: Default limit of 10,000 rows × 1,000 columns
+- **Max changes**: Default limit of 10,000 changes per batch operation
+- **Soft warnings**: Console warnings for large pastes (>1,000 cells)
+- **Dry run mode**: Optional `dryRun` parameter in `applyCellChanges()` to validate without persisting
+
+These can be configured via options:
+
+```typescript
+// Limit paste size
+const intent = dataView.resolvePasteIntent(selection, text, {
+  maxRows: 5000,
+  maxCols: 500,
+})
+
+// Dry run validation
+const result = await dataView.applyCellChanges(changes, {
+  dryRun: true,
+  maxChanges: 5000,
+})
+```
+
+## Event Naming for Analytics/Debugging
+
+The service logs events for analytics and debugging. Events are pushed to `window.__dataViewEvents` (if available):
+
+- `dataView.paste.column` - Column paste operation
+- `dataView.paste.row` - Row paste operation  
+- `dataView.paste.grid` - Grid paste operation
+- `dataView.column.duplicate` - Column duplication
+
+Each event includes:
+- `type`: Event type
+- `mode`/`selectionType`: Selection context
+- `timestamp`: When the event occurred
+- Additional context-specific fields
+
+Example:
+```javascript
+// Enable event logging
+window.__dataViewEvents = []
+
+// Events will be pushed automatically
+// Access via: window.__dataViewEvents
+```
+
 ## Non-Goals
 
 The following are explicitly NOT implemented:

@@ -862,7 +862,7 @@ export default function CSVImportModal({
       setProgress('Preparing rows for insertion...')
 
       const preparedRows = parsedData.rows
-        .map((csvRow) => {
+        .map((csvRow, rowIndex) => {
           const mappedRow: Record<string, any> = {}
           
           parsedData.columns.forEach((col) => {

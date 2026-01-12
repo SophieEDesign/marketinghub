@@ -69,6 +69,7 @@ export interface BatchMutationResult {
   errors: ValidationError[]
   appliedCount: number
   errorCount: number
+  warnings?: string[] // Optional warnings (e.g., large paste size)
 }
 
 /**
@@ -77,6 +78,7 @@ export interface BatchMutationResult {
 export interface PasteIntent {
   targetCells: Array<{ rowId: string; columnId: string; fieldName: string }>
   pasteMode: 'vertical' | 'horizontal' | 'grid'
+  warnings?: string[] // Optional warnings (e.g., large paste size)
 }
 
 /**

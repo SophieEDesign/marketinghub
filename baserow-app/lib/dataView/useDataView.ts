@@ -102,6 +102,20 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
           }
         }
 
+        // Determine paste mode for event naming
+        const pasteMode = selection.type === 'column' ? 'column' : selection.type === 'row' ? 'row' : 'grid'
+        
+        // Log paste event for analytics/debugging
+        if (typeof window !== 'undefined' && (window as any).__dataViewEvents) {
+          (window as any).__dataViewEvents.push({
+            type: 'dataView.paste',
+            mode: pasteMode,
+            selectionType: selection.type,
+            clipboardSize: `${clipboardGrid.length}×${Math.max(...clipboardGrid.map(r => r.length), 0)}`,
+            timestamp: Date.now(),
+          })
+        }
+
         // Resolve paste intent
         const intent = serviceRef.current.resolvePasteIntent(selection, clipboardText)
         if (!intent) {
@@ -181,6 +195,11 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
         // Apply changes
         const result = await serviceRef.current.applyCellChanges(changes)
 
+        // Include warnings from paste intent
+        if (intent.warnings && intent.warnings.length > 0) {
+          result.warnings = intent.warnings
+        }
+
         // Add to history for undo
         if (result.appliedCount > 0) {
           setHistory(prev => {
@@ -223,6 +242,16 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
       }
 
       try {
+        // Log duplicate event for analytics/debugging
+        if (typeof window !== 'undefined' && (window as any).__dataViewEvents) {
+          (window as any).__dataViewEvents.push({
+            type: 'dataView.column.duplicate',
+            columnId,
+            withData: options?.withData || false,
+            timestamp: Date.now(),
+          })
+        }
+
         return await serviceRef.current.duplicateColumn(columnId, options)
       } catch (error: any) {
         if (onError) {
