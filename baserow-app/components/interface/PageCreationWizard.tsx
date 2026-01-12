@@ -236,8 +236,9 @@ export default function PageCreationWizard({
         }
         base_table = tableId.trim()
         
-        // Create a grid view for data access (optional - blocks can use their own views)
-        // Check for existing views with the same name to avoid duplicate key errors
+        // Create a grid view for data access (required for record_view pages)
+        // This view is used internally and appears in Core Data
+        // Note: The view name pattern is intentional - it helps identify which view belongs to which page
         const baseViewName = `${pageName.trim()} View`
         let viewName = baseViewName
         let counter = 1
