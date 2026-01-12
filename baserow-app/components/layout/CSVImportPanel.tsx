@@ -35,6 +35,14 @@ function sanitizeFieldNameSafe(name: string): string {
 }
 
 /**
+ * Validate if a string is a valid UUID format
+ */
+function isValidUUID(value: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(value.trim())
+}
+
+/**
  * Parse date from CSV value, handling various formats including dd/mm/yyyy
  */
 function parseDateFromCSV(value: string): Date | null {
@@ -926,6 +934,22 @@ export default function CSVImportPanel({
             } else if (field.type === "single_select") {
               // Single select is just a string
               value = String(value).trim()
+            } else if (field.type === "link_to_table") {
+              // Link to table fields require valid UUID values
+              const stringValue = String(value).trim()
+              if (stringValue && isValidUUID(stringValue)) {
+                value = stringValue
+              } else {
+                // Invalid UUID - set to null (skip this field for this row)
+                // Log warning for debugging but don't fail the entire import
+                if (stringValue) {
+                  console.warn(
+                    `Skipping invalid UUID value "${stringValue}" for link_to_table field "${fieldNameToUse}" in row ${rowIndex + 1}. ` +
+                    `Expected a valid UUID format (e.g., "550e8400-e29b-41d4-a716-446655440000").`
+                  )
+                }
+                value = null
+              }
             } else {
               // For text fields, convert to string
               value = String(value).trim()
@@ -1089,6 +1113,25 @@ export default function CSVImportPanel({
             throw new Error(
               `Foreign key constraint violation. Please check that referenced records exist. ` +
               `Error: ${error.message}`
+            )
+          }
+          
+          // Check for UUID format errors
+          if (error.message?.includes('invalid input syntax for type uuid') || error.code === '22P02') {
+            const uuidMatch = error.message?.match(/invalid input syntax for type uuid: "([^"]+)"/)
+            const invalidValue = uuidMatch ? uuidMatch[1] : 'unknown'
+            
+            // Find which field might be causing this
+            const linkToTableFields = updatedFields.filter((f: TableField) => f.type === 'link_to_table')
+            const fieldNames = linkToTableFields.map((f: TableField) => f.name).join(', ')
+            
+            throw new Error(
+              `Invalid UUID value "${invalidValue}" found in CSV data. ` +
+              `This value is being inserted into a "Link to table" field, which requires a valid UUID format. ` +
+              `Link to table fields in this table: ${fieldNames || 'none found'}. ` +
+              `Please ensure CSV values for link_to_table fields are valid UUIDs (e.g., "550e8400-e29b-41d4-a716-446655440000"). ` +
+              `If you're trying to link by name or other identifier, you'll need to first look up the UUID of the related record. ` +
+              `Original error: ${error.message}`
             )
           }
           
