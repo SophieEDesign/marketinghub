@@ -17,6 +17,7 @@ interface FieldBlockProps {
   isEditing?: boolean
   pageTableId?: string | null
   recordId?: string | null // Record ID from page context (required for field blocks)
+  hideEditButton?: boolean // Hide Edit button for top fields (inline editing only)
 }
 
 /**
@@ -32,7 +33,8 @@ export default function FieldBlock({
   block, 
   isEditing = false, 
   pageTableId = null,
-  recordId = null 
+  recordId = null,
+  hideEditButton = false
 }: FieldBlockProps) {
   const { config } = block
   const fieldId = config?.field_id
@@ -371,7 +373,7 @@ export default function FieldBlock({
           {field.name}
           {field.required && <span className="text-red-500 ml-1">*</span>}
         </label>
-        {isEditable && !isEditingValue && (
+        {isEditable && !isEditingValue && !hideEditButton && (
           <Button
             variant="ghost"
             size="sm"

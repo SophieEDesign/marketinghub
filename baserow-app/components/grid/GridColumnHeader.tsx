@@ -100,8 +100,8 @@ export default function GridColumnHeader({
     <div
       ref={setNodeRef}
       style={{ ...style, width, minWidth: width, maxWidth: width }}
-      className={`relative flex items-center border-r border-gray-200 bg-white hover:bg-gray-50 transition-colors group ${
-        isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
+      className={`relative flex items-center border-r border-gray-100 bg-white hover:bg-gray-50/50 transition-colors group ${
+        isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -125,11 +125,11 @@ export default function GridColumnHeader({
       </div>
 
       {/* Field icon and name */}
-      <div className="flex items-center gap-2 px-2 flex-1 min-w-0">
-        <span className="text-gray-500 flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 flex-1 min-w-0">
+        <span className="text-gray-400 flex-shrink-0">
           {getFieldIcon(field.type)}
         </span>
-        <span className="text-sm font-semibold text-gray-900 truncate">
+        <span className="text-sm font-medium text-gray-700 truncate">
           {field.name}
         </span>
       </div>
@@ -141,14 +141,14 @@ export default function GridColumnHeader({
             e.stopPropagation()
             onToggleWrapText(field.name)
           }}
-          className={`p-1 rounded transition-colors ${
+          className={`p-1.5 rounded transition-colors ${
             wrapText
-              ? 'text-blue-600 bg-blue-50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              ? 'text-blue-600 bg-blue-50/50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
           }`}
           title={wrapText ? 'Text wrapping enabled' : 'Enable text wrapping'}
         >
-          <WrapText className="h-3 w-3" />
+          <WrapText className="h-3.5 w-3.5" />
         </button>
       )}
 
@@ -156,19 +156,19 @@ export default function GridColumnHeader({
       {onSort && (
         <button
           onClick={handleSortClick}
-          className={`p-1 rounded transition-colors flex items-center gap-0.5 ${
+          className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${
             sortDirection
-              ? 'text-blue-600 bg-blue-50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+              ? 'text-blue-600 bg-blue-50/50'
+              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
           }`}
           title={`Sort ${sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none'}${sortOrder !== null ? ` (${sortOrder})` : ''}`}
         >
           {sortDirection === 'asc' ? (
-            <ArrowUp className="h-3 w-3" />
+            <ArrowUp className="h-3.5 w-3.5" />
           ) : sortDirection === 'desc' ? (
-            <ArrowDown className="h-3 w-3" />
+            <ArrowDown className="h-3.5 w-3.5" />
           ) : (
-            <ArrowUpDown className="h-3 w-3" />
+            <ArrowUpDown className="h-3.5 w-3.5" />
           )}
           {sortOrder !== null && (
             <span className="text-[10px] font-semibold leading-none">
@@ -182,10 +182,10 @@ export default function GridColumnHeader({
       {onEdit && (
         <button
           onClick={() => onEdit(field.name)}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-opacity mr-1"
+          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-100/50 rounded transition-opacity mr-1"
           title="Edit column"
         >
-          <MoreVertical className="h-4 w-4 text-gray-500" />
+          <MoreVertical className="h-4 w-4 text-gray-400" />
         </button>
       )}
 
@@ -193,9 +193,9 @@ export default function GridColumnHeader({
       <div
         ref={resizeRef}
         onMouseDown={handleMouseDown}
-        className={`absolute right-0 top-0 bottom-0 w-1 cursor-col-resize ${
-          isResizing ? 'bg-blue-500' : 'hover:bg-blue-500'
-        } transition-colors`}
+        className={`absolute right-0 top-0 bottom-0 w-0.5 cursor-col-resize ${
+          isResizing ? 'bg-blue-400' : 'hover:bg-blue-300'
+        } transition-colors opacity-0 group-hover:opacity-100`}
       />
     </div>
   )

@@ -71,7 +71,7 @@ export default function LongTextCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full min-h-[60px] px-2 py-1 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded resize-none"
+        className="w-full min-h-[60px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md resize-none"
         disabled={saving}
         rows={3}
       />
@@ -84,7 +84,7 @@ export default function LongTextCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors flex items-center"
+      className="w-full min-h-[36px] px-3 py-2 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex items-center"
       title={value || undefined}
     >
       <span className={`truncate ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'}`}>

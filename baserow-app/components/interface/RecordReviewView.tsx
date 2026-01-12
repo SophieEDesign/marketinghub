@@ -151,6 +151,10 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     return fieldIdOrName
   }
   
+  // Get left panel display settings
+  const leftPanelColorField = config.left_panel?.color_field
+  const leftPanelImageField = config.left_panel?.image_field
+  
   // Get preview fields from config, or fallback to auto-detection
   // Priority: left_panel settings (title_field, field_1, field_2) > config.preview_fields > auto-detect
   const previewFields = useMemo(() => {
@@ -831,6 +835,26 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                           {records.map((record) => {
                             const isSelected = record.id === selectedRecordId
                             
+                            // Get color from color field if configured
+                            const colorValue = leftPanelColorField ? record[leftPanelColorField] : null
+                            const colorField = leftPanelColorField ? tableFields.find(f => f.name === leftPanelColorField) : null
+                            
+                            // Get image from image field if configured
+                            const imageValue = leftPanelImageField ? record[leftPanelImageField] : null
+                            
+                            // Determine border color from color field (for single_select fields)
+                            // Extract the background color class and convert to border color
+                            let borderColorClass = ''
+                            if (colorValue && colorField?.type === 'single_select') {
+                              const statusColorClasses = getStatusColor(String(colorValue))
+                              // Extract bg-* class and convert to border-* for left border
+                              const bgMatch = statusColorClasses.match(/bg-(\w+)-(\d+)/)
+                              if (bgMatch) {
+                                const [, colorName, shade] = bgMatch
+                                borderColorClass = `border-l-4 border-${colorName}-${shade}`
+                              }
+                            }
+                            
                             return (
                               <div
                                 key={record.id}
@@ -843,54 +867,77 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                   setSelectedRecordId(record.id)
                                 }}
                                 className={cn(
-                                  'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs',
+                                  'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs flex items-start gap-2',
                                   isSelected 
                                     ? 'bg-blue-50 border border-blue-200' 
-                                    : 'hover:bg-gray-50 border border-transparent'
+                                    : 'hover:bg-gray-50 border border-transparent',
+                                  borderColorClass
                                 )}
                               >
-                                {/* Render configured preview fields */}
-                                {previewFields.length > 0 ? (
-                                  <div className="space-y-0.5">
-                                    {previewFields.map((fieldIdOrName: string, idx: number) => {
-                                      const fieldValue = record[fieldIdOrName]
-                                      const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
-                                      const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
-                                                            fieldIdOrName.toLowerCase() === 'state' ||
-                                                            fieldIdOrName.toLowerCase() === 'stage'
-                                      
-                                      return (
-                                        <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}>
-                                          {isStatusField && fieldValue ? (
-                                            <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
-                                              {String(fieldValue)}
-                                            </Badge>
-                                          ) : (
-                                            <span>
-                                              {fieldValue !== null && fieldValue !== undefined 
-                                                ? String(fieldValue).substring(0, 30)
-                                                : '—'}
-                                              {fieldValue !== null && fieldValue !== undefined && String(fieldValue).length > 30 ? '...' : ''}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                ) : (
-                                  // Fallback: show name and status if no preview fields configured
-                                  <>
-                                    <div className="font-medium text-gray-900">
-                                      {String(record[nameField] || record.id || 'Untitled').substring(0, 30)}
-                                      {String(record[nameField] || record.id || 'Untitled').length > 30 ? '...' : ''}
-                                    </div>
-                                    {record[statusField] && (
-                                      <Badge className={cn('text-xs mt-0.5', getStatusColor(String(record[statusField])))}>
-                                        {record[statusField]}
-                                      </Badge>
+                                {/* Image field (if configured) */}
+                                {leftPanelImageField && imageValue && (
+                                  <div className="flex-shrink-0 w-8 h-8 rounded overflow-hidden bg-gray-100">
+                                    {typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/')) ? (
+                                      <img 
+                                        src={imageValue} 
+                                        alt="" 
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).style.display = 'none'
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                                        {String(imageValue).substring(0, 2).toUpperCase()}
+                                      </div>
                                     )}
-                                  </>
+                                  </div>
                                 )}
+                                
+                                {/* Render configured preview fields */}
+                                <div className="flex-1 min-w-0">
+                                  {previewFields.length > 0 ? (
+                                    <div className="space-y-0.5">
+                                      {previewFields.map((fieldIdOrName: string, idx: number) => {
+                                        const fieldValue = record[fieldIdOrName]
+                                        const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
+                                        const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
+                                                              fieldIdOrName.toLowerCase() === 'state' ||
+                                                              fieldIdOrName.toLowerCase() === 'stage'
+                                        
+                                        return (
+                                          <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                                            {isStatusField && fieldValue ? (
+                                              <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
+                                                {String(fieldValue)}
+                                              </Badge>
+                                            ) : (
+                                              <span>
+                                                {fieldValue !== null && fieldValue !== undefined 
+                                                  ? String(fieldValue).substring(0, 30)
+                                                  : '—'}
+                                                {fieldValue !== null && fieldValue !== undefined && String(fieldValue).length > 30 ? '...' : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  ) : (
+                                    // Fallback: show name and status if no preview fields configured
+                                    <>
+                                      <div className="font-medium text-gray-900">
+                                        {String(record[nameField] || record.id || 'Untitled').substring(0, 30)}
+                                        {String(record[nameField] || record.id || 'Untitled').length > 30 ? '...' : ''}
+                                      </div>
+                                      {record[statusField] && (
+                                        <Badge className={cn('text-xs mt-0.5', getStatusColor(String(record[statusField])))}>
+                                          {record[statusField]}
+                                        </Badge>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             )
                           })}
@@ -925,7 +972,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           loading={!selectedRecord && selectedRecordId !== null}
           blocks={loadedBlocks.filter(block => {
             // Only show blocks in the right column (x >= 4) or all blocks if no position constraint
+            // Exclude record blocks (we use field blocks instead)
             // Field blocks and other blocks (text, related lists, etc.) should all be shown
+            if (block.type === 'record') return false
             return block.x >= 4 || block.x === undefined || block.x === null
           })}
           page={recordReviewPage}

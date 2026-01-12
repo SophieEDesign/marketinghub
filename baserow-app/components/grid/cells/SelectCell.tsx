@@ -149,7 +149,7 @@ export default function SelectCell({
         }}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-full px-2 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded appearance-none cursor-pointer"
+        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md appearance-none cursor-pointer"
         disabled={saving}
         autoFocus
       >
@@ -166,20 +166,23 @@ export default function SelectCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 flex items-center gap-1.5 text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors group min-h-[32px]"
+      className="w-full min-h-[36px] px-3 py-2 flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50/50 rounded transition-colors group"
     >
       {value && pillStyle ? (
         <span 
-          className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${pillStyle.textColor} shadow-sm`}
-          style={{ backgroundColor: pillStyle.backgroundColor }}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${pillStyle.textColor} hover:opacity-80`}
+          style={{ 
+            backgroundColor: pillStyle.backgroundColor,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
         >
           {value}
         </span>
       ) : (
-        <span className="text-gray-400 italic">{placeholder}</span>
+        <span className="text-gray-400 italic text-sm">{placeholder}</span>
       )}
       {editable && value && (
-        <ChevronDown className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        <ChevronDown className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
       )}
     </div>
   )

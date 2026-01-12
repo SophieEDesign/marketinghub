@@ -685,7 +685,7 @@ export default function AirtableGridView({
       {/* Header */}
       <div
         ref={headerScrollRef}
-        className="flex-shrink-0 border-b border-gray-300 bg-white shadow-sm overflow-x-hidden overflow-y-hidden"
+        className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-hidden overflow-y-hidden"
         style={{ height: HEADER_HEIGHT }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
@@ -698,7 +698,7 @@ export default function AirtableGridView({
         <div className="flex" style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content' }}>
           {/* Checkbox column */}
           <div
-            className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-20"
+            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky left-0 z-20"
             style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
             onClick={(e) => {
               e.stopPropagation()
@@ -713,14 +713,14 @@ export default function AirtableGridView({
                   if (el) el.indeterminate = isIndeterminate
                 }}
                 onChange={() => handleSelectAll(!isAllSelected)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
               />
             </div>
           </div>
 
           {/* Frozen row number column */}
           <div
-            className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs font-medium text-gray-600 sticky left-[50px] z-20"
+            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center text-xs font-medium text-gray-500 sticky left-[50px] z-20"
             style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
           >
             #
@@ -762,15 +762,15 @@ export default function AirtableGridView({
           {/* Add column button */}
           {onAddField && (
             <div
-              className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center"
+              className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center"
               style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
             >
               <button
                 onClick={onAddField}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                className="p-1.5 hover:bg-gray-100/50 rounded transition-colors text-gray-400 hover:text-gray-600"
                 title="Add column"
               >
-                <Plus className="h-4 w-4 text-gray-500" />
+                <Plus className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -801,19 +801,19 @@ export default function AirtableGridView({
               return (
                 <div
                   key={`group-${item.groupKey}`}
-                  className="flex border-b border-gray-200 bg-gray-50 sticky top-0 z-20"
+                  className="flex border-b border-gray-100 bg-gray-50/50 sticky top-0 z-20"
                   style={{ height: GROUP_HEADER_HEIGHT }}
                 >
                   <div
-                    className="flex items-center px-4 flex-1 cursor-pointer hover:bg-gray-100"
+                    className="flex items-center px-4 flex-1 cursor-pointer hover:bg-gray-100/50 transition-colors"
                     onClick={() => toggleGroup(item.groupKey!)}
                   >
                     {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4 mr-2 text-gray-500" />
+                      <ChevronRight className="h-4 w-4 mr-2 text-gray-400" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 mr-2 text-gray-500" />
+                      <ChevronDown className="h-4 w-4 mr-2 text-gray-400" />
                     )}
-                    <span className="font-semibold text-sm text-gray-700">
+                    <span className="font-medium text-sm text-gray-700">
                       {groupBy}: {String(group.value ?? "Uncategorized")}
                     </span>
                     <span className="text-gray-500 ml-2 text-sm">
@@ -832,11 +832,11 @@ export default function AirtableGridView({
               return (
                 <div
                   key={row.id}
-                  className={`flex border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                  className={`flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
                     disableRecordPanel ? '' : 'cursor-pointer'
                   } ${
-                    isEven ? 'bg-white' : 'bg-gray-50/50'
-                  } ${isSelected ? 'bg-blue-100' : ''}`}
+                    isEven ? 'bg-white' : 'bg-gray-50/30'
+                  } ${isSelected ? 'bg-blue-50/50' : ''}`}
                   style={{ height: ROW_HEIGHT }}
                   onClick={(e) => {
                     // Don't open panel if clicking checkbox or cell editor
@@ -848,7 +848,7 @@ export default function AirtableGridView({
                 >
                   {/* Checkbox */}
                   <div
-                    className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center sticky left-0 z-10"
+                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky left-0 z-10"
                     style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -865,14 +865,14 @@ export default function AirtableGridView({
                         e.stopPropagation()
                         handleRowSelect(row.id, rowIndex, e)
                       }}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
                     />
                   </div>
 
                   {/* Frozen row number */}
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
-                    className="flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-500 font-medium sticky left-[50px] z-10"
+                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center text-xs text-gray-400 font-medium sticky left-[50px] z-10"
                     style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
                   >
                     {actualIndex + 1}
@@ -887,8 +887,8 @@ export default function AirtableGridView({
                     return (
                       <div
                         key={field.name}
-                        className={`border-r border-gray-100 relative flex items-center ${
-                          isSelected ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' : ''
+                        className={`border-r border-gray-100/50 relative flex items-center ${
+                          isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
                         }`}
                         style={{ width, height: ROW_HEIGHT }}
                         onClick={() => {

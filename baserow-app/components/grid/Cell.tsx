@@ -163,13 +163,13 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     
     return (
       <div 
-        className={`min-h-[32px] flex items-center gap-2 px-2 py-1 ${
-          isError ? 'text-red-600' : 'text-gray-600'
+        className={`min-h-[36px] flex items-center gap-2 px-3 py-2 ${
+          isError ? 'text-red-600' : 'text-gray-500'
         } italic`}
         title={fieldOptions?.formula ? `Formula: ${fieldOptions.formula}` : 'Formula field'}
       >
-        <Calculator className="h-3 w-3 opacity-50" />
-        <span>{displayValue}</span>
+        <Calculator className="h-3.5 w-3.5 opacity-40" />
+        <span className="text-sm">{displayValue}</span>
       </div>
     )
   }
@@ -201,8 +201,8 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       return (
         <div
           onClick={handleStartEdit}
-          className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
-            editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+          className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
+            editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
           }`}
           title={editable ? "Click to edit" : "Read-only"}
         >
@@ -218,14 +218,17 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
-          editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+        className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
+          editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
         title={editable ? "Click to edit" : "Read-only"}
       >
         <span 
-          className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
-          style={{ backgroundColor: bgColor }}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${textColorClass} hover:opacity-80`}
+          style={{ 
+            backgroundColor: bgColor,
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+          }}
         >
           {value}
         </span>
@@ -239,8 +242,8 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className={`min-h-[32px] flex items-center flex-wrap gap-1.5 px-2 py-1 rounded transition-colors ${
-          editable ? 'cursor-pointer hover:bg-gray-50' : 'cursor-default'
+        className={`min-h-[36px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-md transition-colors ${
+          editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
         title={editable ? "Click to edit" : "Read-only"}
       >
@@ -254,8 +257,11 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
             return (
               <span
                 key={val}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
-                style={{ backgroundColor: bgColor }}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${textColorClass} hover:opacity-80`}
+                style={{ 
+                  backgroundColor: bgColor,
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
               >
                 {val}
               </span>
@@ -339,15 +345,15 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   return (
     <div
       onClick={isVirtual || !editable ? undefined : handleStartEdit}
-      className={`min-h-[32px] flex items-center px-2 py-1 rounded transition-colors ${
+      className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
         isVirtual || !editable
           ? "text-gray-500 cursor-default" 
-          : "cursor-pointer hover:bg-blue-50"
+          : "cursor-pointer hover:bg-gray-50/50"
       }`}
       title={isVirtual ? "Virtual field (read-only)" : editable ? "Click to edit" : "Read-only"}
     >
       {displayValue || (
-        <span className="text-gray-400 italic text-sm">Empty</span>
+        <span className="text-gray-400 italic text-sm">—</span>
       )}
     </div>
   )

@@ -353,9 +353,10 @@ export default function LookupFieldPicker({
         <PopoverTrigger asChild>
           <div
             className={cn(
-              "min-h-[38px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-              "flex flex-wrap items-center gap-2 cursor-pointer",
-              "hover:border-ring focus-within:border-ring focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+              "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm",
+              "flex flex-wrap items-center gap-2 cursor-pointer transition-colors",
+              "hover:border-gray-300 hover:bg-gray-50/50",
+              "focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1",
               disabled && "opacity-50 cursor-not-allowed"
             )}
             onClick={() => !disabled && setOpen(true)}
@@ -363,33 +364,40 @@ export default function LookupFieldPicker({
             {selectedOptions.length > 0 ? (
               <>
                 {selectedOptions.map((option) => (
-                  <Badge
+                  <span
                     key={option.id}
-                    variant="secondary"
-                    className="flex items-center gap-1 pr-1"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onRecordClick && !disabled) {
+                        onRecordClick(lookupTableId!, option.id)
+                      }
+                    }}
                   >
-                    <span className="font-medium">{option.primaryLabel}</span>
+                    <span>{option.primaryLabel}</span>
                     {!disabled && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           handleRemove(option.id)
                         }}
-                        className="ml-1 rounded-full hover:bg-background/80 p-0.5"
+                        className="ml-0.5 rounded p-0.5 hover:bg-gray-300/50 transition-colors opacity-70 hover:opacity-100"
+                        title="Remove"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     )}
-                  </Badge>
+                  </span>
                 ))}
-                {isMultiSelect && (
-                  <span className="text-muted-foreground text-xs">
+                {isMultiSelect && selectedOptions.length > 1 && (
+                  <span className="text-gray-500 text-xs">
                     {selectedOptions.length} selected
                   </span>
                 )}
               </>
             ) : (
-              <span className="text-muted-foreground">{placeholder}</span>
+              <span className="text-gray-400 italic">{placeholder}</span>
             )}
           </div>
         </PopoverTrigger>
@@ -418,10 +426,10 @@ export default function LookupFieldPicker({
           <div className="max-h-[300px] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
               </div>
             ) : availableOptions.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">
+              <div className="p-8 text-center text-sm text-gray-500">
                 {searchQuery ? "No results found" : "Start typing to search"}
               </div>
             ) : (
@@ -432,16 +440,16 @@ export default function LookupFieldPicker({
                     <div
                       key={option.id}
                       className={cn(
-                        "px-3 py-2 cursor-pointer hover:bg-accent transition-colors",
-                        isSelected && "bg-accent"
+                        "px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors",
+                        isSelected && "bg-blue-50/50"
                       )}
                       onClick={() => handleSelect(option)}
                       onMouseEnter={(e) => handlePreview(option, e)}
                       onMouseLeave={handlePreviewLeave}
                     >
-                      <div className="font-medium text-sm">{option.primaryLabel}</div>
+                      <div className="font-medium text-sm text-gray-900">{option.primaryLabel}</div>
                       {option.secondaryLabels && option.secondaryLabels.length > 0 && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
+                        <div className="text-xs text-gray-500 mt-0.5">
                           {option.secondaryLabels.join(" • ")}
                         </div>
                       )}
@@ -451,10 +459,10 @@ export default function LookupFieldPicker({
                 
                 {config?.allowCreate && onCreateRecord && (
                   <div
-                    className="px-3 py-2 border-t cursor-pointer hover:bg-accent transition-colors flex items-center gap-2 text-sm text-muted-foreground"
+                    className="px-3 py-2 border-t border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm text-gray-600"
                     onClick={handleCreateNew}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-4 w-4 text-gray-500" />
                     <span>Create new record</span>
                   </div>
                 )}

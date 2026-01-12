@@ -2,7 +2,9 @@
  * Value validation by field type
  */
 
-import type { TableField, FieldType } from '@/types/fields'
+import type { TableField, FieldType, LinkedField } from '@/types/fields'
+import { isLinkedField, isLookupField } from '@/types/fields'
+import { resolvePastedLinkedValue } from './linkedFields'
 
 export interface ValidationResult {
   valid: boolean
@@ -51,6 +53,8 @@ export function validateValue(field: TableField, value: any): ValidationResult {
       return validateCheckbox(field, value)
 
     case 'link_to_table':
+      // Linked fields require async resolution for pasted text
+      // This is handled in DataViewService.applyCellChanges with a special case
       return validateLinkToTable(field, value)
 
     case 'attachment':
@@ -194,18 +198,66 @@ function validateCheckbox(field: TableField, value: any): ValidationResult {
 }
 
 function validateLinkToTable(field: TableField, value: any): ValidationResult {
-  // UUID validation
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const strValue = String(value)
-  
-  if (!uuidRegex.test(strValue)) {
-    return {
-      valid: false,
-      error: `Invalid UUID for "${field.name}"`,
+  // If value is already a UUID (string), validate it
+  if (typeof value === 'string') {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (uuidRegex.test(value)) {
+      return { valid: true, normalizedValue: value }
     }
   }
 
-  return { valid: true, normalizedValue: strValue }
+  // If value is an array of UUIDs (multi-link)
+  if (Array.isArray(value)) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const allValid = value.every(v => typeof v === 'string' && uuidRegex.test(v))
+    if (allValid) {
+      return { valid: true, normalizedValue: value }
+    }
+  }
+
+  // If value is a string but not a UUID, it might be a display name
+  // This will be resolved in DataViewService.applyCellChanges
+  // For now, we return invalid to trigger the async resolution
+  return {
+    valid: false,
+    error: `Invalid value for "${field.name}". Expected record ID or display name.`,
+  }
+}
+
+/**
+ * Validate and resolve a pasted linked field value
+ * 
+ * This is called from DataViewService when pasting into a linked field.
+ * It attempts to resolve display names to record IDs.
+ * 
+ * @param field - Linked field definition
+ * @param pastedValue - Pasted text (display name or ID)
+ * @returns Validation result with resolved IDs
+ */
+export async function validatePastedLinkedValue(
+  field: LinkedField,
+  pastedValue: string
+): Promise<ValidationResult> {
+  const result = await resolvePastedLinkedValue(field, pastedValue)
+
+  if (result.errors.length > 0) {
+    return {
+      valid: false,
+      error: result.errors.join('; '),
+    }
+  }
+
+  if (!result.ids) {
+    return {
+      valid: false,
+      error: `Could not resolve "${pastedValue}" to a record in the target table`,
+    }
+  }
+
+  return {
+    valid: true,
+    normalizedValue: result.ids,
+  }
 }
 
 function validateAttachment(field: TableField, value: any): ValidationResult {

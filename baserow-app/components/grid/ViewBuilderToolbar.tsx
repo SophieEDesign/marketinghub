@@ -176,7 +176,7 @@ export default function ViewBuilderToolbar({
 
   return (
     <>
-      <div className="h-10 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4">
+      <div className="h-10 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 z-10 relative">
         {/* Left side - View name (view type is locked, no selector) */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-700">{viewName}</span>

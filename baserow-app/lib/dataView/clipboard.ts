@@ -3,6 +3,10 @@
  * Handles plain text format: tab-separated columns, newline-separated rows
  */
 
+import type { TableField } from '@/types/fields'
+import { isLinkedField } from '@/types/fields'
+import { resolveLinkedFieldDisplay } from './linkedFields'
+
 /**
  * Parse clipboard text into a 2D grid
  * @param text - Clipboard text (tab-separated columns, newline-separated rows)
@@ -36,12 +40,29 @@ export function formatClipboardText(grid: string[][]): string {
 
 /**
  * Format cell value for clipboard (plain text representation)
+ * 
+ * For linked fields, this returns display labels (comma-separated for multi-link).
+ * For other fields, returns standard string representation.
+ * 
+ * Note: For linked fields, this is synchronous and returns IDs if display resolution
+ * is needed. The caller (DataViewService.copy) should handle async resolution.
+ * 
  * @param value - Cell value (any type)
+ * @param field - Optional field definition (for linked field display resolution)
  * @returns Plain text string
  */
-export function formatCellValue(value: any): string {
+export function formatCellValue(value: any, field?: TableField): string {
   if (value === null || value === undefined) {
     return ''
+  }
+
+  // Linked fields: return IDs as-is (display resolution happens in DataViewService.copy)
+  // This allows the async resolution to happen at the service level
+  if (field && isLinkedField(field)) {
+    if (Array.isArray(value)) {
+      return value.join(', ')
+    }
+    return String(value)
   }
 
   // Handle arrays (e.g., multi-select)
@@ -60,9 +81,13 @@ export function formatCellValue(value: any): string {
 
 /**
  * Parse cell value from clipboard text
+ * 
+ * Note: For linked fields, this returns the raw text. Resolution to IDs
+ * happens in validation.ts via resolvePastedLinkedValue().
+ * 
  * @param text - Clipboard text value
  * @param fieldType - Field type for type-specific parsing
- * @returns Parsed value
+ * @returns Parsed value (raw text for linked fields, parsed for others)
  */
 export function parseCellValue(text: string, fieldType?: string): any {
   if (!text || text.trim().length === 0) {
@@ -70,6 +95,16 @@ export function parseCellValue(text: string, fieldType?: string): any {
   }
 
   const trimmed = text.trim()
+
+  // Linked fields: return raw text (will be resolved to IDs in validation)
+  if (fieldType === 'link_to_table') {
+    return trimmed
+  }
+
+  // Lookup fields: should never be parsed (read-only)
+  if (fieldType === 'lookup') {
+    return null // Explicitly reject
+  }
 
   // Type-specific parsing
   switch (fieldType) {

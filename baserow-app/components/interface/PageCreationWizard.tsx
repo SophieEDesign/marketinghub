@@ -51,10 +51,12 @@ export default function PageCreationWizard({
   const [selectedFields, setSelectedFields] = useState<string[]>([]) // Fields selected for structured field list
   const [fieldsAsBlocks, setFieldsAsBlocks] = useState<string[]>([]) // Fields to add as blocks
   const [leftPanelFilter, setLeftPanelFilter] = useState<string>('')
+  const [leftPanelFilterOperator, setLeftPanelFilterOperator] = useState<string>('equal')
+  const [leftPanelFilterValue, setLeftPanelFilterValue] = useState<string>('')
   const [leftPanelSort, setLeftPanelSort] = useState<string>('')
   const [leftPanelSortDirection, setLeftPanelSortDirection] = useState<'asc' | 'desc'>('asc')
   const [leftPanelGroup, setLeftPanelGroup] = useState<string>('')
-  const [tableFields, setTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [tableFields, setTableFields] = useState<Array<{ id: string; name: string; type: string; options?: any }>>([])
   const [creating, setCreating] = useState(false)
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [interfaceGroups, setInterfaceGroups] = useState<Array<{ id: string; name: string }>>([])
@@ -74,6 +76,8 @@ export default function PageCreationWizard({
       setSelectedFields([])
       setFieldsAsBlocks([])
       setLeftPanelFilter('')
+      setLeftPanelFilterOperator('equal')
+      setLeftPanelFilterValue('')
       setLeftPanelSort('')
       setLeftPanelSortDirection('asc')
       setLeftPanelGroup('')
@@ -359,9 +363,11 @@ export default function PageCreationWizard({
       // For record_view pages, store tableId in both base_table and config.tableId
       // Also store selected fields in config.visible_fields
       // Store left panel settings (filter, sort, group) in config.left_panel
-      // Default title_field to "name" if available
+      // Default title_field to "name" if available, otherwise first column (excluding ID)
       const nameField = tableFields.find(f => f.name.toLowerCase() === 'name')
-      const defaultTitleField = nameField?.name || tableFields[0]?.name || undefined
+      // Skip ID field and use first non-ID field
+      const firstNonIdField = tableFields.find(f => f.name.toLowerCase() !== 'id')
+      const defaultTitleField = nameField?.name || firstNonIdField?.name || undefined
       
       const pageConfig = pageType === 'record_view' && base_table
         ? {
@@ -372,8 +378,8 @@ export default function PageCreationWizard({
               ...(leftPanelFilter ? {
                 filter_by: [{
                   field: leftPanelFilter,
-                  operator: 'equal', // Default operator, can be configured later
-                  value: ''
+                  operator: leftPanelFilterOperator as any,
+                  value: leftPanelFilterValue
                 }]
               } : {}),
               ...(leftPanelSort ? {
@@ -675,7 +681,15 @@ export default function PageCreationWizard({
                 <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs text-gray-500">Filter</Label>
-                    <Select value={leftPanelFilter || "__none__"} onValueChange={(value) => setLeftPanelFilter(value === "__none__" ? "" : value)}>
+                    <Select value={leftPanelFilter || "__none__"} onValueChange={(value) => {
+                      const newField = value === "__none__" ? "" : value
+                      setLeftPanelFilter(newField)
+                      // Reset filter operator and value when field changes
+                      if (newField !== leftPanelFilter) {
+                        setLeftPanelFilterOperator('equal')
+                        setLeftPanelFilterValue('')
+                      }
+                    }}>
                       <SelectTrigger className="h-9">
                         <SelectValue placeholder="None" />
                       </SelectTrigger>
@@ -724,6 +738,71 @@ export default function PageCreationWizard({
                     </Select>
                   </div>
                 </div>
+                {leftPanelFilter && (
+                  <div className="pt-2 space-y-2 border-t">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-gray-500">Operator</Label>
+                        <Select value={leftPanelFilterOperator} onValueChange={setLeftPanelFilterOperator}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="equal">Equals</SelectItem>
+                            <SelectItem value="not_equal">Not equals</SelectItem>
+                            <SelectItem value="contains">Contains</SelectItem>
+                            <SelectItem value="not_contains">Does not contain</SelectItem>
+                            <SelectItem value="is_empty">Is empty</SelectItem>
+                            <SelectItem value="is_not_empty">Is not empty</SelectItem>
+                            <SelectItem value="greater_than">Greater than</SelectItem>
+                            <SelectItem value="less_than">Less than</SelectItem>
+                            <SelectItem value="greater_than_or_equal">Greater than or equal</SelectItem>
+                            <SelectItem value="less_than_or_equal">Less than or equal</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!['is_empty', 'is_not_empty'].includes(leftPanelFilterOperator) && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-gray-500">Value</Label>
+                          {(() => {
+                            const selectedFilterField = tableFields.find(f => f.name === leftPanelFilter)
+                            const isSelectField = selectedFilterField && 
+                              (selectedFilterField.type === 'single_select' || selectedFilterField.type === 'multi_select') &&
+                              selectedFilterField.options?.choices &&
+                              selectedFilterField.options.choices.length > 0
+                            
+                            if (isSelectField) {
+                              return (
+                                <Select value={leftPanelFilterValue} onValueChange={setLeftPanelFilterValue}>
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="Select value" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {selectedFilterField.options.choices.map((choice: string) => (
+                                      <SelectItem key={choice} value={choice}>
+                                        {choice}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )
+                            }
+                            
+                            return (
+                              <Input
+                                type="text"
+                                value={leftPanelFilterValue}
+                                onChange={(e) => setLeftPanelFilterValue(e.target.value)}
+                                placeholder="Enter filter value"
+                                className="h-9"
+                              />
+                            )
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {leftPanelSort && (
                   <div className="pt-1">
                     <Select value={leftPanelSortDirection} onValueChange={(value: 'asc' | 'desc') => setLeftPanelSortDirection(value)}>

@@ -7,6 +7,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
+import { isLinkedField, isLookupField } from '@/types/fields'
 import type {
   Selection,
   CellChange,
@@ -17,7 +18,8 @@ import type {
   DataViewContext,
 } from './types'
 import { parseClipboardText, formatClipboardText, formatCellValue, parseCellValue } from './clipboard'
-import { validateValue as validateFieldValue } from './validation'
+import { validateValue as validateFieldValue, validatePastedLinkedValue } from './validation'
+import { resolveLinkedFieldDisplay } from './linkedFields'
 
 export class DataViewService {
   private context: DataViewContext
@@ -35,6 +37,13 @@ export class DataViewService {
 
   /**
    * Copy operation - format selection for clipboard
+   * 
+   * For linked fields, uses display labels (comma-separated for multi-link).
+   * For lookup fields, copies computed display values (read-only).
+   * 
+   * Note: This is synchronous and returns IDs for linked fields if async resolution
+   * is needed. In practice, linked field display values should be pre-resolved
+   * in the view layer before calling copy().
    */
   copy(selection: Selection): string {
     const { rows, fields, visibleFields } = this.context
@@ -43,22 +52,25 @@ export class DataViewService {
     const orderedFields = visibleFields || fields
     const fieldOrder = orderedFields
       .sort((a, b) => (a.order_index ?? a.position ?? 0) - (b.order_index ?? b.position ?? 0))
-      .map(f => f.name)
+      .map(f => ({ name: f.name, field: f }))
 
     switch (selection.type) {
       case 'cell': {
         // Copy single cell value
         const row = rows.find(r => r.id === selection.rowId)
         if (!row) return ''
+        const field = fields.find(f => f.name === selection.fieldName)
         const value = row[selection.fieldName]
-        return formatCellValue(value)
+        
+        // For linked fields, format with field context
+        return formatCellValue(value, field)
       }
 
       case 'row': {
         // Copy row(s) as tab-separated values in visible column order
         const selectedRows = rows.filter(r => selection.rowIds.includes(r.id))
         const grid: string[][] = selectedRows.map(row =>
-          fieldOrder.map(fieldName => formatCellValue(row[fieldName]))
+          fieldOrder.map(({ name, field }) => formatCellValue(row[name], field))
         )
         return formatClipboardText(grid)
       }
@@ -70,7 +82,91 @@ export class DataViewService {
           .map(id => rows.find(r => r.id === id))
           .filter((r): r is typeof rows[0] => r !== undefined)
 
-        const values = orderedRows.map(row => formatCellValue(row[selection.fieldName]))
+        const field = fields.find(f => f.name === selection.fieldName)
+        const values = orderedRows.map(row => formatCellValue(row[selection.fieldName], field))
+        return values.join('\n')
+      }
+    }
+  }
+
+  /**
+   * Copy operation with async display resolution for linked fields
+   * 
+   * This version resolves linked field IDs to display labels before copying.
+   * Use this when you need display names in the clipboard.
+   */
+  async copyWithDisplayResolution(selection: Selection): Promise<string> {
+    const { rows, fields, visibleFields } = this.context
+
+    // Get visible fields in order (for row/column copy)
+    const orderedFields = visibleFields || fields
+    const fieldOrder = orderedFields
+      .sort((a, b) => (a.order_index ?? a.position ?? 0) - (b.order_index ?? b.position ?? 0))
+      .map(f => ({ name: f.name, field: f }))
+
+    switch (selection.type) {
+      case 'cell': {
+        // Copy single cell value
+        const row = rows.find(r => r.id === selection.rowId)
+        if (!row) return ''
+        const field = fields.find(f => f.name === selection.fieldName)
+        const value = row[selection.fieldName]
+        
+        // Resolve linked field display if needed
+        if (field && isLinkedField(field) && value) {
+          const display = await resolveLinkedFieldDisplay(field, value)
+          return display
+        }
+        
+        return formatCellValue(value, field)
+      }
+
+      case 'row': {
+        // Copy row(s) as tab-separated values in visible column order
+        const selectedRows = rows.filter(r => selection.rowIds.includes(r.id))
+        const grid: string[][] = []
+        
+        for (const row of selectedRows) {
+          const rowValues: string[] = []
+          for (const { name, field } of fieldOrder) {
+            const value = row[name]
+            
+            // Resolve linked field display if needed
+            if (field && isLinkedField(field) && value) {
+              const display = await resolveLinkedFieldDisplay(field, value)
+              rowValues.push(display)
+            } else {
+              rowValues.push(formatCellValue(value, field))
+            }
+          }
+          grid.push(rowValues)
+        }
+        
+        return formatClipboardText(grid)
+      }
+
+      case 'column': {
+        // Copy column as newline-separated values in row order
+        const rowOrder = this.context.rowOrder || rows.map(r => r.id)
+        const orderedRows = rowOrder
+          .map(id => rows.find(r => r.id === id))
+          .filter((r): r is typeof rows[0] => r !== undefined)
+
+        const field = fields.find(f => f.name === selection.fieldName)
+        const values: string[] = []
+        
+        for (const row of orderedRows) {
+          const value = row[selection.fieldName]
+          
+          // Resolve linked field display if needed
+          if (field && isLinkedField(field) && value) {
+            const display = await resolveLinkedFieldDisplay(field, value)
+            values.push(display)
+          } else {
+            values.push(formatCellValue(value, field))
+          }
+        }
+        
         return values.join('\n')
       }
     }
@@ -148,6 +244,18 @@ export class DataViewService {
         const field = fields.find(f => f.id === selection.columnId || f.name === selection.fieldName)
         if (!field) return null
 
+        // Reject paste into lookup fields
+        if (isLookupField(field)) {
+          return {
+            targetCells: [],
+            pasteMode: 'vertical',
+            warnings: [
+              `Cannot paste into lookup field "${field.name}" (read-only)`,
+              ...warnings,
+            ],
+          }
+        }
+
         const targetCells: Array<{ rowId: string; columnId: string; fieldName: string }> = []
         const firstRow = orderedRows[0]
         if (!firstRow) return null
@@ -178,11 +286,22 @@ export class DataViewService {
 
         const targetCells: Array<{ rowId: string; columnId: string; fieldName: string }> = []
         const firstRowData = grid[0] || []
+        const skippedLookups: string[] = []
 
         // Paste one value per column, starting from first visible field
         firstRowData.forEach((value, colIndex) => {
           if (colIndex < fieldOrder.length && value.trim() !== '') {
             const field = fieldOrder[colIndex]
+            const targetField = fields.find(f => f.id === field.id || f.name === field.name)
+            
+            // Skip lookup fields
+            if (targetField && isLookupField(targetField)) {
+              if (!skippedLookups.includes(targetField.name)) {
+                skippedLookups.push(targetField.name)
+              }
+              return
+            }
+
             // Apply to all selected rows
             selection.rowIds.forEach(rowId => {
               targetCells.push({
@@ -194,9 +313,18 @@ export class DataViewService {
           }
         })
 
+        const allWarnings = [
+          ...warnings,
+          ...(skippedLookups.length > 0 
+            ? [`Skipped ${skippedLookups.length} lookup field(s): ${skippedLookups.join(', ')} (read-only)`]
+            : []
+          ),
+        ]
+
         return {
           targetCells,
           pasteMode: 'horizontal',
+          warnings: allWarnings.length > 0 ? allWarnings : undefined,
         }
       }
 
@@ -205,6 +333,18 @@ export class DataViewService {
         const activeRow = rows.find(r => r.id === selection.rowId)
         const activeField = fields.find(f => f.id === selection.columnId || f.name === selection.fieldName)
         if (!activeRow || !activeField) return null
+
+        // Reject paste into lookup fields
+        if (isLookupField(activeField)) {
+          return {
+            targetCells: [],
+            pasteMode: 'grid',
+            warnings: [
+              `Cannot paste into lookup field "${activeField.name}" (read-only)`,
+              ...warnings,
+            ],
+          }
+        }
 
         const activeRowIndex = orderedRows.findIndex(r => r.id === selection.rowId)
         const activeColIndex = fieldOrder.findIndex(f => f.name === selection.fieldName)
@@ -226,6 +366,13 @@ export class DataViewService {
             if (value.trim() === '') return // Skip empty cells
 
             const field = fieldOrder[targetColIndex]
+            const targetField = fields.find(f => f.id === field.id || f.name === field.name)
+            
+            // Skip lookup fields
+            if (targetField && isLookupField(targetField)) {
+              return
+            }
+
             targetCells.push({
               rowId: targetRow.id,
               columnId: field.id,
@@ -296,20 +443,54 @@ export class DataViewService {
         continue
       }
 
-      // Skip virtual fields
-      if (field.type === 'formula' || field.type === 'lookup') {
+      // Reject lookup fields (read-only, computed)
+      if (isLookupField(field)) {
         errors.push({
           rowId: change.rowId,
           columnId: change.columnId,
           fieldName: change.fieldName,
           value: change.value,
-          error: `Field "${field.name}" is computed and cannot be edited`,
+          error: `Field "${field.name}" is a lookup field (read-only) and cannot be edited`,
         })
         continue
       }
 
-      // Parse and validate value
-      const parsedValue = parseCellValue(change.value, field.type)
+      // Reject formula fields (read-only, computed)
+      if (field.type === 'formula') {
+        errors.push({
+          rowId: change.rowId,
+          columnId: change.columnId,
+          fieldName: change.fieldName,
+          value: change.value,
+          error: `Field "${field.name}" is a formula field (read-only) and cannot be edited`,
+        })
+        continue
+      }
+
+      // Special handling for linked fields: resolve pasted text to IDs
+      let parsedValue = parseCellValue(change.value, field.type)
+      
+      if (isLinkedField(field) && typeof parsedValue === 'string' && parsedValue.trim()) {
+        // Check if it's already a UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (!uuidRegex.test(parsedValue)) {
+          // Not a UUID - try to resolve as display name
+          const resolution = await validatePastedLinkedValue(field, parsedValue)
+          if (!resolution.valid) {
+            errors.push({
+              rowId: change.rowId,
+              columnId: change.columnId,
+              fieldName: change.fieldName,
+              value: change.value,
+              error: resolution.error || `Could not resolve "${parsedValue}" to a record in the target table`,
+            })
+            continue
+          }
+          parsedValue = resolution.normalizedValue
+        }
+      }
+
+      // Validate value
       const validation = validateFieldValue(field, parsedValue)
 
       if (!validation.valid) {
@@ -424,14 +605,19 @@ export class DataViewService {
       }
     }
 
-    // Skip virtual fields
-    // Note: formula and lookup are virtual field types, but they're not in the FieldType union
-    // We check for them as strings to handle any edge cases
-    const fieldType = sourceField.type as string
-    if (fieldType === 'formula' || fieldType === 'lookup') {
+    // Skip lookup fields (read-only, computed)
+    if (isLookupField(sourceField)) {
       return {
         success: false,
-        error: `Cannot duplicate computed field: ${sourceField.name}`,
+        error: `Cannot duplicate lookup field "${sourceField.name}" (read-only, computed). Duplicate the linked field it depends on instead.`,
+      }
+    }
+
+    // Skip formula fields (read-only, computed)
+    if (sourceField.type === 'formula') {
+      return {
+        success: false,
+        error: `Cannot duplicate formula field "${sourceField.name}" (read-only, computed)`,
       }
     }
 
@@ -474,10 +660,8 @@ export class DataViewService {
       }
 
       // Add column to physical table (if not virtual)
-      // Note: formula and lookup are virtual field types, but they're not in the FieldType union
-      // We check for them as strings to handle any edge cases
-      const fieldType = sourceField.type as string
-      if (fieldType !== 'formula' && fieldType !== 'lookup') {
+      // Linked fields are stored (not virtual), so they need a physical column
+      if (sourceField.type !== 'formula' && sourceField.type !== 'lookup') {
         // Get PostgreSQL type from field type
         const postgresType = this.getPostgresType(sourceField.type)
 
@@ -496,7 +680,9 @@ export class DataViewService {
       }
 
       // Copy data if requested
-      if (options.withData && rows.length > 0) {
+      // For linked fields, copy the linked values (IDs)
+      // For lookup fields, this should never happen (they're excluded above)
+      if (options.withData && rows.length > 0 && sourceField.type !== 'lookup' && sourceField.type !== 'formula') {
         const updates = rows.map(row => ({
           id: row.id,
           [newName]: row[sourceField.name],
@@ -569,7 +755,10 @@ export class DataViewService {
       case 'json':
         return 'JSONB'
       case 'link_to_table':
-        return 'UUID'
+        // Single link: UUID, multi-link: UUID[]
+        // For now, we use TEXT[] for multi-link (PostgreSQL doesn't have native UUID[])
+        // The actual storage format depends on relationship_type in field options
+        return 'TEXT' // Can store single UUID or JSON array of UUIDs
       default:
         return 'TEXT'
     }

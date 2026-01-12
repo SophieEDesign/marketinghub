@@ -137,15 +137,15 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
     <button
       onClick={handleClick}
       disabled={loading}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-      title="Open record"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-gray-200"
+      title="Click to open record"
       aria-label={`Open record: ${displayValue}`}
     >
       <span>{displayValue}</span>
       {loading ? (
-        <span className="h-3 w-3 border-2 border-blue-800 border-t-transparent rounded-full animate-spin" />
+        <span className="h-3 w-3 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
       ) : (
-        <ExternalLink className="h-3 w-3 opacity-60" />
+        <ExternalLink className="h-3 w-3 text-gray-500 opacity-70" />
       )}
       {error && (
         <span className="text-red-600 text-xs" title={error}>⚠</span>
@@ -165,7 +165,7 @@ export default function LookupCell({
 
   if (!value) {
     return (
-      <div className="w-full h-full px-2 flex items-center text-sm text-gray-400">
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
         {placeholder}
       </div>
     )
@@ -179,7 +179,7 @@ export default function LookupCell({
 
   if (validValues.length === 0) {
     return (
-      <div className="w-full h-full px-2 flex items-center text-sm text-gray-400">
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
         {placeholder}
       </div>
     )
@@ -192,7 +192,7 @@ export default function LookupCell({
   if (!lookupTableId || !lookupFieldId) {
     // If lookup config is missing, just display the value(s)
     return (
-      <div className="w-full h-full px-2 flex items-center gap-1 flex-wrap">
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center gap-1.5 flex-wrap">
         {validValues.map((item, index) => {
           const displayValue = typeof item === 'string' 
             ? item 
@@ -202,7 +202,8 @@ export default function LookupCell({
           return (
             <span 
               key={index}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
+              className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700"
+              style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
             >
               {displayValue}
             </span>
@@ -213,7 +214,13 @@ export default function LookupCell({
   }
 
   return (
-    <div className="w-full h-full px-2 flex items-center gap-1 flex-wrap">
+    <div 
+      className="w-full min-h-[36px] px-3 py-2 flex items-center gap-1.5 flex-wrap"
+      onClick={(e) => {
+        // Prevent cell selection when clicking pills
+        e.stopPropagation()
+      }}
+    >
       {validValues.map((item, index) => (
         <LookupPill
           key={index}

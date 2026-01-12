@@ -42,6 +42,7 @@ interface BlockRendererProps {
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
+  hideEditButton?: boolean // Hide Edit button for top field blocks (inline editing only)
 }
 
 export default function BlockRenderer({
@@ -58,6 +59,7 @@ export default function BlockRenderer({
   aggregateData,
   pageEditable,
   editableFieldNames = [],
+  hideEditButton = false,
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -213,7 +215,7 @@ export default function BlockRenderer({
           ...safeBlock,
           config: fieldBlockConfig,
         }
-        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
+        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} hideEditButton={hideEditButton} />
 
       case "text":
         // Lazy-load TextBlock to improve initial page load performance

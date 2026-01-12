@@ -302,88 +302,90 @@ export default function AirtableViewPage({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      <ViewBuilderToolbar
-        viewId={viewId}
-        viewName={view.name}
-        viewType={view.type as ViewType}
-        tableId={tableId}
-        tableFields={tableFields}
-        viewFields={viewFields}
-        filters={filters}
-        sorts={sorts}
-        groupBy={groupBy || undefined}
-        rowHeight={rowHeight}
-        hiddenFields={hiddenFields}
-        userRole="editor"
-        onFiltersChange={(newFilters) => {
-          setFilters(newFilters as typeof filters)
-          router.refresh()
-        }}
-        onSortsChange={(newSorts) => {
-          setSorts(newSorts as typeof sorts)
-          router.refresh()
-        }}
-        onGroupChange={(fieldName) => {
-          setGroupBy(fieldName)
-          router.refresh()
-        }}
-        onRowHeightChange={async (height) => {
-          setRowHeight(height)
-          try {
-            // Save row height to grid_view_settings using client-side supabase
-            const { data: existing } = await supabase
-              .from('grid_view_settings')
-              .select('id')
-              .eq('view_id', viewId)
-              .maybeSingle()
-
-            if (existing) {
-              // Update existing settings
-              await supabase
+    <div className="flex flex-col h-full min-h-0 bg-gray-50">
+      <div className="flex-shrink-0">
+        <ViewBuilderToolbar
+          viewId={viewId}
+          viewName={view.name}
+          viewType={view.type as ViewType}
+          tableId={tableId}
+          tableFields={tableFields}
+          viewFields={viewFields}
+          filters={filters}
+          sorts={sorts}
+          groupBy={groupBy || undefined}
+          rowHeight={rowHeight}
+          hiddenFields={hiddenFields}
+          userRole="editor"
+          onFiltersChange={(newFilters) => {
+            setFilters(newFilters as typeof filters)
+            router.refresh()
+          }}
+          onSortsChange={(newSorts) => {
+            setSorts(newSorts as typeof sorts)
+            router.refresh()
+          }}
+          onGroupChange={(fieldName) => {
+            setGroupBy(fieldName)
+            router.refresh()
+          }}
+          onRowHeightChange={async (height) => {
+            setRowHeight(height)
+            try {
+              // Save row height to grid_view_settings using client-side supabase
+              const { data: existing } = await supabase
                 .from('grid_view_settings')
-                .update({ row_height: height })
+                .select('id')
                 .eq('view_id', viewId)
-            } else {
-              // Create new settings
-              await supabase
-                .from('grid_view_settings')
-                .insert([
-                  {
-                    view_id: viewId,
-                    row_height: height,
-                    column_widths: {},
-                    column_order: [],
-                    column_wrap_text: {},
-                    frozen_columns: 0,
-                  },
-                ])
+                .maybeSingle()
+
+              if (existing) {
+                // Update existing settings
+                await supabase
+                  .from('grid_view_settings')
+                  .update({ row_height: height })
+                  .eq('view_id', viewId)
+              } else {
+                // Create new settings
+                await supabase
+                  .from('grid_view_settings')
+                  .insert([
+                    {
+                      view_id: viewId,
+                      row_height: height,
+                      column_widths: {},
+                      column_order: [],
+                      column_wrap_text: {},
+                      frozen_columns: 0,
+                    },
+                  ])
+              }
+            } catch (error) {
+              console.error("Error saving row height:", error)
+              // Still update local state even if save fails
             }
-          } catch (error) {
-            console.error("Error saving row height:", error)
-            // Still update local state even if save fails
-          }
-          router.refresh()
-        }}
-        onHiddenFieldsChange={(fields) => {
-          setHiddenFields(fields)
-          router.refresh()
-        }}
-        onSaveView={handleSaveView}
-        onViewAction={(action) => {
-          if (action === "delete") {
-            // ViewManagementDialog handles the deletion and redirect
-            // No additional action needed here
-          } else if (action === "setDefault") {
-            // TODO: Implement set as default
-            alert("Set as default functionality coming soon")
-          }
-        }}
-        onDesign={() => setDesignSidebarOpen(true)}
-        onAddField={() => setDesignSidebarOpen(true)}
-        onNewRecord={handleNewRecord}
-      />
-      <div className="flex-1 overflow-hidden relative">
+            router.refresh()
+          }}
+          onHiddenFieldsChange={(fields) => {
+            setHiddenFields(fields)
+            router.refresh()
+          }}
+          onSaveView={handleSaveView}
+          onViewAction={(action) => {
+            if (action === "delete") {
+              // ViewManagementDialog handles the deletion and redirect
+              // No additional action needed here
+            } else if (action === "setDefault") {
+              // TODO: Implement set as default
+              alert("Set as default functionality coming soon")
+            }
+          }}
+          onDesign={() => setDesignSidebarOpen(true)}
+          onAddField={() => setDesignSidebarOpen(true)}
+          onNewRecord={handleNewRecord}
+        />
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden relative">
         {view.type === "grid" ? (
           <AirtableGridView
             tableName={table.supabase_table}

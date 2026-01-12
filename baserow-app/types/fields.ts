@@ -136,3 +136,64 @@ export const RESERVED_WORDS = [
   'select', 'insert', 'update', 'delete', 'from', 'where', 'order', 'group', 'by',
   'table', 'view', 'field', 'column', 'row', 'data'
 ]
+
+/**
+ * Linked Field Type
+ * 
+ * A linked field creates a relationship between records in two tables.
+ * - Stores record IDs only (single: string, or multiple: string[])
+ * - Editable and participates in batch updates and undo
+ * - Display values are resolved separately from stored IDs
+ * - Can be copied (uses display labels) and pasted (resolves labels to IDs)
+ * 
+ * Value format:
+ * - Single link: string (UUID)
+ * - Multi-link: string[] (array of UUIDs)
+ */
+export interface LinkedField extends TableField {
+  type: 'link_to_table'
+  options: FieldOptions & {
+    linked_table_id: string // Required: target table ID
+    linked_field_id?: string // Optional: field in target table for relationship
+  }
+}
+
+/**
+ * Lookup Field Type
+ * 
+ * A lookup field displays data from a linked field's target records.
+ * - Stores no values (computed at runtime)
+ * - Always read-only
+ * - Cannot be pasted into or directly edited
+ * - Depends on exactly one linked field (via lookup_field_id)
+ * - Recomputes automatically when linked data changes
+ * 
+ * Value format:
+ * - Computed at runtime, never stored
+ * - Type depends on lookup_result_field_id in target table
+ */
+export interface LookupField extends TableField {
+  type: 'lookup'
+  options: FieldOptions & {
+    lookup_table_id: string // Required: table to lookup from
+    lookup_field_id: string // Required: linked field ID that this lookup depends on
+    lookup_result_field_id: string // Required: field in lookup table to display
+  }
+}
+
+/**
+ * Type guard: Check if a field is a linked field
+ */
+export function isLinkedField(field: TableField): field is LinkedField {
+  return field.type === 'link_to_table' && !!field.options?.linked_table_id
+}
+
+/**
+ * Type guard: Check if a field is a lookup field
+ */
+export function isLookupField(field: TableField): field is LookupField {
+  return field.type === 'lookup' && 
+    !!field.options?.lookup_table_id && 
+    !!field.options?.lookup_field_id &&
+    !!field.options?.lookup_result_field_id
+}

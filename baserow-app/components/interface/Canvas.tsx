@@ -91,6 +91,34 @@ export default function Canvas({
   // Fetch all aggregates for KPI blocks
   const aggregateData = usePageAggregates(blocks, pageFilters)
   
+  // Identify top two field blocks (by y position) for inline editing without Edit button
+  // Only consider field blocks in the right column (x >= 4) for record view pages
+  const topTwoFieldBlockIds = useMemo(() => {
+    const fieldBlocks = blocks
+      .filter(block => {
+        // Only field blocks
+        if (block.type !== 'field') return false
+        // For record view pages, only consider blocks in right column (x >= 4)
+        // For other pages, consider all field blocks
+        const blockX = block.x ?? 0
+        if (mode === 'view' && recordId) {
+          return blockX >= 4
+        }
+        return true
+      })
+      .sort((a, b) => {
+        // Sort by y position, then by x position
+        const aY = a.y ?? 0
+        const bY = b.y ?? 0
+        if (aY !== bY) return aY - bY
+        return (a.x ?? 0) - (b.x ?? 0)
+      })
+      .slice(0, 2) // Get top two
+      .map(block => block.id)
+    
+    return new Set(fieldBlocks)
+  }, [blocks, mode, recordId])
+  
   const [layout, setLayout] = useState<Layout[]>([])
   const previousBlockIdsRef = useRef<string>("")
   const previousBlockPositionsRef = useRef<Map<string, { x: number; y: number; w: number; h: number }>>(new Map())
@@ -787,6 +815,7 @@ export default function Canvas({
                     aggregateData={aggregateData[block.id]}
                     pageEditable={pageEditable}
                     editableFieldNames={editableFieldNames}
+                    hideEditButton={topTwoFieldBlockIds.has(block.id)}
                   />
                 </div>
               </BlockAppearanceWrapper>

@@ -181,21 +181,25 @@ export default function MultiSelectCell({
       <div
         ref={containerRef}
         onKeyDown={handleKeyDown}
-        className="w-full min-h-[32px] px-2 py-1.5 flex flex-wrap gap-1.5 text-sm bg-white border border-blue-500 rounded-lg focus-within:ring-2 focus-within:ring-blue-500"
+        className="w-full min-h-[36px] px-3 py-2 flex flex-wrap gap-1.5 text-sm bg-white border border-blue-400 rounded-md focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1"
       >
         {selectedValues.map((val) => {
           const colorInfo = getColorForChoice(val)
           return (
             <span
               key={val}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${colorInfo.textColor}`}
-              style={{ backgroundColor: colorInfo.backgroundColor }}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${colorInfo.textColor}`}
+              style={{ 
+                backgroundColor: colorInfo.backgroundColor,
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
             >
               {val}
               <button
                 onClick={(e) => handleRemove(val, e)}
-                className={`rounded-full p-0.5 hover:bg-black/10 transition-colors ${colorInfo.textColor}`}
+                className={`ml-0.5 rounded p-0.5 hover:bg-black/10 transition-colors ${colorInfo.textColor} opacity-70 hover:opacity-100`}
                 aria-label={`Remove ${val}`}
+                title="Remove"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -211,10 +215,10 @@ export default function MultiSelectCell({
                 <button
                   key={choice}
                   onClick={() => handleToggle(choice)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border border-gray-300 hover:shadow-sm transition-all ${colorInfo.textColor}`}
-                  style={{ backgroundColor: colorInfo.backgroundColor, opacity: 0.7 }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all bg-white text-gray-700 hover:bg-gray-50`}
+                  title={`Add ${choice}`}
                 >
-                  <Plus className="h-3 w-3" />
+                  <Plus className="h-3 w-3 text-gray-500" />
                   {choice}
                 </button>
               )
@@ -226,37 +230,41 @@ export default function MultiSelectCell({
 
   const displayValues = value || []
   const isEmpty = displayValues.length === 0
-  const MAX_VISIBLE_PILLS = 2
-  const visiblePills = displayValues.slice(0, MAX_VISIBLE_PILLS)
-  const remainingCount = Math.max(0, displayValues.length - MAX_VISIBLE_PILLS)
 
   return (
     <div
-      onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm cursor-pointer hover:bg-gray-50 rounded transition-colors min-h-[32px] group"
+      onClick={(e) => {
+        // Only trigger edit if clicking the cell background, not pills
+        if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.cell-background')) {
+          editable && setEditing(true)
+        }
+      }}
+      className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm cursor-pointer hover:bg-gray-50/50 rounded transition-colors group cell-background"
       title={isEmpty ? undefined : displayValues.join(', ')}
     >
       {isEmpty ? (
-        <span className="text-gray-400 italic">{placeholder}</span>
+        <span className="text-gray-400 italic text-sm">{placeholder}</span>
       ) : (
         <>
-          {visiblePills.map((val) => {
+          {displayValues.map((val) => {
             const colorInfo = getColorForChoice(val)
             return (
               <span
                 key={val}
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${colorInfo.textColor}`}
-                style={{ backgroundColor: colorInfo.backgroundColor }}
+                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${colorInfo.textColor} hover:opacity-80 hover:scale-[1.02]`}
+                style={{ 
+                  backgroundColor: colorInfo.backgroundColor,
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // Pills are not clickable in view mode - clicking cell background edits
+                }}
               >
                 {val}
               </span>
             )
           })}
-          {remainingCount > 0 && (
-            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">
-              +{remainingCount} more
-            </span>
-          )}
         </>
       )}
     </div>

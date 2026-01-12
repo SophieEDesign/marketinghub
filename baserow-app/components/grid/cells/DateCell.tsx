@@ -105,7 +105,7 @@ export default function DateCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-full px-2 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded"
+        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
         disabled={saving}
       />
     )
@@ -114,10 +114,10 @@ export default function DateCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full h-full px-2 flex items-center text-sm text-gray-900 cursor-pointer hover:bg-blue-50 rounded transition-colors"
+      className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors"
     >
       <span className="truncate">
-        {value ? formatDisplayValue(value) : <span className="text-gray-400">{placeholder}</span>}
+        {value ? formatDisplayValue(value) : <span className="text-gray-400 italic">{placeholder}</span>}
       </span>
     </div>
   )

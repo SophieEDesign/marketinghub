@@ -196,24 +196,32 @@ export default function FieldSettingsDrawer({
 
   // Detect when type changes to single_select and fetch existing values
   useEffect(() => {
-    // Only trigger if:
-    // 1. Drawer is open
-    // 2. Field exists (not a new field)
-    // 3. Type changed to single_select
-    // 4. Previous type was not single_select
-    // 5. Options are empty or don't have choices
-    // 6. We haven't already prompted for this type change
+    // Auto-import when changing from 'text' to 'single_select'
     if (
       open &&
       field &&
       type === 'single_select' &&
-      previousTypeRef.current !== 'single_select' &&
+      previousTypeRef.current === 'text' && // Only when changing from text
       previousTypeRef.current !== null && // Only if there was a previous type (not initial load)
       (!options.choices || options.choices.length === 0 || (options.choices.length === 1 && options.choices[0] === '')) &&
       !hasPromptedForOptionsRef.current
     ) {
       hasPromptedForOptionsRef.current = true
-      fetchExistingValues()
+      fetchExistingValues(true) // Auto-import mode
+    }
+    // Show dialog for other type changes to single_select
+    else if (
+      open &&
+      field &&
+      type === 'single_select' &&
+      previousTypeRef.current !== 'single_select' &&
+      previousTypeRef.current !== 'text' && // Not from text (handled above)
+      previousTypeRef.current !== null && // Only if there was a previous type (not initial load)
+      (!options.choices || options.choices.length === 0 || (options.choices.length === 1 && options.choices[0] === '')) &&
+      !hasPromptedForOptionsRef.current
+    ) {
+      hasPromptedForOptionsRef.current = true
+      fetchExistingValues(false) // Show dialog mode
     }
     
     // Reset prompt flag when type changes away from single_select
@@ -223,9 +231,9 @@ export default function FieldSettingsDrawer({
     
     // Update previous type ref
     previousTypeRef.current = type
-  }, [type, field, open])
+  }, [type, field, open, options.choices])
 
-  async function fetchExistingValues() {
+  async function fetchExistingValues(autoImport: boolean = false) {
     if (!field || !field.name) return
 
     setLoadingOptions(true)
@@ -272,8 +280,19 @@ export default function FieldSettingsDrawer({
 
       const uniqueArray = Array.from(uniqueValues).sort()
       
-      // Only show dialog if we found values
-      if (uniqueArray.length > 0) {
+      // Auto-import when changing from text to single_select
+      if (autoImport && uniqueArray.length > 0) {
+        // Automatically add all values to options
+        const existingChoices = options.choices || []
+        const mergedChoices = [...new Set([...existingChoices.filter(c => c.trim() !== ''), ...uniqueArray])]
+        
+        setOptions({
+          ...options,
+          choices: mergedChoices,
+        })
+      }
+      // Show dialog for other type changes
+      else if (uniqueArray.length > 0) {
         setFoundOptions(uniqueArray)
         setShowAddOptionsDialog(true)
       }
