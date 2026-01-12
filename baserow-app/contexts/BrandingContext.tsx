@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, useEffect, ReactNode } from 'react'
 import type { WorkspaceSettings } from '@/lib/branding'
 
 interface BrandingContextType {
