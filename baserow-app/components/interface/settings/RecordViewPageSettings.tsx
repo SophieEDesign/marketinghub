@@ -72,6 +72,20 @@ export default function RecordViewPageSettings({
   const [leftPanelTitleField, setLeftPanelTitleField] = useState<string>(leftPanelConfig.title_field || config.title_field || "")
   const [leftPanelField1, setLeftPanelField1] = useState<string>(leftPanelConfig.field_1 || "")
   const [leftPanelField2, setLeftPanelField2] = useState<string>(leftPanelConfig.field_2 || "")
+
+  // Sync state with config changes
+  useEffect(() => {
+    const leftPanel = config.left_panel || {}
+    setLeftPanelFilterBy(leftPanel.filter_by?.[0]?.field || "")
+    setLeftPanelSortBy(leftPanel.sort_by?.[0]?.field || "")
+    setLeftPanelSortDirection(leftPanel.sort_by?.[0]?.direction || 'asc')
+    setLeftPanelGroupBy(leftPanel.group_by || "")
+    setLeftPanelColorField(leftPanel.color_field || "")
+    setLeftPanelImageField(leftPanel.image_field || "")
+    setLeftPanelTitleField(leftPanel.title_field || config.title_field || "")
+    setLeftPanelField1(leftPanel.field_1 || "")
+    setLeftPanelField2(leftPanel.field_2 || "")
+  }, [config.left_panel, config.title_field])
   
   // Parse field configurations from config
   const fieldConfigs = useCallback((): FieldConfig[] => {
