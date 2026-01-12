@@ -49,7 +49,6 @@ export default function PageCreationWizard({
   const [tableId, setTableId] = useState<string>('') // Users select tables, not views
   const [pageName, setPageName] = useState('')
   const [selectedFields, setSelectedFields] = useState<string[]>([]) // Fields selected for structured field list
-  const [fieldsAsBlocks, setFieldsAsBlocks] = useState<string[]>([]) // Fields to add as blocks
   const [leftPanelFilter, setLeftPanelFilter] = useState<string>('')
   const [leftPanelFilterOperator, setLeftPanelFilterOperator] = useState<string>('equal')
   const [leftPanelFilterValue, setLeftPanelFilterValue] = useState<string>('')
@@ -74,7 +73,6 @@ export default function PageCreationWizard({
       setTableId('')
       setPageName('')
       setSelectedFields([])
-      setFieldsAsBlocks([])
       setLeftPanelFilter('')
       setLeftPanelFilterOperator('equal')
       setLeftPanelFilterValue('')
@@ -297,10 +295,6 @@ export default function PageCreationWizard({
   const handleFieldsSelectedAndContinue = (fieldNames: string[]) => {
     setSelectedFields(fieldNames)
     setStep('name')
-  }
-
-  const handleAddFieldsAsBlocks = (fieldNames: string[]) => {
-    setFieldsAsBlocks(fieldNames)
   }
 
   const handleCreate = async () => {
@@ -573,10 +567,9 @@ export default function PageCreationWizard({
               }
             }
 
-            // Create field blocks for ALL selected fields (not just fieldsAsBlocks)
+            // Create field blocks for ALL selected fields
             // These are placed in the right column (x=4)
-            // Priority: selectedFields (from field picker) > fieldsAsBlocks (if no selectedFields)
-            const fieldsToCreateAsBlocks = selectedFields.length > 0 ? selectedFields : fieldsAsBlocks
+            const fieldsToCreateAsBlocks = selectedFields
             
             if (fieldsToCreateAsBlocks.length > 0) {
               let yOffset = 0 // Start at top of right column
@@ -998,7 +991,6 @@ export default function PageCreationWizard({
         tableId={tableId}
         selectedFields={selectedFields}
         onFieldsChange={handleFieldsSelectedAndContinue}
-        onAddAsBlocks={handleAddFieldsAsBlocks}
       />
     )
   }

@@ -885,6 +885,14 @@ export default function FieldSettingsDrawer({
                     )}
                   </SelectContent>
                 </Select>
+                {options.linked_table_id && (() => {
+                  const selectedTable = tables.find(t => t.id === options.linked_table_id)
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      This field lets you pull records from the {selectedTable?.name || 'selected'} table. Each row can contain one or more records from that table.
+                    </p>
+                  )
+                })()}
               </div>
               {options.linked_table_id && (
                 <div className="space-y-3 border-t pt-4">
@@ -913,7 +921,7 @@ export default function FieldSettingsDrawer({
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Field used as the main label in relationship picker
+                      Field used as the main label when selecting records
                     </p>
                   </div>
                   
@@ -965,8 +973,8 @@ export default function FieldSettingsDrawer({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="link-relationship-type" className="text-sm font-normal">
-                      Relationship Type
+                        <Label htmlFor="link-relationship-type" className="text-sm font-normal">
+                      How many records can be selected
                     </Label>
                     <Select
                       value={options.relationship_type || 'one-to-many'}
@@ -1012,7 +1020,7 @@ export default function FieldSettingsDrawer({
                         Allow Creating New Records
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Users can create new related records from the relationship field
+                        Users can create new records in the linked table from this field
                       </p>
                     </div>
                     <Switch
@@ -1061,6 +1069,20 @@ export default function FieldSettingsDrawer({
                     )}
                   </SelectContent>
                 </Select>
+                {options.lookup_table_id && options.lookup_field_id && (() => {
+                  const lookupField = lookupTableFields.find(f => f.id === options.lookup_field_id)
+                  const linkField = tableFields.find(f => 
+                    f.type === 'link_to_table' && 
+                    f.options?.linked_table_id === options.lookup_table_id
+                  )
+                  return (
+                    <p className="text-xs text-muted-foreground">
+                      {linkField 
+                        ? `This field shows information pulled from records in the "${linkField.name}" field.`
+                        : `This field shows information pulled from records in the linked table.`}
+                    </p>
+                  )
+                })()}
               </div>
               {options.lookup_table_id && (
                 <>
@@ -1169,7 +1191,7 @@ export default function FieldSettingsDrawer({
 
                     <div className="space-y-2">
                       <Label htmlFor="relationship-type" className="text-sm font-normal">
-                        Relationship Type
+                        How many records can be selected
                       </Label>
                       <Select
                         value={options.relationship_type || 'one-to-many'}
@@ -1215,7 +1237,7 @@ export default function FieldSettingsDrawer({
                           Allow Creating New Records
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          Users can create new related records from the lookup field
+                          Users can create new records in the linked table from this field
                         </p>
                       </div>
                       <Switch

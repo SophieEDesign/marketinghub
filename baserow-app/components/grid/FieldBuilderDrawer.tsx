@@ -255,7 +255,7 @@ export default function FieldBuilderDrawer({
               placeholder="Table ID"
             />
             <p className="text-xs text-gray-500">
-              Enter the ID of the table to link to
+              Enter the ID of the table to pull records from
             </p>
           </div>
         )

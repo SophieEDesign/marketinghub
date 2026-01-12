@@ -111,11 +111,13 @@ export default function LazyBlockWrapper({
   }
 
   // Default minimal placeholder - maintains layout space
+  // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
+  // minHeight causes gaps when blocks collapse - it persists after collapse
   return (
     <div
       ref={containerRef}
       className="h-full w-full"
-      style={{ minHeight: "100px" }}
+      // Removed minHeight - height must be derived from content, not fixed
       aria-hidden="true"
     />
   )

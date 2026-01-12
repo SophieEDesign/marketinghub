@@ -91,6 +91,25 @@ export default function LookupFieldPicker({
   const primaryLabelField = config?.primaryLabelField || 'name' // Default fallback
   const secondaryLabelFields = config?.secondaryLabelFields || []
 
+  // Get table name for display
+  const [tableName, setTableName] = useState<string | null>(null)
+  
+  useEffect(() => {
+    if (lookupTableId) {
+      const supabase = createClient()
+      supabase
+        .from("tables")
+        .select("name")
+        .eq("id", lookupTableId)
+        .single()
+        .then(({ data }) => {
+          if (data) setTableName(data.name)
+        })
+    } else {
+      setTableName(null)
+    }
+  }, [lookupTableId])
+
   // Load options when search query changes
   useEffect(() => {
     if (open && lookupTableId) {
@@ -441,8 +460,8 @@ export default function LookupFieldPicker({
                       setOpen(true)
                     }}
                     className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
-                    title="Add record"
-                    aria-label="Add record"
+                    title={tableName ? `Add record from ${tableName}` : "Add record"}
+                    aria-label={tableName ? `Add record from ${tableName}` : "Add record"}
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -458,8 +477,8 @@ export default function LookupFieldPicker({
                       setOpen(true)
                     }}
                     className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors flex-shrink-0"
-                    title="Add record"
-                    aria-label="Add record"
+                    title={tableName ? `Add record from ${tableName}` : "Add record"}
+                    aria-label={tableName ? `Add record from ${tableName}` : "Add record"}
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>

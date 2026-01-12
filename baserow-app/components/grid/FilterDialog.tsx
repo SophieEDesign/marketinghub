@@ -511,7 +511,7 @@ export default function FilterDialog({
                                           {field.options.choices.map((choice: string) => {
                                             const hexColor = resolveChoiceColor(
                                               choice,
-                                              field.type,
+                                              field.type as 'single_select' | 'multi_select',
                                               field.options,
                                               field.type === 'single_select'
                                             )

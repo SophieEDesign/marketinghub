@@ -67,6 +67,7 @@ interface GridViewWrapperProps {
     fit_image_size?: boolean
   }
   permissions?: BlockPermissions // Block-level permissions
+  hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
 }
 
 export default function GridViewWrapper({
@@ -83,6 +84,7 @@ export default function GridViewWrapper({
   onRecordClick,
   appearance = {},
   permissions,
+  hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -572,6 +574,7 @@ export default function GridViewWrapper({
           colorField={appearance.color_field}
           imageField={appearance.image_field}
           fitImageSize={appearance.fit_image_size}
+          hideEmptyState={hideEmptyState}
         />
       </div>
       <FieldBuilderDrawer

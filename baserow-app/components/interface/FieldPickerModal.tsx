@@ -40,7 +40,6 @@ interface FieldPickerModalProps {
   tableId: string | null
   selectedFields: string[] // Field names
   onFieldsChange: (fieldNames: string[]) => void
-  onAddAsBlocks?: (fieldNames: string[]) => void // Optional: add selected fields as blocks
 }
 
 export default function FieldPickerModal({
@@ -49,7 +48,6 @@ export default function FieldPickerModal({
   tableId,
   selectedFields,
   onFieldsChange,
-  onAddAsBlocks,
 }: FieldPickerModalProps) {
   const [fields, setFields] = useState<TableField[]>([])
   const [tableName, setTableName] = useState<string>("")
@@ -173,13 +171,6 @@ export default function FieldPickerModal({
     onOpenChange(false)
   }
 
-  const handleAddAsBlocks = () => {
-    if (onAddAsBlocks) {
-      onAddAsBlocks(localSelectedFields)
-    }
-    onFieldsChange(localSelectedFields)
-    onOpenChange(false)
-  }
 
   // Get visible fields for preview (in order they appear in fields array)
   const visibleFieldsForPreview = useMemo(() => {
@@ -393,15 +384,6 @@ export default function FieldPickerModal({
             {localSelectedFields.length} of {fields.length} fields selected
           </div>
           <div className="flex gap-2">
-            {onAddAsBlocks && (
-              <Button
-                variant="outline"
-                onClick={handleAddAsBlocks}
-                disabled={localSelectedFields.length === 0}
-              >
-                Add as Blocks
-              </Button>
-            )}
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>

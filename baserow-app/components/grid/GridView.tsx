@@ -51,6 +51,7 @@ interface GridViewProps {
   colorField?: string // Field name to use for row colors (single-select field)
   imageField?: string // Field name to use for row images
   fitImageSize?: boolean // Whether to fit image to container size
+  hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
 }
 
 const ITEMS_PER_PAGE = 100
@@ -75,6 +76,7 @@ export default function GridView({
   colorField,
   imageField,
   fitImageSize = false,
+  hideEmptyState = false,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -563,7 +565,9 @@ export default function GridView({
   }
 
   // Show message when no visible fields are configured
-  if (visibleFields.length === 0) {
+  // CRITICAL: In record view context, don't show "No columns configured" UI
+  // Record view uses field blocks, not grid columns, so this UI is not applicable
+  if (visibleFields.length === 0 && !hideEmptyState) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="max-w-md p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
@@ -604,6 +608,11 @@ export default function GridView({
         </div>
       </div>
     )
+  }
+  
+  // In record view context with no visible fields, return empty state (no UI)
+  if (visibleFields.length === 0 && hideEmptyState) {
+    return null
   }
 
   return (

@@ -829,7 +829,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       )}
       style={{
         ...blockStyle,
-        minHeight: '100px',
+        // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
+        // minHeight causes gaps when blocks collapse - it persists after collapse
+        // Height must come from content and current expansion state only
         // Ensure toolbar can overflow - critical for toolbar visibility
         overflow: isEditing ? 'visible' : 'auto',
         // Ensure relative positioning for absolute toolbar

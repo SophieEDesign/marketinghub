@@ -1318,7 +1318,7 @@ export default function CSVImportModal({
                                   }}
                                 >
                                   <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Select a table to link to" />
+                                    <SelectValue placeholder="Select a table to pull records from" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {availableTables.map((table) => (
@@ -1329,7 +1329,7 @@ export default function CSVImportModal({
                                   </SelectContent>
                                 </Select>
                                 <p className="text-xs text-gray-500">
-                                  Select the table this field should link to
+                                  This will match or create records in the selected table and pull them into this field.
                                 </p>
                               </div>
                             )}

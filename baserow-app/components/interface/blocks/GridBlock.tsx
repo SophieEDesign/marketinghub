@@ -471,6 +471,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             }))
           : undefined // Disable record clicks if not allowed
 
+        // CRITICAL: In record view pages, GridBlocks in the right column (x >= 4) should hide empty state
+        // These blocks are for record detail display, not grid views
+        // Left column blocks (x < 4) are for record lists and should show empty state if needed
+        const isRightColumnBlock = block.x !== undefined && block.x >= 4
+        const hideEmptyState = isRightColumnBlock
+
         return (
           <GridViewWrapper
             tableId={tableId!}
@@ -496,6 +502,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
               allowInlineDelete: isViewOnly ? false : allowInlineDelete,
               allowOpenRecord,
             }}
+            hideEmptyState={hideEmptyState}
           />
         )
     }

@@ -135,8 +135,9 @@ export default function Canvas({
   // Track if this is the first layout change after mount (to ignore grid's initial "normalization")
   const isFirstLayoutChangeRef = useRef(true)
   
-  // CRITICAL: Track block heights before resize to detect shrinkage
-  // This is used to trigger vertical compaction when a block shrinks
+  // CRITICAL: Track block heights ONLY during active manual resize (user dragging resize handle)
+  // This is NOT used for content-based expand/collapse - those must be handled by DOM flow
+  // Height must be DERIVED from content, not remembered after collapse
   const blockHeightsBeforeResizeRef = useRef<Map<string, number>>(new Map())
   const currentlyResizingBlockIdRef = useRef<string | null>(null)
   
@@ -637,8 +638,9 @@ export default function Canvas({
         })
         
         // CRITICAL: Clear all resize state immediately
+        // Height must be DERIVED, not remembered - clear all cached heights
         isResizingRef.current = false
-        blockHeightsBeforeResizeRef.current.clear()
+        blockHeightsBeforeResizeRef.current.clear() // Clear ALL cached heights
         currentlyResizingBlockIdRef.current = null
         
         // Reset user update flag after a delay to allow blocks to update
@@ -669,8 +671,9 @@ export default function Canvas({
       }
       // CRITICAL: Clear all resize state when exiting edit mode
       // This ensures no cached heights or resize state remains
+      // Height must be DERIVED from content, not remembered
       isResizingRef.current = false
-      blockHeightsBeforeResizeRef.current.clear()
+      blockHeightsBeforeResizeRef.current.clear() // Clear ALL cached heights
       currentlyResizingBlockIdRef.current = null
     }
   }, [isEditing])
@@ -787,6 +790,8 @@ export default function Canvas({
     <ErrorBoundary>
       {/* CRITICAL: Canvas wrapper must have min-width: 0 to prevent flex collapse */}
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
+      {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
+      {/* No cached heights, no min-height persistence, no delayed updates */}
       <div ref={containerRef} className="w-full h-full min-w-0">
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
@@ -818,8 +823,9 @@ export default function Canvas({
             }
           }}
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
-            // CRITICAL: Immediately clear resize state when resize ends
-            // This ensures no cached heights remain
+            // CRITICAL: Immediately clear ALL resize state when resize ends
+            // This ensures no cached heights remain after manual resize completes
+            // Height must be DERIVED from content, not remembered
             const blockId = oldItem.i
             const previousHeight = blockHeightsBeforeResizeRef.current.get(blockId)
             const newHeight = newItem.h || 4
@@ -827,6 +833,11 @@ export default function Canvas({
             if (process.env.NODE_ENV === 'development') {
               console.log(`[Canvas] Resize stopped for block ${blockId}, height: ${previousHeight} → ${newHeight}`)
             }
+            
+            // CRITICAL: Clear cached height immediately - do NOT persist after resize
+            // Old heights must never be cached after collapse
+            blockHeightsBeforeResizeRef.current.delete(blockId)
+            currentlyResizingBlockIdRef.current = null
             
             // If block shrunk, trigger immediate layout compaction
             if (previousHeight !== undefined && newHeight < previousHeight) {
@@ -978,9 +989,16 @@ export default function Canvas({
             )}
 
             {/* Block Content */}
+            {/* CRITICAL: No min-height - height must be DERIVED from content */}
+            {/* min-h-0 allows flex children to shrink below content size */}
             <div 
               className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
+              style={{
+                // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
+                // minHeight causes gaps when blocks collapse - it persists after collapse
+                // Height must come from content and current expansion state only
+              }}
             >
               <BlockAppearanceWrapper 
                 block={block}

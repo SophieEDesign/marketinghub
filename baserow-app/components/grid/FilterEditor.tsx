@@ -146,7 +146,7 @@ export default function FilterEditor({
                             backgroundColor: normalizeHexColor(
                               resolveChoiceColor(
                                 value,
-                                selectedField.type,
+                                selectedField.type as 'single_select' | 'multi_select',
                                 selectedField.options,
                                 selectedField.type === 'single_select'
                               )
@@ -164,7 +164,7 @@ export default function FilterEditor({
                   {selectedField.options?.choices?.map((choice: string) => {
                     const hexColor = resolveChoiceColor(
                       choice,
-                      selectedField.type,
+                      selectedField.type as 'single_select' | 'multi_select',
                       selectedField.options,
                       selectedField.type === 'single_select'
                     )
