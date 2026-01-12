@@ -82,6 +82,16 @@ export default function GridView({
   const [tableError, setTableError] = useState<string | null>(null)
   const [initializingFields, setInitializingFields] = useState(false)
 
+  // CRITICAL: Normalize all inputs at grid entry point
+  // Never trust upstream to pass correct types - always normalize
+  type ViewFieldType = {
+    field_name: string
+    visible: boolean
+    position: number
+  }
+  const safeViewFields = asArray<ViewFieldType>(viewFields)
+  const safeTableFields = asArray<TableField>(tableFields)
+
   // Helper to get color from color field
   const getRowColor = useCallback((row: Record<string, any>): string | null => {
     if (!colorField) return null
@@ -136,15 +146,6 @@ export default function GridView({
     return null
   }, [imageField])
 
-  // CRITICAL: Normalize all inputs at grid entry point
-  // Never trust upstream to pass correct types - always normalize
-  type ViewFieldType = {
-    field_name: string
-    visible: boolean
-    position: number
-  }
-  const safeViewFields = asArray<ViewFieldType>(viewFields)
-  const safeTableFields = asArray<TableField>(tableFields)
   type ViewFilterType = {
     field_name: string
     operator: string

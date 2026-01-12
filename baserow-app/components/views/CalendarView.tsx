@@ -585,15 +585,6 @@ export default function CalendarView({
     )
   }, [viewConfig, loadedTableFields])
 
-  // Get color field from view config
-  const colorField = useMemo(() => {
-    if (!viewConfig?.calendar_color_field || !loadedTableFields.length) return null
-    return loadedTableFields.find(f => 
-      f.name === viewConfig.calendar_color_field || 
-      f.id === viewConfig.calendar_color_field
-    )
-  }, [viewConfig, loadedTableFields])
-
   function getEvents(): EventInput[] {
     // Use resolved date field from config or fallback
     const effectiveDateField = dateField
