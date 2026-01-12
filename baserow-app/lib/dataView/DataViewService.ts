@@ -617,7 +617,6 @@ export class DataViewService {
     // Note: This is allowed because users expect to duplicate column "structure" even if computed
     // The value will recompute automatically
     // "Duplicate with data" is not applicable for lookup fields
-    // Check this after formula check so TypeScript can properly narrow types
     const isLookup = isLookupField(sourceField)
     if (isLookup) {
       if (options.withData) {
@@ -631,9 +630,9 @@ export class DataViewService {
     }
 
     // TypeScript: At this point, we know it's not 'formula' (we returned above)
-    // But TypeScript doesn't know it's not 'lookup' because we continued instead of returning
-    // So we use the isLookup variable instead of checking sourceField.type === 'lookup'
-    // This avoids the TypeScript error about comparing types with no overlap
+    // For lookup fields, we continue but skip data copy later
+    // We need to check if it's a virtual field type to determine if we should add a physical column
+    // Only lookup fields are virtual at this point (formula fields already returned)
     const isVirtualFieldType = isLookup
 
     try {
@@ -676,13 +675,12 @@ export class DataViewService {
 
       // Add column to physical table (if not virtual)
       // Linked fields are stored (not virtual), so they need a physical column
-      // At this point, we've already excluded 'lookup' and 'formula' types above
-      // TypeScript: After the checks above, we know it's not 'lookup' or 'formula'
-      // Use the isVirtualFieldType check we created above
+      // TypeScript: We know it's not 'formula' (we returned early), and isVirtualFieldType checks for 'lookup'
       if (!isVirtualFieldType) {
         // Get PostgreSQL type from field type
-        // Type assertion: we've already checked it's not 'formula' or 'lookup'
-        const postgresType = this.getPostgresType(sourceField.type as Exclude<FieldType, 'formula' | 'lookup'>)
+        // At this point, TypeScript knows it's not 'formula' (returned above)
+        // and !isVirtualFieldType means it's not 'lookup' either
+        const postgresType = this.getPostgresType(sourceField.type)
 
         const { error: alterError } = await supabase.rpc('execute_sql_safe', {
           sql_text: `ALTER TABLE ${supabaseTableName} ADD COLUMN "${newName}" ${postgresType}`,
@@ -702,8 +700,8 @@ export class DataViewService {
       // For linked fields, copy the linked values (IDs)
       // For lookup fields, skip data copy (values are computed, not stored)
       // Note: Lookup field duplication is allowed above, but we skip data copy here
-      // Use isLookup variable we already have instead of checking type again
-      const isVirtualFieldForData = sourceField.type === 'formula' || isLookup
+      // TypeScript: We know it's not 'formula' (we returned early), so only check isLookup
+      const isVirtualFieldForData = isLookup
       if (options.withData && rows.length > 0 && !isVirtualFieldForData) {
         const updates = rows.map(row => ({
           id: row.id,
