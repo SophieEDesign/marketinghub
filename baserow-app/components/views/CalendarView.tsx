@@ -643,26 +643,58 @@ export default function CalendarView({
         sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
       })
       
-      // Resolve start field: block config > view config > null
-      const blockStartField = blockConfig?.start_date_field || blockConfig?.from_date_field || blockConfig?.calendar_start_field
-      const resolvedStartField = blockStartField 
-        ? loadedTableFields.find(f => (f.name === blockStartField || f.id === blockStartField) && f.type === 'date')
+      // Resolve date_from field (default/primary): block config > view config > auto-detect > null
+      // Check for date_from, from_date_field, start_date_field, calendar_start_field
+      const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.calendar_start_field
+      const resolvedFromField = blockFromField 
+        ? loadedTableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
         : null
-      const actualStartFieldName = resolvedStartField?.name || startField?.name || viewConfig?.calendar_start_field || null
       
-      // Resolve end field: block config > view config > null
-      const blockEndField = blockConfig?.end_date_field || blockConfig?.to_date_field || blockConfig?.calendar_end_field
-      const resolvedEndField = blockEndField
-        ? loadedTableFields.find(f => (f.name === blockEndField || f.id === blockEndField) && f.type === 'date')
+      // Auto-detect date_from field if not configured (look for fields named "date_from", "from_date", "start_date", etc.)
+      let autoDetectedFromField = null
+      if (!resolvedFromField && !startField && !viewConfig?.calendar_start_field) {
+        autoDetectedFromField = loadedTableFields.find(f => 
+          f.type === 'date' && (
+            f.name.toLowerCase() === 'date_from' || 
+            f.name.toLowerCase() === 'from_date' ||
+            f.name.toLowerCase() === 'start_date' ||
+            f.name.toLowerCase().includes('date_from') ||
+            f.name.toLowerCase().includes('from_date')
+          )
+        )
+      }
+      
+      const actualFromFieldName = resolvedFromField?.name || startField?.name || viewConfig?.calendar_start_field || autoDetectedFromField?.name || actualFieldName || null
+      
+      // Resolve date_to field (secondary/range): block config > view config > auto-detect > null
+      // Check for date_to, to_date_field, end_date_field, calendar_end_field
+      const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field || blockConfig?.calendar_end_field
+      const resolvedToField = blockToField
+        ? loadedTableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
         : null
-      const actualEndFieldName = resolvedEndField?.name || endField?.name || viewConfig?.calendar_end_field || null
+      
+      // Auto-detect date_to field if not configured (look for fields named "date_to", "to_date", "end_date", etc.)
+      let autoDetectedToField = null
+      if (!resolvedToField && !endField && !viewConfig?.calendar_end_field) {
+        autoDetectedToField = loadedTableFields.find(f => 
+          f.type === 'date' && (
+            f.name.toLowerCase() === 'date_to' || 
+            f.name.toLowerCase() === 'to_date' ||
+            f.name.toLowerCase() === 'end_date' ||
+            f.name.toLowerCase().includes('date_to') ||
+            f.name.toLowerCase().includes('to_date')
+          )
+        )
+      }
+      
+      const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null
       
       if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         console.log('Calendar: Date field resolution', {
           actualFieldName,
-          actualStartFieldName,
-          actualEndFieldName,
-          blockConfig: { start_date_field: blockConfig?.start_date_field, end_date_field: blockConfig?.end_date_field },
+          actualFromFieldName,
+          actualToFieldName,
+          blockConfig: { date_from: blockConfig?.date_from, date_to: blockConfig?.date_to, start_date_field: blockConfig?.start_date_field, end_date_field: blockConfig?.end_date_field },
           viewConfig: { calendar_start_field: viewConfig?.calendar_start_field, calendar_end_field: viewConfig?.calendar_end_field }
         })
       }
@@ -672,8 +704,10 @@ export default function CalendarView({
         const sampleRow = filteredRows[0]
         console.log('Calendar: Sample row data for event mapping', {
           rowId: sampleRow.id,
-          dateFieldName: actualStartFieldName || actualFieldName,
-          dateValue: sampleRow.data ? sampleRow.data[actualStartFieldName || actualFieldName] : 'no data',
+          dateFromFieldName: actualFromFieldName,
+          dateToFieldName: actualToFieldName,
+          dateFromValue: sampleRow.data ? sampleRow.data[actualFromFieldName || ''] : 'no data',
+          dateToValue: sampleRow.data ? sampleRow.data[actualToFieldName || ''] : 'no data',
           allDataKeys: sampleRow.data ? Object.keys(sampleRow.data) : [],
           rowDataSample: sampleRow.data ? Object.fromEntries(
             Object.entries(sampleRow.data).slice(0, 5)
@@ -690,31 +724,50 @@ export default function CalendarView({
             return false
           }
           
-          // Check for date value - prefer start field if configured, otherwise use date field
-          let dateValue: any = null
-          const dateFieldToUse = actualStartFieldName || actualFieldName
+          // Check for date values - prefer date_from (default), fallback to date_to if only that exists
+          let fromDateValue: any = null
+          let toDateValue: any = null
           
-          if (dateFieldToUse) {
-            dateValue = row.data[dateFieldToUse]
-            
+          // Try to get date_from value
+          if (actualFromFieldName) {
+            fromDateValue = row.data[actualFromFieldName]
             // Also try common variations (case-insensitive, with/without underscores)
-            if (!dateValue) {
-              const lowerFieldName = dateFieldToUse.toLowerCase()
+            if (!fromDateValue) {
+              const lowerFieldName = actualFromFieldName.toLowerCase()
               for (const key of Object.keys(row.data)) {
                 if (key.toLowerCase() === lowerFieldName) {
-                  dateValue = row.data[key]
+                  fromDateValue = row.data[key]
                   break
                 }
               }
             }
           }
           
-          // Skip if no date value
+          // Try to get date_to value
+          if (actualToFieldName) {
+            toDateValue = row.data[actualToFieldName]
+            // Also try common variations (case-insensitive, with/without underscores)
+            if (!toDateValue) {
+              const lowerFieldName = actualToFieldName.toLowerCase()
+              for (const key of Object.keys(row.data)) {
+                if (key.toLowerCase() === lowerFieldName) {
+                  toDateValue = row.data[key]
+                  break
+                }
+              }
+            }
+          }
+          
+          // Use date_from as default, fallback to date_to if date_from is not available
+          const dateValue = fromDateValue || toDateValue
+          
+          // Skip if no date value at all
           if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
             if (process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
               console.log('Calendar: Row filtered out - no date value', {
                 rowId: row.id,
-                dateField: dateFieldToUse,
+                dateFromField: actualFromFieldName,
+                dateToField: actualToFieldName,
                 availableKeys: Object.keys(row.data)
               })
             }
@@ -748,46 +801,73 @@ export default function CalendarView({
         // Ensure we have an array before mapping
         .filter((row): row is TableRow => row !== null && row !== undefined)
         .map((row) => {
-          // Get date values - support both single date field and start/end fields
-          const dateFieldToUse = actualStartFieldName || actualFieldName
-          let dateValue: any = null
+          // Get date values - use date_from (default) and date_to (if available for range)
+          let fromDateValue: any = null
+          let toDateValue: any = null
           
-          if (dateFieldToUse) {
-            dateValue = row.data[dateFieldToUse]
-            
+          // Try to get date_from value
+          if (actualFromFieldName) {
+            fromDateValue = row.data[actualFromFieldName]
             // Also try common variations (case-insensitive, with/without underscores)
-            if (!dateValue) {
-              const lowerFieldName = dateFieldToUse.toLowerCase()
+            if (!fromDateValue) {
+              const lowerFieldName = actualFromFieldName.toLowerCase()
               for (const key of Object.keys(row.data)) {
                 if (key.toLowerCase() === lowerFieldName) {
-                  dateValue = row.data[key]
+                  fromDateValue = row.data[key]
                   break
                 }
               }
             }
           }
           
-          const endDateValue = actualEndFieldName ? row.data[actualEndFieldName] : null
+          // Try to get date_to value
+          if (actualToFieldName) {
+            toDateValue = row.data[actualToFieldName]
+            // Also try common variations (case-insensitive, with/without underscores)
+            if (!toDateValue) {
+              const lowerFieldName = actualToFieldName.toLowerCase()
+              for (const key of Object.keys(row.data)) {
+                if (key.toLowerCase() === lowerFieldName) {
+                  toDateValue = row.data[key]
+                  break
+                }
+              }
+            }
+          }
           
           // Parse date values
+          // Use date_from as default start date, fallback to date_to if date_from is not available
           let parsedStartDate: Date
           let parsedEndDate: Date | null = null
           
           try {
-            parsedStartDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
-            if (isNaN(parsedStartDate.getTime())) {
+            // Start date: prefer date_from, fallback to date_to if date_from is not available
+            const startDateValue = fromDateValue || toDateValue
+            if (startDateValue) {
+              parsedStartDate = startDateValue instanceof Date ? startDateValue : new Date(startDateValue)
+              if (isNaN(parsedStartDate.getTime())) {
+                parsedStartDate = new Date()
+              }
+            } else {
               parsedStartDate = new Date()
             }
             
-            if (endDateValue) {
-              parsedEndDate = endDateValue instanceof Date ? endDateValue : new Date(endDateValue)
+            // End date: use date_to if available (for range), otherwise use start date (single day event)
+            if (toDateValue) {
+              parsedEndDate = toDateValue instanceof Date ? toDateValue : new Date(toDateValue)
               if (isNaN(parsedEndDate.getTime())) {
                 parsedEndDate = parsedStartDate
               }
+            } else if (fromDateValue && !toDateValue) {
+              // Only date_from available, use it for both start and end (single day event)
+              parsedEndDate = parsedStartDate
+            } else {
+              // No end date, use start date for both
+              parsedEndDate = parsedStartDate
             }
           } catch {
             parsedStartDate = new Date()
-            parsedEndDate = null
+            parsedEndDate = new Date()
           }
           
           // Use visible fields (fieldIds) to determine title - prefer first text field
@@ -799,8 +879,8 @@ export default function CalendarView({
               return field && 
                 field.type !== 'date' && 
                 field.name !== actualFieldName && 
-                field.name !== actualStartFieldName &&
-                field.name !== actualEndFieldName &&
+                field.name !== actualFromFieldName &&
+                field.name !== actualToFieldName &&
                 field.id !== effectiveDateFieldId
             })
           
@@ -833,7 +913,7 @@ export default function CalendarView({
           } else {
             // Fallback: use first non-date, non-id field
             for (const [key, value] of Object.entries(row.data)) {
-              if (key !== 'id' && key !== dateFieldToUse && key !== actualEndFieldName && value) {
+              if (key !== 'id' && key !== actualFromFieldName && key !== actualToFieldName && key !== actualFieldName && value) {
                 title = String(value)
                 break
               }

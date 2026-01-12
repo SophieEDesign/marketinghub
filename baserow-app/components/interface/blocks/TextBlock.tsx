@@ -487,6 +487,19 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editorElement.style.color = ''
       }
       
+      // Apply font weight
+      if (appearance.font_weight) {
+        const fontWeightMap: Record<string, string> = {
+          'normal': '400',
+          'medium': '500',
+          'semibold': '600',
+          'bold': '700'
+        }
+        editorElement.style.fontWeight = fontWeightMap[appearance.font_weight] || '400'
+      } else {
+        editorElement.style.fontWeight = ''
+      }
+      
       // Apply text alignment
       if (textAlign === 'center') {
         editorElement.style.textAlign = 'center'
@@ -498,7 +511,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         editorElement.style.textAlign = 'left'
       }
     }
-  }, [editor, readOnly, appearance.text_color, textAlign, block.id, isEditing, isViewer])
+  }, [editor, readOnly, appearance.text_color, appearance.font_weight, textAlign, block.id, isEditing, isViewer])
 
   // Toolbar component
   // CRITICAL: Only check for editor existence - visibility controlled by isEditing prop

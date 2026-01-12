@@ -15,7 +15,7 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
-import { sanitizeFieldName } from "@/lib/fields/validation"
+import { sanitizeFieldName, formatFieldNameForDisplay } from "@/lib/fields/validation"
 import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
@@ -1129,7 +1129,7 @@ export default function CSVImportPanel({
                         <SelectItem value="new">+ Create new field</SelectItem>
                         {tableFields.map((field) => (
                           <SelectItem key={field.id} value={field.name}>
-                            {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
+                            {formatFieldNameForDisplay(field.name)} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1209,7 +1209,7 @@ export default function CSVImportPanel({
                       return (
                         <th key={header} className="px-2 py-2 text-left font-medium text-gray-700">
                           <div className="flex flex-col">
-                            <span>{mappedField || header}</span>
+                            <span>{mappedField ? formatFieldNameForDisplay(mappedField) : header}</span>
                             {fieldTypeLabel && (
                               <span className="text-xs font-normal text-gray-500 mt-0.5">
                                 {mappedField ? `(${fieldTypeLabel})` : `New: ${fieldTypeLabel}`}

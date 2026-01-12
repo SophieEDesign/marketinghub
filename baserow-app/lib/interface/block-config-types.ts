@@ -198,23 +198,6 @@ export interface LinkPreviewBlockConfig extends BaseBlockConfig {
   }
 }
 
-// Tabs Block Config
-export interface TabsBlockConfig extends BaseBlockConfig {
-  tabs: Array<{
-    id: string
-    label: string
-    block_ids: string[]
-  }>
-  default_tab_id?: string
-  appearance?: BaseBlockConfig['appearance'] & {
-    tab_style?: 'default' | 'pills' | 'underline'
-    tab_position?: 'top' | 'left' | 'right'
-    tab_background?: string
-    active_tab_color?: string
-    content_padding?: number
-  }
-}
-
 // Filter Block Config
 export interface FilterBlockConfig extends BaseBlockConfig {
   table_id?: string // Optional - can use page table_id
@@ -244,7 +227,6 @@ export type BlockConfigUnion =
   | (ButtonBlockConfig & { _type: 'button' })
   | (ActionBlockConfig & { _type: 'action' })
   | (LinkPreviewBlockConfig & { _type: 'link_preview' })
-  | (TabsBlockConfig & { _type: 'tabs' })
   | (FilterBlockConfig & { _type: 'filter' })
 
 /**
@@ -274,10 +256,6 @@ export function isImageBlockConfig(config: any): config is ImageBlockConfig {
 
 export function isActionBlockConfig(config: any): config is ActionBlockConfig {
   return config && config.action_type !== undefined && typeof config.label === 'string'
-}
-
-export function isTabsBlockConfig(config: any): config is TabsBlockConfig {
-  return config && Array.isArray(config.tabs)
 }
 
 export function isTextBlockConfig(config: any): config is TextBlockConfig {
@@ -362,12 +340,6 @@ export function validateBlockConfig(
       }
       if (config.action_type === 'create_record' && !config.table_id) {
         errors.push('Create record action requires table_id')
-      }
-      break
-
-    case 'tabs':
-      if (!Array.isArray(config.tabs) || config.tabs.length === 0) {
-        errors.push('Tabs block requires at least one tab')
       }
       break
 

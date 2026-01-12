@@ -27,6 +27,20 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
     },
   },
+  table: {
+    type: 'table',
+    label: 'Table',
+    icon: 'Grid',
+    defaultWidth: 12,
+    defaultHeight: 8,
+    minWidth: 4,
+    minHeight: 4,
+    defaultConfig: {
+      title: 'Table View',
+      table_id: '',
+      view_type: 'grid',
+    },
+  },
   form: {
     type: 'form',
     label: 'Form',
@@ -138,19 +152,6 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       title: 'Button',
       button_label: 'Click Me',
       button_automation_id: '',
-    },
-  },
-  tabs: {
-    type: 'tabs',
-    label: 'Tabs',
-    icon: 'Layout',
-    defaultWidth: 12,
-    defaultHeight: 6,
-    minWidth: 6,
-    minHeight: 4,
-    defaultConfig: {
-      title: 'Tabs',
-      tabs: [],
     },
   },
   action: {

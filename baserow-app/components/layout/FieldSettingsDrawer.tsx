@@ -901,11 +901,11 @@ export default function FieldSettingsDrawer({
                         return (
                           <Select
                             key={idx}
-                            value={currentValue || ''}
+                            value={currentValue || '__none__'}
                             onValueChange={(fieldName) => {
                               const current = options.secondary_label_fields || []
                               const updated = [...current]
-                              updated[idx] = fieldName
+                              updated[idx] = fieldName === '__none__' ? undefined : fieldName
                               setOptions({ 
                                 ...options, 
                                 secondary_label_fields: updated.filter(Boolean)
@@ -916,7 +916,7 @@ export default function FieldSettingsDrawer({
                               <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="__none__">None</SelectItem>
                               {lookupTableFields
                                 .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                                 .map((field) => (
@@ -1100,11 +1100,11 @@ export default function FieldSettingsDrawer({
                           return (
                             <Select
                               key={idx}
-                              value={currentValue || ''}
+                              value={currentValue || '__none__'}
                               onValueChange={(fieldName) => {
                                 const current = options.secondary_label_fields || []
                                 const updated = [...current]
-                                updated[idx] = fieldName
+                                updated[idx] = fieldName === '__none__' ? undefined : fieldName
                                 setOptions({ 
                                   ...options, 
                                   secondary_label_fields: updated.filter(Boolean)
@@ -1115,7 +1115,7 @@ export default function FieldSettingsDrawer({
                                 <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="__none__">None</SelectItem>
                                 {lookupTableFields
                                   .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                                   .map((field) => (

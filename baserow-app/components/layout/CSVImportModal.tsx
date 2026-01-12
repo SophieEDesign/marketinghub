@@ -23,7 +23,7 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { parseCSV, type ParsedCSV } from "@/lib/import/csvParser"
-import { sanitizeFieldName } from "@/lib/fields/validation"
+import { sanitizeFieldName, formatFieldNameForDisplay } from "@/lib/fields/validation"
 import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
@@ -1101,7 +1101,7 @@ export default function CSVImportModal({
                             <SelectItem value="new">+ Create new field</SelectItem>
                             {tableFields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name} ({FIELD_TYPES.find(t => t.type === field.type)?.label || field.type})
+                                {formatFieldNameForDisplay(field.name)} ({FIELD_TYPES.find(t => t.type === field.type)?.label || field.type})
                               </SelectItem>
                             ))}
                           </SelectContent>

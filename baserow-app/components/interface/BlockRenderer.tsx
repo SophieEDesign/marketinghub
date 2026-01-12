@@ -14,7 +14,6 @@ import DividerBlock from "./blocks/DividerBlock"
 import ButtonBlock from "./blocks/ButtonBlock"
 import ActionBlock from "./blocks/ActionBlock"
 import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
-import TabsBlock from "./blocks/TabsBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
@@ -125,6 +124,8 @@ export default function BlockRenderer({
     
     switch (block.type) {
       case "grid":
+      case "table":
+        // Table blocks use the same rendering as Grid blocks
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
         // pageTableId must flow to blocks for base_table fallback
@@ -226,15 +227,6 @@ export default function BlockRenderer({
 
       case "button":
         return <ButtonBlock block={safeBlock} isEditing={canEdit} />
-
-      case "tabs":
-        return (
-          <TabsBlock
-            block={safeBlock}
-            isEditing={canEdit}
-            childBlocks={[]} // TODO: Pass actual child blocks from parent
-          />
-        )
 
       case "calendar":
         // Calendar block - wrapper around GridBlock with view_type='calendar'

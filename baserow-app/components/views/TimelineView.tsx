@@ -20,6 +20,7 @@ interface TimelineViewProps {
   fieldIds: string[]
   searchQuery?: string
   tableFields?: TableField[]
+  blockConfig?: Record<string, any> // Block/page config for reading date_from/date_to from page settings
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -43,6 +44,7 @@ export default function TimelineView({
   fieldIds: fieldIdsProp,
   searchQuery = "",
   tableFields = [],
+  blockConfig = {},
 }: TimelineViewProps) {
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -53,6 +55,12 @@ export default function TimelineView({
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("month")
   const [scrollPosition, setScrollPosition] = useState(0)
   const timelineRef = useRef<HTMLDivElement>(null)
+
+  // Drag and resize state
+  const [draggingEvent, setDraggingEvent] = useState<string | null>(null)
+  const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
+  const [dragStartPos, setDragStartPos] = useState<{ x: number; startDate: Date; endDate: Date } | null>(null)
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { start?: Date; end?: Date }>>({})
 
   // Get table name for opening records
   const [supabaseTableName, setSupabaseTableName] = useState<string>("")
@@ -126,18 +134,81 @@ export default function TimelineView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
+  // Resolve date_from and date_to fields from block config, props, or auto-detect
+  const resolvedDateFields = useMemo(() => {
+    // Resolve date_from field (default/primary): block config > props > auto-detect
+    const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field
+    let resolvedFromField = blockFromField
+      ? tableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
+      : null
+    
+    // Auto-detect date_from field if not configured
+    if (!resolvedFromField && !startDateFieldId) {
+      resolvedFromField = tableFields.find(f => 
+        f.type === 'date' && (
+          f.name.toLowerCase() === 'date_from' || 
+          f.name.toLowerCase() === 'from_date' ||
+          f.name.toLowerCase() === 'start_date' ||
+          f.name.toLowerCase().includes('date_from') ||
+          f.name.toLowerCase().includes('from_date')
+        )
+      )
+    }
+    
+    const actualFromFieldName = resolvedFromField?.name || startDateFieldId || dateFieldId || null
+    
+    // Resolve date_to field (secondary/range): block config > props > auto-detect
+    const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field
+    let resolvedToField = blockToField
+      ? tableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
+      : null
+    
+    // Auto-detect date_to field if not configured
+    if (!resolvedToField && !endDateFieldId) {
+      resolvedToField = tableFields.find(f => 
+        f.type === 'date' && (
+          f.name.toLowerCase() === 'date_to' || 
+          f.name.toLowerCase() === 'to_date' ||
+          f.name.toLowerCase() === 'end_date' ||
+          f.name.toLowerCase().includes('date_to') ||
+          f.name.toLowerCase().includes('to_date')
+        )
+      )
+    }
+    
+    const actualToFieldName = resolvedToField?.name || endDateFieldId || null
+    
+    return {
+      fromFieldName: actualFromFieldName,
+      toFieldName: actualToFieldName,
+    }
+  }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, tableFields])
+
   // Convert rows to timeline events
   const events = useMemo<TimelineEvent[]>(() => {
     // Ensure filteredRows is an array
     if (!Array.isArray(filteredRows)) return []
     
+    const { fromFieldName, toFieldName } = resolvedDateFields
+    
     return filteredRows
       .filter((row) => {
-        if (startDateFieldId && endDateFieldId) {
-          return row.data[startDateFieldId] || row.data[endDateFieldId]
+        // Check if row has at least one date value (from date_from or date_to)
+        if (fromFieldName && row.data[fromFieldName]) {
+          return true
         }
-        if (dateFieldId) {
-          return row.data[dateFieldId]
+        if (toFieldName && row.data[toFieldName]) {
+          return true
+        }
+        // Fallback to old field names for backward compatibility
+        if (startDateFieldId && row.data[startDateFieldId]) {
+          return true
+        }
+        if (endDateFieldId && row.data[endDateFieldId]) {
+          return true
+        }
+        if (dateFieldId && row.data[dateFieldId]) {
+          return true
         }
         return false
       })
@@ -145,43 +216,80 @@ export default function TimelineView({
         let start: Date
         let end: Date
 
-        if (startDateFieldId && endDateFieldId) {
-          const startDateValue = row.data[startDateFieldId]
-          const endDateValue = row.data[endDateFieldId]
-          const parsedStart = startDateValue ? new Date(startDateValue) : null
-          const parsedEnd = endDateValue ? new Date(endDateValue) : null
-          
-          if (parsedStart && !isNaN(parsedStart.getTime())) {
+        // Apply optimistic updates if available
+        const optimistic = optimisticUpdates[row.id]
+
+        const { fromFieldName, toFieldName } = resolvedDateFields
+        
+        // Get date values - prefer date_from (default), fallback to date_to if only that exists
+        let fromDateValue: any = null
+        let toDateValue: any = null
+        
+        // Try to get date_from value
+        if (fromFieldName) {
+          fromDateValue = optimistic?.start 
+            ? optimistic.start.toISOString()
+            : row.data[fromFieldName]
+        }
+        
+        // Try to get date_to value
+        if (toFieldName) {
+          toDateValue = optimistic?.end
+            ? optimistic.end.toISOString()
+            : row.data[toFieldName]
+        }
+        
+        // Fallback to old field names for backward compatibility
+        if (!fromDateValue && startDateFieldId) {
+          fromDateValue = optimistic?.start 
+            ? optimistic.start.toISOString()
+            : row.data[startDateFieldId]
+        }
+        if (!toDateValue && endDateFieldId) {
+          toDateValue = optimistic?.end
+            ? optimistic.end.toISOString()
+            : row.data[endDateFieldId]
+        }
+        if (!fromDateValue && !toDateValue && dateFieldId) {
+          fromDateValue = optimistic?.start
+            ? optimistic.start.toISOString()
+            : row.data[dateFieldId]
+        }
+        
+        // Parse date values
+        // Start date: prefer date_from, fallback to date_to if date_from is not available
+        const startDateValue = fromDateValue || toDateValue
+        if (startDateValue) {
+          const parsedStart = startDateValue instanceof Date ? startDateValue : new Date(startDateValue)
+          if (!isNaN(parsedStart.getTime())) {
             start = parsedStart
-          } else if (parsedEnd && !isNaN(parsedEnd.getTime())) {
-            start = parsedEnd
           } else {
             start = new Date()
           }
-          
-          if (parsedEnd && !isNaN(parsedEnd.getTime())) {
+        } else {
+          start = new Date()
+        }
+        
+        // End date: use date_to if available (for range), otherwise use start date (single day event)
+        if (toDateValue) {
+          const parsedEnd = toDateValue instanceof Date ? toDateValue : new Date(toDateValue)
+          if (!isNaN(parsedEnd.getTime())) {
             end = parsedEnd
           } else {
             end = start
           }
-        } else if (dateFieldId) {
-          const dateValue = row.data[dateFieldId]
-          const parsedDate = dateValue ? new Date(dateValue) : null
-          if (parsedDate && !isNaN(parsedDate.getTime())) {
-            start = parsedDate
-            end = parsedDate
-          } else {
-            start = new Date()
-            end = new Date()
-          }
+        } else if (fromDateValue && !toDateValue) {
+          // Only date_from available, use it for both start and end (single day event)
+          end = start
         } else {
-          start = new Date()
-          end = new Date()
+          // No end date, use start date for both
+          end = start
         }
 
         // Get title from first non-date field
         const titleField = (Array.isArray(fieldIds) ? fieldIds : []).find(
-          (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId
+          (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId && 
+                   fid !== fromFieldName && fid !== toFieldName
         )
         const title = titleField ? String(row.data[titleField] || "Untitled") : "Untitled"
 
@@ -204,7 +312,7 @@ export default function TimelineView({
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
@@ -294,13 +402,191 @@ export default function TimelineView({
   }, [timelineRange, zoomLevel])
 
   const handleEventClick = useCallback(
-    (event: TimelineEvent) => {
+    (event: TimelineEvent, e: React.MouseEvent) => {
+      // Don't open record if we're resizing
+      if (resizingEvent) {
+        e.stopPropagation()
+        return
+      }
       if (supabaseTableName && tableId) {
         openRecord(tableId, event.rowId, supabaseTableName)
       }
     },
-    [openRecord, supabaseTableName, tableId]
+    [openRecord, supabaseTableName, tableId, resizingEvent]
   )
+
+  // Handle event date updates
+  const handleEventUpdate = useCallback(
+    async (eventId: string, updates: { start?: Date; end?: Date }) => {
+      if (!supabaseTableName) return
+
+      try {
+        const updateData: Record<string, any> = {}
+        
+        if (updates.start !== undefined) {
+          if (startDateFieldId) {
+            updateData[startDateFieldId] = updates.start.toISOString()
+          } else if (dateFieldId) {
+            updateData[dateFieldId] = updates.start.toISOString()
+          }
+        }
+        
+        if (updates.end !== undefined) {
+          if (endDateFieldId) {
+            updateData[endDateFieldId] = updates.end.toISOString()
+          } else if (dateFieldId && !startDateFieldId) {
+            // If only dateFieldId, update it with end date
+            updateData[dateFieldId] = updates.end.toISOString()
+          }
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase
+            .from(supabaseTableName)
+            .update(updateData)
+            .eq('id', eventId)
+
+          if (error) throw error
+
+          // Reload rows to reflect changes
+          await loadRows()
+        }
+      } catch (error) {
+        console.error('Error updating event dates:', error)
+        alert('Failed to update event dates')
+      }
+    },
+    [supabaseTableName, startDateFieldId, endDateFieldId, dateFieldId]
+  )
+
+  // Handle drag start
+  const handleDragStart = useCallback(
+    (event: TimelineEvent, e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setDraggingEvent(event.id)
+      setDragStartPos({
+        x: e.clientX,
+        startDate: new Date(event.start),
+        endDate: new Date(event.end),
+      })
+    },
+    []
+  )
+
+  // Handle resize start
+  const handleResizeStart = useCallback(
+    (event: TimelineEvent, edge: 'start' | 'end', e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setResizingEvent({ id: event.id, edge })
+      // Store original dates for constraint calculations
+      setDragStartPos({
+        x: e.clientX,
+        startDate: new Date(event.start),
+        endDate: new Date(event.end),
+      })
+    },
+    []
+  )
+
+  // Handle mouse move for dragging/resizing
+  useEffect(() => {
+    if (!draggingEvent && !resizingEvent) return
+    if (!dragStartPos) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!timelineRef.current) return
+
+      const timelineRect = timelineRef.current.getBoundingClientRect()
+      const relativeX = e.clientX - timelineRect.left
+      const timelineWidth = timelineRef.current.clientWidth
+      const rangeMs = timelineRange.end.getTime() - timelineRange.start.getTime()
+      
+      if (draggingEvent) {
+        // Calculate the offset from the drag start
+        const dragOffsetX = e.clientX - dragStartPos.x
+        const offsetMs = (dragOffsetX / timelineWidth) * rangeMs
+        const duration = dragStartPos.endDate.getTime() - dragStartPos.startDate.getTime()
+        const newStart = new Date(dragStartPos.startDate.getTime() + offsetMs)
+        const newEnd = new Date(newStart.getTime() + duration)
+        
+        // Don't clamp during dragging - allow moving outside visible range
+
+        // Update optimistic state
+        setOptimisticUpdates((prev) => ({
+          ...prev,
+          [draggingEvent]: { start: newStart, end: newEnd },
+        }))
+      } else if (resizingEvent && dragStartPos) {
+        // Calculate the date at the mouse position for resizing
+        const dateMs = timelineRange.start.getTime() + (relativeX / timelineWidth) * rangeMs
+        const newDate = new Date(dateMs)
+        
+        // Use original dates from dragStartPos for constraints
+        if (resizingEvent.edge === 'start') {
+          // Start can't be after end
+          const newStart = newDate < dragStartPos.endDate ? newDate : new Date(dragStartPos.endDate.getTime() - 1)
+          setOptimisticUpdates((prev) => ({
+            ...prev,
+            [resizingEvent.id]: { ...prev[resizingEvent.id], start: newStart },
+          }))
+        } else {
+          // End can't be before start
+          const newEnd = newDate > dragStartPos.startDate ? newDate : new Date(dragStartPos.startDate.getTime() + 1)
+          setOptimisticUpdates((prev) => ({
+            ...prev,
+            [resizingEvent.id]: { ...prev[resizingEvent.id], end: newEnd },
+          }))
+        }
+      }
+    }
+
+    const handleMouseUp = async () => {
+      if (draggingEvent && dragStartPos) {
+        const event = events.find((e) => e.id === draggingEvent)
+        if (event) {
+          await handleEventUpdate(draggingEvent, {
+            start: event.start,
+            end: event.end,
+          })
+        }
+        // Clear optimistic update after save
+        setOptimisticUpdates((prev) => {
+          const next = { ...prev }
+          delete next[draggingEvent]
+          return next
+        })
+        setDraggingEvent(null)
+        setDragStartPos(null)
+      } else if (resizingEvent && dragStartPos) {
+        const event = events.find((e) => e.id === resizingEvent.id)
+        if (event) {
+          if (resizingEvent.edge === 'start') {
+            await handleEventUpdate(resizingEvent.id, { start: event.start })
+          } else {
+            await handleEventUpdate(resizingEvent.id, { end: event.end })
+          }
+        }
+        // Clear optimistic update after save
+        setOptimisticUpdates((prev) => {
+          const next = { ...prev }
+          delete next[resizingEvent.id]
+          return next
+        })
+        setResizingEvent(null)
+        setDragStartPos(null)
+      }
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingEvent, resizingEvent, dragStartPos, timelineRange, events, handleEventUpdate])
 
   const handlePrevious = () => {
     const newDate = new Date(currentDate)
@@ -436,29 +722,52 @@ export default function TimelineView({
           <div className="relative" style={{ minHeight: "400px" }}>
             {visibleEvents.map((event, index) => {
               const { left, width } = getEventPosition(event)
+              const isDragging = draggingEvent === event.id
+              const isResizing = resizingEvent?.id === event.id
+              
               return (
                 <div
                   key={event.id}
-                  className="absolute cursor-pointer group"
+                  className="absolute group"
                   style={{
                     left: `${left}px`,
                     width: `${width}px`,
                     top: `${index * 50}px`,
                     height: "40px",
                   }}
-                  onClick={() => handleEventClick(event)}
                 >
                   <Card
                     className={`h-full shadow-sm hover:shadow-md transition-shadow ${
                       event.color ? `border-l-4` : ""
+                    } ${isDragging || isResizing ? 'opacity-75' : ''} ${
+                      draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
                     }`}
                     style={{
                       borderLeftColor: event.color,
                       backgroundColor: event.color ? `${event.color}15` : "white",
                     }}
+                    onMouseDown={(e) => handleDragStart(event, e)}
+                    onClick={(e) => handleEventClick(event, e)}
                   >
-                    <CardContent className="p-2 h-full flex items-center">
-                      <div className="truncate text-sm font-medium">{event.title}</div>
+                    <CardContent className="p-2 h-full flex items-center relative">
+                      {/* Resize handle - left */}
+                      <div
+                        className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
+                        onMouseDown={(e) => handleResizeStart(event, 'start', e)}
+                        style={{ marginLeft: '-3px' }}
+                        title="Drag to resize start date"
+                      />
+                      
+                      {/* Event content */}
+                      <div className="truncate text-sm font-medium flex-1 px-1">{event.title}</div>
+                      
+                      {/* Resize handle - right */}
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
+                        onMouseDown={(e) => handleResizeStart(event, 'end', e)}
+                        style={{ marginRight: '-3px' }}
+                        title="Drag to resize end date"
+                      />
                     </CardContent>
                   </Card>
                 </div>

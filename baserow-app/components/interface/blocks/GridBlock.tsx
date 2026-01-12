@@ -389,15 +389,18 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }
       
       case 'timeline': {
-        // Timeline requires a date field
-        const dateFieldFromConfig = config.timeline_date_field || config.start_date_field || config.calendar_date_field
+        // Timeline requires a date field - check for date_from (default) or date_to
+        const dateFromFieldFromConfig = config.date_from || config.from_date_field || config.start_date_field || config.timeline_date_field || config.calendar_date_field
+        const dateToFieldFromConfig = config.date_to || config.to_date_field || config.end_date_field
+        
         const dateFieldFromFields = visibleFields.find(f => {
           const field = safeTableFields.find(tf => tf.name === f.field_name || tf.id === f.field_name)
           return field && field.type === 'date'
         })
-        const dateFieldId = dateFieldFromConfig || dateFieldFromFields?.field_name || ''
+        const dateFieldId = dateFromFieldFromConfig || dateFieldFromFields?.field_name || ''
         
-        if (!dateFieldId) {
+        // Don't require date field if we have date_from or date_to in config, as TimelineView will auto-detect
+        if (!dateFieldId && !dateFromFieldFromConfig && !dateToFieldFromConfig) {
           return (
             <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
               <div className="text-center">
@@ -415,9 +418,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             tableId={tableId!}
             viewId={viewId || ''}
             dateFieldId={dateFieldId}
+            startDateFieldId={dateFromFieldFromConfig}
+            endDateFieldId={dateToFieldFromConfig}
             fieldIds={fieldIds}
             searchQuery=""
             tableFields={tableFields}
+            blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
           />
         )
       }

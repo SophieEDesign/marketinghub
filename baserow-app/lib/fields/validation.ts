@@ -15,6 +15,19 @@ export function sanitizeFieldName(name: string): string {
 }
 
 /**
+ * Format field name for display (converts snake_case to Title Case)
+ * Example: "social_media" -> "Social Media"
+ */
+export function formatFieldNameForDisplay(name: string): string {
+  if (!name) return ''
+  
+  return name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+/**
  * Validate field name
  */
 export function validateFieldName(name: string, existingNames: string[]): { valid: boolean; error?: string } {

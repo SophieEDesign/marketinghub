@@ -9,6 +9,7 @@ import { SidebarModeProvider } from "@/contexts/SidebarModeContext"
 import { EditModeProvider } from "@/contexts/EditModeContext"
 import { getInterfaces, getInterfaceCategories, type Interface, type InterfaceCategory } from "@/lib/interfaces"
 import WorkspaceShell from "./WorkspaceShell"
+import DynamicFavicon from "./DynamicFavicon"
 import type { View } from "@/types/database"
 import type { Automation } from "@/types/database"
 
@@ -254,6 +255,7 @@ export default async function WorkspaceShellWrapper({
 
   return (
     <BrandingProvider settings={brandingSettings}>
+      <DynamicFavicon />
       <EditModeProvider>
         <SidebarModeProvider>
           <div data-page-title={finalTitle}>

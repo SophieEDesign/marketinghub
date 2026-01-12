@@ -937,8 +937,14 @@ export default function InterfaceBuilder({
   const handleSaveSettings = useCallback(
     async (blockId: string, config: Partial<PageBlock["config"]>) => {
       await handleBlockUpdate(blockId, config)
+      // CRITICAL: Ensure edit mode stays active after saving
+      // User may need to edit other blocks, so explicitly keep edit mode active
+      // Only if not in viewer mode
+      if (!isViewer && !isEditing) {
+        enterBlockEdit()
+      }
     },
-    [handleBlockUpdate]
+    [handleBlockUpdate, isViewer, isEditing, enterBlockEdit]
   )
 
   const handlePageUpdate = useCallback(async () => {

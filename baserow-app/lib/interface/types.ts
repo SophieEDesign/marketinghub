@@ -1,5 +1,6 @@
 export type BlockType =
   | 'grid'
+  | 'table'
   | 'form'
   | 'record'
   | 'chart'
@@ -8,7 +9,6 @@ export type BlockType =
   | 'image'
   | 'divider'
   | 'button'
-  | 'tabs'
   | 'action'
   | 'link_preview'
   | 'filter'
@@ -93,13 +93,6 @@ export interface BlockConfig {
   // Chart
   group_by_field?: string
   metric_field?: string
-  // Tabs
-  tabs?: Array<{
-    id: string
-    label: string
-    block_ids: string[]
-  }>
-  default_tab_id?: string
   source_type?: 'table' | 'sql_view'
   source_view?: string
   // Form
@@ -178,6 +171,7 @@ export interface BlockConfig {
     // Text block specific
     text_size?: string
     text_align?: string
+    font_weight?: 'normal' | 'medium' | 'semibold' | 'bold'
     // Link preview specific
     display_mode?: string
     show_provider?: boolean

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from "@/components/ui/use-toast"
 
 // Import block-specific settings components
 import KPIDataSettings from "./settings/KPIDataSettings"
@@ -43,8 +44,6 @@ import {
 import ImageDataSettings from "./settings/ImageDataSettings"
 import ImageAppearanceSettings from "./settings/ImageAppearanceSettings"
 import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
-import TabsDataSettings from "./settings/TabsDataSettings"
-import TabsAppearanceSettings from "./settings/TabsAppearanceSettings"
 import FilterBlockSettings from "./settings/FilterBlockSettings"
 import FieldDataSettings from "./settings/FieldDataSettings"
 import FieldAppearanceSettings from "./settings/FieldAppearanceSettings"
@@ -75,6 +74,7 @@ export default function SettingsPanel({
   onLock,
   pageTableId = null,
 }: SettingsPanelProps) {
+  const { toast } = useToast()
   const [tables, setTables] = useState<Table[]>([])
   const [views, setViews] = useState<View[]>([])
   const [fields, setFields] = useState<TableField[]>([])
@@ -90,13 +90,19 @@ export default function SettingsPanel({
   useEffect(() => {
     if (block && isOpen) {
       const blockConfig = block.config || {}
-      // Ensure calendar/kanban/timeline blocks have the correct view_type
+      // Ensure calendar/kanban/timeline/table blocks have the correct view_type
       if (block.type === 'calendar' && !blockConfig.view_type) {
         blockConfig.view_type = 'calendar'
       } else if (block.type === 'kanban' && !blockConfig.view_type) {
         blockConfig.view_type = 'kanban'
       } else if (block.type === 'timeline' && !blockConfig.view_type) {
         blockConfig.view_type = 'timeline'
+      } else if (block.type === 'table' && !blockConfig.view_type) {
+        blockConfig.view_type = 'grid'
+      }
+      // Ensure chart blocks have a default chart_type if not set
+      if (block.type === 'chart' && !blockConfig.chart_type) {
+        blockConfig.chart_type = 'bar'
       }
       setConfig(blockConfig)
       // Store initial config as JSON for comparison
@@ -183,6 +189,11 @@ export default function SettingsPanel({
     
     if (!validation.valid) {
       setValidationErrors(validation.errors)
+      toast({
+        variant: "destructive",
+        title: "Configuration errors",
+        description: validation.errors.join(". ") || "Please fix the configuration errors before saving.",
+      })
       return // Don't save invalid configs
     }
     
@@ -204,15 +215,21 @@ export default function SettingsPanel({
       // Update previous config ref to prevent re-saving
       previousConfigRef.current = configToSaveJson
       setTimeout(() => setSaved(false), 2000)
-      // Refresh the page after save
-      window.location.reload()
-    } catch (error) {
+      // Don't reload - let the parent component handle updates
+      // This prevents interrupting the save process and losing user context
+    } catch (error: any) {
       console.error("Failed to save block settings:", error)
-      alert("Failed to save settings. Please try again.")
+      const errorMessage = error?.message || error?.toString() || "Failed to save settings. Please try again."
+      setValidationErrors([errorMessage])
+      toast({
+        variant: "destructive",
+        title: "Failed to save settings",
+        description: errorMessage,
+      })
     } finally {
       setSaving(false)
     }
-  }, [block, onSave])
+  }, [block, onSave, toast])
 
   // Validate config on change (for UI feedback)
   useEffect(() => {
@@ -384,6 +401,8 @@ export default function SettingsPanel({
       case "link_preview":
         return <LinkPreviewDataSettings {...commonProps} />
       case "grid":
+      case "table":
+        // Table blocks use the same settings as Grid blocks
         return <GridDataSettings {...commonProps} />
       case "form":
         return <FormDataSettings {...commonProps} />
@@ -391,16 +410,6 @@ export default function SettingsPanel({
         return <RecordDataSettings {...commonProps} />
       case "image":
         return <ImageDataSettings {...commonProps} />
-      case "tabs":
-        // Tabs need access to all blocks for assignment
-        // Note: In a real implementation, pass blocks from parent context
-        return (
-          <TabsDataSettings
-            config={config}
-            allBlocks={[]} // TODO: Pass actual blocks from parent context
-            onUpdate={updateConfig}
-          />
-        )
       case "filter":
         return <FilterBlockSettings {...commonProps} allBlocks={[]} />
       case "field":
@@ -491,14 +500,9 @@ export default function SettingsPanel({
             <CommonAppearanceSettings {...commonProps} />
           </>
         )
-      case "tabs":
-        return (
-          <>
-            <TabsAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
-          </>
-        )
       case "grid":
+      case "table":
+        // Table blocks use the same appearance settings as Grid blocks
         return (
           <>
             <GridAppearanceSettings {...commonProps} />
