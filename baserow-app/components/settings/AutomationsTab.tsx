@@ -24,11 +24,18 @@ export default function SettingsAutomationsTab() {
 
       if (error) {
         console.error('Error loading automations:', error)
+        // If it's a 500 error, it might be a schema issue - set empty array
+        if (error.code === 'PGRST116' || error.message?.includes('500')) {
+          console.warn('Automations table may have schema issues. Please run migration: fix_automations_trigger_fields.sql')
+          setAutomations([])
+        }
       } else {
         setAutomations((data || []) as Automation[])
       }
     } catch (error) {
       console.error('Error loading automations:', error)
+      // Set empty array on any error to prevent UI breakage
+      setAutomations([])
     } finally {
       setLoading(false)
     }
@@ -96,7 +103,7 @@ export default function SettingsAutomationsTab() {
                     <p className="text-sm text-gray-600 mb-2">{automation.description}</p>
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>Trigger: {automation.trigger_type || 'N/A'}</span>
+                    <span>Trigger: {(automation as any).trigger_type || (automation.trigger as any)?.type || 'N/A'}</span>
                     <span>Actions: {(automation.actions || []).length}</span>
                   </div>
                 </div>

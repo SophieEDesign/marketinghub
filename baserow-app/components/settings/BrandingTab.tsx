@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +48,8 @@ export default function SettingsBrandingTab() {
   const [sidebarTextColor, setSidebarTextColor] = useState(settings?.sidebar_text_color || "#4b5563")
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSaveRef = useRef<number>(0)
 
   useEffect(() => {
     if (settings) {
@@ -131,6 +133,23 @@ export default function SettingsBrandingTab() {
   }
 
   async function handleSave() {
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = null
+    }
+
+    // Prevent rapid successive saves (debounce)
+    const now = Date.now()
+    const timeSinceLastSave = now - lastSaveRef.current
+    if (timeSinceLastSave < 1000 && lastSaveRef.current > 0) {
+      // If saved less than 1 second ago, debounce
+      saveTimeoutRef.current = setTimeout(() => {
+        handleSave()
+      }, 1000 - timeSinceLastSave)
+      return
+    }
+
     setIsSaving(true)
     try {
       const payload = {
@@ -159,6 +178,8 @@ export default function SettingsBrandingTab() {
       const result = await response.json()
       console.log('Save successful:', result)
       
+      lastSaveRef.current = Date.now()
+      
       // Refresh to apply changes
       router.refresh()
     } catch (error) {
@@ -168,6 +189,15 @@ export default function SettingsBrandingTab() {
       setIsSaving(false)
     }
   }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <Card>
