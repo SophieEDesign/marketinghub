@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
-import type { ViewFilterGroup, ViewFilter, FilterConditionType } from "@/types/database"
+import type { ViewFilterGroup, ViewFilter, FilterConditionType, FilterType } from "@/types/database"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -32,12 +32,12 @@ interface FilterDialogProps {
   filters: Array<{
     id: string
     field_name: string
-    operator: string
+    operator: FilterType
     value?: string
     filter_group_id?: string | null
     order_index?: number
   }>
-  onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: string; value?: string }>) => void
+  onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: FilterType; value?: string }>) => void
 }
 
 interface LocalFilter extends Omit<ViewFilter, 'id' | 'view_id' | 'created_at'> {
@@ -451,7 +451,7 @@ export default function FilterDialog({
                                 <Select
                                   value={filter.operator}
                                   onValueChange={(value) =>
-                                    updateFilterInGroup(groupIndex, filterIndex, { operator: value })
+                                    updateFilterInGroup(groupIndex, filterIndex, { operator: value as FilterType })
                                   }
                                 >
                                   <SelectTrigger className="h-8 text-sm">
@@ -601,7 +601,7 @@ export default function FilterDialog({
                             <Label className="text-xs text-gray-600">Operator</Label>
                             <Select
                               value={filter.operator}
-                              onValueChange={(value) => updateUngroupedFilter(index, { operator: value })}
+                              onValueChange={(value) => updateUngroupedFilter(index, { operator: value as FilterType })}
                             >
                               <SelectTrigger className="h-8 text-sm">
                                 <SelectValue />

@@ -40,7 +40,7 @@ import GroupDialog from "./GroupDialog"
 import HideFieldsDialog from "./HideFieldsDialog"
 import ViewManagementDialog from "./ViewManagementDialog"
 import type { TableField } from "@/types/fields"
-import type { ViewType } from "@/types/database"
+import type { ViewType, FilterType } from "@/types/database"
 
 interface ViewBuilderToolbarProps {
   viewId: string
@@ -56,7 +56,7 @@ interface ViewBuilderToolbarProps {
   filters: Array<{
     id: string
     field_name: string
-    operator: string
+    operator: FilterType
     value?: string
   }>
   sorts: Array<{
@@ -68,7 +68,7 @@ interface ViewBuilderToolbarProps {
   rowHeight?: "short" | "medium" | "tall"
   hiddenFields?: string[]
   userRole?: "admin" | "editor" | "viewer" | null
-  onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: string; value?: string }>) => void
+  onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: FilterType; value?: string }>) => void
   onSortsChange?: (sorts: Array<{ id?: string; field_name: string; direction: string }>) => void
   onGroupChange?: (fieldName: string | null) => void
   onRowHeightChange?: (height: "short" | "medium" | "tall") => void

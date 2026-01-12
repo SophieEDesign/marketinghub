@@ -9,7 +9,7 @@ import FieldBuilderModal from "./FieldBuilderModal"
 import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
-import type { ViewType } from "@/types/database"
+import type { ViewType, FilterType } from "@/types/database"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -33,7 +33,7 @@ interface AirtableViewPageProps {
   initialViewFilters: Array<{
     id: string
     field_name: string
-    operator: string
+    operator: FilterType
     value?: string
   }>
   initialViewSorts: Array<{
