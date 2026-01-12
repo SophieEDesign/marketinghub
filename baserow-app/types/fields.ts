@@ -34,7 +34,10 @@ export interface TableField {
 export interface FieldOptions {
   // For select fields
   choices?: string[]
-  choiceColors?: Record<string, string> // Map of choice value to hex color
+  choiceColors?: Record<string, string> // Map of choice value to hex color (option-level override)
+  
+  // Field-level color override (applies to entire field when no option-level override exists)
+  fieldColor?: string // Hex color for the field (applies to linked records, lookups, or as fallback for selects)
   
   // For number/currency/percent
   precision?: number

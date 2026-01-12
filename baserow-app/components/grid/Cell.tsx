@@ -2,70 +2,19 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Calculator } from "lucide-react"
-
-// Default color scheme for select options (vibrant, accessible colors)
-const DEFAULT_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6366F1', // Indigo
-  '#14B8A6', // Teal
-  '#A855F7', // Violet
-]
-
-// Helper function to get a consistent color for a choice
-const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
-  if (customColors?.[choice]) {
-    return customColors[choice]
-  }
-  
-  // Try case-insensitive match
-  if (customColors) {
-    const matchingKey = Object.keys(customColors).find(
-      key => key.toLowerCase() === choice.toLowerCase()
-    )
-    if (matchingKey) {
-      return customColors[matchingKey]
-    }
-  }
-  
-  // Generate consistent color from choice name (hash-based)
-  let hash = 0
-  for (let i = 0; i < choice.length; i++) {
-    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
-}
-
-// Calculate text color based on background luminance
-const getTextColor = (hexColor: string): string => {
-  try {
-    const r = parseInt(hexColor.slice(1, 3), 16)
-    const g = parseInt(hexColor.slice(3, 5), 16)
-    const b = parseInt(hexColor.slice(5, 7), 16)
-    
-    if (isNaN(r) || isNaN(g) || isNaN(b)) {
-      return 'text-gray-900'
-    }
-    
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
-  } catch {
-    return 'text-gray-900'
-  }
-}
+import {
+  resolveChoiceColor,
+  resolveFieldColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
+import type { FieldType, FieldOptions } from "@/types/fields"
 
 interface CellProps {
   value: any
   fieldName: string
-  fieldType?: string
-  fieldOptions?: any
+  fieldType?: FieldType | string
+  fieldOptions?: FieldOptions
   isVirtual?: boolean
   editable?: boolean // Whether the cell can be edited
   onSave: (value: any) => Promise<void>
@@ -211,9 +160,14 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       )
     }
     
-    const hexColor = getColorForChoiceName(value as string, fieldOptions.choiceColors)
-    const textColorClass = getTextColor(hexColor)
-    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+    const hexColor = resolveChoiceColor(
+      value as string,
+      'single_select',
+      fieldOptions,
+      true // Use semantic colors for single-select
+    )
+    const textColorClass = getTextColorForBackground(hexColor)
+    const bgColor = normalizeHexColor(hexColor)
     
     return (
       <div
@@ -251,9 +205,14 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
           <span className="text-gray-400 italic text-sm">—</span>
         ) : (
           displayValues.map((val: string) => {
-            const hexColor = getColorForChoiceName(val, fieldOptions.choiceColors)
-            const textColorClass = getTextColor(hexColor)
-            const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+            const hexColor = resolveChoiceColor(
+              val,
+              'multi_select',
+              fieldOptions,
+              false // Use muted colors for multi-select
+            )
+            const textColorClass = getTextColorForBackground(hexColor)
+            const bgColor = normalizeHexColor(hexColor)
             return (
               <span
                 key={val}

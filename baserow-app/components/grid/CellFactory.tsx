@@ -68,6 +68,7 @@ export function CellFactory({
           {...commonProps}
           choices={field.options?.choices || []}
           choiceColors={field.options?.choiceColors}
+          fieldOptions={field.options}
         />
       )
 
@@ -77,6 +78,7 @@ export function CellFactory({
           {...commonProps}
           choices={field.options?.choices || []}
           choiceColors={field.options?.choiceColors}
+          fieldOptions={field.options}
         />
       )
 

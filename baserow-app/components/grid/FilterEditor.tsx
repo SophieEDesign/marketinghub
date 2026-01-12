@@ -10,6 +10,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { TableField } from "@/types/fields"
+import {
+  resolveChoiceColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
 
 interface Filter {
   id?: string
@@ -132,14 +137,51 @@ export default function FilterEditor({
             {isSelectField ? (
               <Select value={value} onValueChange={setValue}>
                 <SelectTrigger className="w-full text-sm">
-                  <SelectValue placeholder="Select value..." />
+                  <SelectValue placeholder="Select value...">
+                    {value && selectedField ? (
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="inline-block w-3 h-3 rounded-full"
+                          style={{
+                            backgroundColor: normalizeHexColor(
+                              resolveChoiceColor(
+                                value,
+                                selectedField.type,
+                                selectedField.options,
+                                selectedField.type === 'single_select'
+                              )
+                            ),
+                          }}
+                        />
+                        {value}
+                      </span>
+                    ) : (
+                      "Select value..."
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedField.options?.choices?.map((choice: string) => (
-                    <SelectItem key={choice} value={choice}>
-                      {choice}
-                    </SelectItem>
-                  ))}
+                  {selectedField.options?.choices?.map((choice: string) => {
+                    const hexColor = resolveChoiceColor(
+                      choice,
+                      selectedField.type,
+                      selectedField.options,
+                      selectedField.type === 'single_select'
+                    )
+                    const bgColor = normalizeHexColor(hexColor)
+                    const textColorClass = getTextColorForBackground(hexColor)
+                    return (
+                      <SelectItem key={choice} value={choice}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: bgColor }}
+                          />
+                          <span>{choice}</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             ) : (

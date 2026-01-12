@@ -1,7 +1,13 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { X, Plus } from 'lucide-react'
+import {
+  resolveChoiceColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
+import type { FieldOptions } from "@/types/fields"
 
 interface MultiSelectCellProps {
   value: string[] | null
@@ -11,83 +17,7 @@ interface MultiSelectCellProps {
   placeholder?: string
   choices?: string[]
   choiceColors?: Record<string, string>
-}
-
-// Muted color palette for multi-select tags (Airtable-style)
-// These are desaturated, calmer colors suitable for tags
-const MUTED_COLORS = [
-  '#94A3B8', // Slate (muted blue-gray)
-  '#86EFAC', // Light green
-  '#FCD34D', // Light amber
-  '#FCA5A5', // Light red
-  '#C4B5FD', // Light purple
-  '#F9A8D4', // Light pink
-  '#67E8F9', // Light cyan
-  '#D9F99D', // Light lime
-  '#FED7AA', // Light orange
-  '#A5B4FC', // Light indigo
-  '#5EEAD4', // Light teal
-  '#C084FC', // Light violet
-]
-
-// Primary color palette for single-select status (more vibrant)
-const PRIMARY_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6366F1', // Indigo
-  '#14B8A6', // Teal
-  '#A855F7', // Violet
-]
-
-// Helper function to get a consistent muted color for multi-select tags
-const getColorForChoiceName = (choice: string, customColors?: Record<string, string>, useMuted = true): string => {
-  if (customColors?.[choice]) {
-    return customColors[choice]
-  }
-  
-  // Try case-insensitive match
-  if (customColors) {
-    const matchingKey = Object.keys(customColors).find(
-      key => key.toLowerCase() === choice.toLowerCase()
-    )
-    if (matchingKey) {
-      return customColors[matchingKey]
-    }
-  }
-  
-  // Generate consistent color from choice name (hash-based)
-  // Use muted palette for tags, primary for status
-  let hash = 0
-  for (let i = 0; i < choice.length; i++) {
-    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const colors = useMuted ? MUTED_COLORS : PRIMARY_COLORS
-  return colors[Math.abs(hash) % colors.length]
-}
-
-// Calculate text color based on background luminance
-const getTextColor = (hexColor: string): string => {
-  try {
-    const r = parseInt(hexColor.slice(1, 3), 16)
-    const g = parseInt(hexColor.slice(3, 5), 16)
-    const b = parseInt(hexColor.slice(5, 7), 16)
-    
-    if (isNaN(r) || isNaN(g) || isNaN(b)) {
-      return 'text-gray-900'
-    }
-    
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
-  } catch {
-    return 'text-gray-900'
-  }
+  fieldOptions?: FieldOptions // Full field options for field-level color override support
 }
 
 export default function MultiSelectCell({
@@ -98,6 +28,7 @@ export default function MultiSelectCell({
   placeholder = '—',
   choices = [],
   choiceColors,
+  fieldOptions,
 }: MultiSelectCellProps) {
   const [editing, setEditing] = useState(false)
   const [selectedValues, setSelectedValues] = useState<string[]>(value || [])
@@ -164,11 +95,24 @@ export default function MultiSelectCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, selectedValues, value])
 
+  // Merge choiceColors into fieldOptions for proper resolution precedence
+  const mergedOptions: FieldOptions = useMemo(() => {
+    return {
+      ...fieldOptions,
+      choiceColors: choiceColors || fieldOptions?.choiceColors,
+    }
+  }, [choiceColors, fieldOptions])
+
   // Helper to get color styling for a choice (using muted palette for tags)
   const getColorForChoice = (choice: string): { backgroundColor: string; textColor: string } => {
-    const hexColor = getColorForChoiceName(choice, choiceColors, true) // true = use muted colors
-    const textColorClass = getTextColor(hexColor)
-    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+    const hexColor = resolveChoiceColor(
+      choice,
+      'multi_select',
+      mergedOptions,
+      false // Use muted colors for multi-select
+    )
+    const textColorClass = getTextColorForBackground(hexColor)
+    const bgColor = normalizeHexColor(hexColor)
     
     return {
       backgroundColor: bgColor,

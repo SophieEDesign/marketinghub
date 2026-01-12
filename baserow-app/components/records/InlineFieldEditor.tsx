@@ -9,63 +9,12 @@ import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 
-// Default color scheme for select options (vibrant, accessible colors)
-const DEFAULT_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6366F1', // Indigo
-  '#14B8A6', // Teal
-  '#A855F7', // Violet
-]
-
-// Helper function to get a consistent color for a choice
-const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
-  if (customColors?.[choice]) {
-    return customColors[choice]
-  }
-  
-  // Try case-insensitive match
-  if (customColors) {
-    const matchingKey = Object.keys(customColors).find(
-      key => key.toLowerCase() === choice.toLowerCase()
-    )
-    if (matchingKey) {
-      return customColors[matchingKey]
-    }
-  }
-  
-  // Generate consistent color from choice name (hash-based)
-  let hash = 0
-  for (let i = 0; i < choice.length; i++) {
-    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return DEFAULT_COLORS[Math.abs(hash) % DEFAULT_COLORS.length]
-}
-
-// Calculate text color based on background luminance
-const getTextColor = (hexColor: string): string => {
-  try {
-    const r = parseInt(hexColor.slice(1, 3), 16)
-    const g = parseInt(hexColor.slice(3, 5), 16)
-    const b = parseInt(hexColor.slice(5, 7), 16)
-    
-    if (isNaN(r) || isNaN(g) || isNaN(b)) {
-      return 'text-gray-900'
-    }
-    
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
-  } catch {
-    return 'text-gray-900'
-  }
-}
+import {
+  resolveChoiceColor,
+  resolveFieldColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
 
 interface InlineFieldEditorProps {
   field: TableField
@@ -363,9 +312,14 @@ export default function InlineFieldEditor({
           <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm min-h-[40px] flex items-center flex-wrap gap-1.5">
             {selectedValues.length > 0 ? (
               selectedValues.map((val: string) => {
-                const hexColor = getColorForChoiceName(val, field.options?.choiceColors)
-                const textColorClass = getTextColor(hexColor)
-                const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+                const hexColor = resolveChoiceColor(
+                  val,
+                  isMulti ? 'multi_select' : 'single_select',
+                  field.options,
+                  !isMulti // Use semantic colors for single-select, muted for multi-select
+                )
+                const textColorClass = getTextColorForBackground(hexColor)
+                const bgColor = normalizeHexColor(hexColor)
                 return (
                   <span
                     key={val}
@@ -387,9 +341,14 @@ export default function InlineFieldEditor({
           >
             {selectedValues.length > 0 ? (
               selectedValues.map((val: string) => {
-                const hexColor = getColorForChoiceName(val, field.options?.choiceColors)
-                const textColorClass = getTextColor(hexColor)
-                const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+                const hexColor = resolveChoiceColor(
+                  val,
+                  isMulti ? 'multi_select' : 'single_select',
+                  field.options,
+                  !isMulti // Use semantic colors for single-select, muted for multi-select
+                )
+                const textColorClass = getTextColorForBackground(hexColor)
+                const bgColor = normalizeHexColor(hexColor)
                 return (
                   <span
                     key={val}

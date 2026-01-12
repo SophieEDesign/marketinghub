@@ -2,6 +2,12 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
+import {
+  resolveChoiceColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
+import type { FieldOptions } from "@/types/fields"
 
 interface SelectCellProps {
   value: string | null
@@ -11,65 +17,7 @@ interface SelectCellProps {
   placeholder?: string
   choices?: string[]
   choiceColors?: Record<string, string>
-}
-
-// Primary color palette for single-select status (more vibrant)
-const PRIMARY_COLORS = [
-  '#3B82F6', // Blue
-  '#10B981', // Green
-  '#F59E0B', // Amber
-  '#EF4444', // Red
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#06B6D4', // Cyan
-  '#84CC16', // Lime
-  '#F97316', // Orange
-  '#6366F1', // Indigo
-  '#14B8A6', // Teal
-  '#A855F7', // Violet
-]
-
-// Helper function to get a consistent primary color for a single-select choice
-const getColorForChoiceName = (choice: string, customColors?: Record<string, string>): string => {
-  if (customColors?.[choice]) {
-    return customColors[choice]
-  }
-  
-  // Try case-insensitive match
-  if (customColors) {
-    const matchingKey = Object.keys(customColors).find(
-      key => key.toLowerCase() === choice.toLowerCase()
-    )
-    if (matchingKey) {
-      return customColors[matchingKey]
-    }
-  }
-  
-  // Generate consistent color from choice name (hash-based)
-  // Use primary colors for single-select status
-  let hash = 0
-  for (let i = 0; i < choice.length; i++) {
-    hash = choice.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return PRIMARY_COLORS[Math.abs(hash) % PRIMARY_COLORS.length]
-}
-
-// Calculate text color based on background luminance
-const getTextColor = (hexColor: string): string => {
-  try {
-    const r = parseInt(hexColor.slice(1, 3), 16)
-    const g = parseInt(hexColor.slice(3, 5), 16)
-    const b = parseInt(hexColor.slice(5, 7), 16)
-    
-    if (isNaN(r) || isNaN(g) || isNaN(b)) {
-      return 'text-gray-900'
-    }
-    
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.5 ? 'text-gray-900' : 'text-white'
-  } catch {
-    return 'text-gray-900'
-  }
+  fieldOptions?: FieldOptions // Full field options for field-level color override support
 }
 
 export default function SelectCell({
@@ -80,6 +28,7 @@ export default function SelectCell({
   placeholder = '—',
   choices = [],
   choiceColors,
+  fieldOptions,
 }: SelectCellProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
@@ -122,21 +71,32 @@ export default function SelectCell({
   }
 
   // Get color styling for the current value (must be before conditional return)
+  // Merge choiceColors into fieldOptions for proper resolution precedence
+  const mergedOptions: FieldOptions = useMemo(() => {
+    return {
+      ...fieldOptions,
+      choiceColors: choiceColors || fieldOptions?.choiceColors,
+    }
+  }, [choiceColors, fieldOptions])
+
   const pillStyle = useMemo(() => {
     if (!value) return null
     
     const normalizedValue = String(value).trim()
-    const hexColor = getColorForChoiceName(normalizedValue, choiceColors)
-    const textColorClass = getTextColor(hexColor)
-    
-    // Ensure hex color has # prefix
-    const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+    const hexColor = resolveChoiceColor(
+      normalizedValue,
+      'single_select',
+      mergedOptions,
+      true // Use semantic colors for single-select
+    )
+    const textColorClass = getTextColorForBackground(hexColor)
+    const bgColor = normalizeHexColor(hexColor)
     
     return {
       backgroundColor: bgColor,
       textColor: textColorClass,
     }
-  }, [value, choiceColors])
+  }, [value, mergedOptions])
 
   if (editing && editable) {
     return (
