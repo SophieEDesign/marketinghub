@@ -7,6 +7,7 @@ import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import RichTextEditor from "@/components/fields/RichTextEditor"
 
 // Default color scheme for select options (vibrant, accessible colors)
 const DEFAULT_COLORS = [
@@ -495,15 +496,13 @@ export default function InlineFieldEditor({
       return (
         <div className="space-y-2.5">
           <label className="block text-sm font-medium text-gray-700">{field.name}</label>
-          <textarea
-            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+          <RichTextEditor
             value={localValue ?? ""}
-            onChange={(e) => handleChange(e.target.value)}
+            onChange={handleChange}
             onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            rows={4}
-            placeholder="Enter text..."
+            editable={true}
+            showToolbar={true}
+            minHeight="150px"
           />
           <div className="flex gap-2">
             <button
@@ -528,15 +527,29 @@ export default function InlineFieldEditor({
           )}
         </label>
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic whitespace-pre-wrap">
-            {value || "—"}
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 min-h-[60px]">
+            {value ? (
+              <div 
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: value }}
+              />
+            ) : (
+              <span className="italic">—</span>
+            )}
           </div>
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[60px] whitespace-pre-wrap"
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[60px]"
           >
-            {value || <span className="text-gray-400">Click to add text...</span>}
+            {value ? (
+              <div 
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: value }}
+              />
+            ) : (
+              <span className="text-gray-400">Click to add text...</span>
+            )}
           </div>
         )}
       </div>

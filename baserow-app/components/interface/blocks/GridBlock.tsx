@@ -337,6 +337,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             filters={allFilters}
             blockConfig={config} // Pass block config so CalendarView can read date_field from page settings
             onRecordClick={onRecordClick} // CRITICAL: Pass onRecordClick for RecordReview integration
+            colorField={appearance.color_field}
+            imageField={appearance.image_field}
+            fitImageSize={appearance.fit_image_size}
           />
         )
       }
@@ -384,6 +387,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             fieldIds={fieldIds}
             searchQuery=""
             tableFields={tableFields}
+            colorField={appearance.color_field}
+            imageField={appearance.image_field}
+            fitImageSize={appearance.fit_image_size}
           />
         )
       }
@@ -425,6 +431,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             tableFields={tableFields}
             filters={allFilters} // Pass merged filters
             blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
+            colorField={appearance.color_field}
+            imageField={appearance.image_field}
+            fitImageSize={appearance.fit_image_size}
           />
         )
       }
@@ -475,7 +484,12 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             initialTableFields={tableFields}
             isEditing={isEditing}
             onRecordClick={handleRecordClick}
-            appearance={appearance}
+            appearance={{
+              ...appearance,
+              color_field: appearance.color_field,
+              image_field: appearance.image_field,
+              fit_image_size: appearance.fit_image_size,
+            }}
             permissions={{
               mode: permissions.mode || 'edit',
               allowInlineCreate: isViewOnly ? false : allowInlineCreate,

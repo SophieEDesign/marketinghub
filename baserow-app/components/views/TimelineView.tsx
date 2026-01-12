@@ -23,6 +23,9 @@ interface TimelineViewProps {
   tableFields?: TableField[]
   filters?: FilterConfig[] // Dynamic filters from config
   blockConfig?: Record<string, any> // Block/page config for reading date_from/date_to from page settings
+  colorField?: string // Field name to use for event colors (single-select field)
+  imageField?: string // Field name to use for event images
+  fitImageSize?: boolean // Whether to fit image to container size
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -35,6 +38,7 @@ interface TimelineEvent {
   end: Date
   rowData: Record<string, any>
   color?: string
+  image?: string
 }
 
 export default function TimelineView({
@@ -48,6 +52,9 @@ export default function TimelineView({
   tableFields = [],
   filters = [],
   blockConfig = {},
+  colorField,
+  imageField,
+  fitImageSize = false,
 }: TimelineViewProps) {
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -176,9 +183,18 @@ export default function TimelineView({
     }
   }
 
-  // Resolve color field from block config, view config, or auto-detect
+  // Resolve color field from props (highest priority), block config, view config, or auto-detect
   const resolvedColorField = useMemo(() => {
-    // 1. Check block/page config first
+    // 1. Props (highest priority - from appearance settings)
+    if (colorField) {
+      const field = tableFields.find(f => 
+        (f.name === colorField || f.id === colorField) && 
+        (f.type === 'single_select' || f.type === 'multi_select')
+      )
+      if (field) return field
+    }
+    
+    // 2. Check block/page config
     const blockColorField = blockConfig?.timeline_color_field || blockConfig?.color_field
     if (blockColorField) {
       const field = tableFields.find(f => 
@@ -188,7 +204,7 @@ export default function TimelineView({
       if (field) return field
     }
     
-    // 2. Check view config
+    // 3. Check view config
     if (viewConfig?.timeline_color_field) {
       const field = tableFields.find(f => 
         (f.name === viewConfig.timeline_color_field || f.id === viewConfig.timeline_color_field) && 
@@ -197,9 +213,9 @@ export default function TimelineView({
       if (field) return field
     }
     
-    // 3. Auto-detect: find first single_select or multi_select field
+    // 4. Auto-detect: find first single_select or multi_select field
     return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
-  }, [blockConfig, viewConfig, tableFields])
+  }, [colorField, blockConfig, viewConfig, tableFields])
 
   // Resolve date_from and date_to fields from block config, props, or auto-detect
   const resolvedDateFields = useMemo(() => {
@@ -378,6 +394,20 @@ export default function TimelineView({
           }
         }
 
+        // Get image from image field
+        let image: string | undefined = undefined
+        if (imageField) {
+          const imageValue = row.data[imageField]
+          if (imageValue) {
+            // Handle attachment field (array of URLs) or URL field (single URL)
+            if (Array.isArray(imageValue) && imageValue.length > 0) {
+              image = imageValue[0]
+            } else if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
+              image = imageValue
+            }
+          }
+        }
+
         return {
           id: row.id,
           rowId: row.id,
@@ -386,10 +416,11 @@ export default function TimelineView({
           end,
           rowData: row.data,
           color,
+          image,
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, imageField])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
@@ -828,7 +859,21 @@ export default function TimelineView({
                     onMouseDown={(e) => handleDragStart(event, e)}
                     onClick={(e) => handleEventClick(event, e)}
                   >
-                    <CardContent className="p-2 h-full flex items-center relative">
+                    <CardContent className="p-2 h-full flex items-center relative gap-2">
+                      {/* Image if configured */}
+                      {event.image && (
+                        <div className={`flex-shrink-0 w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                          <img
+                            src={event.image}
+                            alt=""
+                            className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      
                       {/* Resize handle - left */}
                       <div
                         className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"

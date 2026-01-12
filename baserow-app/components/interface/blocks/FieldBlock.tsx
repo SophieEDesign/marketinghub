@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Save, X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import RichTextEditor from "@/components/fields/RichTextEditor"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -415,7 +416,7 @@ export default function FieldBlock({
         <div 
           className={cn(
             "flex-1 text-sm text-gray-900",
-            field.type === 'long_text' && "whitespace-pre-wrap",
+            field.type === 'long_text' && "prose prose-sm max-w-none",
             field.type === 'checkbox' && "text-lg",
             isEditable && "cursor-pointer hover:bg-gray-50 rounded p-1 -m-1",
             isEditable && !isEditingValue && "transition-colors"
@@ -423,7 +424,11 @@ export default function FieldBlock({
           onClick={isEditable && !isEditingValue ? handleStartEdit : undefined}
           title={isEditable && !isEditingValue ? "Click to edit" : undefined}
         >
-          {displayValue}
+          {field.type === 'long_text' && displayValue ? (
+            <div dangerouslySetInnerHTML={{ __html: String(displayValue) }} />
+          ) : (
+            displayValue
+          )}
         </div>
       )}
     </div>
@@ -452,11 +457,12 @@ export default function FieldBlock({
       
       case 'long_text':
         return (
-          <Textarea
+          <RichTextEditor
             value={editingValue ?? ''}
-            onChange={(e) => setEditingValue(e.target.value)}
-            placeholder={field.required ? "Required" : "Enter text"}
-            className="w-full min-h-[100px]"
+            onChange={(val) => setEditingValue(val)}
+            editable={true}
+            showToolbar={true}
+            minHeight="150px"
           />
         )
       

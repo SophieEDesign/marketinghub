@@ -505,7 +505,7 @@ export default function SettingsPanel({
         // Table blocks use the same appearance settings as Grid blocks
         return (
           <>
-            <GridAppearanceSettings {...commonProps} />
+            <GridAppearanceSettings {...commonProps} fields={fields} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )
@@ -537,7 +537,7 @@ export default function SettingsPanel({
         // List, Calendar, Kanban, and Timeline blocks use the same appearance settings as Grid blocks
         return (
           <>
-            <GridAppearanceSettings {...commonProps} />
+            <GridAppearanceSettings {...commonProps} fields={fields} />
             <CommonAppearanceSettings {...commonProps} />
           </>
         )

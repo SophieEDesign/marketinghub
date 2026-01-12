@@ -33,6 +33,9 @@ interface CalendarViewProps {
   filters?: FilterConfig[] // Dynamic filters from config
   onRecordClick?: (recordId: string) => void // Emit recordId on click
   blockConfig?: Record<string, any> // Block/page config for reading date_field from page settings
+  colorField?: string // Field name to use for event colors (single-select field)
+  imageField?: string // Field name to use for event images
+  fitImageSize?: boolean // Whether to fit image to container size
 }
 
 export default function CalendarView({ 
@@ -44,7 +47,10 @@ export default function CalendarView({
   tableFields = [],
   filters = [],
   onRecordClick,
-  blockConfig = {}
+  blockConfig = {},
+  colorField,
+  imageField,
+  fitImageSize = false,
 }: CalendarViewProps) {
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
@@ -924,33 +930,58 @@ export default function CalendarView({
           }
 
           // Get color from color field if configured
+          // Priority: props colorField > viewConfig calendar_color_field
           let eventColor: string | undefined = undefined
-          if (colorField && viewConfig?.calendar_color_field) {
-            const colorFieldName = colorField.name || viewConfig.calendar_color_field
-            const colorValue = row.data[colorFieldName]
+          const colorFieldToUse = colorField || viewConfig?.calendar_color_field
+          
+          if (colorFieldToUse) {
+            // Find the color field object
+            const colorFieldObj = loadedTableFields.find(f => 
+              (f.name === colorFieldToUse || f.id === colorFieldToUse) && 
+              (f.type === 'single_select' || f.type === 'multi_select')
+            )
             
-            // If color field is a select field, use choiceColors from options
-            if (colorValue && colorField.options?.choiceColors) {
-              // Normalize the value for lookup (trim whitespace, handle case)
-              const normalizedValue = String(colorValue).trim()
-              const choiceColors = colorField.options.choiceColors
+            if (colorFieldObj) {
+              const colorFieldName = colorFieldObj.name
+              const colorValue = row.data[colorFieldName]
               
-              // Try exact match first
-              if (choiceColors[normalizedValue]) {
-                eventColor = choiceColors[normalizedValue]
-              } else {
-                // Try case-insensitive match
-                const matchingKey = Object.keys(choiceColors).find(
-                  key => key.toLowerCase() === normalizedValue.toLowerCase()
-                )
-                if (matchingKey) {
-                  eventColor = choiceColors[matchingKey]
+              // If color field is a select field, use choiceColors from options
+              if (colorValue && colorFieldObj.options?.choiceColors) {
+                // Normalize the value for lookup (trim whitespace, handle case)
+                const normalizedValue = String(colorValue).trim()
+                const choiceColors = colorFieldObj.options.choiceColors
+                
+                // Try exact match first
+                if (choiceColors[normalizedValue]) {
+                  eventColor = choiceColors[normalizedValue]
+                } else {
+                  // Try case-insensitive match
+                  const matchingKey = Object.keys(choiceColors).find(
+                    key => key.toLowerCase() === normalizedValue.toLowerCase()
+                  )
+                  if (matchingKey) {
+                    eventColor = choiceColors[matchingKey]
+                  }
+                }
+                
+                // Ensure hex color format
+                if (eventColor && !eventColor.startsWith('#')) {
+                  eventColor = `#${eventColor}`
                 }
               }
-              
-              // Ensure hex color format
-              if (eventColor && !eventColor.startsWith('#')) {
-                eventColor = `#${eventColor}`
+            }
+          }
+
+          // Get image from image field if configured
+          let eventImage: string | undefined = undefined
+          if (imageField) {
+            const imageValue = row.data[imageField]
+            if (imageValue) {
+              // Handle attachment field (array of URLs) or URL field (single URL)
+              if (Array.isArray(imageValue) && imageValue.length > 0) {
+                eventImage = imageValue[0]
+              } else if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
+                eventImage = imageValue
               }
             }
           }
@@ -974,6 +1005,8 @@ export default function CalendarView({
             extendedProps: {
               rowId: row.id,
               rowData: row.data,
+              image: eventImage,
+              fitImageSize,
             },
           }
         })
@@ -1277,6 +1310,28 @@ export default function CalendarView({
           eventBackgroundColor="#f3f4f6"
           dayHeaderFormat={{ weekday: 'short' }}
           firstDay={1}
+          eventContent={(eventInfo) => {
+            const image = eventInfo.event.extendedProps?.image
+            const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
+            
+            return (
+              <div className="flex items-center gap-1.5 h-full">
+                {image && (
+                  <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                    <img
+                      src={image}
+                      alt=""
+                      className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  </div>
+                )}
+                <span className="truncate text-xs font-medium">{eventInfo.event.title}</span>
+              </div>
+            )
+          }}
           viewDidMount={(view) => {
             // Update view mode when user changes view
             if (view.view.type === 'dayGridMonth') {

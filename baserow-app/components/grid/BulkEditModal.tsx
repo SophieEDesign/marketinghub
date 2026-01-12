@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import RichTextEditor from "@/components/fields/RichTextEditor"
 
 interface BulkEditModalProps {
   isOpen: boolean
@@ -250,10 +251,12 @@ export default function BulkEditModal({
         return (
           <div className="space-y-2">
             <Label>Text</Label>
-            <Textarea
+            <RichTextEditor
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-              rows={4}
+              onChange={setValue}
+              editable={true}
+              showToolbar={true}
+              minHeight="150px"
             />
           </div>
         )

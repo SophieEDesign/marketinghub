@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,6 +16,9 @@ interface KanbanViewProps {
   fieldIds: string[]
   searchQuery?: string
   tableFields?: any[]
+  colorField?: string // Field name to use for card colors (single-select field)
+  imageField?: string // Field name to use for card images
+  fitImageSize?: boolean // Whether to fit image to container size
 }
 
 export default function KanbanView({ 
@@ -24,7 +27,10 @@ export default function KanbanView({
   groupingFieldId, 
   fieldIds,
   searchQuery = "",
-  tableFields = []
+  tableFields = [],
+  colorField,
+  imageField,
+  fitImageSize = false,
 }: KanbanViewProps) {
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -125,6 +131,60 @@ export default function KanbanView({
   const groupedRows = groupRowsByField()
   const groups = Object.keys(groupedRows)
 
+  // Helper to get color from color field
+  const getCardColor = useCallback((row: TableRow): string | null => {
+    if (!colorField) return null
+    
+    const colorFieldObj = tableFields.find(f => f.name === colorField || f.id === colorField)
+    if (!colorFieldObj || (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
+      return null
+    }
+    
+    const colorValue = row.data[colorField]
+    if (!colorValue) return null
+    
+    const choiceColors = colorFieldObj.options?.choiceColors
+    if (!choiceColors) return null
+    
+    // Normalize value for lookup
+    const normalizedValue = String(colorValue).trim()
+    
+    // Try exact match first
+    if (choiceColors[normalizedValue]) {
+      const color = choiceColors[normalizedValue]
+      return color.startsWith('#') ? color : `#${color}`
+    }
+    
+    // Try case-insensitive match
+    const matchingKey = Object.keys(choiceColors).find(
+      key => key.toLowerCase() === normalizedValue.toLowerCase()
+    )
+    if (matchingKey) {
+      const color = choiceColors[matchingKey]
+      return color.startsWith('#') ? color : `#${color}`
+    }
+    
+    return null
+  }, [colorField, tableFields])
+
+  // Helper to get image from image field
+  const getCardImage = useCallback((row: TableRow): string | null => {
+    if (!imageField) return null
+    
+    const imageValue = row.data[imageField]
+    if (!imageValue) return null
+    
+    // Handle attachment field (array of URLs) or URL field (single URL)
+    if (Array.isArray(imageValue) && imageValue.length > 0) {
+      return imageValue[0]
+    }
+    if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
+      return imageValue
+    }
+    
+    return null
+  }, [imageField])
+
   // Empty state for search
   if (searchQuery && filteredRows.length === 0) {
     return (
@@ -155,13 +215,32 @@ export default function KanbanView({
               <p className="text-xs text-gray-500 mt-0.5">{groupedRows[groupName].length} items</p>
             </div>
             <div className="space-y-2">
-              {groupedRows[groupName].map((row) => (
+              {groupedRows[groupName].map((row) => {
+                const cardColor = getCardColor(row)
+                const cardImage = getCardImage(row)
+                const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: '4px' } : {}
+                
+                return (
                 <Card 
                   key={row.id} 
                   className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg"
+                  style={borderColor}
                 >
                   <CardContent className="p-4">
                     <div className="space-y-2">
+                      {/* Image if configured */}
+                      {cardImage && (
+                        <div className={`w-full ${fitImageSize ? 'h-auto' : 'h-32'} rounded overflow-hidden bg-gray-100 mb-2`}>
+                          <img
+                            src={cardImage}
+                            alt=""
+                            className={`w-full ${fitImageSize ? 'h-auto object-contain' : 'h-32 object-cover'}`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
                       {(Array.isArray(fieldIds) ? fieldIds : [])
                         .filter((fid) => fid !== groupingFieldId)
                         .slice(0, 3)
@@ -176,7 +255,8 @@ export default function KanbanView({
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
               <Button
                 variant="ghost"
                 size="sm"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight } from "lucide-react"
@@ -47,6 +47,9 @@ interface GridViewProps {
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   rowHeight?: string // Row height: 'compact', 'medium', 'comfortable'
   permissions?: BlockPermissions // Block-level permissions
+  colorField?: string // Field name to use for row colors (single-select field)
+  imageField?: string // Field name to use for row images
+  fitImageSize?: boolean // Whether to fit image to container size
 }
 
 const ITEMS_PER_PAGE = 100
@@ -68,6 +71,9 @@ export default function GridView({
   onRecordClick,
   rowHeight = 'medium',
   permissions,
+  colorField,
+  imageField,
+  fitImageSize = false,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<Record<string, any>[]>([])
@@ -75,6 +81,60 @@ export default function GridView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
   const [initializingFields, setInitializingFields] = useState(false)
+
+  // Helper to get color from color field
+  const getRowColor = useCallback((row: Record<string, any>): string | null => {
+    if (!colorField) return null
+    
+    const colorFieldObj = safeTableFields.find(f => f.name === colorField || f.id === colorField)
+    if (!colorFieldObj || (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
+      return null
+    }
+    
+    const colorValue = row[colorField]
+    if (!colorValue) return null
+    
+    const choiceColors = colorFieldObj.options?.choiceColors
+    if (!choiceColors) return null
+    
+    // Normalize value for lookup
+    const normalizedValue = String(colorValue).trim()
+    
+    // Try exact match first
+    if (choiceColors[normalizedValue]) {
+      const color = choiceColors[normalizedValue]
+      return color.startsWith('#') ? color : `#${color}`
+    }
+    
+    // Try case-insensitive match
+    const matchingKey = Object.keys(choiceColors).find(
+      key => key.toLowerCase() === normalizedValue.toLowerCase()
+    )
+    if (matchingKey) {
+      const color = choiceColors[matchingKey]
+      return color.startsWith('#') ? color : `#${color}`
+    }
+    
+    return null
+  }, [colorField, safeTableFields])
+
+  // Helper to get image from image field
+  const getRowImage = useCallback((row: Record<string, any>): string | null => {
+    if (!imageField) return null
+    
+    const imageValue = row[imageField]
+    if (!imageValue) return null
+    
+    // Handle attachment field (array of URLs) or URL field (single URL)
+    if (Array.isArray(imageValue) && imageValue.length > 0) {
+      return imageValue[0]
+    }
+    if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
+      return imageValue
+    }
+    
+    return null
+  }, [imageField])
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -598,6 +658,10 @@ export default function GridView({
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                {/* Image column header if image field is configured */}
+                {imageField && (
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 sticky top-0 bg-gray-50 z-10"></th>
+                )}
                 {visibleFields.map((field) => {
                   const tableField = safeTableFields.find(f => f.name === field.field_name)
                   const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
@@ -674,12 +738,35 @@ export default function GridView({
                       {!isCollapsed &&
                         groupRows.map((row) => {
                           const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
+                          const rowColor = getRowColor ? getRowColor(row) : null
+                          const rowImage = getRowImage ? getRowImage(row) : null
+                          const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+                          
                           return (
                           <tr
                             key={row.id}
                             className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
+                            style={borderColor}
                             onClick={() => handleRowClick(row.id)}
                           >
+                            {/* Image cell if image field is configured */}
+                            {rowImage && (
+                              <td
+                                className="px-2 py-1 w-12"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                                  <img
+                                    src={rowImage}
+                                    alt=""
+                                    className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none'
+                                    }}
+                                  />
+                                </div>
+                              </td>
+                            )}
                             {visibleFields.map((field) => (
                               <td
                                 key={field.field_name}
@@ -707,12 +794,35 @@ export default function GridView({
                 // CRITICAL: filteredRows is already normalized, but guard for safety
                 filteredRows.map((row) => {
                   const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
+                  const rowColor = getRowColor ? getRowColor(row) : null
+                  const rowImage = getRowImage ? getRowImage(row) : null
+                  const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+                  
                   return (
                   <tr
                     key={row.id}
                     className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
+                    style={borderColor}
                     onClick={() => handleRowClick(row.id)}
                   >
+                    {/* Image cell if image field is configured */}
+                    {rowImage && (
+                      <td
+                        className="px-2 py-1 w-12"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                          <img
+                            src={rowImage}
+                            alt=""
+                            className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      </td>
+                    )}
                     {visibleFields.map((field) => {
                       const tableField = safeTableFields.find(f => f.name === field.field_name)
                       const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'

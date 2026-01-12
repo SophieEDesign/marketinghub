@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client"
 
 import type { TableField } from "@/types/fields"
 import { Calculator } from "lucide-react"
+import RichTextEditor from "@/components/fields/RichTextEditor"
 
 interface RecordDrawerProps {
   isOpen: boolean
@@ -276,12 +277,12 @@ export default function RecordDrawer({
                           />
                         </div>
                       ) : isLongText ? (
-                        <textarea
+                        <RichTextEditor
                           value={value ?? ""}
-                          onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                          rows={4}
-                          placeholder="Enter text..."
+                          onChange={(val) => handleFieldChange(fieldName, val)}
+                          editable={true}
+                          showToolbar={true}
+                          minHeight="150px"
                         />
                       ) : (
                         <input

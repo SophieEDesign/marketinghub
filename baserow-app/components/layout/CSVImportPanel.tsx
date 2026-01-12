@@ -325,7 +325,7 @@ export default function CSVImportPanel({
     if (sampleValues.length === 0) return 'text'
     
     const threshold = Math.max(1, Math.floor(sampleValues.length * 0.6)) // 60% threshold (lowered from 70%)
-    const nonEmptyValues = sampleValues.filter(v => v && v.trim())
+    const nonEmptyValues = sampleValues.filter(v => v != null && v.trim() !== '')
 
     if (nonEmptyValues.length === 0) return 'text'
 
@@ -477,6 +477,7 @@ export default function CSVImportPanel({
     // Default to text
     return 'text'
   }
+
 
   function handleMappingChange(csvHeader: string, fieldName: string) {
     setFieldMappings((prev) => ({

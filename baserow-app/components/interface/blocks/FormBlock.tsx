@@ -7,6 +7,7 @@ import type { TableField as FieldType } from "@/types/database"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import { useToast } from "@/components/ui/use-toast"
 import { canCreateRecords, canEditBlock } from "@/lib/interface/block-permissions"
+import RichTextEditor from "@/components/fields/RichTextEditor"
 
 interface FormBlockProps {
   block: PageBlock
@@ -188,12 +189,12 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
               {isRequired && <span className="text-red-500 ml-1">*</span>}
             </label>
             {field.type === "long_text" ? (
-              <textarea
+              <RichTextEditor
                 value={value}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                rows={4}
-                disabled={isEditing || isViewOnly}
+                onChange={(val) => setFormData({ ...formData, [field.name]: val })}
+                editable={!isEditing && !isViewOnly}
+                showToolbar={!isEditing && !isViewOnly}
+                minHeight="150px"
               />
             ) : (
               <input

@@ -168,6 +168,10 @@ export interface BlockConfig {
     show_search?: boolean
     show_filter?: boolean
     show_sort?: boolean
+    // Color and image fields for table/kanban/timeline/calendar blocks
+    color_field?: string // Field name/ID to use for row/card colors (single-select field)
+    image_field?: string // Field name/ID to use for row/card images
+    fit_image_size?: boolean // Whether to fit image to container size
     // Text block specific
     text_size?: string
     text_align?: string

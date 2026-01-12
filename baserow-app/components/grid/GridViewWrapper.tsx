@@ -62,6 +62,9 @@ interface GridViewWrapperProps {
     show_filter?: boolean
     show_sort?: boolean
     row_height?: string
+    color_field?: string
+    image_field?: string
+    fit_image_size?: boolean
   }
   permissions?: BlockPermissions // Block-level permissions
 }
@@ -566,6 +569,9 @@ export default function GridViewWrapper({
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}
           permissions={permissions}
+          colorField={appearance.color_field}
+          imageField={appearance.image_field}
+          fitImageSize={appearance.fit_image_size}
         />
       </div>
       <FieldBuilderDrawer
