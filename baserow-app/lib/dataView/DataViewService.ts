@@ -93,6 +93,7 @@ export class DataViewService {
     const { rows, fields } = this.context
     const { maxRows = 10000, maxCols = 1000 } = options
     const grid = parseClipboardText(clipboardText)
+    const warnings: string[] = []
 
     if (grid.length === 0) {
       return null
@@ -103,13 +104,17 @@ export class DataViewService {
     const colCount = Math.max(...grid.map(row => row.length), 0)
     
     if (rowCount > maxRows) {
-      console.warn(`[DataViewService] Paste size exceeds max rows: ${rowCount} > ${maxRows}. Truncating.`)
+      const warning = `[DataViewService] Paste size exceeds max rows: ${rowCount} > ${maxRows}. Truncating.`
+      console.warn(warning)
+      warnings.push(warning)
       // Truncate to max rows
       grid.splice(maxRows)
     }
     
     if (colCount > maxCols) {
-      console.warn(`[DataViewService] Paste size exceeds max columns: ${colCount} > ${maxCols}. Truncating.`)
+      const warning = `[DataViewService] Paste size exceeds max columns: ${colCount} > ${maxCols}. Truncating.`
+      console.warn(warning)
+      warnings.push(warning)
       // Truncate each row to max columns
       grid.forEach(row => {
         if (row.length > maxCols) {
@@ -120,7 +125,9 @@ export class DataViewService {
 
     // Soft warning for large pastes
     if (rowCount * colCount > 1000) {
-      console.warn(`[DataViewService] Large paste detected: ${rowCount} rows × ${colCount} columns = ${rowCount * colCount} cells`)
+      const warning = `[DataViewService] Large paste detected: ${rowCount} rows × ${colCount} columns = ${rowCount * colCount} cells`
+      console.warn(warning)
+      warnings.push(warning)
     }
 
     // Get visible fields in order

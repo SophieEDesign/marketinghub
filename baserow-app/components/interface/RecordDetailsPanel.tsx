@@ -43,7 +43,7 @@ interface RecordDetailsPanelProps {
   onRecordDelete?: (recordId: string) => void
   onRecordDuplicate?: (recordId: string) => void
   loading?: boolean
-  // Blocks to render below fields
+  // Blocks to render (all fields are blocks now - field blocks + other blocks)
   blocks?: any[] // PageBlock[]
   page?: any // InterfacePage
   pageTableId?: string | null
@@ -459,43 +459,7 @@ export default function RecordDetailsPanel({
           </div>
         ) : (
           <>
-            {/* Record Fields Section */}
-            {visibleFields.length > 0 && (
-              <div className="p-4 border-b">
-                {/* Helper text if page is view-only but some fields are editable */}
-                {!pageEditable && editableFieldNames.length > 0 && (
-                  <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-xs text-yellow-800">
-                      Some fields are configured as editable, but the page is view-only. All fields are displayed as view-only.
-                    </p>
-                  </div>
-                )}
-
-                {/* Helper text about field permissions */}
-                {pageEditable && editableFieldNames.length > 0 && editableFieldNames.length < visibleFields.length && (
-                  <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <p className="text-xs text-blue-800">
-                      Some fields are view-only because their permissions have been independently updated.
-                    </p>
-                  </div>
-                )}
-
-                <RecordFields
-                  fields={visibleFields}
-                  formData={formData}
-                  onFieldChange={pageEditable ? onFieldChange : () => {}}
-                  fieldGroups={fieldGroups}
-                  tableId={tableId}
-                  recordId={recordId || ""}
-                  isFieldEditable={(fieldName: string) => {
-                    if (!pageEditable) return false
-                    return editableFieldNames.includes(fieldName)
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Blocks Section */}
+            {/* Blocks Section - All fields are blocks (field blocks + other blocks) */}
             {page && (
               <div className="flex-1">
                 {blocksLoading ? (
@@ -509,7 +473,7 @@ export default function RecordDetailsPanel({
                   <div className="flex items-center justify-center py-8 text-gray-400 text-sm p-4">
                     <div className="text-center">
                       <p className="text-xs mb-1 font-medium">No blocks configured</p>
-                      <p className="text-xs text-gray-400">Add blocks to customize this view.</p>
+                      <p className="text-xs text-gray-400">Add field blocks or other blocks to customize this view.</p>
                     </div>
                   </div>
                 ) : (
@@ -521,6 +485,8 @@ export default function RecordDetailsPanel({
                     pageTableId={pageTableId || undefined}
                     recordId={recordId || undefined}
                     onRecordClick={onRecordClick}
+                    pageEditable={pageEditable}
+                    editableFieldNames={editableFieldNames}
                   />
                 )}
               </div>

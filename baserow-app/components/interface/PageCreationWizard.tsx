@@ -471,19 +471,19 @@ export default function PageCreationWizard({
         }
       }
       
-      // For record_view pages, seed two-column layout blocks
+      // For record_view pages, create blocks (left panel grid + field blocks for selected fields)
       // Note: record_view pages use saved_view_id as their anchor, not dashboard_layout_id
       // Blocks are stored via page_id in view_blocks table, so dashboard_layout_id is not needed
       if (pageType === 'record_view' && page) {
-        // Seed two-column layout blocks for record_view pages
         if (tableId && tableId.trim()) {
           try {
+            // Create left panel grid block (record list)
             const layoutBlocks = createRecordReviewTwoColumnLayout({
               primaryTableId: tableId.trim(),
               mode: 'review',
             })
 
-            // Create default layout blocks sequentially via API
+            // Create default layout blocks sequentially via API (left panel grid)
             for (const blockDef of layoutBlocks) {
               try {
                 const blockResponse = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -501,19 +501,20 @@ export default function PageCreationWizard({
 
                 if (!blockResponse.ok) {
                   console.error(`Error creating block ${blockDef.type}:`, await blockResponse.text())
-                  // Continue with next block
                 }
               } catch (blockError) {
                 console.error(`Error creating block ${blockDef.type}:`, blockError)
-                // Continue with next block
               }
             }
 
-            // Create field blocks from fieldsAsBlocks (selected fields to add as blocks)
+            // Create field blocks for ALL selected fields (not just fieldsAsBlocks)
             // These are placed in the right column (x=4)
-            if (fieldsAsBlocks.length > 0) {
-              let yOffset = 0 // Start at top of right column (no default blocks anymore)
-              for (const fieldName of fieldsAsBlocks) {
+            // Priority: selectedFields (from field picker) > fieldsAsBlocks (if no selectedFields)
+            const fieldsToCreateAsBlocks = selectedFields.length > 0 ? selectedFields : fieldsAsBlocks
+            
+            if (fieldsToCreateAsBlocks.length > 0) {
+              let yOffset = 0 // Start at top of right column
+              for (const fieldName of fieldsToCreateAsBlocks) {
                 const field = tableFields.find(f => f.name === fieldName)
                 if (field) {
                   try {
@@ -531,6 +532,9 @@ export default function PageCreationWizard({
                           table_id: tableId.trim(),
                           field_id: field.id,
                           field_name: field.name,
+                          // Enable inline editing if page is editable
+                          allow_inline_edit: true,
+                          inline_edit_permission: 'both', // Can be configured per field later
                         },
                       }),
                     })
@@ -547,7 +551,7 @@ export default function PageCreationWizard({
               }
             }
           } catch (layoutError) {
-            console.error('Error seeding two-column layout blocks:', layoutError)
+            console.error('Error seeding blocks:', layoutError)
             // Continue anyway - blocks can be added manually
           }
         }

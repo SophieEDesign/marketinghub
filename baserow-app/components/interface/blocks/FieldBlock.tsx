@@ -58,18 +58,34 @@ export default function FieldBlock({
   }, [fieldId])
 
   // Determine if user can edit inline
+  // Priority: allowInlineEdit from config (which includes page-level editability) > role-based permissions
   useEffect(() => {
-    if (!allowInlineEdit || !userRole || !fieldId) {
+    // If allowInlineEdit is explicitly false, disable editing
+    if (allowInlineEdit === false) {
       setCanEditInline(false)
       return
     }
-
-    const canEdit = 
-      editPermission === 'both' ||
-      (editPermission === 'admin' && userRole === 'admin') ||
-      (editPermission === 'member' && userRole === 'member')
     
-    setCanEditInline(canEdit)
+    // If allowInlineEdit is true, check role-based permissions (if configured)
+    if (allowInlineEdit === true) {
+      // If no user role loaded yet, wait (will be set to member by default)
+      if (!userRole) {
+        return
+      }
+      
+      // If editPermission is 'both', allow editing for all roles
+      // Otherwise, check role match
+      const canEdit = 
+        editPermission === 'both' ||
+        (editPermission === 'admin' && userRole === 'admin') ||
+        (editPermission === 'member' && userRole === 'member')
+      
+      setCanEditInline(canEdit)
+      return
+    }
+    
+    // Default: if allowInlineEdit is not explicitly set, disable editing
+    setCanEditInline(false)
   }, [allowInlineEdit, editPermission, userRole, fieldId])
 
   async function loadUserRole() {

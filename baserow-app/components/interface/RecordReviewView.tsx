@@ -923,7 +923,11 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           onRecordDelete={handleRecordDelete}
           onRecordDuplicate={handleRecordDuplicate}
           loading={!selectedRecord && selectedRecordId !== null}
-          blocks={loadedBlocks}
+          blocks={loadedBlocks.filter(block => {
+            // Only show blocks in the right column (x >= 4) or all blocks if no position constraint
+            // Field blocks and other blocks (text, related lists, etc.) should all be shown
+            return block.x >= 4 || block.x === undefined || block.x === null
+          })}
           page={recordReviewPage}
           pageTableId={pageTableId}
           isEditing={isEditing}
@@ -935,6 +939,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
             setSelectedRecordId(recordId)
           }}
           blocksLoading={blocksLoading}
+          pageEditable={pageEditable}
+          editableFieldNames={editableFieldNames}
         />
       )}
     </div>

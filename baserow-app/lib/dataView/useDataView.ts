@@ -111,7 +111,7 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
             type: 'dataView.paste',
             mode: pasteMode,
             selectionType: selection.type,
-            clipboardSize: `${clipboardGrid.length}×${Math.max(...clipboardGrid.map(r => r.length), 0)}`,
+            clipboardSize: `${clipboardGrid.length}×${Math.max(...clipboardGrid.map((r: string[]) => r.length), 0)}`,
             timestamp: Date.now(),
           })
         }

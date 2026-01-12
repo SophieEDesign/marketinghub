@@ -40,6 +40,8 @@ interface BlockRendererProps {
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
+  pageEditable?: boolean // Page-level editability (for field blocks)
+  editableFieldNames?: string[] // Field-level editable list (for field blocks)
 }
 
 export default function BlockRenderer({
@@ -195,7 +197,21 @@ export default function BlockRenderer({
 
       case "field":
         // Field block displays field label + value from recordId context
-        return <FieldBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
+        // Respect page-level editability: if page is editable and field is in editable list (or list is empty), allow editing
+        const fieldName = safeConfig?.field_name || ''
+        const isFieldEditable = pageEditable !== false && (
+          editableFieldNames.length === 0 || editableFieldNames.includes(fieldName)
+        )
+        // Merge page-level editability into block config
+        const fieldBlockConfig = {
+          ...safeConfig,
+          allow_inline_edit: isFieldEditable && (safeConfig?.allow_inline_edit !== false),
+        }
+        const fieldBlockWithConfig = {
+          ...safeBlock,
+          config: fieldBlockConfig,
+        }
+        return <FieldBlock block={fieldBlockWithConfig} isEditing={canEdit} pageTableId={pageTableId} recordId={recordId} />
 
       case "text":
         // Lazy-load TextBlock to improve initial page load performance

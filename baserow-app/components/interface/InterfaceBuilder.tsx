@@ -34,6 +34,8 @@ interface InterfaceBuilderProps {
   recordId?: string | null // Record ID for record review pages
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  pageEditable?: boolean // Page-level editability (for field blocks)
+  editableFieldNames?: string[] // Field-level editable list (for field blocks)
 }
 
 export default function InterfaceBuilder({
@@ -47,6 +49,8 @@ export default function InterfaceBuilder({
   recordId = null,
   mode = 'view', // Default to view mode
   onRecordClick,
+  pageEditable,
+  editableFieldNames = [],
 }: InterfaceBuilderProps) {
   const { primaryColor } = useBranding()
   const { toast } = useToast()
@@ -1145,6 +1149,8 @@ export default function InterfaceBuilder({
               recordId={recordId}
               mode={mode}
               onRecordClick={onRecordClick}
+              pageEditable={pageEditable}
+              editableFieldNames={editableFieldNames}
             />
             )}
           </FilterStateProvider>
