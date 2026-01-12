@@ -460,7 +460,7 @@ export default function RecordDetailsPanel({
         ) : (
           <>
             {/* Blocks Section - All fields are blocks (field blocks + other blocks) */}
-            {page && (
+            {page ? (
               <div className="flex-1">
                 {blocksLoading ? (
                   <div className="flex items-center justify-center py-8 text-gray-400 text-sm p-4">
@@ -473,7 +473,7 @@ export default function RecordDetailsPanel({
                   <div className="flex items-center justify-center py-8 text-gray-400 text-sm p-4">
                     <div className="text-center">
                       <p className="text-xs mb-1 font-medium">No blocks configured</p>
-                      <p className="text-xs text-gray-400">Add field blocks or other blocks to customize this view.</p>
+                      <p className="text-xs text-gray-400">Select fields in page settings to automatically create field blocks.</p>
                     </div>
                   </div>
                 ) : (
@@ -489,6 +489,13 @@ export default function RecordDetailsPanel({
                     editableFieldNames={editableFieldNames}
                   />
                 )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8 text-gray-400 text-sm p-4">
+                <div className="text-center">
+                  <p className="text-xs mb-1 font-medium">No blocks configured</p>
+                  <p className="text-xs text-gray-400">Select fields in page settings to automatically create field blocks.</p>
+                </div>
               </div>
             )}
           </>

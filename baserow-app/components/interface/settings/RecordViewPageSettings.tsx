@@ -299,6 +299,85 @@ export default function RecordViewPageSettings({
     saveFieldConfigs(updated)
   }
 
+  // Create field blocks from field names
+  const createFieldBlocksFromNames = async (fieldNames: string[]) => {
+    if (!selectedTableId || !pageId || fieldNames.length === 0) return
+    
+    try {
+      // Get field IDs from field names
+      const fieldIds = fields
+        .filter(f => fieldNames.includes(f.name))
+        .map(f => f.id)
+      
+      if (fieldIds.length === 0) return
+      
+      // Get existing blocks to determine starting position and avoid duplicates
+      const blocksResponse = await fetch(`/api/pages/${pageId}/blocks`)
+      const blocksData = blocksResponse.ok ? await blocksResponse.json() : { blocks: [] }
+      const existingBlocks = blocksData.blocks || []
+      
+      // Get existing field block field IDs to avoid duplicates
+      const existingFieldIds = existingBlocks
+        .filter((b: any) => b.type === 'field' && b.config?.field_id)
+        .map((b: any) => b.config.field_id)
+      
+      // Filter out fields that already have blocks
+      const fieldsToCreate = fieldIds.filter(id => !existingFieldIds.includes(id))
+      
+      if (fieldsToCreate.length === 0) {
+        return // All fields already have blocks
+      }
+      
+      // Calculate grid layout: 2 columns, 6 wide each (half of 12-column grid)
+      const colsPerRow = 2
+      const blockWidth = 6 // 6 columns each (half of 12-column grid)
+      const blockHeight = 3 // Default height
+      const marginY = 1 // Vertical spacing
+      
+      // Find the maximum Y position to start below existing blocks
+      const maxY = existingBlocks.length > 0
+        ? Math.max(...existingBlocks.map((b: any) => (b.y || 0) + (b.h || 4)))
+        : 0
+      
+      let startY = maxY + marginY
+      
+      // Create blocks in grid layout via API, maintaining field order
+      for (let i = 0; i < fieldsToCreate.length; i++) {
+        const fieldId = fieldsToCreate[i]
+        const row = Math.floor(i / colsPerRow)
+        const col = i % colsPerRow
+        
+        const x = col * blockWidth
+        const y = startY + (row * (blockHeight + marginY))
+        
+        const response = await fetch(`/api/pages/${pageId}/blocks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'field',
+            x,
+            y,
+            w: blockWidth,
+            h: blockHeight,
+            config: {
+              field_id: fieldId,
+              table_id: selectedTableId,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('Failed to create field block:', error)
+          // Continue creating other blocks even if one fails
+        }
+      }
+    } catch (error) {
+      console.error('Error creating field blocks:', error)
+      // Don't throw - allow page save to complete even if block creation fails
+    }
+  }
+
   const saveFieldConfigs = async (configs: FieldConfig[]) => {
     const visibleFields = configs
       .filter((f) => f.visible)
@@ -314,6 +393,9 @@ export default function RecordViewPageSettings({
       editable_fields: editableFields,
       detail_fields: visibleFields, // Keep for backward compatibility
     })
+    
+    // Auto-create field blocks for visible fields
+    await createFieldBlocksFromNames(visibleFields)
   }
 
   const visibleFieldConfigs = fieldConfigList.filter((f) => f.visible)

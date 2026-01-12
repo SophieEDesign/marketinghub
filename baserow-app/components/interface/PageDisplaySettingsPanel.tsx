@@ -78,6 +78,7 @@ export default function PageDisplaySettingsPanel({
   const [startDateField, setStartDateField] = useState<string>("")
   const [endDateField, setEndDateField] = useState<string>("")
   const [calendarDisplayFields, setCalendarDisplayFields] = useState<string[]>([])
+  const [timelineColorField, setTimelineColorField] = useState<string>("") // Color field for timeline view
   const [previewFields, setPreviewFields] = useState<string[]>([])
   const [detailFields, setDetailFields] = useState<string[]>([])
   const [selectedFieldsForBlocks, setSelectedFieldsForBlocks] = useState<string[]>([]) // Fields selected for blocks
@@ -121,6 +122,7 @@ export default function PageDisplaySettingsPanel({
       setStartDateField("")
       setEndDateField("")
       setCalendarDisplayFields([])
+      setTimelineColorField("")
       setPreviewFields([])
       setDetailFields([])
       setIsInitialLoad(true)
@@ -332,6 +334,8 @@ export default function PageDisplaySettingsPanel({
         ...(supportsGrouping && groupBy ? { group_by: groupBy, group_by_field: groupBy } : {}),
         // Store group_by_field for record review pages
         ...(currentPage.page_type === 'record_review' ? { group_by_field: recordReviewGroupBy || undefined } : {}),
+        // Store timeline color field
+        ...(timelineColorField ? { timeline_color_field: timelineColorField } : {}),
         // UNIFIED: Blocks handle their own view type and configuration
         // Page config only stores basic metadata
       }
@@ -362,6 +366,7 @@ export default function PageDisplaySettingsPanel({
               filters: blockFilters,
               sorts: blockSorts,
               ...(supportsGrouping && groupBy ? { group_by_field: groupBy } : {}),
+              ...(timelineColorField ? { timeline_color_field: timelineColorField } : {}),
               // UNIFIED: Blocks handle their own configuration
             }
           })
@@ -383,6 +388,7 @@ export default function PageDisplaySettingsPanel({
               filters: blockFilters,
               sorts: blockSorts,
               ...(supportsGrouping && groupBy ? { group_by_field: groupBy } : {}),
+              ...(timelineColorField ? { timeline_color_field: timelineColorField } : {}),
               // UNIFIED: Blocks handle their own configuration
             },
             order_index: 0,
@@ -396,7 +402,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, recordReviewGroupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, previewFields, detailFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, recordReviewGroupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, timelineColorField, previewFields, detailFields, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -682,6 +688,35 @@ export default function PageDisplaySettingsPanel({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Timeline Color Field */}
+              <div className="space-y-2">
+                <Label>Timeline Color Field (Optional)</Label>
+                <Select
+                  value={timelineColorField || "__none__"}
+                  onValueChange={(value) =>
+                    setTimelineColorField(value === "__none__" ? "" : value)
+                  }
+                  disabled={!selectedTableId || tableFields.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select color field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {tableFields
+                      .filter((f) => f.type === "single_select" || f.type === "multi_select")
+                      .map((field) => (
+                        <SelectItem key={field.id} value={field.name}>
+                          {field.name} ({field.type})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Use a single-select or multi-select field to color-code timeline records. For multi-select fields, the first value is used.
+                </p>
               </div>
 
               {/* Sorting */}

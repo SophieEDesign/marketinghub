@@ -423,6 +423,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             fieldIds={fieldIds}
             searchQuery=""
             tableFields={tableFields}
+            filters={allFilters} // Pass merged filters
             blockConfig={config} // Pass block config so TimelineView can read date_from/date_to from page settings
           />
         )

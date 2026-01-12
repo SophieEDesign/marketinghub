@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -20,6 +21,7 @@ interface TimelineViewProps {
   fieldIds: string[]
   searchQuery?: string
   tableFields?: TableField[]
+  filters?: FilterConfig[] // Dynamic filters from config
   blockConfig?: Record<string, any> // Block/page config for reading date_from/date_to from page settings
 }
 
@@ -44,6 +46,7 @@ export default function TimelineView({
   fieldIds: fieldIdsProp,
   searchQuery = "",
   tableFields = [],
+  filters = [],
   blockConfig = {},
 }: TimelineViewProps) {
   // Ensure fieldIds is always an array
@@ -75,7 +78,7 @@ export default function TimelineView({
       loadRows()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId])
+  }, [supabaseTableName, tableId, filters])
 
   async function loadTableInfo() {
     const { data } = await supabase
@@ -93,10 +96,19 @@ export default function TimelineView({
     
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      // Build query with filters
+      let query = supabase
         .from(supabaseTableName)
         .select("*")
-        .order("created_at", { ascending: false })
+
+      // Apply filters using shared filter system
+      const normalizedFields = tableFields.map(f => ({ name: f.name || f.id, type: f.type }))
+      query = applyFiltersToQuery(query, filters, normalizedFields)
+
+      // Apply ordering
+      query = query.order("created_at", { ascending: false })
+
+      const { data, error } = await query
 
       if (error) {
         console.error("Error loading rows:", error)
@@ -133,6 +145,61 @@ export default function TimelineView({
 
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
+
+  // Load view config for timeline settings (color field, etc.)
+  const [viewConfig, setViewConfig] = useState<{
+    timeline_color_field?: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    if (viewId) {
+      loadViewConfig()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewId])
+
+  async function loadViewConfig() {
+    if (!viewId) return
+    
+    try {
+      const { data: view } = await supabase
+        .from('views')
+        .select('config')
+        .eq('id', viewId)
+        .single()
+
+      if (view?.config) {
+        setViewConfig(view.config as any)
+      }
+    } catch (error) {
+      console.error('Timeline: Error loading view config:', error)
+    }
+  }
+
+  // Resolve color field from block config, view config, or auto-detect
+  const resolvedColorField = useMemo(() => {
+    // 1. Check block/page config first
+    const blockColorField = blockConfig?.timeline_color_field || blockConfig?.color_field
+    if (blockColorField) {
+      const field = tableFields.find(f => 
+        (f.name === blockColorField || f.id === blockColorField) && 
+        (f.type === 'single_select' || f.type === 'multi_select')
+      )
+      if (field) return field
+    }
+    
+    // 2. Check view config
+    if (viewConfig?.timeline_color_field) {
+      const field = tableFields.find(f => 
+        (f.name === viewConfig.timeline_color_field || f.id === viewConfig.timeline_color_field) && 
+        (f.type === 'single_select' || f.type === 'multi_select')
+      )
+      if (field) return field
+    }
+    
+    // 3. Auto-detect: find first single_select or multi_select field
+    return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
+  }, [blockConfig, viewConfig, tableFields])
 
   // Resolve date_from and date_to fields from block config, props, or auto-detect
   const resolvedDateFields = useMemo(() => {
@@ -293,13 +360,23 @@ export default function TimelineView({
         )
         const title = titleField ? String(row.data[titleField] || "Untitled") : "Untitled"
 
-        // Get color from select field if available
-        const colorField = tableFields.find(
-          (f) => f.type === "single_select" && Array.isArray(fieldIds) && fieldIds.includes(f.id || f.name)
-        )
-        const color = colorField
-          ? getColorForValue(row.data[colorField.id || colorField.name])
-          : undefined
+        // Get color from resolved color field (single_select or multi_select)
+        let color: string | undefined = undefined
+        if (resolvedColorField) {
+          const fieldName = resolvedColorField.name
+          const fieldValue = row.data[fieldName]
+          
+          if (fieldValue) {
+            // For multi_select, use the first value; for single_select, use the value directly
+            const valueToColor = resolvedColorField.type === 'multi_select' && Array.isArray(fieldValue)
+              ? fieldValue[0]
+              : fieldValue
+            
+            if (valueToColor) {
+              color = getColorForValue(String(valueToColor))
+            }
+          }
+        }
 
         return {
           id: row.id,
@@ -312,7 +389,7 @@ export default function TimelineView({
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
