@@ -1,6 +1,6 @@
 "use client"
 
-import type { PageBlock } from "@/lib/interface/types"
+import type { PageBlock, BlockType } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
 import GridBlock from "./blocks/GridBlock"
@@ -87,6 +87,9 @@ export default function BlockRenderer({
   const renderBlock = () => {
     const canEdit = isEditing && !isLocked
     
+    // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
+    const normalizedBlockType = (block.type === 'table' ? 'grid' : block.type) as BlockType
+    
     // Pre-deployment guard: Validate block config before rendering
     // Check for all possible date field config properties
     const hasDateField = !!(
@@ -96,14 +99,14 @@ export default function BlockRenderer({
       safeConfig.calendar_date_field ||
       safeConfig.calendar_start_field
     )
-    const blockValidity = assertBlockConfig(block.type, safeConfig, {
+    const blockValidity = assertBlockConfig(normalizedBlockType, safeConfig, {
       pageTableId,
       pageRecordId: recordId,
       hasDateField,
     })
     
     // Show setup UI if block config is invalid
-    if (shouldShowBlockSetupUI(block.type, safeConfig, {
+    if (shouldShowBlockSetupUI(normalizedBlockType, safeConfig, {
       pageTableId,
       pageRecordId: recordId,
       hasDateField,
@@ -111,27 +114,25 @@ export default function BlockRenderer({
       // Return setup UI component (blocks handle this internally)
       // But log for diagnostics
       if (!warnedBlocks.has(block.id)) {
-        console.warn(`[BlockGuard] Block ${block.id} (${block.type}) showing setup UI: ${blockValidity.reason}`)
+        console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) showing setup UI: ${blockValidity.reason}`)
         warnedBlocks.add(block.id)
       }
     }
     
     // Check if config is complete enough to render
-    const isComplete = isBlockConfigComplete(block.type, safeConfig)
+    const isComplete = isBlockConfigComplete(normalizedBlockType, safeConfig)
     
     // Deployment safety: Warn (don't crash) if required config is missing
     // Only warn once per block to avoid console spam
     // Image blocks are always valid (can be empty), so skip warning for them
-    if (!isComplete && !isEditing && block.type !== 'image' && !warnedBlocks.has(block.id)) {
+    if (!isComplete && !isEditing && normalizedBlockType !== 'image' && !warnedBlocks.has(block.id)) {
       // In view mode, log warning but still attempt to render
-      console.warn(`[BlockGuard] Block ${block.id} (${block.type}) has incomplete config:`, safeConfig)
+      console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) has incomplete config:`, safeConfig)
       warnedBlocks.add(block.id)
     }
     
-    switch (block.type) {
+    switch (normalizedBlockType) {
       case "grid":
-      case "table": // Backward compatibility: table blocks are deprecated, use grid instead
-        // Table blocks use the same rendering as Grid blocks
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null
         // pageTableId must flow to blocks for base_table fallback

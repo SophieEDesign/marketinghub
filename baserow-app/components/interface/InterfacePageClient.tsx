@@ -864,15 +864,15 @@ function InterfacePageClientInternal({
           body: JSON.stringify({ name: newTitle.trim() }),
         })
 
+        const data = await res.json()
+        
         if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}))
-          throw new Error(errorData.error || 'Failed to save page title')
+          throw new Error(data.error || 'Failed to save page title')
         }
 
         // Update local state
-        const updatedPage = await res.json()
         // API returns page directly (not wrapped in { page: ... })
-        setPage(updatedPage)
+        setPage(data)
         lastSavedTitleRef.current = newTitle.trim()
         setTitleValue(newTitle.trim())
         setTitleError(false)

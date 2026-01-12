@@ -22,6 +22,7 @@ import { useBranding } from "@/contexts/BrandingContext"
 import { useSidebarMode } from "@/contexts/SidebarModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import { cn } from "@/lib/utils"
+import { useIsMobileOrTablet } from "@/hooks/useResponsive"
 import type { Automation, Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -46,6 +47,8 @@ interface AirtableSidebarProps {
   tables?: Table[]
   views?: Record<string, View[]>
   userRole?: 'admin' | 'member' | null
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 export default function AirtableSidebar({ 
@@ -53,11 +56,15 @@ export default function AirtableSidebar({
   interfaceGroups = [],
   tables = [],
   views = {},
-  userRole = null
+  userRole = null,
+  isOpen: isOpenProp,
+  onClose
 }: AirtableSidebarProps) {
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
+  const isMobileOrTablet = useIsMobileOrTablet()
+  
   // Load initial state from localStorage or default to interfaces expanded
   const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
@@ -72,8 +79,15 @@ export default function AirtableSidebar({
     }
     return new Set(["interfaces"])
   })
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  
+  // For mobile/tablet: use controlled state from parent, default to closed
+  // For desktop: use internal collapsed state
+  const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
+  
+  // Determine if sidebar should be visible
+  const isOpen = isOpenProp !== undefined ? isOpenProp : !internalCollapsed
+  const isCollapsed = isMobileOrTablet ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
   const isEditMode = mode === "edit"
@@ -81,6 +95,22 @@ export default function AirtableSidebar({
   const isInterfacePage = pathname.includes("/pages/")
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
+  
+  // Close sidebar on mobile/tablet when navigating
+  useEffect(() => {
+    if (isMobileOrTablet && isOpen && onClose) {
+      // Close on navigation
+      const handleRouteChange = () => {
+        onClose()
+      }
+      
+      window.addEventListener('popstate', handleRouteChange)
+      
+      return () => {
+        window.removeEventListener('popstate', handleRouteChange)
+      }
+    }
+  }, [isMobileOrTablet, isOpen, onClose])
 
   // Load persisted expand/collapse state from localStorage on mount
   useEffect(() => {
@@ -115,14 +145,20 @@ export default function AirtableSidebar({
   }
 
 
-  if (isCollapsed) {
+  // On mobile/tablet: if closed, don't render (toggle button is in Topbar)
+  if (isMobileOrTablet && !isOpen) {
+    return null
+  }
+
+  // On desktop: show collapsed state
+  if (!isMobileOrTablet && isCollapsed) {
     return (
       <div 
         className="w-12 border-r border-gray-200 flex flex-col items-center py-2"
         style={{ backgroundColor: sidebarColor }}
       >
         <button
-          onClick={() => setIsCollapsed(false)}
+          onClick={() => setInternalCollapsed(false)}
           className="p-2 hover:bg-gray-100 rounded transition-colors"
           style={{ color: sidebarTextColor }}
           title="Expand sidebar"
@@ -134,10 +170,27 @@ export default function AirtableSidebar({
   }
 
   return (
-    <div 
-      className="w-64 border-r border-gray-200 flex flex-col h-screen shadow-sm"
-      style={{ backgroundColor: sidebarColor }}
-    >
+    <>
+      {/* Overlay for mobile/tablet */}
+      {isMobileOrTablet && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 desktop:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+      
+      <div 
+        data-sidebar
+        className={cn(
+          "flex flex-col h-screen shadow-sm transition-transform duration-300",
+          isMobileOrTablet 
+            ? "fixed left-0 top-0 z-50 w-64" 
+            : "relative w-64",
+          isMobileOrTablet && !isOpen && "-translate-x-full"
+        )}
+        style={{ backgroundColor: sidebarColor }}
+      >
       {/* Header with Branding */}
       <div className="p-3 border-b border-gray-200 flex items-center justify-between" style={{ borderBottomColor: primaryColor + '20' }}>
         <Link href="/" className="flex items-center gap-2">
@@ -159,10 +212,16 @@ export default function AirtableSidebar({
           </span>
         </Link>
         <button
-          onClick={() => setIsCollapsed(true)}
+          onClick={() => {
+            if (isMobileOrTablet && onClose) {
+              onClose()
+            } else {
+              setInternalCollapsed(true)
+            }
+          }}
           className="p-1 hover:bg-gray-100 rounded transition-colors"
           style={{ color: sidebarTextColor }}
-          title="Collapse sidebar"
+          title={isMobileOrTablet ? "Close sidebar" : "Collapse sidebar"}
         >
           <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
         </button>
@@ -288,6 +347,7 @@ export default function AirtableSidebar({
 
       {/* New Page Modal */}
       <PageCreationWizard open={newPageModalOpen} onOpenChange={setNewPageModalOpen} defaultGroupId={null} />
-    </div>
+      </div>
+    </>
   )
 }

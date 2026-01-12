@@ -86,6 +86,8 @@ export default function PageDisplaySettingsPanel({
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [addingFields, setAddingFields] = useState(false)
+  const [contentPageName, setContentPageName] = useState(page?.name || "")
+  const [savingContentPageName, setSavingContentPageName] = useState(false)
 
   // Load initial data
   useEffect(() => {
@@ -396,8 +398,8 @@ export default function PageDisplaySettingsPanel({
       }
 
       onUpdate()
-      // Refresh the page after save
-      window.location.reload()
+      // Refresh data without full page reload
+      // The onUpdate callback will trigger a data refresh in the parent component
     } catch (error: any) {
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
@@ -463,8 +465,45 @@ export default function PageDisplaySettingsPanel({
   const pageDefinition = getPageTypeDefinition(currentPage.page_type)
   const isDataBacked = pageDefinition.requiresSourceView || pageDefinition.requiresBaseTable
   
+  // Update content page name when page changes
+  useEffect(() => {
+    if (page) {
+      setContentPageName(page.name)
+    }
+  }, [page?.name, page])
+
   // Content pages don't show data settings - they're block-based only
   if (currentPage.page_type === 'content') {
+    const handleSaveContentPageName = async () => {
+      if (!page || contentPageName.trim() === page.name) return
+      
+      setSavingContentPageName(true)
+      try {
+        const res = await fetch(`/api/interface-pages/${page.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: contentPageName.trim() }),
+        })
+
+        const data = await res.json()
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to save page name')
+        }
+
+        onUpdate()
+        // Trigger sidebar refresh
+        window.dispatchEvent(new CustomEvent('pages-updated'))
+      } catch (error: any) {
+        console.error('Error saving page name:', error)
+        alert(error.message || 'Failed to save page name. Please try again.')
+        // Revert to original name
+        setContentPageName(page.name)
+      } finally {
+        setSavingContentPageName(false)
+      }
+    }
+
     return (
       <Sheet open={isOpen} onOpenChange={onClose}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
@@ -477,7 +516,26 @@ export default function PageDisplaySettingsPanel({
           <div className="mt-6 space-y-6">
             <div className="space-y-2">
               <Label>Page Name</Label>
-              <Input value={page.name} disabled className="bg-gray-50" />
+              <div className="flex gap-2">
+                <Input 
+                  value={contentPageName} 
+                  onChange={(e) => setContentPageName(e.target.value)}
+                  onBlur={handleSaveContentPageName}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur()
+                    } else if (e.key === 'Escape') {
+                      setContentPageName(page.name)
+                      e.currentTarget.blur()
+                    }
+                  }}
+                  disabled={savingContentPageName}
+                  className="flex-1"
+                />
+                {savingContentPageName && (
+                  <span className="text-xs text-gray-400 self-center">Saving...</span>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Page Type</Label>

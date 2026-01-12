@@ -29,6 +29,8 @@ import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
 import { useDataView } from '@/lib/dataView/useDataView'
 import type { Selection } from '@/lib/dataView/types'
+import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
+import { cn } from '@/lib/utils'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -36,6 +38,7 @@ interface AirtableGridViewProps {
   tableName: string
   tableId?: string // Table ID for opening records
   viewName?: string
+  viewId?: string // View ID for saving/loading grid view settings
   rowHeight?: 'short' | 'medium' | 'tall'
   editable?: boolean
   fields?: TableField[]
@@ -65,6 +68,7 @@ export default function AirtableGridView({
   tableName,
   tableId,
   viewName = 'default',
+  viewId,
   rowHeight = 'medium',
   editable = true,
   fields = [],
@@ -75,6 +79,8 @@ export default function AirtableGridView({
   disableRecordPanel = false,
 }: AirtableGridViewProps) {
   const { openRecord } = useRecordPanel()
+  const isMobile = useIsMobile()
+  const isTablet = useIsTablet()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
 
   // Load tableId from tableName if not provided
@@ -106,9 +112,11 @@ export default function AirtableGridView({
   }, [tableIdState, tableName, openRecord, disableRecordPanel])
   
   // Map row height from props to internal format
+  // On mobile, cap row height to medium for better usability
   const mappedRowHeight = mapRowHeightToAirtable(rowHeight)
-  const ROW_HEIGHT =
-    mappedRowHeight === 'short' ? ROW_HEIGHT_SHORT : mappedRowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
+  const ROW_HEIGHT = isMobile
+    ? ROW_HEIGHT_MEDIUM // Cap at medium on mobile
+    : mappedRowHeight === 'short' ? ROW_HEIGHT_SHORT : mappedRowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
 
   // State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
@@ -573,23 +581,27 @@ export default function AirtableGridView({
   }, [])
 
   // Handle column resize
+  // Disable resize on mobile (can enable long-press later if needed)
   const handleResizeStart = useCallback((fieldName: string) => {
+    if (isMobile) return // Disable resize on mobile
     setResizingColumn(fieldName)
-  }, [])
+  }, [isMobile])
 
   const handleResize = useCallback(
     (fieldName: string, width: number) => {
+      if (isMobile) return // Disable resize on mobile
       setColumnWidths((prev) => ({
         ...prev,
         [fieldName]: Math.max(COLUMN_MIN_WIDTH, Math.min(width, 1000)), // Max width 1000px
       }))
     },
-    []
+    [isMobile]
   )
 
   const handleResizeEnd = useCallback(() => {
+    if (isMobile) return // Disable resize on mobile
     setResizingColumn(null)
-  }, [])
+  }, [isMobile])
 
   // Handle column reorder
   const handleDragEnd = (event: DragEndEvent) => {
@@ -797,7 +809,7 @@ export default function AirtableGridView({
         }}
       >
         <div className="flex" style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content' }}>
-          {/* Checkbox column */}
+          {/* Checkbox column - sticky on all screen sizes */}
           <div
             className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky left-0 z-20"
             style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
@@ -819,9 +831,12 @@ export default function AirtableGridView({
             </div>
           </div>
 
-          {/* Frozen row number column */}
+          {/* Frozen row number column - sticky on mobile/tablet for better navigation */}
           <div
-            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center text-xs font-medium text-gray-500 sticky left-[50px] z-20"
+            className={cn(
+              "flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center text-xs font-medium text-gray-500 z-20",
+              (isMobile || isTablet) && "sticky left-[50px]"
+            )}
             style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
           >
             #
@@ -948,7 +963,7 @@ export default function AirtableGridView({
                     }
                   }}
                 >
-                  {/* Checkbox */}
+                  {/* Checkbox - sticky on all screen sizes */}
                   <div
                     className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky left-0 z-10"
                     style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}

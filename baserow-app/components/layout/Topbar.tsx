@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Search, User } from "lucide-react"
+import { Search, User, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -9,9 +9,10 @@ import { createClient } from "@/lib/supabase/client"
 
 interface TopbarProps {
   title?: string
+  onSidebarToggle?: () => void
 }
 
-export default function Topbar({ title }: TopbarProps) {
+export default function Topbar({ title, onSidebarToggle }: TopbarProps) {
   const { primaryColor } = useBranding()
   const [workspaceName, setWorkspaceName] = useState<string>("Marketing Hub")
   const [workspaceIcon, setWorkspaceIcon] = useState<string | null>(null)
@@ -53,6 +54,18 @@ export default function Topbar({ title }: TopbarProps) {
   return (
     <div className="h-14 border-b bg-white flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1">
+        {/* Sidebar toggle button - only visible on mobile/tablet */}
+        {onSidebarToggle && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 w-9 p-0 desktop:hidden"
+            onClick={onSidebarToggle}
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" style={{ color: primaryColor }} />
+          </Button>
+        )}
         {workspaceIcon && (
           <span className="text-xl" role="img" aria-label="Workspace icon">
             {workspaceIcon}

@@ -9,9 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { Save, X } from "lucide-react"
+import { Save, X, Paperclip } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import RichTextEditor from "@/components/fields/RichTextEditor"
+import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -308,6 +309,11 @@ export default function FieldBlock({
           return `${value.length} linked record${value.length !== 1 ? 's' : ''}`
         }
         return value ? 'Linked' : '—'
+      case 'attachment':
+        // Attachments are handled separately in render
+        return Array.isArray(value) && value.length > 0 
+          ? `${value.length} attachment${value.length !== 1 ? 's' : ''}`
+          : '—'
       default:
         return String(value)
     }
@@ -365,16 +371,39 @@ export default function FieldBlock({
 
   const displayValue = field ? formatValue(fieldValue, field.type, field.options) : "—"
   const isEditable = canEditInline && !isEditing && field // Can't edit when in block edit mode or if field not loaded
+  const showLabel = config?.appearance?.showTitle !== false // Default to true if not set
+
+  // Handle attachment fields specially
+  const isAttachmentField = field?.type === 'attachment'
+  const attachments: Attachment[] = isAttachmentField && fieldValue 
+    ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
+    : []
 
   return (
     <div className="h-full flex flex-col p-4">
-      {/* Field Label */}
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium text-gray-700">
-          {field.name}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
-        </label>
-        {isEditable && !isEditingValue && !hideEditButton && (
+      {/* Field Label - Only show if showTitle is not false */}
+      {showLabel && (
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700">
+            {field.name}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          {isEditable && !isEditingValue && !hideEditButton && !isAttachmentField && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartEdit}
+              className="h-6 px-2 text-xs"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+      )}
+      
+      {/* Edit button when label is hidden */}
+      {!showLabel && isEditable && !isEditingValue && !hideEditButton && !isAttachmentField && (
+        <div className="flex justify-end mb-2">
           <Button
             variant="ghost"
             size="sm"
@@ -383,11 +412,11 @@ export default function FieldBlock({
           >
             Edit
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       
       {/* Field Value - Editable or Display */}
-      {isEditable && isEditingValue ? (
+      {isEditable && isEditingValue && !isAttachmentField ? (
         <div className="flex-1 space-y-2">
           {renderEditableField()}
           <div className="flex items-center gap-2">
@@ -411,6 +440,22 @@ export default function FieldBlock({
               Cancel
             </Button>
           </div>
+        </div>
+      ) : isAttachmentField ? (
+        <div className="flex-1">
+          {attachments.length > 0 ? (
+            <AttachmentPreview
+              attachments={attachments}
+              maxVisible={10}
+              size={config?.appearance?.attachment_size || 'medium'}
+              displayStyle={field.options?.attachment_display_style || config?.appearance?.attachment_display_style || 'thumbnails'}
+            />
+          ) : (
+            <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+              <Paperclip className="h-4 w-4" />
+              No attachments
+            </div>
+          )}
         </div>
       ) : (
         <div 

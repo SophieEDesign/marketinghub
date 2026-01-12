@@ -387,7 +387,10 @@ export default function SettingsPanel({
       },
     }
 
-    switch (block?.type) {
+    // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
+    const normalizedBlockType = block?.type === 'table' ? 'grid' : block?.type
+
+    switch (normalizedBlockType) {
       case "kpi":
         return <KPIDataSettings {...commonProps} />
       case "chart":
@@ -399,8 +402,6 @@ export default function SettingsPanel({
       case "link_preview":
         return <LinkPreviewDataSettings {...commonProps} />
       case "grid":
-      case "table":
-        // Table blocks use the same settings as Grid blocks
         return <GridDataSettings {...commonProps} />
       case "form":
         return <FormDataSettings {...commonProps} />
@@ -438,7 +439,10 @@ export default function SettingsPanel({
       onUpdate: updateAppearance,
     }
 
-    switch (block?.type) {
+    // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
+    const normalizedBlockType = block?.type === 'table' ? 'grid' : block?.type
+
+    switch (normalizedBlockType) {
       case "kpi":
         return (
           <>
@@ -499,8 +503,6 @@ export default function SettingsPanel({
           </>
         )
       case "grid":
-      case "table":
-        // Table blocks use the same appearance settings as Grid blocks
         return (
           <>
             <GridAppearanceSettings {...commonProps} fields={fields} />

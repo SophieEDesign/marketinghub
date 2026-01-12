@@ -74,7 +74,6 @@ export function normalizeBlockConfig(
 function getDefaultConfigForType(blockType: BlockType): BlockConfig {
   const defaults: Record<BlockType, BlockConfig> = {
     grid: { table_id: '' },
-    table: { table_id: '', view_type: 'grid' },
     form: { table_id: '' },
     record: { table_id: '', record_id: '' },
     chart: { table_id: '', chart_type: 'bar' },

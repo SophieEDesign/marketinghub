@@ -1,13 +1,15 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Link2, Plus, X, Calculator, Link as LinkIcon } from "lucide-react"
+import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
+import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
+import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
 
 import {
   resolveChoiceColor,
@@ -26,6 +28,9 @@ interface InlineFieldEditorProps {
   onLinkedRecordClick: (tableId: string, recordId: string) => void
   onAddLinkedRecord: (field: TableField) => void
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
+  tableId?: string // For attachment uploads
+  recordId?: string // For attachment uploads
+  tableName?: string // For attachment uploads (supabase table name)
 }
 
 export default function InlineFieldEditor({
@@ -38,6 +43,9 @@ export default function InlineFieldEditor({
   onLinkedRecordClick,
   onAddLinkedRecord,
   isReadOnly: propIsReadOnly,
+  tableId,
+  recordId,
+  tableName,
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
@@ -248,55 +256,6 @@ export default function InlineFieldEditor({
   if (field.type === "single_select" || field.type === "multi_select") {
     const choices = field.options?.choices || []
     const isMulti = field.type === "multi_select"
-    const selectedValues = isMulti
-      ? (Array.isArray(value) ? value : value ? [value] : [])
-      : value
-        ? [value]
-        : []
-
-    if (isEditing && !isReadOnly) {
-      return (
-        <div className="space-y-2.5">
-          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
-          <div className="space-y-2">
-            {choices.map((choice: string) => {
-              const isSelected = selectedValues.includes(choice)
-              return (
-                <label
-                  key={choice}
-                  className="flex items-center gap-2.5 px-3.5 py-2.5 border border-gray-200 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <input
-                    type={isMulti ? "checkbox" : "radio"}
-                    checked={isSelected}
-                    onChange={(e) => {
-                      if (isMulti) {
-                        const newValues = e.target.checked
-                          ? [...selectedValues, choice]
-                          : selectedValues.filter((v) => v !== choice)
-                        handleChange(newValues)
-                      } else {
-                        handleChange(e.target.checked ? choice : null)
-                      }
-                    }}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-900">{choice}</span>
-                </label>
-              )
-            })}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleBlur}
-              className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )
-    }
 
     return (
       <div className="space-y-2.5">
@@ -308,62 +267,21 @@ export default function InlineFieldEditor({
             </span>
           )}
         </label>
-        {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm min-h-[40px] flex items-center flex-wrap gap-1.5">
-            {selectedValues.length > 0 ? (
-              selectedValues.map((val: string) => {
-                const hexColor = resolveChoiceColor(
-                  val,
-                  isMulti ? 'multi_select' : 'single_select',
-                  field.options,
-                  !isMulti // Use semantic colors for single-select, muted for multi-select
-                )
-                const textColorClass = getTextColorForBackground(hexColor)
-                const bgColor = normalizeHexColor(hexColor)
-                return (
-                  <span
-                    key={val}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {val}
-                  </span>
-                )
-              })
-            ) : (
-              <span className="text-gray-400 italic">—</span>
-            )}
-          </div>
-        ) : (
-          <div
-            onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer min-h-[40px] flex items-center flex-wrap gap-2"
-          >
-            {selectedValues.length > 0 ? (
-              selectedValues.map((val: string) => {
-                const hexColor = resolveChoiceColor(
-                  val,
-                  isMulti ? 'multi_select' : 'single_select',
-                  field.options,
-                  !isMulti // Use semantic colors for single-select, muted for multi-select
-                )
-                const textColorClass = getTextColorForBackground(hexColor)
-                const bgColor = normalizeHexColor(hexColor)
-                return (
-                  <span
-                    key={val}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
-                    style={{ backgroundColor: bgColor }}
-                  >
-                    {val}
-                  </span>
-                )
-              })
-            ) : (
-              <span className="text-sm text-gray-400 italic">Click to select...</span>
-            )}
-          </div>
-        )}
+        <InlineSelectDropdown
+          value={isMulti ? (Array.isArray(value) ? value : value ? [value] : []) : value}
+          choices={choices}
+          choiceColors={field.options?.choiceColors}
+          fieldOptions={field.options}
+          fieldType={field.type}
+          fieldId={field.id}
+          tableId={field.table_id}
+          editable={!isReadOnly}
+          canEditOptions={!isReadOnly} // If they can edit the field, they can edit options
+          onValueChange={async (newValue) => {
+            onChange(newValue)
+          }}
+          placeholder="Click to select..."
+        />
       </div>
     )
   }
@@ -515,6 +433,53 @@ export default function InlineFieldEditor({
     )
   }
 
+  // Attachment fields
+  if (field.type === "attachment") {
+    const attachments: Attachment[] = Array.isArray(value) ? value : value ? [value] : []
+    
+    if (isEditing && !isReadOnly && tableId && recordId && tableName) {
+      // Show attachment editor with upload capability
+      return (
+        <AttachmentFieldEditor
+          field={field}
+          attachments={attachments}
+          onChange={onChange}
+          onEditEnd={onEditEnd}
+          tableId={tableId}
+          recordId={recordId}
+          tableName={tableName}
+        />
+      )
+    }
+    
+    // Display mode - show previews
+    return (
+      <div className="space-y-2.5">
+        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+          {field.name}
+          {isVirtual && (
+            <span title="Formula or lookup field">
+              <Calculator className="h-3 w-3 text-gray-400" />
+            </span>
+          )}
+        </label>
+        {attachments.length > 0 ? (
+          <AttachmentPreview
+            attachments={attachments}
+            maxVisible={5}
+            size="medium"
+            displayStyle={field.options?.attachment_display_style || 'thumbnails'}
+          />
+        ) : (
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            No attachments
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // Default: Text, Number, Email, URL, etc.
   if (isEditing && !isReadOnly) {
     const inputType =
@@ -576,6 +541,221 @@ export default function InlineFieldEditor({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Attachment Field Editor Component
+ * Handles upload, delete, and preview for attachment fields in record views
+ */
+function AttachmentFieldEditor({
+  field,
+  attachments,
+  onChange,
+  onEditEnd,
+  tableId,
+  recordId,
+  tableName,
+}: {
+  field: TableField
+  attachments: Attachment[]
+  onChange: (value: Attachment[]) => void
+  onEditEnd: () => void
+  tableId: string
+  recordId: string
+  tableName: string
+}) {
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [dragActive, setDragActive] = useState(false)
+  const supabase = createClient()
+  const { toast } = useToast()
+
+  // Generate UUID helper
+  const generateUUID = (): string => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  const handleFiles = async (files: FileList) => {
+    if (uploading) return
+
+    setUploading(true)
+    const uploaded: Attachment[] = []
+
+    try {
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop() || 'bin'
+        const filePath = `attachments/${tableName}/${recordId}/${field.name}/${generateUUID()}.${ext}`
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, file, { upsert: false })
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: `Failed to upload ${file.name}`,
+          })
+          continue
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('attachments')
+          .getPublicUrl(filePath)
+
+        uploaded.push({
+          url: urlData.publicUrl,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      }
+
+      if (uploaded.length > 0) {
+        onChange([...attachments, ...uploaded])
+        toast({
+          title: "Uploaded",
+          description: `${uploaded.length} file${uploaded.length !== 1 ? 's' : ''} uploaded successfully`,
+        })
+      }
+    } catch (error) {
+      console.error('Error uploading files:', error)
+      toast({
+        variant: "destructive",
+        title: "Upload error",
+        description: "An error occurred while uploading files",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDelete = async (index: number) => {
+    const file = attachments[index]
+    if (!file) return
+
+    try {
+      // Extract storage path from public URL
+      const urlParts = file.url.split('/storage/v1/object/public/attachments/')
+      const storagePath = urlParts[1]
+
+      if (storagePath) {
+        await supabase.storage.from('attachments').remove([storagePath])
+      }
+
+      const updated = attachments.filter((_, i) => i !== index)
+      onChange(updated)
+      toast({
+        title: "Deleted",
+        description: "File deleted successfully",
+      })
+    } catch (error) {
+      console.error('Error deleting file:', error)
+      toast({
+        variant: "destructive",
+        title: "Delete error",
+        description: "Failed to delete file",
+      })
+    }
+  }
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(true)
+  }
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+  }
+
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+    if (e.dataTransfer.files.length > 0) {
+      await handleFiles(e.dataTransfer.files)
+    }
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+      
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        className="hidden"
+        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+      />
+
+      <div
+        className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+          dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+        }`}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div className="text-center">
+          <Paperclip className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-600 mb-1">
+            {uploading ? 'Uploading...' : 'Click or drag files to upload'}
+          </p>
+          <p className="text-xs text-gray-400">Multiple files supported</p>
+        </div>
+      </div>
+
+      {attachments.length > 0 && (
+        <div className="space-y-2">
+          <AttachmentPreview
+            attachments={attachments}
+            maxVisible={10}
+            size="medium"
+            displayStyle={field.options?.attachment_display_style || 'thumbnails'}
+          />
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((attachment, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-2 px-2 py-1 bg-gray-100 rounded text-xs"
+              >
+                <span className="truncate max-w-[200px]">{attachment.name}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(index)
+                  }}
+                  className="text-red-600 hover:text-red-800"
+                  aria-label="Delete"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={onEditEnd}
+          className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+        >
+          Done
+        </button>
+      </div>
     </div>
   )
 }

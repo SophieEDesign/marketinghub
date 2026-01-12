@@ -121,13 +121,34 @@ export default function GroupedInterfaces({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  
+  // Track interaction states - these are mutually exclusive
+  const [isDragging, setIsDragging] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false)
+  
+  // Store original order for revert on error
+  const [originalGroups, setOriginalGroups] = useState<InterfaceGroup[]>([])
+  const [originalPages, setOriginalPages] = useState<InterfacePage[]>([])
 
+  // Configure sensors to require explicit drag handle activation
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  // Sync props to state, but only when not dragging or editing
+  useEffect(() => {
+    if (!isDragging && !isRenaming) {
+      setGroups(initialGroups.filter(g => g && g.id))
+      setPages(interfacePages)
+    }
+  }, [initialGroups, interfacePages, isDragging, isRenaming])
 
   // Load collapse state from localStorage
   useEffect(() => {
@@ -216,13 +237,26 @@ export default function GroupedInterfaces({
   }
 
   const handleStartEditGroup = (group: InterfaceGroup) => {
+    // Prevent editing if dragging
+    if (isDragging) return
+    setIsRenaming(true)
     setEditingGroupId(group.id)
     setEditingName(group.name)
+  }
+
+  const handleCancelEditGroup = () => {
+    const group = groups.find(g => g.id === editingGroupId)
+    if (group) {
+      setEditingName(group.name) // Restore original name
+    }
+    setEditingGroupId(null)
+    setIsRenaming(false)
   }
 
   const handleSaveGroup = async (groupId: string) => {
     if (!editingName.trim()) {
       setEditingGroupId(null)
+      setIsRenaming(false)
       return
     }
 
@@ -238,14 +272,19 @@ export default function GroupedInterfaces({
           prev.map((g) => (g.id === groupId ? { ...g, name: editingName.trim() } : g))
         )
         setEditingGroupId(null)
+        setIsRenaming(false)
         onRefresh?.()
       } else {
         console.warn("Failed to update group:", response.status, response.statusText)
-        // Silently fail - groups might not be available
+        // Revert name on error
+        setEditingGroupId(null)
+        setIsRenaming(false)
       }
     } catch (error) {
       console.warn("Failed to update group:", error)
-      // Silently fail - groups are optional
+      // Revert on error
+      setEditingGroupId(null)
+      setIsRenaming(false)
     }
   }
 
@@ -302,13 +341,26 @@ export default function GroupedInterfaces({
   }
 
   const handleStartEditPage = (page: InterfacePage) => {
+    // Prevent editing if dragging
+    if (isDragging) return
+    setIsRenaming(true)
     setEditingPageId(page.id)
     setEditingName(page.name)
+  }
+
+  const handleCancelEditPage = () => {
+    const page = pages.find(p => p.id === editingPageId)
+    if (page) {
+      setEditingName(page.name) // Restore original name
+    }
+    setEditingPageId(null)
+    setIsRenaming(false)
   }
 
   const handleSavePage = async (pageId: string) => {
     if (!editingName.trim()) {
       setEditingPageId(null)
+      setIsRenaming(false)
       return
     }
 
@@ -324,10 +376,18 @@ export default function GroupedInterfaces({
           prev.map((p) => (p.id === pageId ? { ...p, name: editingName.trim() } : p))
         )
         setEditingPageId(null)
+        setIsRenaming(false)
         onRefresh?.()
+      } else {
+        // Revert on error
+        setEditingPageId(null)
+        setIsRenaming(false)
       }
     } catch (error) {
       console.error("Failed to update interface:", error)
+      // Revert on error
+      setEditingPageId(null)
+      setIsRenaming(false)
     }
   }
 
@@ -414,14 +474,33 @@ export default function GroupedInterfaces({
   }
 
   const handleDragStart = (event: DragStartEvent) => {
+    // Prevent drag if renaming
+    if (isRenaming) {
+      event.preventDefault()
+      return
+    }
+    
+    // Store original state for potential revert
+    setOriginalGroups([...sortedGroups])
+    setOriginalPages([...pages])
+    
+    setIsDragging(true)
     setActiveId(event.active.id as string)
   }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
+    
+    // Always clear dragging state
+    setIsDragging(false)
     setActiveId(null)
 
-    if (!over) return
+    if (!over) {
+      // No drop target - revert to original state
+      if (originalGroups.length > 0) setGroups(originalGroups)
+      if (originalPages.length > 0) setPages(originalPages)
+      return
+    }
 
     const activeId = active.id as string
     const overId = over.id as string
@@ -441,16 +520,25 @@ export default function GroupedInterfaces({
 
         const groupIds = newGroups.map((g) => g.id)
         try {
-          await fetch("/api/interface-groups/reorder", {
+          const response = await fetch("/api/interface-groups/reorder", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ groupIds }),
           })
 
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+          }
+
+          // Only update state after successful API call
           setGroups(newGroups.map((g, i) => ({ ...g, order_index: i })))
           onRefresh?.()
         } catch (error) {
           console.error("Failed to reorder groups:", error)
+          // Revert to original state on error
+          if (originalGroups.length > 0) setGroups(originalGroups)
+          alert(`Failed to reorder interfaces: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
       }
       return
@@ -549,7 +637,7 @@ export default function GroupedInterfaces({
           throw new Error(result.error || 'Failed to reorder interfaces')
         }
 
-        // Update local state optimistically
+        // Only update state after successful API call (no optimistic updates)
         setPages((prev) =>
           prev.map((p) => {
             const update = updates.find((u) => u.id === p.id)
@@ -559,7 +647,8 @@ export default function GroupedInterfaces({
         onRefresh?.()
       } catch (error) {
         console.error("Failed to reorder interfaces:", error)
-        // Show error to user (you might want to add a toast notification here)
+        // Revert to original state on error
+        if (originalPages.length > 0) setPages(originalPages)
         alert(`Failed to reorder interfaces: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
@@ -569,7 +658,7 @@ export default function GroupedInterfaces({
   function SortableGroup({ group }: { group: InterfaceGroup }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: `group-${group.id}`,
-      disabled: !editMode,
+      disabled: !editMode || isRenaming || editingGroupId !== null,
     })
     const { setNodeRef: setDroppableRef, isOver } = useDroppable({
       id: `group-${group.id}`,
@@ -577,8 +666,8 @@ export default function GroupedInterfaces({
 
     const style = {
       transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
+      transition: isDragging ? 'none' : transition, // No transition during drag for stability
+      opacity: isDragging ? 0.3 : 1,
     }
 
     const isCollapsed = collapsedGroups.has(group.id)
@@ -619,17 +708,30 @@ export default function GroupedInterfaces({
     }
 
     // Edit mode - full editing UI
+    const isEditing = editingGroupId === group.id
+    const canDrag = editMode && !isRenaming && !isEditing
+    
     return (
-      <div ref={combinedRef} style={style} className={`group ${isOver ? 'bg-blue-50' : ''}`}>
+      <div 
+        ref={combinedRef} 
+        style={style} 
+        className={`group ${isOver && canDrag ? 'bg-blue-50 border-l-2 border-blue-400' : ''} ${isDragging ? 'pointer-events-none' : ''}`}
+      >
         <div className="flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded">
-          <button
-            {...attributes}
-            {...listeners}
-            className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
-          </button>
+          {canDrag ? (
+            <button
+              {...attributes}
+              {...listeners}
+              className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+            </button>
+          ) : (
+            <div className="p-0.5 w-3 h-3 flex-shrink-0" />
+          )}
           <button
             onClick={() => toggleGroup(group.id)}
             className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-100 rounded"
@@ -647,14 +749,18 @@ export default function GroupedInterfaces({
                 onBlur={() => handleSaveGroup(group.id)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
+                    e.preventDefault()
                     handleSaveGroup(group.id)
                   } else if (e.key === "Escape") {
-                    setEditingGroupId(null)
+                    e.preventDefault()
+                    handleCancelEditGroup()
                   }
                 }}
                 className="h-5 text-xs px-1 py-0"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                draggable={false}
               />
             ) : (
               <span className="truncate">{group.name}</span>
@@ -662,7 +768,11 @@ export default function GroupedInterfaces({
           </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+              <button 
+                className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                disabled={isDragging || isRenaming}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
               </button>
             </DropdownMenuTrigger>
@@ -738,30 +848,46 @@ export default function GroupedInterfaces({
 
   // Sortable Page Component (edit mode)
   function SortablePage({ page }: { page: InterfacePage }) {
+    const isEditing = editingPageId === page.id
+    const canDrag = editMode && !isRenaming && !isEditing
+    
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
       id: `page-${page.id}`,
-      disabled: !editMode,
+      disabled: !editMode || isRenaming || isEditing,
     })
 
     const style = {
       transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
+      transition: isDragging ? 'none' : transition, // No transition during drag for stability
+      opacity: isDragging ? 0.3 : 1,
     }
 
     const isActive = pathname.includes(`/pages/${page.id}`)
 
     return (
-      <div ref={setNodeRef} style={style} className="group/page">
+      <div 
+        ref={setNodeRef} 
+        style={style}
+        className={`group/page ${isDragging ? 'pointer-events-none' : ''}`}
+      >
         <div className="flex items-center gap-1">
-          <button
-            {...attributes}
-            {...listeners}
-            className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity"
-            onClick={(e) => e.preventDefault()}
-          >
-            <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
-          </button>
+          {canDrag ? (
+            <button
+              {...attributes}
+              {...listeners}
+              className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              title="Drag to reorder"
+            >
+              <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+            </button>
+          ) : (
+            <div className="p-0.5 w-3 h-3 flex-shrink-0 opacity-0 group-hover/page:opacity-0" />
+          )}
           {editingPageId === page.id ? (
             <Input
               value={editingName}
@@ -769,14 +895,19 @@ export default function GroupedInterfaces({
               onBlur={() => handleSavePage(page.id)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
+                  e.preventDefault()
                   handleSavePage(page.id)
                 } else if (e.key === "Escape") {
-                  setEditingPageId(null)
+                  e.preventDefault()
+                  handleCancelEditPage()
                 }
               }}
               className="flex-1 h-7 text-sm px-2 py-0"
               autoFocus
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
             />
           ) : (
             <Link
@@ -786,14 +917,24 @@ export default function GroupedInterfaces({
                 backgroundColor: primaryColor + '15', 
                 color: primaryColor 
               } : { color: sidebarTextColor }}
+              onClick={(e) => {
+                // Prevent navigation if we're in drag state
+                if (isDragging) {
+                  e.preventDefault()
+                }
+              }}
             >
               <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
               <span className="text-sm truncate">{page.name}</span>
             </Link>
           )}
-          <DropdownMenu>
+            <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <button className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover/page:opacity-100 transition-opacity">
+              <button 
+                className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover/page:opacity-100 transition-opacity"
+                disabled={isDragging || isRenaming}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
               </button>
             </DropdownMenuTrigger>
@@ -930,16 +1071,23 @@ export default function GroupedInterfaces({
       </div>
 
       <DragOverlay>
-        {activeId ? (
-          <div className="bg-white border border-gray-200 rounded shadow-lg p-2">
+        {activeId && isDragging ? (
+          <div className="bg-white border-2 border-blue-400 rounded shadow-xl p-2 opacity-90">
             {activeId.startsWith("group-") ? (
-              <span className="text-xs font-semibold uppercase" style={{ color: sidebarTextColor }}>
-                {groups.find((g) => `group-${g.id}` === activeId)?.name}
-              </span>
+              <div className="flex items-center gap-2">
+                <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <span className="text-xs font-semibold uppercase" style={{ color: sidebarTextColor }}>
+                  {groups.find((g) => `group-${g.id}` === activeId)?.name}
+                </span>
+              </div>
             ) : (
-              <span className="text-sm" style={{ color: sidebarTextColor }}>
-                {pages.find((p) => `page-${p.id}` === activeId)?.name}
-              </span>
+              <div className="flex items-center gap-2">
+                <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <Layers className="h-4 w-4" style={{ color: sidebarTextColor }} />
+                <span className="text-sm" style={{ color: sidebarTextColor }}>
+                  {pages.find((p) => `page-${p.id}` === activeId)?.name}
+                </span>
+              </div>
             )}
           </div>
         ) : null}

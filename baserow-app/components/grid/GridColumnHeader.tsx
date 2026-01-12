@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText } from 'lucide-react'
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
+import { useIsMobile } from '@/hooks/useResponsive'
 
 const COLUMN_MIN_WIDTH = 100
 
@@ -42,6 +43,7 @@ export default function GridColumnHeader({
   sortOrder = null,
   onSort,
 }: GridColumnHeaderProps) {
+  const isMobile = useIsMobile()
   const {
     attributes,
     listeners,
@@ -63,6 +65,9 @@ export default function GridColumnHeader({
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Disable resize on mobile
+    if (isMobile) return
+    
     e.preventDefault()
     e.stopPropagation()
     resizeStartXRef.current = e.clientX
@@ -191,14 +196,16 @@ export default function GridColumnHeader({
         </button>
       )}
 
-      {/* Resize handle */}
-      <div
-        ref={resizeRef}
-        onMouseDown={handleMouseDown}
-        className={`absolute right-0 top-0 bottom-0 w-0.5 cursor-col-resize ${
-          isResizing ? 'bg-blue-400' : 'hover:bg-blue-300'
-        } transition-colors opacity-0 group-hover:opacity-100`}
-      />
+      {/* Resize handle - hidden on mobile */}
+      {!isMobile && (
+        <div
+          ref={resizeRef}
+          onMouseDown={handleMouseDown}
+          className={`absolute right-0 top-0 bottom-0 w-0.5 cursor-col-resize ${
+            isResizing ? 'bg-blue-400' : 'hover:bg-blue-300'
+          } transition-colors opacity-0 group-hover:opacity-100`}
+        />
+      )}
     </div>
   )
 }

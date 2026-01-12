@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Paperclip, X } from 'lucide-react'
+import { Paperclip } from 'lucide-react'
+import AttachmentPreview, { type Attachment } from '@/components/attachments/AttachmentPreview'
 
 // Using crypto.randomUUID() instead of uuid package for browser compatibility
 function generateUUID(): string {
@@ -17,12 +18,8 @@ function generateUUID(): string {
   })
 }
 
-export interface Attachment {
-  url: string
-  name: string
-  size: number
-  type: string
-}
+// Re-export Attachment type for backwards compatibility
+export type { Attachment } from '@/components/attachments/AttachmentPreview'
 
 interface AttachmentCellProps {
   value: Attachment[] | null
@@ -32,6 +29,11 @@ interface AttachmentCellProps {
   editable?: boolean
   onSave: (value: Attachment[]) => Promise<void>
   placeholder?: string
+  fieldOptions?: {
+    attachment_display_style?: 'thumbnails' | 'list'
+    attachment_preview_size?: 'small' | 'medium' | 'large'
+    attachment_max_visible?: number
+  }
 }
 
 export default function AttachmentCell({
@@ -42,11 +44,13 @@ export default function AttachmentCell({
   editable = true,
   onSave,
   placeholder = '—',
+  fieldOptions,
 }: AttachmentCellProps) {
   const [uploading, setUploading] = useState(false)
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
 
   const attachments = useMemo(() => value || [], [value])
 
@@ -102,6 +106,7 @@ export default function AttachmentCell({
       const file = attachments[index]
       if (!file) return
 
+      setDeletingIndex(index)
       try {
         // Extract storage path from public URL
         const urlParts = file.url.split('/storage/v1/object/public/attachments/')
@@ -113,11 +118,24 @@ export default function AttachmentCell({
 
         const updated = attachments.filter((_, i) => i !== index)
         await onSave(updated)
+        
+        // Close preview if deleting current item
+        if (previewIndex === index) {
+          if (updated.length > 0 && index < updated.length) {
+            setPreviewIndex(index)
+          } else if (updated.length > 0 && index > 0) {
+            setPreviewIndex(index - 1)
+          } else {
+            setPreviewIndex(null)
+          }
+        }
       } catch (error) {
         console.error('Error deleting file:', error)
+      } finally {
+        setDeletingIndex(null)
       }
     },
-    [editable, attachments, onSave]
+    [editable, attachments, onSave, previewIndex]
   )
 
   const onDragOver = (e: React.DragEvent) => {
@@ -142,7 +160,9 @@ export default function AttachmentCell({
     if (editable) fileInputRef.current?.click()
   }
 
-  const isImage = (type: string) => type.startsWith('image/')
+  const handlePreviewClick = useCallback((index: number) => {
+    setPreviewIndex(index)
+  }, [])
 
   return (
     <>
@@ -157,11 +177,17 @@ export default function AttachmentCell({
       <div
         className={`w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm ${
           editable ? 'cursor-pointer hover:bg-blue-50' : ''
-        } rounded transition-colors`}
+        } rounded transition-colors relative`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        onClick={openFilePicker}
+        onClick={(e) => {
+          // Don't open file picker if clicking on preview
+          if ((e.target as HTMLElement).closest('[data-attachment-preview]')) {
+            return
+          }
+          openFilePicker()
+        }}
         title={attachments.length > 0 ? `${attachments.length} attachment${attachments.length !== 1 ? 's' : ''}` : undefined}
       >
         {attachments.length === 0 ? (
@@ -170,12 +196,16 @@ export default function AttachmentCell({
             {placeholder}
           </span>
         ) : (
-          <div className="flex items-center gap-1.5">
-            <Paperclip className="h-3.5 w-3.5 text-gray-600 flex-shrink-0" />
-            <span className="text-gray-700 font-medium text-xs">
-              {attachments.length}
-            </span>
-            {uploading && <span className="text-xs text-gray-500">Uploading...</span>}
+          <div className="flex items-center gap-1.5 flex-1 min-w-0" data-attachment-preview>
+            <AttachmentPreview
+              attachments={attachments}
+              maxVisible={fieldOptions?.attachment_max_visible || 1}
+              size={fieldOptions?.attachment_preview_size || 'small'}
+              compact={true}
+              onPreviewClick={handlePreviewClick}
+              className="flex-1"
+            />
+            {uploading && <span className="text-xs text-gray-500 whitespace-nowrap">Uploading...</span>}
           </div>
         )}
       </div>
@@ -187,6 +217,8 @@ export default function AttachmentCell({
           onClose={() => setPreviewIndex(null)}
           onDelete={handleDelete}
           setIndex={setPreviewIndex}
+          deletingIndex={deletingIndex}
+          editable={editable}
         />
       )}
     </>
@@ -199,17 +231,22 @@ function AttachmentPreviewModal({
   onClose,
   onDelete,
   setIndex,
+  deletingIndex,
+  editable = true,
 }: {
   attachments: Attachment[]
   index: number
   onClose: () => void
   onDelete: (index: number) => void
   setIndex: (n: number) => void
+  deletingIndex: number | null
+  editable?: boolean
 }) {
   const file = attachments[index]
   if (!file) return null
 
   const isImage = file.type.startsWith('image/')
+  const isDeleting = deletingIndex === index
 
   return (
     <div
@@ -223,6 +260,7 @@ function AttachmentPreviewModal({
         <button
           onClick={onClose}
           className="absolute top-2 right-2 text-xl text-gray-600 hover:text-black z-10"
+          aria-label="Close"
         >
           ✕
         </button>
@@ -244,34 +282,32 @@ function AttachmentPreviewModal({
           </div>
         )}
 
-        <div className="flex justify-between mt-4">
+        <div className="flex justify-between items-center mt-4">
           <button
             onClick={() => index > 0 && setIndex(index - 1)}
-            disabled={index === 0}
+            disabled={index === 0 || isDeleting}
             className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
           >
             ← Prev
           </button>
 
-          <button
-            onClick={() => {
-              onDelete(index)
-              if (index >= attachments.length - 1 && index > 0) {
-                setIndex(index - 1)
-              } else if (index < attachments.length - 1) {
-                setIndex(index)
-              } else {
-                onClose()
-              }
-            }}
-            className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Delete
-          </button>
+          <span className="text-sm text-gray-600">
+            {index + 1} of {attachments.length}
+          </span>
+
+          {editable && (
+            <button
+              onClick={() => onDelete(index)}
+              disabled={isDeleting}
+              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+          )}
 
           <button
             onClick={() => index < attachments.length - 1 && setIndex(index + 1)}
-            disabled={index === attachments.length - 1}
+            disabled={index === attachments.length - 1 || isDeleting}
             className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
           >
             Next →

@@ -23,6 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useIsMobile } from "@/hooks/useResponsive"
+import { cn } from "@/lib/utils"
 import type { TableField } from "@/types/database"
 
 interface RecordPageClientProps {
@@ -40,6 +42,7 @@ export default function RecordPageClient({
 }: RecordPageClientProps) {
   const router = useRouter()
   const { toast } = useToast()
+  const isMobile = useIsMobile()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +53,9 @@ export default function RecordPageClient({
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  
+  // Find title field (first text field or first field)
+  const titleField = fields.find(f => f.type === 'text') || fields[0]
 
   useEffect(() => {
     loadData()
@@ -224,100 +230,126 @@ export default function RecordPageClient({
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 mobile:px-3 py-4 mobile:py-3 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 mobile:gap-1.5 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push(`/tables/${tableId}`)}
+              className="mobile:px-2"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              <ArrowLeft className="h-4 w-4 mobile:mr-0 mr-2" />
+              <span className="mobile:hidden">Back</span>
             </Button>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900">
-                {tableName}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg mobile:text-base font-semibold text-gray-900 truncate">
+                {isMobile && titleField && formData[titleField.name]
+                  ? String(formData[titleField.name]).substring(0, 30) + (String(formData[titleField.name]).length > 30 ? '...' : '')
+                  : tableName}
               </h1>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Record {recordId.substring(0, 8)}...
-              </p>
+              {!isMobile && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Record {recordId.substring(0, 8)}...
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {editing ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(false)
-                    setFormData({ ...record })
-                    setHasChanges(false)
-                  }}
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={!hasChanges || saving}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? "Saving..." : "Save"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing(true)}
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleCopyId}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Record ID
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            )}
-          </div>
+          {/* Desktop actions in header */}
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              {editing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditing(false)
+                      setFormData({ ...record })
+                      setHasChanges(false)
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={!hasChanges || saving}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {saving ? "Saving..." : "Save"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleCopyId}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy Record ID
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setShowDeleteDialog(true)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto px-6 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="max-w-6xl mx-auto px-6 mobile:px-4 py-6 mobile:py-4">
+          <div className={cn(
+            "grid gap-6 mobile:gap-4",
+            isMobile ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3"
+          )}>
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className={cn(
+              "space-y-6 mobile:space-y-4",
+              !isMobile && "lg:col-span-2"
+            )}>
+              {/* Title field pinned at top on mobile */}
+              {isMobile && titleField && (
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sticky top-0 z-10">
+                  <div className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                    {titleField.name}
+                  </div>
+                  <div className="text-base font-medium text-gray-900">
+                    {formData[titleField.name] ? String(formData[titleField.name]) : '—'}
+                  </div>
+                </div>
+              )}
+              
               {/* Record Fields */}
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="px-6 py-4 border-b border-gray-200">
+                <div className="px-6 mobile:px-4 py-4 mobile:py-3 border-b border-gray-200">
                   <h2 className="text-sm font-semibold text-gray-900">Fields</h2>
                 </div>
-                <div className="p-6">
+                <div className="p-6 mobile:p-4">
                   <RecordFields
-                    fields={fields}
+                    fields={isMobile ? fields.filter(f => f.id !== titleField?.id) : fields}
                     formData={formData}
                     onFieldChange={handleFieldChange}
                     fieldGroups={fieldGroups}
@@ -328,26 +360,92 @@ export default function RecordPageClient({
               </div>
             </div>
 
-            {/* Sidebar */}
-            <div className="space-y-6">
-              {/* Activity */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-sm font-semibold text-gray-900">Activity</h2>
-                </div>
-                <div className="p-6">
-                  {record && (
-                    <RecordActivity
-                      tableId={tableId}
-                      record={record}
-                    />
-                  )}
+            {/* Sidebar - hidden on mobile, shown on tablet/desktop */}
+            {!isMobile && (
+              <div className="space-y-6">
+                {/* Activity */}
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h2 className="text-sm font-semibold text-gray-900">Activity</h2>
+                  </div>
+                  <div className="p-6">
+                    {record && (
+                      <RecordActivity
+                        tableId={tableId}
+                        record={record}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
+      
+      {/* Mobile action bar - sticky at bottom */}
+      {isMobile && (
+        <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between gap-2 z-20 shadow-lg">
+          {editing ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  setEditing(false)
+                  setFormData({ ...record })
+                  setHasChanges(false)
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1"
+                onClick={handleSave}
+                disabled={!hasChanges || saving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setEditing(true)}
+              >
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleCopyId}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Record ID
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import RecordPanel from "@/components/records/RecordPanel"
+import { useIsMobileOrTablet } from "@/hooks/useResponsive"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -64,7 +65,27 @@ export default function WorkspaceShell({
   hideTopbar = false,
   hideRecordPanel = false,
 }: WorkspaceShellProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const isMobileOrTablet = useIsMobileOrTablet()
+  // On mobile/tablet: sidebar closed by default
+  // On desktop: sidebar open by default (no state needed, handled internally)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  
+  // Persist sidebar state per device type
+  useEffect(() => {
+    if (isMobileOrTablet) {
+      // Load from localStorage with device-specific key
+      const saved = localStorage.getItem('sidebar-open-mobile')
+      if (saved !== null) {
+        setSidebarOpen(JSON.parse(saved))
+      }
+    }
+  }, [isMobileOrTablet])
+  
+  useEffect(() => {
+    if (isMobileOrTablet) {
+      localStorage.setItem('sidebar-open-mobile', JSON.stringify(sidebarOpen))
+    }
+  }, [sidebarOpen, isMobileOrTablet])
 
   return (
     <RecordPanelProvider>
@@ -75,9 +96,16 @@ export default function WorkspaceShell({
           tables={tables}
           views={views}
           userRole={userRole}
+          isOpen={isMobileOrTablet ? sidebarOpen : undefined}
+          onClose={isMobileOrTablet ? () => setSidebarOpen(false) : undefined}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
-          {!hideTopbar && <Topbar title={title} />}
+          {!hideTopbar && (
+            <Topbar 
+              title={title} 
+              onSidebarToggle={isMobileOrTablet ? () => setSidebarOpen(!sidebarOpen) : undefined}
+            />
+          )}
           <main className="flex-1 overflow-y-auto">
             {children}
           </main>

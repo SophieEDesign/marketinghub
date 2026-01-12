@@ -17,6 +17,18 @@ const config = {
         "2xl": "1400px",
       },
     },
+    screens: {
+      // Explicit breakpoints matching requirements
+      'mobile': { 'max': '767px' },      // ≤ 767px
+      'tablet': { 'min': '768px', 'max': '1279px' }, // 768px – 1279px
+      'desktop': { 'min': '1280px' },   // ≥ 1280px
+      // Keep existing breakpoints for backward compatibility
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",

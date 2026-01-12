@@ -72,6 +72,8 @@ export function CellFactory({
           choices={field.options?.choices || []}
           choiceColors={field.options?.choiceColors}
           fieldOptions={field.options}
+          fieldId={field.id}
+          tableId={field.table_id}
         />
       )
 
@@ -82,6 +84,8 @@ export function CellFactory({
           choices={field.options?.choices || []}
           choiceColors={field.options?.choiceColors}
           fieldOptions={field.options}
+          fieldId={field.id}
+          tableId={field.table_id}
         />
       )
 
@@ -94,6 +98,7 @@ export function CellFactory({
           {...commonProps}
           rowId={rowId}
           tableName={tableName}
+          fieldOptions={field.options}
         />
       )
 

@@ -486,9 +486,13 @@ export default function TimelineView({
             if (valueToColor) {
               // Use centralized color system
               const normalizedValue = String(valueToColor).trim()
+              // Type assertion: resolvedColorField is already filtered to be single_select or multi_select
+              const fieldType = (resolvedColorField.type === 'single_select' || resolvedColorField.type === 'multi_select')
+                ? resolvedColorField.type as 'single_select' | 'multi_select'
+                : 'single_select' as const // Fallback (shouldn't happen due to filtering)
               const hexColor = resolveChoiceColor(
                 normalizedValue,
-                resolvedColorField.type,
+                fieldType,
                 resolvedColorField.options,
                 resolvedColorField.type === 'single_select'
               )
@@ -1010,9 +1014,13 @@ export default function TimelineView({
                 const groupLabel = groupKey === 'Unassigned' ? 'Unassigned' : groupKey
                 let groupColor: string | undefined = undefined
                 if (groupKey !== 'Unassigned' && resolvedGroupByField.options) {
+                  // Type assertion: resolvedGroupByField is already filtered to be single_select or multi_select
+                  const fieldType = (resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select')
+                    ? resolvedGroupByField.type as 'single_select' | 'multi_select'
+                    : 'single_select' as const // Fallback (shouldn't happen due to filtering)
                   const hexColor = resolveChoiceColor(
                     groupKey,
-                    resolvedGroupByField.type,
+                    fieldType,
                     resolvedGroupByField.options,
                     resolvedGroupByField.type === 'single_select'
                   )

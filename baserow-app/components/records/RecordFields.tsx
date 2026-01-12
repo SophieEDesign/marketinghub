@@ -16,6 +16,7 @@ interface RecordFieldsProps {
   tableId: string
   recordId: string
   isFieldEditable?: (fieldName: string) => boolean // Function to check if a field is editable
+  tableName?: string // Supabase table name (optional, will be fetched if not provided)
 }
 
 export default function RecordFields({
@@ -26,11 +27,30 @@ export default function RecordFields({
   tableId,
   recordId,
   isFieldEditable = () => true, // Default to all fields editable if not provided
+  tableName: propTableName,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [editingField, setEditingField] = useState<string | null>(null)
+  const [tableName, setTableName] = useState<string | undefined>(propTableName)
+  const supabase = createClient()
+
+  // Fetch table name if not provided
+  useEffect(() => {
+    if (!tableName && tableId) {
+      supabase
+        .from("tables")
+        .select("supabase_table")
+        .eq("id", tableId)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setTableName(data.supabase_table)
+          }
+        })
+    }
+  }, [tableId, tableName, supabase])
 
   // Group fields
   // fieldGroups maps groupName -> fieldNames[]
@@ -149,6 +169,9 @@ export default function RecordFields({
                       onLinkedRecordClick={handleLinkedRecordClick}
                       onAddLinkedRecord={handleAddLinkedRecord}
                       isReadOnly={!fieldEditable}
+                      tableId={tableId}
+                      recordId={recordId}
+                      tableName={tableName}
                     />
                   )
                 })}
@@ -175,6 +198,9 @@ export default function RecordFields({
                 onLinkedRecordClick={handleLinkedRecordClick}
                 onAddLinkedRecord={handleAddLinkedRecord}
                 isReadOnly={!fieldEditable}
+                tableId={tableId}
+                recordId={recordId}
+                tableName={tableName}
               />
             )
           })}
