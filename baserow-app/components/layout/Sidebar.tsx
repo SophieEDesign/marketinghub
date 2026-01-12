@@ -14,6 +14,7 @@ import {
   Plus,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useBranding } from "@/contexts/BrandingContext"
 import type { Table, View } from "@/types/database"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 
@@ -54,6 +55,7 @@ export default function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const pathname = usePathname()
+  const { primaryColor, sidebarTextColor } = useBranding()
   const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
 
   const isActive = (path: string) => pathname === path || pathname?.startsWith(path + "/")
@@ -76,12 +78,13 @@ export default function Sidebar({
         className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md transition-colors",
           active
-            ? "bg-gray-100 text-gray-900 font-medium"
-            : "text-gray-700 hover:bg-gray-50",
+            ? "bg-gray-100 font-medium"
+            : "hover:bg-gray-50",
           isCollapsed && "justify-center px-2"
         )}
+        style={{ color: active ? primaryColor : sidebarTextColor }}
       >
-        <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed && "mx-auto")} />
+        <Icon className={cn("h-4 w-4 flex-shrink-0", isCollapsed && "mx-auto")} style={{ color: active ? primaryColor : sidebarTextColor }} />
         {!isCollapsed && (
           <>
             <span className="flex-1 truncate">{label}</span>
@@ -113,13 +116,14 @@ export default function Sidebar({
       <div className="h-14 border-b border-gray-200 flex items-center justify-end px-3">
         <button
           onClick={onToggleCollapse}
-          className="p-1.5 rounded-md hover:bg-gray-100 text-gray-600"
+          className="p-1.5 rounded-md hover:bg-gray-100"
+          style={{ color: sidebarTextColor }}
           aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
           ) : (
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" style={{ color: sidebarTextColor }} />
           )}
         </button>
       </div>
@@ -129,7 +133,7 @@ export default function Sidebar({
         {/* Quick Actions */}
         {!isCollapsed && (
           <div className="mb-4 px-3">
-            <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: sidebarTextColor }}>
               Quick Actions
             </div>
             <div className="space-y-0.5 mt-1">
@@ -171,7 +175,7 @@ export default function Sidebar({
         {/* Interface Pages Section */}
           <div className="mb-4">
             {!isCollapsed && (
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: sidebarTextColor }}>
               Pages
               </div>
             )}
@@ -209,7 +213,7 @@ export default function Sidebar({
         {userRole && userRole !== "viewer" && dashboards.length > 0 && (
           <div className="mb-4">
             {!isCollapsed && (
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: sidebarTextColor }}>
                 Dashboards
               </div>
             )}

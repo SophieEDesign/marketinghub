@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { isAdmin } from "@/lib/roles"
 import { getInterfacePage, querySqlView } from "@/lib/interface/pages"
+import { isRecordReviewPage } from "@/lib/interface/page-types"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
 import InterfacePageClient from "@/components/interface/InterfacePageClient"
 
@@ -78,8 +79,11 @@ export default async function PagePage({
 
   // ALWAYS render - never redirect away from explicitly requested page
   // Invalid pages will show setup UI via PageRenderer
+  // Hide RecordPanel for record_review pages since they have their own record detail panel
+  const hideRecordPanel = page ? isRecordReviewPage(page.page_type as any) : false
+  
   return (
-    <WorkspaceShellWrapper title={pageName} hideTopbar={true}>
+    <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
       <InterfacePageClient 
         pageId={pageId} 
         initialPage={page || undefined}

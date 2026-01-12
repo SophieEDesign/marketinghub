@@ -103,9 +103,10 @@ export default function AirtableSidebar({
         <button
           onClick={() => setIsCollapsed(false)}
           className="p-2 hover:bg-gray-100 rounded transition-colors"
+          style={{ color: sidebarTextColor }}
           title="Expand sidebar"
         >
-          <ChevronRight className="h-4 w-4 text-gray-600" />
+          <ChevronRight className="h-4 w-4" style={{ color: sidebarTextColor }} />
         </button>
       </div>
     )
@@ -139,9 +140,10 @@ export default function AirtableSidebar({
         <button
           onClick={() => setIsCollapsed(true)}
           className="p-1 hover:bg-gray-100 rounded transition-colors"
+          style={{ color: sidebarTextColor }}
           title="Collapse sidebar"
         >
-          <X className="h-4 w-4 text-gray-600" />
+          <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
         </button>
       </div>
 
@@ -167,9 +169,10 @@ export default function AirtableSidebar({
                 onClick={toggleMode}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                   isEditMode
-                    ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                    : "text-gray-600 hover:bg-gray-100"
+                    ? "bg-blue-100 hover:bg-blue-200"
+                    : "hover:bg-gray-100"
                 }`}
+                style={{ color: isEditMode ? primaryColor : sidebarTextColor }}
                 title={isEditMode ? "Done editing" : "Edit interfaces"}
               >
                 {isEditMode ? (

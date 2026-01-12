@@ -627,16 +627,17 @@ export default function GroupedInterfaces({
             className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing"
             onClick={(e) => e.stopPropagation()}
           >
-            <GripVertical className="h-3 w-3 text-gray-400" />
+            <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
           </button>
           <button
             onClick={() => toggleGroup(group.id)}
-            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold text-gray-700 uppercase tracking-wider hover:bg-gray-100 rounded"
+            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-100 rounded"
+            style={{ color: sidebarTextColor }}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
             ) : (
-              <ChevronDown className="h-3 w-3" />
+              <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
             )}
             {editingGroupId === group.id ? (
               <Input
@@ -661,7 +662,7 @@ export default function GroupedInterfaces({
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                <Edit2 className="h-3 w-3 text-gray-400" />
+                <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -753,7 +754,7 @@ export default function GroupedInterfaces({
             className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity"
             onClick={(e) => e.preventDefault()}
           >
-            <GripVertical className="h-3 w-3 text-gray-400" />
+            <GripVertical className="h-3 w-3" style={{ color: sidebarTextColor }} />
           </button>
           {editingPageId === page.id ? (
             <Input
@@ -787,7 +788,7 @@ export default function GroupedInterfaces({
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover/page:opacity-100 transition-opacity">
-                <Edit2 className="h-3 w-3 text-gray-400" />
+                <Edit2 className="h-3 w-3" style={{ color: sidebarTextColor }} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -846,14 +847,15 @@ export default function GroupedInterfaces({
                   e.stopPropagation()
                   toggleGroup(group.id)
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-gray-50 rounded transition-colors"
+                style={{ color: sidebarTextColor }}
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 )}
-                <Folder className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                <Folder className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 <span className="flex-1 text-left truncate">{group.name}</span>
               </button>
               {!isCollapsed && (
@@ -882,17 +884,19 @@ export default function GroupedInterfaces({
         <div className="px-2 mb-1 flex gap-1">
           <button
             onClick={() => setNewPageModalOpen(true)}
-            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-100 rounded transition-colors"
+            style={{ color: sidebarTextColor }}
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
             <span>New Page</span>
           </button>
           <button
             onClick={handleCreateGroup}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-100 rounded transition-colors"
+            style={{ color: sidebarTextColor }}
             title="New Interface"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
             <span className="hidden sm:inline">Interface</span>
           </button>
         </div>
@@ -923,11 +927,11 @@ export default function GroupedInterfaces({
         {activeId ? (
           <div className="bg-white border border-gray-200 rounded shadow-lg p-2">
             {activeId.startsWith("group-") ? (
-              <span className="text-xs font-semibold text-gray-700 uppercase">
+              <span className="text-xs font-semibold uppercase" style={{ color: sidebarTextColor }}>
                 {groups.find((g) => `group-${g.id}` === activeId)?.name}
               </span>
             ) : (
-              <span className="text-sm text-gray-700">
+              <span className="text-sm" style={{ color: sidebarTextColor }}>
                 {pages.find((p) => `page-${p.id}` === activeId)?.name}
               </span>
             )}

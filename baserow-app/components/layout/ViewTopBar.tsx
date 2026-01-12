@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useBranding } from "@/contexts/BrandingContext"
 
 interface ViewTopBarProps {
   viewName: string
@@ -49,6 +50,7 @@ export default function ViewTopBar({
   onSearch,
   onDesign,
 }: ViewTopBarProps) {
+  const { primaryColor } = useBranding()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
@@ -113,13 +115,13 @@ export default function ViewTopBar({
     <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm">
       {/* Left side - View name and controls */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <h1 className="text-base font-semibold text-gray-900 truncate">{viewName}</h1>
-        <span className="text-xs text-gray-500 capitalize">({viewType})</span>
+        <h1 className="text-base font-semibold truncate" style={{ color: primaryColor }}>{viewName}</h1>
+        <span className="text-xs capitalize" style={{ color: primaryColor }}>({viewType})</span>
 
         {/* Search */}
         {onSearch && (
           <div className="relative w-64">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{ color: primaryColor }} />
             <Input
               type="text"
               placeholder="Search this view…"
@@ -130,10 +132,11 @@ export default function ViewTopBar({
             {searchQuery && (
               <button
                 onClick={handleClearSearch}
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 hover:text-gray-600"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4"
+                style={{ color: primaryColor }}
                 aria-label="Clear search"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" style={{ color: primaryColor }} />
               </button>
             )}
           </div>
@@ -145,9 +148,10 @@ export default function ViewTopBar({
             variant="ghost"
             size="sm"
             onClick={onFilter}
-            className="h-8 px-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+            className="h-8 px-2.5 text-sm font-normal hover:bg-gray-100"
+            style={{ color: primaryColor }}
           >
-            <Filter className="h-4 w-4 mr-1.5" />
+            <Filter className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Filter
           </Button>
 
@@ -155,9 +159,10 @@ export default function ViewTopBar({
             variant="ghost"
             size="sm"
             onClick={onSort}
-            className="h-8 px-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+            className="h-8 px-2.5 text-sm font-normal hover:bg-gray-100"
+            style={{ color: primaryColor }}
           >
-            <ArrowUpDown className="h-4 w-4 mr-1.5" />
+            <ArrowUpDown className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Sort
           </Button>
 
@@ -165,9 +170,10 @@ export default function ViewTopBar({
             variant="ghost"
             size="sm"
             onClick={onGroup}
-            className="h-8 px-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+            className="h-8 px-2.5 text-sm font-normal hover:bg-gray-100"
+            style={{ color: primaryColor }}
           >
-            <Group className="h-4 w-4 mr-1.5" />
+            <Group className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Group
           </Button>
 
@@ -175,9 +181,10 @@ export default function ViewTopBar({
             variant="ghost"
             size="sm"
             onClick={onHideFields}
-            className="h-8 px-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+            className="h-8 px-2.5 text-sm font-normal hover:bg-gray-100"
+            style={{ color: primaryColor }}
           >
-            <Eye className="h-4 w-4 mr-1.5" />
+            <Eye className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Hide Fields
           </Button>
 
@@ -185,9 +192,10 @@ export default function ViewTopBar({
             variant="ghost"
             size="sm"
             onClick={onShare}
-            className="h-8 px-2.5 text-sm font-normal text-gray-700 hover:bg-gray-100"
+            className="h-8 px-2.5 text-sm font-normal hover:bg-gray-100"
+            style={{ color: primaryColor }}
           >
-            <Share2 className="h-4 w-4 mr-1.5" />
+            <Share2 className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Share
           </Button>
         </div>
@@ -201,8 +209,9 @@ export default function ViewTopBar({
             size="sm"
             variant="outline"
             className="h-8 px-3 text-sm font-medium border-gray-300 hover:bg-gray-50"
+            style={{ color: primaryColor }}
           >
-            <Settings className="h-4 w-4 mr-1.5" />
+            <Settings className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Design
           </Button>
         )}
@@ -212,8 +221,9 @@ export default function ViewTopBar({
             size="sm"
             variant="outline"
             className="h-8 px-3 text-sm font-medium border-gray-300 hover:bg-gray-50"
+            style={{ color: primaryColor }}
           >
-            <Plus className="h-4 w-4 mr-1.5" />
+            <Plus className="h-4 w-4 mr-1.5" style={{ color: primaryColor }} />
             Add Field
           </Button>
         )}

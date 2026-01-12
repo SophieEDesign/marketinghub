@@ -49,6 +49,7 @@ interface WorkspaceShellProps {
   dashboards: Dashboard[]
   userRole: "admin" | "member" | null
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
+  hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
 }
 
 export default function WorkspaceShell({
@@ -61,6 +62,7 @@ export default function WorkspaceShell({
   dashboards,
   userRole,
   hideTopbar = false,
+  hideRecordPanel = false,
 }: WorkspaceShellProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -80,8 +82,8 @@ export default function WorkspaceShell({
             {children}
           </main>
         </div>
-        {/* Global Record Panel */}
-        <RecordPanel />
+        {/* Global Record Panel - hidden for pages with their own record detail panel */}
+        {!hideRecordPanel && <RecordPanel />}
       </div>
     </RecordPanelProvider>
   )

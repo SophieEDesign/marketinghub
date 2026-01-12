@@ -17,12 +17,14 @@ interface WorkspaceShellWrapperProps {
   children: React.ReactNode
   title?: string
   hideTopbar?: boolean // Option to hide topbar (for interface pages that have their own toolbar)
+  hideRecordPanel?: boolean // Option to hide the global RecordPanel (for pages that have their own record detail panel)
 }
 
 export default async function WorkspaceShellWrapper({
   children,
   title,
   hideTopbar = false,
+  hideRecordPanel = false,
 }: WorkspaceShellWrapperProps) {
   const supabase = await createClient()
   
@@ -268,6 +270,7 @@ export default async function WorkspaceShellWrapper({
               dashboards={dashboards}
               userRole={userRole}
               hideTopbar={hideTopbar}
+              hideRecordPanel={hideRecordPanel}
             >
               {children}
             </WorkspaceShell>

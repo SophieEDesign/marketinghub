@@ -34,6 +34,107 @@ function sanitizeFieldNameSafe(name: string): string {
   return sanitized
 }
 
+/**
+ * Parse date from CSV value, handling various formats including dd/mm/yyyy
+ */
+function parseDateFromCSV(value: string): Date | null {
+  if (!value || typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  // Try explicit dd/mm/yyyy format first (most common in CSV)
+  const ddMMyyyyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/)
+  if (ddMMyyyyMatch) {
+    const day = parseInt(ddMMyyyyMatch[1], 10)
+    const month = parseInt(ddMMyyyyMatch[2], 10) - 1 // Month is 0-indexed
+    const year = parseInt(ddMMyyyyMatch[3], 10)
+    
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month, day)
+      // Verify the date is valid (handles invalid dates like 31/02/2024)
+      if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+        return date
+      }
+    }
+  }
+
+  // Try yyyy-mm-dd format (ISO date)
+  const yyyyMMddMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/)
+  if (yyyyMMddMatch) {
+    const year = parseInt(yyyyMMddMatch[1], 10)
+    const month = parseInt(yyyyMMddMatch[2], 10) - 1
+    const day = parseInt(yyyyMMddMatch[3], 10)
+    
+    if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month, day)
+      if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+        return date
+      }
+    }
+  }
+
+  // Try mm/dd/yyyy format (US format)
+  const mmDDyyyyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/)
+  if (mmDDyyyyMatch) {
+    const month = parseInt(mmDDyyyyMatch[1], 10) - 1
+    const day = parseInt(mmDDyyyyMatch[2], 10)
+    const year = parseInt(mmDDyyyyMatch[3], 10)
+    
+    // Only use this if it's clearly US format (month > 12 would indicate dd/mm)
+    if (parseInt(mmDDyyyyMatch[1], 10) <= 12 && day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month, day)
+      if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+        return date
+      }
+    }
+  }
+
+  // Try ISO datetime format
+  if (trimmed.includes('T') || trimmed.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+    const date = new Date(trimmed)
+    if (!isNaN(date.getTime())) {
+      const year = date.getFullYear()
+      if (year >= 1900 && year <= 2100) {
+        return date
+      }
+    }
+  }
+
+  // Try text date formats (e.g., "01 Jan 2024", "Jan 01, 2024")
+  const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+  const textDateMatch = trimmed.match(/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4})/i)
+  if (textDateMatch) {
+    const day = parseInt(textDateMatch[1], 10)
+    const monthName = textDateMatch[2].toLowerCase()
+    const year = parseInt(textDateMatch[3], 10)
+    const month = monthNames.indexOf(monthName)
+    
+    if (month >= 0 && day >= 1 && day <= 31 && year >= 1900 && year <= 2100) {
+      const date = new Date(year, month, day)
+      if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+        return date
+      }
+    }
+  }
+
+  // Fallback to native Date parsing (but validate result)
+  const date = new Date(trimmed)
+  if (!isNaN(date.getTime())) {
+    const year = date.getFullYear()
+    // Only accept if it's a reasonable date and the input looks date-like
+    if (year >= 1900 && year <= 2100 && /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(trimmed)) {
+      return date
+    }
+  }
+
+  return null
+}
+
 interface CSVImportPanelProps {
   tableId: string
   tableName: string
@@ -810,13 +911,13 @@ export default function CSVImportPanel({
             } else if (field.type === "checkbox") {
               value = (String(value).toLowerCase() === "true" || value === "1" || String(value).toLowerCase() === "yes")
             } else if (field.type === "date") {
-              // Try to parse date - handle various formats
-              const date = new Date(value)
-              if (isNaN(date.getTime())) {
-                value = null
-              } else {
+              // Parse date using robust parser that handles dd/mm/yyyy and other formats
+              const date = parseDateFromCSV(String(value))
+              if (date) {
                 // Return ISO string for timestamptz
                 value = date.toISOString()
+              } else {
+                value = null
               }
             } else if (field.type === "multi_select") {
               // Convert comma/semicolon-separated values to array
