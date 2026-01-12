@@ -434,6 +434,16 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            // Card field configuration
+            titleField={config.timeline_title_field || config.card_title_field}
+            cardField1={config.timeline_field_1 || config.card_field_1}
+            cardField2={config.timeline_field_2 || config.card_field_2}
+            cardField3={config.timeline_field_3 || config.card_field_3}
+            // Grouping
+            groupByField={config.timeline_group_by || config.group_by_field || config.group_by}
+            // Appearance settings
+            wrapTitle={appearance.timeline_wrap_title || appearance.card_wrap_title}
+            rowSize={appearance.row_height as 'compact' | 'medium' | 'comfortable' || 'medium'}
           />
         )
       }

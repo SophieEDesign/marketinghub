@@ -814,8 +814,10 @@ function InterfacePageClientInternal({
         layout_template: 'content' as const,
         // Map config to settings for RecordReviewPage
         // For record_view/record_review pages, tableId comes from base_table or config.tableId
+        // CRITICAL: RecordViewPageSettings saves to config.left_panel (snake_case), so check both formats
         tableId: pageConfig.tableId || page.base_table || pageTableId || null,
-        leftPanel: pageConfig.leftPanel || null,
+        leftPanel: pageConfig.left_panel || pageConfig.leftPanel || null,
+        left_panel: pageConfig.left_panel || pageConfig.leftPanel || null, // Also include snake_case for direct access
         primary_table_id: page.base_table || pageTableId || null,
       }
     } as any

@@ -67,6 +67,9 @@ export default function GridAppearanceSettings({
     f.type === 'attachment' || f.type === 'url' // URL can contain image URLs
   )
 
+  // Get view type from config to show view-specific settings
+  const viewType = (config as any)?.view_type || 'grid'
+
   return (
     <div className="space-y-4">
       {/* Row Height / Density */}
@@ -86,9 +89,31 @@ export default function GridAppearanceSettings({
           </SelectContent>
         </Select>
         <p className="text-xs text-gray-500">
-          Control the height of rows in the grid view
+          {viewType === 'timeline' || viewType === 'calendar'
+            ? "Control the vertical spacing of rows/lanes and card padding"
+            : "Control the height of rows in the grid view"}
         </p>
       </div>
+
+      {/* Title Wrapping - For Timeline and Calendar */}
+      {(viewType === 'timeline' || viewType === 'calendar') && (
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="wrap-title">Wrap title text</Label>
+            <p className="text-xs text-gray-500 mt-1">
+              Allow card titles to wrap to multiple lines instead of truncating
+            </p>
+          </div>
+          <Switch
+            id="wrap-title"
+            checked={appearance.timeline_wrap_title || appearance.card_wrap_title || false}
+            onCheckedChange={(checked) => onUpdate({ 
+              timeline_wrap_title: checked,
+              card_wrap_title: checked
+            })}
+          />
+        </div>
+      )}
 
       {/* Show Toolbar */}
       <div className="flex items-center justify-between">

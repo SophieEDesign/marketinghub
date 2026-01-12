@@ -62,9 +62,50 @@ export default function RecordReviewLeftColumn({
   const compact = isRecordReview ? (leftPanelSettings?.compact ?? false) : false
   
   // For record_view: simplified 3-field configuration
-  const titleFieldId = isRecordView ? (leftPanelSettings?.titleFieldId || null) : null
-  const subtitleFieldId = isRecordView ? (leftPanelSettings?.subtitleFieldId || null) : null
-  const additionalFieldId = isRecordView ? (leftPanelSettings?.additionalFieldId || null) : null
+  // CRITICAL: RecordViewPageSettings saves field names (title_field, field_1, field_2), not IDs
+  // Support both field names and field IDs for backward compatibility
+  const titleFieldNameOrId = isRecordView ? (
+    leftPanelSettings?.title_field || 
+    leftPanelSettings?.titleFieldId || 
+    null
+  ) : null
+  const subtitleFieldNameOrId = isRecordView ? (
+    leftPanelSettings?.field_1 || 
+    leftPanelSettings?.subtitleFieldId || 
+    null
+  ) : null
+  const additionalFieldNameOrId = isRecordView ? (
+    leftPanelSettings?.field_2 || 
+    leftPanelSettings?.additionalFieldId || 
+    null
+  ) : null
+  
+  // Convert field names to field IDs once fields are loaded
+  const titleFieldId = useMemo(() => {
+    if (!titleFieldNameOrId || fields.length === 0) return null
+    // Check if it's already an ID (UUID format) or a field name
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(titleFieldNameOrId)
+    if (isUUID) return titleFieldNameOrId
+    // It's a field name, find the field ID
+    const field = fields.find(f => f.name === titleFieldNameOrId)
+    return field?.id || null
+  }, [titleFieldNameOrId, fields])
+  
+  const subtitleFieldId = useMemo(() => {
+    if (!subtitleFieldNameOrId || fields.length === 0) return null
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subtitleFieldNameOrId)
+    if (isUUID) return subtitleFieldNameOrId
+    const field = fields.find(f => f.name === subtitleFieldNameOrId)
+    return field?.id || null
+  }, [subtitleFieldNameOrId, fields])
+  
+  const additionalFieldId = useMemo(() => {
+    if (!additionalFieldNameOrId || fields.length === 0) return null
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(additionalFieldNameOrId)
+    if (isUUID) return additionalFieldNameOrId
+    const field = fields.find(f => f.name === additionalFieldNameOrId)
+    return field?.id || null
+  }, [additionalFieldNameOrId, fields])
 
   // Load table name and fields
   useEffect(() => {

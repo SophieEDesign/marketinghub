@@ -48,9 +48,11 @@ export default function RecordReviewPage({
 
   // Get tableId and leftPanel settings from page.settings or page.config (single source of truth)
   // InterfacePage uses config, Page type uses settings - handle both
+  // CRITICAL: RecordViewPageSettings saves to config.left_panel (snake_case), so check both formats
   const pageConfig = (page as any).config || page.settings || {}
   const pageTableId = pageConfig.tableId || pageConfig.primary_table_id || page.settings?.tableId || page.settings?.primary_table_id || null
-  const leftPanelSettings = pageConfig.leftPanel || page.settings?.leftPanel
+  // Check both left_panel (snake_case) and leftPanel (camelCase) for backward compatibility
+  const leftPanelSettings = pageConfig.left_panel || pageConfig.leftPanel || page.settings?.left_panel || page.settings?.leftPanel
   
   // Determine page type from page object (for record_view vs record_review)
   const pageType = (page as any).page_type || (page as any).type || 'record_review'

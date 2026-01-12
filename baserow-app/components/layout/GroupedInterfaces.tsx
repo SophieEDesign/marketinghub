@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -697,7 +698,12 @@ export default function GroupedInterfaces({
     return (
       <Link
         href={`/pages/${page.id}`}
-        className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-50"
+        className={cn(
+          "flex items-center gap-2 px-2 py-1.5 rounded transition-colors",
+          "hover:bg-gray-50",
+          // Ensure consistent sizing - active state only changes background and text color, not layout
+          isActive && "font-medium"
+        )}
         onClick={(e) => {
           // Only navigate, don't toggle edit mode
           e.stopPropagation()
@@ -708,7 +714,7 @@ export default function GroupedInterfaces({
         } : { color: sidebarTextColor }}
       >
         <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
-        <span className="text-sm truncate">{page.name}</span>
+        <span className="text-sm truncate flex-1">{page.name}</span>
       </Link>
     )
   }

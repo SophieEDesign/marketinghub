@@ -100,9 +100,9 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
             >
               <span>Recently Viewed</span>
               {expandedSections.has('recents') ? (
-                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               )}
             </button>
           </div>
@@ -121,7 +121,7 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
                     } : { color: sidebarTextColor }}
                   >
                     <Clock className="h-3 w-3 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
-                    <span className="truncate flex-1 text-left">{item.name || item.entity_id}</span>
+                    <span className="truncate flex-1 text-left font-medium">{item.name || item.entity_id}</span>
                   </button>
                 )
               })}
@@ -141,9 +141,9 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
             >
               <span>Starred</span>
               {expandedSections.has('favorites') ? (
-                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               )}
             </button>
           </div>
@@ -162,7 +162,7 @@ export default function RecentsFavoritesSection({ primaryColor, sidebarTextColor
                     } : { color: sidebarTextColor }}
                   >
                     <Star className="h-3 w-3 flex-shrink-0 fill-yellow-400 text-yellow-400" />
-                    <span className="truncate flex-1 text-left">{item.name || item.entity_id}</span>
+                    <span className="truncate flex-1 text-left font-medium">{item.name || item.entity_id}</span>
                   </button>
                 )
               })}

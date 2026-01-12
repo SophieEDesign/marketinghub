@@ -11,6 +11,11 @@ import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import TimelineFieldValue from "./TimelineFieldValue"
+import {
+  resolveChoiceColor,
+  normalizeHexColor,
+} from "@/lib/field-colors"
 
 interface TimelineViewProps {
   tableId: string
@@ -26,6 +31,16 @@ interface TimelineViewProps {
   colorField?: string // Field name to use for event colors (single-select field)
   imageField?: string // Field name to use for event images
   fitImageSize?: boolean // Whether to fit image to container size
+  // Card field configuration
+  titleField?: string // Field to use as card title
+  cardField1?: string // Secondary field 1
+  cardField2?: string // Secondary field 2
+  cardField3?: string // Secondary field 3
+  // Grouping
+  groupByField?: string // Field to group by (select field)
+  // Appearance settings
+  wrapTitle?: boolean // Whether to wrap title text
+  rowSize?: 'compact' | 'medium' | 'comfortable' // Row size setting
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -39,6 +54,7 @@ interface TimelineEvent {
   rowData: Record<string, any>
   color?: string
   image?: string
+  groupValue?: string | null
 }
 
 export default function TimelineView({
@@ -55,6 +71,13 @@ export default function TimelineView({
   colorField,
   imageField,
   fitImageSize = false,
+  titleField: titleFieldProp,
+  cardField1,
+  cardField2,
+  cardField3,
+  groupByField: groupByFieldProp,
+  wrapTitle: wrapTitleProp,
+  rowSize = 'medium',
 }: TimelineViewProps) {
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -195,7 +218,7 @@ export default function TimelineView({
     }
     
     // 2. Check block/page config
-    const blockColorField = blockConfig?.timeline_color_field || blockConfig?.color_field
+    const blockColorField = blockConfig?.timeline_color_field || blockConfig?.color_field || blockConfig?.appearance?.color_field
     if (blockColorField) {
       const field = tableFields.find(f => 
         (f.name === blockColorField || f.id === blockColorField) && 
@@ -216,6 +239,67 @@ export default function TimelineView({
     // 4. Auto-detect: find first single_select or multi_select field
     return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
   }, [colorField, blockConfig, viewConfig, tableFields])
+
+  // Resolve card field configuration
+  const resolvedCardFields = useMemo(() => {
+    // Priority: props > blockConfig > auto-detect
+    const titleFieldName = titleFieldProp || 
+      blockConfig?.timeline_title_field || 
+      blockConfig?.card_title_field ||
+      null
+    
+    // Find primary field (name/title field) as default
+    const primaryField = tableFields.find(f => 
+      (f.type === 'text' || f.type === 'long_text') && 
+      (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
+    ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
+    
+    const resolvedTitleField = titleFieldName
+      ? tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || primaryField
+      : primaryField
+
+    const cardFields = [
+      cardField1 || blockConfig?.timeline_field_1 || blockConfig?.card_field_1,
+      cardField2 || blockConfig?.timeline_field_2 || blockConfig?.card_field_2,
+      cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
+    ].filter(Boolean).map(fieldName => 
+      tableFields.find(f => f.name === fieldName || f.id === fieldName)
+    ).filter(Boolean) as TableField[]
+
+    return {
+      titleField: resolvedTitleField,
+      cardFields,
+    }
+  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields])
+
+  // Resolve group by field
+  const resolvedGroupByField = useMemo(() => {
+    const groupFieldName = groupByFieldProp || 
+      blockConfig?.timeline_group_by || 
+      blockConfig?.group_by_field || 
+      blockConfig?.group_by ||
+      null
+    
+    if (!groupFieldName) return null
+    
+    const field = tableFields.find(f => 
+      (f.name === groupFieldName || f.id === groupFieldName) &&
+      (f.type === 'single_select' || f.type === 'multi_select')
+    )
+    
+    return field || null
+  }, [groupByFieldProp, blockConfig, tableFields])
+
+  // Resolve wrap title setting
+  const wrapTitle = useMemo(() => {
+    return wrapTitleProp !== undefined 
+      ? wrapTitleProp 
+      : blockConfig?.timeline_wrap_title || 
+        blockConfig?.card_wrap_title || 
+        blockConfig?.appearance?.timeline_wrap_title ||
+        blockConfig?.appearance?.card_wrap_title ||
+        false
+  }, [wrapTitleProp, blockConfig])
 
   // Resolve date_from and date_to fields from block config, props, or auto-detect
   const resolvedDateFields = useMemo(() => {
@@ -369,12 +453,23 @@ export default function TimelineView({
           end = start
         }
 
-        // Get title from first non-date field
-        const titleField = (Array.isArray(fieldIds) ? fieldIds : []).find(
-          (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId && 
-                   fid !== fromFieldName && fid !== toFieldName
-        )
-        const title = titleField ? String(row.data[titleField] || "Untitled") : "Untitled"
+        // Get title from configured title field or fallback
+        let title = "Untitled"
+        if (resolvedCardFields.titleField) {
+          const titleValue = row.data[resolvedCardFields.titleField.name]
+          if (titleValue !== null && titleValue !== undefined && titleValue !== "") {
+            title = String(titleValue)
+          }
+        } else {
+          // Fallback: use first non-date field
+          const titleField = (Array.isArray(fieldIds) ? fieldIds : []).find(
+            (fid) => fid !== dateFieldId && fid !== startDateFieldId && fid !== endDateFieldId && 
+                     fid !== fromFieldName && fid !== toFieldName
+          )
+          if (titleField) {
+            title = String(row.data[titleField] || "Untitled")
+          }
+        }
 
         // Get color from resolved color field (single_select or multi_select)
         let color: string | undefined = undefined
@@ -389,8 +484,30 @@ export default function TimelineView({
               : fieldValue
             
             if (valueToColor) {
-              color = getColorForValue(String(valueToColor))
+              // Use centralized color system
+              const normalizedValue = String(valueToColor).trim()
+              const hexColor = resolveChoiceColor(
+                normalizedValue,
+                resolvedColorField.type,
+                resolvedColorField.options,
+                resolvedColorField.type === 'single_select'
+              )
+              color = normalizeHexColor(hexColor)
             }
+          }
+        }
+
+        // Get group value for grouping
+        let groupValue: string | null = null
+        if (resolvedGroupByField) {
+          const groupFieldName = resolvedGroupByField.name
+          const groupFieldValue = row.data[groupFieldName]
+          
+          if (groupFieldValue) {
+            // For multi_select, use the first value; for single_select, use the value directly
+            groupValue = resolvedGroupByField.type === 'multi_select' && Array.isArray(groupFieldValue)
+              ? String(groupFieldValue[0] || '')
+              : String(groupFieldValue || '')
           }
         }
 
@@ -417,10 +534,11 @@ export default function TimelineView({
           rowData: row.data,
           color,
           image,
+          groupValue,
         }
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, imageField])
+  }, [filteredRows, startDateFieldId, endDateFieldId, dateFieldId, fieldIds, tableFields, optimisticUpdates, resolvedColorField, resolvedDateFields, imageField, resolvedCardFields, resolvedGroupByField])
 
   // Calculate timeline range based on zoom level
   const timelineRange = useMemo(() => {
@@ -470,6 +588,61 @@ export default function TimelineView({
       return event.end >= timelineRange.start && event.start <= timelineRange.end
     })
   }, [events, timelineRange])
+
+  // Group events by group field if configured
+  const groupedEvents = useMemo(() => {
+    if (!resolvedGroupByField) {
+      // No grouping - return single group
+      return { '': visibleEvents }
+    }
+
+    const groups: Record<string, TimelineEvent[]> = {}
+    
+    visibleEvents.forEach(event => {
+      const groupKey = event.groupValue || 'Unassigned'
+      if (!groups[groupKey]) {
+        groups[groupKey] = []
+      }
+      groups[groupKey].push(event)
+    })
+
+    // Sort groups by field options order if available
+    if (resolvedGroupByField.options?.choices) {
+      const sortedGroups: Record<string, TimelineEvent[]> = {}
+      const choices = resolvedGroupByField.options.choices
+      
+      // Add groups in choice order
+      choices.forEach(choice => {
+        if (groups[choice]) {
+          sortedGroups[choice] = groups[choice]
+        }
+      })
+      
+      // Add remaining groups (including Unassigned)
+      Object.keys(groups).forEach(key => {
+        if (!sortedGroups[key]) {
+          sortedGroups[key] = groups[key]
+        }
+      })
+      
+      return sortedGroups
+    }
+
+    return groups
+  }, [visibleEvents, resolvedGroupByField])
+
+  // Calculate row size spacing
+  const rowSizeSpacing = useMemo(() => {
+    const rowSizeValue = blockConfig?.appearance?.row_height || rowSize || 'medium'
+    switch (rowSizeValue) {
+      case 'compact':
+        return { cardPadding: 'p-1.5', laneSpacing: 'mb-2', cardHeight: 'h-8' }
+      case 'comfortable':
+        return { cardPadding: 'p-3', laneSpacing: 'mb-6', cardHeight: 'h-16' }
+      default: // medium
+        return { cardPadding: 'p-2', laneSpacing: 'mb-4', cardHeight: 'h-10' }
+    }
+  }, [blockConfig, rowSize])
 
   // Calculate pixel positions for events
   const getEventPosition = useCallback(
@@ -828,75 +1001,221 @@ export default function TimelineView({
             </div>
           </div>
 
-          {/* Events */}
+          {/* Events - Grouped or Ungrouped */}
           <div className="relative" style={{ minHeight: "400px" }}>
-            {visibleEvents.map((event, index) => {
-              const { left, width } = getEventPosition(event)
-              const isDragging = draggingEvent === event.id
-              const isResizing = resizingEvent?.id === event.id
-              
-              return (
-                <div
-                  key={event.id}
-                  className="absolute group"
-                  style={{
-                    left: `${left}px`,
-                    width: `${width}px`,
-                    top: `${index * 50}px`,
-                    height: "40px",
-                  }}
-                >
-                  <Card
-                    className={`h-full shadow-sm hover:shadow-md transition-shadow ${
-                      event.color ? `border-l-4` : ""
-                    } ${isDragging || isResizing ? 'opacity-75' : ''} ${
-                      draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
-                    }`}
-                    style={{
-                      borderLeftColor: event.color,
-                      backgroundColor: event.color ? `${event.color}15` : "white",
-                    }}
-                    onMouseDown={(e) => handleDragStart(event, e)}
-                    onClick={(e) => handleEventClick(event, e)}
-                  >
-                    <CardContent className="p-2 h-full flex items-center relative gap-2">
-                      {/* Image if configured */}
-                      {event.image && (
-                        <div className={`flex-shrink-0 w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
-                          <img
-                            src={event.image}
-                            alt=""
-                            className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none'
-                            }}
+            {resolvedGroupByField ? (
+              // Render grouped lanes
+              Object.entries(groupedEvents).map(([groupKey, groupEvents], groupIndex) => {
+                // Get group label and color
+                const groupLabel = groupKey === 'Unassigned' ? 'Unassigned' : groupKey
+                let groupColor: string | undefined = undefined
+                if (groupKey !== 'Unassigned' && resolvedGroupByField.options) {
+                  const hexColor = resolveChoiceColor(
+                    groupKey,
+                    resolvedGroupByField.type,
+                    resolvedGroupByField.options,
+                    resolvedGroupByField.type === 'single_select'
+                  )
+                  groupColor = normalizeHexColor(hexColor)
+                }
+
+                const laneTop = groupIndex * (rowSizeSpacing.cardHeight === 'h-8' ? 60 : rowSizeSpacing.cardHeight === 'h-16' ? 100 : 80)
+
+                return (
+                  <div key={groupKey} className={rowSizeSpacing.laneSpacing}>
+                    {/* Group header */}
+                    <div className="sticky top-12 bg-white z-5 border-b border-gray-200 pb-1 mb-2">
+                      <div className="flex items-center gap-2">
+                        {groupColor && (
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: groupColor }}
                           />
+                        )}
+                        <span className="text-xs font-medium text-gray-700">{groupLabel}</span>
+                        <span className="text-xs text-gray-400">({groupEvents.length})</span>
+                      </div>
+                    </div>
+
+                    {/* Group events */}
+                    <div className="relative" style={{ minHeight: "60px" }}>
+                      {groupEvents.map((event, eventIndex) => {
+                        const { left, width } = getEventPosition(event)
+                        const isDragging = draggingEvent === event.id
+                        const isResizing = resizingEvent?.id === event.id
+                        
+                        return (
+                          <div
+                            key={event.id}
+                            className="absolute group"
+                            style={{
+                              left: `${left}px`,
+                              width: `${width}px`,
+                              top: `${eventIndex * (rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70)}px`,
+                            }}
+                          >
+                            <Card
+                              className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
+                                event.color ? `border-l-4` : ""
+                              } ${isDragging || isResizing ? 'opacity-75' : ''} ${
+                                draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
+                              }`}
+                              style={{
+                                borderLeftColor: event.color,
+                                backgroundColor: event.color ? `${event.color}15` : "white",
+                              }}
+                              onMouseDown={(e) => handleDragStart(event, e)}
+                              onClick={(e) => handleEventClick(event, e)}
+                            >
+                              <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
+                                {/* Image if configured */}
+                                {event.image && (
+                                  <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                                    <img
+                                      src={event.image}
+                                      alt=""
+                                      className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none'
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                                
+                                {/* Resize handle - left */}
+                                <div
+                                  className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
+                                  onMouseDown={(e) => handleResizeStart(event, 'start', e)}
+                                  style={{ marginLeft: '-3px' }}
+                                  title="Drag to resize start date"
+                                />
+                                
+                                {/* Title */}
+                                <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                                  {event.title}
+                                </div>
+
+                                {/* Card fields */}
+                                {resolvedCardFields.cardFields.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-0.5">
+                                    {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
+                                      const value = event.rowData[field.name]
+                                      return (
+                                        <TimelineFieldValue
+                                          key={field.id}
+                                          field={field}
+                                          value={value}
+                                          compact={true}
+                                        />
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {/* Resize handle - right */}
+                                <div
+                                  className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
+                                  onMouseDown={(e) => handleResizeStart(event, 'end', e)}
+                                  style={{ marginRight: '-3px' }}
+                                  title="Drag to resize end date"
+                                />
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              // Render ungrouped events
+              visibleEvents.map((event, index) => {
+                const { left, width } = getEventPosition(event)
+                const isDragging = draggingEvent === event.id
+                const isResizing = resizingEvent?.id === event.id
+                
+                return (
+                  <div
+                    key={event.id}
+                    className="absolute group"
+                    style={{
+                      left: `${left}px`,
+                      width: `${width}px`,
+                      top: `${index * (rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70)}px`,
+                    }}
+                  >
+                    <Card
+                      className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
+                        event.color ? `border-l-4` : ""
+                      } ${isDragging || isResizing ? 'opacity-75' : ''} ${
+                        draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
+                      }`}
+                      style={{
+                        borderLeftColor: event.color,
+                        backgroundColor: event.color ? `${event.color}15` : "white",
+                      }}
+                      onMouseDown={(e) => handleDragStart(event, e)}
+                      onClick={(e) => handleEventClick(event, e)}
+                    >
+                      <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
+                        {/* Image if configured */}
+                        {event.image && (
+                          <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                            <img
+                              src={event.image}
+                              alt=""
+                              className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+                        
+                        {/* Resize handle - left */}
+                        <div
+                          className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
+                          onMouseDown={(e) => handleResizeStart(event, 'start', e)}
+                          style={{ marginLeft: '-3px' }}
+                          title="Drag to resize start date"
+                        />
+                        
+                        {/* Title */}
+                        <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                          {event.title}
                         </div>
-                      )}
-                      
-                      {/* Resize handle - left */}
-                      <div
-                        className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-l"
-                        onMouseDown={(e) => handleResizeStart(event, 'start', e)}
-                        style={{ marginLeft: '-3px' }}
-                        title="Drag to resize start date"
-                      />
-                      
-                      {/* Event content */}
-                      <div className="truncate text-sm font-medium flex-1 px-1">{event.title}</div>
-                      
-                      {/* Resize handle - right */}
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
-                        onMouseDown={(e) => handleResizeStart(event, 'end', e)}
-                        style={{ marginRight: '-3px' }}
-                        title="Drag to resize end date"
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              )
-            })}
+
+                        {/* Card fields */}
+                        {resolvedCardFields.cardFields.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
+                              const value = event.rowData[field.name]
+                              return (
+                                <TimelineFieldValue
+                                  key={field.id}
+                                  field={field}
+                                  value={value}
+                                  compact={true}
+                                />
+                              )
+                            })}
+                          </div>
+                        )}
+                        
+                        {/* Resize handle - right */}
+                        <div
+                          className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-blue-300/50 opacity-0 group-hover:opacity-100 transition-opacity z-10 rounded-r"
+                          onMouseDown={(e) => handleResizeStart(event, 'end', e)}
+                          style={{ marginRight: '-3px' }}
+                          title="Drag to resize end date"
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
+                )
+              })
+            )}
           </div>
 
           {visibleEvents.length === 0 && (
@@ -935,21 +1254,7 @@ export default function TimelineView({
   )
 }
 
-// Helper functions
-function getColorForValue(value: string): string {
-  const colors = [
-    "#3B82F6", // blue
-    "#10B981", // green
-    "#F59E0B", // amber
-    "#EF4444", // red
-    "#8B5CF6", // purple
-    "#EC4899", // pink
-    "#06B6D4", // cyan
-    "#84CC16", // lime
-  ]
-  const hash = value.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return colors[hash % colors.length]
-}
+// Helper functions (getColorForValue removed - using centralized color system)
 
 function getIncrementForZoom(zoom: ZoomLevel): number {
   switch (zoom) {

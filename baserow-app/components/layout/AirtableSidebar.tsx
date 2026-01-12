@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useSidebarMode } from "@/contexts/SidebarModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
+import { cn } from "@/lib/utils"
 import type { Automation, Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -57,10 +58,20 @@ export default function AirtableSidebar({
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
-  // Interfaces expanded by default
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["interfaces"])
-  )
+  // Load initial state from localStorage or default to interfaces expanded
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem("sidebar-sections-expanded")
+      if (saved) {
+        try {
+          return new Set(JSON.parse(saved))
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+    return new Set(["interfaces"])
+  })
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [newPageModalOpen, setNewPageModalOpen] = useState(false)
   
@@ -71,15 +82,23 @@ export default function AirtableSidebar({
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
 
-  // Auto-expand sections based on current route
+  // Load persisted expand/collapse state from localStorage on mount
   useEffect(() => {
-    if (isInterfacePage) {
-      setExpandedSections(prev => new Set(prev).add("interfaces"))
+    const saved = localStorage.getItem("sidebar-sections-expanded")
+    if (saved) {
+      try {
+        const expanded = JSON.parse(saved)
+        setExpandedSections(new Set(expanded))
+      } catch (e) {
+        // Ignore parse errors, use default
+      }
     }
-    if (isTablePage) {
-      setExpandedSections(prev => new Set(prev).add("core-data"))
-    }
-  }, [isInterfacePage, isTablePage, pathname])
+  }, [])
+
+  // Save expand/collapse state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(expandedSections)))
+  }, [expandedSections])
 
   function toggleSection(section: string) {
     setExpandedSections(prev => {
@@ -89,6 +108,8 @@ export default function AirtableSidebar({
       } else {
         next.add(section)
       }
+      // Persist to localStorage
+      localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(next)))
       return next
     })
   }
@@ -159,31 +180,32 @@ export default function AirtableSidebar({
             >
               <span>Interfaces</span>
               {expandedSections.has("interfaces") ? (
-                <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               ) : (
-                <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
               )}
             </button>
             {expandedSections.has("interfaces") && (
               <button
                 onClick={toggleMode}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                className={cn(
+                  "px-2 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1",
                   isEditMode
                     ? "bg-blue-100 hover:bg-blue-200"
                     : "hover:bg-gray-100"
-                }`}
+                )}
                 style={{ color: isEditMode ? primaryColor : sidebarTextColor }}
                 title={isEditMode ? "Done editing" : "Edit interfaces"}
               >
                 {isEditMode ? (
                   <>
-                    <Check className="h-3 w-3 inline mr-1" />
-                    Done
+                    <Check className="h-3 w-3" />
+                    <span>Done</span>
                   </>
                 ) : (
                   <>
-                    <Edit2 className="h-3 w-3 inline mr-1" />
-                    Edit
+                    <Edit2 className="h-3 w-3" />
+                    <span>Edit</span>
                   </>
                 )}
               </button>
@@ -218,9 +240,9 @@ export default function AirtableSidebar({
               >
                 <span>Core Data</span>
                 {expandedSections.has("core-data") ? (
-                  <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                  <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 ) : (
-                  <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
+                  <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 )}
               </button>
             </div>

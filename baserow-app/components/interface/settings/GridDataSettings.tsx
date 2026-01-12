@@ -838,6 +838,153 @@ export default function GridDataSettings({
                 Use start + end fields for date range events, or leave as &quot;None&quot; for single date events.
               </p>
             </div>
+
+            {/* Group by Select Field */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Group by (optional)</Label>
+              <Select
+                value={config.timeline_group_by || config.group_by_field || config.group_by || "__none__"}
+                onValueChange={(value) => onUpdate({ 
+                  timeline_group_by: value === "__none__" ? undefined : value,
+                  group_by_field: value === "__none__" ? undefined : value,
+                  group_by: value === "__none__" ? undefined : value
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select a select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (no grouping)</SelectItem>
+                  {fields
+                    .filter(field => field.type === 'single_select' || field.type === 'multi_select')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {fields.filter(f => f.type === 'single_select' || f.type === 'multi_select').length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No select fields found. Add a single-select or multi-select field to enable grouping.
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Group timeline events by a select field. Each group appears as a separate lane.
+              </p>
+            </div>
+          </div>
+
+          {/* Card Fields Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Card fields</Label>
+            <p className="text-xs text-gray-500 mb-3">
+              Configure which fields appear on timeline cards
+            </p>
+
+            {/* Title Field */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Title field</Label>
+              <Select
+                value={config.timeline_title_field || config.card_title_field || ""}
+                onValueChange={(value) => onUpdate({ 
+                  timeline_title_field: value,
+                  card_title_field: value
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select title field (default: primary field)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fields
+                    .filter(field => field.type !== 'date' && field.type !== 'formula' && field.type !== 'lookup')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                Field to use as the card title. Defaults to the primary field if not set.
+              </p>
+            </div>
+
+            {/* Secondary Fields */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Field 1 (optional)</Label>
+              <Select
+                value={config.timeline_field_1 || config.card_field_1 || "__none__"}
+                onValueChange={(value) => onUpdate({ 
+                  timeline_field_1: value === "__none__" ? undefined : value,
+                  card_field_1: value === "__none__" ? undefined : value
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {fields
+                    .filter(field => field.type !== 'date' && field.type !== 'formula' && field.type !== 'lookup')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Field 2 (optional)</Label>
+              <Select
+                value={config.timeline_field_2 || config.card_field_2 || "__none__"}
+                onValueChange={(value) => onUpdate({ 
+                  timeline_field_2: value === "__none__" ? undefined : value,
+                  card_field_2: value === "__none__" ? undefined : value
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {fields
+                    .filter(field => field.type !== 'date' && field.type !== 'formula' && field.type !== 'lookup')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Field 3 (optional)</Label>
+              <Select
+                value={config.timeline_field_3 || config.card_field_3 || "__none__"}
+                onValueChange={(value) => onUpdate({ 
+                  timeline_field_3: value === "__none__" ? undefined : value,
+                  card_field_3: value === "__none__" ? undefined : value
+                })}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {fields
+                    .filter(field => field.type !== 'date' && field.type !== 'formula' && field.type !== 'lookup')
+                    .map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Fields Section - Airtable Style */}
