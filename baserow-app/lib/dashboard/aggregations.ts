@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import type { TableField } from '@/types/database'
+import { applyFiltersToQuery, normalizeFilter, type FilterConfig } from '@/lib/interface/filters'
+import type { BlockFilter } from '@/lib/interface/types'
 
 export type AggregateFunction = 'count' | 'sum' | 'avg' | 'min' | 'max'
 
@@ -24,7 +26,8 @@ export async function aggregateTableData(
   tableId: string,
   aggregate: AggregateFunction,
   fieldName?: string,
-  filters?: any[]
+  filters?: BlockFilter[] | FilterConfig[],
+  tableFields?: TableField[]
 ): Promise<AggregationResult> {
   try {
     const supabase = await createClient()
@@ -42,6 +45,22 @@ export async function aggregateTableData(
 
     const supabaseTable = table.supabase_table
 
+    // Load table fields if not provided (needed for filter application)
+    let fields = tableFields
+    if (!fields) {
+      const { data: fieldsData } = await supabase
+        .from('table_fields')
+        .select('*')
+        .eq('table_id', tableId)
+        .order('position', { ascending: true })
+      fields = fieldsData || []
+    }
+
+    // Normalize filters to FilterConfig format
+    const normalizedFilters: FilterConfig[] = filters
+      ? filters.map(f => normalizeFilter(f))
+      : []
+
     // Build query based on aggregate type
     if (aggregate === 'count') {
       // Count all rows (with filters if provided)
@@ -49,25 +68,9 @@ export async function aggregateTableData(
         .from(supabaseTable)
         .select('*', { count: 'exact', head: true })
 
-      // Apply filters if provided
-      if (filters && filters.length > 0) {
-        filters.forEach((filter: any) => {
-          if (filter.operator === 'eq') {
-            query = query.eq(filter.field, filter.value)
-          } else if (filter.operator === 'neq') {
-            query = query.neq(filter.field, filter.value)
-          } else if (filter.operator === 'gt') {
-            query = query.gt(filter.field, filter.value)
-          } else if (filter.operator === 'gte') {
-            query = query.gte(filter.field, filter.value)
-          } else if (filter.operator === 'lt') {
-            query = query.lt(filter.field, filter.value)
-          } else if (filter.operator === 'lte') {
-            query = query.lte(filter.field, filter.value)
-          } else if (filter.operator === 'contains') {
-            query = query.ilike(filter.field, `%${filter.value}%`)
-          }
-        })
+      // Apply filters using shared filter logic
+      if (normalizedFilters.length > 0) {
+        query = applyFiltersToQuery(query, normalizedFilters, fields)
       }
 
       const { count, error } = await query
@@ -85,14 +88,8 @@ export async function aggregateTableData(
     }
 
     // Get field info to determine type
-    const { data: field, error: fieldError } = await supabase
-      .from('table_fields')
-      .select('type')
-      .eq('table_id', tableId)
-      .eq('name', fieldName)
-      .single()
-
-    if (fieldError || !field) {
+    const field = fields.find(f => f.name === fieldName)
+    if (!field) {
       return { value: null, error: 'Field not found' }
     }
 
@@ -109,7 +106,7 @@ export async function aggregateTableData(
         table_name: supabaseTable,
         field_name: fieldName,
         aggregate_type: aggregate,
-        filter_json: filters ? JSON.stringify(filters) : null
+        filter_json: normalizedFilters.length > 0 ? JSON.stringify(normalizedFilters) : null
       })
 
       if (!rpcError && data !== null) {
@@ -126,25 +123,9 @@ export async function aggregateTableData(
       .select(fieldName)
       .limit(2000) // Reduced limit to prevent crashes
 
-    // Apply filters
-    if (filters && filters.length > 0) {
-      filters.forEach((filter: any) => {
-        if (filter.operator === 'eq') {
-          query = query.eq(filter.field, filter.value)
-        } else if (filter.operator === 'neq') {
-          query = query.neq(filter.field, filter.value)
-        } else if (filter.operator === 'gt') {
-          query = query.gt(filter.field, filter.value)
-        } else if (filter.operator === 'gte') {
-          query = query.gte(filter.field, filter.value)
-        } else if (filter.operator === 'lt') {
-          query = query.lt(filter.field, filter.value)
-        } else if (filter.operator === 'lte') {
-          query = query.lte(filter.field, filter.value)
-        } else if (filter.operator === 'contains') {
-          query = query.ilike(filter.field, `%${filter.value}%`)
-        }
-      })
+    // Apply filters using shared filter logic
+    if (normalizedFilters.length > 0) {
+      query = applyFiltersToQuery(query, normalizedFilters, fields)
     }
 
     const { data: rows, error } = await query
@@ -203,23 +184,29 @@ export async function comparePeriods(
   currentEnd: Date,
   previousStart: Date,
   previousEnd: Date,
-  filters?: any[]
+  filters?: BlockFilter[] | FilterConfig[],
+  tableFields?: TableField[]
 ): Promise<ComparisonResult> {
+  // Normalize existing filters
+  const normalizedFilters: FilterConfig[] = filters
+    ? filters.map(f => normalizeFilter(f))
+    : []
+
   // Get current period value
-  const currentFilters = [
-    ...(filters || []),
-    { field: dateFieldName, operator: 'gte', value: currentStart.toISOString() },
-    { field: dateFieldName, operator: 'lte', value: currentEnd.toISOString() },
+  const currentFilters: FilterConfig[] = [
+    ...normalizedFilters,
+    { field: dateFieldName, operator: 'greater_than_or_equal', value: currentStart.toISOString() },
+    { field: dateFieldName, operator: 'less_than_or_equal', value: currentEnd.toISOString() },
   ]
-  const current = await aggregateTableData(tableId, aggregate, fieldName, currentFilters)
+  const current = await aggregateTableData(tableId, aggregate, fieldName, currentFilters, tableFields)
 
   // Get previous period value
-  const previousFilters = [
-    ...(filters || []),
-    { field: dateFieldName, operator: 'gte', value: previousStart.toISOString() },
-    { field: dateFieldName, operator: 'lte', value: previousEnd.toISOString() },
+  const previousFilters: FilterConfig[] = [
+    ...normalizedFilters,
+    { field: dateFieldName, operator: 'greater_than_or_equal', value: previousStart.toISOString() },
+    { field: dateFieldName, operator: 'less_than_or_equal', value: previousEnd.toISOString() },
   ]
-  const previous = await aggregateTableData(tableId, aggregate, fieldName, previousFilters)
+  const previous = await aggregateTableData(tableId, aggregate, fieldName, previousFilters, tableFields)
 
   const currentValue = current.value || 0
   const previousValue = previous.value || 0

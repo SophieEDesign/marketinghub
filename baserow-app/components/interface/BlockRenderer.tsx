@@ -88,7 +88,7 @@ export default function BlockRenderer({
     const canEdit = isEditing && !isLocked
     
     // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
-    const normalizedBlockType = (block.type === 'table' ? 'grid' : block.type) as BlockType
+    const normalizedBlockType = ((block.type as string) === 'table' ? 'grid' : block.type) as BlockType
     
     // Pre-deployment guard: Validate block config before rendering
     // Check for all possible date field config properties

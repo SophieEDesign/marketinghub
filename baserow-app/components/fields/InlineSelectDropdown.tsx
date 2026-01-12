@@ -50,7 +50,7 @@ export default function InlineSelectDropdown({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const isMulti = fieldType === 'multi_select'
-  const selectedValues = useMemo(() => {
+  const selectedValues = useMemo((): string[] => {
     if (isMulti) {
       return Array.isArray(value) ? value : []
     }
@@ -213,7 +213,7 @@ export default function InlineSelectDropdown({
 
       // Update selected values if the renamed choice was selected
       if (isMulti) {
-        const newSelected = selectedValues.map(v => v === oldChoice ? newName.trim() : v)
+        const newSelected: string[] = selectedValues.map(v => v === oldChoice ? newName.trim() : v)
         await onValueChange(newSelected)
       } else if (selectedValues[0] === oldChoice) {
         await onValueChange(newName.trim())
@@ -301,7 +301,8 @@ export default function InlineSelectDropdown({
 
       // Remove from selected values if it was selected
       if (isMulti) {
-        await onValueChange(selectedValues.filter(v => v !== choiceToDelete))
+        const filteredValues: string[] = selectedValues.filter(v => v !== choiceToDelete)
+        await onValueChange(filteredValues)
       } else if (selectedValues[0] === choiceToDelete) {
         await onValueChange(null)
       }
@@ -320,7 +321,7 @@ export default function InlineSelectDropdown({
     return (
       <div className="flex flex-wrap gap-1.5">
         {selectedValues.length > 0 ? (
-          selectedValues.map((val) => {
+          selectedValues.map((val: string) => {
             const hexColor = getChoiceColor(val)
             const textColorClass = getTextColorForBackground(hexColor)
             const bgColor = normalizeHexColor(hexColor)
@@ -349,7 +350,7 @@ export default function InlineSelectDropdown({
         className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer"
       >
         {selectedValues.length > 0 ? (
-          selectedValues.map((val) => {
+          selectedValues.map((val: string) => {
             const hexColor = getChoiceColor(val)
             const textColorClass = getTextColorForBackground(hexColor)
             const bgColor = normalizeHexColor(hexColor)

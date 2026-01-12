@@ -476,7 +476,7 @@ export default function GroupedInterfaces({
   const handleDragStart = (event: DragStartEvent) => {
     // Prevent drag if renaming
     if (isRenaming) {
-      event.preventDefault()
+      // Return early to prevent drag - DragStartEvent doesn't have preventDefault
       return
     }
     

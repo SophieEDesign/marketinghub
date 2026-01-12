@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
-import { TrendingUp, TrendingDown, ArrowRight } from "lucide-react"
+import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
 
 interface KPIBlockProps {
@@ -33,6 +33,8 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
   const comparison = config?.comparison
   const target = config?.target_value
   const clickThrough = config?.click_through
+  const blockFilters = config?.filters || []
+  const hasFilters = blockFilters.length > 0
   
   // CRITICAL: Use pre-fetched aggregate data if available (page-level fetching)
   // Fallback to local state only if aggregateData is not provided (backward compatibility)
@@ -60,11 +62,20 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
 
   function handleClick() {
     if (clickThrough && !isEditing) {
-      // Navigate to filtered view
-      if (clickThrough.view_id) {
-        router.push(`/tables/${tableId}/views/${clickThrough.view_id}`)
-      } else if (tableId) {
-        router.push(`/tables/${tableId}`)
+      // Navigate to filtered view with filters applied
+      // Build URL with filter query params
+      const params = new URLSearchParams()
+      if (hasFilters) {
+        params.set('filters', JSON.stringify(blockFilters))
+      }
+      const queryString = params.toString()
+      const url = clickThrough.view_id
+        ? `/tables/${tableId}/views/${clickThrough.view_id}${queryString ? `?${queryString}` : ''}`
+        : tableId
+          ? `/tables/${tableId}${queryString ? `?${queryString}` : ''}`
+          : null
+      if (url) {
+        router.push(url)
       }
     }
   }
@@ -144,9 +155,19 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="text-center w-full">
           {!showTitle && (
-            <p className="text-sm mb-2" style={{ color: appearance.title_color }}>
-              {displayLabel}
-            </p>
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <p className="text-sm" style={{ color: appearance.title_color }}>
+                {displayLabel}
+              </p>
+              {hasFilters && isEditing && (
+                <div className="group relative">
+                  <Filter className="h-3 w-3 text-blue-600" />
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                    This KPI is filtered ({blockFilters.length} filter{blockFilters.length !== 1 ? 's' : ''})
+                  </div>
+                </div>
+              )}
+            </div>
           )}
           <p className="text-3xl font-bold mb-2" style={{ color: appearance.title_color || '#111827' }}>
             {displayValue}

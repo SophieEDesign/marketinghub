@@ -447,8 +447,8 @@ export default function FieldBlock({
             <AttachmentPreview
               attachments={attachments}
               maxVisible={10}
-              size={config?.appearance?.attachment_size || 'medium'}
-              displayStyle={field.options?.attachment_display_style || config?.appearance?.attachment_display_style || 'thumbnails'}
+              size={(config?.appearance as any)?.attachment_size || 'medium'}
+              displayStyle={field.options?.attachment_display_style || (config?.appearance as any)?.attachment_display_style || 'thumbnails'}
             />
           ) : (
             <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">

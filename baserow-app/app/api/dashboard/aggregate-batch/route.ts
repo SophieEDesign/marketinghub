@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aggregateTableData, comparePeriods, type AggregateFunction } from '@/lib/dashboard/aggregations'
 import { getCachedAggregate, setCachedAggregate, getOrCreatePromise } from '@/lib/dashboard/aggregateCache'
+import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,6 +44,14 @@ export async function POST(request: NextRequest) {
           return cached
         }
 
+        // Load table fields for filter application
+        const supabase = await createClient()
+        const { data: tableFields } = await supabase
+          .from('table_fields')
+          .select('*')
+          .eq('table_id', tableId)
+          .order('position', { ascending: true })
+
         // Use getOrCreatePromise to deduplicate concurrent requests
         return await getOrCreatePromise(cacheParams, async () => {
           // Handle comparison request
@@ -68,7 +77,8 @@ export async function POST(request: NextRequest) {
               new Date(currentEnd),
               new Date(previousStart),
               new Date(previousEnd),
-              filters
+              filters,
+              tableFields || []
             )
           }
 
@@ -77,7 +87,8 @@ export async function POST(request: NextRequest) {
             tableId,
             aggregate as AggregateFunction,
             fieldName,
-            filters
+            filters,
+            tableFields || []
           )
         })
       })

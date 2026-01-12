@@ -13,6 +13,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
+import BlockFilterEditor from "./BlockFilterEditor"
 
 interface KPIDataSettingsProps {
   config: BlockConfig
@@ -254,6 +255,17 @@ export default function KPIDataSettings({
           />
         )}
       </div>
+
+      {/* Filters */}
+      {config.table_id && (
+        <div className="space-y-2 border-t pt-4">
+          <BlockFilterEditor
+            filters={config.filters || []}
+            tableFields={fields}
+            onChange={(filters) => onUpdate({ filters })}
+          />
+        </div>
+      )}
 
       {/* Click-through */}
       {config.table_id && (

@@ -462,15 +462,20 @@ export default function PageDisplaySettingsPanel({
   // TypeScript guard: page is non-null after the check above
   const currentPage = page
 
-  const pageDefinition = getPageTypeDefinition(currentPage.page_type)
-  const isDataBacked = pageDefinition.requiresSourceView || pageDefinition.requiresBaseTable
-  
-  // Update content page name when page changes
+  // Update content page name when page changes (must be before any early returns)
   useEffect(() => {
     if (page) {
       setContentPageName(page.name)
     }
   }, [page?.name, page])
+
+  if (!page) return null
+
+  // TypeScript guard: page is non-null after the check above
+  const currentPage = page
+
+  const pageDefinition = getPageTypeDefinition(currentPage.page_type)
+  const isDataBacked = pageDefinition.requiresSourceView || pageDefinition.requiresBaseTable
 
   // Content pages don't show data settings - they're block-based only
   if (currentPage.page_type === 'content') {
