@@ -68,6 +68,8 @@ export default function Canvas({
   recordId = null,
   mode = 'view', // Default to view mode
   onRecordClick,
+  pageEditable,
+  editableFieldNames = [],
 }: CanvasProps) {
   // Get filters from filter blocks for this block
   const { getFiltersForBlock } = useFilterState()

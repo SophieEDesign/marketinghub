@@ -56,6 +56,8 @@ export default function BlockRenderer({
   filters = [],
   onRecordClick,
   aggregateData,
+  pageEditable,
+  editableFieldNames = [],
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)

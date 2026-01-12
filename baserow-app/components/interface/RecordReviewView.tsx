@@ -939,8 +939,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
             setSelectedRecordId(recordId)
           }}
           blocksLoading={blocksLoading}
-          pageEditable={pageEditable}
-          editableFieldNames={editableFieldNames}
         />
       )}
     </div>
