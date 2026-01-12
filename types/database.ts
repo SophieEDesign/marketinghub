@@ -21,6 +21,8 @@ export type FilterOperator =
 
 export type SortDirection = 'asc' | 'desc'
 
+export type FilterConditionType = 'AND' | 'OR'
+
 export type BlockType =
   | 'text'
   | 'image'
@@ -64,6 +66,19 @@ export interface ViewFilter {
   field_name: string
   operator: FilterOperator
   value?: string
+  filter_group_id?: string | null
+  order_index?: number
+}
+
+export interface ViewFilterGroup {
+  id: string
+  view_id: string
+  condition_type: FilterConditionType
+  order_index: number
+  created_at?: string
+  updated_at?: string
+  created_by?: string
+  updated_by?: string
 }
 
 export interface ViewSort {

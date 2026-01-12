@@ -3,12 +3,11 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Save } from "lucide-react"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import FieldEditor from "@/components/fields/FieldEditor"
 
 interface FormViewProps {
   tableId: string
@@ -183,34 +182,16 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
             </div>
           ) : (
             visibleFields.map((field) => {
-              const value = formData[field.name] || ""
-              const isRequired = field.required || false
+              const value = formData[field.name] ?? ""
 
               return (
-                <div key={field.id} className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    {field.name}
-                    {isRequired && <span className="text-red-500 ml-1">*</span>}
-                  </label>
-                  {field.type === "long_text" ? (
-                    <Textarea
-                      value={value}
-                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                      placeholder={`Enter ${field.name}`}
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500 min-h-[100px]"
-                      required={isRequired}
-                    />
-                  ) : (
-                    <Input
-                      type={field.type === "number" ? "number" : field.type === "email" ? "email" : "text"}
-                      value={value}
-                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                      placeholder={`Enter ${field.name}`}
-                      className="bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      required={isRequired}
-                    />
-                  )}
-                </div>
+                <FieldEditor
+                  key={field.id}
+                  field={field}
+                  value={value}
+                  onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                  required={field.required || false}
+                />
               )
             })
           )}

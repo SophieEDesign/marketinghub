@@ -5,8 +5,7 @@ import { X, Save, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 
 import type { TableField } from "@/types/fields"
-import { Calculator } from "lucide-react"
-import RichTextEditor from "@/components/fields/RichTextEditor"
+import FieldEditor from "@/components/fields/FieldEditor"
 
 interface RecordDrawerProps {
   isOpen: boolean
@@ -145,19 +144,6 @@ export default function RecordDrawer({
     }))
   }
 
-  function getInputType(fieldName: string, value: any): string {
-    // Infer type from value or field name
-    if (typeof value === "number") return "number"
-    if (typeof value === "boolean") return "checkbox"
-    if (value instanceof Date || (typeof value === "string" && value.match(/^\d{4}-\d{2}-\d{2}/))) {
-      return "date"
-    }
-    if (fieldName.toLowerCase().includes("email")) return "email"
-    if (fieldName.toLowerCase().includes("url")) return "url"
-    if (fieldName.toLowerCase().includes("phone")) return "tel"
-    return "text"
-  }
-
   if (!isOpen) return null
 
   return (
@@ -195,109 +181,29 @@ export default function RecordDrawer({
                 fieldNames.map((fieldName) => {
                   const value = formData[fieldName]
                   const tableField = tableFields.find(f => f.name === fieldName)
-                  const isFormula = tableField?.type === 'formula'
-                  const isVirtual = isFormula || tableField?.type === 'lookup'
-                  const isSelect = tableField?.type === 'single_select' || tableField?.type === 'multi_select'
-                  const inputType = getInputType(fieldName, value)
-                  const isLongText = fieldName.toLowerCase().includes("description") ||
-                                    fieldName.toLowerCase().includes("notes") ||
-                                    fieldName.toLowerCase().includes("comment")
-                  const isError = typeof value === 'string' && value.startsWith('#')
 
-                  // Helper for select field pill rendering
-                  const getSelectPillColor = (choiceValue: string) => {
-                    const choiceColor = tableField?.options?.choiceColors?.[choiceValue]
-                    if (!choiceColor) return { bg: 'bg-blue-100', text: 'text-blue-800', style: undefined }
-                    const r = parseInt(choiceColor.slice(1, 3), 16)
-                    const g = parseInt(choiceColor.slice(3, 5), 16)
-                    const b = parseInt(choiceColor.slice(5, 7), 16)
-                    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-                    return {
-                      bg: '',
-                      text: luminance > 0.5 ? 'text-gray-900' : 'text-white',
-                      style: { backgroundColor: choiceColor }
-                    }
+                  // If we have field metadata, use FieldEditor
+                  if (tableField) {
+                    return (
+                      <FieldEditor
+                        key={fieldName}
+                        field={tableField}
+                        value={value}
+                        onChange={(newValue) => handleFieldChange(fieldName, newValue)}
+                        required={tableField.required || false}
+                      />
+                    )
                   }
 
+                  // Fallback for fields without metadata - show as read-only
                   return (
                     <div key={fieldName} className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+                      <label className="block text-sm font-medium text-gray-700">
                         {fieldName}
-                        {isFormula && (
-                          <span title={`Formula: ${tableField?.options?.formula || ''}`}>
-                            <Calculator className="h-3 w-3 text-gray-400" />
-                          </span>
-                        )}
                       </label>
-                      {isVirtual ? (
-                        <div className={`px-3 py-2 border border-gray-200 rounded-md bg-gray-50 ${
-                          isError ? 'text-red-600' : 'text-gray-700'
-                        } italic`}>
-                          {value !== null && value !== undefined ? String(value) : "—"}
-                          {isFormula && tableField?.options?.formula && (
-                            <div className="text-xs text-gray-500 mt-1 font-mono">
-                              = {tableField.options.formula}
-                            </div>
-                          )}
-                        </div>
-                      ) : isSelect ? (
-                        <div className="px-3 py-2 border border-gray-300 rounded-md bg-white min-h-[38px] flex items-center flex-wrap gap-2">
-                          {(() => {
-                            const choices = tableField?.options?.choices || []
-                            const isMulti = tableField?.type === 'multi_select'
-                            const selectedValues = isMulti
-                              ? (Array.isArray(value) ? value : value ? [value] : [])
-                              : value ? [value] : []
-                            
-                            if (selectedValues.length === 0) {
-                              return <span className="text-sm text-gray-400">Select...</span>
-                            }
-                            
-                            return selectedValues.map((val: string) => {
-                              const colorInfo = getSelectPillColor(val)
-                              return (
-                                <span
-                                  key={val}
-                                  className={`px-2 py-1 rounded text-xs font-medium ${colorInfo.text}`}
-                                  style={colorInfo.style}
-                                >
-                                  {val}
-                                </span>
-                              )
-                            })
-                          })()}
-                        </div>
-                      ) : inputType === "checkbox" ? (
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={!!value}
-                            onChange={(e) => handleFieldChange(fieldName, e.target.checked)}
-                            className="w-4 h-4 cursor-pointer"
-                          />
-                        </div>
-                      ) : isLongText ? (
-                        <RichTextEditor
-                          value={value ?? ""}
-                          onChange={(val) => handleFieldChange(fieldName, val)}
-                          editable={true}
-                          showToolbar={true}
-                          minHeight="150px"
-                        />
-                      ) : (
-                        <input
-                          type={inputType}
-                          value={value ?? ""}
-                          onChange={(e) => {
-                            const newValue = inputType === "number"
-                              ? (e.target.value === "" ? null : Number(e.target.value))
-                              : e.target.value
-                            handleFieldChange(fieldName, newValue)
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={`Enter ${fieldName}...`}
-                        />
-                      )}
+                      <div className="px-3 py-2 bg-gray-50 rounded-md text-sm text-gray-600">
+                        {value !== null && value !== undefined ? String(value) : "—"}
+                      </div>
                     </div>
                   )
                 })
@@ -318,36 +224,34 @@ export default function RecordDrawer({
                   }
 
                   const value = formData[key]
-                  const inputType = getInputType(key, value)
+                  const tableField = tableFields.find(f => f.name === key)
 
+                  // If we have field metadata, use FieldEditor
+                  if (tableField) {
+                    return (
+                      <FieldEditor
+                        key={key}
+                        field={tableField}
+                        value={value}
+                        onChange={(newValue) => handleFieldChange(key, newValue)}
+                        required={tableField.required || false}
+                      />
+                    )
+                  }
+
+                  // Fallback for fields without metadata
                   return (
                     <div key={key} className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
                         {key}
                       </label>
-                      {inputType === "checkbox" ? (
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={!!value}
-                            onChange={(e) => handleFieldChange(key, e.target.checked)}
-                            className="w-4 h-4 cursor-pointer"
-                          />
-                        </div>
-                      ) : (
-                        <input
-                          type={inputType}
-                          value={value ?? ""}
-                          onChange={(e) => {
-                            const newValue = inputType === "number"
-                              ? (e.target.value === "" ? null : Number(e.target.value))
-                              : e.target.value
-                            handleFieldChange(key, newValue)
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={`Enter ${key}...`}
-                        />
-                      )}
+                      <input
+                        type="text"
+                        value={value ?? ""}
+                        onChange={(e) => handleFieldChange(key, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder={`Enter ${key}...`}
+                      />
                     </div>
                   )
                 })

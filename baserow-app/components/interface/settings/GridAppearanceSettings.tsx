@@ -162,14 +162,14 @@ export default function GridAppearanceSettings({
           <Label>Image field</Label>
           <div className="relative">
             <Select
-              value={appearance.image_field || ""}
-              onValueChange={(value) => onUpdate({ image_field: value || undefined })}
+              value={appearance.image_field || "__none__"}
+              onValueChange={(value) => onUpdate({ image_field: value === "__none__" ? undefined : value })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select image field..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {imageFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}
@@ -206,14 +206,14 @@ export default function GridAppearanceSettings({
           <Label>Color</Label>
           <div className="relative">
             <Select
-              value={appearance.color_field || ""}
-              onValueChange={(value) => onUpdate({ color_field: value || undefined })}
+              value={appearance.color_field || "__none__"}
+              onValueChange={(value) => onUpdate({ color_field: value === "__none__" ? undefined : value })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select color field..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="__none__">None</SelectItem>
                 {selectFields.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
                     {field.name}

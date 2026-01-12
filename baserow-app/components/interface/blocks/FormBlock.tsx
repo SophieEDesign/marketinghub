@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
-import type { TableField as FieldType } from "@/types/database"
-import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import type { TableField as FieldType } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import { canCreateRecords, canEditBlock } from "@/lib/interface/block-permissions"
-import RichTextEditor from "@/components/fields/RichTextEditor"
+import FieldEditor from "@/components/fields/FieldEditor"
 
 interface FormBlockProps {
   block: PageBlock
@@ -179,226 +178,68 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
     const value = formData[field.name] ?? ""
     const isRequired = field.formConfig?.required || false
 
-    switch (field.type) {
-      case "text":
-      case "long_text":
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              {field.name}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {field.type === "long_text" ? (
-              <RichTextEditor
-                value={value}
-                onChange={(val) => setFormData({ ...formData, [field.name]: val })}
-                editable={!isEditing && !isViewOnly}
-                showToolbar={!isEditing && !isViewOnly}
-                minHeight="150px"
-              />
-            ) : (
-              <input
-                type="text"
-                value={value}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                disabled={isEditing || isViewOnly}
-              />
-            )}
-          </div>
-        )
-
-      case "number":
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              {field.name}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => setFormData({ ...formData, [field.name]: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              disabled={isEditing}
-            />
-          </div>
-        )
-
-      case "checkbox":
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={value || false}
-                onChange={(e) => setFormData({ ...formData, [field.name]: e.target.checked })}
-                className="w-4 h-4"
-                disabled={isEditing || isViewOnly}
-                required={isRequired}
-              />
-              <span className="text-sm font-medium">
-                {field.name}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </span>
-            </label>
-          </div>
-        )
-
-      case "date":
-        // Convert ISO date string to YYYY-MM-DD format for HTML5 date input
-        // HTML5 date inputs require YYYY-MM-DD format internally
-        const dateInputValue = value 
-          ? (typeof value === 'string' 
-              ? value.split('T')[0] // Extract date part from ISO string
-              : new Date(value).toISOString().split('T')[0])
-          : ''
+    // Handle create new record for linked fields
+    const handleCreateRecord = async (tableId: string): Promise<string | null> => {
+      try {
+        const supabase = createClient()
         
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              {field.name}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            <input
-              type="date"
-              value={dateInputValue}
-              onChange={(e) => {
-                // Store as ISO date string (YYYY-MM-DD) for consistency
-                const isoDate = e.target.value ? `${e.target.value}T00:00:00.000Z` : null
-                setFormData({ ...formData, [field.name]: isoDate })
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              disabled={isEditing}
-              required={isRequired}
-            />
-          </div>
-        )
+        const { data: table } = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", tableId)
+          .single()
 
-      case "link_to_table":
-      case "lookup": {
-        const linkedTableId = field.type === "link_to_table" 
-          ? (field.options as any)?.linked_table_id 
-          : (field.options as any)?.lookup_table_id
+        if (!table) return null
 
-        const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
-          lookupTableId: linkedTableId,
-          primaryLabelField: (field.options as any)?.primary_label_field || 'name',
-          secondaryLabelFields: (field.options as any)?.secondary_label_fields || [],
-          relationshipType: (field.options as any)?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
-          maxSelections: (field.options as any)?.max_selections,
-          required: isRequired,
-          allowCreate: (field.options as any)?.allow_create,
-        } : undefined
+        const { data: fields } = await supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("position", { ascending: true })
+          .limit(5)
 
-        // Handle create new record
-        const handleCreateRecord = async (tableId: string): Promise<string | null> => {
-          try {
-            const supabase = createClient()
-            
-            const { data: table } = await supabase
-              .from("tables")
-              .select("supabase_table")
-              .eq("id", tableId)
-              .single()
-
-            if (!table) return null
-
-            const { data: fields } = await supabase
-              .from("table_fields")
-              .select("*")
-              .eq("table_id", tableId)
-              .order("position", { ascending: true })
-              .limit(5)
-
-            const newRecord: Record<string, any> = {}
-            fields?.forEach(f => {
-              if (f.default_value !== null && f.default_value !== undefined) {
-                newRecord[f.name] = f.default_value
-              }
-            })
-
-            const { data, error } = await supabase
-              .from(table.supabase_table)
-              .insert([newRecord])
-              .select()
-              .single()
-
-            if (error) {
-              console.error("Error creating record:", error)
-              toast({
-                title: "Failed to create record",
-                description: error.message || "Please try again",
-                variant: "destructive",
-              })
-              return null
-            }
-
-            return data?.id || null
-          } catch (error: any) {
-            console.error("Error in handleCreateRecord:", error)
-            return null
+        const newRecord: Record<string, any> = {}
+        fields?.forEach(f => {
+          if (f.default_value !== null && f.default_value !== undefined) {
+            newRecord[f.name] = f.default_value
           }
+        })
+
+        const { data, error } = await supabase
+          .from(table.supabase_table)
+          .insert([newRecord])
+          .select()
+          .single()
+
+        if (error) {
+          console.error("Error creating record:", error)
+          toast({
+            title: "Failed to create record",
+            description: error.message || "Please try again",
+            variant: "destructive",
+          })
+          return null
         }
 
-        if (field.type === "lookup") {
-          // Lookup fields are read-only in forms
-          return (
-            <div key={field.id} className="mb-4">
-              <label className="block text-sm font-medium mb-1">
-                {field.name}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </label>
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 italic">
-                {value !== null && value !== undefined ? String(value) : "—"}
-              </div>
-            </div>
-          )
-        }
-
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              {field.name}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            {lookupConfig ? (
-              <LookupFieldPicker
-                field={field as any}
-                value={value}
-                onChange={(newValue) => setFormData({ ...formData, [field.name]: newValue })}
-                config={lookupConfig}
-                disabled={isEditing || isViewOnly}
-                placeholder={`Select ${field.name}...`}
-                onCreateRecord={lookupConfig.allowCreate ? handleCreateRecord : undefined}
-              />
-            ) : (
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
-                Configure lookup table in field settings
-              </div>
-            )}
-          </div>
-        )
+        return data?.id || null
+      } catch (error: any) {
+        console.error("Error in handleCreateRecord:", error)
+        return null
       }
-
-      default:
-        return (
-          <div key={field.id} className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              {field.name}
-              {isRequired && <span className="text-red-500 ml-1">*</span>}
-            </label>
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              disabled={isEditing}
-              required={isRequired}
-            />
-          </div>
-        )
     }
+
+    return (
+      <div key={field.id} className="mb-4">
+        <FieldEditor
+          field={field}
+          value={value}
+          onChange={(newValue) => setFormData({ ...formData, [field.name]: newValue })}
+          isReadOnly={isEditing || isViewOnly}
+          required={isRequired}
+          onCreateRecord={handleCreateRecord}
+        />
+      </div>
+    )
   }
 
   // Show setup state if table not selected

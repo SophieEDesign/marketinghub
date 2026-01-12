@@ -22,6 +22,7 @@ import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import type { ViewFilterGroup, ViewFilter, FilterConditionType } from "@/types/database"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -33,8 +34,21 @@ interface FilterDialogProps {
     field_name: string
     operator: string
     value?: string
+    filter_group_id?: string | null
+    order_index?: number
   }>
   onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: string; value?: string }>) => void
+}
+
+interface LocalFilter extends Omit<ViewFilter, 'id' | 'view_id' | 'created_at'> {
+  id?: string
+  tempId?: string
+}
+
+interface LocalFilterGroup extends Omit<ViewFilterGroup, 'id' | 'view_id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'> {
+  id?: string
+  tempId?: string
+  filters: LocalFilter[]
 }
 
 export default function FilterDialog({
@@ -45,15 +59,80 @@ export default function FilterDialog({
   filters,
   onFiltersChange,
 }: FilterDialogProps) {
-  const [localFilters, setLocalFilters] = useState(filters)
+  const [filterGroups, setFilterGroups] = useState<LocalFilterGroup[]>([])
+  const [ungroupedFilters, setUngroupedFilters] = useState<LocalFilter[]>([])
 
+  // Load filter groups and filters when dialog opens
   useEffect(() => {
-    setLocalFilters(filters)
-  }, [filters, isOpen])
+    if (isOpen) {
+      loadFilterGroups()
+    }
+  }, [isOpen, viewId])
+
+  async function loadFilterGroups() {
+    try {
+      // Load filter groups
+      const { data: groups, error: groupsError } = await supabase
+        .from("view_filter_groups")
+        .select("*")
+        .eq("view_id", viewId)
+        .order("order_index", { ascending: true })
+
+      if (groupsError) throw groupsError
+
+      // Load all filters
+      const { data: allFilters, error: filtersError } = await supabase
+        .from("view_filters")
+        .select("*")
+        .eq("view_id", viewId)
+        .order("order_index", { ascending: true })
+
+      if (filtersError) throw filtersError
+
+      // Organize filters into groups
+      const groupsMap = new Map<string, LocalFilterGroup>()
+      const ungrouped: LocalFilter[] = []
+
+      // Initialize groups
+      if (groups) {
+        groups.forEach((group) => {
+          groupsMap.set(group.id, {
+            ...group,
+            filters: [],
+          })
+        })
+      }
+
+      // Assign filters to groups
+      if (allFilters) {
+        allFilters.forEach((filter) => {
+          const localFilter: LocalFilter = {
+            ...filter,
+            tempId: filter.id,
+          }
+          if (filter.filter_group_id && groupsMap.has(filter.filter_group_id)) {
+            groupsMap.get(filter.filter_group_id)!.filters.push(localFilter)
+          } else {
+            ungrouped.push(localFilter)
+          }
+        })
+      }
+
+      setFilterGroups(Array.from(groupsMap.values()))
+      setUngroupedFilters(ungrouped)
+    } catch (error) {
+      console.error("Error loading filter groups:", error)
+      // Fallback to old structure
+      const localFilters: LocalFilter[] = filters.map((f) => ({
+        ...f,
+        tempId: f.id,
+      }))
+      setUngroupedFilters(localFilters)
+      setFilterGroups([])
+    }
+  }
 
   function getOperatorsForFieldType(fieldType: string) {
-    const fieldTypeInfo = FIELD_TYPES.find(t => t.type === fieldType)
-    
     switch (fieldType) {
       case "text":
       case "long_text":
@@ -111,50 +190,160 @@ export default function FilterDialog({
     }
   }
 
-  function addFilter() {
-    setLocalFilters([
-      ...localFilters,
-      {
-        id: `temp-${Date.now()}`,
-        field_name: tableFields[0]?.name || "",
-        operator: "equal",
-        value: "",
-      },
-    ])
+  function addFilterGroup() {
+    const newGroup: LocalFilterGroup = {
+      tempId: `temp-group-${Date.now()}`,
+      condition_type: "AND",
+      order_index: filterGroups.length,
+      filters: [
+        {
+          tempId: `temp-${Date.now()}`,
+          field_name: tableFields[0]?.name || "",
+          operator: "equal",
+          value: "",
+          order_index: 0,
+        },
+      ],
+    }
+    setFilterGroups([...filterGroups, newGroup])
   }
 
-  function removeFilter(index: number) {
-    setLocalFilters(localFilters.filter((_, i) => i !== index))
+  function removeFilterGroup(groupIndex: number) {
+    setFilterGroups(filterGroups.filter((_, i) => i !== groupIndex))
   }
 
-  function updateFilter(index: number, updates: Partial<typeof localFilters[0]>) {
-    const newFilters = [...localFilters]
+  function updateFilterGroup(groupIndex: number, updates: Partial<LocalFilterGroup>) {
+    const newGroups = [...filterGroups]
+    newGroups[groupIndex] = { ...newGroups[groupIndex], ...updates }
+    setFilterGroups(newGroups)
+  }
+
+  function addFilterToGroup(groupIndex: number) {
+    const newGroups = [...filterGroups]
+    const group = newGroups[groupIndex]
+    const newFilter: LocalFilter = {
+      tempId: `temp-${Date.now()}`,
+      field_name: tableFields[0]?.name || "",
+      operator: "equal",
+      value: "",
+      filter_group_id: group.id || group.tempId,
+      order_index: group.filters.length,
+    }
+    group.filters.push(newFilter)
+    setFilterGroups(newGroups)
+  }
+
+  function removeFilterFromGroup(groupIndex: number, filterIndex: number) {
+    const newGroups = [...filterGroups]
+    newGroups[groupIndex].filters = newGroups[groupIndex].filters.filter((_, i) => i !== filterIndex)
+    setFilterGroups(newGroups)
+  }
+
+  function updateFilterInGroup(groupIndex: number, filterIndex: number, updates: Partial<LocalFilter>) {
+    const newGroups = [...filterGroups]
+    newGroups[groupIndex].filters[filterIndex] = {
+      ...newGroups[groupIndex].filters[filterIndex],
+      ...updates,
+    }
+    setFilterGroups(newGroups)
+  }
+
+  function addUngroupedFilter() {
+    const newFilter: LocalFilter = {
+      tempId: `temp-${Date.now()}`,
+      field_name: tableFields[0]?.name || "",
+      operator: "equal",
+      value: "",
+      order_index: ungroupedFilters.length,
+    }
+    setUngroupedFilters([...ungroupedFilters, newFilter])
+  }
+
+  function removeUngroupedFilter(index: number) {
+    setUngroupedFilters(ungroupedFilters.filter((_, i) => i !== index))
+  }
+
+  function updateUngroupedFilter(index: number, updates: Partial<LocalFilter>) {
+    const newFilters = [...ungroupedFilters]
     newFilters[index] = { ...newFilters[index], ...updates }
-    setLocalFilters(newFilters)
+    setUngroupedFilters(newFilters)
   }
 
   async function handleSave() {
     try {
-      // Delete existing filters
+      // Delete existing filter groups and filters
       await supabase.from("view_filters").delete().eq("view_id", viewId)
+      await supabase.from("view_filter_groups").delete().eq("view_id", viewId)
 
-      // Insert new filters
-      if (localFilters.length > 0) {
-        const filtersToInsert = localFilters
-          .filter(f => f.field_name && f.operator)
-          .map(f => ({
-            view_id: viewId,
-            field_name: f.field_name,
-            operator: f.operator,
-            value: f.value || null,
-          }))
+      // Insert filter groups first
+      const groupsToInsert = filterGroups
+        .filter((group) => group.filters.length > 0)
+        .map((group, index) => ({
+          view_id: viewId,
+          condition_type: group.condition_type,
+          order_index: index,
+        }))
 
-        if (filtersToInsert.length > 0) {
-          await supabase.from("view_filters").insert(filtersToInsert)
-        }
+      let insertedGroupIds: string[] = []
+      if (groupsToInsert.length > 0) {
+        const { data: insertedGroups, error: groupsError } = await supabase
+          .from("view_filter_groups")
+          .insert(groupsToInsert)
+          .select("id")
+
+        if (groupsError) throw groupsError
+        insertedGroupIds = insertedGroups?.map((g) => g.id) || []
       }
 
-      onFiltersChange?.(localFilters)
+      // Collect all filters to insert
+      const filtersToInsert: any[] = []
+
+      // Add filters from groups
+      filterGroups.forEach((group, groupIndex) => {
+        if (group.filters.length > 0 && insertedGroupIds[groupIndex]) {
+          group.filters.forEach((filter, filterIndex) => {
+            if (filter.field_name && filter.operator) {
+              filtersToInsert.push({
+                view_id: viewId,
+                field_name: filter.field_name,
+                operator: filter.operator,
+                value: filter.value || null,
+                filter_group_id: insertedGroupIds[groupIndex],
+                order_index: filterIndex,
+              })
+            }
+          })
+        }
+      })
+
+      // Add ungrouped filters
+      ungroupedFilters.forEach((filter, index) => {
+        if (filter.field_name && filter.operator) {
+          filtersToInsert.push({
+            view_id: viewId,
+            field_name: filter.field_name,
+            operator: filter.operator,
+            value: filter.value || null,
+            filter_group_id: null,
+            order_index: index,
+          })
+        }
+      })
+
+      // Insert all filters
+      if (filtersToInsert.length > 0) {
+        await supabase.from("view_filters").insert(filtersToInsert)
+      }
+
+      // Notify parent component (flattened for backward compatibility)
+      const flattenedFilters = filtersToInsert.map((f) => ({
+        id: f.id,
+        field_name: f.field_name,
+        operator: f.operator,
+        value: f.value,
+      }))
+      onFiltersChange?.(flattenedFilters)
+
       onClose()
     } catch (error) {
       console.error("Error saving filters:", error)
@@ -162,135 +351,343 @@ export default function FilterDialog({
     }
   }
 
+  const totalFilters = filterGroups.reduce((sum, group) => sum + group.filters.length, 0) + ungroupedFilters.length
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Filter Records</DialogTitle>
           <DialogDescription>
-            Add filters to narrow down the records displayed in this view.
+            Add filter groups with AND/OR logic to narrow down the records displayed in this view.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {localFilters.length === 0 ? (
+          {totalFilters === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p className="text-sm">No filters applied</p>
-              <p className="text-xs mt-1">Add a filter to narrow down your records</p>
+              <p className="text-xs mt-1">Add a filter group or filter to narrow down your records</p>
             </div>
           ) : (
-            localFilters.map((filter, index) => {
-              const field = tableFields.find((f) => f.name === filter.field_name)
-              const operators = field ? getOperatorsForFieldType(field.type) : []
+            <>
+              {/* Filter Groups */}
+              {filterGroups.map((group, groupIndex) => {
+                if (group.filters.length === 0) return null
 
-              return (
-                <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Filter {index + 1}</span>
+                return (
+                  <div key={group.id || group.tempId} className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-semibold text-blue-900">Group {groupIndex + 1}</span>
+                        <Select
+                          value={group.condition_type}
+                          onValueChange={(value: FilterConditionType) =>
+                            updateFilterGroup(groupIndex, { condition_type: value })
+                          }
+                        >
+                          <SelectTrigger className="h-7 w-20 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AND">AND</SelectItem>
+                            <SelectItem value="OR">OR</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-xs text-gray-600">
+                          ({group.filters.length} condition{group.filters.length !== 1 ? "s" : ""})
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFilterGroup(groupIndex)}
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {group.filters.map((filter, filterIndex) => {
+                      const field = tableFields.find((f) => f.name === filter.field_name)
+                      const operators = field ? getOperatorsForFieldType(field.type) : []
+
+                      return (
+                        <div key={filter.id || filter.tempId} className="pl-4 border-l-2 border-blue-300 space-y-2">
+                          {filterIndex > 0 && (
+                            <div className="text-xs font-medium text-blue-700 -mt-1 -mb-1">
+                              {group.condition_type}
+                            </div>
+                          )}
+                          <div className="p-3 bg-white rounded border border-gray-200">
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <Label className="text-xs text-gray-600">Field</Label>
+                                <Select
+                                  value={filter.field_name}
+                                  onValueChange={(value) => {
+                                    updateFilterInGroup(groupIndex, filterIndex, {
+                                      field_name: value,
+                                      operator: "equal",
+                                      value: "",
+                                    })
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {tableFields.map((field) => (
+                                      <SelectItem key={field.id} value={field.name}>
+                                        {field.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div>
+                                <Label className="text-xs text-gray-600">Operator</Label>
+                                <Select
+                                  value={filter.operator}
+                                  onValueChange={(value) =>
+                                    updateFilterInGroup(groupIndex, filterIndex, { operator: value })
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {operators.map((op) => (
+                                      <SelectItem key={op.value} value={op.value}>
+                                        {op.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div>
+                                <Label className="text-xs text-gray-600">Value</Label>
+                                {filter.operator !== "is_empty" && filter.operator !== "is_not_empty" ? (
+                                  <>
+                                    {(field?.type === "single_select" || field?.type === "multi_select") &&
+                                    field?.options?.choices ? (
+                                      <Select
+                                        value={filter.value || ""}
+                                        onValueChange={(value) =>
+                                          updateFilterInGroup(groupIndex, filterIndex, { value })
+                                        }
+                                      >
+                                        <SelectTrigger className="h-8 text-sm">
+                                          <SelectValue placeholder="Select value" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {field.options.choices.map((choice: string) => (
+                                            <SelectItem key={choice} value={choice}>
+                                              {choice}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <Input
+                                        type={
+                                          field?.type === "number"
+                                            ? "number"
+                                            : field?.type === "date"
+                                            ? "date"
+                                            : "text"
+                                        }
+                                        value={filter.value || ""}
+                                        onChange={(e) =>
+                                          updateFilterInGroup(groupIndex, filterIndex, {
+                                            value: e.target.value,
+                                          })
+                                        }
+                                        className="h-8 text-sm"
+                                        placeholder="Enter value"
+                                      />
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="h-8 flex items-center text-xs text-gray-500">
+                                    No value needed
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex justify-end mt-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeFilterFromGroup(groupIndex, filterIndex)}
+                                className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      onClick={() => removeFilter(index)}
-                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => addFilterToGroup(groupIndex)}
+                      className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Condition to Group
                     </Button>
                   </div>
+                )
+              })}
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <Label className="text-xs text-gray-600">Field</Label>
-                      <Select
-                        value={filter.field_name}
-                        onValueChange={(value) => {
-                          updateFilter(index, { field_name: value, operator: "equal", value: "" })
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tableFields.map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {field.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+              {/* Ungrouped Filters */}
+              {ungroupedFilters.length > 0 && (
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-700">
+                      Ungrouped Filters ({ungroupedFilters.length})
+                    </span>
+                  </div>
+                  {ungroupedFilters.map((filter, index) => {
+                    const field = tableFields.find((f) => f.name === filter.field_name)
+                    const operators = field ? getOperatorsForFieldType(field.type) : []
 
-                    <div>
-                      <Label className="text-xs text-gray-600">Operator</Label>
-                      <Select
-                        value={filter.operator}
-                        onValueChange={(value) => updateFilter(index, { operator: value })}
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {operators.map((op) => (
-                            <SelectItem key={op.value} value={op.value}>
-                              {op.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs text-gray-600">Value</Label>
-                      {filter.operator !== "is_empty" && filter.operator !== "is_not_empty" && (
-                        <>
-                          {/* Show dropdown for single_select and multi_select fields */}
-                          {(field?.type === "single_select" || field?.type === "multi_select") && field?.options?.choices ? (
+                    return (
+                      <div key={filter.id || filter.tempId} className="p-3 bg-white rounded border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-600">Filter {index + 1}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeUngroupedFilter(index)}
+                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-xs text-gray-600">Field</Label>
                             <Select
-                              value={filter.value || ""}
-                              onValueChange={(value) => updateFilter(index, { value })}
+                              value={filter.field_name}
+                              onValueChange={(value) => {
+                                updateUngroupedFilter(index, {
+                                  field_name: value,
+                                  operator: "equal",
+                                  value: "",
+                                })
+                              }}
                             >
                               <SelectTrigger className="h-8 text-sm">
-                                <SelectValue placeholder="Select value" />
+                                <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {field.options.choices.map((choice: string) => (
-                                  <SelectItem key={choice} value={choice}>
-                                    {choice}
+                                {tableFields.map((field) => (
+                                  <SelectItem key={field.id} value={field.name}>
+                                    {field.name}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                          ) : (
-                            <Input
-                              type={field?.type === "number" ? "number" : field?.type === "date" ? "date" : "text"}
-                              value={filter.value || ""}
-                              onChange={(e) => updateFilter(index, { value: e.target.value })}
-                              className="h-8 text-sm"
-                              placeholder="Enter value"
-                            />
-                          )}
-                        </>
-                      )}
-                      {(filter.operator === "is_empty" || filter.operator === "is_not_empty") && (
-                        <div className="h-8 flex items-center text-xs text-gray-500">
-                          No value needed
+                          </div>
+
+                          <div>
+                            <Label className="text-xs text-gray-600">Operator</Label>
+                            <Select
+                              value={filter.operator}
+                              onValueChange={(value) => updateUngroupedFilter(index, { operator: value })}
+                            >
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {operators.map((op) => (
+                                  <SelectItem key={op.value} value={op.value}>
+                                    {op.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <Label className="text-xs text-gray-600">Value</Label>
+                            {filter.operator !== "is_empty" && filter.operator !== "is_not_empty" ? (
+                              <>
+                                {(field?.type === "single_select" || field?.type === "multi_select") &&
+                                field?.options?.choices ? (
+                                  <Select
+                                    value={filter.value || ""}
+                                    onValueChange={(value) => updateUngroupedFilter(index, { value })}
+                                  >
+                                    <SelectTrigger className="h-8 text-sm">
+                                      <SelectValue placeholder="Select value" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {field.options.choices.map((choice: string) => (
+                                        <SelectItem key={choice} value={choice}>
+                                          {choice}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    type={
+                                      field?.type === "number"
+                                        ? "number"
+                                        : field?.type === "date"
+                                        ? "date"
+                                        : "text"
+                                    }
+                                    value={filter.value || ""}
+                                    onChange={(e) => updateUngroupedFilter(index, { value: e.target.value })}
+                                    className="h-8 text-sm"
+                                    placeholder="Enter value"
+                                  />
+                                )}
+                              </>
+                            ) : (
+                              <div className="h-8 flex items-center text-xs text-gray-500">
+                                No value needed
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })
+              )}
+            </>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={addFilter}
-            className="w-full"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Filter
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addFilterGroup}
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Filter Group
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addUngroupedFilter}
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Filter
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-4 border-t">

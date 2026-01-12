@@ -1,5 +1,7 @@
 import { createServerSupabaseClient } from './supabase'
-import type { ViewFilter, ViewSort, ViewField } from '@/types/database'
+import type { ViewFilter, ViewSort, ViewField, ViewFilterGroup } from '@/types/database'
+import { dbFiltersToFilterTree } from '@/lib/filters/converters'
+import { applyFiltersToQuery } from '@/lib/filters/evaluation'
 
 export interface LoadRowsOptions {
   tableId: string
@@ -29,6 +31,7 @@ export async function loadRows(options: LoadRowsOptions) {
 
   // Use provided metadata if available, otherwise load it (but serialize to avoid parallel requests)
   let filters: ViewFilter[] = providedFilters || []
+  let filterGroups: ViewFilterGroup[] = []
   let sorts: ViewSort[] = providedSorts || []
   let visibleFields: ViewField[] = providedVisibleFields || []
 
@@ -45,11 +48,23 @@ export async function loadRows(options: LoadRowsOptions) {
   // Only load metadata if not provided AND viewId is present
   if (viewId && (!providedFilters || !providedSorts || !providedVisibleFields)) {
     // CRITICAL: Serialize requests instead of Promise.all to avoid connection exhaustion
-    // Load filters first
+    // Load filter groups first
+    const groupsRes = await supabase
+      .from('view_filter_groups')
+      .select('*')
+      .eq('view_id', viewId)
+      .order('order_index', { ascending: true })
+    
+    if (!providedFilters) {
+      filterGroups = groupsRes.data || []
+    }
+
+    // Load filters
     const filtersRes = await supabase
       .from('view_filters')
       .select('*')
       .eq('view_id', viewId)
+      .order('order_index', { ascending: true })
     
     if (!providedFilters) {
       filters = filtersRes.data || []
@@ -84,57 +99,9 @@ export async function loadRows(options: LoadRowsOptions) {
     .select('*')
     .range(offset, offset + limit - 1)
 
-  // Apply filters using field_name
-  for (const filter of filters) {
-    const fieldValue = filter.value
-    switch (filter.operator) {
-      case 'equal':
-        query = query.eq(filter.field_name, fieldValue)
-        break
-      case 'not_equal':
-        query = query.neq(filter.field_name, fieldValue)
-        break
-      case 'contains':
-        query = query.ilike(filter.field_name, `%${fieldValue}%`)
-        break
-      case 'not_contains':
-        query = query.not(filter.field_name, 'ilike', `%${fieldValue}%`)
-        break
-      case 'is_empty':
-        query = query.or(`${filter.field_name}.is.null,${filter.field_name}.eq.`)
-        break
-      case 'is_not_empty':
-        query = query.not(filter.field_name, 'is', null)
-        break
-      case 'greater_than':
-        query = query.gt(filter.field_name, fieldValue)
-        break
-      case 'less_than':
-        query = query.lt(filter.field_name, fieldValue)
-        break
-      case 'greater_than_or_equal':
-        query = query.gte(filter.field_name, fieldValue)
-        break
-      case 'less_than_or_equal':
-        query = query.lte(filter.field_name, fieldValue)
-        break
-      case 'date_equal':
-        query = query.eq(filter.field_name, fieldValue)
-        break
-      case 'date_before':
-        query = query.lt(filter.field_name, fieldValue)
-        break
-      case 'date_after':
-        query = query.gt(filter.field_name, fieldValue)
-        break
-      case 'date_on_or_before':
-        query = query.lte(filter.field_name, fieldValue)
-        break
-      case 'date_on_or_after':
-        query = query.gte(filter.field_name, fieldValue)
-        break
-    }
-  }
+  // Convert database filters to canonical filter tree and apply using shared evaluation engine
+  const filterTree = dbFiltersToFilterTree(filters, filterGroups)
+  query = applyFiltersToQuery(query, filterTree)
 
   // Apply sorting using field_name
   if (sorts.length > 0) {
