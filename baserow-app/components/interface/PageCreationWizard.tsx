@@ -235,6 +235,10 @@ export default function PageCreationWizard({
     setStep('name')
   }
 
+  const handleAddFieldsAsBlocks = (fieldNames: string[]) => {
+    setFieldsAsBlocks(fieldNames)
+  }
+
   const handleCreate = async () => {
     if (!pageName.trim() || !pageType) {
       alert('Please complete all required fields')
