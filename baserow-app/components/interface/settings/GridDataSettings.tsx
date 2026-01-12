@@ -366,7 +366,7 @@ export default function GridDataSettings({
                               </SelectItem>
                             ))
                           ) : (
-                            <SelectItem value="" disabled>No options available</SelectItem>
+                            <div className="px-2 py-1.5 text-sm text-gray-500">No options available</div>
                           )}
                         </SelectContent>
                       </Select>

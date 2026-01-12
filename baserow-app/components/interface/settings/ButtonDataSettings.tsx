@@ -71,10 +71,10 @@ export default function ButtonDataSettings({
       <div className="space-y-2">
         <Label>Automation</Label>
         <Select
-          value={config.button_automation_id || ""}
+          value={config.button_automation_id || "__none__"}
           onValueChange={(value) =>
             onUpdate({
-              button_automation_id: value || undefined,
+              button_automation_id: value === "__none__" ? undefined : value,
             })
           }
           disabled={loading}
@@ -83,7 +83,7 @@ export default function ButtonDataSettings({
             <SelectValue placeholder={loading ? "Loading..." : "Select an automation"} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none__">None</SelectItem>
             {automations.map((automation) => (
               <SelectItem key={automation.id} value={automation.id}>
                 {automation.name}

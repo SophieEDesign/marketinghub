@@ -109,7 +109,7 @@ export default function FieldDataSettings({
             </SelectTrigger>
             <SelectContent>
               {availableFields.length === 0 ? (
-                <SelectItem value="" disabled>Loading fields...</SelectItem>
+                <div className="px-2 py-1.5 text-sm text-gray-500">Loading fields...</div>
               ) : (
                 availableFields.map((field) => (
                   <SelectItem key={field.id} value={field.id}>

@@ -260,9 +260,9 @@ export default function RecordViewPageSettings({
             <div className="space-y-2">
               <Label>Title Field</Label>
               <Select
-                value={config.title_field || ""}
+                value={config.title_field || "__none__"}
                 onValueChange={(value) =>
-                  onUpdate({ title_field: value || undefined })
+                  onUpdate({ title_field: value === "__none__" ? undefined : value })
                 }
                 disabled={!selectedTableId || fields.length === 0}
               >
@@ -270,7 +270,7 @@ export default function RecordViewPageSettings({
                   <SelectValue placeholder="Select a field to use as the record title" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None (use record ID)</SelectItem>
+                  <SelectItem value="__none__">None (use record ID)</SelectItem>
                   {fields.map((field) => (
                     <SelectItem key={field.id} value={field.name}>
                       {field.name}
@@ -568,9 +568,9 @@ export default function RecordViewPageSettings({
                     <div className="space-y-2">
                       <Label>Title</Label>
                       <Select
-                        value={config.title_field || ""}
+                        value={config.title_field || "__none__"}
                         onValueChange={(value) =>
-                          onUpdate({ title_field: value || undefined })
+                          onUpdate({ title_field: value === "__none__" ? undefined : value })
                         }
                         disabled={!selectedTableId || fields.length === 0}
                       >
@@ -578,7 +578,7 @@ export default function RecordViewPageSettings({
                           <SelectValue placeholder="Select a field" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
                               {field.name}
