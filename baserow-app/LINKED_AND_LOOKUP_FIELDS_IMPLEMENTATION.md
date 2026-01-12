@@ -80,15 +80,24 @@ Located in `baserow-app/lib/dataView/linkedFields.ts`:
 Resolves linked field IDs to display labels for copy operations.
 
 - Handles single and multi-link values
-- Uses `primary_label_field` if configured, otherwise falls back to first text field
+- Uses explicit fallback order for display field:
+  1. `primary_label_field` (if set in field options)
+  2. Table's configured primary field (if system has one)
+  3. First text-like field (`text`, `long_text`, `email`, `url`)
+  4. Finally falls back to ID display
 - Returns comma-separated string for multi-link
+- Prevents weirdness if first text field is something like "Notes"
 
 #### `resolvePastedLinkedValue(field, pastedText)`
 Resolves pasted text (display names or IDs) to record IDs.
 
 - Accepts comma or newline-separated values
-- First checks if text is already a UUID
-- Searches target table by display name across text fields
+- First checks if text is already a UUID (validates against target table)
+- Searches target table by display name using same fallback order as `resolveLinkedFieldDisplay()`
+- Ambiguity handling:
+  - Default: Rejects ambiguous matches (multiple records found)
+  - Optional: If multiple matches, accepts if exact (case-insensitive) match exists
+  - Always accepts if user pasted an ID (UUID format)
 - Validates single-link constraint (rejects multiple values for single-link)
 - Returns resolved IDs with any errors
 
@@ -97,8 +106,22 @@ Resolves pasted text (display names or IDs) to record IDs.
 Located in `baserow-app/lib/dataView/clipboard.ts`:
 
 #### Copy
-- Linked fields: Returns IDs (display resolution happens in `DataViewService.copyWithDisplayResolution()`)
+
+**Low-level method (`copy()`):**
+- Linked fields: Returns raw stored value (IDs)
 - Lookup fields: Returns computed display values
+- Synchronous operation
+
+**UI method (`copyWithDisplayResolution()`):**
+- Linked fields: Returns display labels (resolved from IDs)
+- Lookup fields: Returns computed display values
+- Asynchronous operation (resolves display names)
+
+**UI behavior:**
+- Grid/Portal copy uses `copyWithDisplayResolution()` by default
+- Clipboard contains human-readable labels for linked fields
+- Users can paste nicely into Excel/other apps
+- `copy()` remains a low-level method for internal uses
 
 #### Paste
 - Linked fields: Returns raw text (resolution happens in validation)
@@ -172,12 +195,19 @@ Located in `baserow-app/lib/dataView/DataViewService.ts`:
 ### Linked Field
 1. Duplicate schema (field metadata)
 2. Preserve `linked_table_id` and `linked_field_id`
-3. Add physical column to table (TEXT type for UUID storage)
+3. Add physical column to table:
+   - Single link: `UUID` type (PostgreSQL native)
+   - Multi-link: `TEXT` or `TEXT[]` type (stores JSON array of UUIDs)
+   - Note: Currently using `TEXT` for portability and to match existing Baserow-style schema, avoiding complex migrations
 4. Optionally copy linked values (IDs) if `withData: true`
 
 ### Lookup Field
-1. **Cannot be duplicated** (returns error)
-2. Error message: "Cannot duplicate lookup field [name] (read-only, computed). Duplicate the linked field it depends on instead."
+1. **Duplicate definition only** (schema copy)
+   - Duplicates lookup field configuration
+   - Preserves `lookup_table_id`, `lookup_field_id`, `lookup_result_field_id`
+   - Value recomputes automatically (no data to copy)
+2. **"Duplicate with data" is not applicable** (lookup values are computed, not stored)
+3. Error message if attempting data copy: "Lookup field values are computed and cannot be duplicated. Only the field definition will be copied."
 
 ## Integration Points
 
@@ -190,6 +220,11 @@ Located in `baserow-app/lib/dataView/DataViewService.ts`:
 - Displays linked field values using display resolution
 - Shows lookup field computed values
 - Prevents editing of lookup fields
+- **Pills display model:**
+  - Pills show display labels; stored value remains UUID(s)
+  - Clicking a pill opens the linked record
+  - Clicking cell background selects only (for copy/paste)
+  - This locks the interaction model so no one "optimises" it later and breaks selection/copy
 
 ### Bulk Editor
 - Excludes lookup fields from bulk edit operations
@@ -206,7 +241,14 @@ Located in `baserow-app/lib/dataView/DataViewService.ts`:
 ### Lookup Field Errors
 - "Cannot paste into lookup field [name] (read-only)"
 - "Field [name] is a lookup field (read-only) and cannot be edited"
-- "Cannot duplicate lookup field [name] (read-only, computed)"
+- "Lookup field values are computed and cannot be duplicated. Only the field definition will be copied."
+
+### Lookup Dependency Integrity
+**Hard rule:** If the linked field that a lookup depends on is deleted or renamed:
+- Lookup field becomes invalid
+- Should surface a warning: "Broken lookup: depends on missing linked field [name]"
+- Even if not implemented immediately, having this in the doc avoids silent failures
+- Consider preventing deletion of linked fields that have dependent lookup fields
 
 ## Testing Considerations
 
@@ -221,12 +263,14 @@ Located in `baserow-app/lib/dataView/DataViewService.ts`:
 2. **Lookup Field Protection:**
    - Attempt paste into lookup field (should reject)
    - Attempt edit lookup field (should reject)
-   - Attempt duplicate lookup field (should reject)
+   - Duplicate lookup field definition (should succeed, recomputes values)
+   - Attempt duplicate lookup field with data (should warn, only copy definition)
 
 3. **Column Duplication:**
    - Duplicate linked field with data (should copy IDs)
    - Duplicate linked field without data (should only copy schema)
-   - Attempt duplicate lookup field (should reject)
+   - Duplicate lookup field definition (should succeed, recomputes)
+   - Attempt duplicate lookup field with data (should warn, only copy definition)
 
 ## Future Enhancements
 

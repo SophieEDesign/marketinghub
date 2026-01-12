@@ -6,7 +6,7 @@
  */
 
 import { createClient } from '@/lib/supabase/client'
-import type { TableField } from '@/types/fields'
+import type { TableField, FieldType } from '@/types/fields'
 import { isLinkedField, isLookupField } from '@/types/fields'
 import type {
   Selection,
@@ -605,14 +605,6 @@ export class DataViewService {
       }
     }
 
-    // Skip lookup fields (read-only, computed)
-    if (isLookupField(sourceField)) {
-      return {
-        success: false,
-        error: `Cannot duplicate lookup field "${sourceField.name}" (read-only, computed). Duplicate the linked field it depends on instead.`,
-      }
-    }
-
     // Skip formula fields (read-only, computed)
     if (sourceField.type === 'formula') {
       return {
@@ -620,6 +612,29 @@ export class DataViewService {
         error: `Cannot duplicate formula field "${sourceField.name}" (read-only, computed)`,
       }
     }
+
+    // Lookup fields: allow duplicate definition only (no data copy)
+    // Note: This is allowed because users expect to duplicate column "structure" even if computed
+    // The value will recompute automatically
+    // "Duplicate with data" is not applicable for lookup fields
+    // Check this after formula check so TypeScript can properly narrow types
+    const isLookup = isLookupField(sourceField)
+    if (isLookup) {
+      if (options.withData) {
+        // Warn but allow - only copy definition
+        // This matches Airtable behavior where you can duplicate lookup field definition
+        console.warn(
+          `[duplicateColumn] Lookup field "${sourceField.name}" values are computed. Only duplicating field definition.`
+        )
+      }
+      // Continue to duplicate definition (schema only)
+    }
+
+    // TypeScript: At this point, we know it's not 'formula' (we returned above)
+    // But TypeScript doesn't know it's not 'lookup' because we continued instead of returning
+    // So we use the isLookup variable instead of checking sourceField.type === 'lookup'
+    // This avoids the TypeScript error about comparing types with no overlap
+    const isVirtualFieldType = isLookup
 
     try {
       // Generate new field name
@@ -661,9 +676,13 @@ export class DataViewService {
 
       // Add column to physical table (if not virtual)
       // Linked fields are stored (not virtual), so they need a physical column
-      if (sourceField.type !== 'formula' && sourceField.type !== 'lookup') {
+      // At this point, we've already excluded 'lookup' and 'formula' types above
+      // TypeScript: After the checks above, we know it's not 'lookup' or 'formula'
+      // Use the isVirtualFieldType check we created above
+      if (!isVirtualFieldType) {
         // Get PostgreSQL type from field type
-        const postgresType = this.getPostgresType(sourceField.type)
+        // Type assertion: we've already checked it's not 'formula' or 'lookup'
+        const postgresType = this.getPostgresType(sourceField.type as Exclude<FieldType, 'formula' | 'lookup'>)
 
         const { error: alterError } = await supabase.rpc('execute_sql_safe', {
           sql_text: `ALTER TABLE ${supabaseTableName} ADD COLUMN "${newName}" ${postgresType}`,
@@ -681,8 +700,11 @@ export class DataViewService {
 
       // Copy data if requested
       // For linked fields, copy the linked values (IDs)
-      // For lookup fields, this should never happen (they're excluded above)
-      if (options.withData && rows.length > 0 && sourceField.type !== 'lookup' && sourceField.type !== 'formula') {
+      // For lookup fields, skip data copy (values are computed, not stored)
+      // Note: Lookup field duplication is allowed above, but we skip data copy here
+      // Use isLookup variable we already have instead of checking type again
+      const isVirtualFieldForData = sourceField.type === 'formula' || isLookup
+      if (options.withData && rows.length > 0 && !isVirtualFieldForData) {
         const updates = rows.map(row => ({
           id: row.id,
           [newName]: row[sourceField.name],

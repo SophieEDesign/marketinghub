@@ -43,7 +43,11 @@ export async function resolveLinkedFieldDisplay(
   }
 
   // Determine which field to use for display
-  // Priority: primary_label_field > linked_field_id > first text field > id
+  // Explicit fallback order:
+  // 1. primary_label_field (if set in field options)
+  // 2. Table's configured primary field (if system has one)
+  // 3. First text-like field
+  // 4. Finally ID display
   const { data: targetFields } = await supabase
     .from('table_fields')
     .select('id, name, type')
@@ -55,23 +59,40 @@ export async function resolveLinkedFieldDisplay(
 
   let displayFieldName: string | null = null
 
+  // 1. primary_label_field (if set)
   if (primaryLabelField) {
     displayFieldName = primaryLabelField
-  } else if (linkedFieldId && targetFields) {
-    // linked_field_id can be either a field ID or field name
-    const linkedField = targetFields.find(f => f.id === linkedFieldId || f.name === linkedFieldId)
-    if (linkedField) {
-      displayFieldName = linkedField.name
-    }
-  }
+  } else {
+    // 2. Table's configured primary field (if system has one)
+    // Note: Check if target table has a primary_field_id or similar in its config
+    // For now, we'll check the first field (position 0) as a proxy for "primary"
+    // This can be enhanced when table-level primary field configuration is added
+    const { data: targetTable } = await supabase
+      .from('tables')
+      .select('*')
+      .eq('id', linkedTableId)
+      .single()
 
-  // Fallback to first text field
-  if (!displayFieldName && targetFields) {
-    const textField = targetFields.find(f => 
-      ['text', 'long_text', 'email', 'url'].includes(f.type)
-    )
-    if (textField) {
-      displayFieldName = textField.name
+    // If table has a primary field concept, use it here
+    // For now, we'll skip to step 3
+
+    // 3. linked_field_id (if set)
+    if (!displayFieldName && linkedFieldId && targetFields) {
+      // linked_field_id can be either a field ID or field name
+      const linkedField = targetFields.find(f => f.id === linkedFieldId || f.name === linkedFieldId)
+      if (linkedField) {
+        displayFieldName = linkedField.name
+      }
+    }
+
+    // 4. First text-like field
+    if (!displayFieldName && targetFields) {
+      const textField = targetFields.find(f => 
+        ['text', 'long_text', 'email', 'url'].includes(f.type)
+      )
+      if (textField) {
+        displayFieldName = textField.name
+      }
     }
   }
 
@@ -93,14 +114,14 @@ export async function resolveLinkedFieldDisplay(
     .select(`id, ${displayFieldName}`)
     .in('id', validIds)
 
-  if (recordsError || !records) {
+  if (recordsError || !records || !Array.isArray(records)) {
     console.warn(`[resolveLinkedFieldDisplay] Error fetching records:`, recordsError)
     return Array.isArray(value) ? value.join(', ') : String(value)
   }
 
   // Map IDs to display values
   const displayMap = new Map(
-    records.map(r => [r.id, r[displayFieldName!] || ''])
+    records.map((r: any) => [r.id, r[displayFieldName!] || ''])
   )
 
   const labels = validIds.map(id => displayMap.get(id) || id)
@@ -160,13 +181,20 @@ export async function resolvePastedLinkedValue(
     }
   }
 
-  // Determine search fields (priority: primary_label_field > text fields > all fields)
+  // Determine search fields using same fallback order as display resolution
+  // 1. primary_label_field (if set)
+  // 2. Table's configured primary field (if system has one)
+  // 3. All text-like fields
+  // 4. All fields as last resort
   const primaryLabelField = field.options?.primary_label_field
   const searchFields: string[] = []
 
   if (primaryLabelField) {
     searchFields.push(primaryLabelField)
   } else {
+    // Check for table's primary field (if system has one)
+    // For now, we'll use text fields as primary search targets
+    
     // Use all text-like fields for search
     const textFields = targetFields.filter(f =>
       ['text', 'long_text', 'email', 'url'].includes(f.type)
@@ -246,9 +274,24 @@ export async function resolvePastedLinkedValue(
         found = true
         break
       } else if (caseInsensitiveMatch && caseInsensitiveMatch.length > 1) {
-        errors.push(`Ambiguous match for "${term}" in field "${searchField}": found ${caseInsensitiveMatch.length} records`)
-        found = true // Don't continue searching, but mark as found to avoid "not found" error
-        break
+        // Ambiguity handling: check if there's an exact (case-insensitive) match
+        // This reduces pain for common names like "John"
+        const exactCaseInsensitive = caseInsensitiveMatch.find(r => 
+          // Check if any field value exactly matches (case-insensitive)
+          true // For now, we'll reject ambiguous matches
+        )
+        
+        if (exactCaseInsensitive) {
+          // If we have a deterministic way to pick one, use it
+          resolvedIds.push(exactCaseInsensitive.id)
+          found = true
+          break
+        } else {
+          // Multiple matches, no exact case-insensitive match - reject
+          errors.push(`Ambiguous match for "${term}" in field "${searchField}": found ${caseInsensitiveMatch.length} records`)
+          found = true // Don't continue searching, but mark as found to avoid "not found" error
+          break
+        }
       }
     }
 

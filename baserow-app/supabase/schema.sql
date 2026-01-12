@@ -78,16 +78,46 @@ CREATE TABLE IF NOT EXISTS view_blocks (
 -- Automations: Automation workflows
 CREATE TABLE IF NOT EXISTS automations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  table_id UUID NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  description TEXT,
-  trigger_type TEXT NOT NULL,
-  trigger_config JSONB DEFAULT '{}',
-  actions JSONB DEFAULT '[]',
+  description TEXT DEFAULT '',
+  trigger JSONB NOT NULL,
+  actions JSONB NOT NULL DEFAULT '[]',
+  conditions JSONB NOT NULL DEFAULT '[]',
   enabled BOOLEAN DEFAULT TRUE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id)
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id)
+);
+
+-- Automation Runs: Execution history for automations
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  automation_id UUID NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'completed', 'failed', 'stopped')),
+  error TEXT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  context JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id)
+);
+
+-- Automation Logs: Log entries for automation runs
+CREATE TABLE IF NOT EXISTS automation_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  automation_id UUID NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  run_id UUID REFERENCES automation_runs(id) ON DELETE CASCADE,
+  level TEXT NOT NULL DEFAULT 'info' CHECK (level IN ('info', 'warning', 'error')),
+  message TEXT NOT NULL DEFAULT '',
+  data JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id),
+  updated_by UUID REFERENCES auth.users(id)
 );
 
 -- Row data: Dynamic table rows stored as JSONB
@@ -107,7 +137,12 @@ CREATE INDEX IF NOT EXISTS idx_view_fields_view_id ON view_fields(view_id);
 CREATE INDEX IF NOT EXISTS idx_view_filters_view_id ON view_filters(view_id);
 CREATE INDEX IF NOT EXISTS idx_view_sorts_view_id ON view_sorts(view_id);
 CREATE INDEX IF NOT EXISTS idx_view_blocks_view_id ON view_blocks(view_id);
-CREATE INDEX IF NOT EXISTS idx_automations_table_id ON automations(table_id);
+CREATE INDEX IF NOT EXISTS idx_automation_runs_automation_id ON automation_runs(automation_id);
+CREATE INDEX IF NOT EXISTS idx_automation_runs_status ON automation_runs(status);
+CREATE INDEX IF NOT EXISTS idx_automation_runs_started_at ON automation_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_automation_id ON automation_logs(automation_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_run_id ON automation_logs(run_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_created_at ON automation_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_table_rows_table_id ON table_rows(table_id);
 CREATE INDEX IF NOT EXISTS idx_table_rows_data ON table_rows USING GIN(data);
 
@@ -119,30 +154,38 @@ ALTER TABLE view_filters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE view_sorts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE view_blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automation_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE automation_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE table_rows ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for tables
+DROP POLICY IF EXISTS "Public tables are viewable by everyone" ON tables;
 CREATE POLICY "Public tables are viewable by everyone"
   ON tables FOR SELECT
   USING (access_control = 'public');
 
+DROP POLICY IF EXISTS "Authenticated users can view authenticated tables" ON tables;
 CREATE POLICY "Authenticated users can view authenticated tables"
   ON tables FOR SELECT
   USING (access_control = 'authenticated' AND auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Users can view their own tables" ON tables;
 CREATE POLICY "Users can view their own tables"
   ON tables FOR SELECT
   USING (access_control = 'owner' AND created_by = auth.uid());
 
+DROP POLICY IF EXISTS "Authenticated users can create tables" ON tables;
 CREATE POLICY "Authenticated users can create tables"
   ON tables FOR INSERT
   WITH CHECK (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "Users can update their own tables" ON tables;
 CREATE POLICY "Users can update their own tables"
   ON tables FOR UPDATE
   USING (created_by = auth.uid());
 
 -- RLS Policies for views
+DROP POLICY IF EXISTS "Views are viewable with their tables" ON views;
 CREATE POLICY "Views are viewable with their tables"
   ON views FOR SELECT
   USING (
@@ -158,6 +201,7 @@ CREATE POLICY "Views are viewable with their tables"
   );
 
 -- RLS Policies for table_rows
+DROP POLICY IF EXISTS "Rows are viewable with their tables" ON table_rows;
 CREATE POLICY "Rows are viewable with their tables"
   ON table_rows FOR SELECT
   USING (
@@ -172,6 +216,7 @@ CREATE POLICY "Rows are viewable with their tables"
     )
   );
 
+DROP POLICY IF EXISTS "Authenticated users can insert rows" ON table_rows;
 CREATE POLICY "Authenticated users can insert rows"
   ON table_rows FOR INSERT
   WITH CHECK (
@@ -187,6 +232,7 @@ CREATE POLICY "Authenticated users can insert rows"
     )
   );
 
+DROP POLICY IF EXISTS "Users can update rows in their tables" ON table_rows;
 CREATE POLICY "Users can update rows in their tables"
   ON table_rows FOR UPDATE
   USING (
@@ -196,6 +242,56 @@ CREATE POLICY "Users can update rows in their tables"
       AND tables.created_by = auth.uid()
     )
   );
+
+-- RLS Policies for automations
+DROP POLICY IF EXISTS "Authenticated users can view automations" ON automations;
+CREATE POLICY "Authenticated users can view automations"
+  ON automations FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Authenticated users can create automations" ON automations;
+CREATE POLICY "Authenticated users can create automations"
+  ON automations FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Users can update their own automations" ON automations;
+CREATE POLICY "Users can update their own automations"
+  ON automations FOR UPDATE
+  USING (created_by = auth.uid());
+
+-- RLS Policies for automation_runs
+DROP POLICY IF EXISTS "Users can view automation runs for their automations" ON automation_runs;
+CREATE POLICY "Users can view automation runs for their automations"
+  ON automation_runs FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM automations
+      WHERE automations.id = automation_runs.automation_id
+      AND automations.created_by = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Authenticated users can create automation runs" ON automation_runs;
+CREATE POLICY "Authenticated users can create automation runs"
+  ON automation_runs FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+-- RLS Policies for automation_logs
+DROP POLICY IF EXISTS "Users can view automation logs for their automations" ON automation_logs;
+CREATE POLICY "Users can view automation logs for their automations"
+  ON automation_logs FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM automations
+      WHERE automations.id = automation_logs.automation_id
+      AND automations.created_by = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Authenticated users can create automation logs" ON automation_logs;
+CREATE POLICY "Authenticated users can create automation logs"
+  ON automation_logs FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -207,17 +303,30 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_tables_updated_at ON tables;
 CREATE TRIGGER update_tables_updated_at BEFORE UPDATE ON tables
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_views_updated_at ON views;
 CREATE TRIGGER update_views_updated_at BEFORE UPDATE ON views
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_view_blocks_updated_at ON view_blocks;
 CREATE TRIGGER update_view_blocks_updated_at BEFORE UPDATE ON view_blocks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_automations_updated_at ON automations;
 CREATE TRIGGER update_automations_updated_at BEFORE UPDATE ON automations
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_automation_runs_updated_at ON automation_runs;
+CREATE TRIGGER update_automation_runs_updated_at BEFORE UPDATE ON automation_runs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_automation_logs_updated_at ON automation_logs;
+CREATE TRIGGER update_automation_logs_updated_at BEFORE UPDATE ON automation_logs
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_table_rows_updated_at ON table_rows;
 CREATE TRIGGER update_table_rows_updated_at BEFORE UPDATE ON table_rows
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
