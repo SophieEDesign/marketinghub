@@ -143,7 +143,7 @@ export default function RecordPanel() {
         .from("table_fields")
         .select("*")
         .eq("table_id", state.tableId)
-        .order("order_index", { ascending: true, nullsLast: true })
+        .order("order_index", { ascending: true, nullsFirst: false })
         .order("position", { ascending: true })
 
       if (!error && data) {

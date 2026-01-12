@@ -874,7 +874,7 @@ export default function GridView({
                             title="Open record"
                             aria-label="Open record"
                           >
-                            <ChevronRightIcon className="h-4 w-4" />
+                            <ChevronRight className="h-4 w-4" />
                           </button>
                         )}
                       </td>

@@ -660,31 +660,17 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     )
   }
 
-  // Check for empty data based on chart type
-  if (chartType === 'categorical_legend') {
-    if (categoricalData.length === 0 && !loading) {
-      return (
-        <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-          <div className="text-center">
-            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-            <p className="mb-1">No categories found</p>
-            <p className="text-xs text-gray-400">Try adjusting filters or select a different field</p>
-          </div>
+  // Check for empty data (categorical legend functionality removed - was incomplete)
+  if (chartData.length === 0 && !loading) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+          <p className="mb-1">No data available</p>
+          <p className="text-xs text-gray-400">Try adjusting filters or date range</p>
         </div>
-      )
-    }
-  } else {
-    if (chartData.length === 0 && !loading) {
-      return (
-        <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-          <div className="text-center">
-            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-            <p className="mb-1">No data available</p>
-            <p className="text-xs text-gray-400">Try adjusting filters or date range</p>
-          </div>
-        </div>
-      )
-    }
+      </div>
+    )
   }
 
   // Apply appearance settings
@@ -717,13 +703,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         </div>
       )}
       <div className="flex-1 min-h-0">
-        {chartType === 'categorical_legend' ? (
-          renderCategoricalLegend()
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            {renderChart()}
-          </ResponsiveContainer>
-        )}
+        <ResponsiveContainer width="100%" height="100%">
+          {renderChart()}
+        </ResponsiveContainer>
       </div>
       {clickThrough && !isEditing && (
         <div className="text-xs text-gray-400 text-center mt-2">

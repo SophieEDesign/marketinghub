@@ -92,22 +92,22 @@ export default function ListView({
       filters.forEach((filter) => {
         const { field, operator, value } = filter
         switch (operator) {
-          case 'eq':
+          case 'equal':
             query = query.eq(field, value)
             break
-          case 'neq':
+          case 'not_equal':
             query = query.neq(field, value)
             break
-          case 'gt':
+          case 'greater_than':
             query = query.gt(field, value)
             break
-          case 'gte':
+          case 'greater_than_or_equal':
             query = query.gte(field, value)
             break
-          case 'lt':
+          case 'less_than':
             query = query.lt(field, value)
             break
-          case 'lte':
+          case 'less_than_or_equal':
             query = query.lte(field, value)
             break
           case 'contains':

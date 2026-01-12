@@ -102,7 +102,7 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
           .eq("table_id", tableId)
           .order("position", { ascending: true })
 
-        const normalizedFields = asArray(tableFieldsRes.data)
+        const normalizedFields = asArray<TableField>(tableFieldsRes.data)
         setTableFields(normalizedFields)
 
         if (viewId) {

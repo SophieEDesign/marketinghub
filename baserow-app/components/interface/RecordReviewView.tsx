@@ -474,7 +474,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         .from('table_fields')
         .select('*')
         .eq('table_id', pageTableId)
-        .order('order_index', { ascending: true, nullsLast: true })
+        .order('order_index', { ascending: true, nullsFirst: false })
         .order('position', { ascending: true })
       
       if (error) {

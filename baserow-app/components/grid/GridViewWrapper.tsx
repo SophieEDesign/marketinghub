@@ -62,6 +62,7 @@ interface GridViewWrapperProps {
     show_filter?: boolean
     show_sort?: boolean
     row_height?: string
+    wrap_text?: boolean
     color_field?: string
     image_field?: string
     fit_image_size?: boolean
