@@ -64,9 +64,9 @@ export default function FieldBuilderModal({
     setError(null)
   }, [field, isOpen])
 
-  // Load tables for lookup fields
+  // Load tables for lookup and link_to_table fields
   useEffect(() => {
-    if (isOpen && type === 'lookup') {
+    if (isOpen && (type === 'lookup' || type === 'link_to_table')) {
       loadTables()
     }
   }, [isOpen, type])
@@ -283,6 +283,42 @@ export default function FieldBuilderModal({
             }
             tableFields={tableFields.filter(f => f.id !== field?.id && f.type !== 'formula')}
           />
+        )
+
+      case "link_to_table":
+        return (
+          <div className="space-y-2">
+            <Label htmlFor="linked-table">Linked Table *</Label>
+            <Select
+              value={options.linked_table_id || undefined}
+              onValueChange={(tableId) =>
+                setOptions({ 
+                  ...options, 
+                  linked_table_id: tableId || undefined,
+                })
+              }
+            >
+              <SelectTrigger id="linked-table">
+                <SelectValue placeholder="Select a table" />
+              </SelectTrigger>
+              <SelectContent>
+                {loadingTables ? (
+                  <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
+                ) : (
+                  tables
+                    .filter(t => t.id !== tableId)
+                    .map((table) => (
+                      <SelectItem key={table.id} value={table.id}>
+                        {table.name}
+                      </SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Select the table to link records from. Each row can contain one or more records from that table.
+            </p>
+          </div>
         )
 
       case "lookup":
