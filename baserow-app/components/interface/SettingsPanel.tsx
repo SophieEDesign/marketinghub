@@ -97,8 +97,6 @@ export default function SettingsPanel({
         blockConfig.view_type = 'kanban'
       } else if (block.type === 'timeline' && !blockConfig.view_type) {
         blockConfig.view_type = 'timeline'
-      } else if (block.type === 'table' && !blockConfig.view_type) {
-        blockConfig.view_type = 'grid'
       }
       // Ensure chart blocks have a default chart_type if not set
       if (block.type === 'chart' && !blockConfig.chart_type) {

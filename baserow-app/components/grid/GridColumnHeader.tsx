@@ -7,6 +7,8 @@ import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText }
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 
+const COLUMN_MIN_WIDTH = 100
+
 interface GridColumnHeaderProps {
   field: TableField
   width: number
@@ -51,8 +53,8 @@ export default function GridColumnHeader({
 
   const [isHovered, setIsHovered] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
-  const [resizeStartX, setResizeStartX] = useState(0)
-  const [resizeStartWidth, setResizeStartWidth] = useState(0)
+  const resizeStartXRef = useRef(0)
+  const resizeStartWidthRef = useRef(0)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -63,13 +65,13 @@ export default function GridColumnHeader({
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setResizeStartX(e.clientX)
-    setResizeStartWidth(width)
+    resizeStartXRef.current = e.clientX
+    resizeStartWidthRef.current = width
     onResizeStart(field.name)
     
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const diff = moveEvent.clientX - resizeStartX
-      const newWidth = Math.max(100, resizeStartWidth + diff)
+      const diff = moveEvent.clientX - resizeStartXRef.current
+      const newWidth = Math.max(COLUMN_MIN_WIDTH, Math.min(resizeStartWidthRef.current + diff, 1000))
       onResize(field.name, newWidth)
     }
 

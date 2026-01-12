@@ -6,7 +6,8 @@ interface TextCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
-  wrapText?: boolean // Deprecated: kept for compatibility but ignored
+  wrapText?: boolean // If true, allow max 2 lines; if false, single line with ellipsis
+  rowHeight?: number // Row height in pixels
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -15,7 +16,8 @@ export default function TextCell({
   value,
   fieldName,
   editable = true,
-  wrapText = false, // Deprecated
+  wrapText = false,
+  rowHeight,
   onSave,
   placeholder = '—',
 }: TextCellProps) {
@@ -72,7 +74,8 @@ export default function TextCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
+        className="w-full h-full px-3 py-1 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
+        style={{ height: rowHeight ? `${rowHeight}px` : 'auto' }}
         disabled={saving}
       />
     )
@@ -81,13 +84,26 @@ export default function TextCell({
   const displayValue = value || placeholder
   const isPlaceholder = !value
 
+  // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
+  const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
+    maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+  }
+
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full min-h-[36px] px-3 py-2 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex items-center"
+      className="w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex items-center overflow-hidden"
+      style={cellStyle}
       title={value || undefined}
     >
-      <span className={`truncate ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+      <span 
+        className={`${wrapText ? 'line-clamp-2' : 'truncate'} ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'} w-full`}
+        style={{ 
+          lineHeight: rowHeight ? `${Math.max(16, rowHeight - 8)}px` : '1.5',
+          maxHeight: wrapText && rowHeight ? `${rowHeight - 8}px` : 'none',
+        }}
+      >
         {displayValue}
       </span>
     </div>

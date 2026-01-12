@@ -130,7 +130,7 @@ export default function BlockRenderer({
     
     switch (block.type) {
       case "grid":
-      case "table":
+      case "table": // Backward compatibility: table blocks are deprecated, use grid instead
         // Table blocks use the same rendering as Grid blocks
         // CRITICAL: Pass pageTableId to GridBlock for table resolution fallback
         // Table resolution order: block.config.table_id → page.base_table (pageTableId) → block.config.base_table → null

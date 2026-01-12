@@ -1,6 +1,5 @@
 export type BlockType =
   | 'grid'
-  | 'table'
   | 'form'
   | 'record'
   | 'chart'
@@ -202,6 +201,9 @@ export interface BlockConfig {
     divider_style?: 'solid' | 'dashed' | 'dotted'
     divider_spacing_top?: number
     divider_spacing_bottom?: number
+    // Timeline/Calendar view specific
+    timeline_wrap_title?: boolean
+    card_wrap_title?: boolean
   }
   [key: string]: any
 }
@@ -255,6 +257,13 @@ export interface PageSettings {
   // Record Review page settings
   tableId?: string // Required for record_review pages
   leftPanel?: {
+    visibleFieldIds: string[] // Which fields show in left column
+    fieldOrder: string[] // Order of fields (if empty, use table field order)
+    showLabels?: boolean // Show field labels
+    compact?: boolean // Compact display mode
+  }
+  // Backward compatibility: support snake_case format
+  left_panel?: {
     visibleFieldIds: string[] // Which fields show in left column
     fieldOrder: string[] // Order of fields (if empty, use table field order)
     showLabels?: boolean // Show field labels

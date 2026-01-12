@@ -27,20 +27,6 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       table_id: '',
     },
   },
-  table: {
-    type: 'table',
-    label: 'Table',
-    icon: 'Grid',
-    defaultWidth: 12,
-    defaultHeight: 8,
-    minWidth: 4,
-    minHeight: 4,
-    defaultConfig: {
-      title: 'Table View',
-      table_id: '',
-      view_type: 'grid',
-    },
-  },
   form: {
     type: 'form',
     label: 'Form',

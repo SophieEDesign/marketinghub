@@ -22,6 +22,7 @@ interface CellFactoryProps {
   tableName: string
   editable?: boolean
   wrapText?: boolean
+  rowHeight?: number // Row height in pixels
   onSave: (value: any) => Promise<void>
 }
 
@@ -32,6 +33,7 @@ export function CellFactory({
   tableName,
   editable = true,
   wrapText = false,
+  rowHeight,
   onSave,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
@@ -39,6 +41,7 @@ export function CellFactory({
     fieldName: field.name,
     editable,
     wrapText,
+    rowHeight,
     onSave,
   }
 

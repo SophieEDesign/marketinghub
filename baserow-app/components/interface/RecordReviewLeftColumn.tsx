@@ -34,6 +34,10 @@ interface RecordReviewLeftColumnProps {
     titleFieldId?: string | null
     subtitleFieldId?: string | null
     additionalFieldId?: string | null
+    // Backward compatibility: support old field name format (snake_case)
+    title_field?: string | null
+    field_1?: string | null
+    field_2?: string | null
   }
   pageType?: 'record_view' | 'record_review' // To determine which settings format to use
 }

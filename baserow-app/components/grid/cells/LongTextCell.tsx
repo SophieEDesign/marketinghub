@@ -7,7 +7,8 @@ interface LongTextCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
-  wrapText?: boolean // Deprecated: kept for compatibility but ignored - always clamped
+  wrapText?: boolean // If true, allow max 2 lines; if false, single line with ellipsis
+  rowHeight?: number // Row height in pixels
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -16,7 +17,8 @@ export default function LongTextCell({
   value,
   fieldName,
   editable = true,
-  wrapText = true, // Deprecated
+  wrapText = false, // Default to single line
+  rowHeight,
   onSave,
   placeholder = '—',
 }: LongTextCellProps) {
@@ -77,19 +79,30 @@ export default function LongTextCell({
   const isPlaceholder = !value
   const plainText = stripHtml(value)
 
+  // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
+  const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
+    maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+  }
+
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full min-h-[36px] px-3 py-2 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors"
+      className="w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex items-center"
+      style={cellStyle}
       title={plainText || undefined}
     >
       {value && value.trim() && value !== '<p></p>' ? (
         <div 
-          className="prose prose-sm max-w-none text-gray-900 line-clamp-2"
+          className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
+          style={{ 
+            lineHeight: rowHeight ? `${Math.max(16, rowHeight - 8)}px` : '1.5',
+            maxHeight: wrapText && rowHeight ? `${rowHeight - 8}px` : rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none',
+          }}
           dangerouslySetInnerHTML={{ __html: value }}
         />
       ) : (
-        <span className={`text-gray-400 italic`}>
+        <span className={`text-gray-400 italic truncate w-full`}>
           {isPlaceholder ? placeholder : ''}
         </span>
       )}

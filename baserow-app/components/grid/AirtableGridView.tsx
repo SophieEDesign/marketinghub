@@ -54,6 +54,13 @@ const COLUMN_MIN_WIDTH = 100
 const COLUMN_DEFAULT_WIDTH = 200
 const FROZEN_COLUMN_WIDTH = 50
 
+// Map row height values: 'compact' -> 'short', 'comfortable' -> 'tall'
+const mapRowHeightToAirtable = (height: string): 'short' | 'medium' | 'tall' => {
+  if (height === 'compact') return 'short'
+  if (height === 'comfortable') return 'tall'
+  return 'medium'
+}
+
 export default function AirtableGridView({
   tableName,
   tableId,
@@ -97,8 +104,11 @@ export default function AirtableGridView({
       openRecord(tableIdState, rowId, tableName)
     }
   }, [tableIdState, tableName, openRecord, disableRecordPanel])
+  
+  // Map row height from props to internal format
+  const mappedRowHeight = mapRowHeightToAirtable(rowHeight)
   const ROW_HEIGHT =
-    rowHeight === 'short' ? ROW_HEIGHT_SHORT : rowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
+    mappedRowHeight === 'short' ? ROW_HEIGHT_SHORT : mappedRowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
 
   // State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
@@ -114,6 +124,9 @@ export default function AirtableGridView({
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set())
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  
+  // Track wrap text settings per column (from grid_view_settings)
+  const [columnWrapTextSettings, setColumnWrapTextSettings] = useState<Record<string, boolean>>({})
 
   // Refs
   const gridRef = useRef<HTMLDivElement>(null)
@@ -212,78 +225,166 @@ export default function AirtableGridView({
     })
   }
 
-  // Initialize column widths and order from localStorage or defaults
+  // Load grid view settings from database (column widths, order, wrap text)
   useEffect(() => {
-    if (safeFields.length === 0) return
+    if (!viewId || safeFields.length === 0) return
 
-    const storageKey = `grid_${tableName}_${viewName}`
-    const savedWidths = localStorage.getItem(`${storageKey}_widths`)
-    const savedOrder = localStorage.getItem(`${storageKey}_order`)
-    const savedWrapText = localStorage.getItem(`${storageKey}_wrapText`)
-
-    if (savedWidths) {
+    async function loadGridViewSettings() {
       try {
-        const parsed = JSON.parse(savedWidths) as Record<string, number>
-        setColumnWidths(parsed)
-      } catch {
-        // Fallback to defaults
-      }
-    }
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('grid_view_settings')
+          .select('column_widths, column_order, column_wrap_text')
+          .eq('view_id', viewId)
+          .maybeSingle()
 
-    if (savedOrder) {
-      try {
-        const order = JSON.parse(savedOrder)
-        // Validate order contains all fields
-        const allFieldNames = safeFields.map((f) => f.name)
-        if (Array.isArray(order) && order.every((name: string) => allFieldNames.includes(name))) {
-          setColumnOrder(order)
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading grid view settings:', error)
+          // Fallback to localStorage
+          loadFromLocalStorage()
+          return
+        }
+
+        if (data) {
+          // Use database settings if available
+          if (data.column_widths && typeof data.column_widths === 'object') {
+            setColumnWidths(data.column_widths as Record<string, number>)
+          }
+          if (data.column_order && Array.isArray(data.column_order)) {
+            const allFieldNames = safeFields.map((f) => f.name)
+            if (data.column_order.every((name: string) => allFieldNames.includes(name))) {
+              setColumnOrder(data.column_order)
+            } else {
+              setColumnOrder(allFieldNames)
+            }
+          }
+          if (data.column_wrap_text && typeof data.column_wrap_text === 'object') {
+            setColumnWrapText(data.column_wrap_text as Record<string, boolean>)
+            setColumnWrapTextSettings(data.column_wrap_text as Record<string, boolean>)
+          }
         } else {
-          setColumnOrder(allFieldNames)
+          // Fallback to localStorage
+          loadFromLocalStorage()
         }
-      } catch {
-        setColumnOrder(safeFields.map((f) => f.name))
-      }
-    } else {
-      // Sort fields by order_index, then by position, then by name
-      const sortedFields = [...safeFields].sort((a, b) => {
-        const aOrder = a.order_index ?? a.position ?? 0
-        const bOrder = b.order_index ?? b.position ?? 0
-        if (aOrder !== bOrder) return aOrder - bOrder
-        return a.name.localeCompare(b.name)
-      })
-      setColumnOrder(sortedFields.map((f) => f.name))
-    }
-    
-    if (savedWrapText) {
-      try {
-        const parsed = JSON.parse(savedWrapText) as Record<string, boolean>
-        setColumnWrapText(parsed)
-      } catch {
-        // Fallback to defaults
+
+        // Set default widths for fields without saved widths
+        setColumnWidths((prev) => {
+          const newWidths = { ...prev }
+          safeFields.forEach((field) => {
+            if (!newWidths[field.name]) {
+              newWidths[field.name] = COLUMN_DEFAULT_WIDTH
+            }
+          })
+          return newWidths
+        })
+      } catch (error) {
+        console.error('Error loading grid view settings:', error)
+        loadFromLocalStorage()
       }
     }
 
-    // Set default widths for fields without saved widths
-    setColumnWidths((prev) => {
-      const newWidths = { ...prev }
-      safeFields.forEach((field) => {
-        if (!newWidths[field.name]) {
-          newWidths[field.name] = COLUMN_DEFAULT_WIDTH
-        }
-      })
-      return newWidths
-    })
-  }, [safeFields, tableName, viewName])
+    function loadFromLocalStorage() {
+      const storageKey = `grid_${tableName}_${viewName}`
+      const savedWidths = localStorage.getItem(`${storageKey}_widths`)
+      const savedOrder = localStorage.getItem(`${storageKey}_order`)
+      const savedWrapText = localStorage.getItem(`${storageKey}_wrapText`)
 
-  // Save column widths and order to localStorage
+      if (savedWidths) {
+        try {
+          const parsed = JSON.parse(savedWidths) as Record<string, number>
+          setColumnWidths(parsed)
+        } catch {
+          // Fallback to defaults
+        }
+      }
+
+      if (savedOrder) {
+        try {
+          const order = JSON.parse(savedOrder)
+          const allFieldNames = safeFields.map((f) => f.name)
+          if (Array.isArray(order) && order.every((name: string) => allFieldNames.includes(name))) {
+            setColumnOrder(order)
+          } else {
+            setColumnOrder(allFieldNames)
+          }
+        } catch {
+          setColumnOrder(safeFields.map((f) => f.name))
+        }
+      } else {
+        // Sort fields by order_index, then by position, then by name
+        const sortedFields = [...safeFields].sort((a, b) => {
+          const aOrder = a.order_index ?? a.position ?? 0
+          const bOrder = b.order_index ?? b.position ?? 0
+          if (aOrder !== bOrder) return aOrder - bOrder
+          return a.name.localeCompare(b.name)
+        })
+        setColumnOrder(sortedFields.map((f) => f.name))
+      }
+      
+      if (savedWrapText) {
+        try {
+          const parsed = JSON.parse(savedWrapText) as Record<string, boolean>
+          setColumnWrapText(parsed)
+          setColumnWrapTextSettings(parsed)
+        } catch {
+          // Fallback to defaults
+        }
+      }
+    }
+
+    loadGridViewSettings()
+  }, [safeFields, tableName, viewName, viewId])
+
+  // Save column widths, order, and wrap text to database and localStorage
   useEffect(() => {
     if (Object.keys(columnWidths).length === 0 || columnOrder.length === 0) return
 
+    // Save to localStorage as backup
     const storageKey = `grid_${tableName}_${viewName}`
     localStorage.setItem(`${storageKey}_widths`, JSON.stringify(columnWidths))
     localStorage.setItem(`${storageKey}_order`, JSON.stringify(columnOrder))
     localStorage.setItem(`${storageKey}_wrapText`, JSON.stringify(columnWrapText))
-  }, [columnWidths, columnOrder, columnWrapText, tableName, viewName])
+
+    // Save to database if viewId is available
+    if (viewId) {
+      async function saveToDatabase() {
+        try {
+          const supabase = createClient()
+          const { data: existing } = await supabase
+            .from('grid_view_settings')
+            .select('id')
+            .eq('view_id', viewId)
+            .maybeSingle()
+
+          const settingsData = {
+            column_widths: columnWidths,
+            column_order: columnOrder,
+            column_wrap_text: columnWrapText,
+          }
+
+          if (existing) {
+            await supabase
+              .from('grid_view_settings')
+              .update(settingsData)
+              .eq('view_id', viewId)
+          } else {
+            await supabase
+              .from('grid_view_settings')
+              .insert([{
+                view_id: viewId,
+                ...settingsData,
+                row_height: 'medium',
+                frozen_columns: 0,
+              }])
+          }
+        } catch (error) {
+          console.error('Error saving grid view settings:', error)
+          // Non-critical, continue
+        }
+      }
+      saveToDatabase()
+    }
+  }, [columnWidths, columnOrder, columnWrapText, tableName, viewName, viewId])
 
   // Update container height
   useEffect(() => {
@@ -480,7 +581,7 @@ export default function AirtableGridView({
     (fieldName: string, width: number) => {
       setColumnWidths((prev) => ({
         ...prev,
-        [fieldName]: Math.max(COLUMN_MIN_WIDTH, width),
+        [fieldName]: Math.max(COLUMN_MIN_WIDTH, Math.min(width, 1000)), // Max width 1000px
       }))
     },
     []
@@ -681,11 +782,11 @@ export default function AirtableGridView({
   }
 
   return (
-    <div ref={gridRef} className="flex flex-col h-full bg-gray-50 overflow-hidden">
+    <div ref={gridRef} className="flex flex-col h-full bg-gray-50 overflow-hidden w-full">
       {/* Header */}
       <div
         ref={headerScrollRef}
-        className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-hidden overflow-y-hidden"
+        className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-auto overflow-y-hidden"
         style={{ height: HEADER_HEIGHT }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
@@ -780,7 +881,8 @@ export default function AirtableGridView({
       {/* Body */}
       <div
         ref={bodyScrollRef}
-        className="flex-1 overflow-x-auto overflow-y-auto bg-white grid-scroll-container"
+        className="flex-1 overflow-x-auto overflow-y-auto bg-white grid-scroll-container w-full"
+        style={{ maxWidth: '100%' }}
         onScroll={(e) => {
           const left = e.currentTarget.scrollLeft
           const top = e.currentTarget.scrollTop
@@ -883,27 +985,32 @@ export default function AirtableGridView({
                     const width = columnWidths[field.name] || COLUMN_DEFAULT_WIDTH
                     const isSelected =
                       selectedCell?.rowId === row.id && selectedCell?.fieldName === field.name
+                    const wrapText = columnWrapText[field.name] || false
 
                     return (
                       <div
                         key={field.name}
-                        className={`border-r border-gray-100/50 relative flex items-center ${
+                        className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
                           isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
                         }`}
-                        style={{ width, height: ROW_HEIGHT }}
+                        style={{ width, height: ROW_HEIGHT, maxHeight: ROW_HEIGHT }}
                         onClick={() => {
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
                         }}
                       >
-                        <CellFactory
-                          field={field}
-                          value={row[field.name]}
-                          rowId={row.id}
-                          tableName={tableName}
-                          editable={editable && !field.options?.read_only}
-                          onSave={(value) => handleCellSave(row.id, field.name, value)}
-                        />
+                        <div className="w-full h-full flex items-center overflow-hidden">
+                          <CellFactory
+                            field={field}
+                            value={row[field.name]}
+                            rowId={row.id}
+                            tableName={tableName}
+                            editable={editable && !field.options?.read_only}
+                            wrapText={wrapText}
+                            rowHeight={ROW_HEIGHT}
+                            onSave={(value) => handleCellSave(row.id, field.name, value)}
+                          />
+                        </div>
                       </div>
                     )
                   })}
