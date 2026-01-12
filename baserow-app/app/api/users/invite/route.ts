@@ -70,13 +70,19 @@ export async function POST(request: NextRequest) {
       'http://localhost:3000'
 
     // Invite user via Supabase Auth Admin API
+    // Build user metadata - only include default_interface if it has a valid value
+    const userMetadata: { role: string; default_interface?: string } = {
+      role: role,
+    }
+    
+    if (default_interface && default_interface !== '__none__') {
+      userMetadata.default_interface = default_interface
+    }
+    
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       email.trim(),
       {
-        data: {
-          role: role,
-          default_interface: default_interface && default_interface !== '__none__' ? default_interface : null,
-        },
+        data: userMetadata,
         redirectTo: `${baseUrl}/auth/callback`,
       }
     )

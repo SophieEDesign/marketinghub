@@ -61,8 +61,6 @@ export default function UsersTab() {
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member')
-  const [inviteDefaultInterface, setInviteDefaultInterface] = useState<string>('__none__')
-  const [interfaces, setInterfaces] = useState<Array<{ id: string; name: string }>>([])
   const [inviting, setInviting] = useState(false)
 
   // Edit form state
@@ -73,25 +71,7 @@ export default function UsersTab() {
 
   useEffect(() => {
     loadUsers()
-    loadInterfaces()
   }, [])
-
-  async function loadInterfaces() {
-    try {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('views')
-        .select('id, name')
-        .eq('type', 'interface')
-        .order('name')
-
-      if (!error && data) {
-        setInterfaces(data)
-      }
-    } catch (error) {
-      console.error('Error loading interfaces:', error)
-    }
-  }
 
   async function loadUsers() {
     setLoading(true)
@@ -183,14 +163,21 @@ export default function UsersTab() {
         body: JSON.stringify({
           email: inviteEmail.trim(),
           role: inviteRole,
-          default_interface: inviteDefaultInterface === '__none__' ? null : inviteDefaultInterface,
         }),
       })
 
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        // If JSON parsing fails, use the response status text
+        throw new Error(`Server error: ${response.status} ${response.statusText || 'Unknown error'}`)
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to invite user')
+        const errorMessage = data?.error || data?.message || `Server error: ${response.status} ${response.statusText || 'Unknown error'}`
+        const errorDetails = data?.details ? `\n\n${data.details}` : ''
+        throw new Error(errorMessage + errorDetails)
       }
 
       // Success - show confirmation
@@ -199,7 +186,6 @@ export default function UsersTab() {
       setInviteDialogOpen(false)
       setInviteEmail('')
       setInviteRole('member')
-      setInviteDefaultInterface('__none__')
       loadUsers()
     } catch (error: any) {
       console.error('Error inviting user:', error)
@@ -590,22 +576,6 @@ export default function UsersTab() {
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="member">Member</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-interface">Default Interface (Optional)</Label>
-              <Select value={inviteDefaultInterface} onValueChange={setInviteDefaultInterface}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select default interface" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">None</SelectItem>
-                  {interfaces.map((iface) => (
-                    <SelectItem key={iface.id} value={iface.id}>
-                      {iface.name}
-                    </SelectItem>
-                  ))}
                 </SelectContent>
               </Select>
             </div>

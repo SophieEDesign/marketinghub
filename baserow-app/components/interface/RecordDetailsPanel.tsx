@@ -8,17 +8,20 @@
  * for viewing/editing record fields.
  * 
  * Layout:
- * - Header: Record title, created date, actions (duplicate/delete)
+ * - Header: Record title (editable), status, created date, actions (save/duplicate/delete/copy link)
+ * - Toolbar: Unsaved changes indicator
  * - Record Fields: Structured field list (page-level configuration)
- * - Optional sections: Activity, Comments (future)
+ * - Activity: Record activity timeline
+ * - Blocks: Optional blocks section
  */
 
-import { useMemo, useCallback } from "react"
-import { Copy, Trash2, X } from "lucide-react"
+import { useMemo, useCallback, useState, useEffect, useRef } from "react"
+import { Copy, Trash2, X, Save, Edit2, Check } from "lucide-react"
 import { formatDateUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 import RecordFields from "@/components/records/RecordFields"
+import RecordActivity from "@/components/records/RecordActivity"
 import InterfaceBuilder from "./InterfaceBuilder"
 import type { TableField } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
@@ -74,6 +77,26 @@ export default function RecordDetailsPanel({
   blocksLoading = false,
 }: RecordDetailsPanelProps) {
   const { toast } = useToast()
+  const [hasChanges, setHasChanges] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState("")
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const previousFormDataRef = useRef<Record<string, any>>({})
+
+  // Find primary name field (for editable title)
+  const primaryNameField = useMemo(() => {
+    if (titleField) {
+      return fields.find((f) => f.name === titleField) || fields.find((f) => f.type === "text")
+    }
+    return fields.find(
+      (f) =>
+        f.type === "text" &&
+        (f.name.toLowerCase() === "name" ||
+          f.name.toLowerCase() === "title" ||
+          f.name.toLowerCase() === "subject")
+    ) || fields.find((f) => f.type === "text")
+  }, [fields, titleField])
 
   // Get record title from titleField or fallback to first text field
   const recordTitle = useMemo(() => {
@@ -88,8 +111,94 @@ export default function RecordDetailsPanel({
     return recordId?.substring(0, 8) || "Untitled"
   }, [formData, fields, titleField, recordId])
 
-  // Get created date
+  // Track form data changes
+  useEffect(() => {
+    const hasFormChanges = JSON.stringify(formData) !== JSON.stringify(previousFormDataRef.current)
+    setHasChanges(hasFormChanges)
+    previousFormDataRef.current = { ...formData }
+  }, [formData])
+
+  // Update name value when record title changes
+  useEffect(() => {
+    setNameValue(String(recordTitle || ""))
+  }, [recordTitle])
+
+  // Focus name input when editing
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus()
+      nameInputRef.current.select()
+    }
+  }, [isEditingName])
+
+  // Find status field
+  const statusField = useMemo(() => {
+    return fields.find(
+      (f) =>
+        (f.type === "single_select" || f.type === "checkbox") &&
+        (f.name.toLowerCase() === "status" ||
+          f.name.toLowerCase() === "state" ||
+          f.name.toLowerCase() === "stage")
+    )
+  }, [fields])
+
+  const statusValue = statusField ? formData[statusField.name] : null
+
+  // Get created/updated dates
   const createdAt = record?.created_at ? formatDateUK(record.created_at) : null
+  const updatedAt = record?.updated_at ? formatDateUK(record.updated_at) : null
+
+  // Handle save
+  const handleSave = useCallback(async () => {
+    if (!recordId || !tableName || !hasChanges) return
+
+    setSaving(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from(tableName)
+        .update(formData)
+        .eq("id", recordId)
+
+      if (error) throw error
+
+      toast({
+        title: "Record saved",
+        description: "Changes have been saved successfully.",
+      })
+
+      setHasChanges(false)
+      previousFormDataRef.current = { ...formData }
+    } catch (error: any) {
+      console.error("Error saving record:", error)
+      toast({
+        variant: "destructive",
+        title: "Failed to save record",
+        description: error.message || "Please try again",
+      })
+    } finally {
+      setSaving(false)
+    }
+  }, [recordId, tableName, formData, hasChanges, toast])
+
+  // Handle name edit
+  const handleNameSave = useCallback(() => {
+    if (primaryNameField && nameValue !== recordTitle) {
+      onFieldChange(primaryNameField.name, nameValue)
+      setIsEditingName(false)
+      // Auto-save if there are changes
+      if (hasChanges) {
+        handleSave()
+      }
+    } else {
+      setIsEditingName(false)
+    }
+  }, [primaryNameField, nameValue, recordTitle, onFieldChange, hasChanges, handleSave])
+
+  const handleNameCancel = useCallback(() => {
+    setNameValue(String(recordTitle || ""))
+    setIsEditingName(false)
+  }, [recordTitle])
 
   const handleDuplicate = useCallback(async () => {
     if (!recordId || !record || !tableName) return
@@ -166,7 +275,7 @@ export default function RecordDetailsPanel({
 
   if (!recordId) {
     return (
-      <div className="w-96 border-l flex flex-col overflow-hidden bg-white">
+      <div className="flex-1 border-l flex flex-col overflow-hidden bg-white">
         <div className="flex items-center justify-center h-full text-gray-400 text-sm p-4">
           <div className="text-center">
             <p className="mb-2 font-medium">Select a record</p>
@@ -178,57 +287,149 @@ export default function RecordDetailsPanel({
   }
 
   return (
-    <div className="w-96 border-l flex flex-col overflow-hidden bg-white">
-      {/* Header */}
-      <div className="border-b bg-white p-4 flex-shrink-0">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900 truncate">{recordTitle}</h2>
-            {createdAt && (
-              <p className="text-xs text-gray-500 mt-1">Created {createdAt}</p>
-            )}
-          </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="ml-2 p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-              aria-label="Collapse panel"
-            >
-              <X className="h-5 w-5 text-gray-500" />
-            </button>
+    <div className="flex-1 border-l flex flex-col overflow-hidden bg-white">
+      {/* Header - Enhanced with editable title and status */}
+      <div className="border-b border-gray-200 bg-white flex-shrink-0">
+        {/* Primary Name - Editable */}
+        <div className="px-6 py-4">
+          {isEditingName && primaryNameField ? (
+            <div className="flex items-center gap-2">
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleNameSave()
+                  } else if (e.key === "Escape") {
+                    handleNameCancel()
+                  }
+                }}
+                onBlur={handleNameSave}
+                className="flex-1 text-2xl font-semibold text-gray-900 border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+                placeholder="Record name"
+              />
+              <button
+                onClick={handleNameSave}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <Check className="h-4 w-4 text-green-600" />
+              </button>
+              <button
+                onClick={handleNameCancel}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+              >
+                <X className="h-4 w-4 text-gray-600" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 group">
+              <h1 className="text-2xl font-semibold text-gray-900 flex-1 min-w-0">
+                {recordTitle || "Untitled"}
+              </h1>
+              {primaryNameField && pageEditable && (
+                <button
+                  onClick={() => setIsEditingName(true)}
+                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
+                  title="Edit name"
+                >
+                  <Edit2 className="h-4 w-4 text-gray-600" />
+                </button>
+              )}
+              {onClose && (
+                <button
+                  onClick={onClose}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                  aria-label="Collapse panel"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              )}
+            </div>
           )}
+
+          {/* Status and Metadata Row */}
+          <div className="flex items-center gap-4 mt-3">
+            {/* Status Pill */}
+            {statusField && statusValue && (
+              <div
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  statusField.type === "checkbox"
+                    ? statusValue
+                      ? "bg-green-100 text-green-800"
+                      : "bg-gray-100 text-gray-600"
+                    : "bg-blue-100 text-blue-800"
+                }`}
+              >
+                {statusField.type === "checkbox"
+                  ? statusValue
+                    ? "Active"
+                    : "Inactive"
+                  : String(statusValue)}
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              {createdAt && (
+                <span>
+                  Created {createdAt}
+                  {updatedAt && updatedAt !== createdAt && ` • Updated ${updatedAt}`}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDuplicate}
-            disabled={loading || !pageEditable}
-            className="h-8 text-xs"
-          >
-            <Copy className="h-3 w-3 mr-1.5" />
-            Duplicate
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDelete}
-            disabled={loading || !pageEditable}
-            className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="h-3 w-3 mr-1.5" />
-            Delete
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopyLink}
-            className="h-8 text-xs"
-          >
-            Copy link
-          </Button>
+        {/* Quick Actions Toolbar */}
+        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
+          <div className="flex items-center gap-2">
+            {hasChanges && (
+              <button
+                onClick={handleSave}
+                disabled={saving || !pageEditable}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save"}
+              </button>
+            )}
+            {hasChanges && !saving && (
+              <span className="text-xs text-blue-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-blue-600 rounded-full" />
+                Unsaved changes
+              </span>
+            )}
+            {saving && (
+              <span className="text-xs text-gray-500">Saving...</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleDuplicate}
+              disabled={loading || !pageEditable}
+              className="p-2 hover:bg-gray-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Duplicate record"
+            >
+              <Copy className="h-4 w-4 text-gray-600" />
+            </button>
+            <button
+              onClick={handleCopyLink}
+              className="p-2 hover:bg-gray-200 rounded transition-colors"
+              title="Copy link"
+            >
+              <Copy className="h-4 w-4 text-gray-600" />
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={loading || !pageEditable}
+              className="p-2 hover:bg-red-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Delete record"
+            >
+              <Trash2 className="h-4 w-4 text-red-600" />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -680,7 +680,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   return (
     <div className="h-full flex bg-white">
       {/* Left Column - Record List Only */}
-      <div className="w-96 border-r flex flex-col overflow-hidden bg-white">
+      <div className="w-80 border-r flex flex-col overflow-hidden bg-white flex-shrink-0">
         {/* Record List Section - Collapsible */}
         <div className="border-b bg-white">
           <button
