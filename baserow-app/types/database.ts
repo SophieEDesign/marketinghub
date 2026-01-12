@@ -118,16 +118,16 @@ export interface ViewBlock {
 
 export interface Automation {
   id: string
-  table_id: string
+  table_id?: string
   name: string
   description?: string
-  trigger_type: string
+  trigger_type?: string
   trigger_config?: Record<string, any>
   actions?: any[]
   conditions?: any[]
   enabled: boolean
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
   created_by?: string
 }
 

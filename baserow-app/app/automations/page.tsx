@@ -97,7 +97,7 @@ export default async function AutomationsPage() {
                       <p className="text-sm text-gray-600 mb-2">{automation.description}</p>
                     )}
                     <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span>Trigger: {(automation as any).trigger_type || (automation.trigger as any)?.type || 'N/A'}</span>
+                      <span>Trigger: {automation.trigger_type || 'N/A'}</span>
                       <span>Actions: {(automation.actions || []).length}</span>
                     </div>
                   </div>

@@ -152,6 +152,8 @@ CREATE POLICY "Users can create automation logs"
 
 -- Check if interface_pages table exists and has RLS enabled
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
@@ -161,11 +163,15 @@ BEGIN
     -- Enable RLS if not already enabled
     ALTER TABLE public.interface_pages ENABLE ROW LEVEL SECURITY;
     
-    -- Drop existing policies
-    DROP POLICY IF EXISTS "Authenticated users can view interface pages" ON public.interface_pages;
-    DROP POLICY IF EXISTS "Authenticated users can create interface pages" ON public.interface_pages;
-    DROP POLICY IF EXISTS "Users can update their interface pages" ON public.interface_pages;
-    DROP POLICY IF EXISTS "Users can delete their interface pages" ON public.interface_pages;
+    -- Drop ALL existing policies on interface_pages table
+    FOR r IN 
+      SELECT policyname 
+      FROM pg_policies 
+      WHERE schemaname = 'public' 
+      AND tablename = 'interface_pages'
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.interface_pages', r.policyname);
+    END LOOP;
     
     -- Allow authenticated users to view interface pages
     CREATE POLICY "Authenticated users can view interface pages"
@@ -203,6 +209,8 @@ END $$;
 -- ============================================================================
 
 DO $$
+DECLARE
+  r RECORD;
 BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.tables 
@@ -212,11 +220,15 @@ BEGIN
     -- Enable RLS if not already enabled
     ALTER TABLE public.interface_groups ENABLE ROW LEVEL SECURITY;
     
-    -- Drop existing policies
-    DROP POLICY IF EXISTS "Authenticated users can view interface groups" ON public.interface_groups;
-    DROP POLICY IF EXISTS "Authenticated users can create interface groups" ON public.interface_groups;
-    DROP POLICY IF EXISTS "Users can update interface groups" ON public.interface_groups;
-    DROP POLICY IF EXISTS "Users can delete interface groups" ON public.interface_groups;
+    -- Drop ALL existing policies on interface_groups table
+    FOR r IN 
+      SELECT policyname 
+      FROM pg_policies 
+      WHERE schemaname = 'public' 
+      AND tablename = 'interface_groups'
+    LOOP
+      EXECUTE format('DROP POLICY IF EXISTS %I ON public.interface_groups', r.policyname);
+    END LOOP;
     
     -- Allow authenticated users to view interface groups
     CREATE POLICY "Authenticated users can view interface groups"
