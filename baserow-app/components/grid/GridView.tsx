@@ -12,6 +12,8 @@ import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
+import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
+import { useIsMobile } from "@/hooks/useResponsive"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -46,12 +48,15 @@ interface GridViewProps {
   onEditField?: (fieldName: string) => void
   isEditing?: boolean // When false, hide builder controls (add row, add field)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
-  rowHeight?: string // Row height: 'compact', 'medium', 'comfortable'
+  rowHeight?: string // Row height: 'compact', 'standard', 'comfortable' (or legacy 'medium')
+  wrapText?: boolean // Whether to wrap cell text (block-level setting)
   permissions?: BlockPermissions // Block-level permissions
   colorField?: string // Field name to use for row colors (single-select field)
   imageField?: string // Field name to use for row images
   fitImageSize?: boolean // Whether to fit image to container size
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
+  enableRecordOpen?: boolean // Enable record opening (default: true)
+  recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
 }
 
 const ITEMS_PER_PAGE = 100
@@ -71,14 +76,18 @@ export default function GridView({
   onEditField,
   isEditing = false,
   onRecordClick,
-  rowHeight = 'medium',
+  rowHeight = 'standard',
+  wrapText = false,
   permissions,
   colorField,
   imageField,
   fitImageSize = false,
   hideEmptyState = false,
+  enableRecordOpen = true,
+  recordOpenStyle = 'side_panel',
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
+  const isMobile = useIsMobile()
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -148,6 +157,9 @@ export default function GridView({
     direction: string
   }
   const safeViewSorts = asArray<ViewSortType>(viewSorts)
+
+  // Calculate row height in pixels from string setting
+  const rowHeightPixels = useMemo(() => getRowHeightPixels(rowHeight), [rowHeight])
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -399,8 +411,8 @@ export default function GridView({
   const canEdit = !isViewOnly
 
   function handleRowClick(rowId: string) {
-    // Don't open record if not allowed
-    if (!allowOpenRecord) return
+    // Don't open record if not allowed or disabled
+    if (!allowOpenRecord || !enableRecordOpen) return
 
     // If onRecordClick callback provided, use it (for blocks)
     if (onRecordClick) {
@@ -409,6 +421,11 @@ export default function GridView({
       // Otherwise, use RecordPanel context (for views)
       openRecord(tableId, rowId, supabaseTableName)
     }
+  }
+
+  function handleOpenRecordClick(e: React.MouseEvent, rowId: string) {
+    e.stopPropagation() // Prevent row click
+    handleRowClick(rowId)
   }
 
   // Apply client-side search
@@ -656,6 +673,10 @@ export default function GridView({
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                {/* Row action column header (for record opening) */}
+                {enableRecordOpen && allowOpenRecord && (
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-8 sticky top-0 bg-gray-50 z-10"></th>
+                )}
                 {/* Image column header if image field is configured */}
                 {imageField && (
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 sticky top-0 bg-gray-50 z-10"></th>
@@ -694,7 +715,11 @@ export default function GridView({
               {filteredRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={visibleFields.length}
+                    colSpan={
+                      visibleFields.length +
+                      (enableRecordOpen && allowOpenRecord ? 1 : 0) +
+                      (imageField ? 1 : 0)
+                    }
                     className="px-4 py-12 text-center text-gray-500"
                   >
                     {searchTerm ? "No rows match your search" : "No rows found"}
@@ -711,7 +736,11 @@ export default function GridView({
                       {/* Group header */}
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <td
-                          colSpan={visibleFields.length}
+                          colSpan={
+                            visibleFields.length +
+                            (enableRecordOpen && allowOpenRecord ? 1 : 0) +
+                            (imageField ? 1 : 0)
+                          }
                           className="px-4 py-2"
                         >
                           <button
@@ -735,18 +764,36 @@ export default function GridView({
                       {/* Group rows */}
                       {!isCollapsed &&
                         groupRows.map((row) => {
-                          const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
                           const rowColor = getRowColor ? getRowColor(row) : null
                           const rowImage = getRowImage ? getRowImage(row) : null
                           const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+                          const canOpenRecord = enableRecordOpen && allowOpenRecord
+                          const shouldRowClickOpen = isMobile && canOpenRecord // Mobile: entire row opens
                           
                           return (
                           <tr
                             key={row.id}
-                            className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
-                            style={borderColor}
-                            onClick={() => handleRowClick(row.id)}
+                            className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
+                            style={{ ...borderColor, height: `${rowHeightPixels}px` }}
+                            onClick={shouldRowClickOpen ? () => handleRowClick(row.id) : undefined}
                           >
+                            {/* Row action indicator (desktop only) */}
+                            {canOpenRecord && (
+                              <td
+                                className="px-2 py-1 w-8"
+                                onClick={(e) => !isMobile && handleOpenRecordClick(e, row.id)}
+                              >
+                                {!isMobile && (
+                                  <button
+                                    className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
+                                    title="Open record"
+                                    aria-label="Open record"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </td>
+                            )}
                             {/* Image cell if image field is configured */}
                             {rowImage && (
                               <td
@@ -765,22 +812,33 @@ export default function GridView({
                                 </div>
                               </td>
                             )}
-                            {visibleFields.map((field) => (
-                              <td
-                                key={field.field_name}
-                                className="px-0 py-0"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Cell
-                                  value={row[field.field_name]}
-                                  fieldName={field.field_name}
-                                  editable={canEdit}
-                                  onSave={async (value) => {
-                                    await handleCellSave(row.id, field.field_name, value)
-                                  }}
-                                />
-                              </td>
-                            ))}
+                            {visibleFields.map((field) => {
+                              const tableField = safeTableFields.find(f => f.name === field.field_name)
+                              const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                              return (
+                                <td
+                                  key={field.field_name}
+                                  className="px-0 py-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Cell
+                                    value={row[field.field_name]}
+                                    fieldName={field.field_name}
+                                    fieldType={tableField?.type}
+                                    fieldOptions={tableField?.options}
+                                    isVirtual={isVirtual}
+                                    editable={canEdit && !isVirtual}
+                                    wrapText={wrapText}
+                                    rowHeight={rowHeightPixels}
+                                    onSave={async (value) => {
+                                      if (!isVirtual) {
+                                        await handleCellSave(row.id, field.field_name, value)
+                                      }
+                                    }}
+                                  />
+                                </td>
+                              )
+                            })}
                           </tr>
                           )
                         })}
@@ -791,18 +849,36 @@ export default function GridView({
                 // Render ungrouped rows
                 // CRITICAL: filteredRows is already normalized, but guard for safety
                 filteredRows.map((row) => {
-                  const rowHeightClass = rowHeight === 'compact' ? 'py-1' : rowHeight === 'comfortable' ? 'py-4' : 'py-2'
                   const rowColor = getRowColor ? getRowColor(row) : null
                   const rowImage = getRowImage ? getRowImage(row) : null
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+                  const canOpenRecord = enableRecordOpen && allowOpenRecord
+                  const shouldRowClickOpen = isMobile && canOpenRecord // Mobile: entire row opens
                   
                   return (
                   <tr
                     key={row.id}
-                    className={`border-b border-gray-100 ${allowOpenRecord ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'} ${rowHeightClass}`}
-                    style={borderColor}
-                    onClick={() => handleRowClick(row.id)}
+                    className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
+                    style={{ ...borderColor, height: `${rowHeightPixels}px` }}
+                    onClick={shouldRowClickOpen ? () => handleRowClick(row.id) : undefined}
                   >
+                    {/* Row action indicator (desktop only) */}
+                    {canOpenRecord && (
+                      <td
+                        className="px-2 py-1 w-8"
+                        onClick={(e) => !isMobile && handleOpenRecordClick(e, row.id)}
+                      >
+                        {!isMobile && (
+                          <button
+                            className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
+                            title="Open record"
+                            aria-label="Open record"
+                          >
+                            <ChevronRightIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    )}
                     {/* Image cell if image field is configured */}
                     {rowImage && (
                       <td
@@ -837,6 +913,8 @@ export default function GridView({
                             fieldOptions={tableField?.options}
                             isVirtual={isVirtual}
                             editable={canEdit && !isVirtual}
+                            wrapText={wrapText}
+                            rowHeight={rowHeightPixels}
                             onSave={async (value) => {
                               if (!isVirtual) {
                                 await handleCellSave(row.id, field.field_name, value)

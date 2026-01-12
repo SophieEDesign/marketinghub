@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { ChevronDown, ChevronRight, Link2, Plus, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -19,6 +19,11 @@ interface RecordFieldsProps {
   tableName?: string // Supabase table name (optional, will be fetched if not provided)
 }
 
+const DEFAULT_GROUP_NAME = "General"
+
+// Get localStorage key for collapsed groups state
+const getCollapsedGroupsKey = (tableId: string) => `record-view-collapsed-groups-${tableId}`
+
 export default function RecordFields({
   fields,
   formData,
@@ -31,10 +36,36 @@ export default function RecordFields({
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tableName, setTableName] = useState<string | undefined>(propTableName)
   const supabase = createClient()
+
+  // Load collapsed groups state from localStorage
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set()
+    try {
+      const stored = localStorage.getItem(getCollapsedGroupsKey(tableId))
+      if (stored) {
+        return new Set(JSON.parse(stored))
+      }
+    } catch (error) {
+      console.warn("Failed to load collapsed groups from localStorage:", error)
+    }
+    return new Set()
+  })
+
+  // Persist collapsed groups state to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem(
+        getCollapsedGroupsKey(tableId),
+        JSON.stringify(Array.from(collapsedGroups))
+      )
+    } catch (error) {
+      console.warn("Failed to save collapsed groups to localStorage:", error)
+    }
+  }, [collapsedGroups, tableId])
 
   // Fetch table name if not provided
   useEffect(() => {
@@ -52,30 +83,53 @@ export default function RecordFields({
     }
   }, [tableId, tableName, supabase])
 
-  // Group fields
-  // fieldGroups maps groupName -> fieldNames[]
-  // We need to reverse this to map fieldName -> groupName
-  const fieldToGroupMap: Record<string, string> = {}
-  Object.entries(fieldGroups).forEach(([groupName, fieldNames]) => {
-    fieldNames.forEach((fieldName) => {
-      fieldToGroupMap[fieldName] = groupName
+  // Group and sort fields based on metadata
+  const groupedFields = useMemo(() => {
+    // Build field-to-group mapping from fieldGroups prop (legacy support)
+    const fieldToGroupMap: Record<string, string> = {}
+    Object.entries(fieldGroups).forEach(([groupName, fieldNames]) => {
+      fieldNames.forEach((fieldName) => {
+        fieldToGroupMap[fieldName] = groupName
+      })
     })
-  })
 
-  const groupedFields: Record<string, TableField[]> = {}
-  const ungroupedFields: TableField[] = []
+    // Group all fields - use field.group_name as primary source, fallback to fieldGroups prop
+    const groups: Record<string, TableField[]> = {}
 
-  fields.forEach((field) => {
-    const groupName = fieldToGroupMap[field.name] || field.group_name || null
-    if (groupName) {
-      if (!groupedFields[groupName]) {
-        groupedFields[groupName] = []
+    fields.forEach((field) => {
+      // Priority: field.group_name > fieldGroups prop > DEFAULT_GROUP_NAME
+      const groupName = field.group_name || fieldToGroupMap[field.name] || DEFAULT_GROUP_NAME
+
+      if (!groups[groupName]) {
+        groups[groupName] = []
       }
-      groupedFields[groupName].push(field)
-    } else {
-      ungroupedFields.push(field)
-    }
-  })
+      groups[groupName].push(field)
+    })
+
+    // Sort fields within each group by order_index (fallback to position)
+    Object.keys(groups).forEach((groupName) => {
+      groups[groupName].sort((a, b) => {
+        const orderA = a.order_index ?? a.position ?? 0
+        const orderB = b.order_index ?? b.position ?? 0
+        return orderA - orderB
+      })
+    })
+
+    // Sort groups by minimum order_index of fields in each group
+    // "General" group always appears first if it exists
+    const sortedGroupEntries = Object.entries(groups).sort(([nameA, fieldsA], [nameB, fieldsB]) => {
+      // "General" group always first
+      if (nameA === DEFAULT_GROUP_NAME) return -1
+      if (nameB === DEFAULT_GROUP_NAME) return 1
+
+      // Otherwise, sort by minimum order_index in each group
+      const minOrderA = Math.min(...fieldsA.map((f) => f.order_index ?? f.position ?? 0))
+      const minOrderB = Math.min(...fieldsB.map((f) => f.order_index ?? f.position ?? 0))
+      return minOrderA - minOrderB
+    })
+
+    return Object.fromEntries(sortedGroupEntries)
+  }, [fields, fieldGroups])
 
   const toggleGroup = (groupName: string) => {
     setCollapsedGroups((prev) => {
@@ -136,76 +190,54 @@ export default function RecordFields({
   )
 
   return (
-    <div className="space-y-8">
-      {/* Grouped Fields */}
-      {Object.entries(groupedFields).map(([groupName, groupFields]) => {
-        const isCollapsed = collapsedGroups.has(groupName)
-        return (
-          <div key={groupName} className="border border-gray-200/60 rounded-lg overflow-hidden bg-white">
-            <button
-              onClick={() => toggleGroup(groupName)}
-              className="w-full px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors flex items-center justify-between border-b border-gray-200/60"
-            >
-              <span className="font-semibold text-sm text-gray-900">{groupName}</span>
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+    <div className="space-y-6">
+      {/* Render all groups - all fields are grouped (ungrouped go to "General") */}
+      {Object.entries(groupedFields)
+        .filter(([_, groupFields]) => groupFields.length > 0) // Hide empty groups
+        .map(([groupName, groupFields]) => {
+          const isCollapsed = collapsedGroups.has(groupName)
+          return (
+            <div key={groupName} className="border border-gray-200/60 rounded-lg overflow-hidden bg-white">
+              <button
+                onClick={() => toggleGroup(groupName)}
+                className="w-full px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors flex items-center justify-between border-b border-gray-200/60"
+                aria-expanded={!isCollapsed}
+                aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
+              >
+                <span className="font-semibold text-sm text-gray-900">{groupName}</span>
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+              {!isCollapsed && (
+                <div className="p-5 space-y-6">
+                  {groupFields.map((field) => {
+                    const fieldEditable = isFieldEditable(field.name)
+                    return (
+                      <InlineFieldEditor
+                        key={field.id}
+                        field={field}
+                        value={formData[field.name]}
+                        onChange={(value) => onFieldChange(field.name, value)}
+                        isEditing={editingField === field.id && fieldEditable}
+                        onEditStart={() => fieldEditable && setEditingField(field.id)}
+                        onEditEnd={() => setEditingField(null)}
+                        onLinkedRecordClick={handleLinkedRecordClick}
+                        onAddLinkedRecord={handleAddLinkedRecord}
+                        isReadOnly={!fieldEditable}
+                        tableId={tableId}
+                        recordId={recordId}
+                        tableName={tableName}
+                      />
+                    )
+                  })}
+                </div>
               )}
-            </button>
-            {!isCollapsed && (
-              <div className="p-5 space-y-6">
-                {groupFields.map((field) => {
-                  const fieldEditable = isFieldEditable(field.name)
-                  return (
-                    <InlineFieldEditor
-                      key={field.id}
-                      field={field}
-                      value={formData[field.name]}
-                      onChange={(value) => onFieldChange(field.name, value)}
-                      isEditing={editingField === field.id && fieldEditable}
-                      onEditStart={() => fieldEditable && setEditingField(field.id)}
-                      onEditEnd={() => setEditingField(null)}
-                      onLinkedRecordClick={handleLinkedRecordClick}
-                      onAddLinkedRecord={handleAddLinkedRecord}
-                      isReadOnly={!fieldEditable}
-                      tableId={tableId}
-                      recordId={recordId}
-                      tableName={tableName}
-                    />
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {/* Ungrouped Fields */}
-      {ungroupedFields.length > 0 && (
-        <div className="space-y-6">
-          {ungroupedFields.map((field) => {
-            const fieldEditable = isFieldEditable(field.name)
-            return (
-              <InlineFieldEditor
-                key={field.id}
-                field={field}
-                value={formData[field.name]}
-                onChange={(value) => onFieldChange(field.name, value)}
-                isEditing={editingField === field.id && fieldEditable}
-                onEditStart={() => fieldEditable && setEditingField(field.id)}
-                onEditEnd={() => setEditingField(null)}
-                onLinkedRecordClick={handleLinkedRecordClick}
-                onAddLinkedRecord={handleAddLinkedRecord}
-                isReadOnly={!fieldEditable}
-                tableId={tableId}
-                recordId={recordId}
-                tableName={tableName}
-              />
-            )
-          })}
-        </div>
-      )}
+            </div>
+          )
+        })}
 
       {/* Empty State */}
       {fields.length === 0 && (

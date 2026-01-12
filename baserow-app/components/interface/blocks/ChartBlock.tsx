@@ -8,6 +8,11 @@ import { applyFiltersToQuery, mergeFilters, type FilterConfig } from "@/lib/inte
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import type { TableField } from "@/types/fields"
 import {
+  resolveChoiceColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
+import {
   BarChart,
   Bar,
   LineChart,
@@ -35,7 +40,15 @@ interface ChartBlockProps {
 interface ChartDataPoint {
   name: string
   value: number
+  color?: string
   [key: string]: any
+}
+
+interface CategoricalLegendItem {
+  category: string
+  count: number
+  percentage: number
+  color: string
 }
 
 export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: ChartBlockProps) {
@@ -44,14 +57,17 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   // Chart block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
   const chartType = config?.chart_type || "bar"
-  const xAxis = config?.chart_x_axis
-  const yAxis = config?.chart_y_axis
+  const metricType = config?.chart_aggregate || "count"
+  const metricField = config?.metric_field
   const groupBy = config?.group_by_field
-  const metric = config?.metric_field || yAxis
+  // X-axis is inferred from Group By when Group By is selected
+  // Otherwise use explicit chart_x_axis
+  const xAxis = groupBy ? groupBy : config?.chart_x_axis
   const clickThrough = config?.click_through
   
   const [rawData, setRawData] = useState<any[]>([])
   const [chartData, setChartData] = useState<ChartDataPoint[]>([])
+  const [categoricalData, setCategoricalData] = useState<CategoricalLegendItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
@@ -73,11 +89,24 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   }, [tableId])
 
   useEffect(() => {
-    if (tableId && xAxis && metric) {
+    // Load data when we have:
+    // - Table ID
+    // - Metric type (always required)
+    // - For non-count metrics: metric field is required
+    // - For count metrics with group by: group by field serves as X-axis
+    // - For non-count metrics without group by: xAxis field is required
+    const hasRequiredConfig = tableId && metricType && (
+      metricType === "count" || metricField
+    ) && (
+      metricType === "count" && groupBy || // Count with group by
+      metricType !== "count" && (groupBy || xAxis) // Non-count: group by or x-axis
+    )
+    
+    if (hasRequiredConfig) {
       loadData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, xAxis, yAxis, groupBy, metric, allFilters])
+  }, [tableId, metricType, metricField, groupBy, xAxis, chartType, allFilters])
 
   async function loadTableFields() {
     if (!tableId) return
@@ -99,7 +128,10 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   }
 
   async function loadData() {
-    if (!tableId || !xAxis || !metric) return
+    // Validation: ensure we have required configuration
+    if (!tableId || !metricType) return
+    if (metricType !== "count" && !metricField) return
+    if (!groupBy && !xAxis) return
 
     setLoading(true)
     setError(null)
@@ -118,30 +150,27 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         throw new Error("Table not found")
       }
 
-      // Check if any of our target fields are formula fields
-      const xAxisField = tableFields.find(f => f.name === xAxis)
-      const metricField = tableFields.find(f => f.name === metric)
-      const groupByField = groupBy ? tableFields.find(f => f.name === groupBy) : null
+      // Determine which fields we need to select
+      const xAxisField = xAxis ? tableFields.find(f => f.name === xAxis) : null
+      const metricFieldDef = metricField ? tableFields.find(f => f.name === metricField) : null
+      const groupByFieldDef = groupBy ? tableFields.find(f => f.name === groupBy) : null
       
       // Collect all formula fields for computation
       const allFormulaFields = tableFields.filter(f => f.type === 'formula')
       
       // Determine if we need to compute formula fields
       const needsFormulaComputation = allFormulaFields.length > 0 && 
-        (xAxisField?.type === 'formula' || metricField?.type === 'formula' || groupByField?.type === 'formula')
+        (xAxisField?.type === 'formula' || metricFieldDef?.type === 'formula' || groupByFieldDef?.type === 'formula')
       
-      // If we need formula fields, select all fields to ensure we have all dependencies
-      // Formula fields can reference other fields, so we need everything
-      // Otherwise, just select the fields we need
+      // Select fields - for count with group by, we only need group by field
       let selectFields: string
       if (needsFormulaComputation) {
         selectFields = '*' // Select all to ensure formula dependencies are available
       } else {
-        // Select only the fields we need
         const fieldsToSelect = new Set<string>()
         if (xAxis) fieldsToSelect.add(xAxis)
-        if (metric) fieldsToSelect.add(metric)
-        if (groupBy) fieldsToSelect.add(groupBy)
+        if (metricField) fieldsToSelect.add(metricField)
+        if (groupBy && groupBy !== xAxis) fieldsToSelect.add(groupBy)
         selectFields = Array.from(fieldsToSelect).join(", ") || "*"
       }
 
@@ -169,14 +198,13 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       setRawData(processedRows)
       
       // Process data for chart
-      const processed = processChartData(processedRows, xAxis, metric, groupBy)
+      const processed = processChartData(processedRows, metricType, metricField, xAxis, groupBy)
       
       if (processed.length === 0 && processedRows.length > 0) {
-        // Data loaded but processing resulted in no chart data
-        // This might indicate invalid field names or data type issues
         console.warn("Chart data processing resulted in empty dataset", {
+          metricType,
+          metricField,
           xAxis,
-          metric,
           groupBy,
           rowCount: processedRows.length,
           sampleRow: processedRows[0]
@@ -184,6 +212,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       }
       
       setChartData(processed)
+      setCategoricalData([])
     } catch (err: any) {
       console.error("Error loading chart data:", err)
       const errorMessage = err.message || "Failed to load chart data"
@@ -192,8 +221,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       // Log additional debugging info
       console.error("Chart block error details:", {
         tableId,
+        metricType,
+        metricField,
         xAxis,
-        metric,
         groupBy,
         error: errorMessage
       })
@@ -202,11 +232,77 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     }
   }
 
+  function processCategoricalLegendData(
+    rows: any[],
+    categoryField: string
+  ): CategoricalLegendItem[] {
+    if (!rows || rows.length === 0) return []
+
+    const sampleRow = rows[0]
+    if (!sampleRow || !(categoryField in sampleRow)) {
+      console.warn(`Category field "${categoryField}" not found in data`)
+      return []
+    }
+
+    // Find the field definition to get color information
+    const categoryFieldDef = tableFields.find(f => f.name === categoryField)
+    const isMultiSelect = categoryFieldDef?.type === 'multi_select'
+    
+    // Count occurrences of each category
+    const categoryCounts: Record<string, number> = {}
+    let totalCount = 0
+
+    rows.forEach((row) => {
+      const value = row[categoryField]
+      
+      if (isMultiSelect && Array.isArray(value)) {
+        // For multi-select, count each selected value
+        value.forEach((val: string) => {
+          if (val) {
+            const category = String(val)
+            categoryCounts[category] = (categoryCounts[category] || 0) + 1
+            totalCount++
+          }
+        })
+      } else if (value) {
+        // For single-select, count the single value
+        const category = String(value)
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1
+        totalCount++
+      }
+    })
+
+    // Convert to array with colors and percentages
+    const result: CategoricalLegendItem[] = Object.entries(categoryCounts)
+      .map(([category, count]) => {
+        // Get color for this category
+        const color = categoryFieldDef
+          ? resolveChoiceColor(
+              category,
+              isMultiSelect ? 'multi_select' : 'single_select',
+              categoryFieldDef.options,
+              !isMultiSelect
+            )
+          : '#3B82F6' // Default blue fallback
+
+        return {
+          category,
+          count,
+          percentage: totalCount > 0 ? (count / totalCount) * 100 : 0,
+          color,
+        }
+      })
+      .sort((a, b) => b.count - a.count) // Sort by count descending
+
+    return result
+  }
+
   function processChartData(
     rows: any[],
-    xField: string,
-    yField: string,
-    groupByField?: string
+    aggregateType: string,
+    metricFieldName: string | undefined,
+    xAxisFieldName: string | undefined,
+    groupByFieldName?: string
   ): ChartDataPoint[] {
     if (!rows || rows.length === 0) return []
 
@@ -214,70 +310,167 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     const sampleRow = rows[0]
     if (!sampleRow) return []
     
-    if (xField && !(xField in sampleRow)) {
-      console.warn(`X-axis field "${xField}" not found in data`)
+    const categoryField = groupByFieldName || xAxisFieldName
+    if (categoryField && !(categoryField in sampleRow)) {
+      console.warn(`Category field "${categoryField}" not found in data`)
       return []
     }
-    if (yField && !(yField in sampleRow)) {
-      console.warn(`Metric field "${yField}" not found in data`)
-      return []
-    }
-    if (groupByField && !(groupByField in sampleRow)) {
-      console.warn(`Group by field "${groupByField}" not found in data`)
+    if (aggregateType !== "count" && metricFieldName && !(metricFieldName in sampleRow)) {
+      console.warn(`Metric field "${metricFieldName}" not found in data`)
       return []
     }
 
-    // If grouping, aggregate by group
-    if (groupByField) {
-      const grouped: Record<string, number> = {}
-      
-      rows.forEach((row) => {
-        const groupValue = String(row[groupByField] ?? "Unknown")
-        const yValue = parseFloat(String(row[yField] ?? 0)) || 0
-        
-        if (!grouped[groupValue]) {
-          grouped[groupValue] = 0
-        }
-        grouped[groupValue] += yValue
-      })
-
-      return Object.entries(grouped).map(([name, value]) => ({
-        name,
-        value,
-      }))
-    }
-
-    // Simple aggregation by x-axis value
-    const aggregated: Record<string, number> = {}
+    // Aggregate data by category (group by or x-axis)
+    const aggregated: Record<string, number[]> = {}
     
     rows.forEach((row) => {
-      const xValue = String(row[xField] ?? "Unknown")
-      const yValue = parseFloat(String(row[yField] ?? 0)) || 0
+      const categoryValue = categoryField ? String(row[categoryField] ?? "Unknown") : "All"
       
-      if (!aggregated[xValue]) {
-        aggregated[xValue] = 0
+      if (!aggregated[categoryValue]) {
+        aggregated[categoryValue] = []
       }
-      aggregated[xValue] += yValue
+      
+      if (aggregateType === "count") {
+        // For count, just add 1 for each row
+        aggregated[categoryValue].push(1)
+      } else if (metricFieldName) {
+        // For other aggregates, collect numeric values
+        const value = parseFloat(String(row[metricFieldName] ?? 0))
+        if (!isNaN(value) && value !== null && value !== undefined) {
+          aggregated[categoryValue].push(value)
+        }
+      }
     })
 
-    return Object.entries(aggregated)
-      .map(([name, value]) => ({
-        name: name.length > 20 ? name.substring(0, 20) + "..." : name,
-        value,
-      }))
+    // Apply aggregation function to each category
+    const result: ChartDataPoint[] = Object.entries(aggregated).map(([name, values]) => {
+      let value = 0
+      
+      if (values.length === 0) {
+        value = 0
+      } else if (aggregateType === "count") {
+        value = values.length
+      } else if (aggregateType === "sum") {
+        value = values.reduce((a, b) => a + b, 0)
+      } else if (aggregateType === "avg") {
+        value = values.reduce((a, b) => a + b, 0) / values.length
+      } else if (aggregateType === "min") {
+        value = Math.min(...values)
+      } else if (aggregateType === "max") {
+        value = Math.max(...values)
+      }
+      
+      return {
+        name: name.length > 30 ? name.substring(0, 30) + "..." : name,
+        value: Math.round(value * 100) / 100, // Round to 2 decimal places
+      }
+    })
+
+    // Sort by value descending and limit to top 20
+    return result
       .sort((a, b) => b.value - a.value)
-      .slice(0, 20) // Limit to top 20 for readability
+      .slice(0, 20)
   }
 
   function handleChartClick(data: any) {
     if (clickThrough && !isEditing && tableId) {
-      // Navigate to filtered view
-      if (clickThrough.view_id) {
-        router.push(`/tables/${tableId}/views/${clickThrough.view_id}`)
-      } else {
-        router.push(`/tables/${tableId}`)
+      // Build URL with filters and group by (match KPI behavior)
+      const params = new URLSearchParams()
+      
+      // Start with block filters
+      let filtersToApply = [...blockBaseFilters]
+      
+      // Apply group by filter if we have group by and clicked data point
+      if (groupBy && data?.name) {
+        filtersToApply.push({
+          field: groupBy,
+          operator: 'equal',
+          value: data.name
+        })
       }
+      
+      if (filtersToApply.length > 0) {
+        params.set('filters', JSON.stringify(filtersToApply))
+      }
+      
+      const queryString = params.toString()
+      const url = clickThrough.view_id
+        ? `/tables/${tableId}/views/${clickThrough.view_id}${queryString ? `?${queryString}` : ''}`
+        : `/tables/${tableId}${queryString ? `?${queryString}` : ''}`
+      
+      router.push(url)
     }
+  }
+
+  function renderCategoricalLegend() {
+    if (categoricalData.length === 0) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+          No categories found
+        </div>
+      )
+    }
+
+    const totalCount = categoricalData.reduce((sum, item) => sum + item.count, 0)
+
+    return (
+      <div className="h-full w-full p-4 overflow-auto">
+        <div className="space-y-3">
+          {categoricalData.map((item) => {
+            const bgColor = normalizeHexColor(item.color)
+            const textColorClass = getTextColorForBackground(bgColor)
+            
+            return (
+              <div
+                key={item.category}
+                className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+              >
+                {/* Color indicator */}
+                <div
+                  className="w-12 h-12 rounded-md flex-shrink-0 flex items-center justify-center"
+                  style={{ backgroundColor: bgColor }}
+                >
+                  <span className={`text-xs font-semibold ${textColorClass}`}>
+                    {item.percentage.toFixed(0)}%
+                  </span>
+                </div>
+                
+                {/* Category info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                      style={{ backgroundColor: bgColor }}
+                    >
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {item.count.toLocaleString()} {item.count === 1 ? 'item' : 'items'}
+                  </div>
+                </div>
+                
+                {/* Percentage bar */}
+                <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${item.percentage}%`,
+                      backgroundColor: bgColor,
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        
+        {/* Total count */}
+        <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600 text-center">
+          Total: {totalCount.toLocaleString()} {totalCount === 1 ? 'item' : 'items'}
+        </div>
+      </div>
+    )
   }
 
   function renderChart() {
@@ -287,6 +480,22 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       '#8884d8', '#82ca9d', '#ffc658', '#ff7300',
       '#8dd1e1', '#d084d0', '#ffb347', '#87ceeb'
     ]
+
+    // Generate Y-axis label based on metric type
+    const getYAxisLabel = () => {
+      if (metricType === "count") return "Count"
+      const metricLabel = metricField || "Value"
+      const aggregateLabels: Record<string, string> = {
+        sum: `Sum of ${metricLabel}`,
+        avg: `Avg of ${metricLabel}`,
+        min: `Min of ${metricLabel}`,
+        max: `Max of ${metricLabel}`,
+      }
+      return aggregateLabels[metricType] || metricLabel
+    }
+
+    const yAxisLabel = getYAxisLabel()
+    const xAxisLabel = groupBy || xAxis || "Category"
 
     switch (chartType) {
       case "bar":
@@ -299,8 +508,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
               textAnchor="end"
               height={80}
               interval={0}
+              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
             />
-            <YAxis />
+            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
             <Bar dataKey="value" fill={COLORS[0]} />
@@ -316,8 +526,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
               textAnchor="end"
               height={80}
               interval={0}
+              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
             />
-            <YAxis />
+            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
             <Line type="monotone" dataKey="value" stroke={COLORS[0]} strokeWidth={2} />
@@ -355,8 +566,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
               textAnchor="end"
               height={80}
               interval={0}
+              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
             />
-            <YAxis />
+            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
             <Bar dataKey="value" stackId="a" fill={COLORS[0]} />
@@ -373,8 +585,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
               textAnchor="end"
               height={80}
               interval={0}
+              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5 }}
             />
-            <YAxis />
+            <YAxis label={{ value: yAxisLabel, angle: -90, position: 'insideLeft' }} />
             <Tooltip />
             <Legend />
             <Bar dataKey="value" fill={COLORS[0]} />
@@ -398,14 +611,27 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     )
   }
   
-  if (!xAxis || !metric) {
+  // Validation: check if configuration is complete
+  const isConfigComplete = metricType && (
+    metricType === "count" || metricField
+  ) && (
+    groupBy || xAxis
+  )
+  
+  if (!isConfigComplete) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
         <div className="text-center">
           <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="mb-2">{isEditing ? "Configure chart settings" : "No chart configuration"}</p>
+          <p className="mb-2">{isEditing ? "Choose how you want to measure your data" : "No chart configuration"}</p>
           {isEditing && (
-            <p className="text-xs text-gray-400">Select X-axis and metric fields in block settings.</p>
+            <p className="text-xs text-gray-400">
+              {!metricType 
+                ? "Select a metric type (e.g., Count records) in block settings."
+                : metricType !== "count" && !metricField
+                ? "Select a field to measure in block settings."
+                : "Select how to group or categorize your data in block settings."}
+            </p>
           )}
         </div>
       </div>
@@ -434,16 +660,31 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     )
   }
 
-  if (chartData.length === 0) {
-  return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-          <p className="mb-1">No data available</p>
-          <p className="text-xs text-gray-400">Try adjusting filters or date range</p>
+  // Check for empty data based on chart type
+  if (chartType === 'categorical_legend') {
+    if (categoricalData.length === 0 && !loading) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+          <div className="text-center">
+            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+            <p className="mb-1">No categories found</p>
+            <p className="text-xs text-gray-400">Try adjusting filters or select a different field</p>
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
+  } else {
+    if (chartData.length === 0 && !loading) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+          <div className="text-center">
+            <BarChart3 className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+            <p className="mb-1">No data available</p>
+            <p className="text-xs text-gray-400">Try adjusting filters or date range</p>
+          </div>
+        </div>
+      )
+    }
   }
 
   // Apply appearance settings
@@ -476,9 +717,13 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         </div>
       )}
       <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
-          {renderChart()}
-        </ResponsiveContainer>
+        {chartType === 'categorical_legend' ? (
+          renderCategoricalLegend()
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {renderChart()}
+          </ResponsiveContainer>
+        )}
       </div>
       {clickThrough && !isEditing && (
         <div className="text-xs text-gray-400 text-center mt-2">

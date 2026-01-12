@@ -505,6 +505,8 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
               color_field: appearance.color_field,
               image_field: appearance.image_field,
               fit_image_size: appearance.fit_image_size,
+              enable_record_open: appearance.enable_record_open,
+              record_open_style: appearance.record_open_style,
             }}
             permissions={{
               mode: permissions.mode || 'edit',

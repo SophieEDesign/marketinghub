@@ -74,9 +74,9 @@ export default function GridAppearanceSettings({
     <div className="space-y-4">
       {/* Row Height / Density */}
       <div className="space-y-2">
-        <Label>Row Size</Label>
+        <Label>Row Height</Label>
         <Select
-          value={appearance.row_height || "medium"}
+          value={appearance.row_height || "standard"}
           onValueChange={(value) => onUpdate({ row_height: value })}
         >
           <SelectTrigger>
@@ -84,16 +84,33 @@ export default function GridAppearanceSettings({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="compact">Compact</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="standard">Standard</SelectItem>
             <SelectItem value="comfortable">Comfortable</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-xs text-gray-500">
           {viewType === 'timeline' || viewType === 'calendar'
             ? "Control the vertical spacing of rows/lanes and card padding"
-            : "Control the height of rows in the grid view"}
+            : "Control the height of rows in the grid view. Applies to all rows in the block."}
         </p>
       </div>
+
+      {/* Text Wrapping - Only for grid view */}
+      {viewType === 'grid' && (
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="wrap-text">Wrap cell text</Label>
+            <p className="text-xs text-gray-500 mt-1">
+              When enabled, text wraps within column width. When disabled, text is single-line with ellipsis.
+            </p>
+          </div>
+          <Switch
+            id="wrap-text"
+            checked={appearance.wrap_text || false}
+            onCheckedChange={(checked) => onUpdate({ wrap_text: checked })}
+          />
+        </div>
+      )}
 
       {/* Title Wrapping - For Timeline and Calendar */}
       {(viewType === 'timeline' || viewType === 'calendar') && (
@@ -261,6 +278,55 @@ export default function GridAppearanceSettings({
           </p>
         </div>
       </div>
+
+      {/* Record Opening Section - Only for grid view */}
+      {viewType === 'grid' && (
+        <div className="border-t pt-4 mt-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Record Opening</h3>
+            <p className="text-xs text-gray-500 mb-4">Configure how users can open records from the table</p>
+          </div>
+
+          {/* Enable Record Opening */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="enable-record-open">Enable record opening</Label>
+              <p className="text-xs text-gray-500 mt-1">
+                Show a control to open records. When disabled, records cannot be opened from this table.
+              </p>
+            </div>
+            <Switch
+              id="enable-record-open"
+              checked={appearance.enable_record_open !== false}
+              onCheckedChange={(checked) => onUpdate({ enable_record_open: checked })}
+            />
+          </div>
+
+          {/* Record Open Style - Only show if enabled */}
+          {appearance.enable_record_open !== false && (
+            <div className="space-y-2">
+              <Label>Open style</Label>
+              <Select
+                value={appearance.record_open_style || "side_panel"}
+                onValueChange={(value) => onUpdate({ record_open_style: value as 'side_panel' | 'modal' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="side_panel">Side panel</SelectItem>
+                  <SelectItem value="modal">Modal</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                {appearance.record_open_style === 'modal'
+                  ? "Records open in a full-screen modal overlay"
+                  : "Records open in a side panel (desktop) or modal (mobile)"}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

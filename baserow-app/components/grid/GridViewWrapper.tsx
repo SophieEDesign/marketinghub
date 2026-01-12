@@ -65,6 +65,8 @@ interface GridViewWrapperProps {
     color_field?: string
     image_field?: string
     fit_image_size?: boolean
+    enable_record_open?: boolean
+    record_open_style?: 'side_panel' | 'modal'
   }
   permissions?: BlockPermissions // Block-level permissions
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
@@ -115,15 +117,21 @@ export default function GridViewWrapper({
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
   
-  // Map row height from database format ('short'|'medium'|'tall') to GridView format ('compact'|'medium'|'comfortable')
+  // CRITICAL: Use block-level appearance settings for row height and wrapping
+  // Block settings take precedence over view-level settings
+  // Map row height from block config (supports 'compact', 'standard', 'comfortable', and legacy 'medium')
   const mapRowHeight = (height: string | undefined): string => {
-    if (!height) return 'medium'
+    if (!height) return 'standard'
+    // Legacy support: map old values
     if (height === 'short') return 'compact'
     if (height === 'tall') return 'comfortable'
-    return height // 'medium' or already in correct format
+    if (height === 'medium') return 'standard'
+    return height // Already in correct format
   }
   
-  const [rowHeight, setRowHeight] = useState<string>(mapRowHeight(appearance.row_height))
+  // Use block appearance settings (block-level control)
+  const rowHeight = mapRowHeight(appearance.row_height)
+  const wrapText = appearance.wrap_text || false
 
   // Track previous values to prevent infinite loops
   const prevInitialFiltersRef = useRef<string>('')
@@ -145,34 +153,6 @@ export default function GridViewWrapper({
       setSorts(safeInitialSorts)
     }
   }, [safeInitialSorts])
-
-  // Load row height from grid_view_settings if viewId is provided
-  useEffect(() => {
-    if (!viewId) return
-
-    async function loadRowHeight() {
-      try {
-        const { data, error } = await supabase
-          .from('grid_view_settings')
-          .select('row_height')
-          .eq('view_id', viewId)
-          .maybeSingle()
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error loading row height:', error)
-          return
-        }
-
-        if (data?.row_height) {
-          setRowHeight(mapRowHeight(data.row_height))
-        }
-      } catch (error) {
-        console.error('Error loading row height:', error)
-      }
-    }
-
-    loadRowHeight()
-  }, [viewId])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
@@ -570,11 +550,14 @@ export default function GridViewWrapper({
         isEditing={isEditing}
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}
+          wrapText={wrapText}
           permissions={permissions}
           colorField={appearance.color_field}
           imageField={appearance.image_field}
           fitImageSize={appearance.fit_image_size}
           hideEmptyState={hideEmptyState}
+          enableRecordOpen={appearance.enable_record_open !== false}
+          recordOpenStyle={appearance.record_open_style || 'side_panel'}
         />
       </div>
       <FieldBuilderDrawer

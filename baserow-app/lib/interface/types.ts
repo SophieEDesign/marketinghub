@@ -167,6 +167,10 @@ export interface BlockConfig {
     show_search?: boolean
     show_filter?: boolean
     show_sort?: boolean
+    wrap_text?: boolean // Whether to wrap cell text (block-level setting)
+    // Record opening settings
+    enable_record_open?: boolean // Enable/disable record opening (default: true)
+    record_open_style?: 'side_panel' | 'modal' // How to open records (default: 'side_panel' for desktop)
     // Color and image fields for table/kanban/timeline/calendar blocks
     color_field?: string // Field name/ID to use for row/card colors (single-select field)
     image_field?: string // Field name/ID to use for row/card images
@@ -204,7 +208,19 @@ export interface BlockConfig {
     // Timeline/Calendar view specific
     timeline_wrap_title?: boolean
     card_wrap_title?: boolean
+    // List view specific
+    list_title_field?: string // Required: field name for list item title
+    list_subtitle_fields?: string[] // Optional: up to 3 subtitle fields
+    list_image_field?: string // Optional: field name for image/attachment
+    list_pill_fields?: string[] // Optional: select/multi-select fields to show as pills
+    list_meta_fields?: string[] // Optional: date, number, etc. for metadata
   }
+  // List block specific config (at root level for backward compatibility)
+  list_title_field?: string
+  list_subtitle_fields?: string[]
+  list_image_field?: string
+  list_pill_fields?: string[]
+  list_meta_fields?: string[]
   [key: string]: any
 }
 

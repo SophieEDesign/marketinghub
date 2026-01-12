@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { X, Save, Check } from "lucide-react"
-import type { PageBlock, BlockConfig } from "@/lib/interface/types"
+import type { PageBlock, BlockConfig, BlockType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,7 @@ import LinkPreviewDataSettings from "./settings/LinkPreviewDataSettings"
 import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSettings"
 import GridDataSettings from "./settings/GridDataSettings"
 import GridAppearanceSettings from "./settings/GridAppearanceSettings"
+import ListDataSettings from "./settings/ListDataSettings"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 import RecordDataSettings from "./settings/RecordDataSettings"
@@ -418,10 +419,12 @@ export default function SettingsPanel({
       case "button":
         return <ButtonDataSettings {...commonProps} />
       case "list":
+        // List blocks have their own settings for field configuration
+        return <ListDataSettings {...commonProps} />
       case "calendar":
       case "kanban":
       case "timeline":
-        // List, Calendar, Kanban, and Timeline blocks use the same settings as Grid blocks
+        // Calendar, Kanban, and Timeline blocks use the same settings as Grid blocks
         // They're grid blocks with different view_type values
         return <GridDataSettings {...commonProps} />
       default:

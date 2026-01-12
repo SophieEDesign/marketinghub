@@ -17,11 +17,13 @@ interface CellProps {
   fieldOptions?: FieldOptions
   isVirtual?: boolean
   editable?: boolean // Whether the cell can be edited
+  wrapText?: boolean // Whether to wrap text (block-level setting)
+  rowHeight?: number // Row height in pixels
   onSave: (value: any) => Promise<void>
   onCancel?: () => void
 }
 
-export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirtual, editable = true, onSave, onCancel }: CellProps) {
+export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirtual, editable = true, wrapText = false, rowHeight, onSave, onCancel }: CellProps) {
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value ?? "")
   const [saving, setSaving] = useState(false)
@@ -103,6 +105,13 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   const inputType = getInputType()
   const isLongText = fieldType === "long_text"
   
+  // Base cell style with row height constraint
+  const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
+    maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+    minHeight: rowHeight ? `${rowHeight}px` : '36px',
+  }
+
   // Handle virtual fields (formula/lookup) - read-only
   if (isVirtual) {
     const displayValue = value !== null && value !== undefined 
@@ -112,13 +121,14 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     
     return (
       <div 
-        className={`min-h-[36px] flex items-center gap-2 px-3 py-2 ${
+        className={`flex items-center gap-2 px-3 py-2 ${
           isError ? 'text-red-600' : 'text-gray-500'
-        } italic`}
+        } italic overflow-hidden`}
+        style={cellStyle}
         title={fieldOptions?.formula ? `Formula: ${fieldOptions.formula}` : 'Formula field'}
       >
-        <Calculator className="h-3.5 w-3.5 opacity-40" />
-        <span className="text-sm">{displayValue}</span>
+        <Calculator className="h-3.5 w-3.5 opacity-40 flex-shrink-0" />
+        <span className={`text-sm ${wrapText ? 'line-clamp-2' : 'truncate'}`}>{displayValue}</span>
       </div>
     )
   }
@@ -150,9 +160,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       return (
         <div
           onClick={handleStartEdit}
-          className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
+          className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
             editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
           }`}
+          style={cellStyle}
           title={editable ? "Click to edit" : "Read-only"}
         >
           <span className="text-gray-400 italic text-sm">—</span>
@@ -172,13 +183,14 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
+        className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
           editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
+        style={cellStyle}
         title={editable ? "Click to edit" : "Read-only"}
       >
         <span 
-          className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all ${textColorClass} hover:opacity-80`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium ${wrapText ? '' : 'whitespace-nowrap'} transition-all ${textColorClass} hover:opacity-80`}
           style={{ 
             backgroundColor: bgColor,
             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
@@ -196,9 +208,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-        className={`min-h-[36px] flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-md transition-colors ${
+        className={`flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-md transition-colors overflow-hidden ${
           editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
+        style={cellStyle}
         title={editable ? "Click to edit" : "Read-only"}
       >
         {displayValues.length === 0 ? (
@@ -301,17 +314,25 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     }
   }
 
+  // Apply text wrapping for text-based fields
+  const textWrapClass = wrapText && (fieldType === 'text' || fieldType === 'long_text' || !fieldType)
+    ? 'line-clamp-2' 
+    : 'truncate'
+
   return (
     <div
       onClick={isVirtual || !editable ? undefined : handleStartEdit}
-      className={`min-h-[36px] flex items-center px-3 py-2 rounded-md transition-colors ${
+      className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
         isVirtual || !editable
           ? "text-gray-500 cursor-default" 
           : "cursor-pointer hover:bg-gray-50/50"
       }`}
+      style={cellStyle}
       title={isVirtual ? "Virtual field (read-only)" : editable ? "Click to edit" : "Read-only"}
     >
-      {displayValue || (
+      {displayValue ? (
+        <span className={`text-sm ${textWrapClass} w-full`}>{displayValue}</span>
+      ) : (
         <span className="text-gray-400 italic text-sm">—</span>
       )}
     </div>

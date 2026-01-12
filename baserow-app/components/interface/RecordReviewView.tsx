@@ -469,10 +469,12 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         pageTableId,
       })
       const supabase = createClient()
+      // Load ALL fields, ordered by order_index (fallback to position)
       const { data: fieldsData, error } = await supabase
         .from('table_fields')
         .select('*')
         .eq('table_id', pageTableId)
+        .order('order_index', { ascending: true, nullsLast: true })
         .order('position', { ascending: true })
       
       if (error) {
@@ -491,6 +493,18 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
           fieldNames: fieldsData.map((f: any) => f.name),
         })
         setTableFields(fieldsData as TableField[])
+        // Build field groups from field metadata (for legacy support)
+        // RecordFields will use field.group_name directly, but we keep this for backward compatibility
+        const groups: Record<string, string[]> = {}
+        fieldsData.forEach((field: any) => {
+          if (field.group_name) {
+            if (!groups[field.group_name]) {
+              groups[field.group_name] = []
+            }
+            groups[field.group_name].push(field.name)
+          }
+        })
+        setFieldGroups(groups)
       } else {
         debugWarn('RECORD', 'No fields returned', {
           pageTableId,
@@ -506,48 +520,9 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   }
 
   async function loadFieldGroups() {
-    if (!pageTableId) return
-    
-    try {
-      debugLog('RECORD', 'Fetching field groups', {
-        pageTableId,
-      })
-      const supabase = createClient()
-      const { data: groupsData, error } = await supabase
-        .from('field_groups')
-        .select('*')
-        .eq('table_id', pageTableId)
-      
-      if (error) {
-        debugError('RECORD', 'Error loading field groups', {
-          pageTableId,
-          error: error.message,
-        })
-        console.error('Error loading field groups:', error)
-        return
-      }
-      
-      if (groupsData) {
-        const groups: Record<string, string[]> = {}
-        groupsData.forEach((group: any) => {
-          if (group.field_names && Array.isArray(group.field_names)) {
-            groups[group.name] = group.field_names
-          }
-        })
-        debugLog('RECORD', 'Field groups loaded', {
-          pageTableId,
-          groupsCount: Object.keys(groups).length,
-          groupNames: Object.keys(groups),
-        })
-        setFieldGroups(groups)
-      }
-    } catch (error: any) {
-      debugError('RECORD', 'Exception loading field groups', {
-        pageTableId,
-        error: error.message,
-      })
-      console.error('Error loading field groups:', error)
-    }
+    // Field groups are now loaded as part of loadTableFields()
+    // This function is kept for backward compatibility but does nothing
+    // RecordFields component uses field.group_name directly from the fields array
   }
 
   // Update formData when selected record changes

@@ -138,33 +138,18 @@ export default function RecordPanel() {
 
     try {
       const supabase = createClient()
+      // Load ALL fields, ordered by order_index (fallback to position)
       const { data, error } = await supabase
         .from("table_fields")
         .select("*")
         .eq("table_id", state.tableId)
+        .order("order_index", { ascending: true, nullsLast: true })
         .order("position", { ascending: true })
 
       if (!error && data) {
         setFields(data as TableField[])
-      }
-    } catch (error) {
-      console.error("Error loading fields:", error)
-    }
-  }
-
-  async function loadFieldGroups() {
-    if (!state.tableId) return
-
-    try {
-      const supabase = createClient()
-      // Load field groups from table_fields (if group_name exists)
-      const { data, error } = await supabase
-        .from("table_fields")
-        .select("name, group_name")
-        .eq("table_id", state.tableId)
-        .not("group_name", "is", null)
-
-      if (!error && data) {
+        // Build field groups from field metadata (for legacy support)
+        // RecordFields will use field.group_name directly, but we keep this for backward compatibility
         const groups: Record<string, string[]> = {}
         data.forEach((field: any) => {
           if (field.group_name) {
@@ -177,9 +162,14 @@ export default function RecordPanel() {
         setFieldGroups(groups)
       }
     } catch (error) {
-      // Field groups may not exist yet - this is fine
-      console.warn("Field groups not available:", error)
+      console.error("Error loading fields:", error)
     }
+  }
+
+  async function loadFieldGroups() {
+    // Field groups are now loaded as part of loadFields()
+    // This function is kept for backward compatibility but does nothing
+    // RecordFields component uses field.group_name directly from the fields array
   }
 
   const handleSave = useCallback(async () => {
