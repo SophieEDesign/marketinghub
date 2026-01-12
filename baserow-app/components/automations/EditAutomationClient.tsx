@@ -39,14 +39,19 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
 
     setAutomation(auto as Automation)
 
-    // Load table fields
-    const { data: fields } = await supabase
-      .from("table_fields")
-      .select("*")
-      .eq("table_id", auto.table_id)
-      .order("position", { ascending: true })
+    // Load table fields only if table_id exists
+    if (auto.table_id) {
+      const { data: fields } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", auto.table_id)
+        .order("position", { ascending: true })
 
-    setTableFields((fields || []) as TableField[])
+      setTableFields((fields || []) as TableField[])
+    } else {
+      setTableFields([])
+    }
+    
     setLoading(false)
   }
 
@@ -109,6 +114,11 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
 
   if (!automation) {
     return <div>Automation not found</div>
+  }
+
+  // Handle case where table_id might be undefined
+  if (!automation.table_id) {
+    return <div>Automation table ID is missing. Please update the automation to include a table ID.</div>
   }
 
   return (
