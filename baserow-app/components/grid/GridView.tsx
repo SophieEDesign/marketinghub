@@ -11,6 +11,7 @@ import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
+import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -102,30 +103,17 @@ export default function GridView({
     }
     
     const colorValue = row[colorField]
-    if (!colorValue) return null
+    if (!colorValue || !(colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) return null
     
-    const choiceColors = colorFieldObj.options?.choiceColors
-    if (!choiceColors) return null
-    
-    // Normalize value for lookup
     const normalizedValue = String(colorValue).trim()
-    
-    // Try exact match first
-    if (choiceColors[normalizedValue]) {
-      const color = choiceColors[normalizedValue]
-      return color.startsWith('#') ? color : `#${color}`
-    }
-    
-    // Try case-insensitive match
-    const matchingKey = Object.keys(choiceColors).find(
-      key => key.toLowerCase() === normalizedValue.toLowerCase()
+    return normalizeHexColor(
+      resolveChoiceColor(
+        normalizedValue,
+        colorFieldObj.type,
+        colorFieldObj.options,
+        colorFieldObj.type === 'single_select'
+      )
     )
-    if (matchingKey) {
-      const color = choiceColors[matchingKey]
-      return color.startsWith('#') ? color : `#${color}`
-    }
-    
-    return null
   }, [colorField, safeTableFields])
 
   // Helper to get image from image field

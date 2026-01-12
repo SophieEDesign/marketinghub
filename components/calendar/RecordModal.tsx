@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -10,9 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import type { TableField } from '@/types/fields'
+import FieldEditor from '@/components/fields/FieldEditor'
 
 interface RecordModalProps {
   open: boolean
@@ -134,70 +133,6 @@ export default function RecordModal({
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
 
-  function getInputType(field: TableField): string {
-    switch (field.type) {
-      case 'number':
-      case 'currency':
-        return 'number'
-      case 'email':
-        return 'email'
-      case 'url':
-        return 'url'
-      case 'date':
-        return 'date'
-      case 'datetime':
-        return 'datetime-local'
-      case 'checkbox':
-        return 'checkbox'
-      default:
-        return 'text'
-    }
-  }
-
-  function formatValueForInput(field: TableField, value: any): string {
-    if (value === null || value === undefined) return ''
-    
-    if (field.type === 'date' && value) {
-      try {
-        const date = new Date(value)
-        return date.toISOString().split('T')[0]
-      } catch {
-        return String(value)
-      }
-    }
-    
-    if (field.type === 'datetime' && value) {
-      try {
-        const date = new Date(value)
-        return date.toISOString().slice(0, 16)
-      } catch {
-        return String(value)
-      }
-    }
-    
-    return String(value)
-  }
-
-  function parseInputValue(field: TableField, value: string): any {
-    if (field.type === 'number' || field.type === 'currency') {
-      return value === '' ? null : Number(value)
-    }
-    
-    if (field.type === 'checkbox') {
-      return value === 'true' || value === true
-    }
-    
-    if (field.type === 'date' && value) {
-      return new Date(value).toISOString()
-    }
-    
-    if (field.type === 'datetime' && value) {
-      return new Date(value).toISOString()
-    }
-    
-    return value === '' ? null : value
-  }
-
   if (!open || !recordId) return null
 
   return (
@@ -226,60 +161,16 @@ export default function RecordModal({
             {tableFields
               .filter((field) => field.name !== 'id' && field.name !== 'created_at' && field.name !== 'updated_at')
               .map((field) => {
-                const inputType = getInputType(field)
                 const value = formData[field.name]
-                const displayValue = formatValueForInput(field, value)
-
-                if (field.type === 'checkbox') {
-                  return (
-                    <div key={field.id} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={field.id}
-                        checked={value === true || value === 'true'}
-                        onChange={(e) => handleFieldChange(field.name, e.target.checked)}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={field.id} className="text-sm font-medium">
-                        {field.name}
-                      </Label>
-                    </div>
-                  )
-                }
-
-                if (field.type === 'text' && field.options?.multiline) {
-                  return (
-                    <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.id} className="text-sm font-medium">
-                        {field.name}
-                      </Label>
-                      <textarea
-                        id={field.id}
-                        value={displayValue}
-                        onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                        className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={4}
-                      />
-                    </div>
-                  )
-                }
 
                 return (
-                  <div key={field.id} className="space-y-2">
-                    <Label htmlFor={field.id} className="text-sm font-medium">
-                      {field.name}
-                    </Label>
-                    <Input
-                      id={field.id}
-                      type={inputType}
-                      value={displayValue}
-                      onChange={(e) => {
-                        const parsedValue = parseInputValue(field, e.target.value)
-                        handleFieldChange(field.name, parsedValue)
-                      }}
-                      className="w-full"
-                    />
-                  </div>
+                  <FieldEditor
+                    key={field.id}
+                    field={field}
+                    value={value}
+                    onChange={(newValue) => handleFieldChange(field.name, newValue)}
+                    required={field.required || false}
+                  />
                 )
               })}
           </div>

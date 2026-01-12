@@ -22,6 +22,7 @@ import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
 import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWarn } from '@/lib/interface/debug-flags'
+import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 
 interface CalendarViewProps {
   tableId: string
@@ -936,29 +937,17 @@ export default function CalendarView({
               const colorFieldName = colorFieldObj.name
               const colorValue = row.data[colorFieldName]
               
-              // If color field is a select field, use choiceColors from options
-              if (colorValue && colorFieldObj.options?.choiceColors) {
-                // Normalize the value for lookup (trim whitespace, handle case)
+              // If color field is a select field, use centralized color system
+              if (colorValue && (colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) {
                 const normalizedValue = String(colorValue).trim()
-                const choiceColors = colorFieldObj.options.choiceColors
-                
-                // Try exact match first
-                if (choiceColors[normalizedValue]) {
-                  eventColor = choiceColors[normalizedValue]
-                } else {
-                  // Try case-insensitive match
-                  const matchingKey = Object.keys(choiceColors).find(
-                    key => key.toLowerCase() === normalizedValue.toLowerCase()
+                eventColor = normalizeHexColor(
+                  resolveChoiceColor(
+                    normalizedValue,
+                    colorFieldObj.type,
+                    colorFieldObj.options,
+                    colorFieldObj.type === 'single_select'
                   )
-                  if (matchingKey) {
-                    eventColor = choiceColors[matchingKey]
-                  }
-                }
-                
-                // Ensure hex color format
-                if (eventColor && !eventColor.startsWith('#')) {
-                  eventColor = `#${eventColor}`
-                }
+                )
               }
             }
           }

@@ -23,6 +23,10 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import type { ViewFilterGroup, ViewFilter, FilterConditionType, FilterType } from "@/types/database"
+import {
+  resolveChoiceColor,
+  normalizeHexColor,
+} from "@/lib/field-colors"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -480,14 +484,50 @@ export default function FilterDialog({
                                         }
                                       >
                                         <SelectTrigger className="h-8 text-sm">
-                                          <SelectValue placeholder="Select value" />
+                                          <SelectValue placeholder="Select value">
+                                            {filter.value && field ? (
+                                              <div className="flex items-center gap-2">
+                                                <span
+                                                  className="inline-block w-3 h-3 rounded-full"
+                                                  style={{
+                                                    backgroundColor: normalizeHexColor(
+                                                      resolveChoiceColor(
+                                                        filter.value,
+                                                        field.type,
+                                                        field.options,
+                                                        field.type === 'single_select'
+                                                      )
+                                                    ),
+                                                  }}
+                                                />
+                                                {filter.value}
+                                              </div>
+                                            ) : (
+                                              "Select value"
+                                            )}
+                                          </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
-                                          {field.options.choices.map((choice: string) => (
-                                            <SelectItem key={choice} value={choice}>
-                                              {choice}
-                                            </SelectItem>
-                                          ))}
+                                          {field.options.choices.map((choice: string) => {
+                                            const hexColor = resolveChoiceColor(
+                                              choice,
+                                              field.type,
+                                              field.options,
+                                              field.type === 'single_select'
+                                            )
+                                            const bgColor = normalizeHexColor(hexColor)
+                                            return (
+                                              <SelectItem key={choice} value={choice}>
+                                                <div className="flex items-center gap-2">
+                                                  <span
+                                                    className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: bgColor }}
+                                                  />
+                                                  <span>{choice}</span>
+                                                </div>
+                                              </SelectItem>
+                                            )
+                                          })}
                                         </SelectContent>
                                       </Select>
                                     ) : (

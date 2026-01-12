@@ -23,6 +23,7 @@ import { X, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 import { FIELD_TYPES } from '@/types/fields'
+import { resolveChoiceColor } from '@/lib/field-colors'
 import { canChangeType } from '@/lib/fields/validation'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import {
@@ -691,7 +692,13 @@ export default function FieldSettingsDrawer({
               <Label>Choices</Label>
               <div className="space-y-2">
                 {(options.choices && options.choices.length > 0 ? options.choices : ['']).map((choice, index) => {
-                  const choiceColor = options.choiceColors?.[choice] || '#3b82f6' // Default blue
+                  // Use centralized color system for default
+                  const choiceColor = options.choiceColors?.[choice] || resolveChoiceColor(
+                    choice,
+                    type as 'single_select' | 'multi_select',
+                    options,
+                    type === 'single_select'
+                  )
                   return (
                     <div key={index} className="flex gap-2 items-center">
                       <Input

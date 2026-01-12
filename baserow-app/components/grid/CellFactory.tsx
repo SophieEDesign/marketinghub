@@ -83,7 +83,7 @@ export function CellFactory({
       )
 
     case 'checkbox':
-      return <CheckboxCell {...commonProps} />
+      return <CheckboxCell {...commonProps} fieldOptions={field.options} />
 
     case 'attachment':
       return (

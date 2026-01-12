@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { X, Save, Trash2, AlertTriangle } from "lucide-react"
 import type { FieldType, TableField, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import { resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 
 interface FieldBuilderDrawerProps {
@@ -158,7 +159,13 @@ export default function FieldBuilderDrawer({
             <label className="block text-sm font-medium">Choices</label>
             <div className="space-y-2">
               {(options.choices || [""]).map((choice, index) => {
-                const choiceColor = options.choiceColors?.[choice] || '#3b82f6'
+                // Use centralized color system for default
+                const choiceColor = options.choiceColors?.[choice] || resolveChoiceColor(
+                  choice,
+                  type as 'single_select' | 'multi_select',
+                  options,
+                  type === 'single_select'
+                )
                 return (
                   <div key={index} className="flex gap-2 items-center">
                     <input

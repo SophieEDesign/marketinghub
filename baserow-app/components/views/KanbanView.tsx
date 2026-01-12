@@ -8,6 +8,7 @@ import { Plus } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 
 interface KanbanViewProps {
   tableId: string
@@ -64,30 +65,17 @@ export default function KanbanView({
     }
     
     const colorValue = row.data[colorField]
-    if (!colorValue) return null
+    if (!colorValue || !(colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) return null
     
-    const choiceColors = colorFieldObj.options?.choiceColors
-    if (!choiceColors) return null
-    
-    // Normalize value for lookup
     const normalizedValue = String(colorValue).trim()
-    
-    // Try exact match first
-    if (choiceColors[normalizedValue]) {
-      const color = choiceColors[normalizedValue]
-      return color.startsWith('#') ? color : `#${color}`
-    }
-    
-    // Try case-insensitive match
-    const matchingKey = Object.keys(choiceColors).find(
-      key => key.toLowerCase() === normalizedValue.toLowerCase()
+    return normalizeHexColor(
+      resolveChoiceColor(
+        normalizedValue,
+        colorFieldObj.type,
+        colorFieldObj.options,
+        colorFieldObj.type === 'single_select'
+      )
     )
-    if (matchingKey) {
-      const color = choiceColors[matchingKey]
-      return color.startsWith('#') ? color : `#${color}`
-    }
-    
-    return null
   }, [colorField, tableFields])
 
   // Helper to get image from image field
