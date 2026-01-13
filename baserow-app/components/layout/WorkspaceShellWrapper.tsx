@@ -67,44 +67,31 @@ export default async function WorkspaceShellWrapper({
   // Fetch interface groups
   let interfaceGroups: any[] = []
   try {
-    // Try to select is_system, is_admin_only, and icon, but handle gracefully if columns don't exist
+    // Start with minimal query (columns that definitely exist)
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, workspace_id, is_admin_only, icon')
+      .select('id, name, order_index')
       .order('order_index', { ascending: true })
     
-    const { data: groupsData, error: groupsError } = await groupsQuery
+    const { data: minimalData, error: minimalError } = await groupsQuery
     
-    if (!groupsError && groupsData) {
-      // Try to fetch is_system separately if the column exists
-      try {
-        const { data: groupsWithSystem } = await supabase
-          .from('interface_groups')
-          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
-          .order('order_index', { ascending: true })
-        
-        if (groupsWithSystem) {
-          // Filter admin-only interfaces for non-admins
-          interfaceGroups = groupsWithSystem
-            .filter((g: any) => admin || !g.is_admin_only)
-        } else {
-          // Add default is_system = false if column doesn't exist, filter admin-only
-          interfaceGroups = groupsData
-            .map((g: any) => ({ ...g, is_system: false }))
-            .filter((g: any) => admin || !g.is_admin_only)
-        }
-      } catch (systemError: any) {
-        // Column doesn't exist - add default value, filter admin-only
-        interfaceGroups = groupsData
-          .map((g: any) => ({ ...g, is_system: false }))
+    if (minimalError) {
+      // If minimal query fails, try even simpler
+      const { data: basicData, error: basicError } = await supabase
+        .from('interface_groups')
+        .select('id, name')
+        .order('order_index', { ascending: true })
+      
+      if (!basicError && basicData) {
+        interfaceGroups = basicData
+          .map((g: any) => ({ ...g, order_index: 0, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
           .filter((g: any) => admin || !g.is_admin_only)
-      }
-    } else if (groupsError) {
-      // If table doesn't exist (42P01) or RLS error, just return empty array
-      if (groupsError.code === '42P01' || groupsError.code === 'PGRST116' || 
-          groupsError.message?.includes('relation') || groupsError.message?.includes('does not exist') ||
-          groupsError.code === 'PGRST301' || groupsError.message?.includes('permission')) {
-        console.warn('interface_groups table may not exist or RLS blocking access, returning empty array')
+      } else if (basicError) {
+        // If table doesn't exist (42P01) or RLS error, just return empty array
+        if (basicError.code === '42P01' || basicError.code === 'PGRST116' || 
+            basicError.message?.includes('relation') || basicError.message?.includes('does not exist') ||
+            basicError.code === 'PGRST301' || basicError.message?.includes('permission')) {
+          console.warn('interface_groups table may not exist or RLS blocking access, returning empty array')
         interfaceGroups = []
       } else {
         console.error('Error loading interface groups:', groupsError)

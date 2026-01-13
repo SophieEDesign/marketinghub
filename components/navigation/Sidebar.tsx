@@ -55,13 +55,22 @@ export default async function Sidebar() {
       
       // Try to fetch additional columns if they exist
       try {
-        const { data: fullData } = await supabase
+        const { data: fullData, error: fullError } = await supabase
           .from('interface_groups')
           .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
           .order('order_index', { ascending: true })
         
-        if (fullData) {
+        if (!fullError && fullData) {
           groupsData = fullData
+        } else {
+          // Query failed (likely missing columns) - use minimal data with defaults
+          groupsData = minimalData.map((g: any) => ({
+            ...g,
+            collapsed: false,
+            is_system: false,
+            is_admin_only: false,
+            icon: null,
+          }))
         }
       } catch (e) {
         // Some columns don't exist - use minimal data and add defaults

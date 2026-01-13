@@ -156,15 +156,15 @@ export default function InterfacesTab() {
       } else if (minimalData) {
         // Try to get full data with optional columns
         try {
-          const { data: fullData } = await supabase
+          const { data: fullData, error: fullError } = await supabase
             .from('interface_groups')
             .select('id, name, order_index, is_system, is_admin_only, icon')
             .order('order_index', { ascending: true })
           
-          if (fullData) {
+          if (!fullError && fullData) {
             groupsData = fullData
           } else {
-            // Use minimal data with defaults
+            // Query failed (likely missing columns) - use minimal data with defaults
             groupsData = minimalData.map((g: any) => ({ ...g, is_system: false, is_admin_only: false, icon: null }))
           }
         } catch (e) {
