@@ -21,6 +21,7 @@ interface RecordModalProps {
   tableFields: TableField[]
   modalFields?: string[] // Fields to show in modal (if undefined, show all; if empty array, show none; if has values, show only those)
   onSave?: () => void
+  initialData?: Record<string, any> // Initial data for creating new records (e.g., pre-filled date)
 }
 
 export default function RecordModal({
@@ -31,6 +32,7 @@ export default function RecordModal({
   tableFields,
   modalFields,
   onSave,
+  initialData,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -47,14 +49,17 @@ export default function RecordModal({
     }
   }, [open, tableId])
 
-  // Load record data after table info is loaded
+  // Load record data after table info is loaded, or initialize with initialData for new records
   useEffect(() => {
     if (open && recordId && supabaseTableName) {
       loadRecord()
+    } else if (open && !recordId && initialData) {
+      // For new records, initialize with initialData
+      setFormData(initialData)
     } else {
       setFormData({})
     }
-  }, [open, recordId, supabaseTableName])
+  }, [open, recordId, supabaseTableName, initialData])
 
   async function loadTableInfo() {
     if (!tableId) return
@@ -106,23 +111,39 @@ export default function RecordModal({
   }
 
   async function handleSave() {
-    if (!supabaseTableName || !recordId) return
+    if (!supabaseTableName) return
 
     setSaving(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase
-        .from(supabaseTableName)
-        .update(formData)
-        .eq('id', recordId)
+      
+      if (recordId) {
+        // Update existing record
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .update(formData)
+          .eq('id', recordId)
 
-      if (error) {
-        console.error('Error saving record:', error)
-        alert('Failed to save record. Please try again.')
+        if (error) {
+          console.error('Error saving record:', error)
+          alert('Failed to save record. Please try again.')
+          return
+        }
       } else {
-        onSave?.()
-        onClose()
+        // Create new record
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .insert([formData])
+
+        if (error) {
+          console.error('Error creating record:', error)
+          alert('Failed to create record. Please try again.')
+          return
+        }
       }
+
+      onSave?.()
+      onClose()
     } catch (error) {
       console.error('Error saving record:', error)
       alert('Failed to save record. Please try again.')
@@ -135,7 +156,9 @@ export default function RecordModal({
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
 
-  if (!open || !recordId) return null
+  if (!open) return null
+
+  const isNewRecord = !recordId
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -150,11 +173,11 @@ export default function RecordModal({
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <DialogTitle>Record Details</DialogTitle>
+            <DialogTitle>{isNewRecord ? 'Create New Record' : 'Record Details'}</DialogTitle>
           </div>
         </DialogHeader>
 
-        {loading ? (
+        {loading && recordId ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-gray-500">Loading...</div>
           </div>
@@ -198,9 +221,9 @@ export default function RecordModal({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
+          <Button onClick={handleSave} disabled={saving || (loading && recordId)}>
             <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save'}
+            {saving ? (isNewRecord ? 'Creating...' : 'Saving...') : (isNewRecord ? 'Create' : 'Save')}
           </Button>
         </div>
       </DialogContent>

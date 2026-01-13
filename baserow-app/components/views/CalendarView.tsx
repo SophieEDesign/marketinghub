@@ -81,6 +81,7 @@ export default function CalendarView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
+  const [createRecordDate, setCreateRecordDate] = useState<Date | null>(null) // Date for creating new record
   
   // View config state - calendar settings from view config
   const [viewConfig, setViewConfig] = useState<{
@@ -1365,13 +1366,15 @@ export default function CalendarView({
             }
           }}
           dateClick={(info) => {
-            // Date clicked - could create new record in future
-            // Silently handle for now
+            // Date clicked - open modal to create new record with pre-filled date
+            // info.dateStr is already in YYYY-MM-DD format
+            const clickedDate = new Date(info.dateStr + 'T00:00:00') // Ensure it's treated as local date
+            setCreateRecordDate(clickedDate)
           }}
         />
       </div>
 
-      {/* Record Modal */}
+      {/* Record Modal for Editing */}
       {selectedRecordId && resolvedTableId && (
         <RecordModal
           open={selectedRecordId !== null}
@@ -1385,6 +1388,47 @@ export default function CalendarView({
             if (resolvedTableId && supabaseTableName) {
               loadRows()
             }
+          }}
+        />
+      )}
+
+      {/* Record Modal for Creating New Record */}
+      {createRecordDate && resolvedTableId && resolvedDateFieldId && (
+        <RecordModal
+          open={createRecordDate !== null}
+          onClose={() => setCreateRecordDate(null)}
+          tableId={resolvedTableId}
+          modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
+          recordId={null}
+          tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
+          initialData={(() => {
+            // Pre-fill the date field(s) based on the clicked date
+            const initial: Record<string, any> = {}
+            const dateValue = createRecordDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+            
+            // Use resolved date field or view config fields
+            if (resolvedDateFieldId) {
+              initial[resolvedDateFieldId] = dateValue
+            }
+            
+            // Also set start field if configured
+            if (viewConfig?.calendar_start_field) {
+              initial[viewConfig.calendar_start_field] = dateValue
+            }
+            
+            // Also set end field if configured (same as start for single-day events)
+            if (viewConfig?.calendar_end_field) {
+              initial[viewConfig.calendar_end_field] = dateValue
+            }
+            
+            return initial
+          })()}
+          onSave={() => {
+            // Reload rows after save
+            if (resolvedTableId && supabaseTableName) {
+              loadRows()
+            }
+            setCreateRecordDate(null)
           }}
         />
       )}
