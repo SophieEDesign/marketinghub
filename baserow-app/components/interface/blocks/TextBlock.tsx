@@ -57,7 +57,17 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   
   // CRITICAL: Determine if viewer mode is forced (check URL or parent context)
   // Viewer mode should always force read-only, regardless of isEditing prop
-  const isViewer = typeof window !== 'undefined' && window.location.search.includes('view=true')
+  // FIX: Use state + useEffect to prevent hydration mismatch
+  // Initialize to false (matches server render), then check on client
+  const [isViewer, setIsViewer] = useState(false)
+  
+  useEffect(() => {
+    // Only check URL on client side after mount to prevent hydration mismatch
+    if (typeof window !== 'undefined') {
+      setIsViewer(window.location.search.includes('view=true'))
+    }
+  }, [])
+  
   const readOnly = isViewer || !isEditing
   
   // Lifecycle logging - SANITY TEST for remount detection

@@ -386,11 +386,10 @@ export default function RecordViewPageSettings({
     if (!field) return null
 
     // Check if this is a select field and show a sample color pill
-    const isSelectField = field.type === 'single_select' || field.type === 'multi_select'
     const sampleChoice = field.options?.choices?.[0]
     let colorBadge = null
     
-    if (isSelectField && sampleChoice) {
+    if ((field.type === 'single_select' || field.type === 'multi_select') && sampleChoice) {
       const hexColor = resolveChoiceColor(
         sampleChoice,
         field.type,

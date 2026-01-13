@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Filter, Plus, X, Link2, CheckCircle2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import { getOperatorsForFieldType, getDefaultOperatorForFieldType } from "@/lib/filters/field-operators"
 
 interface FilterBlockSettingsProps {
   config: BlockConfig
@@ -28,7 +29,9 @@ interface FilterBlockSettingsProps {
   onTableChange: (tableId: string) => Promise<void>
 }
 
-const OPERATORS = [
+// Get all possible operators across all field types for the "Allowed Operators" setting
+// This includes date-specific operators
+const ALL_OPERATORS = [
   { value: 'equal', label: 'equals' },
   { value: 'not_equal', label: 'does not equal' },
   { value: 'contains', label: 'contains' },
@@ -39,6 +42,16 @@ const OPERATORS = [
   { value: 'less_than_or_equal', label: 'less than or equal' },
   { value: 'is_empty', label: 'is empty' },
   { value: 'is_not_empty', label: 'is not empty' },
+  // Date-specific operators
+  { value: 'date_equal', label: 'is (date)' },
+  { value: 'date_before', label: 'before (date)' },
+  { value: 'date_after', label: 'after (date)' },
+  { value: 'date_on_or_before', label: 'on or before (date)' },
+  { value: 'date_on_or_after', label: 'on or after (date)' },
+  { value: 'date_range', label: 'is within (date range)' },
+  // Link/lookup operators
+  { value: 'has', label: 'has record matching' },
+  { value: 'does_not_have', label: 'does not have record matching' },
 ]
 
 export default function FilterBlockSettings({
@@ -52,7 +65,7 @@ export default function FilterBlockSettings({
   const tableId = config?.table_id || ''
   const targetBlocks = config?.target_blocks || 'all'
   const allowedFields = config?.allowed_fields || []
-  const allowedOperators = config?.allowed_operators || OPERATORS.map(op => op.value)
+  const allowedOperators = config?.allowed_operators || ALL_OPERATORS.map(op => op.value)
   const [defaultFilters, setDefaultFilters] = useState<BlockFilter[]>(config?.filters || [])
   const [fieldsWithOptions, setFieldsWithOptions] = useState<Map<string, any>>(new Map())
 
@@ -108,9 +121,9 @@ export default function FilterBlockSettings({
     : fields.filter(f => allowedFields.includes(f.name))
 
   // Get available operators for filters (respect allowed_operators if set)
-  const availableFilterOperators = allowedOperators.length === OPERATORS.length
-    ? OPERATORS
-    : OPERATORS.filter(op => allowedOperators.includes(op.value))
+  const availableFilterOperators = allowedOperators.length === ALL_OPERATORS.length
+    ? ALL_OPERATORS
+    : ALL_OPERATORS.filter(op => allowedOperators.includes(op.value))
 
   function handleTargetBlocksChange(value: string) {
     if (value === 'all') {
@@ -136,11 +149,15 @@ export default function FilterBlockSettings({
   }
 
   function addDefaultFilter() {
-    if (availableFilterFields.length === 0 || availableFilterOperators.length === 0) return
+    if (availableFilterFields.length === 0) return
+    
+    const firstField = availableFilterFields[0]
+    const fieldOperators = getOperatorsForFieldType(firstField.type)
+    const defaultOp = getDefaultOperatorForFieldType(firstField.type)
     
     const newFilter: BlockFilter = {
-      field: availableFilterFields[0].name,
-      operator: availableFilterOperators[0]?.value as BlockFilter['operator'] || 'equal',
+      field: firstField.name,
+      operator: defaultOp as BlockFilter['operator'],
       value: '',
     }
     const newFilters = [...defaultFilters, newFilter]
@@ -306,7 +323,7 @@ export default function FilterBlockSettings({
           Select which filter operators users can use. Leave empty to allow all operators.
         </p>
         <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-          {OPERATORS.map((op) => (
+          {ALL_OPERATORS.map((op) => (
             <div key={op.value} className="flex items-center space-x-2">
               <Checkbox
                 id={`operator-${op.value}`}
@@ -322,7 +339,7 @@ export default function FilterBlockSettings({
             </div>
           ))}
         </div>
-        {allowedOperators.length === OPERATORS.length && (
+        {allowedOperators.length === ALL_OPERATORS.length && (
           <p className="text-xs text-gray-500 italic">All operators are allowed</p>
         )}
       </div>
@@ -344,7 +361,12 @@ export default function FilterBlockSettings({
                 const selectedField = fields.find(f => f.name === filter.field)
                 const fieldOptions = fieldsWithOptions.get(filter.field)
                 const isSelectField = selectedField?.type === 'single_select' || selectedField?.type === 'multi_select'
-                const needsValue = filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty'
+                // Get field-specific operators to determine if value is needed
+                const fieldOperators = selectedField 
+                  ? getOperatorsForFieldType(selectedField.type)
+                  : []
+                const selectedOperator = fieldOperators.find(op => op.value === filter.operator)
+                const needsValue = selectedOperator?.requiresValue !== false
                 
                 return (
                   <div key={index} className="border rounded-lg p-3 bg-gray-50 space-y-2">
@@ -352,7 +374,17 @@ export default function FilterBlockSettings({
                       {/* Field Select */}
                       <Select
                         value={filter.field}
-                        onValueChange={(value) => updateDefaultFilter(index, { field: value, value: '' })}
+                        onValueChange={(value) => {
+                          const newField = fields.find(f => f.name === value)
+                          const defaultOp = newField 
+                            ? getDefaultOperatorForFieldType(newField.type)
+                            : 'equal'
+                          updateDefaultFilter(index, { 
+                            field: value, 
+                            operator: defaultOp as BlockFilter['operator'],
+                            value: '' 
+                          })
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Field" />
@@ -366,23 +398,43 @@ export default function FilterBlockSettings({
                         </SelectContent>
                       </Select>
 
-                      {/* Operator Select */}
+                      {/* Operator Select - Field-aware operators */}
                       <Select
                         value={filter.operator}
-                        onValueChange={(value) => updateDefaultFilter(index, { 
-                          operator: value as BlockFilter['operator'],
-                          value: (value === 'is_empty' || value === 'is_not_empty') ? '' : filter.value
-                        })}
+                        onValueChange={(value) => {
+                          const fieldOperators = selectedField 
+                            ? getOperatorsForFieldType(selectedField.type)
+                            : []
+                          const selectedOp = fieldOperators.find(op => op.value === value)
+                          const needsValue = selectedOp?.requiresValue !== false
+                          
+                          updateDefaultFilter(index, { 
+                            operator: value as BlockFilter['operator'],
+                            value: needsValue ? filter.value : ''
+                          })
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Operator" />
                         </SelectTrigger>
                         <SelectContent>
-                          {availableFilterOperators.map(op => (
-                            <SelectItem key={op.value} value={op.value}>
-                              {op.label}
-                            </SelectItem>
-                          ))}
+                          {(() => {
+                            // Get field-specific operators, filtered by allowed operators
+                            const fieldOperators = selectedField 
+                              ? getOperatorsForFieldType(selectedField.type)
+                              : []
+                            
+                            // Filter by allowed operators if configured
+                            const filteredOperators = allowedOperators.length === ALL_OPERATORS.length
+                              ? fieldOperators
+                              : fieldOperators.filter(op => allowedOperators.includes(op.value))
+                            
+                            return filteredOperators.map(op => (
+                              <SelectItem key={op.value} value={op.value}>
+                                {op.label}
+                              </SelectItem>
+                            ))
+                          })()}
                         </SelectContent>
                       </Select>
 

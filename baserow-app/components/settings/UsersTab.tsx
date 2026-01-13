@@ -29,10 +29,11 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Edit, X, UserX, Trash2, Mail } from 'lucide-react'
+import { Plus, Edit, X, UserX, Trash2, Mail, Key } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { Switch } from '@/components/ui/switch'
 import { formatDateUK } from '@/lib/utils'
+import { validatePassword } from '@/lib/auth-utils'
 
 interface User {
   id: string
@@ -58,6 +59,13 @@ export default function UsersTab() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [reinviting, setReinviting] = useState<string | null>(null)
+  const [changePasswordDialogOpen, setChangePasswordDialogOpen] = useState(false)
+  const [userToChangePassword, setUserToChangePassword] = useState<User | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
 
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('')
@@ -379,6 +387,67 @@ export default function UsersTab() {
     }
   }
 
+  function handleChangePasswordClick(user: User) {
+    setUserToChangePassword(user)
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+    setConfirmPasswordError(null)
+    setChangePasswordDialogOpen(true)
+  }
+
+  async function handleChangePassword() {
+    if (!userToChangePassword) return
+
+    // Reset errors
+    setPasswordError(null)
+    setConfirmPasswordError(null)
+
+    // Validate password
+    const passwordValidation = validatePassword(newPassword)
+    if (!passwordValidation.valid) {
+      setPasswordError(passwordValidation.error || 'Invalid password')
+      return
+    }
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      setConfirmPasswordError('Passwords do not match')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const response = await fetch(`/api/users/${userToChangePassword.user_id}/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password: newPassword,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to change password')
+      }
+
+      // Success
+      alert(`Password changed successfully for ${userToChangePassword.email}`)
+      setChangePasswordDialogOpen(false)
+      setUserToChangePassword(null)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error: any) {
+      console.error('Error changing password:', error)
+      setPasswordError(error.message || 'Failed to change password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   function getRoleBadgeVariant(role: string) {
     return role === 'admin' ? 'destructive' : 'default'
   }
@@ -495,6 +564,16 @@ export default function UsersTab() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+                            {!user.is_pending && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleChangePasswordClick(user)}
+                                title="Change password"
+                              >
+                                <Key className="h-4 w-4" />
+                              </Button>
+                            )}
                             {(user.is_pending || user.needs_password_reset) && (
                               <Button
                                 variant="ghost"
@@ -680,6 +759,93 @@ export default function UsersTab() {
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? 'Deleting...' : 'Delete User'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={changePasswordDialogOpen} onOpenChange={setChangePasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {userToChangePassword?.email}. The user will need to use this password to sign in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password *</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value)
+                  if (passwordError) setPasswordError(null)
+                }}
+                onBlur={() => {
+                  if (newPassword) {
+                    const validation = validatePassword(newPassword)
+                    if (!validation.valid) {
+                      setPasswordError(validation.error || 'Invalid password')
+                    }
+                  }
+                }}
+                placeholder="Enter new password"
+                required
+                minLength={8}
+                className={passwordError ? 'border-destructive' : ''}
+              />
+              {passwordError ? (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters with uppercase, lowercase, numbers, or special characters
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password *</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  if (confirmPasswordError) setConfirmPasswordError(null)
+                }}
+                onBlur={() => {
+                  if (confirmPassword && newPassword && confirmPassword !== newPassword) {
+                    setConfirmPasswordError('Passwords do not match')
+                  }
+                }}
+                placeholder="Confirm new password"
+                required
+                minLength={8}
+                className={confirmPasswordError ? 'border-destructive' : ''}
+              />
+              {confirmPasswordError && (
+                <p className="text-sm text-destructive">{confirmPasswordError}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setChangePasswordDialogOpen(false)
+              setUserToChangePassword(null)
+              setNewPassword('')
+              setConfirmPassword('')
+              setPasswordError(null)
+              setConfirmPasswordError(null)
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleChangePassword} 
+              disabled={changingPassword || !newPassword || !confirmPassword || !!passwordError || !!confirmPasswordError}
+            >
+              {changingPassword ? 'Changing...' : 'Change Password'}
             </Button>
           </DialogFooter>
         </DialogContent>

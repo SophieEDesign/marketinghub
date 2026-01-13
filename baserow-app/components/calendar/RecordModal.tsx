@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
 
-interface RecordModalProps {
+export interface RecordModalProps {
   open: boolean
   onClose: () => void
   tableId: string

@@ -242,35 +242,91 @@ export default function TimelineView({
 
   // Resolve card field configuration
   const resolvedCardFields = useMemo(() => {
-    // Priority: props > blockConfig > auto-detect
-    const titleFieldName = titleFieldProp || 
-      blockConfig?.timeline_title_field || 
-      blockConfig?.card_title_field ||
-      null
-    
-    // Find primary field (name/title field) as default
-    const primaryField = tableFields.find(f => 
-      (f.type === 'text' || f.type === 'long_text') && 
-      (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
-    ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
-    
-    const resolvedTitleField = titleFieldName
-      ? tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || primaryField
-      : primaryField
+    // Get date field names to exclude from card fields
+    const { fromFieldName, toFieldName } = resolvedDateFields
+    const dateFieldNames = new Set([
+      fromFieldName,
+      toFieldName,
+      startDateFieldId,
+      endDateFieldId,
+      dateFieldId,
+    ].filter(Boolean))
 
-    const cardFields = [
-      cardField1 || blockConfig?.timeline_field_1 || blockConfig?.card_field_1,
-      cardField2 || blockConfig?.timeline_field_2 || blockConfig?.card_field_2,
-      cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
-    ].filter(Boolean).map(fieldName => 
-      tableFields.find(f => f.name === fieldName || f.id === fieldName)
-    ).filter(Boolean) as TableField[]
+    // Priority: Use visible_fields from blockConfig if available (new system)
+    // Otherwise fall back to timeline_field_1/2/3 (old system for backward compatibility)
+    let allVisibleFields: TableField[] = []
+    let cardFields: TableField[] = []
+    let resolvedTitleField: TableField | null = null
+    
+    if (blockConfig?.visible_fields && Array.isArray(blockConfig.visible_fields) && blockConfig.visible_fields.length > 0) {
+      // Use visible_fields from page settings (new system)
+      allVisibleFields = blockConfig.visible_fields
+        .map((fieldName: string) => 
+          tableFields.find(f => f.name === fieldName || f.id === fieldName)
+        )
+        .filter((f): f is TableField => f !== undefined)
+      
+      // Resolve title field: explicit config > first non-date field from visible_fields
+      const titleFieldName = titleFieldProp || 
+        blockConfig?.timeline_title_field || 
+        blockConfig?.card_title_field ||
+        null
+      
+      if (titleFieldName) {
+        resolvedTitleField = allVisibleFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
+      }
+      
+      // If no explicit title field, use first non-date field from visible_fields
+      if (!resolvedTitleField) {
+        resolvedTitleField = allVisibleFields.find(f => !dateFieldNames.has(f.name)) || null
+      }
+      
+      // Fallback to auto-detect if still no title field
+      if (!resolvedTitleField) {
+        const primaryField = tableFields.find(f => 
+          (f.type === 'text' || f.type === 'long_text') && 
+          (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
+        ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
+        resolvedTitleField = primaryField
+      }
+      
+      // Card fields are all visible fields except title and date fields
+      const titleFieldNameToExclude = resolvedTitleField?.name
+      cardFields = allVisibleFields.filter(f => 
+        f.name !== titleFieldNameToExclude && 
+        !dateFieldNames.has(f.name)
+      )
+    } else {
+      // Fall back to old system (backward compatibility)
+      const titleFieldName = titleFieldProp || 
+        blockConfig?.timeline_title_field || 
+        blockConfig?.card_title_field ||
+        null
+      
+      // Find primary field (name/title field) as default
+      const primaryField = tableFields.find(f => 
+        (f.type === 'text' || f.type === 'long_text') && 
+        (f.name.toLowerCase() === 'name' || f.name.toLowerCase() === 'title')
+      ) || tableFields.find(f => f.type === 'text' || f.type === 'long_text') || null
+      
+      resolvedTitleField = titleFieldName
+        ? tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || primaryField
+        : primaryField
+      
+      cardFields = [
+        cardField1 || blockConfig?.timeline_field_1 || blockConfig?.card_field_1,
+        cardField2 || blockConfig?.timeline_field_2 || blockConfig?.card_field_2,
+        cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
+      ].filter(Boolean).map(fieldName => 
+        tableFields.find(f => f.name === fieldName || f.id === fieldName)
+      ).filter(Boolean) as TableField[]
+    }
 
     return {
       titleField: resolvedTitleField,
       cardFields,
     }
-  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields])
+  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId])
 
   // Resolve group by field
   const resolvedGroupByField = useMemo(() => {
@@ -697,7 +753,7 @@ export default function TimelineView({
         openRecord(tableId, event.rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
       }
     },
-    [openRecord, supabaseTableName, tableId, resizingEvent]
+    [openRecord, supabaseTableName, tableId, resizingEvent, blockConfig]
   )
 
   // Handle event date updates
@@ -1235,17 +1291,38 @@ export default function TimelineView({
                   size="sm"
                   onClick={async () => {
                     // Create new record
-                    if (supabaseTableName) {
+                    if (supabaseTableName && tableId) {
+                      const { fromFieldName, toFieldName } = resolvedDateFields
                       const newData: Record<string, any> = {}
-                      if (dateFieldId) {
-                        newData[dateFieldId] = new Date().toISOString()
+                      
+                      // Use resolved date fields (from blockConfig, props, or auto-detected)
+                      // Set date to current date in timeline view
+                      const initialDate = currentDate.toISOString()
+                      
+                      if (fromFieldName) {
+                        newData[fromFieldName] = initialDate
+                      } else if (toFieldName) {
+                        newData[toFieldName] = initialDate
+                      } else if (startDateFieldId) {
+                        newData[startDateFieldId] = initialDate
+                      } else if (dateFieldId) {
+                        newData[dateFieldId] = initialDate
                       }
-                      if (startDateFieldId) {
-                        newData[startDateFieldId] = new Date().toISOString()
-                      }
-                      const { error } = await supabase.from(supabaseTableName).insert([newData])
-                      if (!error) {
-                        loadRows()
+                      
+                      const { data, error } = await supabase
+                        .from(supabaseTableName)
+                        .insert([newData])
+                        .select()
+                        .single()
+                      
+                      if (error) {
+                        console.error("Error creating event:", error)
+                        alert("Failed to create event")
+                      } else if (data?.id) {
+                        // Reload rows to show the new event
+                        await loadRows()
+                        // Open the record panel so user can edit it
+                        openRecord(tableId, data.id, supabaseTableName, (blockConfig as any)?.modal_fields)
                       }
                     }
                   }}

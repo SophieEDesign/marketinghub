@@ -7,12 +7,22 @@ import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { 
+  getAuthErrorMessage, 
+  getRedirectUrl, 
+  validateEmail, 
+  validatePassword,
+  performPostAuthRedirect
+} from "@/lib/auth-utils"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>("Marketing Hub")
   const [primaryColor, setPrimaryColor] = useState<string>("hsl(222.2, 47.4%, 11.2%)")
@@ -34,7 +44,9 @@ function LoginForm() {
         }
       } catch (err) {
         // Silently fail - use defaults
-        console.warn('Could not load branding:', err)
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Could not load branding:', err)
+        }
       }
     }
     
@@ -52,52 +64,21 @@ function LoginForm() {
   // Redirect if already logged in
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Check if this is an invited user who needs to set up a password
-        const userMetadata = user.user_metadata || {}
-        const hasRole = !!userMetadata.role
-        const passwordSetupComplete = !!userMetadata.password_setup_complete
-        
-        // If user has a role but hasn't completed password setup, redirect to password setup
-        if (hasRole && !passwordSetupComplete) {
-          const next = searchParams.get('next') || searchParams.get('callbackUrl')
-          const setupUrl = next && next !== '/' 
-            ? `/auth/setup-password?next=${encodeURIComponent(next)}`
-            : '/auth/setup-password'
-          window.location.href = setupUrl
-          return
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          // Use centralized redirect function
+          await performPostAuthRedirect(supabase, searchParams, {
+            checkPasswordSetup: true
+          })
         }
-        
-        // Check for redirect parameter
-        let next = searchParams.get('next') || searchParams.get('callbackUrl')
-        
-        // If no specific redirect, try to get first page to avoid redirect loop
-        if (!next || next === '/') {
-          try {
-            const response = await fetch('/api/pages')
-            if (response.ok) {
-              const pages = await response.json()
-              if (pages && pages.length > 0) {
-                next = `/pages/${pages[0].id}`
-              } else {
-                // No pages, go to settings if admin, otherwise stay on login
-                next = '/settings?tab=pages'
-              }
-            } else {
-              // Fallback to settings
-              next = '/settings?tab=pages'
-            }
-          } catch {
-            // Fallback to settings on error
-            next = '/settings?tab=pages'
-          }
+      } catch (err) {
+        // Error checking user - allow login form to show
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Error checking user:', err)
         }
-        
-        // Use window.location for full page reload to ensure proper redirect
-        if (next && next !== '/login') {
-          window.location.href = next
-        }
+      } finally {
+        setCheckingAuth(false)
       }
     }
     checkUser()
@@ -107,55 +88,43 @@ function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setEmailError(null)
+    setPasswordError(null)
+
+    // Validate inputs
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.valid) {
+      setEmailError(emailValidation.error || 'Invalid email')
+      setLoading(false)
+      return
+    }
+
+    if (!password || password.length === 0) {
+      setPasswordError('Password is required')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     })
 
     if (error) {
-      setError(error.message)
+      setError(getAuthErrorMessage(error))
       setLoading(false)
     } else {
-      // Wait a moment for session to be established
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Verify session is established
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        setError('Session not established. Please try again.')
-        setLoading(false)
-        return
-      }
-
-      // Check for redirect parameter (next or callbackUrl)
-      let next = searchParams.get('next') || searchParams.get('callbackUrl')
-      
-      // If no specific redirect, try to get first page to avoid redirect loop
-      // Don't redirect to '/' as it causes a loop
-      if (!next || next === '/') {
-        try {
-          const response = await fetch('/api/interface-pages')
-          if (response.ok) {
-            const pages = await response.json()
-            if (pages && pages.length > 0) {
-              next = `/pages/${pages[0].id}`
-            } else {
-              next = '/settings?tab=pages'
-            }
-          } else {
-            next = '/settings?tab=pages'
-          }
-        } catch {
-          next = '/settings?tab=pages'
+      // Wait for session using auth state listener, then redirect
+      // This eliminates race conditions and arbitrary delays
+      await performPostAuthRedirect(supabase, searchParams, {
+        checkPasswordSetup: true,
+        onError: (errorMsg) => {
+          setError(errorMsg)
+          setLoading(false)
         }
-      }
-      
-      // Use window.location for full page reload to ensure cookies are sent
-      // This ensures the server-side home page can read the session properly
-      if (next && next !== '/login' && next !== '/') {
-        window.location.href = next
-      }
+      })
+      // Note: If redirect succeeds, component will unmount, so setLoading won't be called
+      // If there's an error, onError callback handles it
     }
   }
 
@@ -163,53 +132,63 @@ function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setEmailError(null)
+    setPasswordError(null)
+
+    // Validate inputs
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.valid) {
+      setEmailError(emailValidation.error || 'Invalid email')
+      setLoading(false)
+      return
+    }
+
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.valid) {
+      setPasswordError(passwordValidation.error || 'Invalid password')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     })
 
     if (error) {
-      setError(error.message)
+      setError(getAuthErrorMessage(error))
       setLoading(false)
     } else {
       // For sign up, user may need to confirm email first
-      // Check if session was created immediately
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        // Session created - redirect
-        let next = searchParams.get('next') || searchParams.get('callbackUrl')
-        
-        // If no specific redirect, try to get first page to avoid redirect loop
-        // Don't redirect to '/' as it causes a loop
-        if (!next || next === '/') {
-          try {
-            const response = await fetch('/api/interface-pages')
-            if (response.ok) {
-              const pages = await response.json()
-              if (pages && pages.length > 0) {
-                next = `/pages/${pages[0].id}`
-              } else {
-                next = '/settings?tab=pages'
-              }
-            } else {
-              next = '/settings?tab=pages'
-            }
-          } catch {
-            next = '/settings?tab=pages'
+      // Wait for session using auth state listener with shorter timeout
+      await performPostAuthRedirect(supabase, searchParams, {
+        checkPasswordSetup: true,
+        onError: (errorMsg) => {
+          // If session not established, likely email confirmation required
+          if (errorMsg.includes('timed out') || errorMsg.includes('not established')) {
+            setError('Please check your email to confirm your account before signing in.')
+          } else {
+            setError(errorMsg)
           }
+          setLoading(false)
         }
-        
-        if (next && next !== '/login' && next !== '/') {
-          window.location.href = next
-        }
-      } else {
-        // Email confirmation required
-        setError('Please check your email to confirm your account before signing in.')
-        setLoading(false)
-      }
+      })
+      // Note: If redirect succeeds, component will unmount
+      // If there's an error, onError callback handles it
     }
+  }
+
+  // Show loading state during initial auth check
+  if (checkingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center text-muted-foreground">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -245,9 +224,22 @@ function LoginForm() {
                 autoComplete="username"
                 placeholder="you@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (emailError) setEmailError(null)
+                }}
+                onBlur={() => {
+                  const validation = validateEmail(email)
+                  if (!validation.valid) {
+                    setEmailError(validation.error || 'Invalid email')
+                  }
+                }}
                 required
+                className={emailError ? 'border-destructive' : ''}
               />
+              {emailError && (
+                <p className="text-sm text-destructive">{emailError}</p>
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
@@ -260,9 +252,16 @@ function LoginForm() {
                 autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (passwordError) setPasswordError(null)
+                }}
                 required
+                className={passwordError ? 'border-destructive' : ''}
               />
+              {passwordError && (
+                <p className="text-sm text-destructive">{passwordError}</p>
+              )}
             </div>
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

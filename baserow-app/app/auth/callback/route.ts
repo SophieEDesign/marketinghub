@@ -30,25 +30,29 @@ export async function GET(request: NextRequest) {
 
       // If profile creation failed, log but don't block auth flow
       if (profileError) {
-        console.error('Error creating/updating profile:', profileError)
-        // Try to create profile with default role if upsert failed
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            user_id: sessionData.user.id,
-            role: 'member',
-          })
-          .select()
-          .maybeSingle()
-        
-        if (insertError && !insertError.message?.includes('duplicate')) {
-          console.error('Error creating profile with default role:', insertError)
+        // Only log in development to avoid exposing errors in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error creating/updating profile:', profileError)
         }
-      }
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError)
-        // Don't fail the auth flow if profile creation fails
+        
+        // Try to create profile with default role if upsert failed
+        // This handles cases where the profile doesn't exist yet
+        if (!profileError.message?.includes('duplicate') && 
+            !profileError.message?.includes('already exists')) {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: sessionData.user.id,
+              role: 'member',
+            })
+            .select()
+            .maybeSingle()
+          
+          if (insertError && process.env.NODE_ENV === 'development') {
+            console.error('Error creating profile with default role:', insertError)
+          }
+        }
+        // Don't fail the auth flow if profile creation fails - user can still proceed
       }
 
       // Check if this is an invited user who needs to set up a password
@@ -77,9 +81,20 @@ export async function GET(request: NextRequest) {
       // Redirect to home page
       return NextResponse.redirect(new URL(next, request.url))
     } else {
-      // Error confirming email
-      console.error('Error confirming email:', error)
-      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error?.message || 'Failed to confirm email')}`, request.url))
+      // Error confirming email - map to user-friendly message
+      const errorMessage = error?.message || 'Failed to confirm email'
+      const friendlyMessage = errorMessage.includes('expired') 
+        ? 'This confirmation link has expired. Please request a new one.'
+        : errorMessage.includes('invalid') || errorMessage.includes('Invalid')
+        ? 'Invalid confirmation link. Please check your email and try again.'
+        : 'Unable to confirm your email. Please try again or contact support.'
+      
+      // Only log detailed error in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error confirming email:', error)
+      }
+      
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(friendlyMessage)}`, request.url))
     }
   }
 

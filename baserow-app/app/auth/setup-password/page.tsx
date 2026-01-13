@@ -7,12 +7,15 @@ import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { validatePassword, getAuthErrorMessage, getRedirectUrl } from "@/lib/auth-utils"
 
 function SetupPasswordForm() {
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>("Marketing Hub")
   const [primaryColor, setPrimaryColor] = useState<string>("hsl(222.2, 47.4%, 11.2%)")
@@ -58,16 +61,20 @@ function SetupPasswordForm() {
     e.preventDefault()
     setLoading(true)
     setError(null)
+    setPasswordError(null)
+    setConfirmPasswordError(null)
 
-    // Validate passwords
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long')
+    // Validate password strength
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.valid) {
+      setPasswordError(passwordValidation.error || 'Invalid password')
       setLoading(false)
       return
     }
 
+    // Validate passwords match
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setConfirmPasswordError('Passwords do not match')
       setLoading(false)
       return
     }
@@ -89,27 +96,14 @@ function SetupPasswordForm() {
     })
 
     if (updateError) {
-      setError(updateError.message)
+      setError(getAuthErrorMessage(updateError))
       setLoading(false)
     } else {
       // Password set successfully, redirect to home
-      const next = searchParams.get('next') || '/'
-      
-      // Try to get first page to avoid redirect loop
-      if (!next || next === '/') {
-        try {
-          const response = await fetch('/api/interface-pages')
-          if (response.ok) {
-            const pages = await response.json()
-            if (pages && pages.length > 0) {
-              router.push(`/pages/${pages[0].id}`)
-              return
-            }
-          }
-        } catch {
-          // Fallback
-        }
-      }
+      const next = await getRedirectUrl(
+        searchParams.get('next'),
+        null
+      )
       
       // Use window.location for full page reload to ensure cookies are sent
       if (next && next !== '/login' && next !== '/') {
@@ -153,13 +147,29 @@ function SetupPasswordForm() {
                 autoComplete="new-password"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (passwordError) setPasswordError(null)
+                }}
+                onBlur={() => {
+                  if (password) {
+                    const validation = validatePassword(password)
+                    if (!validation.valid) {
+                      setPasswordError(validation.error || 'Invalid password')
+                    }
+                  }
+                }}
                 required
-                minLength={6}
+                minLength={8}
+                className={passwordError ? 'border-destructive' : ''}
               />
-              <p className="text-xs text-muted-foreground">
-                Must be at least 6 characters long
-              </p>
+              {passwordError ? (
+                <p className="text-xs text-destructive">{passwordError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 8 characters with uppercase, lowercase, numbers, or special characters
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label htmlFor="confirmPassword" className="text-sm font-medium">
@@ -172,10 +182,22 @@ function SetupPasswordForm() {
                 autoComplete="new-password"
                 placeholder="••••••••"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  if (confirmPasswordError) setConfirmPasswordError(null)
+                }}
+                onBlur={() => {
+                  if (confirmPassword && password && confirmPassword !== password) {
+                    setConfirmPasswordError('Passwords do not match')
+                  }
+                }}
                 required
-                minLength={6}
+                minLength={8}
+                className={confirmPasswordError ? 'border-destructive' : ''}
               />
+              {confirmPasswordError && (
+                <p className="text-xs text-destructive">{confirmPasswordError}</p>
+              )}
             </div>
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
