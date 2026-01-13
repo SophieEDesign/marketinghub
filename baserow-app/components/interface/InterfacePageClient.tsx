@@ -241,7 +241,8 @@ function InterfacePageClientInternal({
     // Only check when page is visible to avoid unnecessary requests
     const checkViewUpdates = async () => {
       // Skip check if page is hidden (tab in background)
-      if (document.hidden) return
+      // CRITICAL: Guard document access to prevent hydration issues
+      if (typeof document !== 'undefined' && document.hidden) return
       
       try {
         const supabase = createClient()
@@ -283,12 +284,15 @@ function InterfacePageClientInternal({
     viewCheckIntervalRef.current = setInterval(checkViewUpdates, 5000)
     
     // Also check when page becomes visible (user switches back to tab)
+    // CRITICAL: Guard document access to prevent hydration issues
     const handleVisibilityChange = () => {
-      if (!document.hidden && page?.saved_view_id) {
+      if (typeof document !== 'undefined' && !document.hidden && page?.saved_view_id) {
         checkViewUpdates()
       }
     }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
     
     // Cleanup interval and event listener on unmount or when saved_view_id changes
     return () => {
@@ -296,7 +300,9 @@ function InterfacePageClientInternal({
         clearInterval(viewCheckIntervalRef.current)
         viewCheckIntervalRef.current = null
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.saved_view_id])
@@ -473,9 +479,19 @@ function InterfacePageClientInternal({
       }
 
       // Ensure each record has an id field
+      // CRITICAL: Use a stable fallback for IDs to prevent hydration mismatches
+      // Only generate UUID on client-side, use a placeholder on server
+      const generateId = () => {
+        if (typeof window !== 'undefined' && typeof crypto !== 'undefined' && crypto.randomUUID) {
+          return crypto.randomUUID()
+        }
+        // Fallback for SSR or environments without crypto.randomUUID
+        // Use a deterministic placeholder that won't cause hydration issues
+        return `temp-${Math.random().toString(36).substring(2, 15)}`
+      }
       const records = (tableData || []).map((record: any) => ({
         ...record,
-        id: record.id || record.record_id || crypto.randomUUID(), // Ensure id exists
+        id: record.id || record.record_id || generateId(), // Ensure id exists
       }))
 
       setData(records)
@@ -767,6 +783,9 @@ function InterfacePageClientInternal({
     if (!page) {
       // CRITICAL: Return a placeholder object instead of null to prevent remounts
       // This ensures the component tree stays stable
+      // CRITICAL: Use stable timestamp values to prevent hydration mismatches
+      // Use a fixed date instead of new Date() which would differ between server/client
+      const stableTimestamp = '1970-01-01T00:00:00.000Z'
       return {
         id: '',
         name: '',
@@ -776,8 +795,8 @@ function InterfacePageClientInternal({
         base_table: null,
         group_id: null,
         order_index: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: stableTimestamp,
+        updated_at: stableTimestamp,
         created_by: null,
         is_admin_only: true,
         saved_view_id: null,

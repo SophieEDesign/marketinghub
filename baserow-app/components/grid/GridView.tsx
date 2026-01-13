@@ -4,6 +4,24 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import Cell from "./Cell"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
@@ -14,6 +32,7 @@ import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/f
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
 import { useIsMobile } from "@/hooks/useResponsive"
+import { createClient } from "@/lib/supabase/client"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -62,6 +81,68 @@ interface GridViewProps {
 
 const ITEMS_PER_PAGE = 100
 
+// Draggable column header component
+function DraggableColumnHeader({
+  fieldName,
+  tableField,
+  isVirtual,
+  onEdit,
+}: {
+  fieldName: string
+  tableField?: TableField
+  isVirtual: boolean
+  onEdit?: (fieldName: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: fieldName })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <th
+      ref={setNodeRef}
+      style={style}
+      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors"
+    >
+      <div className="flex items-center justify-between gap-2">
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex items-center justify-center w-4 h-full cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+        >
+          <GripVertical className="h-3 w-3" />
+        </div>
+        <span
+          onClick={() => onEdit?.(fieldName)}
+          className={`flex-1 ${onEdit ? 'cursor-pointer hover:text-blue-600' : ''}`}
+          title={tableField?.type === 'formula' && tableField?.options?.formula 
+            ? `Formula: ${tableField.options.formula}` 
+            : undefined}
+        >
+          {fieldName}
+          {isVirtual && (
+            <span className="ml-1 text-xs text-gray-400" title="Formula field">(fx)</span>
+          )}
+        </span>
+        {tableField?.required && (
+          <span className="text-red-500 text-xs ml-1">*</span>
+        )}
+      </div>
+    </th>
+  )
+}
+
 export default function GridView({
   tableId,
   viewId,
@@ -95,6 +176,15 @@ export default function GridView({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
   const [initializingFields, setInitializingFields] = useState(false)
+  const [columnOrder, setColumnOrder] = useState<string[]>([])
+
+  // Sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -175,17 +265,152 @@ export default function GridView({
     })
   }
 
-  // Get visible fields ordered by order_index (from table_fields) or position
-  const visibleFields = safeViewFields
-    .filter((f) => f && f.visible)
-    .map((vf) => {
-      const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
-      return {
-        ...vf,
-        order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+  // Load column order from grid_view_settings
+  useEffect(() => {
+    if (!viewId || safeTableFields.length === 0) return
+
+    async function loadColumnOrder() {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('grid_view_settings')
+          .select('column_order')
+          .eq('view_id', viewId)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading column order:', error)
+          return
+        }
+
+        if (data?.column_order && Array.isArray(data.column_order)) {
+          const allFieldNames = safeViewFields
+            .filter((f) => f && f.visible)
+            .map((f) => f.field_name)
+          
+          // Validate that all fields in order exist
+          if (data.column_order.every((name: string) => allFieldNames.includes(name))) {
+            // Add any missing fields to the end
+            const missingFields = allFieldNames.filter(name => !data.column_order.includes(name))
+            setColumnOrder([...data.column_order, ...missingFields])
+          } else {
+            // Invalid order, use default
+            initializeColumnOrder()
+          }
+        } else {
+          initializeColumnOrder()
+        }
+      } catch (error) {
+        console.error('Error loading column order:', error)
+        initializeColumnOrder()
       }
-    })
-    .sort((a, b) => a.order_index - b.order_index)
+    }
+
+    function initializeColumnOrder() {
+      const visibleFieldNames = safeViewFields
+        .filter((f) => f && f.visible)
+        .map((vf) => {
+          const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
+          return {
+            field_name: vf.field_name,
+            order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+          }
+        })
+        .sort((a, b) => a.order_index - b.order_index)
+        .map((f) => f.field_name)
+      
+      setColumnOrder(visibleFieldNames)
+    }
+
+    loadColumnOrder()
+  }, [viewId, safeViewFields, safeTableFields])
+
+  // Save column order to grid_view_settings
+  useEffect(() => {
+    if (!viewId || columnOrder.length === 0) return
+
+    async function saveColumnOrder() {
+      try {
+        const supabase = createClient()
+        const { data: existing } = await supabase
+          .from('grid_view_settings')
+          .select('id')
+          .eq('view_id', viewId)
+          .maybeSingle()
+
+        const settingsData = {
+          column_order: columnOrder,
+        }
+
+        if (existing) {
+          await supabase
+            .from('grid_view_settings')
+            .update(settingsData)
+            .eq('view_id', viewId)
+        } else {
+          await supabase
+            .from('grid_view_settings')
+            .insert([{
+              view_id: viewId,
+              ...settingsData,
+              column_widths: {},
+              column_wrap_text: {},
+              row_height: 'medium',
+              frozen_columns: 0,
+            }])
+        }
+      } catch (error) {
+        console.error('Error saving column order:', error)
+      }
+    }
+
+    // Debounce saves to avoid too many database calls
+    const timeoutId = setTimeout(saveColumnOrder, 500)
+    return () => clearTimeout(timeoutId)
+  }, [columnOrder, viewId])
+
+  // Get visible fields ordered by column order (if set) or by order_index
+  const visibleFields = useMemo(() => {
+    if (columnOrder.length > 0) {
+      // Use column order if available
+      return columnOrder
+        .map((fieldName) => {
+          const vf = safeViewFields.find((f) => f && f.field_name === fieldName && f.visible)
+          if (!vf) return null
+          const tableField = safeTableFields.find((tf) => tf.name === fieldName)
+          return {
+            ...vf,
+            order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+          }
+        })
+        .filter((f): f is NonNullable<typeof f> => f !== null)
+    }
+    
+    // Fallback to order_index sorting
+    return safeViewFields
+      .filter((f) => f && f.visible)
+      .map((vf) => {
+        const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
+        return {
+          ...vf,
+          order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+        }
+      })
+      .sort((a, b) => a.order_index - b.order_index)
+  }, [safeViewFields, safeTableFields, columnOrder])
+
+  // Handle column reorder
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string)
+        const newIndex = items.indexOf(over.id as string)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }, [])
 
   useEffect(() => {
     loadRows()
@@ -683,34 +908,23 @@ export default function GridView({
                 {imageField && (
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 sticky top-0 bg-gray-50 z-10"></th>
                 )}
-                {visibleFields.map((field) => {
-                  const tableField = safeTableFields.find(f => f.name === field.field_name)
-                  const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
-                  return (
-                    <th
-                      key={field.field_name}
-                      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span
-                          onClick={() => onEditField?.(field.field_name)}
-                          className={`flex-1 ${onEditField ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                          title={tableField?.type === 'formula' && tableField?.options?.formula 
-                            ? `Formula: ${tableField.options.formula}` 
-                            : undefined}
-                        >
-                          {field.field_name}
-                          {isVirtual && (
-                            <span className="ml-1 text-xs text-gray-400" title="Formula field">(fx)</span>
-                          )}
-                        </span>
-                        {tableField?.required && (
-                          <span className="text-red-500 text-xs ml-1">*</span>
-                        )}
-                      </div>
-                    </th>
-                  )
-                })}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={columnOrder.length > 0 ? columnOrder : visibleFields.map(f => f.field_name)} strategy={horizontalListSortingStrategy}>
+                    {visibleFields.map((field) => {
+                      const tableField = safeTableFields.find(f => f.name === field.field_name)
+                      const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                      return (
+                        <DraggableColumnHeader
+                          key={field.field_name}
+                          fieldName={field.field_name}
+                          tableField={tableField}
+                          isVirtual={isVirtual}
+                          onEdit={onEditField}
+                        />
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
               </tr>
             </thead>
             <tbody>

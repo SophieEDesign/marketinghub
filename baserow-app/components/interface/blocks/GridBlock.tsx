@@ -504,6 +504,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             modalFields={(config as any).modal_fields}
             appearance={{
               ...appearance,
+              show_toolbar: false, // Hide horizontal toolbar for blocks
               color_field: appearance.color_field,
               image_field: appearance.image_field,
               fit_image_size: appearance.fit_image_size,
