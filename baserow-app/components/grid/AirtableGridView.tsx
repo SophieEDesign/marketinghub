@@ -171,12 +171,36 @@ export default function AirtableGridView({
   const safeSorts = asArray<Sort>(sorts)
 
   // Get visible fields in order (needed for search filtering and rendering)
+  // CRITICAL: If columnOrder is empty, fall back to all fields sorted by order_index/position
   const visibleFields = useMemo(() => {
-    if (columnOrder.length === 0) return []
-    const safeColumnOrder = asArray(columnOrder)
+    // CRITICAL: Defensive guard - ensure safeFields is an array
+    if (!Array.isArray(safeFields) || safeFields.length === 0) {
+      return []
+    }
+
+    // If columnOrder is empty or invalid, use all fields sorted by order_index/position
+    if (!Array.isArray(columnOrder) || columnOrder.length === 0) {
+      // Sort fields by order_index, then by position, then by name
+      const sortedFields = [...safeFields].sort((a, b) => {
+        const aOrder = a.order_index ?? a.position ?? 0
+        const bOrder = b.order_index ?? b.position ?? 0
+        if (aOrder !== bOrder) return aOrder - bOrder
+        return (a.name || '').localeCompare(b.name || '')
+      })
+      return sortedFields.filter((f): f is TableField => f !== null && f !== undefined && !!f.name)
+    }
+
+    // Use columnOrder if available
+    const safeColumnOrder = asArray(columnOrder).filter((name): name is string => 
+      typeof name === 'string' && name.length > 0
+    )
+    
     return safeColumnOrder
-      .map((fieldName) => safeFields.find((f) => f.name === fieldName))
-      .filter((f): f is TableField => f !== undefined)
+      .map((fieldName) => {
+        const field = safeFields.find((f) => f && typeof f === 'object' && f.name === fieldName)
+        return field
+      })
+      .filter((f): f is TableField => f !== null && f !== undefined && !!f.name)
   }, [columnOrder, safeFields])
 
   // Filter rows by search query (only visible fields)
@@ -262,12 +286,39 @@ export default function AirtableGridView({
             setColumnWidths(data.column_widths as Record<string, number>)
           }
           if (data.column_order && Array.isArray(data.column_order)) {
-            const allFieldNames = safeFields.map((f) => f.name)
-            if (data.column_order.every((name: string) => allFieldNames.includes(name))) {
-              setColumnOrder(data.column_order)
+            // CRITICAL: Sanitize persisted column order - filter out null/undefined/empty strings
+            const sanitizedOrder = data.column_order
+              .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
+            
+            // Get current field names
+            const allFieldNames = Array.isArray(safeFields)
+              ? safeFields
+                  .filter((f) => f && typeof f === 'object' && f.name)
+                  .map((f) => f.name)
+                  .filter((name): name is string => typeof name === 'string' && name.length > 0)
+              : []
+            
+            // Validate that all fields in persisted order still exist
+            const validOrder = sanitizedOrder.filter(name => allFieldNames.includes(name))
+            
+            if (validOrder.length > 0 && validOrder.length === sanitizedOrder.length) {
+              // All fields in order are valid - use it
+              // Add any missing fields to the end
+              const missingFields = allFieldNames.filter(name => !validOrder.includes(name))
+              setColumnOrder([...validOrder, ...missingFields])
             } else {
+              // Some fields in order are stale - rebuild from current fields
               setColumnOrder(allFieldNames)
             }
+          } else if (Array.isArray(safeFields) && safeFields.length > 0) {
+            // No persisted order - initialize from fields
+            const sortedFields = [...safeFields].sort((a, b) => {
+              const aOrder = a.order_index ?? a.position ?? 0
+              const bOrder = b.order_index ?? b.position ?? 0
+              if (aOrder !== bOrder) return aOrder - bOrder
+              return (a.name || '').localeCompare(b.name || '')
+            })
+            setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
           }
           if (data.column_wrap_text && typeof data.column_wrap_text === 'object') {
             setColumnWrapText(data.column_wrap_text as Record<string, boolean>)
@@ -312,24 +363,55 @@ export default function AirtableGridView({
       if (savedOrder) {
         try {
           const order = JSON.parse(savedOrder)
-          const allFieldNames = safeFields.map((f) => f.name)
-          if (Array.isArray(order) && order.every((name: string) => allFieldNames.includes(name))) {
-            setColumnOrder(order)
+          // CRITICAL: Sanitize localStorage order
+          const sanitizedOrder = Array.isArray(order)
+            ? order.filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
+            : []
+          
+          const allFieldNames = Array.isArray(safeFields)
+            ? safeFields
+                .filter((f) => f && typeof f === 'object' && f.name)
+                .map((f) => f.name)
+                .filter((name): name is string => typeof name === 'string' && name.length > 0)
+            : []
+          
+          if (sanitizedOrder.length > 0 && sanitizedOrder.every((name: string) => allFieldNames.includes(name))) {
+            // All fields in order are valid - use it
+            // Add any missing fields to the end
+            const missingFields = allFieldNames.filter(name => !sanitizedOrder.includes(name))
+            setColumnOrder([...sanitizedOrder, ...missingFields])
           } else {
+            // Invalid order - rebuild from current fields
             setColumnOrder(allFieldNames)
           }
         } catch {
-          setColumnOrder(safeFields.map((f) => f.name))
+          // Fallback: initialize from fields
+          if (Array.isArray(safeFields) && safeFields.length > 0) {
+            const sortedFields = [...safeFields].sort((a, b) => {
+              const aOrder = a.order_index ?? a.position ?? 0
+              const bOrder = b.order_index ?? b.position ?? 0
+              if (aOrder !== bOrder) return aOrder - bOrder
+              return (a.name || '').localeCompare(b.name || '')
+            })
+            setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
+          } else {
+            setColumnOrder([])
+          }
         }
       } else {
-        // Sort fields by order_index, then by position, then by name
-        const sortedFields = [...safeFields].sort((a, b) => {
-          const aOrder = a.order_index ?? a.position ?? 0
-          const bOrder = b.order_index ?? b.position ?? 0
-          if (aOrder !== bOrder) return aOrder - bOrder
-          return a.name.localeCompare(b.name)
-        })
-        setColumnOrder(sortedFields.map((f) => f.name))
+        // No saved order - initialize from fields
+        if (Array.isArray(safeFields) && safeFields.length > 0) {
+          // Sort fields by order_index, then by position, then by name
+          const sortedFields = [...safeFields].sort((a, b) => {
+            const aOrder = a.order_index ?? a.position ?? 0
+            const bOrder = b.order_index ?? b.position ?? 0
+            if (aOrder !== bOrder) return aOrder - bOrder
+            return (a.name || '').localeCompare(b.name || '')
+          })
+          setColumnOrder(sortedFields.map((f) => f.name).filter((name): name is string => typeof name === 'string' && name.length > 0))
+        } else {
+          setColumnOrder([])
+        }
       }
       
       if (savedWrapText) {
