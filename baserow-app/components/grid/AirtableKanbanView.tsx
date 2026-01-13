@@ -742,15 +742,16 @@ function KanbanCard({ row, displayFields, tableFields, onClick, onEdit, canEdit 
     // Handle select fields with colored pills
     if (fullField.type === "single_select" || fullField.type === "multi_select") {
       const values = Array.isArray(value) ? value : [value]
+      const fieldType = fullField.type as 'single_select' | 'multi_select'
       return (
         <div className="flex flex-wrap gap-1.5">
           {values.map((val: string, idx: number) => {
             if (!val) return null
             const hexColor = resolveChoiceColor(
               val,
-              fullField.type,
+              fieldType,
               fullField.options,
-              fullField.type === 'single_select'
+              fieldType === 'single_select'
             )
             const bgColor = normalizeHexColor(hexColor)
             const textColorClass = getTextColorForBackground(bgColor)

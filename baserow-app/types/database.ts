@@ -18,6 +18,7 @@ export type FilterType =
   | 'date_after'
   | 'date_on_or_before'
   | 'date_on_or_after'
+  | 'date_range'
 
 export type SortDirection = 'asc' | 'desc'
 

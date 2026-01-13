@@ -8,6 +8,7 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
@@ -683,7 +684,7 @@ export default function ListView({
               filters={currentFilters.map((f, idx) => ({
                 id: `filter-${idx}`,
                 field_name: f.field,
-                operator: f.operator,
+                operator: f.operator as FilterType,
                 value: f.value,
               }))}
               onFiltersChange={handleFiltersChange}
@@ -769,7 +770,7 @@ export default function ListView({
               filters={currentFilters.map((f, idx) => ({
                 id: `filter-${idx}`,
                 field_name: f.field,
-                operator: f.operator,
+                operator: f.operator as FilterType,
                 value: f.value,
               }))}
               onFiltersChange={handleFiltersChange}
