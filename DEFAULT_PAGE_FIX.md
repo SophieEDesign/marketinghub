@@ -40,27 +40,40 @@ There was a mismatch in how pages were filtered for accessibility:
    - Go to Settings → Workspace tab
    - Check what page is selected as "Default Page at Login"
    - Note the page name and ID
+   - Click "Save Changes" to ensure it's saved
 
-2. **Run Diagnostic Query:**
-   - Execute `CHECK_DEFAULT_PAGE.sql` to verify:
-     - Default page ID is set in `workspace_settings`
-     - The page exists in `interface_pages` table
-     - The page is not admin-only (if you're not an admin)
-     - Foreign key constraint is correct
+2. **Run Comprehensive Diagnostic:**
+   - Execute `DIAGNOSE_DEFAULT_PAGE.sql` (recommended) or `CHECK_DEFAULT_PAGE.sql`
+   - This will show you:
+     - Whether workspace_settings exists and has a default_interface_id
+     - Whether the default page exists in interface_pages
+     - Whether the page is admin-only
+     - What the first accessible page is (fallback)
+     - RLS policies that might be blocking access
+     - Test queries to simulate what the code does
 
 3. **Test Login Flow:**
    - Log out and log back in
    - Check browser console (in development mode) for logs showing:
-     - `[Landing Page]` - workspace settings and validation
-     - `[validatePageAccess]` - page validation details
-     - `[Redirect]` - final redirect decision
-   - Verify you're redirected to the correct default page
+     - `[Landing Page]` - workspace settings query and validation results
+     - `[validatePageAccess]` - detailed page validation (which table checked, results)
+     - `[Redirect]` - final redirect decision and page ID
+   - Look for:
+     - `✓ Using workspace default page` - means default was found and used
+     - `✗ Workspace default page validation FAILED` - means default exists but validation failed
+     - `Using first accessible page (fallback)` - means default wasn't used
 
 4. **Check for Common Issues:**
    - **Page doesn't exist**: The default_interface_id points to a deleted page
+     - Fix: Set a new default page in Settings → Workspace
    - **Admin-only page**: Non-admin users can't access admin-only pages
-   - **Foreign key mismatch**: The constraint might reference the wrong table
+     - Fix: Either make the page non-admin-only or set a different default
    - **RLS policy blocking**: Row-level security might be preventing access
+     - Check: Run Step 5 of DIAGNOSE_DEFAULT_PAGE.sql to see RLS policies
+   - **Workspace settings not found**: No row in workspace_settings table
+     - Fix: Save workspace settings again in Settings → Workspace
+   - **Default page ID is NULL**: Settings exist but default_interface_id is null
+     - Fix: Select a default page in Settings → Workspace and save
 
 ## Files Modified
 

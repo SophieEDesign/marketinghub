@@ -333,8 +333,21 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       })
     }
     
-    if (!settingsError && workspaceSettings?.default_interface_id) {
+    if (settingsError) {
+      if (isDev) {
+        console.warn('[Landing Page] Error querying workspace_settings:', {
+          error: settingsError.message,
+          code: settingsError.code,
+          details: settingsError
+        })
+      }
+    } else if (workspaceSettings?.default_interface_id) {
       const workspaceDefaultPageId = workspaceSettings.default_interface_id
+      
+      if (isDev) {
+        console.log('[Landing Page] Found workspace default page ID:', workspaceDefaultPageId)
+      }
+      
       const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
       
       if (isDev) {
@@ -348,16 +361,25 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       
       if (validation.valid) {
         if (isDev) {
-          console.log('[Landing Page] Using workspace default page:', workspaceDefaultPageId)
+          console.log('[Landing Page] ✓ Using workspace default page:', workspaceDefaultPageId)
         }
         return { pageId: workspaceDefaultPageId, reason: 'workspace_default' }
       } else {
         if (isDev) {
-          console.warn('[Landing Page] Workspace default page invalid:', workspaceDefaultPageId, validation.reason)
+          console.error('[Landing Page] ✗ Workspace default page validation FAILED:', {
+            pageId: workspaceDefaultPageId,
+            reason: validation.reason,
+            userIsAdmin,
+            note: 'Will fall back to first accessible page'
+          })
         }
       }
-    } else if (isDev && workspaceSettings && !workspaceSettings.default_interface_id) {
-      console.log('[Landing Page] Workspace settings found but no default_interface_id set')
+    } else if (isDev) {
+      if (workspaceSettings && !workspaceSettings.default_interface_id) {
+        console.log('[Landing Page] Workspace settings found but no default_interface_id set')
+      } else {
+        console.log('[Landing Page] No workspace_settings row found')
+      }
     }
   } catch (error: any) {
     // Silently handle if column doesn't exist
@@ -372,8 +394,30 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
   }
   
   // Priority 3: Get first accessible interface page
+  // BUT: If workspace default was set but invalid, log a warning
   const accessiblePages = await getAccessibleInterfacePages()
   if (accessiblePages.length > 0) {
+    // Check if workspace default was set but failed validation
+    try {
+      const { data: workspaceSettings } = await supabase
+        .from('workspace_settings')
+        .select('default_interface_id')
+        .maybeSingle()
+      
+      if (workspaceSettings?.default_interface_id) {
+        // Workspace default was set but validation failed - this is a problem
+        if (isDev) {
+          console.warn('[Landing Page] WARNING: Workspace default page was set but validation failed:', {
+            defaultPageId: workspaceSettings.default_interface_id,
+            fallingBackTo: accessiblePages[0].id,
+            accessiblePagesCount: accessiblePages.length
+          })
+        }
+      }
+    } catch (error) {
+      // Ignore errors checking workspace settings
+    }
+    
     if (isDev) {
       console.log('[Landing Page] Using first accessible page:', accessiblePages[0].id, '(fallback)')
     }
