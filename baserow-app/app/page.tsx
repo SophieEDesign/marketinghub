@@ -4,6 +4,7 @@ import { isAdmin } from "@/lib/roles"
 import { resolveLandingPage } from "@/lib/interfaces"
 import { getAllInterfacePages } from "@/lib/interface/pages"
 import WorkspaceShellWrapper from "@/components/layout/WorkspaceShellWrapper"
+import { authErrorToMessage } from "@/lib/auth-utils"
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -18,9 +19,10 @@ export default async function HomePage({
   if (searchParams?.code) {
     const { error } = await supabase.auth.exchangeCodeForSession(searchParams.code)
     if (error) {
-      // If there's an error, redirect to login with error message
+      // If there's an error, redirect to login with user-friendly error message
+      const userFriendlyError = authErrorToMessage(error, 'emailConfirmation')
       const nextParam = searchParams.next ? `&next=${encodeURIComponent(searchParams.next)}` : ''
-      redirect(`/login?error=${encodeURIComponent(error.message)}${nextParam}`)
+      redirect(`/login?error=${encodeURIComponent(userFriendlyError)}${nextParam}`)
     }
     // After successful confirmation, continue with normal flow
   }

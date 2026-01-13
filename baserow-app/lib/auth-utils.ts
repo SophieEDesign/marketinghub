@@ -3,49 +3,111 @@
  */
 
 /**
- * Map Supabase auth errors to user-friendly messages
+ * Log auth error details in development mode only
+ * Never logs to console in production to avoid exposing sensitive information
  */
-export function getAuthErrorMessage(error: any): string {
-  if (!error) return 'An unexpected error occurred'
+function logAuthError(error: any, context?: string): void {
+  if (process.env.NODE_ENV === 'development') {
+    const contextMsg = context ? `[${context}] ` : ''
+    console.error(`${contextMsg}Auth error details:`, {
+      message: error?.message,
+      code: error?.code,
+      status: error?.status,
+      name: error?.name,
+      fullError: error,
+    })
+  }
+  // In production, errors should be logged to server logs if needed
+  // but never exposed to users or client console
+}
+
+/**
+ * Map Supabase auth errors to user-friendly messages
+ * 
+ * This function maps common Supabase authentication error codes and messages
+ * to user-friendly strings. Full error details are logged in development mode only.
+ * 
+ * @param error - The error object from Supabase auth operations
+ * @param context - Optional context string for logging (e.g., 'signIn', 'signUp')
+ * @returns User-friendly error message string
+ */
+export function authErrorToMessage(error: any, context?: string): string {
+  // Log full error details in development mode
+  logAuthError(error, context)
+  
+  if (!error) {
+    return 'An unexpected error occurred. Please try again.'
+  }
   
   const message = error.message || ''
   const code = error.code || error.status || ''
+  const errorString = String(message).toLowerCase()
   
-  // Map common Supabase auth errors to user-friendly messages
-  if (message.includes('Invalid login credentials') || 
-      message.includes('Invalid credentials') ||
-      message.includes('Email not confirmed')) {
-    return 'Invalid email or password. Please check your credentials and try again.'
+  // Map specific Supabase auth error codes first (most reliable)
+  // Check error code if available
+  if (code === 'invalid_login_credentials' || 
+      errorString.includes('invalid_login_credentials') ||
+      errorString.includes('invalid login credentials') ||
+      errorString.includes('invalid credentials')) {
+    return 'Email or password is incorrect.'
   }
   
-  if (message.includes('Email rate limit exceeded')) {
-    return 'Too many email requests. Please wait a few minutes before trying again.'
+  if (code === 'user_already_registered' ||
+      errorString.includes('user_already_registered') ||
+      errorString.includes('user already registered') ||
+      errorString.includes('already registered') ||
+      (errorString.includes('already exists') && errorString.includes('email'))) {
+    return 'An account already exists for this email.'
   }
   
-  if (message.includes('User already registered') || 
-      message.includes('already exists')) {
-    return 'An account with this email already exists. Please sign in instead.'
+  if (code === 'email_not_confirmed' ||
+      errorString.includes('email_not_confirmed') ||
+      errorString.includes('email not confirmed') ||
+      errorString.includes('email address not confirmed')) {
+    return 'Please confirm your email before signing in.'
   }
   
-  if (message.includes('Password should be at least')) {
+  if (code === 'too_many_requests' ||
+      errorString.includes('too_many_requests') ||
+      errorString.includes('too many requests') ||
+      errorString.includes('rate limit') ||
+      errorString.includes('email rate limit exceeded')) {
+    return 'Too many attempts. Try again shortly.'
+  }
+  
+  // Map other common error patterns (fallback for cases where code isn't set)
+  if (errorString.includes('password should be at least') ||
+      errorString.includes('password is too short')) {
     return 'Password is too short. Please use a stronger password.'
   }
   
-  if (message.includes('Invalid email')) {
+  if (errorString.includes('invalid email') ||
+      errorString.includes('email format')) {
     return 'Please enter a valid email address.'
   }
   
-  if (message.includes('Email not confirmed')) {
-    return 'Please check your email and confirm your account before signing in.'
-  }
-  
-  if (message.includes('Token has expired') || 
-      message.includes('expired')) {
+  if (errorString.includes('token has expired') ||
+      errorString.includes('session expired') ||
+      errorString.includes('jwt expired')) {
     return 'Your session has expired. Please sign in again.'
   }
   
-  // Generic fallback - don't expose internal error details
+  if (errorString.includes('network') ||
+      errorString.includes('fetch failed') ||
+      errorString.includes('connection')) {
+    return 'Network error. Please check your connection and try again.'
+  }
+  
+  // Generic fallback - never expose raw error details to users
   return 'Unable to sign in. Please check your credentials and try again.'
+}
+
+/**
+ * @deprecated Use authErrorToMessage instead for consistency
+ * This function is kept for backward compatibility but delegates to authErrorToMessage
+ */
+export function getAuthErrorMessage(error: any): string {
+  return authErrorToMessage(error, 'legacy')
 }
 
 /**
@@ -206,7 +268,7 @@ export async function waitForSession(
     subscription = authSubscription
 
     // Also check current session immediately (in case session is already established)
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }: { data: { user: any }, error: any }) => {
       if (resolved) return
       
       if (user) {

@@ -47,6 +47,11 @@ CREATE INDEX IF NOT EXISTS idx_views_is_admin_only ON public.views(is_admin_only
 
 -- 5. Create helper function to check if a user is an admin
 -- This function checks the profiles table to determine if a user has admin role
+-- Drop any existing versions first to avoid function signature conflicts
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin(uuid) CASCADE;
+
+-- Create function with optional parameter (defaults to current user if not provided)
 CREATE OR REPLACE FUNCTION public.is_admin(uid uuid DEFAULT auth.uid())
 RETURNS boolean
 LANGUAGE plpgsql
@@ -70,12 +75,17 @@ $$;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist (idempotent)
+-- Drop all possible policy names that might exist from previous migrations
 DROP POLICY IF EXISTS "Users can read their own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can read all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can read all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Only admins can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile non-role fields" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can insert profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Only admins can insert profiles" ON public.profiles;
 
 -- SELECT: Users can read their own profile; admins can read all profiles
 CREATE POLICY "Users can read their own profile"
@@ -143,9 +153,12 @@ CREATE POLICY "Admins can insert profiles"
 ALTER TABLE public.workspace_settings ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies if they exist (idempotent)
+-- Drop all possible policy names that might exist from previous migrations
 DROP POLICY IF EXISTS "Users can read workspace settings" ON public.workspace_settings;
 DROP POLICY IF EXISTS "Admins can update workspace settings" ON public.workspace_settings;
+DROP POLICY IF EXISTS "Only admins can update workspace settings" ON public.workspace_settings;
 DROP POLICY IF EXISTS "Admins can insert workspace settings" ON public.workspace_settings;
+DROP POLICY IF EXISTS "Only admins can insert workspace settings" ON public.workspace_settings;
 
 -- All authenticated users can read workspace settings (needed for branding on login page)
 CREATE POLICY "Users can read workspace settings"

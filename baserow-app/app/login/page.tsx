@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
-  getAuthErrorMessage, 
+  authErrorToMessage,
+  getAuthErrorMessage, // Deprecated, but kept for backward compatibility
   getRedirectUrl, 
   validateEmail, 
   validatePassword,
@@ -54,6 +55,7 @@ function LoginForm() {
   }, [])
   
   // Check for error message from URL (e.g., from email confirmation failure)
+  // Error messages from URL are already user-friendly (mapped by authErrorToMessage)
   useEffect(() => {
     const errorParam = searchParams.get('error')
     if (errorParam) {
@@ -111,7 +113,7 @@ function LoginForm() {
     })
 
     if (error) {
-      setError(getAuthErrorMessage(error))
+      setError(authErrorToMessage(error, 'signIn'))
       setLoading(false)
     } else {
       // Wait for session using auth state listener, then redirect
@@ -156,7 +158,7 @@ function LoginForm() {
     })
 
     if (error) {
-      setError(getAuthErrorMessage(error))
+      setError(authErrorToMessage(error, 'signUp'))
       setLoading(false)
     } else {
       // For sign up, user may need to confirm email first

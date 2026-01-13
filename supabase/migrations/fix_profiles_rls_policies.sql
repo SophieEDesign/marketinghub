@@ -1,9 +1,18 @@
 -- Migration: Fix overly permissive RLS policies on profiles table
 -- This ensures only admins can update profiles, not all authenticated users
 
--- 1. Create a function to check if a user is an admin
--- This function checks the profiles table to determine if the current user has admin role
-CREATE OR REPLACE FUNCTION public.is_admin()
+-- 1. Ensure is_admin function exists with the correct signature
+-- This function should already exist from add_profiles_and_branding.sql
+-- We need to drop any conflicting versions and ensure only one signature exists
+-- The function accepts an optional uid parameter (defaults to current user)
+
+-- Drop all possible versions of is_admin to avoid ambiguity
+DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_admin(uuid) CASCADE;
+
+-- Create function with optional parameter (matches add_profiles_and_branding.sql)
+-- This is the canonical version that should be used everywhere
+CREATE OR REPLACE FUNCTION public.is_admin(uid uuid DEFAULT auth.uid())
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -12,10 +21,10 @@ AS $$
 DECLARE
   user_role text;
 BEGIN
-  -- Get the current user's role from profiles table
+  -- Get the user's role from profiles table
   SELECT role INTO user_role
   FROM public.profiles
-  WHERE user_id = auth.uid();
+  WHERE user_id = uid;
   
   -- Return true if role is 'admin', false otherwise
   RETURN COALESCE(user_role = 'admin', false);
@@ -23,64 +32,32 @@ END;
 $$;
 
 -- 2. Drop existing overly permissive policies
+-- Drop all possible policy names that might exist from previous migrations
 DROP POLICY IF EXISTS "Admins can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Only admins can update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile non-role fields" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can insert profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Only admins can insert profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 
--- 3. Create proper RLS policies that check admin role at database level
--- Only admins can update profiles (including role changes)
-CREATE POLICY "Only admins can update profiles"
-  ON public.profiles
-  FOR UPDATE
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
-
--- Only admins can insert new profiles
-CREATE POLICY "Only admins can insert profiles"
-  ON public.profiles
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
-
--- Note: The SELECT policies remain unchanged as they allow users to read their own profile
--- and all profiles (needed for role checking). These are safe as they don't allow modifications.
+-- 3. Note: This migration drops old policies but does NOT create new ones
+-- The add_profiles_and_branding.sql migration creates the final hardened policies
+-- with proper role escalation prevention (trigger + RLS). This migration just
+-- ensures the is_admin() function exists and drops old overly-permissive policies.
 
 -- 4. Fix workspace_settings RLS policies similarly
--- Create function to check admin for workspace settings
-CREATE OR REPLACE FUNCTION public.is_admin_for_workspace()
-RETURNS boolean
-LANGUAGE plpgsql
-SECURITY DEFINER
-STABLE
-AS $$
-DECLARE
-  user_role text;
-BEGIN
-  SELECT role INTO user_role
-  FROM public.profiles
-  WHERE user_id = auth.uid();
-  
-  RETURN COALESCE(user_role = 'admin', false);
-END;
-$$;
+-- Use the existing is_admin() function instead of creating a duplicate
+-- Drop the duplicate function if it exists
+DROP FUNCTION IF EXISTS public.is_admin_for_workspace();
 
 -- Drop existing overly permissive policies
+-- Drop all possible policy names that might exist from previous migrations
 DROP POLICY IF EXISTS "Admins can update workspace settings" ON public.workspace_settings;
+DROP POLICY IF EXISTS "Only admins can update workspace settings" ON public.workspace_settings;
 DROP POLICY IF EXISTS "Admins can insert workspace settings" ON public.workspace_settings;
+DROP POLICY IF EXISTS "Only admins can insert workspace settings" ON public.workspace_settings;
 
--- Create proper RLS policies for workspace settings
-CREATE POLICY "Only admins can update workspace settings"
-  ON public.workspace_settings
-  FOR UPDATE
-  TO authenticated
-  USING (public.is_admin_for_workspace())
-  WITH CHECK (public.is_admin_for_workspace());
-
-CREATE POLICY "Only admins can insert workspace settings"
-  ON public.workspace_settings
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin_for_workspace());
-
--- Note: SELECT policy remains unchanged - all authenticated users can read workspace settings
--- (needed for branding display on login page)
+-- Note: This migration drops old policies but does NOT create new ones
+-- The add_profiles_and_branding.sql migration creates the final hardened policies
+-- for workspace_settings with proper admin checks.

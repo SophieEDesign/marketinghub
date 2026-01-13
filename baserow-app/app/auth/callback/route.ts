@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { authErrorToMessage } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -81,18 +82,8 @@ export async function GET(request: NextRequest) {
       // Redirect to home page
       return NextResponse.redirect(new URL(next, request.url))
     } else {
-      // Error confirming email - map to user-friendly message
-      const errorMessage = error?.message || 'Failed to confirm email'
-      const friendlyMessage = errorMessage.includes('expired') 
-        ? 'This confirmation link has expired. Please request a new one.'
-        : errorMessage.includes('invalid') || errorMessage.includes('Invalid')
-        ? 'Invalid confirmation link. Please check your email and try again.'
-        : 'Unable to confirm your email. Please try again or contact support.'
-      
-      // Only log detailed error in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error confirming email:', error)
-      }
+      // Error confirming email - use centralized error mapping
+      const friendlyMessage = authErrorToMessage(error, 'emailConfirmation')
       
       return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(friendlyMessage)}`, request.url))
     }

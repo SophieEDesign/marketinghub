@@ -240,6 +240,57 @@ export default function TimelineView({
     return tableFields.find(f => f.type === 'single_select' || f.type === 'multi_select') || null
   }, [colorField, blockConfig, viewConfig, tableFields])
 
+  // Resolve date_from and date_to fields from block config, props, or auto-detect
+  // This must be defined before resolvedCardFields since it's used there
+  const resolvedDateFields = useMemo(() => {
+    // Resolve date_from field (default/primary): block config > props > auto-detect
+    const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.timeline_date_field
+    let resolvedFromField = blockFromField
+      ? tableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
+      : null
+    
+    // Auto-detect date_from field if not configured
+    if (!resolvedFromField && !startDateFieldId) {
+      resolvedFromField = tableFields.find(f => 
+        f.type === 'date' && (
+          f.name.toLowerCase() === 'date_from' || 
+          f.name.toLowerCase() === 'from_date' ||
+          f.name.toLowerCase() === 'start_date' ||
+          f.name.toLowerCase().includes('date_from') ||
+          f.name.toLowerCase().includes('from_date')
+        )
+      )
+    }
+    
+    const actualFromFieldName = resolvedFromField?.name || startDateFieldId || dateFieldId || null
+    
+    // Resolve date_to field (secondary/range): block config > props > auto-detect
+    const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field
+    let resolvedToField = blockToField
+      ? tableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
+      : null
+    
+    // Auto-detect date_to field if not configured
+    if (!resolvedToField && !endDateFieldId) {
+      resolvedToField = tableFields.find(f => 
+        f.type === 'date' && (
+          f.name.toLowerCase() === 'date_to' || 
+          f.name.toLowerCase() === 'to_date' ||
+          f.name.toLowerCase() === 'end_date' ||
+          f.name.toLowerCase().includes('date_to') ||
+          f.name.toLowerCase().includes('to_date')
+        )
+      )
+    }
+    
+    const actualToFieldName = resolvedToField?.name || endDateFieldId || null
+    
+    return {
+      fromFieldName: actualFromFieldName,
+      toFieldName: actualToFieldName,
+    }
+  }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, tableFields])
+
   // Resolve card field configuration
   const resolvedCardFields = useMemo(() => {
     // Get date field names to exclude from card fields
@@ -356,56 +407,6 @@ export default function TimelineView({
         blockConfig?.appearance?.card_wrap_title ||
         false
   }, [wrapTitleProp, blockConfig])
-
-  // Resolve date_from and date_to fields from block config, props, or auto-detect
-  const resolvedDateFields = useMemo(() => {
-    // Resolve date_from field (default/primary): block config > props > auto-detect
-    const blockFromField = blockConfig?.date_from || blockConfig?.from_date_field || blockConfig?.start_date_field || blockConfig?.timeline_date_field
-    let resolvedFromField = blockFromField
-      ? tableFields.find(f => (f.name === blockFromField || f.id === blockFromField) && f.type === 'date')
-      : null
-    
-    // Auto-detect date_from field if not configured
-    if (!resolvedFromField && !startDateFieldId) {
-      resolvedFromField = tableFields.find(f => 
-        f.type === 'date' && (
-          f.name.toLowerCase() === 'date_from' || 
-          f.name.toLowerCase() === 'from_date' ||
-          f.name.toLowerCase() === 'start_date' ||
-          f.name.toLowerCase().includes('date_from') ||
-          f.name.toLowerCase().includes('from_date')
-        )
-      )
-    }
-    
-    const actualFromFieldName = resolvedFromField?.name || startDateFieldId || dateFieldId || null
-    
-    // Resolve date_to field (secondary/range): block config > props > auto-detect
-    const blockToField = blockConfig?.date_to || blockConfig?.to_date_field || blockConfig?.end_date_field
-    let resolvedToField = blockToField
-      ? tableFields.find(f => (f.name === blockToField || f.id === blockToField) && f.type === 'date')
-      : null
-    
-    // Auto-detect date_to field if not configured
-    if (!resolvedToField && !endDateFieldId) {
-      resolvedToField = tableFields.find(f => 
-        f.type === 'date' && (
-          f.name.toLowerCase() === 'date_to' || 
-          f.name.toLowerCase() === 'to_date' ||
-          f.name.toLowerCase() === 'end_date' ||
-          f.name.toLowerCase().includes('date_to') ||
-          f.name.toLowerCase().includes('to_date')
-        )
-      )
-    }
-    
-    const actualToFieldName = resolvedToField?.name || endDateFieldId || null
-    
-    return {
-      fromFieldName: actualFromFieldName,
-      toFieldName: actualToFieldName,
-    }
-  }, [blockConfig, startDateFieldId, endDateFieldId, dateFieldId, tableFields])
 
   // Convert rows to timeline events
   const events = useMemo<TimelineEvent[]>(() => {

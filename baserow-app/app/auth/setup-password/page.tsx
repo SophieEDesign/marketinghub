@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { validatePassword, getAuthErrorMessage, getRedirectUrl } from "@/lib/auth-utils"
+import { validatePassword, authErrorToMessage, getAuthErrorMessage, getRedirectUrl } from "@/lib/auth-utils"
 
 function SetupPasswordForm() {
   const [password, setPassword] = useState("")
@@ -96,7 +96,7 @@ function SetupPasswordForm() {
     })
 
     if (updateError) {
-      setError(getAuthErrorMessage(updateError))
+      setError(authErrorToMessage(updateError, 'setupPassword'))
       setLoading(false)
     } else {
       // Password set successfully, redirect to home
