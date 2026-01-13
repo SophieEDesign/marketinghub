@@ -48,6 +48,7 @@ import RecordDrawer from "./RecordDrawer"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
 interface AirtableKanbanViewProps {
   tableId: string
@@ -465,8 +466,8 @@ export default function AirtableKanbanView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-full bg-gray-50 overflow-x-auto">
-          <div className="flex gap-4 p-4 min-w-max h-full">
+        <div className="h-full bg-white overflow-x-auto">
+          <div className="flex gap-4 p-6 min-w-max h-full">
             {columns.map((column) => {
               const columnRows = groupedRows[column.id] || []
               const isCollapsed = collapsedColumns.has(column.id)
@@ -487,6 +488,7 @@ export default function AirtableKanbanView({
                     setEditingCard({ rowId, fieldName })
                     setCardValue(String(value || ""))
                   }}
+                  tableFields={tableFields}
                 />
               )
             })}
@@ -494,7 +496,7 @@ export default function AirtableKanbanView({
         </div>
         <DragOverlay>
           {activeId ? (
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 w-64">
+            <div className="bg-white rounded-lg shadow-xl border-2 border-blue-300 p-4 w-64 opacity-95">
               <div className="text-sm font-medium text-gray-900">Moving card...</div>
             </div>
           ) : null}
@@ -558,6 +560,7 @@ interface KanbanColumnProps {
   canEdit: boolean
   onCardClick: (row: Record<string, any>) => void
   onCardEdit: (rowId: string, fieldName: string, value: any) => void
+  tableFields: TableField[]
 }
 
 function KanbanColumn({
@@ -571,6 +574,7 @@ function KanbanColumn({
   canEdit,
   onCardClick,
   onCardEdit,
+  tableFields,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: `column-${column.id}`,
@@ -580,33 +584,55 @@ function KanbanColumn({
     },
   })
 
+  // Get column color from group field if it's a select field
+  const getColumnColor = () => {
+    if (groupField.type === 'single_select' || groupField.type === 'multi_select') {
+      const hexColor = resolveChoiceColor(
+        column.id,
+        groupField.type,
+        groupField.options,
+        groupField.type === 'single_select'
+      )
+      return normalizeHexColor(hexColor)
+    }
+    return null
+  }
+
+  const columnColor = getColumnColor()
+  const textColorClass = columnColor ? getTextColorForBackground(columnColor) : 'text-gray-900'
+
   return (
     <div
       ref={setNodeRef}
-      className="flex-shrink-0 w-80 bg-gray-100 rounded-lg flex flex-col h-full max-h-full"
+      className="flex-shrink-0 w-80 bg-gray-50 rounded-lg flex flex-col h-full max-h-full border border-gray-200"
       data-column-id={column.id}
     >
       {/* Column Header */}
-      <div className="p-3 bg-white rounded-t-lg border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+      <div className="p-3 flex items-center justify-between flex-shrink-0 border-b border-gray-200">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 flex-1 text-left hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1"
+          className="flex items-center gap-2 flex-1 text-left hover:opacity-90 rounded px-2 py-1 -mx-2 -my-1 transition-opacity"
         >
           {isCollapsed ? (
             <ChevronRight className="h-4 w-4 text-gray-500" />
           ) : (
             <ChevronDown className="h-4 w-4 text-gray-500" />
           )}
-          <span className="font-semibold text-sm text-gray-900">{column.name}</span>
-          <span className="text-xs text-gray-500 ml-auto">{rows.length}</span>
+          <span
+            className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold ${textColorClass}`}
+            style={columnColor ? { backgroundColor: columnColor } : { backgroundColor: '#9CA3AF' }}
+          >
+            {column.name}
+            <span className={`${textColorClass} font-normal`}>{rows.length}</span>
+          </span>
         </button>
       </div>
 
       {/* Cards */}
       {!isCollapsed && (
-        <div className="flex-1 px-2 py-2 overflow-y-auto min-h-0">
+        <div className="flex-1 px-3 py-3 overflow-y-auto min-h-0">
           <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {rows.length === 0 ? (
                 <div className="text-center py-8 text-gray-400 text-sm">
                   Drop cards here
@@ -617,6 +643,7 @@ function KanbanColumn({
                     key={row.id}
                     row={row}
                     displayFields={displayFields}
+                    tableFields={tableFields}
                     onClick={() => onCardClick(row)}
                     onEdit={onCardEdit}
                     canEdit={canEdit}
@@ -630,15 +657,15 @@ function KanbanColumn({
 
       {/* Add Card Button */}
       {!isCollapsed && canEdit && (
-        <div className="p-2 border-t border-gray-200 flex-shrink-0">
+        <div className="px-3 py-2 border-t border-gray-200 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
             onClick={onAddCard}
-            className="w-full text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+            className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-lg"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Card
+            Add element
           </Button>
         </div>
       )}
@@ -649,12 +676,13 @@ function KanbanColumn({
 interface KanbanCardProps {
   row: Record<string, any>
   displayFields: TableField[]
+  tableFields: TableField[]
   onClick: () => void
   onEdit: (rowId: string, fieldName: string, value: any) => void
   canEdit: boolean
 }
 
-function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCardProps) {
+function KanbanCard({ row, displayFields, tableFields, onClick, onEdit, canEdit }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.id,
     disabled: !canEdit,
@@ -670,6 +698,13 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
   const primaryValue = primaryField ? row[primaryField.name] : null
   const otherFields = (Array.isArray(displayFields) ? displayFields : []).slice(1)
 
+  // Helper to get full field definition (with options) from tableFields
+  const getFullField = (field: TableField): TableField => {
+    if (!field || !tableFields) return field
+    const fullField = tableFields.find(f => f.id === field.id || f.name === field.name)
+    return fullField || field
+  }
+
   // Format field values based on type
   const formatValue = (field: TableField, value: any): string => {
     if (value === null || value === undefined || value === "") return "—"
@@ -678,7 +713,7 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
       if (!value) return "—"
       try {
         const date = new Date(value)
-        return date.toLocaleDateString()
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
       } catch {
         return String(value)
       }
@@ -695,39 +730,101 @@ function KanbanCard({ row, displayFields, onClick, onEdit, canEdit }: KanbanCard
     return String(value)
   }
 
+  // Render field value with appropriate styling
+  const renderFieldValue = (field: TableField, value: any) => {
+    if (!field || value === null || value === undefined || value === "") {
+      return <span className="text-gray-400">—</span>
+    }
+
+    // Get full field definition with options
+    const fullField = getFullField(field)
+
+    // Handle select fields with colored pills
+    if (fullField.type === "single_select" || fullField.type === "multi_select") {
+      const values = Array.isArray(value) ? value : [value]
+      return (
+        <div className="flex flex-wrap gap-1.5">
+          {values.map((val: string, idx: number) => {
+            if (!val) return null
+            const hexColor = resolveChoiceColor(
+              val,
+              fullField.type,
+              fullField.options,
+              fullField.type === 'single_select'
+            )
+            const bgColor = normalizeHexColor(hexColor)
+            const textColorClass = getTextColorForBackground(bgColor)
+            
+            return (
+              <span
+                key={idx}
+                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${textColorClass}`}
+                style={{ backgroundColor: bgColor }}
+              >
+                {val}
+              </span>
+            )
+          })}
+        </div>
+      )
+    }
+
+    // Handle date fields with "Date" or "Date Due" prefix
+    if (fullField.type === "date") {
+      const formattedDate = formatValue(fullField, value)
+      const isDueDate = fullField.name.toLowerCase().includes('due')
+      return (
+        <span className="text-gray-700">
+          {isDueDate ? 'Date Due ' : 'Date '}
+          <span className="font-medium">{formattedDate}</span>
+        </span>
+      )
+    }
+
+    // Handle checkbox
+    if (fullField.type === "checkbox") {
+      return value ? (
+        <span className="text-green-600 font-semibold">✓</span>
+      ) : (
+        <span className="text-gray-400">—</span>
+      )
+    }
+
+    // Default text display
+    return <span className="text-gray-900">{formatValue(fullField, value)}</span>
+  }
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg"
+      className="cursor-pointer hover:shadow-lg transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm"
       onClick={onClick}
     >
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         <div className="flex items-start gap-2">
           {canEdit && (
             <div
               {...attributes}
               {...listeners}
-              className="mt-0.5 cursor-grab active:cursor-grabbing flex-shrink-0"
+              className="mt-0.5 cursor-grab active:cursor-grabbing flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
-          <div className="flex-1 space-y-1.5 min-w-0">
+          <div className="flex-1 space-y-2.5 min-w-0">
             {primaryField && (
-              <div className="font-medium text-sm text-gray-900 break-words">
-                {formatValue(primaryField, primaryValue) || "Untitled"}
+              <div className="font-semibold text-sm text-gray-900 break-words leading-tight">
+                {formatValue(primaryField, primaryValue) || "Unnamed content"}
               </div>
             )}
             {otherFields.map((field) => {
               if (!field || !field.name) return null
               const value = row[field.name]
-              const formattedValue = formatValue(field, value)
               
               return (
-                <div key={field.name} className="text-xs text-gray-600 break-words">
-                  <span className="text-gray-500 font-medium">{field.name}:</span>{" "}
-                  <span className="text-gray-700">{formattedValue}</span>
+                <div key={field.name} className="text-xs break-words">
+                  {renderFieldValue(field, value)}
                 </div>
               )
             })}

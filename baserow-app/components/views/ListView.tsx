@@ -8,8 +8,11 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
+import { Button } from "@/components/ui/button"
+import GroupDialog from "../grid/GroupDialog"
+import FilterDialog from "../grid/FilterDialog"
 
 interface ListViewProps {
   tableId: string
@@ -51,6 +54,10 @@ export default function ListView({
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableName, setTableName] = useState<string | null>(null)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false)
+  const [currentGroupBy, setCurrentGroupBy] = useState<string | undefined>(groupBy)
+  const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(filters)
 
   // Load table name for record panel
   useEffect(() => {
@@ -70,11 +77,21 @@ export default function ListView({
     }
   }, [tableId, tableName])
 
+  // Update currentGroupBy when groupBy prop changes
+  useEffect(() => {
+    setCurrentGroupBy(groupBy)
+  }, [groupBy])
+
+  // Update currentFilters when filters prop changes
+  useEffect(() => {
+    setCurrentFilters(filters)
+  }, [filters])
+
   // Load rows
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, supabaseTableName, filters, sorts])
+  }, [tableId, supabaseTableName, currentFilters, sorts])
 
   async function loadRows() {
     if (!supabaseTableName) {
@@ -89,7 +106,7 @@ export default function ListView({
       let query = supabase.from(supabaseTableName).select("*")
 
       // Apply filters
-      filters.forEach((filter) => {
+      currentFilters.forEach((filter) => {
         const { field, operator, value } = filter
         switch (operator) {
           case 'equal':
@@ -165,15 +182,15 @@ export default function ListView({
 
   // Group rows if groupBy is set
   const groupedRows = useMemo(() => {
-    if (!groupBy) return { ungrouped: filteredRows }
+    if (!currentGroupBy) return { ungrouped: filteredRows }
 
-    const groupField = tableFields.find(f => f.name === groupBy || f.id === groupBy)
+    const groupField = tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy)
     if (!groupField) return { ungrouped: filteredRows }
 
     const groups: Record<string, Record<string, any>[]> = {}
 
     filteredRows.forEach((row) => {
-      const groupValue = row[groupBy] || 'Ungrouped'
+      const groupValue = row[currentGroupBy] || '(Empty)'
       const groupKey = String(groupValue)
       if (!groups[groupKey]) {
         groups[groupKey] = []
@@ -182,7 +199,78 @@ export default function ListView({
     })
 
     return groups
-  }, [filteredRows, groupBy, tableFields])
+  }, [filteredRows, currentGroupBy, tableFields])
+
+  // Handle group change
+  const handleGroupChange = useCallback(async (fieldName: string | null) => {
+    setCurrentGroupBy(fieldName || undefined)
+    
+    if (!viewId) {
+      // No viewId - just update local state
+      return
+    }
+
+    try {
+      const supabase = createClient()
+      const groupByValue = fieldName || null
+
+      // Update view config
+      const { data: viewData } = await supabase
+        .from("views")
+        .select("config")
+        .eq("id", viewId)
+        .single()
+
+      if (viewData) {
+        const config = (viewData.config as Record<string, any>) || {}
+        config.groupBy = groupByValue
+
+        await supabase
+          .from("views")
+          .update({ config })
+          .eq("id", viewId)
+      }
+    } catch (error) {
+      console.error("Error saving group setting:", error)
+    }
+  }, [viewId])
+
+  // Handle filters change
+  const handleFiltersChange = useCallback((newFilters: Array<{ id?: string; field_name: string; operator: any; value?: string }>) => {
+    const filterConfigs: FilterConfig[] = newFilters.map(f => ({
+      field: f.field_name,
+      operator: f.operator,
+      value: f.value || '',
+    }))
+    setCurrentFilters(filterConfigs)
+  }, [])
+
+  // Get visible fields for table display (title, subtitle, pill, meta fields)
+  const visibleFieldsForTable = useMemo(() => {
+    const fields: TableField[] = []
+    
+    if (titleField) {
+      const field = tableFields.find(f => f.name === titleField || f.id === titleField)
+      if (field) fields.push(field)
+    }
+    
+    subtitleFields.forEach(fieldName => {
+      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+      if (field) fields.push(field)
+    })
+    
+    pillFields.forEach(fieldName => {
+      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+      if (field) fields.push(field)
+    })
+    
+    metaFields.forEach(fieldName => {
+      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+      if (field) fields.push(field)
+    })
+    
+    return fields
+  }, [tableFields, titleField, subtitleFields, pillFields, metaFields])
 
   // Helper to get image from image field
   const getImageUrl = useCallback((row: Record<string, any>): string | null => {
@@ -408,73 +496,379 @@ export default function ListView({
   }
 
   // Render grouped or ungrouped
-  if (groupBy && Object.keys(groupedRows).length > 0 && 'ungrouped' in groupedRows === false) {
+  if (currentGroupBy && Object.keys(groupedRows).length > 0 && 'ungrouped' in groupedRows === false) {
+    const groupField = tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy)
+    const groupValue = currentGroupBy
+
     return (
-      <div className="h-full overflow-y-auto">
-        {Object.entries(groupedRows).map(([groupKey, groupRows]) => {
-          const isCollapsed = collapsedGroups.has(groupKey)
-          const groupField = tableFields.find(f => f.name === groupBy || f.id === groupBy)
+      <div className="h-full flex flex-col">
+        {/* Toolbar */}
+        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGroupDialogOpen(true)}
+            className="h-8"
+          >
+            <Group className="h-4 w-4 mr-2" />
+            Group
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilterDialogOpen(true)}
+            className="h-8"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+            {currentFilters.length > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                {currentFilters.length}
+              </span>
+            )}
+          </Button>
+        </div>
 
-          return (
-            <div key={groupKey} className="border-b border-gray-200 last:border-b-0">
-              {/* Group Header */}
-              <button
-                onClick={() => {
-                  setCollapsedGroups((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(groupKey)) {
-                      next.delete(groupKey)
-                    } else {
-                      next.add(groupKey)
-                    }
-                    return next
-                  })
-                }}
-                className="w-full flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                )}
-                <span className="font-medium text-gray-700">
-                  {groupKey === 'Ungrouped' ? 'Ungrouped' : String(groupKey)}
-                </span>
-                <span className="text-sm text-gray-500">({groupRows.length})</span>
-              </button>
+        {/* Grouped Content */}
+        <div className="flex-1 overflow-y-auto">
+          {Object.entries(groupedRows).map(([groupKey, groupRows]) => {
+            const isCollapsed = collapsedGroups.has(groupKey)
+            const groupDisplayValue = groupKey === '(Empty)' ? '(Empty)' : String(groupKey)
+            
+            // Get group color if it's a select field
+            let groupColor: string | null = null
+            if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+              groupColor = getPillColor(groupField, groupKey)
+            }
 
-              {/* Group Items */}
-              {!isCollapsed && (
-                <div>
-                  {groupRows.map((row) => renderListItem(row))}
+            return (
+              <div key={groupKey} className="border-b border-gray-200 last:border-b-0">
+                {/* Group Header */}
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <button
+                    onClick={() => {
+                      setCollapsedGroups((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(groupKey)) {
+                          next.delete(groupKey)
+                        } else {
+                          next.add(groupKey)
+                        }
+                        return next
+                      })
+                    }}
+                    className="flex items-center gap-2 text-left flex-1"
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium"
+                      style={{
+                        backgroundColor: groupColor ? `${groupColor}20` : undefined,
+                        color: groupColor || undefined,
+                        border: groupColor ? `1px solid ${groupColor}40` : undefined,
+                      }}
+                    >
+                      {groupDisplayValue}
+                    </span>
+                    <span className="text-sm text-gray-500 ml-2">{groupRows.length}</span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      // TODO: Implement add record functionality
+                      console.log('Add content to group:', groupKey)
+                    }}
+                    className="h-7 text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add content
+                  </Button>
                 </div>
-              )}
+
+                {/* Group Items - Table View */}
+                {!isCollapsed && (
+                  <div className="bg-white">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          {visibleFieldsForTable.map((field) => (
+                            <th
+                              key={field.name}
+                              className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
+                            >
+                              {field.name}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {groupRows.map((row) => {
+                          const recordId = row.id
+                          return (
+                            <tr
+                              key={recordId}
+                              onClick={() => handleRecordClick(recordId)}
+                              className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              {visibleFieldsForTable.map((field) => {
+                                const value = row[field.name]
+                                const formattedValue = formatFieldValue(field, value)
+                                
+                                // Render pills for select fields
+                                if ((field.type === 'single_select' || field.type === 'multi_select') && value) {
+                                  const values = Array.isArray(value) ? value : [value]
+                                  return (
+                                    <td key={field.name} className="px-4 py-2">
+                                      <div className="flex flex-wrap gap-1">
+                                        {values.map((v, idx) => {
+                                          const color = getPillColor(field, v)
+                                          return (
+                                            <span
+                                              key={idx}
+                                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                              style={{
+                                                backgroundColor: color ? `${color}20` : undefined,
+                                                color: color || undefined,
+                                                border: color ? `1px solid ${color}40` : undefined,
+                                              }}
+                                            >
+                                              {String(v)}
+                                            </span>
+                                          )
+                                        })}
+                                      </div>
+                                    </td>
+                                  )
+                                }
+                                
+                                return (
+                                  <td key={field.name} className="px-4 py-2 text-sm text-gray-900">
+                                    {formattedValue}
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Dialogs */}
+        {viewId ? (
+          <>
+            <GroupDialog
+              isOpen={groupDialogOpen}
+              onClose={() => setGroupDialogOpen(false)}
+              viewId={viewId}
+              tableFields={tableFields}
+              groupBy={currentGroupBy}
+              onGroupChange={handleGroupChange}
+            />
+            <FilterDialog
+              isOpen={filterDialogOpen}
+              onClose={() => setFilterDialogOpen(false)}
+              viewId={viewId}
+              tableFields={tableFields}
+              filters={currentFilters.map((f, idx) => ({
+                id: `filter-${idx}`,
+                field_name: f.field,
+                operator: f.operator,
+                value: f.value,
+              }))}
+              onFiltersChange={handleFiltersChange}
+            />
+          </>
+        ) : (groupDialogOpen || filterDialogOpen) && (
+          // Simple dialog for when there's no viewId
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md">
+              <h3 className="text-lg font-semibold mb-2">
+                {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
+              </p>
+              <Button onClick={() => {
+                setGroupDialogOpen(false)
+                setFilterDialogOpen(false)
+              }}>Close</Button>
             </div>
-          )
-        })}
+          </div>
+        )}
       </div>
     )
   }
 
   // Render ungrouped list
-  const rowsToRender = groupBy ? (groupedRows as { ungrouped: Record<string, any>[] }).ungrouped || [] : filteredRows
+  const rowsToRender = currentGroupBy ? (groupedRows as { ungrouped: Record<string, any>[] }).ungrouped || [] : filteredRows
 
   if (rowsToRender.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-        <div className="text-center">
-          <p className="mb-2">No records found</p>
-          {searchQuery && (
-            <p className="text-xs text-gray-400">Try adjusting your search or filters</p>
-          )}
+      <div className="h-full flex flex-col">
+        {/* Toolbar */}
+        <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGroupDialogOpen(true)}
+            className="h-8"
+          >
+            <Group className="h-4 w-4 mr-2" />
+            Group
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilterDialogOpen(true)}
+            className="h-8"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+            {currentFilters.length > 0 && (
+              <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                {currentFilters.length}
+              </span>
+            )}
+          </Button>
         </div>
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm p-4">
+          <div className="text-center">
+            <p className="mb-2">No records found</p>
+            {searchQuery && (
+              <p className="text-xs text-gray-400">Try adjusting your search or filters</p>
+            )}
+          </div>
+        </div>
+        {/* Dialogs */}
+        {viewId ? (
+          <>
+            <GroupDialog
+              isOpen={groupDialogOpen}
+              onClose={() => setGroupDialogOpen(false)}
+              viewId={viewId}
+              tableFields={tableFields}
+              groupBy={currentGroupBy}
+              onGroupChange={handleGroupChange}
+            />
+            <FilterDialog
+              isOpen={filterDialogOpen}
+              onClose={() => setFilterDialogOpen(false)}
+              viewId={viewId}
+              tableFields={tableFields}
+              filters={currentFilters.map((f, idx) => ({
+                id: `filter-${idx}`,
+                field_name: f.field,
+                operator: f.operator,
+                value: f.value,
+              }))}
+              onFiltersChange={handleFiltersChange}
+            />
+          </>
+        ) : (groupDialogOpen || filterDialogOpen) && (
+          // Simple dialog for when there's no viewId
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md">
+              <h3 className="text-lg font-semibold mb-2">
+                {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
+              </p>
+              <Button onClick={() => {
+                setGroupDialogOpen(false)
+                setFilterDialogOpen(false)
+              }}>Close</Button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      {rowsToRender.map((row) => renderListItem(row))}
+    <div className="h-full flex flex-col">
+      {/* Toolbar */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 border-b bg-white">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setGroupDialogOpen(true)}
+          className="h-8"
+        >
+          <Group className="h-4 w-4 mr-2" />
+          Group
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setFilterDialogOpen(true)}
+          className="h-8"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filter
+          {currentFilters.length > 0 && (
+            <span className="ml-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+              {currentFilters.length}
+            </span>
+          )}
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {rowsToRender.map((row) => renderListItem(row))}
+      </div>
+      {/* Dialogs */}
+      {viewId ? (
+        <>
+          <GroupDialog
+            isOpen={groupDialogOpen}
+            onClose={() => setGroupDialogOpen(false)}
+            viewId={viewId}
+            tableFields={tableFields}
+            groupBy={currentGroupBy}
+            onGroupChange={handleGroupChange}
+          />
+          <FilterDialog
+            isOpen={filterDialogOpen}
+            onClose={() => setFilterDialogOpen(false)}
+            viewId={viewId}
+            tableFields={tableFields}
+            filters={currentFilters.map((f, idx) => ({
+              id: `filter-${idx}`,
+              field_name: f.field,
+              operator: f.operator,
+              value: f.value,
+            }))}
+            onFiltersChange={handleFiltersChange}
+          />
+        </>
+      ) : (groupDialogOpen || filterDialogOpen) && (
+        // Simple dialog for when there's no viewId
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md">
+            <h3 className="text-lg font-semibold mb-2">
+              {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
+            </p>
+            <Button onClick={() => {
+              setGroupDialogOpen(false)
+              setFilterDialogOpen(false)
+            }}>Close</Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

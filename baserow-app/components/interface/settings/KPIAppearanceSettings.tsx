@@ -24,6 +24,28 @@ export default function KPIAppearanceSettings({
 
   return (
     <div className="space-y-4">
+      {/* Background Color */}
+      <div className="space-y-2">
+        <Label>Background Color</Label>
+        <Select
+          value={appearance.background || 'none'}
+          onValueChange={(value) => onUpdate({ background: value as 'none' | 'subtle' | 'tinted' | 'emphasised' })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">White</SelectItem>
+            <SelectItem value="tinted">Light Green</SelectItem>
+            <SelectItem value="emphasised">Light Pink</SelectItem>
+            <SelectItem value="subtle">Light Orange</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500">
+          Choose a background color for this KPI block
+        </p>
+      </div>
+
       {/* Number Format */}
       <div className="space-y-2">
         <Label>Number Format</Label>

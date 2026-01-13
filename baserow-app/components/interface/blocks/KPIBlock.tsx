@@ -118,12 +118,65 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
 
   // Apply appearance settings
   const appearance = config.appearance || {}
+  
+  // Map appearance.background to actual colors (KPI-specific color scheme)
+  const getBackgroundColor = () => {
+    // Custom background color takes precedence
+    if (appearance.background_color) return appearance.background_color
+    
+    // Map new Airtable-style background options to colors
+    switch (appearance.background) {
+      case 'tinted':
+        // Light green for tinted
+        return '#E8FFEA'
+      case 'emphasised':
+        // Light pink for emphasised
+        return '#FFE8EC'
+      case 'subtle':
+        // Light orange for subtle
+        return '#FFF3E0'
+      case 'none':
+      default:
+        // White background (default)
+        return '#FFFFFF'
+    }
+  }
+
+  // Get text color based on background (for completed/positive states)
+  const getTextColor = () => {
+    if (appearance.text_color) return appearance.text_color
+    if (appearance.title_color) return appearance.title_color
+    
+    // If background is white (none), use green for positive/completed state
+    const bgColor = getBackgroundColor()
+    if (bgColor === '#FFFFFF' || bgColor === 'white' || !bgColor) {
+      return '#166534' // Dark green for completed
+    }
+    return '#111827' // Dark grey/black for others
+  }
+
+  // Get border radius
+  const getBorderRadius = () => {
+    if (appearance.border_radius !== undefined) return `${appearance.border_radius}px`
+    if (appearance.radius === 'rounded') return '8px'
+    return '8px' // Default rounded
+  }
+
+  // Get padding
+  const getPadding = () => {
+    if (typeof appearance.padding === 'number') return `${appearance.padding}px`
+    if (appearance.padding === 'compact') return '12px'
+    if (appearance.padding === 'spacious') return '24px'
+    return '16px' // Default normal
+  }
+
   const blockStyle: React.CSSProperties = {
-    backgroundColor: appearance.background_color,
+    backgroundColor: getBackgroundColor(),
     borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
-    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : 
+                 (appearance.border === 'none' ? '0px' : appearance.border === 'card' ? '1px' : '1px'),
+    borderRadius: getBorderRadius(),
+    padding: getPadding(),
   }
 
   const displayLabel = appearance.title || label
@@ -135,9 +188,32 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
 
   const isClickable = clickThrough && !isEditing
 
+  // Get value size class
+  const getValueSizeClass = () => {
+    switch (appearance.value_size) {
+      case 'small': return 'text-2xl'
+      case 'medium': return 'text-3xl'
+      case 'xlarge': return 'text-5xl'
+      case 'large':
+      default: return 'text-4xl'
+    }
+  }
+
+  // Get alignment class
+  const getAlignmentClass = () => {
+    switch (appearance.alignment) {
+      case 'left': return 'text-left items-start'
+      case 'right': return 'text-right items-end'
+      case 'center':
+      default: return 'text-center items-center'
+    }
+  }
+
+  const textColor = getTextColor()
+
   return (
     <div 
-      className={`h-full w-full overflow-auto flex flex-col ${isClickable ? 'cursor-pointer' : ''}`}
+      className={`h-full w-full overflow-auto flex flex-col ${isClickable ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
       style={blockStyle}
       onClick={handleClick}
     >
@@ -146,17 +222,17 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
           className="mb-4 pb-2 border-b"
           style={{
             backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
+            color: appearance.header_text_color || textColor,
           }}
         >
           <h3 className="text-lg font-semibold">{displayLabel}</h3>
         </div>
       )}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="text-center w-full">
+      <div className={`flex-1 flex flex-col justify-center ${getAlignmentClass()}`}>
+        <div className={`w-full ${getAlignmentClass().includes('text-center') ? 'text-center' : getAlignmentClass().includes('text-left') ? 'text-left' : 'text-right'}`}>
           {!showTitle && (
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <p className="text-sm" style={{ color: appearance.title_color }}>
+            <div className={`flex items-center gap-2 mb-3 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
+              <p className="text-sm font-medium" style={{ color: textColor }}>
                 {displayLabel}
               </p>
               {hasFilters && isEditing && (
@@ -169,13 +245,13 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
               )}
             </div>
           )}
-          <p className="text-3xl font-bold mb-2" style={{ color: appearance.title_color || '#111827' }}>
+          <p className={`${getValueSizeClass()} font-bold mb-2`} style={{ color: textColor }}>
             {displayValue}
           </p>
           
           {/* Comparison indicator */}
           {comparisonData && comparisonData.change !== null && (
-            <div className="flex items-center justify-center gap-1 text-sm mb-1">
+            <div className={`flex items-center gap-1 text-sm mb-1 ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`}>
               {comparisonData.trend === 'up' ? (
                 <TrendingUp className="h-4 w-4 text-green-600" />
               ) : comparisonData.trend === 'down' ? (
@@ -194,7 +270,7 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
 
           {/* Target comparison */}
           {target !== undefined && target !== null && value !== null && (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs mt-1" style={{ color: textColor, opacity: 0.7 }}>
               Target: {typeof target === 'number' ? target.toLocaleString() : target}
               {typeof target === 'number' && (
                 <span className={value >= target ? ' text-green-600' : ' text-red-600'}>
@@ -205,14 +281,14 @@ export default function KPIBlock({ block, isEditing = false, pageTableId = null,
           )}
 
           {aggregate !== "count" && field && (
-            <p className="text-xs mt-1" style={{ color: appearance.title_color || '#6b7280' }}>
+            <p className="text-xs mt-1" style={{ color: textColor, opacity: 0.7 }}>
               {aggregate.toUpperCase()} of {field}
             </p>
           )}
 
           {/* Click-through hint */}
           {isClickable && (
-            <div className="mt-3 flex items-center justify-center gap-1 text-xs text-gray-400">
+            <div className={`mt-3 flex items-center gap-1 text-xs ${getAlignmentClass().includes('text-center') ? 'justify-center' : getAlignmentClass().includes('text-left') ? 'justify-start' : 'justify-end'}`} style={{ color: textColor, opacity: 0.6 }}>
               <span>Click to view records</span>
               <ArrowRight className="h-3 w-3" />
             </div>
