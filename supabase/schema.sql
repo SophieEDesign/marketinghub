@@ -74,6 +74,8 @@ CREATE TABLE IF NOT EXISTS public.workspace_settings (
   primary_color text,
   accent_color text,
   default_interface_id uuid,
+  sidebar_color text,
+  sidebar_text_color text,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
@@ -271,6 +273,20 @@ CREATE TABLE IF NOT EXISTS public.view_fields (
   CONSTRAINT view_fields_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
 );
 
+-- View Filter Groups: Groups of filters with AND/OR logic
+CREATE TABLE IF NOT EXISTS public.view_filter_groups (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  view_id uuid NOT NULL,
+  condition_type text NOT NULL DEFAULT 'AND'::text CHECK (condition_type = ANY (ARRAY['AND'::text, 'OR'::text])),
+  order_index integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  created_by uuid,
+  updated_by uuid,
+  CONSTRAINT view_filter_groups_pkey PRIMARY KEY (id),
+  CONSTRAINT view_filter_groups_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id)
+);
+
 -- View Filters: Filtering rules for views
 CREATE TABLE IF NOT EXISTS public.view_filters (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -278,6 +294,8 @@ CREATE TABLE IF NOT EXISTS public.view_filters (
   field_name text,
   operator text,
   value text,
+  filter_group_id uuid,
+  order_index integer NOT NULL DEFAULT 0,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
@@ -287,6 +305,7 @@ CREATE TABLE IF NOT EXISTS public.view_filters (
   archived_at timestamp with time zone,
   CONSTRAINT view_filters_pkey PRIMARY KEY (id),
   CONSTRAINT view_filters_view_id_fkey FOREIGN KEY (view_id) REFERENCES public.views(id),
+  CONSTRAINT view_filters_filter_group_id_fkey FOREIGN KEY (filter_group_id) REFERENCES public.view_filter_groups(id),
   CONSTRAINT view_filters_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id),
   CONSTRAINT view_filters_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES auth.users(id)
 );
@@ -416,7 +435,7 @@ CREATE TABLE IF NOT EXISTS public.interface_pages (
   dashboard_layout_id uuid,
   form_config_id uuid,
   record_config_id uuid,
-  is_admin_only boolean DEFAULT true,
+  is_admin_only boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
@@ -607,6 +626,9 @@ CREATE TABLE IF NOT EXISTS public.automations (
   conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
   enabled boolean DEFAULT true,
   status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'paused'::text])),
+  trigger_type text,
+  trigger_config jsonb DEFAULT '{}'::jsonb,
+  table_id uuid,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
@@ -622,7 +644,7 @@ CREATE TABLE IF NOT EXISTS public.automations (
 CREATE TABLE IF NOT EXISTS public.automation_runs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   automation_id uuid NOT NULL,
-  status text NOT NULL DEFAULT 'running'::text CHECK (status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'stopped'::text])),
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'stopped'::text, 'pending'::text])),
   error text,
   started_at timestamp with time zone NOT NULL DEFAULT now(),
   completed_at timestamp with time zone,
@@ -882,6 +904,179 @@ CREATE TABLE IF NOT EXISTS public.table_sponsorships_1766847842576 (
   campaigns text,
   contacts text,
   CONSTRAINT table_sponsorships_1766847842576_pkey PRIMARY KEY (id)
+);
+
+-- Table: Briefings (newer version)
+CREATE TABLE IF NOT EXISTS public.table_briefings_1768073365356 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  name text,
+  business_division text,
+  deadline timestamp with time zone,
+  type_of_content text,
+  story_subject_headline text,
+  priority text,
+  impact text,
+  target_audience text,
+  key_messages text,
+  whats_the_story text,
+  peters_may_spokesperson_quote text,
+  "3rd_party_spokesperson_quote_if_applicable" text,
+  contact_for_approval text,
+  email_from_contact_for_approval text,
+  contact_details_for_3rd_parties_and_partners text,
+  is_permission_approval_required_to_write_publish_the_content_fr boolean,
+  approval_process text[],
+  is_there_photography_video_content_or_other_collateral_to_suppo text,
+  do_we_need_permission_to_use_the_visuals_and_if_so_from_whom text,
+  will_you_want_the_content_repurposed_for_example_on_your_social boolean,
+  notes text[],
+  assignee text,
+  status text,
+  created text,
+  created_by_field text,
+  content_calendar text,
+  CONSTRAINT table_briefings_1768073365356_pkey PRIMARY KEY (id)
+);
+
+-- Table: Campaigns (newer version)
+CREATE TABLE IF NOT EXISTS public.table_campaigns_1768074134170 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  name text,
+  notes text[],
+  assignee text,
+  status text,
+  content text[],
+  sponsorships text,
+  content_calendar_from_sponsorships text[],
+  created text,
+  CONSTRAINT table_campaigns_1768074134170_pkey PRIMARY KEY (id)
+);
+
+-- Table: Contact (newer version)
+CREATE TABLE IF NOT EXISTS public.table_contact_1768073851531 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  name text,
+  first_name text,
+  last_name text,
+  publication text,
+  type text,
+  status text,
+  email text,
+  press_field text,
+  phone text,
+  mobile text,
+  job_title text,
+  team text,
+  responsible_for text,
+  notes text,
+  company text,
+  location text,
+  tasks text,
+  social_media_posts text[],
+  pr_tracker text[],
+  events text,
+  website text,
+  content_calendar text,
+  sponsorships text,
+  CONSTRAINT table_contact_1768073851531_pkey PRIMARY KEY (id)
+);
+
+-- Table: Content (newer version)
+CREATE TABLE IF NOT EXISTS public.table_content_1768242820540 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  content_name text,
+  content_type text,
+  created timestamp with time zone,
+  date timestamp with time zone,
+  date_to timestamp with time zone,
+  date_due timestamp with time zone,
+  month text,
+  year text,
+  category text,
+  notes_detail text,
+  channels text[],
+  content_post_text text,
+  twitter text,
+  instagram text,
+  linkedin text,
+  content_folder_canva text,
+  images jsonb,
+  post_originator_approve uuid,
+  status text,
+  schedule text,
+  last_modified_by text,
+  approved_by text,
+  image_approved text,
+  campaigns text,
+  created_by_field text,
+  track text,
+  sponsorships text,
+  website text,
+  logo text,
+  contacts text,
+  publication_from_contacts text,
+  priority text,
+  owner text,
+  documents text,
+  link_to_document text,
+  briefings text,
+  CONSTRAINT table_content_1768242820540_pkey PRIMARY KEY (id)
+);
+
+-- Table: Media
+CREATE TABLE IF NOT EXISTS public.table_media_1768074185692 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  name text,
+  notes text,
+  assignee text,
+  status text,
+  document text,
+  sponsorships text,
+  content_calendar text,
+  document_link text,
+  CONSTRAINT table_media_1768074185692_pkey PRIMARY KEY (id)
+);
+
+-- Table: Sponsorships (newer version)
+CREATE TABLE IF NOT EXISTS public.table_sponsorships_1768074191424 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  name text,
+  sponsorship_title text,
+  perks text,
+  notes text,
+  assignee text,
+  status text,
+  marketing_resources text[],
+  website text,
+  documents text[],
+  document_from_documents text,
+  documents_drive text,
+  last_modified text,
+  content_calendar text[],
+  campaigns text,
+  contacts text,
+  CONSTRAINT table_sponsorships_1768074191424_pkey PRIMARY KEY (id)
+);
+
+-- Table: Strategy
+CREATE TABLE IF NOT EXISTS public.table_strategy_1768299847719 (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  theme text,
+  CONSTRAINT table_strategy_1768299847719_pkey PRIMARY KEY (id)
 );
 
 -- ============================================================================

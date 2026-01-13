@@ -226,7 +226,7 @@ export interface BlockConfig {
 
 export interface BlockFilter {
   field: string
-  operator: 'equal' | 'not_equal' | 'contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty'
+  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty'
   value: any
 }
 

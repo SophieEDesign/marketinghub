@@ -522,7 +522,10 @@ export default function ListDataSettings({
                     value={filter.operator || 'equal'}
                     onValueChange={(value) => {
                       const updated = [...blockFilters]
-                      updated[index] = { ...updated[index], operator: value }
+                      updated[index] = { 
+                        ...updated[index], 
+                        operator: value as 'equal' | 'not_equal' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty'
+                      }
                       onUpdate({ filters: updated })
                     }}
                   >

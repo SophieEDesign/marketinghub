@@ -607,73 +607,10 @@ export default function ListView({
                   </Button>
                 </div>
 
-                {/* Group Items - Table View */}
+                {/* Group Items - Card View (Lists ≠ Tables) */}
                 {!isCollapsed && (
                   <div className="bg-white">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          {visibleFieldsForTable.map((field) => (
-                            <th
-                              key={field.name}
-                              className="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"
-                            >
-                              {field.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupRows.map((row) => {
-                          const recordId = row.id
-                          return (
-                            <tr
-                              key={recordId}
-                              onClick={() => handleRecordClick(recordId)}
-                              className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                            >
-                              {visibleFieldsForTable.map((field) => {
-                                const value = row[field.name]
-                                const formattedValue = formatFieldValue(field, value)
-                                
-                                // Render pills for select fields
-                                if ((field.type === 'single_select' || field.type === 'multi_select') && value) {
-                                  const values = Array.isArray(value) ? value : [value]
-                                  return (
-                                    <td key={field.name} className="px-4 py-2">
-                                      <div className="flex flex-wrap gap-1">
-                                        {values.map((v, idx) => {
-                                          const color = getPillColor(field, v)
-                                          return (
-                                            <span
-                                              key={idx}
-                                              className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                              style={{
-                                                backgroundColor: color ? `${color}20` : undefined,
-                                                color: color || undefined,
-                                                border: color ? `1px solid ${color}40` : undefined,
-                                              }}
-                                            >
-                                              {String(v)}
-                                            </span>
-                                          )
-                                        })}
-                                      </div>
-                                    </td>
-                                  )
-                                }
-                                
-                                return (
-                                  <td key={field.name} className="px-4 py-2 text-sm text-gray-900">
-                                    {formattedValue}
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
+                    {groupRows.map((row) => renderListItem(row))}
                   </div>
                 )}
               </div>
