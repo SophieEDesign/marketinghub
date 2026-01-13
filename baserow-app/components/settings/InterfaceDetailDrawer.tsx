@@ -55,7 +55,7 @@ export default function InterfaceDetailDrawer({
   const [icon, setIcon] = useState('')
   const [description, setDescription] = useState('')
   const [group, setGroup] = useState<string>(iface.group_id || '')
-  const [isAdminOnly, setIsAdminOnly] = useState(iface.is_admin_only)
+  const [isAdminOnly, setIsAdminOnly] = useState(iface.is_admin_only ?? true)
   const [views, setViews] = useState<View[]>([])
   const [groups, setGroups] = useState<Array<{ id: string; name: string }>>([])
   const [saving, setSaving] = useState(false)
@@ -72,7 +72,7 @@ export default function InterfaceDetailDrawer({
 
   useEffect(() => {
     setName(iface.name)
-    setIsAdminOnly(iface.is_admin_only)
+    setIsAdminOnly(iface.is_admin_only ?? true)
     setGroup(iface.group_id || '')
   }, [iface])
 
@@ -217,7 +217,7 @@ export default function InterfaceDetailDrawer({
 
   useEffect(() => {
     setName(iface.name)
-    setIsAdminOnly(iface.is_admin_only)
+    setIsAdminOnly(iface.is_admin_only ?? true)
     setGroup(iface.group_id || '')
   }, [iface])
 
@@ -278,6 +278,20 @@ export default function InterfaceDetailDrawer({
           .eq('id', iface.id)
 
         if (updateError) throw updateError
+
+        // Also update the interface_group's icon if this page belongs to a group
+        // The sidebar displays interface_groups, so icons need to be on the group
+        if (group) {
+          const { error: groupIconError } = await supabase
+            .from('interface_groups')
+            .update({ icon: icon || null })
+            .eq('id', group)
+          
+          // Ignore errors if icon column doesn't exist (graceful degradation)
+          if (groupIconError && !groupIconError.message?.includes('column') && !groupIconError.message?.includes('does not exist')) {
+            console.warn('Failed to update interface_group icon:', groupIconError)
+          }
+        }
       } else {
         // Fallback: update views table
         const { error: updateError } = await supabase
@@ -291,6 +305,19 @@ export default function InterfaceDetailDrawer({
           .eq('id', iface.id)
 
         if (updateError) throw updateError
+
+        // Also update the interface_group's icon if this view belongs to a group
+        if (group) {
+          const { error: groupIconError } = await supabase
+            .from('interface_groups')
+            .update({ icon: icon || null })
+            .eq('id', group)
+          
+          // Ignore errors if icon column doesn't exist (graceful degradation)
+          if (groupIconError && !groupIconError.message?.includes('column') && !groupIconError.message?.includes('does not exist')) {
+            console.warn('Failed to update interface_group icon:', groupIconError)
+          }
+        }
       }
 
 

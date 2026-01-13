@@ -275,3 +275,18 @@ This audit identified **X critical issues** and **Y UX gaps** across the interfa
 - No new features unless required for parity
 - No block-specific logic for shared behaviors
 - No masking issues with animation or styling
+
+---
+
+## QA Checklist Alignment
+
+A detailed QA checklist has been created based on this audit: **`QA_CHECKLIST_AUDIT_RESULTS.md`**
+
+The checklist covers all 10 audit areas with specific verification criteria. Use this checklist before merging or releasing to ensure Airtable-aligned behavior.
+
+**Key Findings:**
+- ✅ **6 areas fully compliant** (no action needed)
+- ⚠️ **4 areas need verification** (testing required)
+- ✅ **1 critical fix applied** (List Block table behavior)
+
+**Lock-In Rule:** Patterns that pass the checklist should be frozen and not re-invented per block.

@@ -18,17 +18,15 @@ export type Breakpoint = 'mobile' | 'tablet' | 'desktop'
 
 /**
  * Hook to get current breakpoint
+ * Always returns 'desktop' on initial render to prevent hydration mismatches
  */
 export function useBreakpoint(): Breakpoint {
-  const [breakpoint, setBreakpoint] = useState<Breakpoint>(() => {
-    if (typeof window === 'undefined') return 'desktop'
-    const width = window.innerWidth
-    if (width <= BREAKPOINTS.mobile) return 'mobile'
-    if (width <= BREAKPOINTS.tablet) return 'tablet'
-    return 'desktop'
-  })
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>('desktop')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+    
     function handleResize() {
       const width = window.innerWidth
       if (width <= BREAKPOINTS.mobile) {
@@ -40,13 +38,16 @@ export function useBreakpoint(): Breakpoint {
       }
     }
 
+    // Set initial breakpoint after mount
+    handleResize()
+    
     window.addEventListener('resize', handleResize)
-    handleResize() // Check on mount
 
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  return breakpoint
+  // Always return 'desktop' until mounted to prevent hydration mismatches
+  return mounted ? breakpoint : 'desktop'
 }
 
 /**
