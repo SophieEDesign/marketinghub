@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Calendar as CalendarPicker } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CalendarIcon } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, formatDateObjectUK } from '@/lib/utils'
 import type { TableField } from '@/types/fields'
 import type { CalendarConfig } from './CalendarView'
 
@@ -47,9 +47,11 @@ export default function CreateEventModal({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setDate(initialDate)
-    setStartDate(initialDate)
-    setEndDate(initialDate)
+    if (open) {
+      setDate(initialDate)
+      setStartDate(initialDate)
+      setEndDate(initialDate)
+    }
   }, [initialDate, open])
 
   const titleField = tableFields.find((f) => f.type === 'text') || tableFields[0]

@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
         let lastActive = null
 
         // Try to get user details from auth.users if admin client is available
+        let needsPasswordReset = false
         if (adminClient) {
           try {
             const { data: authUser } = await adminClient.auth.admin.getUserById(profile.user_id)
@@ -103,6 +104,8 @@ export async function GET(request: NextRequest) {
               email = authUser.user.email || email
               name = authUser.user.user_metadata?.name || authUser.user.user_metadata?.full_name || null
               lastActive = authUser.user.last_sign_in_at || null
+              // Check if user doesn't have a password set (users added via SQL)
+              needsPasswordReset = !authUser.user.encrypted_password || authUser.user.encrypted_password.length === 0
             }
           } catch (error) {
             // If we can't get user details, use placeholder
@@ -122,6 +125,7 @@ export async function GET(request: NextRequest) {
           is_active: true,
           last_active: lastActive,
           created_at: profile.created_at,
+          needs_password_reset: needsPasswordReset, // Show reinvite button for users without passwords
         })
       } catch (error) {
         // If we can't get user details, still include the profile

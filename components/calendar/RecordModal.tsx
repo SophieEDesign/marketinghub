@@ -19,7 +19,7 @@ interface RecordModalProps {
   tableId: string
   recordId: string | null
   tableFields: TableField[]
-  modalFields?: string[] // Fields to show in modal (if empty, show all)
+  modalFields?: string[] // Fields to show in modal (if undefined, show all; if empty array, show none; if has values, show only those)
   onSave?: () => void
 }
 
@@ -29,7 +29,7 @@ export default function RecordModal({
   tableId,
   recordId,
   tableFields,
-  modalFields = [],
+  modalFields,
   onSave,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
@@ -166,11 +166,16 @@ export default function RecordModal({
                 if (field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
                   return false
                 }
-                // If modalFields is specified and not empty, only show those fields
-                if (modalFields.length > 0) {
+                // If modalFields is undefined, show all fields (not configured yet)
+                if (modalFields === undefined) {
+                  return true
+                }
+                // If modalFields is provided (array), only show fields in the array
+                // Empty array means user configured to show none, array with values means show only those
+                if (Array.isArray(modalFields)) {
                   return modalFields.includes(field.name)
                 }
-                // Otherwise show all fields
+                // Fallback: show all if modalFields is not an array
                 return true
               })
               .map((field) => {

@@ -44,6 +44,7 @@ interface User {
   last_active: string | null
   created_at: string
   is_pending?: boolean // True for users who have been invited but haven't accepted yet
+  needs_password_reset?: boolean // True for users without passwords (e.g., added via SQL)
 }
 
 export default function UsersTab() {
@@ -494,13 +495,13 @@ export default function UsersTab() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            {user.is_pending && (
+                            {(user.is_pending || user.needs_password_reset) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleReinvite(user)}
                                 disabled={reinviting === user.user_id}
-                                title="Resend invitation"
+                                title={user.is_pending ? "Resend invitation" : "Send password reset email"}
                               >
                                 <Mail className="h-4 w-4" />
                               </Button>

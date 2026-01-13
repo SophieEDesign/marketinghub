@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Plus, ChevronDown, ChevronRight } from "lucide-react"

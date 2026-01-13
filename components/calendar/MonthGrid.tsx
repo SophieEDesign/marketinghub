@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useRef, useCallback } from 'react'
-import { format, isSameDay, isSameMonth, startOfDay, addDays, differenceInDays } from 'date-fns'
+import { format, isSameDay, isSameMonth, startOfDay, addDays, differenceInDays, parseISO, isValid } from 'date-fns'
+import { Plus } from 'lucide-react'
 import EventCard from './EventCard'
-import { cn } from '@/lib/utils'
+import { cn, formatDateUK } from '@/lib/utils'
 import type { CalendarEvent, CalendarConfig } from './CalendarView'
 import type { TableField } from '@/types/fields'
 
@@ -51,6 +52,7 @@ interface MonthGridProps {
   onEventClick?: (event: CalendarEvent) => void
   config: CalendarConfig
   tableFields: TableField[]
+  onCreateEvent?: (date: Date) => void
 }
 
 export default function MonthGrid({
@@ -62,6 +64,7 @@ export default function MonthGrid({
   onEventClick,
   config,
   tableFields,
+  onCreateEvent,
 }: MonthGridProps) {
   const [draggingEvent, setDraggingEvent] = useState<string | null>(null)
   const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
@@ -197,7 +200,7 @@ export default function MonthGrid({
             <div
               key={day.toISOString()}
               className={cn(
-                'border-r border-b border-gray-200 p-2 min-h-[120px] cursor-pointer hover:bg-gray-50/50 transition-colors',
+                'group border-r border-b border-gray-200 p-2 min-h-[120px] cursor-pointer hover:bg-gray-50/50 transition-colors relative',
                 !isCurrentMonth && 'bg-gray-50/30',
                 isToday && 'bg-blue-50/50'
               )}
@@ -207,14 +210,29 @@ export default function MonthGrid({
                 if (resizingEvent) handleResizeEnd(day)
               }}
             >
-              <div
-                className={cn(
-                  'text-sm font-medium mb-2',
-                  isCurrentMonth ? 'text-gray-900' : 'text-gray-400',
-                  isToday && 'text-blue-600 font-semibold'
-                )}
-              >
-                {format(day, 'd')}
+              <div className="flex items-center justify-between mb-2">
+                <div
+                  className={cn(
+                    'text-sm font-medium',
+                    isCurrentMonth ? 'text-gray-900' : 'text-gray-400',
+                    isToday && 'text-blue-600 font-semibold'
+                  )}
+                >
+                  {format(day, 'd')}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onCreateEvent?.(day)
+                  }}
+                  className={cn(
+                    'opacity-30 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-200',
+                    'text-gray-500 hover:text-gray-700 flex items-center justify-center'
+                  )}
+                  title="Add event"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
               </div>
 
               {/* Multi-day event bars */}

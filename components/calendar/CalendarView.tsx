@@ -525,11 +525,18 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
               days={monthDays}
               currentDate={currentDate}
               events={events}
-              onDateClick={setSelectedDate}
+              onDateClick={(date) => {
+                setSelectedDate(date)
+                setCreateModalOpen(true)
+              }}
               onEventUpdate={handleEventUpdate}
               onEventClick={handleEventClick}
               config={config}
               tableFields={tableFields}
+              onCreateEvent={(date) => {
+                setSelectedDate(date)
+                setCreateModalOpen(true)
+              }}
             />
             {/* Content count footer */}
             <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
@@ -561,7 +568,10 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
       {/* Modals */}
       <CreateEventModal
         open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
+        onClose={() => {
+          setCreateModalOpen(false)
+          setSelectedDate(null)
+        }}
         tableId={tableId}
         tableFields={tableFields}
         config={config}
@@ -586,7 +596,9 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         tableId={tableId}
         recordId={selectedRecordId}
         tableFields={tableFields}
-        modalFields={Array.isArray(config.calendar_modal_fields) ? config.calendar_modal_fields : []}
+        modalFields={Array.isArray(config.calendar_modal_fields) && config.calendar_modal_fields.length > 0 
+          ? config.calendar_modal_fields 
+          : undefined}
         onSave={() => {
           // Reload events after save
           processEvents()

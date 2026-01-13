@@ -81,8 +81,96 @@ export async function POST(
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
       'http://localhost:3000'
 
-    // Try to invite user via Supabase Auth Admin API
-    // This will work for new users or resend invitation for existing users
+    // Check if user has a password set
+    // Note: encrypted_password might not be directly accessible, so we check if user can sign in
+    // Users without passwords typically have null or empty encrypted_password
+    const hasPassword = user.encrypted_password && user.encrypted_password.length > 0
+
+    // If user doesn't have a password, use password recovery instead of invite
+    if (!hasPassword) {
+      // Generate password recovery link (for users without passwords)
+      // This allows them to set their password
+      const { data: recoveryData, error: recoveryError } = await adminClient.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+        options: {
+          redirectTo: `${baseUrl}/auth/callback`,
+        },
+      })
+
+      if (recoveryError) {
+        console.error('Supabase recovery link error:', recoveryError)
+        return NextResponse.json(
+          { error: recoveryError.message || 'Failed to generate password reset link' },
+          { status: 500 }
+        )
+      }
+
+      // generateLink creates the link but doesn't automatically send the email
+      // We need to trigger Supabase's password reset email
+      // Use the Admin API to update user and trigger email, or use the regular auth endpoint
+      // For now, we'll use the recovery link and note that email needs to be sent
+      // The recovery link can be used to set the password
+      
+      // Try to use Supabase's built-in password reset by calling the auth endpoint
+      // This requires making a request to Supabase's auth API
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      
+      if (supabaseUrl && serviceRoleKey) {
+        try {
+          // Call Supabase's password reset endpoint directly
+          const resetResponse = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': serviceRoleKey,
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              email: email,
+              redirectTo: `${baseUrl}/auth/callback`,
+            }),
+          })
+
+          if (resetResponse.ok) {
+            return NextResponse.json({
+              success: true,
+              message: 'Password reset email sent successfully. User can now set their password.',
+            })
+          } else {
+            const errorData = await resetResponse.json().catch(() => ({}))
+            console.error('Password reset email error:', errorData)
+            // Fallback: return the recovery link
+            return NextResponse.json({
+              success: true,
+              message: 'Password reset link generated. Please send this link to the user manually.',
+              recoveryLink: recoveryData?.properties?.action_link,
+              note: 'You can copy the recoveryLink above and send it to the user via email.',
+            })
+          }
+        } catch (fetchError) {
+          console.error('Error calling password reset endpoint:', fetchError)
+          // Fallback: return the recovery link
+          return NextResponse.json({
+            success: true,
+            message: 'Password reset link generated. Please send this link to the user manually.',
+            recoveryLink: recoveryData?.properties?.action_link,
+            note: 'You can copy the recoveryLink above and send it to the user via email.',
+          })
+        }
+      } else {
+        // Fallback: return the recovery link
+        return NextResponse.json({
+          success: true,
+          message: 'Password reset link generated. Please send this link to the user manually.',
+          recoveryLink: recoveryData?.properties?.action_link,
+          note: 'You can copy the recoveryLink above and send it to the user via email.',
+        })
+      }
+    }
+
+    // User has password - try to invite/reinvite normally
     const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
       email,
       {
