@@ -5,6 +5,8 @@
  */
 
 import type { BlockFilter } from './types'
+import { filterConfigsToFilterTree } from '@/lib/filters/converters'
+import { applyFiltersToQuery as applyFiltersToQueryUnified } from '@/lib/filters/evaluation'
 
 export interface FilterConfig {
   field: string
@@ -37,7 +39,10 @@ export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfi
 /**
  * Applies filters to a Supabase query builder
  * This is the shared filter logic used by all blocks
- * Field-type aware: handles multi-select arrays, dates, and other field types appropriately
+ * 
+ * @deprecated This function is kept for backward compatibility.
+ * New code should use the unified filter system from @/lib/filters/evaluation
+ * which uses the canonical FilterTree model.
  */
 export function applyFiltersToQuery(
   query: any,
@@ -46,115 +51,9 @@ export function applyFiltersToQuery(
 ): any {
   if (!filters || filters.length === 0) return query
 
-  for (const filter of filters) {
-    if (!filter.field || filter.operator === undefined) continue
-
-    // Validate field exists in table schema
-    const field = tableFields.find(f => f.name === filter.field || (f.id && f.id === filter.field))
-    if (!field && tableFields.length > 0) {
-      // Field doesn't exist - skip this filter
-      console.warn(`Filter field "${filter.field}" not found in table schema`)
-      continue
-    }
-
-    const fieldName = field?.name || filter.field
-    const fieldType = field?.type
-    const fieldValue = filter.value
-
-    // Apply field-type aware filtering
-    switch (filter.operator) {
-      case 'equal':
-        if (fieldType === 'multi_select') {
-          // For multi-select arrays (text[]), check if array contains the value
-          // Use filter with 'cs' operator for array contains
-          query = query.filter(fieldName, 'cs', `{${String(fieldValue)}}`)
-        } else {
-          query = query.eq(fieldName, fieldValue)
-        }
-        break
-      case 'not_equal':
-        if (fieldType === 'multi_select') {
-          // For multi-select, check if array does NOT contain the value
-          query = query.not(fieldName, 'cs', `{${String(fieldValue)}}`)
-        } else {
-          query = query.neq(fieldName, fieldValue)
-        }
-        break
-      case 'contains':
-        if (fieldType === 'multi_select') {
-          // For multi-select arrays, check if array contains the value
-          query = query.filter(fieldName, 'cs', `{${String(fieldValue)}}`)
-        } else {
-          // For text fields, use case-insensitive like
-          query = query.ilike(fieldName, `%${fieldValue}%`)
-        }
-        break
-      case 'not_contains':
-        if (fieldType === 'multi_select') {
-          // For multi-select, check if array does NOT contain the value
-          query = query.not(fieldName, 'cs', `{${String(fieldValue)}}`)
-        } else {
-          query = query.not(fieldName, 'ilike', `%${fieldValue}%`)
-        }
-        break
-      case 'greater_than':
-        query = query.gt(fieldName, fieldValue)
-        break
-      case 'less_than':
-        query = query.lt(fieldName, fieldValue)
-        break
-      case 'greater_than_or_equal':
-        query = query.gte(fieldName, fieldValue)
-        break
-      case 'less_than_or_equal':
-        query = query.lte(fieldName, fieldValue)
-        break
-      case 'is_empty':
-        if (fieldType === 'multi_select') {
-          // For multi-select arrays, check if array is null or empty array
-          // Use OR to check for null OR empty array
-          query = query.or(`${fieldName}.is.null,${fieldName}.eq.{}`)
-        } else {
-          query = query.or(`${fieldName}.is.null,${fieldName}.eq.`)
-        }
-        break
-      case 'is_not_empty':
-        if (fieldType === 'multi_select') {
-          // For multi-select arrays, check if array is not null and not empty
-          query = query.not(fieldName, 'is', null).neq(fieldName, '{}')
-        } else {
-          query = query.not(fieldName, 'is', null)
-        }
-        break
-      case 'date_range':
-        if (filter.value && filter.value2) {
-          // For date ranges, ensure we're comparing dates properly
-          // If values are date strings (YYYY-MM-DD), add time to make range inclusive
-          const startDate = filter.value instanceof Date 
-            ? filter.value.toISOString().split('T')[0] 
-            : filter.value
-          const endDate = filter.value2 instanceof Date 
-            ? filter.value2.toISOString().split('T')[0] 
-            : filter.value2
-          query = query.gte(fieldName, startDate).lte(fieldName, endDate)
-        } else if (filter.value) {
-          const startDate = filter.value instanceof Date 
-            ? filter.value.toISOString().split('T')[0] 
-            : filter.value
-          query = query.gte(fieldName, startDate)
-        } else if (filter.value2) {
-          const endDate = filter.value2 instanceof Date 
-            ? filter.value2.toISOString().split('T')[0] 
-            : filter.value2
-          query = query.lte(fieldName, endDate)
-        }
-        break
-      default:
-        console.warn(`Unknown filter operator: ${filter.operator}`)
-    }
-  }
-
-  return query
+  // Convert FilterConfig[] to FilterTree and use unified evaluation
+  const filterTree = filterConfigsToFilterTree(filters, 'AND')
+  return applyFiltersToQueryUnified(query, filterTree, tableFields as any)
 }
 
 /**

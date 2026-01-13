@@ -12,6 +12,7 @@ import { conditionsToFilterTree } from './canonical-model'
  * Convert database filters and groups to canonical filter tree
  * 
  * This is the main conversion function used throughout the app.
+ * Handles field_name as field_id (field names are used as identifiers in filters).
  */
 export function dbFiltersToFilterTree(
   filters: ViewFilter[],
@@ -50,8 +51,8 @@ export function dbFiltersToFilterTree(
     groupFilters.sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
     
     const conditions: FilterCondition[] = groupFilters.map(f => ({
-      field_id: f.field_name, // Using field_name as field_id for now
-      operator: f.operator,
+      field_id: f.field_name, // Using field_name as field_id (field names are identifiers)
+      operator: f.operator as FilterCondition['operator'],
       value: f.value || undefined,
     }))
     
@@ -67,7 +68,7 @@ export function dbFiltersToFilterTree(
     
     const conditions: FilterCondition[] = ungroupedFilters.map(f => ({
       field_id: f.field_name,
-      operator: f.operator,
+      operator: f.operator as FilterCondition['operator'],
       value: f.value || undefined,
     }))
     
@@ -131,27 +132,32 @@ export function filterTreeToDbFormat(
   
   let groupIndex = 0
   
+  // Track group indices for proper filter-to-group mapping
+  // We'll use temporary indices and map them after group insertion
+  const tempGroupMap = new Map<number, string | null>()
+  
   function processGroup(
     node: FilterGroup,
-    parentGroupId: string | null = null
-  ): void {
-    // Only create a group if it has multiple children or is explicitly a group
-    // Single conditions in a group are stored without a group
+    parentTempIndex: number | null = null
+  ): number | null {
+    // Determine if we need to create a group
     const hasMultipleChildren = node.children.length > 1
     const hasNestedGroups = node.children.some(child => 'operator' in child && 'children' in child)
+    const needsGroup = hasMultipleChildren || hasNestedGroups || node.operator === 'OR'
     
-    let currentGroupId: string | null = null
+    let currentTempIndex: number | null = null
     
-    if (hasMultipleChildren || hasNestedGroups || node.operator === 'OR') {
+    if (needsGroup) {
       // Create a group
       const groupData: Omit<ViewFilterGroup, 'id' | 'created_at' | 'updated_at' | 'created_by' | 'updated_by'> = {
         view_id: viewId,
         condition_type: node.operator,
-        order_index: groupIndex++,
+        order_index: groupIndex,
       }
       groups.push(groupData)
-      // Note: We can't set the ID here, it will be set when inserted
-      // For now, we'll use a temporary approach
+      currentTempIndex = groupIndex
+      tempGroupMap.set(groupIndex, null) // Will be set after insertion
+      groupIndex++
     }
     
     // Process children
@@ -164,17 +170,22 @@ export function filterTreeToDbFormat(
           field_name: child.field_id,
           operator: child.operator,
           value: child.value as string | undefined,
-          filter_group_id: currentGroupId,
+          filter_group_id: currentTempIndex !== null ? `temp-${currentTempIndex}` : null,
           order_index: conditionIndex++,
         })
       } else {
         // Nested group - recursively process
-        processGroup(child, currentGroupId)
+        processGroup(child, currentTempIndex)
       }
     }
+    
+    return currentTempIndex
   }
   
   processGroup(group)
+  
+  // Note: The filter_group_id values with "temp-" prefix will need to be replaced
+  // with actual group IDs after groups are inserted. This is handled in UnifiedFilterDialog.
   
   return { groups, filters }
 }

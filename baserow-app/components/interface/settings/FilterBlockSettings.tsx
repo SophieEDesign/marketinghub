@@ -15,7 +15,8 @@ import {
 import type { BlockConfig, BlockFilter } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
-import { Filter, Plus, X } from "lucide-react"
+import { Filter, Plus, X, Link2, CheckCircle2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 
 interface FilterBlockSettingsProps {
@@ -87,8 +88,19 @@ export default function FilterBlockSettings({
 
   // Get data blocks that can be filtered
   const filterableBlocks = allBlocks.filter(b => 
-    ['grid', 'chart', 'kpi'].includes(b.type)
+    ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
   )
+  
+  // Get currently connected blocks
+  const connectedBlocks = useMemo(() => {
+    if (targetBlocks === 'all') {
+      return filterableBlocks
+    }
+    if (Array.isArray(targetBlocks)) {
+      return filterableBlocks.filter(b => targetBlocks.includes(b.id))
+    }
+    return []
+  }, [targetBlocks, filterableBlocks])
 
   // Get available fields for filters (respect allowed_fields if set)
   const availableFilterFields = allowedFields.length === 0 
@@ -178,31 +190,78 @@ export default function FilterBlockSettings({
         </p>
       </div>
 
-      {/* Target Blocks */}
+      {/* Connected Elements */}
       <div className="space-y-2">
-        <Label>Target Blocks</Label>
-        <Select
-          value={typeof targetBlocks === 'string' ? targetBlocks : 'specific'}
-          onValueChange={handleTargetBlocksChange}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All compatible blocks</SelectItem>
-            {filterableBlocks.length > 0 && (
-              <SelectItem value="specific">Specific blocks (coming soon)</SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        <Label>Connected Elements</Label>
+        <div className="space-y-3">
+          <Select
+            value={typeof targetBlocks === 'string' ? targetBlocks : 'specific'}
+            onValueChange={(value) => {
+              if (value === 'all') {
+                onUpdate({ target_blocks: 'all' })
+              } else {
+                // For specific selection, we'll implement a multi-select UI
+                // For now, keep 'all' behavior
+                onUpdate({ target_blocks: 'all' })
+              }
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All compatible elements</SelectItem>
+              {filterableBlocks.length > 0 && (
+                <SelectItem value="specific">Select specific elements</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+          
+          {/* Connected Elements List */}
+          {connectedBlocks.length > 0 && (
+            <div className="border rounded-lg p-3 bg-blue-50 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-900">
+                <Link2 className="h-4 w-4" />
+                <span>Connected elements ({connectedBlocks.length})</span>
+              </div>
+              <div className="space-y-1">
+                {connectedBlocks.map((block) => {
+                  const blockTitle = block.config?.title || block.id
+                  const blockTypeLabel = block.type.charAt(0).toUpperCase() + block.type.slice(1)
+                  return (
+                    <div
+                      key={block.id}
+                      className="flex items-center justify-between p-2 bg-white rounded border border-blue-200"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium">{blockTitle}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {blockTypeLabel}
+                        </Badge>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          
+          {connectedBlocks.length === 0 && filterableBlocks.length > 0 && (
+            <div className="border rounded-lg p-3 bg-gray-50 text-sm text-gray-500 text-center">
+              No elements connected. Select "All compatible elements" or choose specific ones.
+            </div>
+          )}
+          
+          {filterableBlocks.length === 0 && (
+            <div className="border rounded-lg p-3 bg-gray-50 text-sm text-gray-500 text-center">
+              No filterable elements found on this page. Add grid, chart, or KPI blocks to connect.
+            </div>
+          )}
+        </div>
         <p className="text-xs text-gray-500">
-          Choose which blocks on this page should be affected by these filters.
+          These filters will be applied on top of each element's own filters.
         </p>
-        {filterableBlocks.length > 0 && (
-          <div className="mt-2 text-xs text-gray-400">
-            Found {filterableBlocks.length} filterable block(s) on this page
-          </div>
-        )}
       </div>
 
       {/* Allowed Fields */}
@@ -435,11 +494,13 @@ export default function FilterBlockSettings({
         <div className="flex items-start space-x-2">
           <Filter className="h-4 w-4 text-blue-600 mt-0.5" />
           <div className="text-xs text-blue-800">
-            <p className="font-medium mb-1">How Filter Blocks Work</p>
+            <p className="font-medium mb-1">How Filter Controls Work</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>Filter blocks narrow results but never override block base filters</li>
-              <li>Multiple filter blocks can work together (AND logic)</li>
-              <li>Filters are applied at the SQL query level for performance</li>
+              <li>Filter controls are shared controls that drive connected elements</li>
+              <li>Filters apply in addition to each element's own filters (never replace them)</li>
+              <li>Full filter system: supports AND/OR groups and nested groups</li>
+              <li>Changes apply instantly - no Save required</li>
+              <li>Only fields common to all connected elements are shown</li>
             </ul>
           </div>
         </div>

@@ -31,6 +31,8 @@ export type FilterOperator =
   | 'date_on_or_before'
   | 'date_on_or_after'
   | 'date_range'
+  | 'has'
+  | 'does_not_have'
 
 export type GroupOperator = 'AND' | 'OR'
 

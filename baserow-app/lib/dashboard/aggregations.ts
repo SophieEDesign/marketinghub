@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import type { TableField } from '@/types/database'
-import { applyFiltersToQuery, normalizeFilter, type FilterConfig } from '@/lib/interface/filters'
+import { normalizeFilter, type FilterConfig } from '@/lib/interface/filters'
+import { filterConfigsToFilterTree } from '@/lib/filters/converters'
+import { applyFiltersToQuery } from '@/lib/filters/evaluation'
 import type { BlockFilter } from '@/lib/interface/types'
 
 export type AggregateFunction = 'count' | 'sum' | 'avg' | 'min' | 'max'
@@ -69,8 +71,10 @@ export async function aggregateTableData(
         .select('*', { count: 'exact', head: true })
 
       // Apply filters using shared filter logic
+      // Convert FilterConfig[] to FilterTree for unified evaluation
       if (normalizedFilters.length > 0) {
-        query = applyFiltersToQuery(query, normalizedFilters, fields)
+        const filterTree = filterConfigsToFilterTree(normalizedFilters, 'AND')
+        query = applyFiltersToQuery(query, filterTree, fields)
       }
 
       const { count, error } = await query
@@ -124,8 +128,10 @@ export async function aggregateTableData(
       .limit(2000) // Reduced limit to prevent crashes
 
     // Apply filters using shared filter logic
+    // Convert FilterConfig[] to FilterTree for unified evaluation
     if (normalizedFilters.length > 0) {
-      query = applyFiltersToQuery(query, normalizedFilters, fields)
+      const filterTree = filterConfigsToFilterTree(normalizedFilters, 'AND')
+      query = applyFiltersToQuery(query, filterTree, fields)
     }
 
     const { data: rows, error } = await query

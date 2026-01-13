@@ -43,6 +43,7 @@ interface BlockRendererProps {
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
   hideEditButton?: boolean // Hide Edit button for top field blocks (inline editing only)
+  allBlocks?: PageBlock[] // All blocks on the page (for FilterBlock connection awareness)
 }
 
 export default function BlockRenderer({
@@ -60,6 +61,7 @@ export default function BlockRenderer({
   pageEditable,
   editableFieldNames = [],
   hideEditButton = false,
+  allBlocks = [],
 }: BlockRendererProps) {
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
@@ -198,7 +200,7 @@ export default function BlockRenderer({
 
       case "filter":
         // Filter block emits filter state via context
-        return <FilterBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} onUpdate={onUpdate} />
+        return <FilterBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} onUpdate={onUpdate} allBlocks={allBlocks} />
 
       case "field":
         // Field block displays field label + value from recordId context
@@ -294,9 +296,37 @@ export default function BlockRenderer({
     }
   }
 
+  // Check if this block is being filtered by filter blocks
+  const filterBlockSources = useMemo(() => {
+    if (!filters || filters.length === 0) return []
+    const sources = new Set<string>()
+    filters.forEach((f: any) => {
+      if (f.sourceBlockTitle) {
+        sources.add(f.sourceBlockTitle)
+      }
+    })
+    return Array.from(sources)
+  }, [filters])
+
   return (
     <ErrorBoundary>
-      {renderBlock()}
+      <div className="relative h-full w-full">
+        {/* Filter indicator - subtle badge showing filter control source */}
+        {filterBlockSources.length > 0 && !isEditing && (
+          <div className="absolute top-2 right-2 z-10">
+            <div 
+              className="px-2 py-1 bg-blue-100 border border-blue-300 rounded text-xs text-blue-700 flex items-center gap-1"
+              title={`Filtered by: ${filterBlockSources.join(', ')}`}
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span>Filtered</span>
+            </div>
+          </div>
+        )}
+        {renderBlock()}
+      </div>
     </ErrorBoundary>
   )
 }

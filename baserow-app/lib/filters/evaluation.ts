@@ -5,10 +5,12 @@
  * All filter evaluation must go through this engine to ensure consistency.
  * 
  * This engine converts the canonical filter model into Supabase queries.
+ * Field-aware: Handles different field types correctly (select, multi-select, linked, lookup, etc.)
  */
 
 import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model'
 import { normalizeFilterTree } from './canonical-model'
+import type { TableField } from '@/types/fields'
 
 /**
  * Convert a filter condition to a Supabase filter string
@@ -58,45 +60,126 @@ function conditionToSupabaseString(condition: FilterCondition): string {
 
 /**
  * Apply a single filter condition to a Supabase query
+ * Field-aware: Handles different field types correctly
  */
 function applyCondition(
   query: any,
-  condition: FilterCondition
+  condition: FilterCondition,
+  tableFields?: TableField[]
 ): any {
   const { field_id, operator, value } = condition
   const fieldName = field_id
   
+  // Find field definition for field-aware filtering
+  const field = tableFields?.find(f => f.name === field_id || f.id === field_id)
+  const fieldType = field?.type
+
   switch (operator) {
     case 'equal':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if array contains the value
+        return query.filter(fieldName, 'cs', `{${String(value)}}`)
+      }
+      if (fieldType === 'checkbox') {
+        // Checkbox: convert boolean to string for Supabase
+        return query.eq(fieldName, value === true || value === 'true')
+      }
       return query.eq(fieldName, value)
+      
     case 'not_equal':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if array does NOT contain the value
+        return query.not(fieldName, 'cs', `{${String(value)}}`)
+      }
+      if (fieldType === 'checkbox') {
+        return query.neq(fieldName, value === true || value === 'true')
+      }
       return query.neq(fieldName, value)
+      
     case 'contains':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if array contains the value
+        return query.filter(fieldName, 'cs', `{${String(value)}}`)
+      }
+      // Text fields: case-insensitive like
       return query.ilike(fieldName, `%${value}%`)
+      
     case 'not_contains':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if array does NOT contain the value
+        return query.not(fieldName, 'cs', `{${String(value)}}`)
+      }
       return query.not(fieldName, 'ilike', `%${value}%`)
+      
     case 'is_empty':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if null or empty array
+        return query.or(`${fieldName}.is.null,${fieldName}.eq.{}`)
+      }
+      // Text/number/date: check if null or empty string
       return query.or(`${fieldName}.is.null,${fieldName}.eq.`)
+      
     case 'is_not_empty':
+      if (fieldType === 'multi_select') {
+        // Multi-select: check if not null and not empty array
+        return query.not(fieldName, 'is', null).neq(fieldName, '{}')
+      }
       return query.not(fieldName, 'is', null)
+      
     case 'greater_than':
       return query.gt(fieldName, value)
+      
     case 'less_than':
       return query.lt(fieldName, value)
+      
     case 'greater_than_or_equal':
       return query.gte(fieldName, value)
+      
     case 'less_than_or_equal':
       return query.lte(fieldName, value)
+      
     case 'date_equal':
       return query.eq(fieldName, value)
+      
     case 'date_before':
       return query.lt(fieldName, value)
+      
     case 'date_after':
       return query.gt(fieldName, value)
+      
     case 'date_on_or_before':
       return query.lte(fieldName, value)
+      
     case 'date_on_or_after':
       return query.gte(fieldName, value)
+      
+    case 'date_range':
+      // Date range: value should be { start, end } or two separate values
+      if (typeof value === 'object' && value !== null && 'start' in value && 'end' in value) {
+        return query.gte(fieldName, value.start).lte(fieldName, value.end)
+      }
+      // Fallback: treat as single date
+      return query.eq(fieldName, value)
+      
+    case 'has':
+      // Linked field: has record matching condition
+      // This requires a subquery to the linked table
+      // For now, we'll use a placeholder - full implementation requires table relationship info
+      if (fieldType === 'link_to_table') {
+        // TODO: Implement linked record filtering with drill-down
+        // This would require: linked_table_id, linked_field_name, and the filter condition
+        return query // Placeholder
+      }
+      return query
+      
+    case 'does_not_have':
+      // Linked field: does not have record matching condition
+      if (fieldType === 'link_to_table') {
+        // TODO: Implement linked record filtering with drill-down
+        return query // Placeholder
+      }
+      return query
+      
     default:
       return query
   }
@@ -111,7 +194,8 @@ function applyCondition(
  */
 function applyGroup(
   query: any,
-  group: FilterGroup
+  group: FilterGroup,
+  tableFields?: TableField[]
 ): any {
   const { operator, children } = group
   
@@ -136,7 +220,7 @@ function applyGroup(
     for (const child of children) {
       if ('operator' in child && 'children' in child) {
         // Nested group - recursively apply
-        query = applyGroup(query, child)
+        query = applyGroup(query, child, tableFields)
       }
     }
   } else {
@@ -144,10 +228,10 @@ function applyGroup(
     for (const child of children) {
       if ('field_id' in child) {
         // Condition
-        query = applyCondition(query, child)
+        query = applyCondition(query, child, tableFields)
       } else {
         // Nested group
-        query = applyGroup(query, child)
+        query = applyGroup(query, child, tableFields)
       }
     }
   }
@@ -163,11 +247,13 @@ function applyGroup(
  * 
  * @param query - The Supabase query builder
  * @param filterTree - The filter tree to apply
+ * @param tableFields - Optional: Table field definitions for field-aware filtering
  * @returns The modified query
  */
 export function applyFiltersToQuery(
   query: any,
-  filterTree: FilterTree
+  filterTree: FilterTree,
+  tableFields?: TableField[]
 ): any {
   if (!filterTree) {
     return query
@@ -178,7 +264,7 @@ export function applyFiltersToQuery(
     return query
   }
   
-  return applyGroup(query, normalized)
+  return applyGroup(query, normalized, tableFields)
 }
 
 /**

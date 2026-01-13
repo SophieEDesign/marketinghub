@@ -101,7 +101,8 @@ export async function loadRows(options: LoadRowsOptions) {
 
   // Convert database filters to canonical filter tree and apply using shared evaluation engine
   const filterTree = dbFiltersToFilterTree(filters, filterGroups)
-  query = applyFiltersToQuery(query, filterTree)
+  // Pass tableFields for field-aware filtering
+  query = applyFiltersToQuery(query, filterTree, tableFields)
 
   // Apply sorting using field_name
   if (sorts.length > 0) {

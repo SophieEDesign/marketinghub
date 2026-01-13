@@ -1020,6 +1020,7 @@ export default function Canvas({
                     pageEditable={pageEditable}
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}
+                    allBlocks={blocks}
                   />
                 </div>
               </BlockAppearanceWrapper>

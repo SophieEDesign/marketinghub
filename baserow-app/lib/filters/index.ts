@@ -11,3 +11,4 @@
 export * from './canonical-model'
 export * from './evaluation'
 export * from './converters'
+export * from './field-operators'
