@@ -287,11 +287,13 @@ export default function InterfaceDetailDrawer({
 
         // Also update the interface_group's icon if this page belongs to a group
         // The sidebar displays interface_groups, so icons need to be on the group
+        // Use the icon from config.settings.icon (which we just saved)
         if (group) {
           try {
+            const iconToSave = config.settings?.icon || icon || null
             const { error: groupIconError } = await supabase
               .from('interface_groups')
-              .update({ icon: icon || null })
+              .update({ icon: iconToSave })
               .eq('id', group)
             
             // Ignore errors if icon column doesn't exist (graceful degradation)
@@ -305,6 +307,9 @@ export default function InterfaceDetailDrawer({
               console.log('icon column does not exist yet, skipping update')
             } else if (groupIconError) {
               console.warn('Failed to update interface_group icon:', groupIconError)
+              // Don't throw - icon in page config will still work as fallback
+            } else {
+              console.log('Successfully updated interface_group icon:', iconToSave)
             }
           } catch (e: any) {
             // Silently ignore column errors
@@ -312,6 +317,7 @@ export default function InterfaceDetailDrawer({
               console.log('icon column does not exist yet, skipping update')
             } else {
               console.warn('Error updating interface_group icon:', e)
+              // Don't throw - icon in page config will still work as fallback
             }
           }
         }

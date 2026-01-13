@@ -32,7 +32,11 @@ export default async function Sidebar() {
     id: string
     name: string
     order_index: number
+    icon?: string | null
   }>> = new Map()
+  
+  // Map to store group icons from pages (fallback if group icon is null)
+  const groupIconsFromPages = new Map<string, string | null>()
   
   try {
     // Load interface groups (interfaces) - start with minimal query, then try to add optional columns
@@ -102,9 +106,10 @@ export default async function Sidebar() {
     }
     
     // Load interface pages FIRST - we need this to determine which groups to show
+    // Also load config to get icons from pages
     let pagesQuery = supabase
       .from('interface_pages')
-      .select('id, name, group_id, order_index, is_admin_only')
+      .select('id, name, group_id, order_index, is_admin_only, config')
       .order('order_index', { ascending: true })
       .order('created_at', { ascending: true }) // Secondary sort for consistency
     
@@ -124,6 +129,9 @@ export default async function Sidebar() {
       
       pagesData.forEach((page) => {
         const groupId = page.group_id
+        // Extract icon from page config if available
+        const pageIcon = (page.config as any)?.settings?.icon || null
+        
         if (groupId) {
           if (!interfacePagesByGroup.has(groupId)) {
             interfacePagesByGroup.set(groupId, [])
@@ -132,13 +140,20 @@ export default async function Sidebar() {
             id: page.id,
             name: page.name,
             order_index: page.order_index || 0,
+            icon: pageIcon,
           })
+          
+          // Store the first page's icon as fallback for the group
+          if (pageIcon && !groupIconsFromPages.has(groupId)) {
+            groupIconsFromPages.set(groupId, pageIcon)
+          }
         } else {
           // Pages without group_id go to ungrouped section
           ungroupedPages.push({
             id: page.id,
             name: page.name,
             order_index: page.order_index || 0,
+            icon: pageIcon,
           })
         }
       })
@@ -171,13 +186,17 @@ export default async function Sidebar() {
           const hasPages = interfacePagesByGroup.has(g.id)
           return hasPages
         })
-        .map(g => ({
-          id: g.id,
-          name: g.name,
-          order_index: g.order_index || 0,
-          collapsed: g.collapsed || false,
-          icon: g.icon || null,
-        }))
+        .map(g => {
+          // Use group icon if available, otherwise fallback to icon from first page
+          const groupIcon = g.icon || groupIconsFromPages.get(g.id) || null
+          return {
+            id: g.id,
+            name: g.name,
+            order_index: g.order_index || 0,
+            collapsed: g.collapsed || false,
+            icon: groupIcon,
+          }
+        })
     } else {
       // No data and no error - table might not exist or be empty
       interfaceGroups = []
