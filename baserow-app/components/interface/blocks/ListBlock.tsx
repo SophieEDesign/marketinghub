@@ -33,7 +33,9 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
   const [loading, setLoading] = useState(true)
   const [table, setTable] = useState<{ supabase_table: string } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
+  
+  // Get groupBy from block config (not view config)
+  const groupBy = config?.group_by
   
   // Use cached metadata hook
   const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
@@ -104,19 +106,6 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
 
         const normalizedFields = asArray<TableField>(tableFieldsRes.data)
         setTableFields(normalizedFields)
-
-        if (viewId) {
-          const viewRes = await supabase
-            .from("views")
-            .select("config")
-            .eq("id", viewId)
-            .maybeSingle()
-
-          if (viewRes.data?.config) {
-            const viewConfig = viewRes.data.config as { groupBy?: string }
-            setGroupBy(viewConfig.groupBy)
-          }
-        }
       } catch (error) {
         console.error("Error loading table data:", error)
       } finally {
@@ -206,7 +195,7 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
       )}
       <ListView
         tableId={tableId}
-        viewId={viewId || ''}
+        viewId={viewId || undefined}
         supabaseTableName={table.supabase_table}
         tableFields={safeTableFields}
         filters={allFilters}

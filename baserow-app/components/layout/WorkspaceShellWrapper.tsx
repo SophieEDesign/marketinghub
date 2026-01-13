@@ -91,10 +91,34 @@ export default async function WorkspaceShellWrapper({
         if (basicError.code === '42P01' || basicError.code === 'PGRST116' || 
             basicError.message?.includes('relation') || basicError.message?.includes('does not exist') ||
             basicError.code === 'PGRST301' || basicError.message?.includes('permission')) {
-          console.warn('interface_groups table may not exist or RLS blocking access, returning empty array')
-        interfaceGroups = []
-      } else {
-        console.error('Error loading interface groups:', groupsError)
+            console.warn('interface_groups table may not exist or RLS blocking access, returning empty array')
+          interfaceGroups = []
+        } else {
+          console.error('Error loading interface_groups:', basicError)
+        }
+      }
+    } else if (minimalData) {
+      // Try to fetch additional columns if they exist
+      try {
+        const { data: fullData, error: fullError } = await supabase
+          .from('interface_groups')
+          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
+          .order('order_index', { ascending: true })
+        
+        if (!fullError && fullData) {
+          interfaceGroups = fullData
+            .filter((g: any) => admin || !g.is_admin_only)
+        } else {
+          // Query failed (likely missing columns) - use minimal data with defaults
+          interfaceGroups = minimalData
+            .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+            .filter((g: any) => admin || !g.is_admin_only)
+        }
+      } catch (e: any) {
+        // Some columns don't exist - use minimal data and add defaults
+        interfaceGroups = minimalData
+          .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+          .filter((g: any) => admin || !g.is_admin_only)
       }
     }
   } catch (error) {

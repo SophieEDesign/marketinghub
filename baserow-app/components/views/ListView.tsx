@@ -31,6 +31,9 @@ interface ListViewProps {
   imageField?: string // Optional: field name for image/attachment
   pillFields?: string[] // Optional: select/multi-select fields to show as pills
   metaFields?: string[] // Optional: date, number, etc. for metadata
+  // Callbacks for block config updates (when not using views)
+  onGroupByChange?: (fieldName: string | null) => void
+  onFiltersChange?: (filters: FilterConfig[]) => void
 }
 
 export default function ListView({
@@ -48,6 +51,8 @@ export default function ListView({
   imageField,
   pillFields = [],
   metaFields = [],
+  onGroupByChange,
+  onFiltersChange,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -206,8 +211,14 @@ export default function ListView({
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
     setCurrentGroupBy(fieldName || undefined)
     
+    // If callback provided (block config), use it
+    if (onGroupByChange) {
+      onGroupByChange(fieldName)
+      return
+    }
+    
+    // Otherwise, try to save to view config if viewId exists
     if (!viewId) {
-      // No viewId - just update local state
       return
     }
 
@@ -234,7 +245,7 @@ export default function ListView({
     } catch (error) {
       console.error("Error saving group setting:", error)
     }
-  }, [viewId])
+  }, [viewId, onGroupByChange])
 
   // Handle filters change
   const handleFiltersChange = useCallback((newFilters: Array<{ id?: string; field_name: string; operator: any; value?: string }>) => {
@@ -244,7 +255,12 @@ export default function ListView({
       value: f.value || '',
     }))
     setCurrentFilters(filterConfigs)
-  }, [])
+    
+    // If callback provided (block config), use it
+    if (onFiltersChange) {
+      onFiltersChange(filterConfigs)
+    }
+  }, [onFiltersChange])
 
   // Get visible fields for table display (title, subtitle, pill, meta fields)
   const visibleFieldsForTable = useMemo(() => {

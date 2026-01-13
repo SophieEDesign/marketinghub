@@ -14,6 +14,7 @@ import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface ListDataSettingsProps {
   config: BlockConfig
@@ -40,6 +41,8 @@ export default function ListDataSettings({
   const imageField = config.list_image_field || config.image_field || ""
   const pillFields = config.list_pill_fields || []
   const metaFields = config.list_meta_fields || []
+  const groupBy = config.group_by || ""
+  const blockFilters = Array.isArray(config.filters) ? config.filters : []
 
   // Get available fields for selection
   const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
@@ -126,6 +129,66 @@ export default function ListDataSettings({
   // Get available fields for meta (date, number, exclude already selected)
   const getAvailableMetaFields = () => {
     return [...dateFields, ...numberFields].filter(f => !metaFields.includes(f.name))
+  }
+
+  // Get groupable fields (not formula, not lookup)
+  const groupableFields = fields.filter(
+    (f) => f.type !== "formula" && f.type !== "lookup"
+  )
+
+  // Get operators for field type
+  const getOperatorsForFieldType = (fieldType: string) => {
+    switch (fieldType) {
+      case "text":
+      case "long_text":
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Not equals" },
+          { value: "contains", label: "Contains" },
+          { value: "not_contains", label: "Does not contain" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "number":
+      case "currency":
+      case "percent":
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Not equals" },
+          { value: "greater_than", label: "Greater than" },
+          { value: "less_than", label: "Less than" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "date":
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "greater_than", label: "After" },
+          { value: "less_than", label: "Before" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "single_select":
+      case "multi_select":
+        return [
+          { value: "equal", label: "Is" },
+          { value: "not_equal", label: "Is not" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+      case "checkbox":
+        return [
+          { value: "equal", label: "Is checked" },
+          { value: "not_equal", label: "Is unchecked" },
+        ]
+      default:
+        return [
+          { value: "equal", label: "Equals" },
+          { value: "not_equal", label: "Not equals" },
+          { value: "is_empty", label: "Is empty" },
+          { value: "is_not_empty", label: "Is not empty" },
+        ]
+    }
   }
 
   return (
@@ -375,6 +438,194 @@ export default function ListDataSettings({
           Date or number fields displayed as metadata
         </p>
       </div>
+
+      {/* Group By (Optional) */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <Label>Group By (Optional)</Label>
+          <Select
+            value={groupBy || "__none__"}
+            onValueChange={(value) => {
+              onUpdate({
+                group_by: value === "__none__" ? undefined : value,
+              })
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select a field to group by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No grouping</SelectItem>
+              {groupableFields.map((field) => (
+                <SelectItem key={field.id} value={field.name}>
+                  {field.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Group records by a field value. Records with the same value will be grouped together.
+          </p>
+        </div>
+      )}
+
+      {/* Filters (Optional) */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Filters (Optional)</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                onUpdate({
+                  filters: [
+                    ...blockFilters,
+                    { field: fields[0]?.name || '', operator: 'equal', value: '' }
+                  ]
+                })
+              }}
+              className="h-7 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Filter
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {blockFilters.map((filter: any, index: number) => {
+              const selectedField = fields.find(f => f.name === filter.field)
+              const operators = selectedField ? getOperatorsForFieldType(selectedField.type) : []
+              
+              return (
+                <div key={index} className="flex gap-2 items-start p-2 border rounded-md">
+                  <Select
+                    value={filter.field || ''}
+                    onValueChange={(value) => {
+                      const updated = [...blockFilters]
+                      updated[index] = { ...updated[index], field: value, operator: 'equal', value: '' }
+                      onUpdate({ filters: updated })
+                    }}
+                  >
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue placeholder="Field" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fields.map((field) => (
+                        <SelectItem key={field.id} value={field.name}>
+                          {field.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filter.operator || 'equal'}
+                    onValueChange={(value) => {
+                      const updated = [...blockFilters]
+                      updated[index] = { ...updated[index], operator: value }
+                      onUpdate({ filters: updated })
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {operators.map((op) => (
+                        <SelectItem key={op.value} value={op.value}>
+                          {op.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' && (() => {
+                    // For single_select or multi_select fields, show dropdown with choices
+                    if (selectedField && (selectedField.type === 'single_select' || selectedField.type === 'multi_select')) {
+                      const choices = selectedField.options?.choices || []
+                      return (
+                        <Select
+                          value={filter.value || ''}
+                          onValueChange={(value) => {
+                            const updated = [...blockFilters]
+                            updated[index] = { ...updated[index], value }
+                            onUpdate({ filters: updated })
+                          }}
+                        >
+                          <SelectTrigger className="h-8 flex-1">
+                            <SelectValue placeholder="Select value" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {choices.length > 0 ? (
+                              choices.map((choice: string) => (
+                                <SelectItem key={choice} value={choice}>
+                                  {choice}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="px-2 py-1.5 text-sm text-gray-500">No options available</div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )
+                    }
+                    
+                    // For date fields, show date input
+                    if (selectedField?.type === 'date') {
+                      return (
+                        <Input
+                          type="date"
+                          value={filter.value || ''}
+                          onChange={(e) => {
+                            const updated = [...blockFilters]
+                            updated[index] = { ...updated[index], value: e.target.value }
+                            onUpdate({ filters: updated })
+                          }}
+                          className="h-8 flex-1"
+                        />
+                      )
+                    }
+                    
+                    // For other field types, show regular text input
+                    return (
+                      <Input
+                        value={filter.value || ''}
+                        onChange={(e) => {
+                          const updated = [...blockFilters]
+                          updated[index] = { ...updated[index], value: e.target.value }
+                          onUpdate({ filters: updated })
+                        }}
+                        placeholder="Value"
+                        className="h-8 flex-1"
+                      />
+                    )
+                  })()}
+                  {(filter.operator === 'is_empty' || filter.operator === 'is_not_empty') && (
+                    <div className="h-8 flex-1 flex items-center text-xs text-gray-500 px-2">
+                      No value needed
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      onUpdate({ filters: blockFilters.filter((_: any, i: number) => i !== index) })
+                    }}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            })}
+            {blockFilters.length === 0 && (
+              <p className="text-xs text-gray-400 italic">No filters configured</p>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            Filter records by field values. Supports equals, contains, comparison, and empty checks.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
