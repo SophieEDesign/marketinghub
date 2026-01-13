@@ -157,6 +157,11 @@ async function getInterfacesFromViews(): Promise<Interface[]> {
  */
 async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise<{ valid: boolean; reason?: string }> {
   const supabase = await createClient()
+  const isDev = process.env.NODE_ENV === 'development'
+  
+  if (isDev) {
+    console.log('[validatePageAccess] Validating page:', { pageId, userIsAdmin })
+  }
   
   // Try interface_pages table first (current system)
   const { data: page, error: pageError } = await supabase
@@ -165,10 +170,24 @@ async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise
     .eq('id', pageId)
     .maybeSingle()
   
+  if (isDev) {
+    console.log('[validatePageAccess] interface_pages query:', { 
+      found: !!page, 
+      isAdminOnly: page?.is_admin_only,
+      error: pageError?.message 
+    })
+  }
+  
   if (!pageError && page) {
     // Check admin-only restriction
     if (!userIsAdmin && page.is_admin_only) {
+      if (isDev) {
+        console.log('[validatePageAccess] Page is admin-only, user is not admin')
+      }
       return { valid: false, reason: 'Page is admin-only and user is not admin' }
+    }
+    if (isDev) {
+      console.log('[validatePageAccess] Page is valid and accessible')
     }
     return { valid: true }
   }
@@ -181,15 +200,32 @@ async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise
     .eq('type', 'interface')
     .maybeSingle()
   
+  if (isDev) {
+    console.log('[validatePageAccess] views table query:', { 
+      found: !!view, 
+      isAdminOnly: view?.is_admin_only,
+      error: viewError?.message 
+    })
+  }
+  
   if (!viewError && view) {
     // Check admin-only restriction
     if (!userIsAdmin && view.is_admin_only) {
+      if (isDev) {
+        console.log('[validatePageAccess] View is admin-only, user is not admin')
+      }
       return { valid: false, reason: 'Page is admin-only and user is not admin' }
+    }
+    if (isDev) {
+      console.log('[validatePageAccess] View is valid and accessible')
     }
     return { valid: true }
   }
   
   // Page doesn't exist
+  if (isDev) {
+    console.warn('[validatePageAccess] Page not found in either table:', pageId)
+  }
   return { valid: false, reason: 'Page not found' }
 }
 
@@ -289,9 +325,26 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       .select('default_interface_id')
       .maybeSingle()
     
+    if (isDev) {
+      console.log('[Landing Page] Workspace settings query:', { 
+        hasSettings: !!workspaceSettings, 
+        defaultInterfaceId: workspaceSettings?.default_interface_id,
+        error: settingsError?.message 
+      })
+    }
+    
     if (!settingsError && workspaceSettings?.default_interface_id) {
       const workspaceDefaultPageId = workspaceSettings.default_interface_id
       const validation = await validatePageAccess(workspaceDefaultPageId, userIsAdmin)
+      
+      if (isDev) {
+        console.log('[Landing Page] Workspace default page validation:', {
+          pageId: workspaceDefaultPageId,
+          valid: validation.valid,
+          reason: validation.reason,
+          userIsAdmin
+        })
+      }
       
       if (validation.valid) {
         if (isDev) {
@@ -303,6 +356,8 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
           console.warn('[Landing Page] Workspace default page invalid:', workspaceDefaultPageId, validation.reason)
         }
       }
+    } else if (isDev && workspaceSettings && !workspaceSettings.default_interface_id) {
+      console.log('[Landing Page] Workspace settings found but no default_interface_id set')
     }
   } catch (error: any) {
     // Silently handle if column doesn't exist
@@ -311,6 +366,8 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       if (isDev) {
         console.warn('[Landing Page] Error checking workspace default page:', error)
       }
+    } else if (isDev) {
+      console.log('[Landing Page] Workspace settings column may not exist (expected in some setups)')
     }
   }
   

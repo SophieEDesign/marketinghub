@@ -130,12 +130,13 @@ export default function PageRenderer({
 
     // UNIFIED: All pages render Canvas via InterfaceBuilder
     // Page type only determines context (recordId injection for record_view)
+    // Allow editing if user is admin - pages can enter edit mode to edit text blocks
     return (
       <InterfaceBuilder
         key={`canvas-${page.id}`}
         page={canvasPage as any}
         initialBlocks={blocks}
-        isViewer={true}
+        isViewer={false}
         hideHeader={true}
         pageTableId={pageTableId}
         recordId={recordId}

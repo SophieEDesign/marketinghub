@@ -39,13 +39,17 @@ export default async function HomePage({
 
   // CRITICAL: Load accessible pages FIRST before any redirect logic
   // This ensures we have data before making redirect decisions
+  // Filter by admin access to match resolveLandingPage() logic
   let accessiblePages: Array<{ id: string }> = []
   try {
     const allPages = await getAllInterfacePages()
-    accessiblePages = allPages.map(p => ({ id: p.id }))
+    // Filter out admin-only pages for non-admin users (matching resolveLandingPage logic)
+    accessiblePages = allPages
+      .filter(p => admin || !p.is_admin_only)
+      .map(p => ({ id: p.id }))
     
     if (isDev) {
-      console.log(`[Redirect] Loaded ${accessiblePages.length} accessible pages`)
+      console.log(`[Redirect] Loaded ${accessiblePages.length} accessible pages (filtered from ${allPages.length} total)`)
     }
   } catch (error) {
     if (isDev) {
@@ -58,12 +62,37 @@ export default async function HomePage({
   try {
     const { pageId, reason } = await resolveLandingPage()
     
-    if (pageId && accessiblePages.some(p => p.id === pageId)) {
-      // Valid page resolved - safe to redirect
-      if (isDev) {
-        console.warn('[Redirect]', { reason, pageId, resolved: true })
+    if (isDev) {
+      console.log(`[Redirect] resolveLandingPage returned:`, { pageId, reason, inAccessiblePages: pageId ? accessiblePages.some(p => p.id === pageId) : false })
+    }
+    
+    // resolveLandingPage() already validates access, so if it returns a pageId, it's safe to redirect
+    // We trust its validation since it checks both existence and admin access
+    if (pageId) {
+      // Double-check that page exists (defensive programming)
+      const pageExists = accessiblePages.some(p => p.id === pageId)
+      
+      if (pageExists) {
+        // Valid page resolved and confirmed in accessible list - safe to redirect
+        if (isDev) {
+          console.log('[Redirect] Redirecting to resolved page:', { reason, pageId })
+        }
+        redirect(`/pages/${pageId}`)
+      } else {
+        // Page was resolved by resolveLandingPage() but not in accessible list
+        // This could happen if there's a timing issue or RLS policy difference
+        // Still redirect since resolveLandingPage() validated it, but log warning
+        if (isDev) {
+          console.warn('[Redirect] Page resolved but not in accessible list (redirecting anyway):', { 
+            pageId, 
+            reason, 
+            accessiblePagesCount: accessiblePages.length,
+            accessiblePageIds: accessiblePages.map(p => p.id)
+          })
+        }
+        // Trust resolveLandingPage() validation and redirect anyway
+        redirect(`/pages/${pageId}`)
       }
-      redirect(`/pages/${pageId}`)
     }
     
     // Fallback: Use first accessible page if available

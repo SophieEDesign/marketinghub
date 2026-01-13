@@ -9,12 +9,30 @@ export async function getTables() {
     .order('created_at', { ascending: false })
   
   if (error) {
+    // Log error for debugging
+    console.error('[getTables] Error fetching tables:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint
+    })
+    
     // If table doesn't exist, return empty array
     if (error.code === '42P01') {
+      console.warn('[getTables] Tables table does not exist (42P01)')
       return []
     }
+    
+    // If RLS error, log it but still return empty array to prevent app crash
+    if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('policy')) {
+      console.error('[getTables] RLS policy error - tables may not be accessible. Check RLS policies on tables table.')
+      return []
+    }
+    
     throw error
   }
+  
+  console.log('[getTables] Successfully loaded tables:', data?.length || 0)
   return (data || []) as Table[]
 }
 
