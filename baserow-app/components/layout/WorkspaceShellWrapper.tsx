@@ -100,34 +100,40 @@ export default async function WorkspaceShellWrapper({
     } else if (minimalData) {
       // Try to fetch additional columns if they exist
       try {
-        const { data: fullData, error: fullError } = await supabase
+        // First try without icon column to avoid 400 errors
+        const { data: dataWithoutIcon, error: errorWithoutIcon } = await supabase
           .from('interface_groups')
-          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
+          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only')
           .order('order_index', { ascending: true })
         
-        if (!fullError && fullData) {
-          interfaceGroups = fullData
-            .filter((g: any) => admin || !g.is_admin_only)
-        } else {
-          // Query failed (likely missing columns like icon) - use minimal data with defaults
-          // Check if error is about missing column
-          if (fullError && (
-            fullError.message?.includes('column') || 
-            fullError.message?.includes('does not exist') ||
-            fullError.code === '42703' || // undefined_column
-            fullError.code === 'PGRST116' // column not found
-          )) {
-            // Silently fall back to minimal data - column doesn't exist yet
-            interfaceGroups = minimalData
-              .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
-              .filter((g: any) => admin || !g.is_admin_only)
-          } else {
-            // Other error - log it but still use minimal data
-            console.warn('Error loading full interface_groups data:', fullError)
-            interfaceGroups = minimalData
-              .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+        if (!errorWithoutIcon && dataWithoutIcon) {
+          // If that works, try with icon column
+          try {
+            const { data: fullData, error: fullError } = await supabase
+              .from('interface_groups')
+              .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
+              .order('order_index', { ascending: true })
+            
+            if (!fullError && fullData) {
+              interfaceGroups = fullData
+                .filter((g: any) => admin || !g.is_admin_only)
+            } else {
+              // Icon column doesn't exist - use data without icon
+              interfaceGroups = dataWithoutIcon
+                .map((g: any) => ({ ...g, icon: null }))
+                .filter((g: any) => admin || !g.is_admin_only)
+            }
+          } catch (e) {
+            // Icon column doesn't exist - use data without icon
+            interfaceGroups = dataWithoutIcon
+              .map((g: any) => ({ ...g, icon: null }))
               .filter((g: any) => admin || !g.is_admin_only)
           }
+        } else {
+          // Fallback to minimal data with defaults
+          interfaceGroups = minimalData
+            .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+            .filter((g: any) => admin || !g.is_admin_only)
         }
       } catch (e: any) {
         // Some columns don't exist - use minimal data and add defaults

@@ -10,10 +10,33 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     
     // If table doesn't exist yet (migration not run), return empty array
-    const { data: groups, error } = await supabase
+    // Try to select columns that definitely exist first, then try with optional columns
+    let groups: any[] = []
+    let error: any = null
+    
+    // First try without icon column
+    const { data: dataWithoutIcon, error: errorWithoutIcon } = await supabase
       .from('interface_groups')
-      .select('*')
+      .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only')
       .order('order_index', { ascending: true })
+    
+    if (!errorWithoutIcon && dataWithoutIcon) {
+      // Try with icon column
+      const { data: fullData, error: fullError } = await supabase
+        .from('interface_groups')
+        .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
+        .order('order_index', { ascending: true })
+      
+      if (!fullError && fullData) {
+        groups = fullData
+      } else {
+        // Icon column doesn't exist - use data without icon
+        groups = dataWithoutIcon.map((g: any) => ({ ...g, icon: null }))
+      }
+    } else {
+      groups = []
+      error = errorWithoutIcon
+    }
 
     if (error) {
       // If table doesn't exist (42P01) or relation doesn't exist (PGRST116), return empty array

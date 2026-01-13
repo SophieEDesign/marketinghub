@@ -55,41 +55,39 @@ export default async function Sidebar() {
       
       // Try to fetch additional columns if they exist
       try {
-        const { data: fullData, error: fullError } = await supabase
+        // First try without icon column to avoid 400 errors
+        const { data: dataWithoutIcon, error: errorWithoutIcon } = await supabase
           .from('interface_groups')
-          .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
+          .select('id, name, order_index, collapsed, is_system, is_admin_only')
           .order('order_index', { ascending: true })
         
-        if (!fullError && fullData) {
-          groupsData = fullData
-        } else {
-          // Query failed (likely missing columns like icon) - use minimal data with defaults
-          // Check if error is about missing column
-          if (fullError && (
-            fullError.message?.includes('column') || 
-            fullError.message?.includes('does not exist') ||
-            fullError.code === '42703' || // undefined_column
-            fullError.code === 'PGRST116' // column not found
-          )) {
-            // Silently fall back - column doesn't exist yet
-            groupsData = minimalData.map((g: any) => ({
-              ...g,
-              collapsed: false,
-              is_system: false,
-              is_admin_only: false,
-              icon: null,
-            }))
-          } else {
-            // Other error - log it but still use minimal data
-            console.warn('Error loading full interface_groups data:', fullError)
-            groupsData = minimalData.map((g: any) => ({
-              ...g,
-              collapsed: false,
-              is_system: false,
-              is_admin_only: false,
-              icon: null,
-            }))
+        if (!errorWithoutIcon && dataWithoutIcon) {
+          // If that works, try with icon column
+          try {
+            const { data: fullData, error: fullError } = await supabase
+              .from('interface_groups')
+              .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
+              .order('order_index', { ascending: true })
+            
+            if (!fullError && fullData) {
+              groupsData = fullData
+            } else {
+              // Icon column doesn't exist - use data without icon
+              groupsData = dataWithoutIcon.map((g: any) => ({ ...g, icon: null }))
+            }
+          } catch (e) {
+            // Icon column doesn't exist - use data without icon
+            groupsData = dataWithoutIcon.map((g: any) => ({ ...g, icon: null }))
           }
+        } else {
+          // Fallback to minimal data with defaults
+          groupsData = minimalData.map((g: any) => ({
+            ...g,
+            collapsed: false,
+            is_system: false,
+            is_admin_only: false,
+            icon: null,
+          }))
         }
       } catch (e) {
         // Some columns don't exist - use minimal data and add defaults
