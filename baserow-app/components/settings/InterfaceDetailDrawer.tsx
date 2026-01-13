@@ -288,14 +288,31 @@ export default function InterfaceDetailDrawer({
         // Also update the interface_group's icon if this page belongs to a group
         // The sidebar displays interface_groups, so icons need to be on the group
         if (group) {
-          const { error: groupIconError } = await supabase
-            .from('interface_groups')
-            .update({ icon: icon || null })
-            .eq('id', group)
-          
-          // Ignore errors if icon column doesn't exist (graceful degradation)
-          if (groupIconError && !groupIconError.message?.includes('column') && !groupIconError.message?.includes('does not exist')) {
-            console.warn('Failed to update interface_group icon:', groupIconError)
+          try {
+            const { error: groupIconError } = await supabase
+              .from('interface_groups')
+              .update({ icon: icon || null })
+              .eq('id', group)
+            
+            // Ignore errors if icon column doesn't exist (graceful degradation)
+            if (groupIconError && (
+              groupIconError.message?.includes('column') || 
+              groupIconError.message?.includes('does not exist') ||
+              groupIconError.code === '42703' || // undefined_column
+              groupIconError.code === 'PGRST116' // column not found
+            )) {
+              // Silently ignore - column doesn't exist yet
+              console.log('icon column does not exist yet, skipping update')
+            } else if (groupIconError) {
+              console.warn('Failed to update interface_group icon:', groupIconError)
+            }
+          } catch (e: any) {
+            // Silently ignore column errors
+            if (e.message?.includes('column') || e.message?.includes('does not exist')) {
+              console.log('icon column does not exist yet, skipping update')
+            } else {
+              console.warn('Error updating interface_group icon:', e)
+            }
           }
         }
       } else {
@@ -314,14 +331,31 @@ export default function InterfaceDetailDrawer({
 
         // Also update the interface_group's icon if this view belongs to a group
         if (group) {
-          const { error: groupIconError } = await supabase
-            .from('interface_groups')
-            .update({ icon: icon || null })
-            .eq('id', group)
-          
-          // Ignore errors if icon column doesn't exist (graceful degradation)
-          if (groupIconError && !groupIconError.message?.includes('column') && !groupIconError.message?.includes('does not exist')) {
-            console.warn('Failed to update interface_group icon:', groupIconError)
+          try {
+            const { error: groupIconError } = await supabase
+              .from('interface_groups')
+              .update({ icon: icon || null })
+              .eq('id', group)
+            
+            // Ignore errors if icon column doesn't exist (graceful degradation)
+            if (groupIconError && (
+              groupIconError.message?.includes('column') || 
+              groupIconError.message?.includes('does not exist') ||
+              groupIconError.code === '42703' || // undefined_column
+              groupIconError.code === 'PGRST116' // column not found
+            )) {
+              // Silently ignore - column doesn't exist yet
+              console.log('icon column does not exist yet, skipping update')
+            } else if (groupIconError) {
+              console.warn('Failed to update interface_group icon:', groupIconError)
+            }
+          } catch (e: any) {
+            // Silently ignore column errors
+            if (e.message?.includes('column') || e.message?.includes('does not exist')) {
+              console.log('icon column does not exist yet, skipping update')
+            } else {
+              console.warn('Error updating interface_group icon:', e)
+            }
           }
         }
       }

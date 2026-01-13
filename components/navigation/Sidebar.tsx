@@ -63,14 +63,33 @@ export default async function Sidebar() {
         if (!fullError && fullData) {
           groupsData = fullData
         } else {
-          // Query failed (likely missing columns) - use minimal data with defaults
-          groupsData = minimalData.map((g: any) => ({
-            ...g,
-            collapsed: false,
-            is_system: false,
-            is_admin_only: false,
-            icon: null,
-          }))
+          // Query failed (likely missing columns like icon) - use minimal data with defaults
+          // Check if error is about missing column
+          if (fullError && (
+            fullError.message?.includes('column') || 
+            fullError.message?.includes('does not exist') ||
+            fullError.code === '42703' || // undefined_column
+            fullError.code === 'PGRST116' // column not found
+          )) {
+            // Silently fall back - column doesn't exist yet
+            groupsData = minimalData.map((g: any) => ({
+              ...g,
+              collapsed: false,
+              is_system: false,
+              is_admin_only: false,
+              icon: null,
+            }))
+          } else {
+            // Other error - log it but still use minimal data
+            console.warn('Error loading full interface_groups data:', fullError)
+            groupsData = minimalData.map((g: any) => ({
+              ...g,
+              collapsed: false,
+              is_system: false,
+              is_admin_only: false,
+              icon: null,
+            }))
+          }
         }
       } catch (e) {
         // Some columns don't exist - use minimal data and add defaults

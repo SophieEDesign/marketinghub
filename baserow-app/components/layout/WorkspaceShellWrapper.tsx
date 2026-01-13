@@ -109,10 +109,25 @@ export default async function WorkspaceShellWrapper({
           interfaceGroups = fullData
             .filter((g: any) => admin || !g.is_admin_only)
         } else {
-          // Query failed (likely missing columns) - use minimal data with defaults
-          interfaceGroups = minimalData
-            .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
-            .filter((g: any) => admin || !g.is_admin_only)
+          // Query failed (likely missing columns like icon) - use minimal data with defaults
+          // Check if error is about missing column
+          if (fullError && (
+            fullError.message?.includes('column') || 
+            fullError.message?.includes('does not exist') ||
+            fullError.code === '42703' || // undefined_column
+            fullError.code === 'PGRST116' // column not found
+          )) {
+            // Silently fall back to minimal data - column doesn't exist yet
+            interfaceGroups = minimalData
+              .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+              .filter((g: any) => admin || !g.is_admin_only)
+          } else {
+            // Other error - log it but still use minimal data
+            console.warn('Error loading full interface_groups data:', fullError)
+            interfaceGroups = minimalData
+              .map((g: any) => ({ ...g, collapsed: false, is_system: false, is_admin_only: false, icon: null }))
+              .filter((g: any) => admin || !g.is_admin_only)
+          }
         }
       } catch (e: any) {
         // Some columns don't exist - use minimal data and add defaults
