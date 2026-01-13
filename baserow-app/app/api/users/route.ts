@@ -105,7 +105,9 @@ export async function GET(request: NextRequest) {
               name = authUser.user.user_metadata?.name || authUser.user.user_metadata?.full_name || null
               lastActive = authUser.user.last_sign_in_at || null
               // Check if user doesn't have a password set (users added via SQL)
-              needsPasswordReset = !authUser.user.encrypted_password || authUser.user.encrypted_password.length === 0
+              // Note: encrypted_password is not in the TypeScript type but exists at runtime in admin API
+              const encryptedPassword = (authUser.user as any).encrypted_password
+              needsPasswordReset = !encryptedPassword || encryptedPassword.length === 0
             }
           } catch (error) {
             // If we can't get user details, use placeholder

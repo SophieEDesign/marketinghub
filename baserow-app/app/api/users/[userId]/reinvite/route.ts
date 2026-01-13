@@ -82,9 +82,9 @@ export async function POST(
       'http://localhost:3000'
 
     // Check if user has a password set
-    // Note: encrypted_password might not be directly accessible, so we check if user can sign in
+    // Note: encrypted_password is not in the TypeScript type but exists at runtime in admin API
     // Users without passwords typically have null or empty encrypted_password
-    const hasPassword = user.encrypted_password && user.encrypted_password.length > 0
+    const hasPassword = (user as any).encrypted_password && (user as any).encrypted_password.length > 0
 
     // If user doesn't have a password, use password recovery instead of invite
     if (!hasPassword) {
