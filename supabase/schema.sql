@@ -170,6 +170,7 @@ CREATE TABLE IF NOT EXISTS public.interface_groups (
   collapsed boolean NOT NULL DEFAULT false,
   is_system boolean NOT NULL DEFAULT false,
   is_admin_only boolean NOT NULL DEFAULT true,
+  icon text,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   created_by uuid,
