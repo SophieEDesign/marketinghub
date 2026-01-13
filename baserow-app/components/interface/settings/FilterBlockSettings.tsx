@@ -249,7 +249,7 @@ export default function FilterBlockSettings({
           
           {connectedBlocks.length === 0 && filterableBlocks.length > 0 && (
             <div className="border rounded-lg p-3 bg-gray-50 text-sm text-gray-500 text-center">
-              No elements connected. Select "All compatible elements" or choose specific ones.
+              No elements connected. Select &quot;All compatible elements&quot; or choose specific ones.
             </div>
           )}
           
@@ -260,7 +260,7 @@ export default function FilterBlockSettings({
           )}
         </div>
         <p className="text-xs text-gray-500">
-          These filters will be applied on top of each element's own filters.
+          These filters will be applied on top of each element&apos;s own filters.
         </p>
       </div>
 
@@ -497,7 +497,7 @@ export default function FilterBlockSettings({
             <p className="font-medium mb-1">How Filter Controls Work</p>
             <ul className="list-disc list-inside space-y-1 text-blue-700">
               <li>Filter controls are shared controls that drive connected elements</li>
-              <li>Filters apply in addition to each element's own filters (never replace them)</li>
+              <li>Filters apply in addition to each element&apos;s own filters (never replace them)</li>
               <li>Full filter system: supports AND/OR groups and nested groups</li>
               <li>Changes apply instantly - no Save required</li>
               <li>Only fields common to all connected elements are shown</li>

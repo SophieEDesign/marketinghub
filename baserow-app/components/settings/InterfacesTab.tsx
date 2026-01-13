@@ -170,21 +170,6 @@ export default function InterfacesTab() {
         } catch (e) {
           // Some columns don't exist - use minimal data with defaults
           groupsData = minimalData.map((g: any) => ({ ...g, is_system: false, is_admin_only: false, icon: null }))
-        } else if (fallbackError) {
-            console.error('Error loading interface_groups (fallback):', fallbackError)
-          }
-        } else {
-          // Other error - might be RLS or table doesn't exist
-          console.error('Failed to load interface_groups:', error)
-          // Try without is_system as fallback
-          const { data: fallbackData } = await supabase
-            .from('interface_groups')
-            .select('id, name, order_index, is_admin_only, icon')
-            .order('order_index', { ascending: true })
-          
-          if (fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only ?? true }))
-          }
         }
       }
     } catch (error) {

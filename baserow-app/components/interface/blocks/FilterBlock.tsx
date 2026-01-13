@@ -435,7 +435,7 @@ export default function FilterBlock({
         <div className="mt-3 pt-2 border-t text-xs text-gray-500 flex items-start gap-2">
           <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
           <span>
-            These filters are applied on top of each element's own filters.
+            These filters are applied on top of each element&apos;s own filters.
           </span>
         </div>
       )}
@@ -459,7 +459,7 @@ export default function FilterBlock({
                   <div className="flex-1 text-sm text-blue-800">
                     <p className="font-medium mb-1">Connected to {connectedBlocks.length} element{connectedBlocks.length !== 1 ? 's' : ''}</p>
                     <p className="text-xs text-blue-700">
-                      These filters are applied in addition to each element's own filters.
+                      These filters are applied in addition to each element&apos;s own filters.
                     </p>
                   </div>
                 </div>
