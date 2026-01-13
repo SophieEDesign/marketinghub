@@ -35,6 +35,23 @@ import FieldPickerModal from "../FieldPickerModal"
 import FilterBuilder from "@/components/filters/FilterBuilder"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 interface RecordViewPageSettingsProps {
   pageId: string
@@ -76,7 +93,7 @@ export default function RecordViewPageSettings({
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false)
   
   // Left panel settings state
-  const leftPanelConfig = config.left_panel || {}
+  const leftPanelConfig: NonNullable<PageConfig['left_panel']> = config.left_panel || {}
   // Support both old flat format and new FilterTree format
   const initialFilterTree: FilterTree = leftPanelConfig.filter_tree 
     ? leftPanelConfig.filter_tree
@@ -95,7 +112,7 @@ export default function RecordViewPageSettings({
 
   // Sync state with config changes
   useEffect(() => {
-    const leftPanel = config.left_panel || {}
+    const leftPanel: NonNullable<PageConfig['left_panel']> = config.left_panel || {}
     // Support both old flat format and new FilterTree format
     const newFilterTree: FilterTree = leftPanel.filter_tree 
       ? leftPanel.filter_tree
@@ -308,6 +325,122 @@ export default function RecordViewPageSettings({
     
     setFieldConfigList(updated)
     saveFieldConfigs(updated)
+  }
+
+  // Drag and drop handlers
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      const oldIndex = visibleFieldConfigs.findIndex((f) => f.field === active.id)
+      const newIndex = visibleFieldConfigs.findIndex((f) => f.field === over.id)
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(visibleFieldConfigs, oldIndex, newIndex)
+        
+        // Update orders based on new positions
+        const updated = reordered.map((fieldConfig, index) => ({
+          ...fieldConfig,
+          order: index,
+        }))
+        
+        // Merge with hidden fields
+        const allUpdated = [
+          ...updated,
+          ...fieldConfigList.filter((f) => !f.visible),
+        ]
+        
+        setFieldConfigList(allUpdated)
+        saveFieldConfigs(allUpdated)
+      }
+    }
+  }
+
+  // Sortable field item component
+  function SortableFieldItem({ fieldConfig, index }: { fieldConfig: FieldConfig; index: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: fieldConfig.field })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    const field = fields.find((f) => f.name === fieldConfig.field)
+    if (!field) return null
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          "flex items-center gap-2 p-2 bg-white rounded border",
+          isDragging && "shadow-lg"
+        )}
+      >
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">
+            {field.name}
+          </div>
+          <div className="text-xs text-gray-500">{field.type}</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              handleFieldEditableChange(
+                fieldConfig.field,
+                !fieldConfig.editable
+              )
+            }
+            className={cn(
+              "p-1.5 rounded",
+              fieldConfig.editable && pageEditable
+                ? "text-blue-600 hover:bg-blue-50"
+                : "text-gray-400 hover:bg-gray-50"
+            )}
+            disabled={!pageEditable}
+            title={fieldConfig.editable ? "Editable" : "View-only"}
+          >
+            {fieldConfig.editable && pageEditable ? (
+              <Edit2 className="h-4 w-4" />
+            ) : (
+              <Lock className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              handleFieldVisibilityChange(fieldConfig.field, false)
+            }
+            className="p-1.5 rounded text-gray-400 hover:bg-gray-50"
+          >
+            <EyeOff className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // Create field blocks from field names
@@ -530,82 +663,27 @@ export default function RecordViewPageSettings({
                 editability per field.
               </p>
 
-              {/* Visible Fields List */}
+              {/* Visible Fields List - Drag and Drop */}
               {visibleFieldConfigs.length > 0 && (
                 <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
-                  {visibleFieldConfigs.map((fieldConfig, index) => {
-                    const field = fields.find((f) => f.name === fieldConfig.field)
-                    if (!field) return null
-
-                    return (
-                      <div
-                        key={fieldConfig.field}
-                        className="flex items-center gap-2 p-2 bg-white rounded border"
-                      >
-                        <GripVertical className="h-4 w-4 text-gray-400 cursor-move" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {field.name}
-                          </div>
-                          <div className="text-xs text-gray-500">{field.type}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleFieldEditableChange(
-                                fieldConfig.field,
-                                !fieldConfig.editable
-                              )
-                            }
-                            className={cn(
-                              "p-1.5 rounded",
-                              fieldConfig.editable && pageEditable
-                                ? "text-blue-600 hover:bg-blue-50"
-                                : "text-gray-400 hover:bg-gray-50"
-                            )}
-                            disabled={!pageEditable}
-                            title={fieldConfig.editable ? "Editable" : "View-only"}
-                          >
-                            {fieldConfig.editable && pageEditable ? (
-                              <Edit2 className="h-4 w-4" />
-                            ) : (
-                              <Lock className="h-4 w-4" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleFieldOrderChange(fieldConfig.field, "up")
-                            }
-                            disabled={index === 0}
-                            className="p-1.5 rounded text-gray-400 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ArrowUp className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleFieldOrderChange(fieldConfig.field, "down")
-                            }
-                            disabled={index === visibleFieldConfigs.length - 1}
-                            className="p-1.5 rounded text-gray-400 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ArrowDown className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleFieldVisibilityChange(fieldConfig.field, false)
-                            }
-                            className="p-1.5 rounded text-gray-400 hover:bg-gray-50"
-                          >
-                            <EyeOff className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={visibleFieldConfigs.map((f) => f.field)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {visibleFieldConfigs.map((fieldConfig, index) => (
+                        <SortableFieldItem
+                          key={fieldConfig.field}
+                          fieldConfig={fieldConfig}
+                          index={index}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
               )}
 
@@ -687,14 +765,15 @@ export default function RecordViewPageSettings({
                                   // Keep legacy filter_by for backward compatibility
                                   filter_by: newFilterTree ? (() => {
                                     // Convert FilterTree to flat format for backward compatibility
-                                    const flatFilters: Array<{ field: string; operator: string; value?: any }> = []
+                                    const flatFilters: Array<{ field: string; operator: string; value: any }> = []
                                     function extractConditions(tree: FilterTree) {
                                       if (!tree) return
                                       if ('field_id' in tree) {
+                                        const filterValue = tree.value !== undefined ? tree.value : null
                                         flatFilters.push({
                                           field: tree.field_id,
                                           operator: tree.operator,
-                                          value: tree.value,
+                                          value: filterValue,
                                         })
                                       } else if ('operator' in tree && 'children' in tree) {
                                         tree.children.forEach(child => extractConditions(child))

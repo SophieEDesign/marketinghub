@@ -141,6 +141,11 @@ export default function Canvas({
   const blockHeightsBeforeResizeRef = useRef<Map<string, number>>(new Map())
   const currentlyResizingBlockIdRef = useRef<string | null>(null)
   
+  // Track drag state for snap detection
+  const dragStartPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  const currentlyDraggingBlockIdRef = useRef<string | null>(null)
+  
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
   useEffect(() => {
@@ -422,6 +427,286 @@ export default function Canvas({
   }, [blocks]) // Removed isEditing - mode changes don't trigger syncs
 
   /**
+   * Detects nearby blocks for snapping on all sides (top, bottom, left, right)
+   * Returns snap candidates with their distances and target positions
+   */
+  const detectSnapTargets = useCallback((
+    draggedBlock: Layout,
+    allLayout: Layout[],
+    snapThreshold: number = 1 // Grid units (approximately 30px for default rowHeight, scales with grid)
+  ): {
+    left?: { block: Layout; distance: number; targetX: number }
+    right?: { block: Layout; distance: number; targetX: number }
+    top?: { block: Layout; distance: number; targetY: number }
+    bottom?: { block: Layout; distance: number; targetY: number }
+  } => {
+    const draggedX = draggedBlock.x || 0
+    const draggedY = draggedBlock.y || 0
+    const draggedW = draggedBlock.w || 4
+    const draggedH = draggedBlock.h || 4
+    const draggedRight = draggedX + draggedW
+    const draggedBottom = draggedY + draggedH
+    
+    const snapTargets: {
+      left?: { block: Layout; distance: number; targetX: number }
+      right?: { block: Layout; distance: number; targetX: number }
+      top?: { block: Layout; distance: number; targetY: number }
+      bottom?: { block: Layout; distance: number; targetY: number }
+    } = {}
+    
+    allLayout.forEach(otherBlock => {
+      if (otherBlock.i === draggedBlock.i) return // Skip self
+      
+      const otherX = otherBlock.x || 0
+      const otherY = otherBlock.y || 0
+      const otherW = otherBlock.w || 4
+      const otherH = otherBlock.h || 4
+      const otherRight = otherX + otherW
+      const otherBottom = otherY + otherH
+      
+      // Check horizontal proximity (left/right snapping)
+      // Blocks are horizontally adjacent if their Y ranges overlap
+      const yOverlap = !(draggedBottom <= otherY || draggedY >= otherBottom)
+      
+      if (yOverlap) {
+        // Check left edge snap (dragged block to the right of other block)
+        const distanceToLeft = Math.abs(draggedX - otherRight)
+        if (distanceToLeft <= snapThreshold && (!snapTargets.left || distanceToLeft < snapTargets.left.distance)) {
+          snapTargets.left = {
+            block: otherBlock,
+            distance: distanceToLeft,
+            targetX: otherRight, // Snap to right edge of other block
+          }
+        }
+        
+        // Check right edge snap (dragged block to the left of other block)
+        const distanceToRight = Math.abs(draggedRight - otherX)
+        if (distanceToRight <= snapThreshold && (!snapTargets.right || distanceToRight < snapTargets.right.distance)) {
+          snapTargets.right = {
+            block: otherBlock,
+            distance: distanceToRight,
+            targetX: otherX - draggedW, // Snap to left edge of other block (position dragged block's left edge)
+          }
+        }
+      }
+      
+      // Check vertical proximity (top/bottom snapping)
+      // Blocks are vertically adjacent if their X ranges overlap
+      const xOverlap = !(draggedRight <= otherX || draggedX >= otherRight)
+      
+      if (xOverlap) {
+        // Check top edge snap (dragged block below other block)
+        const distanceToTop = Math.abs(draggedY - otherBottom)
+        if (distanceToTop <= snapThreshold && (!snapTargets.top || distanceToTop < snapTargets.top.distance)) {
+          snapTargets.top = {
+            block: otherBlock,
+            distance: distanceToTop,
+            targetY: otherBottom, // Snap to bottom edge of other block
+          }
+        }
+        
+        // Check bottom edge snap (dragged block above other block)
+        const distanceToBottom = Math.abs(draggedBottom - otherY)
+        if (distanceToBottom <= snapThreshold && (!snapTargets.bottom || distanceToBottom < snapTargets.bottom.distance)) {
+          snapTargets.bottom = {
+            block: otherBlock,
+            distance: distanceToBottom,
+            targetY: otherY - draggedH, // Snap to top edge of other block (position dragged block's top edge)
+          }
+        }
+      }
+    })
+    
+    return snapTargets
+  }, [])
+  
+  /**
+   * Applies horizontal snap to a dragged block if valid snap targets exist
+   * Returns the snapped position or null if no valid snap
+   */
+  const applyHorizontalSnap = useCallback((
+    draggedBlock: Layout,
+    allLayout: Layout[],
+    dragVector: { dx: number; dy: number } | null,
+    cols: number
+  ): Layout | null => {
+    const snapTargets = detectSnapTargets(draggedBlock, allLayout)
+    
+    // Determine dominant snap direction based on:
+    // 1. Drag vector (user intent)
+    // 2. Smallest distance (proximity)
+    
+    let bestSnap: 'left' | 'right' | null = null
+    let bestDistance = Infinity
+    
+    // Prefer horizontal snap if drag vector indicates horizontal movement
+    if (dragVector && Math.abs(dragVector.dx) > Math.abs(dragVector.dy)) {
+      // User is dragging horizontally - prefer horizontal snap
+      if (snapTargets.left && snapTargets.left.distance < bestDistance) {
+        bestSnap = 'left'
+        bestDistance = snapTargets.left.distance
+      }
+      if (snapTargets.right && snapTargets.right.distance < bestDistance) {
+        bestSnap = 'right'
+        bestDistance = snapTargets.right.distance
+      }
+    } else {
+      // No strong horizontal intent, use proximity
+      if (snapTargets.left && snapTargets.left.distance < bestDistance) {
+        bestSnap = 'left'
+        bestDistance = snapTargets.left.distance
+      }
+      if (snapTargets.right && snapTargets.right.distance < bestDistance) {
+        bestSnap = 'right'
+        bestDistance = snapTargets.right.distance
+      }
+    }
+    
+    if (!bestSnap) return null
+    
+    const snapTarget = bestSnap === 'left' ? snapTargets.left! : snapTargets.right!
+    const snappedX = snapTarget.targetX
+    
+    // Ensure snapped position respects grid boundaries
+    const clampedX = Math.max(0, Math.min(snappedX, cols - (draggedBlock.w || 4)))
+    
+    // Check if snapped position would cause overlap
+    const draggedW = draggedBlock.w || 4
+    const draggedH = draggedBlock.h || 4
+    const draggedY = draggedBlock.y || 0
+    
+    let wouldOverlap = false
+    allLayout.forEach(otherBlock => {
+      if (otherBlock.i === draggedBlock.i) return
+      
+      const otherX = otherBlock.x || 0
+      const otherY = otherBlock.y || 0
+      const otherW = otherBlock.w || 4
+      const otherH = otherBlock.h || 4
+      
+      // Check if blocks would overlap
+      const xOverlap = !(clampedX + draggedW <= otherX || clampedX >= otherX + otherW)
+      const yOverlap = !(draggedY + draggedH <= otherY || draggedY >= otherY + otherH)
+      
+      if (xOverlap && yOverlap) {
+        wouldOverlap = true
+      }
+    })
+    
+    if (wouldOverlap) return null
+    
+    // Valid horizontal snap
+    return {
+      ...draggedBlock,
+      x: clampedX,
+    }
+  }, [detectSnapTargets])
+  
+  /**
+   * Applies vertical snap to a dragged block if valid snap targets exist
+   * Returns the snapped position or null if no valid snap
+   */
+  const applyVerticalSnap = useCallback((
+    draggedBlock: Layout,
+    allLayout: Layout[]
+  ): Layout | null => {
+    const snapTargets = detectSnapTargets(draggedBlock, allLayout)
+    
+    // Determine best vertical snap based on proximity
+    let bestSnap: 'top' | 'bottom' | null = null
+    let bestDistance = Infinity
+    
+    if (snapTargets.top && snapTargets.top.distance < bestDistance) {
+      bestSnap = 'top'
+      bestDistance = snapTargets.top.distance
+    }
+    if (snapTargets.bottom && snapTargets.bottom.distance < bestDistance) {
+      bestSnap = 'bottom'
+      bestDistance = snapTargets.bottom.distance
+    }
+    
+    if (!bestSnap) return null
+    
+    const snapTarget = bestSnap === 'top' ? snapTargets.top! : snapTargets.bottom!
+    const snappedY = snapTarget.targetY
+    
+    // Ensure snapped position is non-negative
+    const clampedY = Math.max(0, snappedY)
+    
+    // Check if snapped position would cause overlap
+    const draggedW = draggedBlock.w || 4
+    const draggedH = draggedBlock.h || 4
+    const draggedX = draggedBlock.x || 0
+    
+    let wouldOverlap = false
+    allLayout.forEach(otherBlock => {
+      if (otherBlock.i === draggedBlock.i) return
+      
+      const otherX = otherBlock.x || 0
+      const otherY = otherBlock.y || 0
+      const otherW = otherBlock.w || 4
+      const otherH = otherBlock.h || 4
+      
+      // Check if blocks would overlap
+      const xOverlap = !(draggedX + draggedW <= otherX || draggedX >= otherX + otherW)
+      const yOverlap = !(clampedY + draggedH <= otherY || clampedY >= otherY + otherH)
+      
+      if (xOverlap && yOverlap) {
+        wouldOverlap = true
+      }
+    })
+    
+    if (wouldOverlap) return null
+    
+    // Valid vertical snap
+    return {
+      ...draggedBlock,
+      y: clampedY,
+    }
+  }, [detectSnapTargets])
+  
+  /**
+   * Applies smart snapping with priority: horizontal > vertical > compaction
+   * This respects user intent by preferring horizontal adjacency when valid
+   */
+  const applySmartSnap = useCallback((
+    draggedBlock: Layout,
+    allLayout: Layout[],
+    dragVector: { dx: number; dy: number } | null,
+    cols: number
+  ): Layout => {
+    // Try horizontal snap first (respects spatial intent)
+    const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
+    if (horizontalSnapped) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
+          originalX: draggedBlock.x,
+          snappedX: horizontalSnapped.x,
+          direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
+        })
+      }
+      return horizontalSnapped
+    }
+    
+    // Try vertical snap as second priority
+    const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
+    if (verticalSnapped) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
+          originalY: draggedBlock.y,
+          snappedY: verticalSnapped.y,
+          direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
+        })
+      }
+      return verticalSnapped
+    }
+    
+    // No snap available - return original position
+    // Vertical compaction will be applied separately if needed
+    return draggedBlock
+  }, [applyHorizontalSnap, applyVerticalSnap])
+  
+  /**
    * Vertically compact layout by shifting blocks upward to fill gaps
    * This ensures that when a block shrinks, moves, or is deleted, blocks below shift up
    * 
@@ -611,20 +896,63 @@ export default function Canvas({
             }
           })
           
-          // Always compact after resize/drag ends to remove any gaps
-          // This ensures blocks snap together after any interaction
-          const compactedLayout = compactLayoutVertically(currentLayout, blocks)
+          // Apply smart snapping to dragged blocks before compaction
+          // Priority: horizontal snap > vertical snap > vertical compaction
+          let snappedLayout = [...currentLayout]
+          const cols = layoutSettings?.cols || 12
           
-          // Check if compaction actually changed anything
+          // Find the block that was just dragged (if any)
+          const draggedBlockId = currentlyDraggingBlockIdRef.current
+          if (draggedBlockId) {
+            const draggedBlock = snappedLayout.find(l => l.i === draggedBlockId)
+            if (draggedBlock) {
+              // Calculate drag vector from start to end position
+              const dragStart = dragStartPositionRef.current.get(draggedBlockId)
+              const dragLast = dragLastPositionRef.current.get(draggedBlockId)
+              
+              let dragVector: { dx: number; dy: number } | null = null
+              if (dragStart && dragLast) {
+                dragVector = {
+                  dx: dragLast.x - dragStart.x,
+                  dy: dragLast.y - dragStart.y,
+                }
+              }
+              
+              // Apply smart snap (horizontal > vertical > none)
+              const snappedBlock = applySmartSnap(draggedBlock, snappedLayout, dragVector, cols)
+              
+              // Update the layout with snapped position
+              snappedLayout = snappedLayout.map(item => 
+                item.i === draggedBlockId ? snappedBlock : item
+              )
+              
+              // Clear drag tracking
+              dragStartPositionRef.current.delete(draggedBlockId)
+              dragLastPositionRef.current.delete(draggedBlockId)
+              currentlyDraggingBlockIdRef.current = null
+            }
+          }
+          
+          // Apply vertical compaction to remove gaps (but preserve snapped positions)
+          // Only compact blocks that weren't just snapped horizontally
+          const compactedLayout = compactLayoutVertically(snappedLayout, blocks)
+          
+          // Check if layout changed (either from snapping or compaction)
           const layoutChanged = compactedLayout.some((item, index) => {
             const original = currentLayout.find(l => l.i === item.i)
             if (!original) return true
-            return Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+            return (
+              Math.abs((item.x || 0) - (original.x || 0)) > 0.01 ||
+              Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+            )
           })
           
           if (layoutChanged) {
             if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Compacting layout after resize/drag end')
+              console.log('[Canvas] Applied snap/compaction after drag/resize end', {
+                hadSnap: draggedBlockId !== null,
+                draggedBlockId,
+              })
             }
             
             // Update position tracking ref
@@ -637,7 +965,7 @@ export default function Canvas({
               })
             })
             
-            // Notify parent of compacted layout asynchronously to avoid state update conflicts
+            // Notify parent of snapped/compacted layout asynchronously to avoid state update conflicts
             setTimeout(() => {
               if (onLayoutChange) {
                 const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
@@ -671,7 +999,7 @@ export default function Canvas({
         resizeTimeoutRef.current = null
       }, 300)
     },
-    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks]
+    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks, applySmartSnap, layoutSettings?.cols]
   )
   
   // Reset first layout change flag when entering edit mode
@@ -884,7 +1212,8 @@ export default function Canvas({
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
-      <div ref={containerRef} className="w-full h-full min-w-0">
+      {/* Add padding-bottom to ensure resize handles aren't cut off */}
+      <div ref={containerRef} className="w-full h-full min-w-0" style={{ paddingBottom: isEditing ? '40px' : '0' }}>
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}
@@ -933,14 +1262,51 @@ export default function Canvas({
             
             // Compaction will be handled by handleLayoutChange timeout
           }}
-          onDragStop={(layout, oldItem, newItem, placeholder, e, element) => {
-            // Trigger compaction after drag ends to remove any gaps
+          onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
+            // Track drag start position for snap detection
+            const blockId = oldItem.i
+            currentlyDraggingBlockIdRef.current = blockId
+            dragStartPositionRef.current.set(blockId, {
+              x: oldItem.x || 0,
+              y: oldItem.y || 0,
+            })
+            dragLastPositionRef.current.set(blockId, {
+              x: oldItem.x || 0,
+              y: oldItem.y || 0,
+            })
             if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Drag stopped for block ${oldItem.i}`)
+              console.log(`[Canvas] Drag started for block ${blockId}`, {
+                startX: oldItem.x,
+                startY: oldItem.y,
+              })
+            }
+          }}
+          onDrag={(layout, oldItem, newItem, placeholder, e, element) => {
+            // Update last position during drag (for drag vector calculation)
+            const blockId = oldItem.i
+            dragLastPositionRef.current.set(blockId, {
+              x: newItem.x || 0,
+              y: newItem.y || 0,
+            })
+          }}
+          onDragStop={(layout, oldItem, newItem, placeholder, e, element) => {
+            // Update final position for drag vector calculation
+            const blockId = oldItem.i
+            dragLastPositionRef.current.set(blockId, {
+              x: newItem.x || 0,
+              y: newItem.y || 0,
+            })
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Canvas] Drag stopped for block ${blockId}`, {
+                startX: dragStartPositionRef.current.get(blockId)?.x,
+                startY: dragStartPositionRef.current.get(blockId)?.y,
+                endX: newItem.x,
+                endY: newItem.y,
+              })
             }
             
             // Use the same timeout mechanism as resize to ensure layout is stable
-            // The handleLayoutChange will be called and will compact after timeout
+            // The handleLayoutChange will be called and will apply snap/compaction after timeout
           }}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}

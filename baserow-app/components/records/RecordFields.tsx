@@ -215,15 +215,16 @@ export default function RecordFields({
                 <div className="p-5 space-y-6">
                   {groupFields.map((field) => {
                     const fieldEditable = isFieldEditable(field.name)
+                    // Always show fields as editable (no edit button needed) - auto-update on change
                     return (
                       <InlineFieldEditor
                         key={field.id}
                         field={field}
                         value={formData[field.name]}
                         onChange={(value) => onFieldChange(field.name, value)}
-                        isEditing={editingField === field.id && fieldEditable}
-                        onEditStart={() => fieldEditable && setEditingField(field.id)}
-                        onEditEnd={() => setEditingField(null)}
+                        isEditing={fieldEditable} // Always in edit mode for editable fields
+                        onEditStart={() => {}} // No-op - fields are always editable
+                        onEditEnd={() => {}} // No-op - auto-saves on change
                         onLinkedRecordClick={handleLinkedRecordClick}
                         onAddLinkedRecord={handleAddLinkedRecord}
                         isReadOnly={!fieldEditable}

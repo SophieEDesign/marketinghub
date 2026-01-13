@@ -31,6 +31,7 @@ import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface
 import { evaluateFilterTree } from '@/lib/filters/evaluation'
 import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 import type { FilterTree } from '@/lib/filters/canonical-model'
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from '@/lib/field-colors'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -738,13 +739,32 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
   }
 
-  // Get status colors
-  const getStatusColor = (status: string) => {
-    const statusLower = String(status).toLowerCase()
-    if (statusLower.includes('new')) return 'bg-blue-100 text-blue-800 border-blue-200'
-    if (statusLower.includes('progress')) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-    if (statusLower.includes('done') || statusLower.includes('complete')) return 'bg-green-100 text-green-800 border-green-200'
-    return 'bg-gray-100 text-gray-800 border-gray-200'
+  // Get badge color classes from field color
+  const getBadgeColorClasses = (value: string, field?: TableField) => {
+    if (!field || (field.type !== 'single_select' && field.type !== 'multi_select')) {
+      // Fallback for non-select fields
+      const statusLower = String(value).toLowerCase()
+      if (statusLower.includes('new')) return 'bg-blue-100 text-blue-800 border-blue-200'
+      if (statusLower.includes('progress')) return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      if (statusLower.includes('done') || statusLower.includes('complete')) return 'bg-green-100 text-green-800 border-green-200'
+      return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+    
+    // Use actual field color from options
+    const hexColor = resolveChoiceColor(
+      value,
+      field.type,
+      field.options,
+      field.type === 'single_select'
+    )
+    const normalizedColor = normalizeHexColor(hexColor)
+    const textColor = getTextColorForBackground(normalizedColor)
+    
+    // Convert hex to inline style
+    return {
+      style: { backgroundColor: normalizedColor },
+      className: `${textColor} border border-opacity-20`
+    }
   }
 
   // Handle record delete - switch to first available record
@@ -832,13 +852,26 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                     {Object.entries(groupedRecords).map(([groupValue, records]) => (
                       <div key={groupValue} className={groupField ? "mb-4" : ""}>
                         {/* Group Header - only show if grouping is enabled and not the empty group key */}
-                        {groupField && groupValue !== '' && (
-                          <div className="flex items-center gap-2 mb-1 px-2">
-                            <Badge className={cn('text-xs font-medium', getStatusColor(groupValue))}>
-                              {groupValue}
-                            </Badge>
-                          </div>
-                        )}
+                        {groupField && groupValue !== '' && (() => {
+                          const groupFieldDef = tableFields.find(f => f.name === groupField)
+                          const badgeColors = getBadgeColorClasses(groupValue, groupFieldDef)
+                          return (
+                            <div className="flex items-center gap-2 mb-1 px-2">
+                              {typeof badgeColors === 'string' ? (
+                                <Badge className={cn('text-xs font-medium', badgeColors)}>
+                                  {groupValue}
+                                </Badge>
+                              ) : (
+                                <Badge 
+                                  className={cn('text-xs font-medium', badgeColors.className)}
+                                  style={badgeColors.style}
+                                >
+                                  {groupValue}
+                                </Badge>
+                              )}
+                            </div>
+                          )
+                        })()}
                         
                         {/* Records in this group */}
                         <div className="space-y-1">
@@ -853,16 +886,17 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                             const imageValue = leftPanelImageField ? record[leftPanelImageField] : null
                             
                             // Determine border color from color field (for single_select fields)
-                            // Extract the background color class and convert to border color
-                            let borderColorClass = ''
+                            // Use actual field color from options
+                            let borderColorStyle: React.CSSProperties | undefined = undefined
                             if (colorValue && colorField?.type === 'single_select') {
-                              const statusColorClasses = getStatusColor(String(colorValue))
-                              // Extract bg-* class and convert to border-* for left border
-                              const bgMatch = statusColorClasses.match(/bg-(\w+)-(\d+)/)
-                              if (bgMatch) {
-                                const [, colorName, shade] = bgMatch
-                                borderColorClass = `border-l-4 border-${colorName}-${shade}`
-                              }
+                              const hexColor = resolveChoiceColor(
+                                String(colorValue),
+                                'single_select',
+                                colorField.options,
+                                true
+                              )
+                              const normalizedColor = normalizeHexColor(hexColor)
+                              borderColorStyle = { borderLeftColor: normalizedColor, borderLeftWidth: '4px' }
                             }
                             
                             return (
@@ -877,12 +911,12 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                   setSelectedRecordId(record.id)
                                 }}
                                 className={cn(
-                                  'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs flex items-start gap-2',
+                                  'px-2 py-1.5 rounded-md cursor-pointer transition-colors text-xs flex items-start gap-2 border-l-4',
                                   isSelected 
-                                    ? 'bg-blue-50 border border-blue-200' 
-                                    : 'hover:bg-gray-50 border border-transparent',
-                                  borderColorClass
+                                    ? 'bg-blue-50 border-r border-t border-b border-blue-200' 
+                                    : 'hover:bg-gray-50 border-r border-t border-b border-transparent',
                                 )}
+                                style={borderColorStyle}
                               >
                                 {/* Image field (if configured) */}
                                 {leftPanelImageField && imageValue && (
@@ -936,11 +970,22 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                           if (Array.isArray(fieldValue) && fieldValue.length > 0) {
                                             return (
                                               <div className="flex flex-wrap gap-1">
-                                                {fieldValue.map((val: any, i: number) => (
-                                                  <Badge key={i} className={cn('text-xs', getStatusColor(String(val)))}>
-                                                    {String(val)}
-                                                  </Badge>
-                                                ))}
+                                                {fieldValue.map((val: any, i: number) => {
+                                                  const badgeColors = getBadgeColorClasses(String(val), actualField)
+                                                  return typeof badgeColors === 'string' ? (
+                                                    <Badge key={i} className={cn('text-xs', badgeColors)}>
+                                                      {String(val)}
+                                                    </Badge>
+                                                  ) : (
+                                                    <Badge 
+                                                      key={i}
+                                                      className={cn('text-xs', badgeColors.className)}
+                                                      style={badgeColors.style}
+                                                    >
+                                                      {String(val)}
+                                                    </Badge>
+                                                  )
+                                                })}
                                               </div>
                                             )
                                           }
@@ -952,11 +997,21 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                             {shouldRenderAsPill && fieldValue ? (
                                               actualField?.type === 'multi_select' ? (
                                                 renderMultiSelectPills()
-                                              ) : (
-                                                <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
-                                                  {String(fieldValue)}
-                                                </Badge>
-                                              )
+                                              ) : (() => {
+                                                const badgeColors = getBadgeColorClasses(String(fieldValue), actualField)
+                                                return typeof badgeColors === 'string' ? (
+                                                  <Badge className={cn('text-xs', badgeColors)}>
+                                                    {String(fieldValue)}
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge 
+                                                    className={cn('text-xs', badgeColors.className)}
+                                                    style={badgeColors.style}
+                                                  >
+                                                    {String(fieldValue)}
+                                                  </Badge>
+                                                )
+                                              })()
                                             ) : (
                                               <span>
                                                 {fieldValue !== null && fieldValue !== undefined 
@@ -976,11 +1031,22 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                         {String(record[nameField] || record.id || 'Untitled').substring(0, 30)}
                                         {String(record[nameField] || record.id || 'Untitled').length > 30 ? '...' : ''}
                                       </div>
-                                      {record[statusField] && (
-                                        <Badge className={cn('text-xs mt-0.5', getStatusColor(String(record[statusField])))}>
-                                          {record[statusField]}
-                                        </Badge>
-                                      )}
+                                      {record[statusField] && (() => {
+                                        const statusFieldDef = tableFields.find(f => f.name === statusField)
+                                        const badgeColors = getBadgeColorClasses(String(record[statusField]), statusFieldDef)
+                                        return typeof badgeColors === 'string' ? (
+                                          <Badge className={cn('text-xs mt-0.5', badgeColors)}>
+                                            {record[statusField]}
+                                          </Badge>
+                                        ) : (
+                                          <Badge 
+                                            className={cn('text-xs mt-0.5', badgeColors.className)}
+                                            style={badgeColors.style}
+                                          >
+                                            {record[statusField]}
+                                          </Badge>
+                                        )
+                                      })()}
                                     </>
                                   )}
                                 </div>

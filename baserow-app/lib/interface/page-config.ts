@@ -3,6 +3,8 @@
  * All page behavior comes from config - no hardcoding
  */
 
+import type { FilterTree } from '../filters/canonical-model'
+
 export interface PageConfig {
   // Visualization settings
   visualisation?: string // Override page_type visualization
@@ -59,6 +61,7 @@ export interface PageConfig {
   left_panel?: {
     // Data options
     filter_by?: Array<{ field: string; operator: string; value: any }>
+    filter_tree?: FilterTree
     sort_by?: Array<{ field: string; direction: 'asc' | 'desc' }>
     group_by?: string // Field name to group by
     

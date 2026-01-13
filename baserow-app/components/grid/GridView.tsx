@@ -25,6 +25,7 @@ import { GripVertical } from 'lucide-react'
 import Cell from "./Cell"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
+import RecordModal from "./RecordModal"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
@@ -81,17 +82,27 @@ interface GridViewProps {
 
 const ITEMS_PER_PAGE = 100
 
-// Draggable column header component
+// Draggable column header component with resize
 function DraggableColumnHeader({
   fieldName,
   tableField,
   isVirtual,
   onEdit,
+  width,
+  isResizing,
+  onResizeStart,
+  onResize,
+  onResizeEnd,
 }: {
   fieldName: string
   tableField?: TableField
   isVirtual: boolean
   onEdit?: (fieldName: string) => void
+  width: number
+  isResizing: boolean
+  onResizeStart: (fieldName: string) => void
+  onResize: (fieldName: string, width: number) => void
+  onResizeEnd: () => void
 }) {
   const {
     attributes,
@@ -102,17 +113,47 @@ function DraggableColumnHeader({
     isDragging,
   } = useSortable({ id: fieldName })
 
+  const resizeRef = useRef<HTMLDivElement>(null)
+  const resizeStartXRef = useRef(0)
+  const resizeStartWidthRef = useRef(0)
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    width: `${width}px`,
+    minWidth: `${width}px`,
+    maxWidth: `${width}px`,
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    resizeStartXRef.current = e.clientX
+    resizeStartWidthRef.current = width
+    onResizeStart(fieldName)
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const diff = moveEvent.clientX - resizeStartXRef.current
+      const newWidth = Math.max(100, Math.min(resizeStartWidthRef.current + diff, 1000))
+      onResize(fieldName, newWidth)
+    }
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      onResizeEnd()
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
   }
 
   return (
     <th
       ref={setNodeRef}
       style={style}
-      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider min-w-[150px] sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors"
+      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors relative"
     >
       <div className="flex items-center justify-between gap-2">
         {/* Drag handle */}
@@ -139,6 +180,18 @@ function DraggableColumnHeader({
           <span className="text-red-500 text-xs ml-1">*</span>
         )}
       </div>
+      {/* Resize handle */}
+      <div
+        ref={resizeRef}
+        onMouseDown={handleMouseDown}
+        className="absolute right-0 top-0 bottom-0 cursor-col-resize z-20 w-1 hover:bg-blue-500 transition-colors"
+        style={{
+          width: '6px',
+          marginRight: '-3px',
+          backgroundColor: isResizing ? 'rgb(96 165 250)' : 'transparent',
+        }}
+        title="Drag to resize column"
+      />
     </th>
   )
 }
@@ -177,6 +230,9 @@ export default function GridView({
   const [tableError, setTableError] = useState<string | null>(null)
   const [initializingFields, setInitializingFields] = useState(false)
   const [columnOrder, setColumnOrder] = useState<string[]>([])
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const [resizingColumn, setResizingColumn] = useState<string | null>(null)
+  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -185,6 +241,9 @@ export default function GridView({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
+
+  const COLUMN_DEFAULT_WIDTH = 200
+  const COLUMN_MIN_WIDTH = 100
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -265,22 +324,27 @@ export default function GridView({
     })
   }
 
-  // Load column order from grid_view_settings
+  // Load column order and widths from grid_view_settings
   useEffect(() => {
     if (!viewId || safeTableFields.length === 0) return
 
-    async function loadColumnOrder() {
+    async function loadColumnSettings() {
       try {
         const supabase = createClient()
         const { data, error } = await supabase
           .from('grid_view_settings')
-          .select('column_order')
+          .select('column_order, column_widths')
           .eq('view_id', viewId)
           .maybeSingle()
 
         if (error && error.code !== 'PGRST116') {
-          console.error('Error loading column order:', error)
+          console.error('Error loading column settings:', error)
           return
+        }
+
+        // Load column widths
+        if (data?.column_widths && typeof data.column_widths === 'object') {
+          setColumnWidths(data.column_widths as Record<string, number>)
         }
 
         if (data?.column_order && Array.isArray(data.column_order)) {
@@ -301,7 +365,7 @@ export default function GridView({
           initializeColumnOrder()
         }
       } catch (error) {
-        console.error('Error loading column order:', error)
+        console.error('Error loading column settings:', error)
         initializeColumnOrder()
       }
     }
@@ -322,14 +386,14 @@ export default function GridView({
       setColumnOrder(visibleFieldNames)
     }
 
-    loadColumnOrder()
+    loadColumnSettings()
   }, [viewId, safeViewFields, safeTableFields])
 
-  // Save column order to grid_view_settings
+  // Save column order and widths to grid_view_settings
   useEffect(() => {
     if (!viewId || columnOrder.length === 0) return
 
-    async function saveColumnOrder() {
+    async function saveColumnSettings() {
       try {
         const supabase = createClient()
         const { data: existing } = await supabase
@@ -340,6 +404,7 @@ export default function GridView({
 
         const settingsData = {
           column_order: columnOrder,
+          column_widths: columnWidths,
         }
 
         if (existing) {
@@ -353,21 +418,37 @@ export default function GridView({
             .insert([{
               view_id: viewId,
               ...settingsData,
-              column_widths: {},
               column_wrap_text: {},
               row_height: 'medium',
               frozen_columns: 0,
             }])
         }
       } catch (error) {
-        console.error('Error saving column order:', error)
+        console.error('Error saving column settings:', error)
       }
     }
 
     // Debounce saves to avoid too many database calls
-    const timeoutId = setTimeout(saveColumnOrder, 500)
+    const timeoutId = setTimeout(saveColumnSettings, 500)
     return () => clearTimeout(timeoutId)
-  }, [columnOrder, viewId])
+  }, [columnOrder, columnWidths, viewId])
+
+  // Handle column resize
+  const handleResizeStart = useCallback((fieldName: string) => {
+    if (isMobile) return
+    setResizingColumn(fieldName)
+  }, [isMobile])
+
+  const handleResize = useCallback((fieldName: string, width: number) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [fieldName]: Math.max(COLUMN_MIN_WIDTH, Math.min(width, 1000)),
+    }))
+  }, [])
+
+  const handleResizeEnd = useCallback(() => {
+    setResizingColumn(null)
+  }, [])
 
   // Get visible fields ordered by column order (if set) or by order_index
   const visibleFields = useMemo(() => {
@@ -644,6 +725,9 @@ export default function GridView({
     // If onRecordClick callback provided, use it (for blocks)
     if (onRecordClick) {
       onRecordClick(rowId)
+    } else if (recordOpenStyle === 'modal') {
+      // Open in modal if configured
+      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName })
     } else {
       // Otherwise, use RecordPanel context (for views)
       openRecord(tableId, rowId, supabaseTableName, modalFields)
@@ -895,8 +979,8 @@ export default function GridView({
       )}
 
       {/* Grid Table - Takes remaining space and scrolls */}
-      <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col">
-        <div className="flex-1 overflow-auto">
+      <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative">
+        <div className="flex-1 overflow-auto" style={{ paddingBottom: isEditing ? '20px' : '0' }}>
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -913,6 +997,7 @@ export default function GridView({
                     {visibleFields.map((field) => {
                       const tableField = safeTableFields.find(f => f.name === field.field_name)
                       const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                      const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
                       return (
                         <DraggableColumnHeader
                           key={field.field_name}
@@ -920,6 +1005,11 @@ export default function GridView({
                           tableField={tableField}
                           isVirtual={isVirtual}
                           onEdit={onEditField}
+                          width={columnWidth}
+                          isResizing={resizingColumn === field.field_name}
+                          onResizeStart={handleResizeStart}
+                          onResize={handleResize}
+                          onResizeEnd={handleResizeEnd}
                         />
                       )
                     })}
@@ -1031,10 +1121,12 @@ export default function GridView({
                             {visibleFields.map((field) => {
                               const tableField = safeTableFields.find(f => f.name === field.field_name)
                               const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                              const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
                               return (
                                 <td
                                   key={field.field_name}
                                   className="px-0 py-0"
+                                  style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <Cell
@@ -1116,10 +1208,12 @@ export default function GridView({
                     {visibleFields.map((field) => {
                       const tableField = safeTableFields.find(f => f.name === field.field_name)
                       const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                      const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
                       return (
                         <td
                           key={field.field_name}
                           className="px-0 py-0"
+                          style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <Cell
@@ -1182,7 +1276,17 @@ export default function GridView({
         </div>
       )}
 
-      {/* Record panel is now global - no local drawer needed */}
+      {/* Record modal */}
+      {modalRecord && (
+        <RecordModal
+          isOpen={!!modalRecord}
+          onClose={() => setModalRecord(null)}
+          tableId={modalRecord.tableId}
+          recordId={modalRecord.recordId}
+          tableName={modalRecord.tableName}
+          modalFields={modalFields}
+        />
+      )}
     </div>
   )
 }
