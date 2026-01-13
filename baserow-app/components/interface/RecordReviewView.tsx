@@ -28,6 +28,9 @@ import { applySearchToFilters, type FilterConfig } from '@/lib/interface/filters
 import RecordDetailsPanel from './RecordDetailsPanel'
 import { useToast } from '@/components/ui/use-toast'
 import { debugLog, debugWarn, debugError, isDebugEnabled } from '@/lib/interface/debug-flags'
+import { evaluateFilterTree } from '@/lib/filters/evaluation'
+import { filterConfigsToFilterTree } from '@/lib/filters/converters'
+import type { FilterTree } from '@/lib/filters/canonical-model'
 
 interface RecordReviewViewProps {
   page: InterfacePage
@@ -267,7 +270,12 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
   ) || columns[0] // Fallback to first column if all else fails
   
   // Get left panel filters and sort from config
-  const leftPanelFilters = config.left_panel?.filter_by || []
+  // Support both old flat format and new FilterTree format
+  const leftPanelFiltersRaw = config.left_panel?.filter_by || []
+  const leftPanelFilterTree: FilterTree = config.left_panel?.filter_tree 
+    ? config.left_panel.filter_tree 
+    : (leftPanelFiltersRaw.length > 0 ? filterConfigsToFilterTree(leftPanelFiltersRaw, 'AND') : null)
+  
   const leftPanelSorts = config.left_panel?.sort_by || []
 
   // Filter data based on search, filters, and left panel filters
@@ -288,56 +296,33 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       })
     }
 
-    // Apply left panel filters (page-level configuration)
-    if (leftPanelFilters.length > 0) {
+    // Apply left panel filters using filter evaluation engine (supports groups)
+    if (leftPanelFilterTree) {
       result = result.filter((record) => {
-        return leftPanelFilters.every((filter: any) => {
-          const fieldValue = record[filter.field]
-          switch (filter.operator) {
-            case 'equal':
-              return fieldValue === filter.value
-            case 'not_equal':
-              return fieldValue !== filter.value
-            case 'contains':
-              return String(fieldValue || '').toLowerCase().includes(String(filter.value || '').toLowerCase())
-            case 'greater_than':
-              return Number(fieldValue) > Number(filter.value)
-            case 'less_than':
-              return Number(fieldValue) < Number(filter.value)
-            case 'is_empty':
-              return fieldValue === null || fieldValue === undefined || fieldValue === ''
-            case 'is_not_empty':
-              return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
-            default:
-              return true
+        return evaluateFilterTree(record, leftPanelFilterTree, (row, fieldId) => {
+          // Try to find field by name or ID
+          const field = tableFields.find(f => f.name === fieldId || f.id === fieldId)
+          if (field) {
+            return row[field.name]
           }
+          // Fallback: try direct access
+          return row[fieldId]
         })
       })
     }
 
-    // Apply block-level filters (if any)
+    // Apply block-level filters using filter evaluation engine (supports groups)
     if (filters.length > 0) {
+      const blockFilterTree = filterConfigsToFilterTree(filters, 'AND')
       result = result.filter((record) => {
-        return filters.every((filter) => {
-          const fieldValue = record[filter.field]
-          switch (filter.operator) {
-            case 'equal':
-              return fieldValue === filter.value
-            case 'not_equal':
-              return fieldValue !== filter.value
-            case 'contains':
-              return String(fieldValue || '').toLowerCase().includes(String(filter.value || '').toLowerCase())
-            case 'greater_than':
-              return Number(fieldValue) > Number(filter.value)
-            case 'less_than':
-              return Number(fieldValue) < Number(filter.value)
-            case 'is_empty':
-              return fieldValue === null || fieldValue === undefined || fieldValue === ''
-            case 'is_not_empty':
-              return fieldValue !== null && fieldValue !== undefined && fieldValue !== ''
-            default:
-              return true
+        return evaluateFilterTree(record, blockFilterTree, (row, fieldId) => {
+          // Try to find field by name or ID
+          const field = tableFields.find(f => f.name === fieldId || f.id === fieldId)
+          if (field) {
+            return row[field.name]
           }
+          // Fallback: try direct access
+          return row[fieldId]
         })
       })
     }
@@ -367,7 +352,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
 
     return result
-  }, [data, searchQuery, filters, leftPanelFilters, leftPanelSorts, columns, pageTableId])
+  }, [data, searchQuery, filters, leftPanelFilterTree, leftPanelSorts, columns, pageTableId, tableFields])
 
   // Find selected record from filtered data (or fallback to full data if not in filtered)
   const selectedRecord = useMemo(() => {
