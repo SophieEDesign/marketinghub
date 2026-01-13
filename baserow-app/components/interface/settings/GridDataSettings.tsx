@@ -130,7 +130,7 @@ export default function GridDataSettings({
     const selectedFieldNames = config.visible_fields || []
     return selectedFieldNames
       .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
-      .filter((f): f is TableField => f !== undefined)
+      .filter((f: TableField | undefined): f is TableField => f !== undefined)
   }, [config.visible_fields, availableDisplayFields])
 
   // Get currently selected modal fields in order
@@ -138,7 +138,7 @@ export default function GridDataSettings({
     const selectedFieldNames = (config as any).modal_fields || []
     return selectedFieldNames
       .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
-      .filter((f): f is TableField => f !== undefined)
+      .filter((f: TableField | undefined): f is TableField => f !== undefined)
   }, [(config as any).modal_fields, availableDisplayFields])
 
   // Get fields that can be added to display (not already selected)
