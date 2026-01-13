@@ -187,6 +187,7 @@ export default function InterfacesTab() {
         order_index: g.order_index || 0,
         is_admin_only: g.is_admin_only ?? true,
         is_system: g.is_system || false,
+        icon: g.icon || null,
       }))
 
     // Group pages by group_id, including ungrouped pages
@@ -232,6 +233,7 @@ export default function InterfacesTab() {
           order_index: 9999,
           is_admin_only: true,
           is_system: true,
+          icon: null,
         }
         allGroups.push(virtualUngroupedGroup)
         pagesByGroup.set(virtualUngroupedGroup.id, ungroupedPages)
