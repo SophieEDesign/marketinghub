@@ -129,7 +129,7 @@ export default function GridDataSettings({
   const selectedDisplayFields = useMemo(() => {
     const selectedFieldNames = config.visible_fields || []
     return selectedFieldNames
-      .map((fieldName) => availableDisplayFields.find((f) => f.name === fieldName || f.id === fieldName))
+      .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
       .filter((f): f is TableField => f !== undefined)
   }, [config.visible_fields, availableDisplayFields])
 
@@ -137,7 +137,7 @@ export default function GridDataSettings({
   const selectedModalFields = useMemo(() => {
     const selectedFieldNames = (config as any).modal_fields || []
     return selectedFieldNames
-      .map((fieldName: string) => availableDisplayFields.find((f) => f.name === fieldName || f.id === fieldName))
+      .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
       .filter((f): f is TableField => f !== undefined)
   }, [(config as any).modal_fields, availableDisplayFields])
 
@@ -367,12 +367,12 @@ export default function GridDataSettings({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={selectedDisplayFields.map((f) => f.name)}
+              items={selectedDisplayFields.map((f: TableField) => f.name)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
                 {selectedDisplayFields.length > 0 ? (
-                  selectedDisplayFields.map((field) => (
+                  selectedDisplayFields.map((field: TableField) => (
                     <SortableFieldItem
                       key={field.id}
                       field={field}
@@ -439,12 +439,12 @@ export default function GridDataSettings({
             onDragEnd={handleModalDragEnd}
           >
             <SortableContext
-              items={selectedModalFields.map((f) => f.name)}
+              items={selectedModalFields.map((f: TableField) => f.name)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
                 {selectedModalFields.length > 0 ? (
-                  selectedModalFields.map((field) => (
+                  selectedModalFields.map((field: TableField) => (
                     <SortableFieldItem
                       key={field.id}
                       field={field}
@@ -453,7 +453,7 @@ export default function GridDataSettings({
                   ))
                 ) : (
                   <p className="text-xs text-gray-400 italic text-center py-4">
-                    No fields selected. All fields will be shown in the modal. Add fields using the dropdown above to limit what's displayed.
+                    No fields selected. All fields will be shown in the modal. Add fields using the dropdown above to limit what&apos;s displayed.
                   </p>
                 )}
               </div>
@@ -1033,63 +1033,6 @@ export default function GridDataSettings({
           </div>
         </>
       )}
-    </div>
-  )
-}
-
-// Sortable field item component
-function SortableFieldItem({
-  field,
-  onRemove,
-}: {
-  field: TableField
-  onRemove: () => void
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: field.name })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="flex items-center gap-3 p-2 border rounded-md bg-white hover:bg-gray-50"
-    >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-        <GripVertical className="h-4 w-4 text-gray-400" />
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-gray-900">
-          {field.name}
-        </div>
-        <div className="text-xs text-gray-500">{field.type}</div>
-      </div>
-      
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={(e) => {
-          e.stopPropagation()
-          e.preventDefault()
-          onRemove()
-        }}
-        className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
-        title="Remove field"
-      >
-        <X className="h-4 w-4" />
-      </Button>
     </div>
   )
 }

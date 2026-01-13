@@ -7,7 +7,8 @@ import type { BlockFilter } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import FilterBuilder from "@/components/filters/FilterBuilder"
 import type { FilterTree } from "@/lib/filters/canonical-model"
-import { filterConfigsToFilterTree, conditionsToFilterTree } from "@/lib/filters/converters"
+import { filterConfigsToFilterTree } from "@/lib/filters/converters"
+import { conditionsToFilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
 
 interface BlockFilterEditorProps {

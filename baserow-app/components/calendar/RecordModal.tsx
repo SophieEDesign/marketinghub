@@ -19,6 +19,7 @@ interface RecordModalProps {
   tableId: string
   recordId: string | null
   tableFields: TableField[]
+  modalFields?: string[] // Fields to show in modal (if empty, show all)
   onSave?: () => void
 }
 
@@ -28,6 +29,7 @@ export default function RecordModal({
   tableId,
   recordId,
   tableFields,
+  modalFields = [],
   onSave,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
@@ -155,7 +157,18 @@ export default function RecordModal({
         ) : (
           <div className="space-y-4 py-4">
             {Array.isArray(tableFields) && tableFields
-              .filter((field) => field && field.name !== 'id' && field.name !== 'created_at' && field.name !== 'updated_at')
+              .filter((field) => {
+                // Always exclude system fields
+                if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
+                  return false
+                }
+                // If modalFields is specified and not empty, only show those fields
+                if (modalFields.length > 0) {
+                  return modalFields.includes(field.name)
+                }
+                // Otherwise show all fields
+                return true
+              })
               .map((field) => {
                 const value = formData[field.name]
 
