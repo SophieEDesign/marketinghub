@@ -479,12 +479,14 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     const shouldBeEditable = !readOnly
     editor.setEditable(shouldBeEditable)
     
-    if (process.env.NODE_ENV === 'development' && shouldBeEditable && !editorInitializedRef.current) {
-      console.log(`[TextBlock] editor init: blockId=${block.id}`, {
+    // Debug logging to verify editable state
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[TextBlock] Setting editable state: blockId=${block.id}`, {
         isEditing,
         isViewer,
         readOnly,
-        effectiveIsEditing: shouldBeEditable,
+        shouldBeEditable,
+        editorIsEditable: editor.isEditable,
       })
     }
     
@@ -875,9 +877,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Always visible when in edit mode (not hover-dependent) */}
-      {/* CRITICAL: Toolbar must NOT depend on hover - force it visible for debugging */}
-      {editor && isEditing && <Toolbar />}
+      {/* Toolbar - Only visible when editor is actually editable */}
+      {/* CRITICAL: Toolbar should only show when editor is editable, not just when isEditing is true */}
+      {editor && isEditing && !readOnly && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (

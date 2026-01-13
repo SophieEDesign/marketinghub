@@ -226,94 +226,170 @@ export default function SettingsWorkspaceTab() {
         // Convert "__none__" to null for database storage
         const defaultInterfaceId = defaultPageId === "__none__" ? null : (defaultPageId || null)
         
+        console.log('[WorkspaceTab] Saving default page:', { 
+          defaultPageId, 
+          defaultInterfaceId,
+          convertingToNull: defaultPageId === "__none__"
+        })
+        
         // First, try to get existing workspace_settings row
         const { data: existingSettings, error: fetchError } = await supabase
           .from('workspace_settings')
           .select('id')
           .maybeSingle()
 
-        if (fetchError && fetchError.code !== 'PGRST116' && fetchError.code !== '42P01' && fetchError.code !== '42703') {
-          // Only log non-column-missing errors
-          if (!fetchError.message?.includes('column') && !fetchError.message?.includes('does not exist')) {
-            console.error('Error fetching workspace settings:', fetchError)
-          }
-        }
-
-        // Use upsert to avoid 409 conflicts - handles both insert and update
-        // If no existing settings, we need to insert with a new UUID or let DB generate it
-        // But first try to get the first row (there should only be one)
-        if (!existingSettings) {
-          // Try to get any existing row first
-          const { data: anySettings } = await supabase
-            .from('workspace_settings')
-            .select('id')
-            .limit(1)
-            .maybeSingle()
-          
-          if (anySettings) {
-            // Update existing row
-            const { error: updateError } = await supabase
-              .from('workspace_settings')
-              .update({
-                default_interface_id: defaultInterfaceId,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', anySettings.id)
-            
-            if (updateError) {
-              throw updateError
-            } else {
-              defaultPageSaveSuccess = true
-            }
+        if (fetchError) {
+          if (fetchError.code === 'PGRST116' || fetchError.code === '42P01' || fetchError.code === '42703' ||
+              fetchError.message?.includes('column') || fetchError.message?.includes('does not exist')) {
+            // Column/table doesn't exist - this is okay, treat as success
+            console.log('[WorkspaceTab] workspace_settings table/column does not exist, skipping save')
+            defaultPageSaveSuccess = true
           } else {
-            // No row exists, insert new one (let DB generate UUID)
-            const { error: insertError } = await supabase
-              .from('workspace_settings')
-              .insert({
-                default_interface_id: defaultInterfaceId,
-              })
-            
-            if (insertError) {
-              throw insertError
-            } else {
-              defaultPageSaveSuccess = true
-            }
+            console.error('[WorkspaceTab] Error fetching workspace settings:', fetchError)
+            throw fetchError
           }
-        } else {
+        } else if (existingSettings) {
           // Update existing row
-          const { error: updateError } = await supabase
+          console.log('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id)
+          const { data: updatedData, error: updateError } = await supabase
             .from('workspace_settings')
             .update({
               default_interface_id: defaultInterfaceId,
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingSettings.id)
+            .select('default_interface_id')
+            .single()
           
           if (updateError) {
+            console.error('[WorkspaceTab] Update error:', {
+              code: updateError.code,
+              message: updateError.message,
+              details: updateError
+            })
             throw updateError
           } else {
+            console.log('[WorkspaceTab] Successfully updated default_interface_id:', {
+              saved: updatedData?.default_interface_id,
+              expected: defaultInterfaceId
+            })
             defaultPageSaveSuccess = true
+          }
+        } else {
+          // No row exists, try to insert new one
+          // First check if there's ANY row (maybe RLS prevented first query)
+          const { data: anyRow } = await supabase
+            .from('workspace_settings')
+            .select('id')
+            .limit(1)
+            .maybeSingle()
+          
+          if (anyRow) {
+            // Row exists but wasn't returned by first query (RLS issue?) - try update
+            console.log('[WorkspaceTab] Found row on second check, updating:', anyRow.id)
+            const { data: updatedData, error: updateError } = await supabase
+              .from('workspace_settings')
+              .update({
+                default_interface_id: defaultInterfaceId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', anyRow.id)
+              .select('default_interface_id')
+              .single()
+            
+            if (updateError) {
+              console.error('[WorkspaceTab] Update error on second check:', {
+                code: updateError.code,
+                message: updateError.message,
+                details: updateError
+              })
+              throw updateError
+            } else {
+              console.log('[WorkspaceTab] Successfully updated default_interface_id on second check:', {
+                saved: updatedData?.default_interface_id,
+                expected: defaultInterfaceId
+              })
+              defaultPageSaveSuccess = true
+            }
+          } else {
+            // No row exists, insert new one (let DB generate UUID)
+            console.log('[WorkspaceTab] No existing row, inserting new workspace_settings')
+            const { data: insertedData, error: insertError } = await supabase
+              .from('workspace_settings')
+              .insert({
+                default_interface_id: defaultInterfaceId,
+              })
+              .select('id, default_interface_id')
+              .single()
+            
+            if (insertError) {
+              console.error('[WorkspaceTab] Insert error:', {
+                code: insertError.code,
+                message: insertError.message,
+                details: insertError,
+                hint: insertError.hint
+              })
+              throw insertError
+            } else {
+              console.log('[WorkspaceTab] Successfully inserted workspace_settings:', {
+                id: insertedData?.id,
+                default_interface_id: insertedData?.default_interface_id,
+                expected: defaultInterfaceId
+              })
+              defaultPageSaveSuccess = true
+            }
+          }
+        }
+        
+        // Verify the save by reading it back
+        if (defaultPageSaveSuccess) {
+          const { data: verifyData, error: verifyError } = await supabase
+            .from('workspace_settings')
+            .select('default_interface_id')
+            .maybeSingle()
+          
+          if (!verifyError && verifyData) {
+            console.log('[WorkspaceTab] Verified save - default_interface_id in DB:', verifyData.default_interface_id)
+            if (verifyData.default_interface_id !== defaultInterfaceId) {
+              console.warn('[WorkspaceTab] WARNING: Saved value does not match!', {
+                expected: defaultInterfaceId,
+                actual: verifyData.default_interface_id
+              })
+            }
+          } else if (verifyError) {
+            console.warn('[WorkspaceTab] Could not verify save:', verifyError)
           }
         }
       } catch (settingsError: any) {
+        console.error('[WorkspaceTab] Error saving default page setting:', settingsError)
         // Only ignore errors if column doesn't exist yet
         if (settingsError?.code === 'PGRST116' || settingsError?.code === '42P01' || settingsError?.code === '42703' ||
             settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist')) {
           // Column doesn't exist - this is okay, treat as success
+          console.log('[WorkspaceTab] Column doesn\'t exist, treating as success')
           defaultPageSaveSuccess = true
         } else if (settingsError?.code === '23503') {
           // Foreign key constraint violation - the page ID doesn't exist in interface_pages
-          console.error('Foreign key constraint violation - page ID not found:', settingsError)
+          console.error('[WorkspaceTab] Foreign key constraint violation - page ID not found:', {
+            pageId: defaultPageId,
+            error: settingsError
+          })
           setMessage({ 
             type: 'error', 
-            text: `Workspace saved, but default page setting failed: The selected page no longer exists. Please select a different page.` 
+            text: `Workspace saved, but default page setting failed: The selected page no longer exists or the foreign key constraint is pointing to the wrong table. Please select a different page.` 
           })
         } else {
-          console.warn('Error saving default page setting:', settingsError)
-          // Don't throw - we'll still save workspace name/icon, but note the issue
-          if (settingsError?.message) {
-            setMessage({ type: 'error', text: `Workspace saved, but default page setting failed: ${settingsError.message}` })
-          }
+          // Show detailed error message
+          const errorMessage = settingsError?.message || settingsError?.code || 'Unknown error'
+          console.error('[WorkspaceTab] Save failed with error:', {
+            code: settingsError?.code,
+            message: errorMessage,
+            details: settingsError
+          })
+          setMessage({ 
+            type: 'error', 
+            text: `Workspace saved, but default page setting failed: ${errorMessage}` 
+          })
         }
       }
 
