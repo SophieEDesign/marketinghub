@@ -203,6 +203,7 @@ export interface BlockConfig {
     divider_thickness?: number
     divider_color?: string
     divider_style?: 'solid' | 'dashed' | 'dotted'
+    divider_height?: number
     divider_spacing_top?: number
     divider_spacing_bottom?: number
     // Timeline/Calendar view specific
