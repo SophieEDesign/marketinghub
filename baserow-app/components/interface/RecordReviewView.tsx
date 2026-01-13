@@ -947,14 +947,31 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                         const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
                                         
                                         // Find the actual field definition to check its type
-                                        const actualField = tableFields.find(f => 
+                                        // Try multiple matching strategies to ensure we find the field
+                                        let actualField = tableFields.find(f => 
                                           f.name === fieldIdOrName || 
-                                          f.id === fieldIdOrName ||
-                                          f.name.toLowerCase() === fieldIdOrName.toLowerCase()
+                                          f.id === fieldIdOrName
                                         )
                                         
+                                        // If not found, try case-insensitive match
+                                        if (!actualField) {
+                                          actualField = tableFields.find(f => 
+                                            f.name.toLowerCase() === fieldIdOrName.toLowerCase() ||
+                                            f.id.toLowerCase() === fieldIdOrName.toLowerCase()
+                                          )
+                                        }
+                                        
+                                        // If still not found, try matching by display name
+                                        if (!actualField) {
+                                          const displayName = getFieldDisplayName(fieldIdOrName)
+                                          actualField = tableFields.find(f => 
+                                            f.name === displayName || 
+                                            f.name.toLowerCase() === displayName.toLowerCase()
+                                          )
+                                        }
+                                        
                                         // Check if field should be rendered as a pill/badge
-                                        // - Select/multi-select fields should always be pills
+                                        // - Select/multi-select fields should always be pills (if they have a value)
                                         // - Fields named "status", "state", or "stage" should be pills
                                         const isSelectField = actualField && (
                                           actualField.type === 'single_select' || 
@@ -963,7 +980,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                         const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
                                                               fieldIdOrName.toLowerCase() === 'state' ||
                                                               fieldIdOrName.toLowerCase() === 'stage'
-                                        const shouldRenderAsPill = isSelectField || (isStatusField && fieldValue)
+                                        // Always render select fields as pills if they have a value
+                                        const shouldRenderAsPill = (isSelectField && fieldValue) || (isStatusField && fieldValue)
                                         
                                         // Handle multi-select fields (array of values)
                                         const renderMultiSelectPills = () => {

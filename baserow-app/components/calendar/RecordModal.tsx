@@ -20,6 +20,7 @@ interface RecordModalProps {
   recordId: string | null
   tableFields: TableField[]
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  initialData?: Record<string, any> // Initial data for creating new records
   onSave?: () => void
 }
 
@@ -30,6 +31,7 @@ export default function RecordModal({
   recordId,
   tableFields,
   modalFields = [],
+  initialData,
   onSave,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
@@ -94,31 +96,54 @@ export default function RecordModal({
     }
   }, [open, tableId, loadTableInfo])
 
-  // Load record data when table name is available
+  // Load record data when table name is available, or initialize with initialData for new records
   useEffect(() => {
-    if (open && recordId && supabaseTableName) {
-      loadRecord()
+    if (open && supabaseTableName) {
+      if (recordId) {
+        loadRecord()
+      } else if (initialData) {
+        // Initialize form data with initialData for new records
+        setFormData(initialData)
+      } else {
+        setFormData({})
+      }
     }
-  }, [open, recordId, supabaseTableName, loadRecord])
+  }, [open, recordId, supabaseTableName, loadRecord, initialData])
 
   async function handleSave() {
-    if (!supabaseTableName || !recordId) return
+    if (!supabaseTableName) return
 
     setSaving(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase
-        .from(supabaseTableName)
-        .update(formData)
-        .eq('id', recordId)
+      
+      if (recordId) {
+        // Update existing record
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .update(formData)
+          .eq('id', recordId)
 
-      if (error) {
-        console.error('Error saving record:', error)
-        alert('Failed to save record. Please try again.')
+        if (error) {
+          console.error('Error saving record:', error)
+          alert('Failed to save record. Please try again.')
+          return
+        }
       } else {
-        onSave?.()
-        onClose()
+        // Create new record
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .insert(formData)
+
+        if (error) {
+          console.error('Error creating record:', error)
+          alert('Failed to create record. Please try again.')
+          return
+        }
       }
+
+      onSave?.()
+      onClose()
     } catch (error) {
       console.error('Error saving record:', error)
       alert('Failed to save record. Please try again.')
@@ -131,7 +156,7 @@ export default function RecordModal({
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
 
-  if (!open || !recordId) return null
+  if (!open) return null
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -146,7 +171,7 @@ export default function RecordModal({
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <DialogTitle>Record Details</DialogTitle>
+            <DialogTitle>{recordId ? 'Record Details' : 'Create New Record'}</DialogTitle>
           </div>
         </DialogHeader>
 

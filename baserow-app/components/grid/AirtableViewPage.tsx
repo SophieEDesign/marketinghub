@@ -398,7 +398,7 @@ export default function AirtableViewPage({
             onEditField={handleEditField}
             groupBy={groupBy || undefined}
             userRole="editor"
-            disableRecordPanel={true}
+            disableRecordPanel={false}
           />
         ) : view.type === "kanban" ? (
           <AirtableKanbanView

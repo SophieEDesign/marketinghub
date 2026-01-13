@@ -303,7 +303,7 @@ export default function RecordDetailsPanel({
   }
 
   return (
-    <div className="flex-1 border-l flex flex-col overflow-hidden bg-white">
+    <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden bg-white">
       {/* Header - Enhanced with editable title and status */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
         {/* Primary Name - Editable */}

@@ -13,7 +13,7 @@
  * These settings control the record itself, not how data is displayed in blocks.
  */
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -27,6 +27,8 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { ArrowUp, ArrowDown, GripVertical, Eye, EyeOff, Edit2, Lock, Settings } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 import type { PageConfig } from "@/lib/interface/page-config"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
@@ -383,6 +385,31 @@ export default function RecordViewPageSettings({
     const field = fields.find((f) => f.name === fieldConfig.field)
     if (!field) return null
 
+    // Check if this is a select field and show a sample color pill
+    const isSelectField = field.type === 'single_select' || field.type === 'multi_select'
+    const sampleChoice = field.options?.choices?.[0]
+    let colorBadge = null
+    
+    if (isSelectField && sampleChoice) {
+      const hexColor = resolveChoiceColor(
+        sampleChoice,
+        field.type,
+        field.options,
+        field.type === 'single_select'
+      )
+      const normalizedColor = normalizeHexColor(hexColor)
+      const textColor = getTextColorForBackground(normalizedColor)
+      
+      colorBadge = (
+        <Badge
+          className={cn('text-xs', textColor)}
+          style={{ backgroundColor: normalizedColor }}
+        >
+          {sampleChoice}
+        </Badge>
+      )
+    }
+
     return (
       <div
         ref={setNodeRef}
@@ -400,8 +427,11 @@ export default function RecordViewPageSettings({
           <GripVertical className="h-4 w-4 text-gray-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 truncate">
-            {field.name}
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-medium text-gray-900 truncate">
+              {field.name}
+            </div>
+            {colorBadge}
           </div>
           <div className="text-xs text-gray-500">{field.type}</div>
         </div>
@@ -546,6 +576,28 @@ export default function RecordViewPageSettings({
   const hiddenFieldConfigs = fieldConfigList.filter((f) => !f.visible)
   const pageEditable = config.allow_editing !== false
 
+  // Group visible fields by their group_name
+  const groupedVisibleFields = useMemo(() => {
+    const groups: Record<string, typeof visibleFieldConfigs> = {}
+    const ungrouped: typeof visibleFieldConfigs = []
+    
+    visibleFieldConfigs.forEach((fieldConfig) => {
+      const field = fields.find((f) => f.name === fieldConfig.field)
+      const groupName = field?.group_name || null
+      
+      if (groupName) {
+        if (!groups[groupName]) {
+          groups[groupName] = []
+        }
+        groups[groupName].push(fieldConfig)
+      } else {
+        ungrouped.push(fieldConfig)
+      }
+    })
+    
+    return { groups, ungrouped }
+  }, [visibleFieldConfigs, fields])
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="data" className="w-full">
@@ -663,9 +715,9 @@ export default function RecordViewPageSettings({
                 editability per field.
               </p>
 
-              {/* Visible Fields List - Drag and Drop */}
+              {/* Visible Fields List - Drag and Drop with Grouping */}
               {visibleFieldConfigs.length > 0 && (
-                <div className="space-y-2 border rounded-lg p-3 bg-gray-50">
+                <div className="space-y-3 border rounded-lg p-3 bg-gray-50">
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -675,12 +727,33 @@ export default function RecordViewPageSettings({
                       items={visibleFieldConfigs.map((f) => f.field)}
                       strategy={verticalListSortingStrategy}
                     >
-                      {visibleFieldConfigs.map((fieldConfig, index) => (
-                        <SortableFieldItem
-                          key={fieldConfig.field}
-                          fieldConfig={fieldConfig}
-                          index={index}
-                        />
+                      {/* Ungrouped fields */}
+                      {groupedVisibleFields.ungrouped.length > 0 && (
+                        <div className="space-y-2">
+                          {groupedVisibleFields.ungrouped.map((fieldConfig, index) => (
+                            <SortableFieldItem
+                              key={fieldConfig.field}
+                              fieldConfig={fieldConfig}
+                              index={index}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Grouped fields */}
+                      {Object.entries(groupedVisibleFields.groups).map(([groupName, groupFields]) => (
+                        <div key={groupName} className="space-y-2">
+                          <div className="px-2 py-1 text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100 rounded">
+                            {groupName}
+                          </div>
+                          {groupFields.map((fieldConfig, index) => (
+                            <SortableFieldItem
+                              key={fieldConfig.field}
+                              fieldConfig={fieldConfig}
+                              index={index}
+                            />
+                          ))}
+                        </div>
                       ))}
                     </SortableContext>
                   </DndContext>

@@ -31,6 +31,7 @@ import { useDataView } from '@/lib/dataView/useDataView'
 import type { Selection } from '@/lib/dataView/types'
 import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
 import { cn } from '@/lib/utils'
+import RecordModal from './RecordModal'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -82,6 +83,7 @@ export default function AirtableGridView({
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
+  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
 
   // Load tableId from tableName if not provided
   useEffect(() => {
@@ -107,9 +109,10 @@ export default function AirtableGridView({
 
   const handleRowClick = useCallback((rowId: string) => {
     if (!disableRecordPanel && tableIdState && tableName) {
-      openRecord(tableIdState, rowId, tableName)
+      // Open in modal instead of side panel
+      setModalRecord({ tableId: tableIdState, recordId: rowId, tableName })
     }
-  }, [tableIdState, tableName, openRecord, disableRecordPanel])
+  }, [tableIdState, tableName, disableRecordPanel])
   
   // Map row height from props to internal format
   // On mobile, cap row height to medium for better usability
@@ -1088,6 +1091,17 @@ export default function AirtableGridView({
           window.location.reload()
         }}
       />
+      
+      {/* Record modal */}
+      {modalRecord && (
+        <RecordModal
+          isOpen={!!modalRecord}
+          onClose={() => setModalRecord(null)}
+          tableId={modalRecord.tableId}
+          recordId={modalRecord.recordId}
+          tableName={modalRecord.tableName}
+        />
+      )}
     </div>
   )
 }
