@@ -568,7 +568,7 @@ export default function GridView({
             order_index: tableField?.order_index ?? tableField?.position ?? vf.position ?? 0,
           }
         })
-        .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && f.field_name)
+        .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && !!f.field_name)
     }
     
     // Fallback to order_index sorting
@@ -912,9 +912,10 @@ export default function GridView({
 
     return sortedGroupKeys.map((key) => {
       const groupRows = asArray(groups[key])
+      const firstRow = groupRows[0] && typeof groupRows[0] === 'object' ? groupRows[0] as Record<string, any> : null
       return {
         key,
-        value: groupRows[0] && typeof groupRows[0] === 'object' ? groupRows[0][groupBy] : "Uncategorized",
+        value: firstRow && groupBy ? firstRow[groupBy] : "Uncategorized",
         rows: groupRows, // Ensure rows is always an array
       }
     })
@@ -1171,7 +1172,7 @@ export default function GridView({
                     items={
                       safeVisibleFields.length > 0
                         ? safeVisibleFields
-                            .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && f.field_name)
+                            .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && !!f.field_name)
                             .map(f => f.field_name)
                             .filter((name): name is string => typeof name === 'string' && name.length > 0)
                         : []
@@ -1185,7 +1186,7 @@ export default function GridView({
                             return field !== null && 
                                    field !== undefined && 
                                    typeof field === 'object' &&
-                                   field.field_name && 
+                                   !!field.field_name && 
                                    typeof field.field_name === 'string'
                           })
                           .map((field) => {
@@ -1331,7 +1332,7 @@ export default function GridView({
                                     return field !== null && 
                                            field !== undefined && 
                                            typeof field === 'object' &&
-                                           field.field_name && 
+                                           !!field.field_name && 
                                            typeof field.field_name === 'string'
                                   })
                                   .map((field) => {
@@ -1443,7 +1444,7 @@ export default function GridView({
                             return field !== null && 
                                    field !== undefined && 
                                    typeof field === 'object' &&
-                                   field.field_name && 
+                                   !!field.field_name && 
                                    typeof field.field_name === 'string'
                           })
                           .map((field) => {
