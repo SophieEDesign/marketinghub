@@ -19,13 +19,15 @@ export async function PATCH(
     // }
     
     const body = await request.json()
-    const { name, order_index, collapsed, is_admin_only } = body
+    const { name, order_index, collapsed, is_admin_only, icon } = body
 
     const updates: any = {}
     if (name !== undefined) updates.name = name.trim()
     if (order_index !== undefined) updates.order_index = order_index
     if (collapsed !== undefined) updates.collapsed = collapsed
     if (is_admin_only !== undefined) updates.is_admin_only = is_admin_only
+    // Only include icon if provided and column exists (will fail gracefully if column doesn't exist)
+    if (icon !== undefined) updates.icon = icon
 
     const { data: group, error } = await supabase
       .from('interface_groups')

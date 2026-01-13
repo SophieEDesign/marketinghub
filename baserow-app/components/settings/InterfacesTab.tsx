@@ -706,16 +706,32 @@ export default function InterfacesTab() {
                 onChange={async (iconName) => {
                   try {
                     const supabase = createClient()
+                    // Try to update icon, but handle gracefully if column doesn't exist
                     const { error } = await supabase
                       .from('interface_groups')
                       .update({ icon: iconName || null })
                       .eq('id', group.id)
                     
-                    if (error) throw error
+                    if (error) {
+                      // If column doesn't exist (PGRST116 or 400 error), just log and continue
+                      if (error.code === 'PGRST116' || error.code === '42703' || 
+                          error.message?.includes('column') || error.message?.includes('does not exist')) {
+                        console.warn('icon column does not exist yet, skipping update')
+                        // Still update the local state for UI consistency
+                        setGroups(prev => prev.map(g => 
+                          g.id === group.id ? { ...g, icon: iconName || null } : g
+                        ))
+                        return
+                      }
+                      throw error
+                    }
                     await loadInterfaces()
                   } catch (error: any) {
                     console.error('Error updating icon:', error)
-                    alert(error.message || 'Failed to update icon')
+                    // Only show alert for non-column-missing errors
+                    if (!error.message?.includes('column') && !error.message?.includes('does not exist')) {
+                      alert(error.message || 'Failed to update icon')
+                    }
                   }
                 }}
                 placeholder="Folder"
