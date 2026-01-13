@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
+import BlockFilterEditor from "./BlockFilterEditor"
 
 interface ChartDataSettingsProps {
   config: BlockConfig
@@ -269,6 +270,17 @@ export default function ChartDataSettings({
           Maximum number of data points to display (default: 100)
         </p>
       </div>
+
+      {/* Filters */}
+      {config.table_id && (
+        <div className="space-y-2 border-t pt-4">
+          <BlockFilterEditor
+            filters={config.filters || []}
+            tableFields={fields}
+            onChange={(filters) => onUpdate({ filters })}
+          />
+        </div>
+      )}
     </div>
   )
 }

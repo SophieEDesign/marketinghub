@@ -10,12 +10,13 @@ interface RecordPanelState {
   width: number
   isPinned: boolean
   isFullscreen: boolean
+  modalFields?: string[] // Fields to show in modal (if empty, show all)
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[]) => void
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
@@ -42,13 +43,14 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     history: [],
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string) => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[]) => {
     setState((prev) => ({
       ...prev,
       isOpen: true,
       tableId,
       recordId,
       tableName,
+      modalFields,
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],

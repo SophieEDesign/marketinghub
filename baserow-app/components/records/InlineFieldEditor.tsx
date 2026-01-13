@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip } from "lucide-react"
+import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
@@ -480,16 +480,171 @@ export default function InlineFieldEditor({
     )
   }
 
-  // Default: Text, Number, Email, URL, etc.
+  // URL fields - display as clickable links
+  if (field.type === "url") {
+    const formatUrl = (url: string): string => {
+      if (!url) return ''
+      try {
+        const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`)
+        return urlObj.hostname.replace('www.', '')
+      } catch {
+        return url
+      }
+    }
+
+    const getFullUrl = (url: string): string => {
+      if (!url) return ''
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url
+      }
+      return `https://${url}`
+    }
+
+    if (isEditing && !isReadOnly) {
+      return (
+        <div className="space-y-2.5">
+          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type="url"
+            value={localValue ?? ""}
+            onChange={(e) => handleChange(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="https://example.com"
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-2.5">
+        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+          {field.name}
+          {isVirtual && (
+            <span title="Formula or lookup field">
+              <Calculator className="h-3 w-3 text-gray-400" />
+            </span>
+          )}
+        </label>
+        {isReadOnly ? (
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic min-h-[40px] flex items-center">
+            {value ? (
+              <a
+                href={getFullUrl(value)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+              >
+                {formatUrl(value)}
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            ) : (
+              "—"
+            )}
+          </div>
+        ) : (
+          <div
+            onClick={onEditStart}
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm min-h-[40px] flex items-center group"
+            title={value || undefined}
+          >
+            {value ? (
+              <a
+                href={getFullUrl(value)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+              >
+                {formatUrl(value)}
+                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </a>
+            ) : (
+              <span className="text-gray-400">Click to edit...</span>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Email fields - display as clickable mailto links
+  if (field.type === "email") {
+    if (isEditing && !isReadOnly) {
+      return (
+        <div className="space-y-2.5">
+          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type="email"
+            value={localValue ?? ""}
+            onChange={(e) => handleChange(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="email@example.com"
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-2.5">
+        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+          {field.name}
+          {isVirtual && (
+            <span title="Formula or lookup field">
+              <Calculator className="h-3 w-3 text-gray-400" />
+            </span>
+          )}
+        </label>
+        {isReadOnly ? (
+          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic min-h-[40px] flex items-center gap-1">
+            {value ? (
+              <>
+                <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                <a
+                  href={`mailto:${value}`}
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  {value}
+                </a>
+              </>
+            ) : (
+              "—"
+            )}
+          </div>
+        ) : (
+          <div
+            onClick={onEditStart}
+            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm min-h-[40px] flex items-center"
+            title={value || undefined}
+          >
+            {value ? (
+              <>
+                <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                <a
+                  href={`mailto:${value}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  {value}
+                </a>
+              </>
+            ) : (
+              <span className="text-gray-400">Click to edit...</span>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Default: Text, Number, etc.
   if (isEditing && !isReadOnly) {
-    const inputType =
-      field.type === "number"
-        ? "number"
-        : field.type === "email"
-          ? "email"
-          : field.type === "url"
-            ? "url"
-            : "text"
+    const inputType = field.type === "number" ? "number" : "text"
 
     return (
       <div className="space-y-2.5">

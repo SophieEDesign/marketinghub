@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -10,13 +10,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch, X, Plus } from "lucide-react"
+import { Grid, Columns, Calendar, Image as ImageIcon, GitBranch, X, Plus, GripVertical } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { BlockConfig, ViewType, BlockFilter } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import type { FieldType } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import BlockFilterEditor from "./BlockFilterEditor"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -86,6 +104,9 @@ export default function GridDataSettings({
   // Removed SQL view loading - users select tables, not SQL views
   // SQL views are internal and must never be selected by users
 
+  const [addFieldValue, setAddFieldValue] = useState<string>('')
+  const [addModalFieldValue, setAddModalFieldValue] = useState<string>('')
+
   // Determine compatible view types based on available fields
   const getCompatibleViewTypes = (): ViewType[] => {
     const fieldTypes = new Set<FieldType>(fields.map(f => f.type as FieldType))
@@ -98,6 +119,113 @@ export default function GridDataSettings({
 
   const compatibleTypes = getCompatibleViewTypes()
   const currentViewType: ViewType = config?.view_type || 'grid'
+
+  // Get available fields for display (exclude system fields)
+  const availableDisplayFields = useMemo(() => {
+    return fields.filter((f) => f.name !== 'id' && f.name !== 'created_at' && f.name !== 'updated_at')
+  }, [fields])
+
+  // Get currently selected display fields in order
+  const selectedDisplayFields = useMemo(() => {
+    const selectedFieldNames = config.visible_fields || []
+    return selectedFieldNames
+      .map((fieldName) => availableDisplayFields.find((f) => f.name === fieldName || f.id === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [config.visible_fields, availableDisplayFields])
+
+  // Get currently selected modal fields in order
+  const selectedModalFields = useMemo(() => {
+    const selectedFieldNames = (config as any).modal_fields || []
+    return selectedFieldNames
+      .map((fieldName: string) => availableDisplayFields.find((f) => f.name === fieldName || f.id === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [(config as any).modal_fields, availableDisplayFields])
+
+  // Get fields that can be added to display (not already selected)
+  const availableToAdd = useMemo(() => {
+    const selectedNames = config.visible_fields || []
+    return availableDisplayFields.filter((f) => !selectedNames.includes(f.name) && !selectedNames.includes(f.id))
+  }, [availableDisplayFields, config.visible_fields])
+
+  // Get fields that can be added to modal (not already selected)
+  const availableToAddModal = useMemo(() => {
+    const selectedNames = (config as any).modal_fields || []
+    return availableDisplayFields.filter((f) => !selectedNames.includes(f.name) && !selectedNames.includes(f.id))
+  }, [availableDisplayFields, (config as any).modal_fields])
+
+  // Set up drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end for display fields (reorder fields)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const currentFields = config.visible_fields || []
+    const oldIndex = currentFields.indexOf(active.id as string)
+    const newIndex = currentFields.indexOf(over.id as string)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newFields = arrayMove(currentFields, oldIndex, newIndex)
+      onUpdate({ visible_fields: newFields })
+    }
+  }
+
+  // Handle drag end for modal fields (reorder fields)
+  const handleModalDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const currentFields = (config as any).modal_fields || []
+    const oldIndex = currentFields.indexOf(active.id as string)
+    const newIndex = currentFields.indexOf(over.id as string)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newFields = arrayMove(currentFields, oldIndex, newIndex)
+      onUpdate({ modal_fields: newFields } as any)
+    }
+  }
+
+  // Handle adding a field to display
+  const handleAddField = (fieldName: string) => {
+    const currentFields = config.visible_fields || []
+    const field = fields.find(f => f.name === fieldName || f.id === fieldName)
+    if (field && !currentFields.includes(field.name) && !currentFields.includes(field.id)) {
+      onUpdate({ visible_fields: [...currentFields, field.name] })
+      setAddFieldValue('')
+    }
+  }
+
+  // Handle removing a field from display
+  const handleRemoveField = (fieldName: string) => {
+    const currentFields = config.visible_fields || []
+    onUpdate({
+      visible_fields: currentFields.filter((f: string) => f !== fieldName && f !== fieldName)
+    })
+  }
+
+  // Handle adding a field to modal
+  const handleAddModalField = (fieldName: string) => {
+    const currentFields = (config as any).modal_fields || []
+    const field = fields.find(f => f.name === fieldName || f.id === fieldName)
+    if (field && !currentFields.includes(field.name) && !currentFields.includes(field.id)) {
+      onUpdate({ modal_fields: [...currentFields, field.name] } as any)
+      setAddModalFieldValue('')
+    }
+  }
+
+  // Handle removing a field from modal
+  const handleRemoveModalField = (fieldName: string) => {
+    const currentFields = (config as any).modal_fields || []
+    onUpdate({
+      modal_fields: currentFields.filter((f: string) => f !== fieldName)
+    } as any)
+  }
 
   return (
     <div className="space-y-4">
@@ -197,299 +325,155 @@ export default function GridDataSettings({
         </p>
       </div>
 
-      {/* Visible Fields - Required */}
+      {/* Fields to Show on Cards/Table - Required */}
       {config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Visible Fields *</Label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  // Select all fields
-                  const allFieldNames = fields.map(f => f.name)
-                  onUpdate({ visible_fields: allFieldNames })
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Select All
-              </button>
-              <span className="text-xs text-gray-300">|</span>
-              <button
-                type="button"
-                onClick={() => {
-                  // Select none
-                  onUpdate({ visible_fields: [] })
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Select None
-              </button>
+            <div>
+              <Label>Fields to Show on Cards/Table *</Label>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Choose which fields appear in the view. Drag to reorder.
+              </p>
             </div>
           </div>
-          <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2">
-            {fields.map((field) => {
-              const visibleFields = config.visible_fields || []
-              const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
-              return (
-                <label
-                  key={field.id}
-                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                >
-                  <Checkbox
-                    checked={isVisible}
-                    onCheckedChange={(checked) => {
-                      const currentFields = config.visible_fields || []
-                      if (checked) {
-                        // Add field if not already present
-                        if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
-                          onUpdate({ visible_fields: [...currentFields, field.name] })
-                        }
-                      } else {
-                        // Remove field
-                        onUpdate({
-                          visible_fields: currentFields.filter(
-                            (f: string) => f !== field.name && f !== field.id
-                          ),
-                        })
-                      }
-                    }}
-                  />
-                  <span className="text-sm">{field.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{field.type}</span>
-                </label>
-              )
-            })}
-          </div>
+
+          {/* Add Field Dropdown */}
+          {availableToAdd.length > 0 && (
+            <Select
+              value={addFieldValue}
+              onValueChange={(value) => {
+                if (value) {
+                  handleAddField(value)
+                }
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Add a field..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableToAdd.map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {field.name} ({field.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Selected Fields List with Drag and Drop */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={selectedDisplayFields.map((f) => f.name)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+                {selectedDisplayFields.length > 0 ? (
+                  selectedDisplayFields.map((field) => (
+                    <SortableFieldItem
+                      key={field.id}
+                      field={field}
+                      onRemove={() => handleRemoveField(field.name)}
+                    />
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 italic text-center py-4">
+                    No fields selected. Add a field using the dropdown above.
+                  </p>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {availableDisplayFields.length === 0 && (
+            <p className="text-xs text-gray-400 italic">No fields available to display</p>
+          )}
           <p className="text-xs text-gray-500">
-            Select which fields to display in the table. At least one field must be selected.
+            At least one field must be selected.
           </p>
+        </div>
+      )}
+
+      {/* Fields to Show in Modal */}
+      {config.table_id && fields.length > 0 && (
+        <div className="space-y-2 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Fields to Show in Modal</Label>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Choose which fields appear when clicking on a record. Drag to reorder. Leave empty to show all fields.
+              </p>
+            </div>
+          </div>
+
+          {/* Add Field Dropdown */}
+          {availableToAddModal.length > 0 && (
+            <Select
+              value={addModalFieldValue}
+              onValueChange={(value) => {
+                if (value) {
+                  handleAddModalField(value)
+                }
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Add a field..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableToAddModal.map((field) => (
+                  <SelectItem key={field.id} value={field.name}>
+                    {field.name} ({field.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Selected Fields List with Drag and Drop */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleModalDragEnd}
+          >
+            <SortableContext
+              items={selectedModalFields.map((f) => f.name)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+                {selectedModalFields.length > 0 ? (
+                  selectedModalFields.map((field) => (
+                    <SortableFieldItem
+                      key={field.id}
+                      field={field}
+                      onRemove={() => handleRemoveModalField(field.name)}
+                    />
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400 italic text-center py-4">
+                    No fields selected. All fields will be shown in the modal. Add fields using the dropdown above to limit what's displayed.
+                  </p>
+                )}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          {availableDisplayFields.length === 0 && (
+            <p className="text-xs text-gray-400 italic">No fields available to display</p>
+          )}
         </div>
       )}
 
       {/* Filters (optional) - For Table, Calendar, Kanban, and Timeline views */}
       {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline') && config.table_id && fields.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Filters (optional)</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const currentFilters = config.filters || []
-                onUpdate({
-                  filters: [
-                    ...currentFilters,
-                    { field: fields[0]?.name || '', operator: 'equal', value: '' }
-                  ]
-                })
-              }}
-              className="h-7 text-xs"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Filter
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {(config.filters || []).map((filter: any, index: number) => (
-              <div key={index} className="flex gap-2 items-start p-2 border rounded-md">
-                <Select
-                  value={filter.field || ''}
-                  onValueChange={(value) => {
-                    const currentFilters = config.filters || []
-                    const updated = [...currentFilters]
-                    updated[index] = { ...updated[index], field: value }
-                    onUpdate({ filters: updated })
-                  }}
-                >
-                  <SelectTrigger className="h-8 flex-1">
-                    <SelectValue placeholder="Field" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fields.map((field) => (
-                      <SelectItem key={field.id} value={field.name}>
-                        {field.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={filter.operator || 'equal'}
-                  onValueChange={(value) => {
-                    const currentFilters = config.filters || []
-                    const updated = [...currentFilters]
-                    // Type assertion: value is guaranteed to be one of the valid operators from SelectItem
-                    updated[index] = { ...updated[index], operator: value as BlockFilter['operator'] }
-                    onUpdate({ filters: updated })
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="equal">Equals</SelectItem>
-                    <SelectItem value="not_equal">Not equals</SelectItem>
-                    <SelectItem value="contains">Contains</SelectItem>
-                    <SelectItem value="greater_than">Greater than</SelectItem>
-                    <SelectItem value="less_than">Less than</SelectItem>
-                    <SelectItem value="is_empty">Is empty</SelectItem>
-                    <SelectItem value="is_not_empty">Is not empty</SelectItem>
-                  </SelectContent>
-                </Select>
-                {filter.operator !== 'is_empty' && filter.operator !== 'is_not_empty' && (() => {
-                  // Find the selected field
-                  const selectedField = fields.find(f => f.name === filter.field)
-                  const fieldType = selectedField?.type
-                  
-                  // For single_select or multi_select fields, show dropdown with choices
-                  if (fieldType === 'single_select' || fieldType === 'multi_select') {
-                    const choices = selectedField?.options?.choices || []
-                    return (
-                      <Select
-                        value={filter.value || ''}
-                        onValueChange={(value) => {
-                          const currentFilters = config.filters || []
-                          const updated = [...currentFilters]
-                          updated[index] = { ...updated[index], value }
-                          onUpdate({ filters: updated })
-                        }}
-                      >
-                        <SelectTrigger className="h-8 flex-1">
-                          <SelectValue placeholder="Select value" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {choices.length > 0 ? (
-                            choices.map((choice: string) => (
-                              <SelectItem key={choice} value={choice}>
-                                {choice}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-1.5 text-sm text-gray-500">No options available</div>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    )
-                  }
-                  
-                  // For date fields, show date input with quick options
-                  if (fieldType === 'date') {
-                    const getDateValue = (option: string): string => {
-                      const today = new Date()
-                      today.setHours(0, 0, 0, 0)
-                      
-                      switch (option) {
-                        case 'today':
-                          return today.toISOString().split('T')[0]
-                        case 'tomorrow':
-                          const tomorrow = new Date(today)
-                          tomorrow.setDate(tomorrow.getDate() + 1)
-                          return tomorrow.toISOString().split('T')[0]
-                        case 'yesterday':
-                          const yesterday = new Date(today)
-                          yesterday.setDate(yesterday.getDate() - 1)
-                          return yesterday.toISOString().split('T')[0]
-                        case 'this_week_start':
-                          const weekStart = new Date(today)
-                          weekStart.setDate(today.getDate() - today.getDay())
-                          return weekStart.toISOString().split('T')[0]
-                        case 'this_week_end':
-                          const weekEnd = new Date(today)
-                          weekEnd.setDate(today.getDate() - today.getDay() + 6)
-                          return weekEnd.toISOString().split('T')[0]
-                        case 'this_month_start':
-                          return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
-                        case 'this_month_end':
-                          return new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
-                        default:
-                          return option
-                      }
-                    }
-                    
-                    return (
-                      <div className="flex gap-2 flex-1">
-                        <Input
-                          type="date"
-                          value={filter.value || ''}
-                          onChange={(e) => {
-                            const currentFilters = config.filters || []
-                            const updated = [...currentFilters]
-                            updated[index] = { ...updated[index], value: e.target.value }
-                            onUpdate({ filters: updated })
-                          }}
-                          className="h-8 flex-1"
-                        />
-                        <Select
-                          value=""
-                          onValueChange={(value) => {
-                            if (value) {
-                              const dateValue = getDateValue(value)
-                              const currentFilters = config.filters || []
-                              const updated = [...currentFilters]
-                              updated[index] = { ...updated[index], value: dateValue }
-                              onUpdate({ filters: updated })
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue placeholder="Quick..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="today">Today</SelectItem>
-                            <SelectItem value="tomorrow">Tomorrow</SelectItem>
-                            <SelectItem value="yesterday">Yesterday</SelectItem>
-                            <SelectItem value="this_week_start">This week start</SelectItem>
-                            <SelectItem value="this_week_end">This week end</SelectItem>
-                            <SelectItem value="this_month_start">This month start</SelectItem>
-                            <SelectItem value="this_month_end">This month end</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )
-                  }
-                  
-                  // For other field types, show regular text input
-                  return (
-                    <Input
-                      value={filter.value || ''}
-                      onChange={(e) => {
-                        const currentFilters = config.filters || []
-                        const updated = [...currentFilters]
-                        updated[index] = { ...updated[index], value: e.target.value }
-                        onUpdate({ filters: updated })
-                      }}
-                      placeholder="Value"
-                      className="h-8 flex-1"
-                    />
-                  )
-                })()}
-                {(filter.operator === 'is_empty' || filter.operator === 'is_not_empty') && (
-                  <div className="h-8 flex-1 flex items-center text-xs text-gray-500 px-2">
-                    No value needed
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const currentFilters = config.filters || []
-                    onUpdate({ filters: currentFilters.filter((_: any, i: number) => i !== index) })
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            {(!config.filters || config.filters.length === 0) && (
-              <p className="text-xs text-gray-400 italic">No filters configured</p>
-            )}
-          </div>
-          <p className="text-xs text-gray-500">
-            Filter rows by field values. Supports equals, contains, comparison, and empty checks.
-          </p>
+        <div className="space-y-2 border-t pt-4">
+          <BlockFilterEditor
+            filters={config.filters || []}
+            tableFields={fields}
+            onChange={(filters) => onUpdate({ filters })}
+          />
         </div>
       )}
 
@@ -1049,6 +1033,120 @@ export default function GridDataSettings({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// Sortable field item component
+function SortableFieldItem({
+  field,
+  onRemove,
+}: {
+  field: TableField
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.name })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-2 border rounded-md bg-white hover:bg-gray-50"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900">
+          {field.name}
+        </div>
+        <div className="text-xs text-gray-500">{field.type}</div>
+      </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          onRemove()
+        }}
+        className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+        title="Remove field"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  )
+}
+
+// Sortable field item component
+function SortableFieldItem({
+  field,
+  onRemove,
+}: {
+  field: TableField
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.name })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-2 border rounded-md bg-white hover:bg-gray-50"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900">
+          {field.name}
+        </div>
+        <div className="text-xs text-gray-500">{field.type}</div>
+      </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          onRemove()
+        }}
+        className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+        title="Remove field"
+      >
+        <X className="h-4 w-4" />
+      </Button>
     </div>
   )
 }

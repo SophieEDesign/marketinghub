@@ -41,7 +41,8 @@ export interface CalendarConfig {
   calendar_start_field: string | null
   calendar_end_field: string | null
   calendar_color_field: string | null
-  calendar_display_fields: string[] // Fields to display on calendar entries
+  calendar_display_fields: string[] // Fields to display on calendar entry cards
+  calendar_modal_fields: string[] // Fields to display in the record modal
   user_dropdown_filters: string[] // Field names to show as dropdown filters at the top
   first_day_of_week: number
   show_weekends: boolean
@@ -70,7 +71,8 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
     calendar_start_field: null,
     calendar_end_field: null,
     calendar_color_field: null,
-    calendar_display_fields: [], // Fields to show on calendar entries
+    calendar_display_fields: [], // Fields to show on calendar entry cards
+    calendar_modal_fields: [], // Fields to show in the record modal
     user_dropdown_filters: [], // Fields to show as dropdown filters
     first_day_of_week: 1, // Monday
     show_weekends: true,
@@ -126,6 +128,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
           calendar_end_field: view.config.calendar_end_field || null,
           calendar_color_field: view.config.calendar_color_field || null,
           calendar_display_fields: Array.isArray(view.config.calendar_display_fields) ? view.config.calendar_display_fields : [],
+          calendar_modal_fields: Array.isArray(view.config.calendar_modal_fields) ? view.config.calendar_modal_fields : [],
           user_dropdown_filters: Array.isArray(view.config.user_dropdown_filters) ? view.config.user_dropdown_filters : [],
           first_day_of_week: view.config.first_day_of_week ?? 1,
           show_weekends: view.config.show_weekends ?? true,
@@ -150,6 +153,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
             calendar_end_field: endField?.name || null,
             calendar_color_field: null,
             calendar_display_fields: [], // Default: show only title
+            calendar_modal_fields: [], // Default: show all fields
             user_dropdown_filters: [], // Default: no filters
             first_day_of_week: 1,
             show_weekends: true,
@@ -582,6 +586,7 @@ export default function CalendarView({ tableId, viewId, rows, visibleFields }: C
         tableId={tableId}
         recordId={selectedRecordId}
         tableFields={tableFields}
+        modalFields={Array.isArray(config.calendar_modal_fields) ? config.calendar_modal_fields : []}
         onSave={() => {
           // Reload events after save
           processEvents()

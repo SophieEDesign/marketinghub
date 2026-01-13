@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -18,6 +18,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { GripVertical, X } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { TableField } from '@/types/fields'
 import type { CalendarConfig } from './CalendarView'
 
@@ -37,6 +55,8 @@ export default function CalendarSettings({
   onSave,
 }: CalendarSettingsProps) {
   const [localConfig, setLocalConfig] = useState<CalendarConfig>(config)
+  const [addFieldValue, setAddFieldValue] = useState<string>('')
+  const [addModalFieldValue, setAddModalFieldValue] = useState<string>('')
 
   useEffect(() => {
     setLocalConfig(config)
@@ -44,6 +64,132 @@ export default function CalendarSettings({
 
   const dateFields = tableFields.filter((f) => f.type === 'date')
   const selectFields = tableFields.filter((f) => f.type === 'single_select' || f.type === 'multi_select')
+
+  // Get available fields for display on cards (exclude date and attachment fields)
+  const availableDisplayFields = useMemo(() => {
+    return tableFields.filter((f) => f.type !== 'date' && f.type !== 'attachment')
+  }, [tableFields])
+
+  // Get available fields for modal (all fields except system fields)
+  const availableModalFields = useMemo(() => {
+    return tableFields.filter((f) => f.name !== 'id' && f.name !== 'created_at' && f.name !== 'updated_at')
+  }, [tableFields])
+
+  // Get currently selected display fields in order (for cards)
+  const selectedDisplayFields = useMemo(() => {
+    const selectedFieldNames = localConfig.calendar_display_fields || []
+    return selectedFieldNames
+      .map((fieldName) => availableDisplayFields.find((f) => f.name === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [localConfig.calendar_display_fields, availableDisplayFields])
+
+  // Get currently selected modal fields in order
+  const selectedModalFields = useMemo(() => {
+    const selectedFieldNames = localConfig.calendar_modal_fields || []
+    return selectedFieldNames
+      .map((fieldName) => availableModalFields.find((f) => f.name === fieldName))
+      .filter((f): f is TableField => f !== undefined)
+  }, [localConfig.calendar_modal_fields, availableModalFields])
+
+  // Get fields that can be added to cards (not already selected)
+  const availableToAdd = useMemo(() => {
+    const selectedNames = localConfig.calendar_display_fields || []
+    return availableDisplayFields.filter((f) => !selectedNames.includes(f.name))
+  }, [availableDisplayFields, localConfig.calendar_display_fields])
+
+  // Get fields that can be added to modal (not already selected)
+  const availableToAddModal = useMemo(() => {
+    const selectedNames = localConfig.calendar_modal_fields || []
+    return availableModalFields.filter((f) => !selectedNames.includes(f.name))
+  }, [availableModalFields, localConfig.calendar_modal_fields])
+
+  // Set up drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  // Handle drag end for card fields (reorder fields)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const currentFields = localConfig.calendar_display_fields || []
+    const oldIndex = currentFields.indexOf(active.id as string)
+    const newIndex = currentFields.indexOf(over.id as string)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newFields = arrayMove(currentFields, oldIndex, newIndex)
+      setLocalConfig({
+        ...localConfig,
+        calendar_display_fields: newFields,
+      })
+    }
+  }
+
+  // Handle drag end for modal fields (reorder fields)
+  const handleModalDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const currentFields = localConfig.calendar_modal_fields || []
+    const oldIndex = currentFields.indexOf(active.id as string)
+    const newIndex = currentFields.indexOf(over.id as string)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newFields = arrayMove(currentFields, oldIndex, newIndex)
+      setLocalConfig({
+        ...localConfig,
+        calendar_modal_fields: newFields,
+      })
+    }
+  }
+
+  // Handle adding a field to cards
+  const handleAddField = (fieldName: string) => {
+    const currentFields = localConfig.calendar_display_fields || []
+    if (!currentFields.includes(fieldName)) {
+      setLocalConfig({
+        ...localConfig,
+        calendar_display_fields: [...currentFields, fieldName],
+      })
+      // Reset the select dropdown
+      setAddFieldValue('')
+    }
+  }
+
+  // Handle removing a field from cards
+  const handleRemoveField = (fieldName: string) => {
+    const currentFields = localConfig.calendar_display_fields || []
+    setLocalConfig({
+      ...localConfig,
+      calendar_display_fields: currentFields.filter((f) => f !== fieldName),
+    })
+  }
+
+  // Handle adding a field to modal
+  const handleAddModalField = (fieldName: string) => {
+    const currentFields = localConfig.calendar_modal_fields || []
+    if (!currentFields.includes(fieldName)) {
+      setLocalConfig({
+        ...localConfig,
+        calendar_modal_fields: [...currentFields, fieldName],
+      })
+      // Reset the select dropdown
+      setAddModalFieldValue('')
+    }
+  }
+
+  // Handle removing a field from modal
+  const handleRemoveModalField = (fieldName: string) => {
+    const currentFields = localConfig.calendar_modal_fields || []
+    setLocalConfig({
+      ...localConfig,
+      calendar_modal_fields: currentFields.filter((f) => f !== fieldName),
+    })
+  }
 
   async function handleSave() {
     await onSave(localConfig)
@@ -207,48 +353,136 @@ export default function CalendarSettings({
             </Select>
           </div>
 
-          {/* Display Fields */}
+          {/* Fields to Show on Cards */}
           <div className="space-y-2">
-            <Label>Fields to Display on Calendar Entries</Label>
-            <p className="text-xs text-gray-500">
-              Choose which fields appear on each calendar entry (in addition to the title)
-            </p>
-            <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
-              {tableFields
-                .filter((f) => f.type !== 'date' && f.type !== 'attachment')
-                .map((field) => {
-                  const isSelected = (localConfig.calendar_display_fields || []).includes(field.name)
-                  return (
-                    <label
-                      key={field.id}
-                      className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={(e) => {
-                          const currentFields = localConfig.calendar_display_fields || []
-                          if (e.target.checked) {
-                            setLocalConfig({
-                              ...localConfig,
-                              calendar_display_fields: [...currentFields, field.name],
-                            })
-                          } else {
-                            setLocalConfig({
-                              ...localConfig,
-                              calendar_display_fields: currentFields.filter((f) => f !== field.name),
-                            })
-                          }
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-sm text-gray-700">{field.name}</span>
-                      <span className="text-xs text-gray-400">({field.type})</span>
-                    </label>
-                  )
-                })}
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Fields to Show on Cards</Label>
+                <p className="text-xs text-gray-500">
+                  Choose which fields appear on each calendar entry card (in addition to the title). Drag to reorder.
+                </p>
+              </div>
             </div>
-            {tableFields.filter((f) => f.type !== 'date' && f.type !== 'attachment').length === 0 && (
+
+            {/* Add Field Dropdown */}
+            {availableToAdd.length > 0 && (
+              <Select
+                value={addFieldValue}
+                onValueChange={(value) => {
+                  if (value) {
+                    handleAddField(value)
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Add a field..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableToAdd.map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name} ({field.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Selected Fields List with Drag and Drop */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={selectedDisplayFields.map((f) => f.name)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+                  {selectedDisplayFields.length > 0 ? (
+                    selectedDisplayFields.map((field) => (
+                      <SortableFieldItem
+                        key={field.id}
+                        field={field}
+                        onRemove={() => handleRemoveField(field.name)}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-4">
+                      No fields selected. Add a field using the dropdown above.
+                    </p>
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
+
+            {availableDisplayFields.length === 0 && (
+              <p className="text-xs text-gray-400 italic">No fields available to display</p>
+            )}
+          </div>
+
+          {/* Fields to Show in Modal */}
+          <div className="space-y-2 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Fields to Show in Modal</Label>
+                <p className="text-xs text-gray-500">
+                  Choose which fields appear when clicking on a calendar entry. Drag to reorder. Leave empty to show all fields.
+                </p>
+              </div>
+            </div>
+
+            {/* Add Field Dropdown */}
+            {availableToAddModal.length > 0 && (
+              <Select
+                value={addModalFieldValue}
+                onValueChange={(value) => {
+                  if (value) {
+                    handleAddModalField(value)
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Add a field..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableToAddModal.map((field) => (
+                    <SelectItem key={field.id} value={field.name}>
+                      {field.name} ({field.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Selected Fields List with Drag and Drop */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleModalDragEnd}
+            >
+              <SortableContext
+                items={selectedModalFields.map((f) => f.name)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
+                  {selectedModalFields.length > 0 ? (
+                    selectedModalFields.map((field) => (
+                      <SortableFieldItem
+                        key={field.id}
+                        field={field}
+                        onRemove={() => handleRemoveModalField(field.name)}
+                      />
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-4">
+                      No fields selected. All fields will be shown in the modal. Add fields using the dropdown above to limit what's displayed.
+                    </p>
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
+
+            {availableModalFields.length === 0 && (
               <p className="text-xs text-gray-400 italic">No fields available to display</p>
             )}
           </div>
@@ -311,5 +545,62 @@ export default function CalendarSettings({
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  )
+}
+
+// Sortable field item component
+function SortableFieldItem({
+  field,
+  onRemove,
+}: {
+  field: TableField
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: field.name })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 p-2 border rounded-md bg-white hover:bg-gray-50"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900">
+          {field.name}
+        </div>
+        <div className="text-xs text-gray-500">{field.type}</div>
+      </div>
+      
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          onRemove()
+        }}
+        className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+        title="Remove field"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
   )
 }

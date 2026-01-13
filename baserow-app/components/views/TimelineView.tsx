@@ -694,7 +694,7 @@ export default function TimelineView({
         return
       }
       if (supabaseTableName && tableId) {
-        openRecord(tableId, event.rowId, supabaseTableName)
+        openRecord(tableId, event.rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
       }
     },
     [openRecord, supabaseTableName, tableId, resizingEvent]

@@ -1377,6 +1377,7 @@ export default function CalendarView({
           open={selectedRecordId !== null}
           onClose={() => setSelectedRecordId(null)}
           tableId={resolvedTableId}
+          modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
           recordId={selectedRecordId}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           onSave={() => {

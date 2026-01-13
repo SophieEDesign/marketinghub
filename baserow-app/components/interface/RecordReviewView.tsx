@@ -200,19 +200,54 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     // Priority: left_panel.group_by > config.group_by_field
     const groupByFieldName = config.left_panel?.group_by || config.group_by_field
     
-    if (groupByFieldName) {
-      const configuredField = tableFields.find(f => 
-        (f.name === groupByFieldName || f.id === groupByFieldName) && 
-        (f.type === 'single_select' || f.type === 'multi_select')
-      )
-      if (configuredField) {
-        return configuredField.name
-      }
+    debugLog('RECORD', 'Computing group field', {
+      groupByFieldName,
+      hasTableFields: tableFields.length > 0,
+      tableFieldsCount: tableFields.length,
+      fieldNames: tableFields.map(f => f.name),
+      configLeftPanel: config.left_panel,
+      configGroupByField: config.group_by_field,
+    })
+    
+    if (!groupByFieldName || !tableFields.length) {
+      debugLog('RECORD', 'No group field configured or no table fields', {
+        groupByFieldName,
+        tableFieldsLength: tableFields.length,
+      })
+      return null
     }
     
-    // If no group field configured, return null (no grouping)
-    return null
-  }, [config.left_panel?.group_by, config.group_by_field, tableFields])
+    // Try to find the field - be more flexible with matching
+    let configuredField = tableFields.find(f => 
+      f.name === groupByFieldName || 
+      f.id === groupByFieldName ||
+      f.name.toLowerCase() === groupByFieldName.toLowerCase()
+    )
+    
+    if (!configuredField) {
+      debugWarn('RECORD', 'Group field not found in table fields', {
+        groupByFieldName,
+        availableFields: tableFields.map(f => ({ name: f.name, id: f.id, type: f.type })),
+      })
+      return null
+    }
+    
+    debugLog('RECORD', 'Group field found', {
+      groupByFieldName,
+      foundField: {
+        name: configuredField.name,
+        id: configuredField.id,
+        type: configuredField.type,
+      },
+    })
+    
+    // If found, check if it's a select field (preferred for grouping)
+    if (configuredField.type === 'single_select' || configuredField.type === 'multi_select') {
+      return configuredField.name
+    }
+    // If it's not a select field but was configured, still use it (might be text field used for grouping)
+    return configuredField.name
+  }, [config.left_panel?.group_by, config.group_by_field, tableFields, recordDebugEnabled])
   
   // Keep statusField for backward compatibility (used in display)
   const statusField = columns.find((col: string) => 
@@ -350,8 +385,16 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     
     if (!groupField) {
       // No group field configured - return all records in a single ungrouped list
+      debugLog('RECORD', 'No group field configured, showing ungrouped list', {
+        filteredDataLength: filteredData.length,
+      })
       return { '': filteredData }
     }
+    
+    debugLog('RECORD', 'Grouping records', {
+      groupField,
+      filteredDataLength: filteredData.length,
+    })
     
     filteredData.forEach((record) => {
       const groupValue = record[groupField]
@@ -366,8 +409,15 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
       groups[groupKey].push(record)
     })
     
+    debugLog('RECORD', 'Grouped records', {
+      groupField,
+      groupCount: Object.keys(groups).length,
+      groups: Object.keys(groups),
+      recordsPerGroup: Object.entries(groups).map(([key, records]) => ({ group: key, count: records.length })),
+    })
+    
     return groups
-  }, [filteredData, groupField])
+  }, [filteredData, groupField, recordDebugEnabled])
 
   // CRITICAL: Auto-select first record if none selected (use filtered data, fallback to data)
   // Record Review must NEVER have null recordId - always select first record if available
@@ -796,8 +846,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                   <div className="p-2">
                     {Object.entries(groupedRecords).map(([groupValue, records]) => (
                       <div key={groupValue} className={groupField ? "mb-4" : ""}>
-                        {/* Group Header - only show if grouping is enabled */}
-                        {groupField && groupValue && (
+                        {/* Group Header - only show if grouping is enabled and not the empty group key */}
+                        {groupField && groupValue !== '' && (
                           <div className="flex items-center gap-2 mb-1 px-2">
                             <Badge className={cn('text-xs font-medium', getStatusColor(groupValue))}>
                               {groupValue}
@@ -876,16 +926,52 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                       {previewFields.map((fieldIdOrName: string, idx: number) => {
                                         const fieldValue = record[fieldIdOrName]
                                         const fieldDisplayName = getFieldDisplayName(fieldIdOrName)
+                                        
+                                        // Find the actual field definition to check its type
+                                        const actualField = tableFields.find(f => 
+                                          f.name === fieldIdOrName || 
+                                          f.id === fieldIdOrName ||
+                                          f.name.toLowerCase() === fieldIdOrName.toLowerCase()
+                                        )
+                                        
+                                        // Check if field should be rendered as a pill/badge
+                                        // - Select/multi-select fields should always be pills
+                                        // - Fields named "status", "state", or "stage" should be pills
+                                        const isSelectField = actualField && (
+                                          actualField.type === 'single_select' || 
+                                          actualField.type === 'multi_select'
+                                        )
                                         const isStatusField = fieldIdOrName.toLowerCase().includes('status') || 
                                                               fieldIdOrName.toLowerCase() === 'state' ||
                                                               fieldIdOrName.toLowerCase() === 'stage'
+                                        const shouldRenderAsPill = isSelectField || (isStatusField && fieldValue)
+                                        
+                                        // Handle multi-select fields (array of values)
+                                        const renderMultiSelectPills = () => {
+                                          if (Array.isArray(fieldValue) && fieldValue.length > 0) {
+                                            return (
+                                              <div className="flex flex-wrap gap-1">
+                                                {fieldValue.map((val: any, i: number) => (
+                                                  <Badge key={i} className={cn('text-xs', getStatusColor(String(val)))}>
+                                                    {String(val)}
+                                                  </Badge>
+                                                ))}
+                                              </div>
+                                            )
+                                          }
+                                          return null
+                                        }
                                         
                                         return (
                                           <div key={fieldIdOrName} className={idx === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}>
-                                            {isStatusField && fieldValue ? (
-                                              <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
-                                                {String(fieldValue)}
-                                              </Badge>
+                                            {shouldRenderAsPill && fieldValue ? (
+                                              actualField?.type === 'multi_select' ? (
+                                                renderMultiSelectPills()
+                                              ) : (
+                                                <Badge className={cn('text-xs', getStatusColor(String(fieldValue)))}>
+                                                  {String(fieldValue)}
+                                                </Badge>
+                                              )
                                             ) : (
                                               <span>
                                                 {fieldValue !== null && fieldValue !== undefined 

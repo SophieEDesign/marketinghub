@@ -326,51 +326,81 @@ export default function FieldEditor({
           </label>
         )}
         {isMulti ? (
-          // Multi-select: show checkboxes
-          <div className={`space-y-2 border border-gray-300 rounded-md p-2 ${inputClassName}`}>
+          // Multi-select: show color pills that can be toggled
+          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
             {choices.length === 0 ? (
               <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
             ) : (
               choices.map((choice: string) => {
                 const isSelected = selectedValues.includes(choice)
+                const hexColor = getColorForChoiceName(choice, field.options?.choiceColors)
+                const textColorClass = getTextColor(hexColor)
+                const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+                
                 return (
-                  <label
+                  <button
                     key={choice}
-                    className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      const newValues = isSelected
+                        ? selectedValues.filter((v) => v !== choice)
+                        : [...selectedValues, choice]
+                      onChange(newValues)
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
+                      isSelected 
+                        ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    style={isSelected ? { backgroundColor: bgColor } : {}}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={(e) => {
-                        const newValues = e.target.checked
-                          ? [...selectedValues, choice]
-                          : selectedValues.filter((v) => v !== choice)
-                        onChange(newValues)
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-gray-900">{choice}</span>
-                  </label>
+                    {choice}
+                  </button>
                 )
               })
             )}
           </div>
         ) : (
-          // Single select: use native select or custom dropdown
-          <select
-            ref={inputRef as React.RefObject<HTMLSelectElement>}
-            value={value || ""}
-            onChange={(e) => onChange(e.target.value || null)}
-            className={`w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputClassName}`}
-            required={required}
-          >
-            <option value="">Select {field.name}...</option>
-            {choices.map((choice: string) => (
-              <option key={choice} value={choice}>
-                {choice}
-              </option>
-            ))}
-          </select>
+          // Single select: show color pills that can be clicked
+          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
+            {choices.length === 0 ? (
+              <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
+            ) : (
+              <>
+                {choices.map((choice: string) => {
+                  const isSelected = selectedValues.includes(choice)
+                  const hexColor = getColorForChoiceName(choice, field.options?.choiceColors)
+                  const textColorClass = getTextColor(hexColor)
+                  const bgColor = hexColor.startsWith('#') ? hexColor : `#${hexColor}`
+                  
+                  return (
+                    <button
+                      key={choice}
+                      type="button"
+                      onClick={() => onChange(choice)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
+                        isSelected 
+                          ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                      style={isSelected ? { backgroundColor: bgColor } : {}}
+                    >
+                      {choice}
+                    </button>
+                  )
+                })}
+                {value && (
+                  <button
+                    type="button"
+                    onClick={() => onChange(null)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-300"
+                  >
+                    Clear
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     )

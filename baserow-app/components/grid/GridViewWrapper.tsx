@@ -56,6 +56,7 @@ interface GridViewWrapperProps {
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
+  modalFields?: string[] // Fields to show in modal (if empty, show all)
   appearance?: {
     show_toolbar?: boolean
     show_search?: boolean
@@ -85,6 +86,7 @@ export default function GridViewWrapper({
   initialTableFields = [],
   isEditing = false,
   onRecordClick,
+  modalFields,
   appearance = {},
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
@@ -559,6 +561,7 @@ export default function GridViewWrapper({
           hideEmptyState={hideEmptyState}
           enableRecordOpen={appearance.enable_record_open !== false}
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
+          modalFields={modalFields}
         />
       </div>
       <FieldBuilderDrawer

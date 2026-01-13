@@ -57,6 +57,7 @@ interface GridViewProps {
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
   enableRecordOpen?: boolean // Enable record opening (default: true)
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
+  modalFields?: string[] // Fields to show in modal (if empty, show all)
 }
 
 const ITEMS_PER_PAGE = 100
@@ -85,6 +86,7 @@ export default function GridView({
   hideEmptyState = false,
   enableRecordOpen = true,
   recordOpenStyle = 'side_panel',
+  modalFields,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -419,7 +421,7 @@ export default function GridView({
       onRecordClick(rowId)
     } else {
       // Otherwise, use RecordPanel context (for views)
-      openRecord(tableId, rowId, supabaseTableName)
+      openRecord(tableId, rowId, supabaseTableName, modalFields)
     }
   }
 

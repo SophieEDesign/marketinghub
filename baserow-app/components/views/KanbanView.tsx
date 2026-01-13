@@ -20,6 +20,7 @@ interface KanbanViewProps {
   colorField?: string // Field name to use for card colors (single-select field)
   imageField?: string // Field name to use for card images
   fitImageSize?: boolean // Whether to fit image to container size
+  blockConfig?: Record<string, any> // Block config for modal_fields
 }
 
 export default function KanbanView({ 
@@ -32,6 +33,7 @@ export default function KanbanView({
   colorField,
   imageField,
   fitImageSize = false,
+  blockConfig = {},
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const [rows, setRows] = useState<TableRow[]>([])

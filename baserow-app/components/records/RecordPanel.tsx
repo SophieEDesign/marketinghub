@@ -37,7 +37,7 @@ export default function RecordPanel() {
       setFormData({})
       setHasChanges(false)
     }
-  }, [state.isOpen, state.tableId, state.recordId])
+  }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
 
   useEffect(() => {
     if (record) {
@@ -147,11 +147,29 @@ export default function RecordPanel() {
         .order("position", { ascending: true })
 
       if (!error && data) {
-        setFields(data as TableField[])
+        let allFields = data as TableField[]
+        
+        // Filter fields based on modal_fields if provided
+        if (state.modalFields && state.modalFields.length > 0) {
+          allFields = allFields.filter((field) => 
+            state.modalFields!.includes(field.name) || state.modalFields!.includes(field.id)
+          )
+          // Sort by modal_fields order
+          allFields.sort((a, b) => {
+            const indexA = state.modalFields!.indexOf(a.name)
+            const indexB = state.modalFields!.indexOf(b.name)
+            if (indexA === -1 && indexB === -1) return 0
+            if (indexA === -1) return 1
+            if (indexB === -1) return -1
+            return indexA - indexB
+          })
+        }
+        
+        setFields(allFields)
         // Build field groups from field metadata (for legacy support)
         // RecordFields will use field.group_name directly, but we keep this for backward compatibility
         const groups: Record<string, string[]> = {}
-        data.forEach((field: any) => {
+        allFields.forEach((field: any) => {
           if (field.group_name) {
             if (!groups[field.group_name]) {
               groups[field.group_name] = []

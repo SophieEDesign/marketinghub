@@ -390,6 +390,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            blockConfig={config}
           />
         )
       }
@@ -500,6 +501,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             initialTableFields={tableFields}
             isEditing={isEditing}
             onRecordClick={handleRecordClick}
+            modalFields={(config as any).modal_fields}
             appearance={{
               ...appearance,
               color_field: appearance.color_field,
