@@ -429,6 +429,36 @@ export default function CalendarSettings({
                   Choose which fields appear when clicking on a calendar entry. Drag to reorder. Leave empty to show all fields.
                 </p>
               </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Select all fields
+                    const allFieldNames = availableModalFields.map(f => f.name)
+                    setLocalConfig({
+                      ...localConfig,
+                      calendar_modal_fields: allFieldNames,
+                    })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select All
+                </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Select none
+                    setLocalConfig({
+                      ...localConfig,
+                      calendar_modal_fields: [],
+                    })
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Select None
+                </button>
+              </div>
             </div>
 
             {/* Add Field Dropdown */}

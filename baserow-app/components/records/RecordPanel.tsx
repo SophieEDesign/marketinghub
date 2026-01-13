@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft, Save } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { createClient } from "@/lib/supabase/client"
@@ -17,6 +18,7 @@ const DEFAULT_WIDTH = 480
 export default function RecordPanel() {
   const { state, closeRecord, setWidth, togglePin, toggleFullscreen, goBack, navigateToLinkedRecord } = useRecordPanel()
   const { toast } = useToast()
+  const router = useRouter()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
@@ -310,10 +312,22 @@ export default function RecordPanel() {
     }
   }, [state.tableName, record, state.tableId])
 
+  // Handle back button - navigate to core data table view if in fullscreen, otherwise use history
+  const handleBack = useCallback(() => {
+    if (state.isFullscreen && state.tableId) {
+      // In fullscreen mode, navigate to the core data table view
+      router.push(`/tables/${state.tableId}`)
+    } else {
+      // In side panel mode, use history-based navigation
+      goBack()
+    }
+  }, [state.isFullscreen, state.tableId, router, goBack])
+
   if (!state.isOpen) return null
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
-  const canGoBack = state.history.length > 1
+  // Show back button if in fullscreen (to go to core data) or if there's history
+  const canGoBack = state.isFullscreen || state.history.length > 1
 
   return (
     <>
@@ -370,9 +384,9 @@ export default function RecordPanel() {
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
-                onClick={goBack}
+                onClick={handleBack}
                 className="p-1 hover:bg-gray-200 rounded transition-colors"
-                title="Go back"
+                title={state.isFullscreen ? "Back to Core Data" : "Go back"}
               >
                 <ChevronLeft className="h-4 w-4 text-gray-600" />
               </button>

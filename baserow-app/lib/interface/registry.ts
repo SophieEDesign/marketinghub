@@ -116,12 +116,15 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     label: 'Divider',
     icon: 'Minus',
     defaultWidth: 12,
-    defaultHeight: 1,
+    defaultHeight: 2, // Default to 2 units for spacing
     minWidth: 2,
     minHeight: 1,
-    maxHeight: 2,
+    maxHeight: 20, // Allow larger heights for intentional spacing
     defaultConfig: {
       title: '',
+      appearance: {
+        divider_height: 2, // Default height setting
+      },
     },
   },
   button: {

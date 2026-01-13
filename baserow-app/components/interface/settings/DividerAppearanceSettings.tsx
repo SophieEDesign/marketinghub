@@ -95,6 +95,62 @@ export default function DividerAppearanceSettings({
         </Select>
       </div>
 
+      {/* Height - Adjustable height for intentional spacing */}
+      <div className="space-y-2">
+        <Label>Height (grid units)</Label>
+        <div className="flex gap-2">
+          <Select
+            value={
+              appearance.divider_height 
+                ? appearance.divider_height.toString() 
+                : '2'
+            }
+            onValueChange={(value) => {
+              const heightMap: Record<string, number> = {
+                'small': 2,
+                'medium': 4,
+                'large': 8,
+              }
+              const height = heightMap[value] || parseInt(value) || 2
+              onUpdate({
+                appearance: {
+                  ...appearance,
+                  divider_height: height,
+                },
+              })
+            }}
+          >
+            <SelectTrigger className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Small (2 units)</SelectItem>
+              <SelectItem value="medium">Medium (4 units)</SelectItem>
+              <SelectItem value="large">Large (8 units)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input
+            type="number"
+            min="1"
+            max="20"
+            value={appearance.divider_height ?? 2}
+            onChange={(e) =>
+              onUpdate({
+                appearance: {
+                  ...appearance,
+                  divider_height: parseInt(e.target.value) || 2,
+                },
+              })
+            }
+            className="w-24"
+            placeholder="Custom"
+          />
+        </div>
+        <p className="text-xs text-gray-500">
+          Use Divider blocks to create intentional spacing between sections. The height controls how much space the divider occupies.
+        </p>
+      </div>
+
       {/* Spacing */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

@@ -423,14 +423,22 @@ export default function Canvas({
 
   /**
    * Vertically compact layout by shifting blocks upward to fill gaps
-   * This ensures that when a block shrinks, blocks below it move up immediately
+   * This ensures that when a block shrinks, moves, or is deleted, blocks below shift up
    * 
    * Algorithm:
-   * 1. Sort blocks by current y position (top to bottom)
-   * 2. For each block, find the lowest y position where it fits without overlapping
-   * 3. Shift block to that position
+   * 1. Sort all blocks by y position (top to bottom), then by x (left to right)
+   * 2. For each block, find the lowest y position where it fits without overlapping blocks above
+   * 3. Shift block to that position (allows upward movement to fill gaps)
+   * 
+   * Divider blocks are treated as intentional spacing and maintain their height
    */
-  const compactLayoutVertically = useCallback((currentLayout: Layout[]): Layout[] => {
+  const compactLayoutVertically = useCallback((currentLayout: Layout[], currentBlocks: PageBlock[]): Layout[] => {
+    // Create a map of block types for quick lookup
+    const blockTypeMap = new Map<string, BlockType>()
+    currentBlocks.forEach(block => {
+      blockTypeMap.set(block.id, block.type)
+    })
+    
     // Sort blocks by y position (top to bottom), then by x (left to right)
     // This ensures we process blocks from top to bottom
     const sortedLayout = [...currentLayout].sort((a, b) => {
@@ -450,19 +458,18 @@ export default function Canvas({
       const w = item.w || 4
       const h = item.h || 4
       const x = item.x || 0
-      const originalY = item.y || 0
       
       // Find the lowest y position where this block fits without overlapping
       let bestY = 0
       
       // Start from y=0 and work upward until we find a valid position
-      // We can't go higher than the original position (only shift down, not up)
-      for (let testY = 0; testY <= originalY; testY++) {
+      // This allows blocks to shift UP to fill gaps
+      while (true) {
         let canFit = true
         
-        // Check all grid cells this block would occupy
+        // Check all grid cells this block would occupy at this y position
         for (let cellX = x; cellX < x + w; cellX++) {
-          for (let cellY = testY; cellY < testY + h; cellY++) {
+          for (let cellY = bestY; cellY < bestY + h; cellY++) {
             const key = `${cellX},${cellY}`
             const occupyingBlockId = occupied.get(key)
             
@@ -476,10 +483,11 @@ export default function Canvas({
         }
         
         if (canFit) {
-          bestY = testY
-        } else {
-          // Can't fit at this y, stop searching (we found the best position)
+          // Found a valid position
           break
+        } else {
+          // Try next y position
+          bestY++
         }
       }
       
@@ -603,9 +611,21 @@ export default function Canvas({
             }
           })
           
-          // If a block shrunk, compact the layout vertically to remove gaps
-          if (needsCompaction) {
-            const compactedLayout = compactLayoutVertically(currentLayout)
+          // Always compact after resize/drag ends to remove any gaps
+          // This ensures blocks snap together after any interaction
+          const compactedLayout = compactLayoutVertically(currentLayout, blocks)
+          
+          // Check if compaction actually changed anything
+          const layoutChanged = compactedLayout.some((item, index) => {
+            const original = currentLayout.find(l => l.i === item.i)
+            if (!original) return true
+            return Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+          })
+          
+          if (layoutChanged) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Canvas] Compacting layout after resize/drag end')
+            }
             
             // Update position tracking ref
             compactedLayout.forEach(layoutItem => {
@@ -651,7 +671,7 @@ export default function Canvas({
         resizeTimeoutRef.current = null
       }, 300)
     },
-    [onLayoutChange, isEditing, pageId, compactLayoutVertically]
+    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks]
   )
   
   // Reset first layout change flag when entering edit mode
@@ -677,6 +697,78 @@ export default function Canvas({
       currentlyResizingBlockIdRef.current = null
     }
   }, [isEditing])
+
+  // Trigger compaction when blocks are deleted (block count decreases)
+  // This ensures blocks below a deleted block shift up automatically
+  const previousBlockCountRef = useRef<number>(blocks.length)
+  useEffect(() => {
+    // Only trigger compaction if:
+    // 1. Block count decreased (deletion)
+    // 2. Layout is hydrated (not initial load)
+    // 3. Not currently resizing/dragging
+    // 4. In edit mode (only compact during editing)
+    const blockCountDecreased = blocks.length < previousBlockCountRef.current
+    const wasHydrated = layoutHydratedRef.current && previousBlockCountRef.current > 0
+    
+    if (blockCountDecreased && wasHydrated && !isResizingRef.current && isEditing && layout.length > 0) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Canvas] Block deleted - triggering compaction', {
+          previousCount: previousBlockCountRef.current,
+          currentCount: blocks.length,
+        })
+      }
+      
+      // Wait a brief moment for the layout to update, then compact
+      setTimeout(() => {
+        setLayout(currentLayout => {
+          // Filter out any blocks that no longer exist
+          const validLayout = currentLayout.filter(item => 
+            blocks.some(block => block.id === item.i)
+          )
+          
+          // Compact the layout
+          const compactedLayout = compactLayoutVertically(validLayout, blocks)
+          
+          // Check if compaction changed anything
+          const layoutChanged = compactedLayout.some((item) => {
+            const original = validLayout.find(l => l.i === item.i)
+            if (!original) return false
+            return Math.abs((item.y || 0) - (original.y || 0)) > 0.01
+          })
+          
+          if (layoutChanged) {
+            // Update position tracking ref
+            compactedLayout.forEach(layoutItem => {
+              previousBlockPositionsRef.current.set(layoutItem.i, {
+                x: layoutItem.x || 0,
+                y: layoutItem.y || 0,
+                w: layoutItem.w || 4,
+                h: layoutItem.h || 4,
+              })
+            })
+            
+            // Notify parent of compacted layout
+            if (onLayoutChange) {
+              const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
+                i: item.i,
+                x: item.x || 0,
+                y: item.y || 0,
+                w: item.w || 4,
+                h: item.h || 4,
+              }))
+              onLayoutChange(layoutItems)
+            }
+            
+            return compactedLayout
+          }
+          
+          return validLayout
+        })
+      }, 100)
+    }
+    
+    previousBlockCountRef.current = blocks.length
+  }, [blocks.length, layout.length, isEditing, compactLayoutVertically, onLayoutChange])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -839,11 +931,16 @@ export default function Canvas({
             blockHeightsBeforeResizeRef.current.delete(blockId)
             currentlyResizingBlockIdRef.current = null
             
-            // If block shrunk, trigger immediate layout compaction
-            if (previousHeight !== undefined && newHeight < previousHeight) {
-              // The timeout in handleLayoutChange will handle compaction
-              // But we ensure state is ready
+            // Compaction will be handled by handleLayoutChange timeout
+          }}
+          onDragStop={(layout, oldItem, newItem, placeholder, e, element) => {
+            // Trigger compaction after drag ends to remove any gaps
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Canvas] Drag stopped for block ${oldItem.i}`)
             }
+            
+            // Use the same timeout mechanism as resize to ensure layout is stable
+            // The handleLayoutChange will be called and will compact after timeout
           }}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}

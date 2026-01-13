@@ -201,9 +201,13 @@ export default function GridColumnHeader({
         <div
           ref={resizeRef}
           onMouseDown={handleMouseDown}
-          className={`absolute right-0 top-0 bottom-0 w-0.5 cursor-col-resize ${
-            isResizing ? 'bg-blue-400' : 'hover:bg-blue-300'
-          } transition-colors opacity-0 group-hover:opacity-100`}
+          className="resize-handle absolute right-0 top-0 bottom-0 cursor-col-resize z-20"
+          style={{
+            width: '6px',
+            marginRight: '-3px', // Extend clickable area beyond column edge
+            backgroundColor: isResizing ? 'rgb(96 165 250)' : isHovered ? 'rgba(96 165 250 / 0.3)' : 'transparent',
+          }}
+          title="Drag to resize column"
         />
       )}
     </div>

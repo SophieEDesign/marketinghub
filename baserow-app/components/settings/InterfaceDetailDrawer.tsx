@@ -253,16 +253,22 @@ export default function InterfaceDetailDrawer({
         ...(description !== undefined ? { description } : {}),
       }
       
-      // Merge settings, preserving existing settings
-      if (icon || existingConfig.settings) {
-        config.settings = {
-          ...(existingConfig.settings || {}),
-          ...(icon ? { icon } : {}),
-        }
-        // Remove icon from settings if it's empty
-        if (!icon && config.settings.icon) {
-          delete config.settings.icon
-        }
+      // Initialize settings object if it doesn't exist
+      if (!config.settings) {
+        config.settings = {}
+      }
+      
+      // Always update icon in settings
+      if (icon) {
+        config.settings.icon = icon
+      } else if (config.settings.icon) {
+        // Remove icon if empty string
+        delete config.settings.icon
+      }
+      
+      // Clean up empty settings object
+      if (Object.keys(config.settings).length === 0) {
+        delete config.settings
       }
 
       if (!checkError && pageData) {

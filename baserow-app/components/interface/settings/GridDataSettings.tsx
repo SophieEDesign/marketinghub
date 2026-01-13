@@ -407,6 +407,30 @@ export default function GridDataSettings({
                 Choose which fields appear when clicking on a record. Drag to reorder. Leave empty to show all fields.
               </p>
             </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Select all fields
+                  const allFieldNames = availableDisplayFields.map(f => f.name)
+                  onUpdate({ modal_fields: allFieldNames } as any)
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select All
+              </button>
+              <span className="text-xs text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Select none
+                  onUpdate({ modal_fields: [] } as any)
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select None
+              </button>
+            </div>
           </div>
 
           {/* Add Field Dropdown */}

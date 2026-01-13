@@ -845,13 +845,17 @@ function InterfacePageClientInternal({
   // CRITICAL: Memoize blocks array to prevent remounts
   // Only create new reference if blocks actually changed
   // CRITICAL: Do NOT include page?.page_type in dependencies - it causes remounts when page type changes
+  // CRITICAL: Do NOT log during render to prevent hydration issues
   const memoizedBlocks = useMemo(() => {
     const result = blocks || []
-    console.log(`[InterfacePageClient] memoizedBlocks: pageId=${page?.id}, page_type=${page?.page_type}`, {
-      blocksCount: result.length,
-      blockIds: result.map(b => b.id),
-      rawBlocksCount: blocks.length,
-    })
+    // Only log in development to avoid hydration issues in production
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      console.log(`[InterfacePageClient] memoizedBlocks: pageId=${page?.id}, page_type=${page?.page_type}`, {
+        blocksCount: result.length,
+        blockIds: result.map(b => b.id),
+        rawBlocksCount: blocks.length,
+      })
+    }
     return result
   }, [blocks, page?.id]) // ONLY page.id - NOT page_type, NOT mode, NOT isViewer
   
