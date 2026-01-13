@@ -6,6 +6,7 @@ import { ChevronRight, Folder, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import SidebarItem from './SidebarItem'
 import PageCreationWizard from '../../baserow-app/components/interface/PageCreationWizard'
+import { renderIconByName } from '@/components/ui/lucide-icon-picker'
 
 interface InterfaceSectionProps {
   interfaceId: string
@@ -17,6 +18,7 @@ interface InterfaceSectionProps {
   }>
   defaultCollapsed?: boolean
   isAdmin?: boolean
+  icon?: string | null
 }
 
 export default function InterfaceSection({
@@ -25,6 +27,7 @@ export default function InterfaceSection({
   pages,
   defaultCollapsed = false,
   isAdmin = false,
+  icon,
 }: InterfaceSectionProps) {
   const [isOpen, setIsOpen] = useState(!defaultCollapsed)
   const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
@@ -53,7 +56,13 @@ export default function InterfaceSection({
     <div className="space-y-1">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="group">
         <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent">
-          <Folder className="h-4 w-4 text-muted-foreground" />
+          {icon ? (
+            <span className="text-muted-foreground">
+              {renderIconByName(icon, "h-4 w-4")}
+            </span>
+          ) : (
+            <Folder className="h-4 w-4 text-muted-foreground" />
+          )}
           <span className="flex-1 text-left">{interfaceName}</span>
           <ChevronRight
             className={cn(

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Settings, GripVertical, Folder, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import InterfaceDetailDrawer from './InterfaceDetailDrawer'
+import { LucideIconPicker, renderIconByName } from '@/components/ui/lucide-icon-picker'
 import {
   Dialog,
   DialogContent,
@@ -53,6 +54,7 @@ interface InterfaceGroup {
   id: string
   name: string
   is_admin_only?: boolean
+  icon?: string | null
   interfaces: Interface[]
 }
 
@@ -136,7 +138,7 @@ export default function InterfacesTab() {
     try {
       const { data, error } = await supabase
         .from('interface_groups')
-        .select('id, name, order_index, is_system, is_admin_only')
+        .select('id, name, order_index, is_system, is_admin_only, icon')
         .order('order_index', { ascending: true })
       
       if (!error && data) {
@@ -148,7 +150,7 @@ export default function InterfacesTab() {
           // Column doesn't exist - fetch without it
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('interface_groups')
-            .select('id, name, order_index, is_admin_only')
+            .select('id, name, order_index, is_admin_only, icon')
             .order('order_index', { ascending: true })
           
           if (!fallbackError && fallbackData) {
@@ -162,7 +164,7 @@ export default function InterfacesTab() {
           // Try without is_system as fallback
           const { data: fallbackData } = await supabase
             .from('interface_groups')
-            .select('id, name, order_index, is_admin_only')
+            .select('id, name, order_index, is_admin_only, icon')
             .order('order_index', { ascending: true })
           
           if (fallbackData) {
@@ -246,6 +248,7 @@ export default function InterfacesTab() {
       id: group.id,
       name: group.name,
       is_admin_only: group.is_admin_only ?? true,
+      icon: group.icon || null,
       interfaces: pagesByGroup.get(group.id) || [],
     }))
 
@@ -680,7 +683,13 @@ export default function InterfacesTab() {
             >
               <GripVertical className="h-5 w-5 text-gray-500" />
             </button>
-            <Folder className="h-5 w-5 text-gray-500" />
+            {group.icon ? (
+              <span className="text-gray-500">
+                {renderIconByName(group.icon, "h-5 w-5")}
+              </span>
+            ) : (
+              <Folder className="h-5 w-5 text-gray-500" />
+            )}
             <h3 className="text-base font-semibold text-gray-900">
               {group.name}
             </h3>
@@ -689,6 +698,27 @@ export default function InterfacesTab() {
             </Badge>
           </div>
           <div className="flex items-center gap-4">
+            <div className="w-48">
+              <LucideIconPicker
+                value={group.icon || ''}
+                onChange={async (iconName) => {
+                  try {
+                    const supabase = createClient()
+                    const { error } = await supabase
+                      .from('interface_groups')
+                      .update({ icon: iconName || null })
+                      .eq('id', group.id)
+                    
+                    if (error) throw error
+                    await loadInterfaces()
+                  } catch (error: any) {
+                    console.error('Error updating icon:', error)
+                    alert(error.message || 'Failed to update icon')
+                  }
+                }}
+                placeholder="Folder"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Admin only</span>
               <Switch

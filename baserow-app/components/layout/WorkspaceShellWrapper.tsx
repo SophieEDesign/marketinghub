@@ -67,10 +67,10 @@ export default async function WorkspaceShellWrapper({
   // Fetch interface groups
   let interfaceGroups: any[] = []
   try {
-    // Try to select is_system and is_admin_only, but handle gracefully if columns don't exist
+    // Try to select is_system, is_admin_only, and icon, but handle gracefully if columns don't exist
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, workspace_id, is_admin_only')
+      .select('id, name, order_index, collapsed, workspace_id, is_admin_only, icon')
       .order('order_index', { ascending: true })
     
     const { data: groupsData, error: groupsError } = await groupsQuery
@@ -80,7 +80,7 @@ export default async function WorkspaceShellWrapper({
       try {
         const { data: groupsWithSystem } = await supabase
           .from('interface_groups')
-          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only')
+          .select('id, name, order_index, collapsed, workspace_id, is_system, is_admin_only, icon')
           .order('order_index', { ascending: true })
         
         if (groupsWithSystem) {

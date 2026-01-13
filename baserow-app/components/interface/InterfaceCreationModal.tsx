@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { createClient } from "@/lib/supabase/client"
+import { LucideIconPicker } from "@/components/ui/lucide-icon-picker"
 
 interface InterfaceCreationModalProps {
   open: boolean
@@ -29,6 +30,7 @@ export default function InterfaceCreationModal({
   onCreated,
 }: InterfaceCreationModalProps) {
   const [name, setName] = useState("")
+  const [icon, setIcon] = useState("")
   const [isAdminOnly, setIsAdminOnly] = useState(true)
   const [creating, setCreating] = useState(false)
 
@@ -36,6 +38,7 @@ export default function InterfaceCreationModal({
     if (open) {
       // Reset form when modal opens
       setName("")
+      setIcon("")
       setIsAdminOnly(true)
     }
   }, [open])
@@ -71,6 +74,7 @@ export default function InterfaceCreationModal({
         .insert([
           {
             name: name.trim(),
+            icon: icon.trim() || null,
             order_index: orderIndex,
             collapsed: false,
             is_admin_only: isAdminOnly,
@@ -85,6 +89,7 @@ export default function InterfaceCreationModal({
 
       // Reset form
       setName("")
+      setIcon("")
       setIsAdminOnly(true)
       setCreating(false)
       onOpenChange(false)
@@ -128,6 +133,18 @@ export default function InterfaceCreationModal({
             />
             <p className="text-xs text-gray-500">
               This is the name that will appear in the sidebar as a folder.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Icon</Label>
+            <LucideIconPicker
+              value={icon}
+              onChange={setIcon}
+              placeholder="Folder"
+            />
+            <p className="text-xs text-gray-500">
+              Optional: Select an icon to represent this interface
             </p>
           </div>
 

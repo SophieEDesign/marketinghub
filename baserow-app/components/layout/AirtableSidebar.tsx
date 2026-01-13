@@ -39,6 +39,7 @@ interface InterfaceGroup {
   order_index: number
   collapsed: boolean
   workspace_id?: string | null
+  icon?: string | null
 }
 
 interface AirtableSidebarProps {

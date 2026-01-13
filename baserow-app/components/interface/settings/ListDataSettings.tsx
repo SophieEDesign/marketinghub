@@ -56,9 +56,10 @@ export default function ListDataSettings({
   }
 
   const handleTitleFieldChange = (fieldName: string) => {
+    const value = fieldName === "__none__" ? undefined : fieldName
     onUpdate({
-      list_title_field: fieldName || undefined,
-      title_field: fieldName || undefined, // Backward compatibility
+      list_title_field: value || undefined,
+      title_field: value || undefined, // Backward compatibility
     })
   }
 
@@ -77,9 +78,10 @@ export default function ListDataSettings({
   }
 
   const handleImageFieldChange = (fieldName: string) => {
+    const value = fieldName === "__none__" ? undefined : fieldName
     onUpdate({
-      list_image_field: fieldName || undefined,
-      image_field: fieldName || undefined, // Backward compatibility
+      list_image_field: value || undefined,
+      image_field: value || undefined, // Backward compatibility
     })
   }
 
@@ -150,12 +152,12 @@ export default function ListDataSettings({
         <Label>
           Title Field <span className="text-red-500">*</span>
         </Label>
-        <Select value={titleField} onValueChange={handleTitleFieldChange}>
+        <Select value={titleField || "__none__"} onValueChange={handleTitleFieldChange}>
           <SelectTrigger>
             <SelectValue placeholder="Select title field" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none__">None</SelectItem>
             {textFields.map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}
@@ -182,10 +184,10 @@ export default function ListDataSettings({
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
-                value={fieldName}
+                value={fieldName || "__none__"}
                 onValueChange={(newFieldName) => {
                   const updated = [...subtitleFields]
-                  updated[index] = newFieldName
+                  updated[index] = newFieldName === "__none__" ? "" : newFieldName
                   onUpdate({ list_subtitle_fields: updated })
                 }}
               >
@@ -193,7 +195,7 @@ export default function ListDataSettings({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
                   {getAvailableSubtitleFields().map((f) => (
                     <SelectItem key={f.id} value={f.name}>
                       {f.name}
@@ -222,7 +224,6 @@ export default function ListDataSettings({
               <SelectValue placeholder="Add subtitle field" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Select a field</SelectItem>
               {getAvailableSubtitleFields().map((field) => (
                 <SelectItem key={field.id} value={field.name}>
                   {field.name}
@@ -239,12 +240,12 @@ export default function ListDataSettings({
       {/* Image Field (Optional) */}
       <div className="space-y-2">
         <Label>Image Field (Optional)</Label>
-        <Select value={imageField} onValueChange={handleImageFieldChange}>
+        <Select value={imageField || "__none__"} onValueChange={handleImageFieldChange}>
           <SelectTrigger>
             <SelectValue placeholder="Select image field" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">None</SelectItem>
+            <SelectItem value="__none__">None</SelectItem>
             {attachmentFields.map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}
@@ -265,10 +266,10 @@ export default function ListDataSettings({
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
-                value={fieldName}
+                value={fieldName || "__none__"}
                 onValueChange={(newFieldName) => {
                   const updated = [...pillFields]
-                  updated[index] = newFieldName
+                  updated[index] = newFieldName === "__none__" ? "" : newFieldName
                   onUpdate({ list_pill_fields: updated })
                 }}
               >
@@ -276,7 +277,7 @@ export default function ListDataSettings({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
                   {selectFields.map((f) => (
                     <SelectItem key={f.id} value={f.name}>
                       {f.name}
@@ -304,7 +305,6 @@ export default function ListDataSettings({
             <SelectValue placeholder="Add pill field" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Select a field</SelectItem>
             {getAvailablePillFields().map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}
@@ -325,10 +325,10 @@ export default function ListDataSettings({
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
-                value={fieldName}
+                value={fieldName || "__none__"}
                 onValueChange={(newFieldName) => {
                   const updated = [...metaFields]
-                  updated[index] = newFieldName
+                  updated[index] = newFieldName === "__none__" ? "" : newFieldName
                   onUpdate({ list_meta_fields: updated })
                 }}
               >
@@ -336,7 +336,7 @@ export default function ListDataSettings({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="__none__">None</SelectItem>
                   {[...dateFields, ...numberFields].map((f) => (
                     <SelectItem key={f.id} value={f.name}>
                       {f.name}
@@ -364,7 +364,6 @@ export default function ListDataSettings({
             <SelectValue placeholder="Add meta field" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Select a field</SelectItem>
             {getAvailableMetaFields().map((field) => (
               <SelectItem key={field.id} value={field.name}>
                 {field.name}

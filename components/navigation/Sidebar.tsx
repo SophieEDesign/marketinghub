@@ -25,6 +25,7 @@ export default async function Sidebar() {
     name: string
     order_index: number
     collapsed: boolean
+    icon?: string | null
   }> = []
   
   let interfacePagesByGroup: Map<string, Array<{ 
@@ -37,7 +38,7 @@ export default async function Sidebar() {
     // Load interface groups (interfaces) - try with is_system and is_admin_only first, fallback if columns don't exist
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, is_system, is_admin_only')
+      .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
       .order('order_index', { ascending: true })
     
     const { data: groupsData, error: groupsError } = await groupsQuery
@@ -46,7 +47,7 @@ export default async function Sidebar() {
     if (groupsError && (groupsError.code === '42703' || groupsError.message?.includes('column'))) {
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('interface_groups')
-        .select('id, name, order_index, collapsed, is_admin_only')
+        .select('id, name, order_index, collapsed, is_admin_only, icon')
         .order('order_index', { ascending: true })
       
       if (!fallbackError && fallbackData) {
@@ -58,6 +59,7 @@ export default async function Sidebar() {
             name: g.name,
             order_index: g.order_index || 0,
             collapsed: g.collapsed || false,
+            icon: g.icon || null,
           }))
       } else if (fallbackError) {
         console.error('Error loading interface groups:', fallbackError)
@@ -72,6 +74,7 @@ export default async function Sidebar() {
           name: g.name,
           order_index: g.order_index || 0,
           collapsed: g.collapsed || false,
+          icon: g.icon || null,
         }))
     } else if (groupsError) {
       console.error('Error loading interface groups:', groupsError)
@@ -187,6 +190,7 @@ export default async function Sidebar() {
                     pages={pages}
                     defaultCollapsed={group.collapsed}
                     isAdmin={userIsAdmin}
+                    icon={group.icon}
                   />
                 )
               })}

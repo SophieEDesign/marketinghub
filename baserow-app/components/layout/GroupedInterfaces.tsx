@@ -35,6 +35,7 @@ import {
   X,
   Folder,
 } from "lucide-react"
+import { renderIconByName } from "@/components/ui/lucide-icon-picker"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -62,6 +63,7 @@ interface InterfaceGroup {
   collapsed: boolean
   workspace_id?: string | null
   is_system?: boolean
+  icon?: string | null
 }
 
 interface GroupedInterfacesProps {
@@ -693,7 +695,13 @@ export default function GroupedInterfaces({
             ) : (
               <ChevronDown className="h-4 w-4" style={{ color: sidebarTextColor }} />
             )}
-            <Folder className="h-4 w-4" style={{ color: sidebarTextColor }} />
+            {group.icon ? (
+              <span style={{ color: sidebarTextColor }}>
+                {renderIconByName(group.icon, "h-4 w-4")}
+              </span>
+            ) : (
+              <Folder className="h-4 w-4" style={{ color: sidebarTextColor }} />
+            )}
             <span className="flex-1 text-left truncate">{group.name}</span>
           </button>
           {!isCollapsed && (
@@ -741,6 +749,13 @@ export default function GroupedInterfaces({
               <ChevronRight className="h-3 w-3" style={{ color: sidebarTextColor }} />
             ) : (
               <ChevronDown className="h-3 w-3" style={{ color: sidebarTextColor }} />
+            )}
+            {group.icon ? (
+              <span style={{ color: sidebarTextColor }}>
+                {renderIconByName(group.icon, "h-3 w-3")}
+              </span>
+            ) : (
+              <Folder className="h-3 w-3" style={{ color: sidebarTextColor }} />
             )}
             {editingGroupId === group.id ? (
               <Input
