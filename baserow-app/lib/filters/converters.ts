@@ -118,7 +118,7 @@ export function filterTreeToDbFormat(
       filters: [{
         view_id: viewId,
         field_name: condition.field_id,
-        operator: condition.operator,
+        operator: condition.operator as any, // FilterOperator includes operators not in FilterType (e.g., 'has')
         value: condition.value as string | undefined,
         filter_group_id: null,
         order_index: 0,
@@ -168,7 +168,7 @@ export function filterTreeToDbFormat(
         filters.push({
           view_id: viewId,
           field_name: child.field_id,
-          operator: child.operator,
+          operator: child.operator as any, // FilterOperator includes operators not in FilterType (e.g., 'has')
           value: child.value as string | undefined,
           filter_group_id: currentTempIndex !== null ? `temp-${currentTempIndex}` : null,
           order_index: conditionIndex++,

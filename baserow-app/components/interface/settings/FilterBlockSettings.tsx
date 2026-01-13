@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
@@ -225,7 +225,7 @@ export default function FilterBlockSettings({
                 <span>Connected elements ({connectedBlocks.length})</span>
               </div>
               <div className="space-y-1">
-                {connectedBlocks.map((block) => {
+                {connectedBlocks.map((block: { id: string; type: string; config?: BlockConfig }) => {
                   const blockTitle = block.config?.title || block.id
                   const blockTypeLabel = block.type.charAt(0).toUpperCase() + block.type.slice(1)
                   return (

@@ -17,6 +17,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
+import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree, FilterGroup, FilterCondition } from "@/lib/filters/canonical-model"
 import { normalizeFilterTree, isEmptyFilterTree, conditionsToFilterTree } from "@/lib/filters/canonical-model"
 import { filterConfigsToFilterTree, filterTreeToDbFormat } from "@/lib/filters/converters"
@@ -188,13 +189,13 @@ export default function FilterBlock({
     const normalized = normalizeFilterTree(filterTree)
     if (!normalized) return []
     
-    const configs: Array<{ field: string; operator: string; value?: any }> = []
+    const configs: FilterConfig[] = []
     
     function traverse(node: FilterGroup | FilterCondition) {
       if ('field_id' in node) {
         configs.push({
           field: node.field_id,
-          operator: node.operator,
+          operator: node.operator as FilterConfig['operator'],
           value: node.value,
         })
       } else {

@@ -137,7 +137,15 @@ export default function UnifiedFilterDialog({
       }
 
       // Notify parent component (flattened for backward compatibility)
-      const flattenedFilters = filtersToInsert.map((f) => ({
+      // Note: filtersToInsert doesn't have id yet (it's Omit<ViewFilter, "id">)
+      // We need to reload filters to get the actual IDs
+      const { data: insertedFilters } = await supabase
+        .from("view_filters")
+        .select("id, field_name, operator, value")
+        .eq("view_id", viewId)
+        .order("order_index", { ascending: true })
+      
+      const flattenedFilters = (insertedFilters || []).map((f) => ({
         id: f.id,
         field_name: f.field_name,
         operator: f.operator,

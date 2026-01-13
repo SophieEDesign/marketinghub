@@ -3,6 +3,7 @@
 import type { PageBlock, BlockType } from "@/lib/interface/types"
 import { normalizeBlockConfig, isBlockConfigComplete } from "@/lib/interface/block-validator"
 import { assertBlockConfig, shouldShowBlockSetupUI } from "@/lib/interface/assertBlockConfig"
+import { useMemo } from "react"
 import GridBlock from "./blocks/GridBlock"
 import FormBlock from "./blocks/FormBlock"
 import RecordBlock from "./blocks/RecordBlock"

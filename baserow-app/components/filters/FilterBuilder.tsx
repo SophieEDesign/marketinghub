@@ -193,7 +193,7 @@ export default function FilterBuilder({
             <div className="col-span-4">
               <Label className="text-xs text-gray-600 mb-1 block">Value</Label>
               <FilterValueInput
-                field={field}
+                field={field || null}
                 operator={condition.operator}
                 value={condition.value}
                 onChange={(value) => updateCondition(path, { value })}
@@ -422,7 +422,12 @@ export default function FilterBuilder({
       if ('field_id' in child) {
         return {
           ...tree,
-          children: tree.children.map((c, i) => i === index ? { ...c, ...updates } : c),
+          children: tree.children.map((c, i) => {
+            if (i === index && 'field_id' in c) {
+              return { ...c, ...updates } as FilterCondition
+            }
+            return c
+          }),
         }
       }
       return tree
