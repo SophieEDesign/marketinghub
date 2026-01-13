@@ -154,6 +154,14 @@ async function getInterfacesFromViews(): Promise<Interface[]> {
 
 /**
  * Validate that a page exists and user has access to it
+ * 
+ * CRITICAL: Only returns false if:
+ * - Page does not exist in database
+ * - Page is not accessible (admin-only and user is not admin)
+ * 
+ * Does NOT return false for:
+ * - Runtime render errors (those should be handled by the page component)
+ * - Missing blocks or configuration (those are valid states)
  */
 async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise<{ valid: boolean; reason?: string }> {
   const supabase = await createClient()
@@ -174,22 +182,39 @@ async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise
     console.log('[validatePageAccess] interface_pages query:', { 
       found: !!page, 
       isAdminOnly: page?.is_admin_only,
-      error: pageError?.message 
+      error: pageError?.message,
+      errorCode: pageError?.code
     })
   }
   
   if (!pageError && page) {
-    // Check admin-only restriction
+    // Page exists - check admin-only restriction
     if (!userIsAdmin && page.is_admin_only) {
       if (isDev) {
-        console.log('[validatePageAccess] Page is admin-only, user is not admin')
+        console.log('[validatePageAccess] ✗ Page is admin-only, user is not admin')
       }
       return { valid: false, reason: 'Page is admin-only and user is not admin' }
     }
+    // Page exists and is accessible - valid for navigation
+    // NOTE: We don't check if page can render successfully - that's handled by the page component
     if (isDev) {
-      console.log('[validatePageAccess] Page is valid and accessible')
+      console.log('[validatePageAccess] ✓ Page is valid and accessible')
     }
     return { valid: true }
+  }
+  
+  // If error is "not found" (PGRST116), page doesn't exist
+  // Otherwise, it might be a temporary error - but we'll treat it as not found for safety
+  if (pageError && pageError.code === 'PGRST116') {
+    if (isDev) {
+      console.log('[validatePageAccess] Page not found in interface_pages (PGRST116)')
+    }
+    // Continue to check views table
+  } else if (pageError) {
+    if (isDev) {
+      console.warn('[validatePageAccess] Error querying interface_pages:', pageError.message)
+    }
+    // Continue to check views table as fallback
   }
   
   // Fallback: try views table (old system)
@@ -204,27 +229,29 @@ async function validatePageAccess(pageId: string, userIsAdmin: boolean): Promise
     console.log('[validatePageAccess] views table query:', { 
       found: !!view, 
       isAdminOnly: view?.is_admin_only,
-      error: viewError?.message 
+      error: viewError?.message,
+      errorCode: viewError?.code
     })
   }
   
   if (!viewError && view) {
-    // Check admin-only restriction
+    // View exists - check admin-only restriction
     if (!userIsAdmin && view.is_admin_only) {
       if (isDev) {
-        console.log('[validatePageAccess] View is admin-only, user is not admin')
+        console.log('[validatePageAccess] ✗ View is admin-only, user is not admin')
       }
       return { valid: false, reason: 'Page is admin-only and user is not admin' }
     }
+    // View exists and is accessible - valid for navigation
     if (isDev) {
-      console.log('[validatePageAccess] View is valid and accessible')
+      console.log('[validatePageAccess] ✓ View is valid and accessible')
     }
     return { valid: true }
   }
   
-  // Page doesn't exist
+  // Page doesn't exist in either table
   if (isDev) {
-    console.warn('[validatePageAccess] Page not found in either table:', pageId)
+    console.warn('[validatePageAccess] ✗ Page not found in either table:', pageId)
   }
   return { valid: false, reason: 'Page not found' }
 }

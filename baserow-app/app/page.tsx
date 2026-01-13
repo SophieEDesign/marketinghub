@@ -57,49 +57,47 @@ export default async function HomePage({
     }
   }
 
-  // Resolve landing page with priority order and validation
-  // Only redirect if user is authenticated AND no pageId in URL AND valid default exists
+  // CRITICAL: Resolve landing page with priority order and validation
+  // Only redirect if user is authenticated AND valid default exists
+  // This redirect happens ONCE at server render time - client-side effects cannot override it
   try {
     const { pageId, reason } = await resolveLandingPage()
     
     if (isDev) {
-      console.log(`[Redirect] resolveLandingPage returned:`, { pageId, reason, inAccessiblePages: pageId ? accessiblePages.some(p => p.id === pageId) : false })
+      console.log(`[Default Page] resolveLandingPage returned:`, { 
+        pageId, 
+        reason, 
+        inAccessiblePages: pageId ? accessiblePages.some(p => p.id === pageId) : false,
+        accessiblePagesCount: accessiblePages.length
+      })
     }
     
-    // resolveLandingPage() already validates access, so if it returns a pageId, it's safe to redirect
-    // We trust its validation since it checks both existence and admin access
+    // resolveLandingPage() already validates access (existence + permissions)
+    // If it returns a pageId, the page exists and user has access
+    // We should redirect to it - even if it fails to render, that's a separate issue
     if (pageId) {
-      // Double-check that page exists (defensive programming)
-      const pageExists = accessiblePages.some(p => p.id === pageId)
-      
-      if (pageExists) {
-        // Valid page resolved and confirmed in accessible list - safe to redirect
-        if (isDev) {
-          console.log('[Redirect] Redirecting to resolved page:', { reason, pageId })
-        }
-        redirect(`/pages/${pageId}`)
-      } else {
-        // Page was resolved by resolveLandingPage() but not in accessible list
-        // This could happen if there's a timing issue or RLS policy difference
-        // Still redirect since resolveLandingPage() validated it, but log warning
-        if (isDev) {
-          console.warn('[Redirect] Page resolved but not in accessible list (redirecting anyway):', { 
-            pageId, 
-            reason, 
-            accessiblePagesCount: accessiblePages.length,
-            accessiblePageIds: accessiblePages.map(p => p.id)
-          })
-        }
-        // Trust resolveLandingPage() validation and redirect anyway
-        redirect(`/pages/${pageId}`)
+      // Log the redirect decision
+      if (isDev) {
+        console.log('[Default Page] ✓ Redirecting to resolved page:', { 
+          reason, 
+          pageId,
+          note: 'Page exists and is accessible. Render errors will be shown on the page, not masked by redirect.'
+        })
       }
+      // CRITICAL: This redirect happens at server render time
+      // Client-side effects cannot override this redirect
+      // If the page fails to render, it will show an error on the page itself
+      redirect(`/pages/${pageId}`)
     }
     
-    // Fallback: Use first accessible page if available
+    // No default page resolved - fallback to first accessible page
     if (accessiblePages.length > 0) {
       const firstPageId = accessiblePages[0].id
       if (isDev) {
-        console.warn('[Redirect]', { reason: 'first_accessible_fallback', pageId: firstPageId, resolved: true })
+        console.log('[Default Page] No default set, using first accessible page:', { 
+          reason: 'first_accessible_fallback', 
+          pageId: firstPageId 
+        })
       }
       redirect(`/pages/${firstPageId}`)
     }
@@ -107,7 +105,7 @@ export default async function HomePage({
     // No accessible pages found - show empty state instead of redirecting
     // Redirecting to "/" creates a loop, so we render an empty state here
     if (isDev) {
-      console.warn('[Redirect]', { reason: 'no_pages_available', pageId: null, resolved: false })
+      console.warn('[Default Page] No accessible pages found - showing empty state')
     }
     
     if (admin) {
@@ -132,11 +130,11 @@ export default async function HomePage({
       )
     }
   } catch (error) {
-    // Error resolving landing page - fallback to old system
+    // Error resolving landing page - log and fallback
     if (isDev) {
-      console.warn('[Landing Page] Error resolving landing page, falling back:', error)
+      console.error('[Default Page] Error resolving landing page:', error)
       if (error instanceof Error) {
-        console.warn('[Landing Page] Error details:', error.message, error.stack)
+        console.error('[Default Page] Error details:', error.message, error.stack)
       }
     }
     
@@ -157,13 +155,16 @@ export default async function HomePage({
       const { data: firstInterface } = await firstQuery.maybeSingle()
       if (firstInterface) {
         if (isDev) {
-          console.warn('[Redirect]', { reason: 'fallback_views_table', pageId: firstInterface.id, resolved: true })
+          console.log('[Default Page] Fallback to views table:', { 
+            reason: 'fallback_views_table', 
+            pageId: firstInterface.id 
+          })
         }
         redirect(`/pages/${firstInterface.id}`)
       }
     } catch (fallbackError) {
       if (isDev) {
-        console.warn('[Redirect]', { reason: 'fallback_error', pageId: null, resolved: false })
+        console.error('[Default Page] Fallback error:', fallbackError)
       }
     }
     

@@ -167,16 +167,26 @@ function DraggableColumnHeader({
         <span
           onClick={() => onEdit?.(fieldName)}
           className={`flex-1 ${onEdit ? 'cursor-pointer hover:text-blue-600' : ''}`}
-          title={tableField?.type === 'formula' && tableField?.options?.formula 
-            ? `Formula: ${tableField.options.formula}` 
-            : undefined}
+          title={
+            tableField && 
+            typeof tableField === 'object' &&
+            tableField.type === 'formula' && 
+            tableField.options && 
+            typeof tableField.options === 'object' &&
+            tableField.options.formula &&
+            typeof tableField.options.formula === 'string'
+              ? `Formula: ${tableField.options.formula}` 
+              : undefined
+          }
         >
-          {fieldName}
+          {fieldName || 'Unknown Field'}
           {isVirtual && (
             <span className="ml-1 text-xs text-gray-400" title="Formula field">(fx)</span>
           )}
         </span>
-        {tableField?.required && (
+        {tableField && 
+         typeof tableField === 'object' &&
+         tableField.required === true && (
           <span className="text-red-500 text-xs ml-1">*</span>
         )}
       </div>
@@ -256,38 +266,64 @@ export default function GridView({
   const safeTableFields = asArray<TableField>(tableFields)
 
   // Helper to get color from color field
+  // CRITICAL: Optional-safe access to field options and metadata
   const getRowColor = useCallback((row: Record<string, any>): string | null => {
-    if (!colorField) return null
+    if (!colorField || typeof colorField !== 'string') return null
     
-    const colorFieldObj = safeTableFields.find(f => f.name === colorField || f.id === colorField)
-    if (!colorFieldObj || (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
+    if (!Array.isArray(safeTableFields) || safeTableFields.length === 0) return null
+    
+    const colorFieldObj = safeTableFields.find(f => 
+      f && 
+      typeof f === 'object' && 
+      (f.name === colorField || f.id === colorField)
+    )
+    
+    if (!colorFieldObj || 
+        typeof colorFieldObj !== 'object' ||
+        (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
       return null
     }
     
-    const colorValue = row[colorField]
-    if (!colorValue || !(colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) return null
+    const colorValue = row && typeof row === 'object' ? row[colorField] : undefined
+    if (!colorValue || 
+        !(colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) {
+      return null
+    }
     
     const normalizedValue = String(colorValue).trim()
+    
+    // CRITICAL: Optional-safe access to options
+    const fieldOptions = colorFieldObj.options && typeof colorFieldObj.options === 'object'
+      ? colorFieldObj.options
+      : undefined
+    
     return normalizeHexColor(
       resolveChoiceColor(
         normalizedValue,
         colorFieldObj.type,
-        colorFieldObj.options,
+        fieldOptions,
         colorFieldObj.type === 'single_select'
       )
     )
   }, [colorField, safeTableFields])
 
   // Helper to get image from image field
+  // CRITICAL: Optional-safe access to row data
   const getRowImage = useCallback((row: Record<string, any>): string | null => {
-    if (!imageField) return null
+    if (!imageField || typeof imageField !== 'string') return null
+    
+    if (!row || typeof row !== 'object') return null
     
     const imageValue = row[imageField]
     if (!imageValue) return null
     
     // Handle attachment field (array of URLs) or URL field (single URL)
     if (Array.isArray(imageValue) && imageValue.length > 0) {
-      return imageValue[0]
+      const firstValue = imageValue[0]
+      if (typeof firstValue === 'string' && firstValue.length > 0) {
+        return firstValue
+      }
+      return null
     }
     if (typeof imageValue === 'string' && (imageValue.startsWith('http') || imageValue.startsWith('/'))) {
       return imageValue
@@ -342,23 +378,42 @@ export default function GridView({
           return
         }
 
-        // Load column widths
-        if (data?.column_widths && typeof data.column_widths === 'object') {
-          setColumnWidths(data.column_widths as Record<string, number>)
+        // Load column widths - CRITICAL: Sanitize persisted state
+        if (data?.column_widths && typeof data.column_widths === 'object' && data.column_widths !== null) {
+          // Filter out invalid entries (non-string keys, non-number values)
+          const sanitizedWidths: Record<string, number> = {}
+          for (const [key, value] of Object.entries(data.column_widths)) {
+            if (typeof key === 'string' && key.length > 0 && typeof value === 'number' && value > 0) {
+              sanitizedWidths[key] = value
+            }
+          }
+          setColumnWidths(sanitizedWidths)
         }
 
+        // Load column order - CRITICAL: Validate against current fields
         if (data?.column_order && Array.isArray(data.column_order)) {
-          const allFieldNames = safeViewFields
-            .filter((f) => f && f.visible)
-            .map((f) => f.field_name)
+          // Sanitize: filter out null/undefined/empty strings
+          const sanitizedOrder = data.column_order
+            .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
           
-          // Validate that all fields in order exist
-          if (data.column_order.every((name: string) => allFieldNames.includes(name))) {
+          // Get current visible field names
+          const allFieldNames = Array.isArray(safeViewFields)
+            ? safeViewFields
+                .filter((f) => f && typeof f === 'object' && f.visible === true && f.field_name)
+                .map((f) => f.field_name)
+                .filter((name): name is string => typeof name === 'string' && name.length > 0)
+            : []
+          
+          // Validate that all fields in persisted order still exist
+          const validOrder = sanitizedOrder.filter(name => allFieldNames.includes(name))
+          
+          if (validOrder.length > 0 && validOrder.length === sanitizedOrder.length) {
+            // All fields in order are valid - use it
             // Add any missing fields to the end
-            const missingFields = allFieldNames.filter(name => !data.column_order.includes(name))
-            setColumnOrder([...data.column_order, ...missingFields])
+            const missingFields = allFieldNames.filter(name => !validOrder.includes(name))
+            setColumnOrder([...validOrder, ...missingFields])
           } else {
-            // Invalid order, use default
+            // Some fields in order are stale - rebuild from current fields
             initializeColumnOrder()
           }
         } else {
@@ -371,17 +426,39 @@ export default function GridView({
     }
 
     function initializeColumnOrder() {
+      // CRITICAL: Defensive initialization - filter out invalid fields
+      if (!Array.isArray(safeViewFields) || safeViewFields.length === 0) {
+        setColumnOrder([])
+        return
+      }
+      
+      const safeFields = Array.isArray(safeTableFields) ? safeTableFields : []
+      
       const visibleFieldNames = safeViewFields
-        .filter((f) => f && f.visible)
+        .filter((f) => {
+          // Filter out null/undefined and ensure field has required properties
+          return f && 
+                 typeof f === 'object' && 
+                 f.visible === true && 
+                 f.field_name && 
+                 typeof f.field_name === 'string'
+        })
         .map((vf) => {
-          const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
+          // Find table field for order_index
+          const tableField = safeFields.find((tf) => 
+            tf && 
+            typeof tf === 'object' && 
+            (tf.name === vf.field_name || tf.id === vf.field_name)
+          )
+          
           return {
             field_name: vf.field_name,
-            order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+            order_index: tableField?.order_index ?? tableField?.position ?? vf.position ?? 0,
           }
         })
-        .sort((a, b) => a.order_index - b.order_index)
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
         .map((f) => f.field_name)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0)
       
       setColumnOrder(visibleFieldNames)
     }
@@ -451,33 +528,74 @@ export default function GridView({
   }, [])
 
   // Get visible fields ordered by column order (if set) or by order_index
+  // CRITICAL: Always return an array, filter out null/undefined, ensure field_name exists
   const visibleFields = useMemo(() => {
+    // Defensive guard: Ensure safeViewFields is an array
+    if (!Array.isArray(safeViewFields) || safeViewFields.length === 0) {
+      return []
+    }
+
+    // Defensive guard: Ensure safeTableFields is an array
+    const safeFields = Array.isArray(safeTableFields) ? safeTableFields : []
+
     if (columnOrder.length > 0) {
       // Use column order if available
+      // CRITICAL: Filter out null/undefined fieldNames and validate field existence
       return columnOrder
+        .filter((fieldName): fieldName is string => {
+          // Filter out null, undefined, empty strings, and non-strings
+          return typeof fieldName === 'string' && fieldName.trim().length > 0
+        })
         .map((fieldName) => {
-          const vf = safeViewFields.find((f) => f && f.field_name === fieldName && f.visible)
-          if (!vf) return null
-          const tableField = safeTableFields.find((tf) => tf.name === fieldName)
+          // Find view field - ensure it exists and is visible
+          const vf = safeViewFields.find((f) => 
+            f && 
+            typeof f === 'object' && 
+            f.field_name === fieldName && 
+            f.visible === true
+          )
+          if (!vf || !vf.field_name) return null
+          
+          // Find table field for metadata
+          const tableField = safeFields.find((tf) => 
+            tf && 
+            typeof tf === 'object' && 
+            (tf.name === fieldName || tf.id === fieldName)
+          )
+          
           return {
             ...vf,
-            order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+            order_index: tableField?.order_index ?? tableField?.position ?? vf.position ?? 0,
           }
         })
-        .filter((f): f is NonNullable<typeof f> => f !== null)
+        .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && f.field_name)
     }
     
     // Fallback to order_index sorting
+    // CRITICAL: Filter out null/undefined fields and ensure field_name exists
     return safeViewFields
-      .filter((f) => f && f.visible)
+      .filter((f) => {
+        // Filter out null, undefined, and ensure field has required properties
+        return f && 
+               typeof f === 'object' && 
+               f.visible === true && 
+               f.field_name && 
+               typeof f.field_name === 'string'
+      })
       .map((vf) => {
-        const tableField = safeTableFields.find((tf) => tf.name === vf.field_name)
+        // Find table field for metadata
+        const tableField = safeFields.find((tf) => 
+          tf && 
+          typeof tf === 'object' && 
+          (tf.name === vf.field_name || tf.id === vf.field_name)
+        )
+        
         return {
           ...vf,
-          order_index: tableField?.order_index ?? tableField?.position ?? vf.position,
+          order_index: tableField?.order_index ?? tableField?.position ?? vf.position ?? 0,
         }
       })
-      .sort((a, b) => a.order_index - b.order_index)
+      .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
   }, [safeViewFields, safeTableFields, columnOrder])
 
   // Handle column reorder
@@ -743,11 +861,22 @@ export default function GridView({
   // CRITICAL: Normalize rows to array before filtering
   const safeRows = asArray<Record<string, any>>(rows)
   const filteredRows = useMemo(() => {
-    if (!searchTerm.trim()) return safeRows
+    if (!searchTerm || typeof searchTerm !== 'string' || !searchTerm.trim()) {
+      return safeRows
+    }
+
+    // CRITICAL: Ensure visibleFields is an array before using it
+    if (!Array.isArray(visibleFields) || visibleFields.length === 0) {
+      return safeRows
+    }
 
     const searchLower = searchTerm.toLowerCase()
     return safeRows.filter((row) => {
+      if (!row || typeof row !== 'object') return false
+      
       return visibleFields.some((field) => {
+        if (!field || typeof field !== 'object' || !field.field_name) return false
+        
         const value = row[field.field_name]
         if (value === null || value === undefined) return false
         return String(value).toLowerCase().includes(searchLower)
@@ -756,17 +885,22 @@ export default function GridView({
   }, [safeRows, searchTerm, visibleFields])
 
   // Group rows if groupBy is set
-  // CRITICAL: Normalize filteredRows before grouping
+  // CRITICAL: Normalize filteredRows before grouping, optional-safe field access
   const groupedRows = useMemo(() => {
-    if (!groupBy) return null
+    if (!groupBy || typeof groupBy !== 'string') return null
+
+    if (!Array.isArray(filteredRows)) return null
 
     const groups: Record<string, Record<string, any>[]> = {}
 
     // filteredRows is already normalized, but guard for safety
     filteredRows.forEach((row) => {
-      if (!row) return // Skip null/undefined rows
+      if (!row || typeof row !== 'object') return // Skip null/undefined/invalid rows
+      
+      // CRITICAL: Optional-safe access to groupBy field
       const groupValue = row[groupBy] ?? "Uncategorized"
       const groupKey = String(groupValue)
+      
       if (!groups[groupKey]) {
         groups[groupKey] = []
       }
@@ -776,11 +910,14 @@ export default function GridView({
     // Sort group keys
     const sortedGroupKeys = Object.keys(groups).sort()
 
-    return sortedGroupKeys.map((key) => ({
-      key,
-      value: groups[key][0]?.[groupBy],
-      rows: asArray(groups[key]), // Ensure rows is always an array
-    }))
+    return sortedGroupKeys.map((key) => {
+      const groupRows = asArray(groups[key])
+      return {
+        key,
+        value: groupRows[0] && typeof groupRows[0] === 'object' ? groupRows[0][groupBy] : "Uncategorized",
+        rows: groupRows, // Ensure rows is always an array
+      }
+    })
   }, [filteredRows, groupBy])
 
   function toggleGroup(groupKey: string) {
@@ -795,6 +932,9 @@ export default function GridView({
     })
   }
 
+  // CRITICAL: Defensive guards - ensure we have required data before rendering
+  // These checks happen AFTER all hooks are called (React rules compliance)
+  
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -803,10 +943,26 @@ export default function GridView({
     )
   }
 
-  if (!supabaseTableName) {
+  // Guard: Table name must exist
+  if (!supabaseTableName || typeof supabaseTableName !== 'string') {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Table not configured</div>
+        <div className="max-w-md p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">Table Not Configured</h3>
+          <p className="text-sm text-gray-600">This view is not connected to a table.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Guard: Table fields must be an array (even if empty)
+  if (!Array.isArray(safeTableFields)) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-md p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Invalid Table Configuration</h3>
+          <p className="text-sm text-yellow-700">Table fields are not properly configured.</p>
+        </div>
       </div>
     )
   }
@@ -892,10 +1048,14 @@ export default function GridView({
     }
   }
 
+  // CRITICAL: Guard against invalid visibleFields before rendering
+  // Ensure visibleFields is an array (even if empty)
+  const safeVisibleFields = Array.isArray(visibleFields) ? visibleFields : []
+  
   // Show message when no visible fields are configured
   // CRITICAL: In record view context, don't show "No columns configured" UI
   // Record view uses field blocks, not grid columns, so this UI is not applicable
-  if (visibleFields.length === 0 && !hideEmptyState) {
+  if (safeVisibleFields.length === 0 && !hideEmptyState) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="max-w-md p-6 bg-gray-50 border border-gray-200 rounded-lg text-center">
@@ -904,7 +1064,7 @@ export default function GridView({
             This view has no visible fields configured. Add fields to the view to display data.
           </p>
           <div className="flex flex-col gap-2 items-center">
-            {safeTableFields.length > 0 && (
+            {Array.isArray(safeTableFields) && safeTableFields.length > 0 && (
               <button
                 onClick={handleInitializeFields}
                 disabled={initializingFields}
@@ -939,8 +1099,22 @@ export default function GridView({
   }
   
   // In record view context with no visible fields, return empty state (no UI)
-  if (visibleFields.length === 0 && hideEmptyState) {
+  if (safeVisibleFields.length === 0 && hideEmptyState) {
     return null
+  }
+  
+  // CRITICAL: Final safety check - if we still don't have valid fields, show fallback
+  if (!Array.isArray(safeVisibleFields) || safeVisibleFields.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="max-w-md p-6 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Unable to Load Grid</h3>
+          <p className="text-sm text-yellow-700">
+            The grid view could not be rendered. Please check that fields are properly configured.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -970,8 +1144,8 @@ export default function GridView({
             )}
           </div>
           <div className="text-sm text-gray-500">
-            {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
-            {searchTerm && filteredRows.length !== safeRows.length && (
+            {Array.isArray(filteredRows) ? filteredRows.length : 0} {Array.isArray(filteredRows) && filteredRows.length === 1 ? "row" : "rows"}
+            {searchTerm && Array.isArray(filteredRows) && Array.isArray(safeRows) && filteredRows.length !== safeRows.length && (
               <span className="ml-1">(filtered from {safeRows.length})</span>
             )}
           </div>
@@ -993,26 +1167,58 @@ export default function GridView({
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12 sticky top-0 bg-gray-50 z-10"></th>
                 )}
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={columnOrder.length > 0 ? columnOrder : visibleFields.map(f => f.field_name)} strategy={horizontalListSortingStrategy}>
-                    {visibleFields.map((field) => {
-                      const tableField = safeTableFields.find(f => f.name === field.field_name)
-                      const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
-                      const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
-                      return (
-                        <DraggableColumnHeader
-                          key={field.field_name}
-                          fieldName={field.field_name}
-                          tableField={tableField}
-                          isVirtual={isVirtual}
-                          onEdit={onEditField}
-                          width={columnWidth}
-                          isResizing={resizingColumn === field.field_name}
-                          onResizeStart={handleResizeStart}
-                          onResize={handleResize}
-                          onResizeEnd={handleResizeEnd}
-                        />
-                      )
-                    })}
+                  <SortableContext 
+                    items={
+                      safeVisibleFields.length > 0
+                        ? safeVisibleFields
+                            .filter((f): f is NonNullable<typeof f> => f !== null && f !== undefined && f.field_name)
+                            .map(f => f.field_name)
+                            .filter((name): name is string => typeof name === 'string' && name.length > 0)
+                        : []
+                    } 
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {safeVisibleFields.length > 0
+                      ? safeVisibleFields
+                          .filter((field): field is NonNullable<typeof field> => {
+                            // CRITICAL: Filter out null/undefined and ensure field_name exists
+                            return field !== null && 
+                                   field !== undefined && 
+                                   typeof field === 'object' &&
+                                   field.field_name && 
+                                   typeof field.field_name === 'string'
+                          })
+                          .map((field) => {
+                            // CRITICAL: Defensive access to tableField and columnWidth
+                            const tableField = Array.isArray(safeTableFields) 
+                              ? safeTableFields.find(f => 
+                                  f && 
+                                  typeof f === 'object' && 
+                                  (f.name === field.field_name || f.id === field.field_name)
+                                )
+                              : undefined
+                            
+                            const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                            const columnWidth = typeof columnWidths === 'object' && columnWidths !== null
+                              ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
+                              : COLUMN_DEFAULT_WIDTH
+                            
+                            return (
+                              <DraggableColumnHeader
+                                key={field.field_name}
+                                fieldName={field.field_name}
+                                tableField={tableField}
+                                isVirtual={isVirtual}
+                                onEdit={onEditField}
+                                width={columnWidth}
+                                isResizing={resizingColumn === field.field_name}
+                                onResizeStart={handleResizeStart}
+                                onResize={handleResize}
+                                onResizeEnd={handleResizeEnd}
+                              />
+                            )
+                          })
+                      : null}
                   </SortableContext>
                 </DndContext>
               </tr>
@@ -1022,7 +1228,7 @@ export default function GridView({
                 <tr>
                   <td
                     colSpan={
-                      visibleFields.length +
+                      safeVisibleFields.length +
                       (enableRecordOpen && allowOpenRecord ? 1 : 0) +
                       (imageField ? 1 : 0)
                     }
@@ -1043,7 +1249,7 @@ export default function GridView({
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <td
                           colSpan={
-                            visibleFields.length +
+                            safeVisibleFields.length +
                             (enableRecordOpen && allowOpenRecord ? 1 : 0) +
                             (imageField ? 1 : 0)
                           }
@@ -1078,16 +1284,16 @@ export default function GridView({
                           
                           return (
                           <tr
-                            key={row.id}
+                            key={row?.id || `row-${Math.random()}`}
                             className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
                             style={{ ...borderColor, height: `${rowHeightPixels}px` }}
-                            onClick={shouldRowClickOpen ? () => handleRowClick(row.id) : undefined}
+                            onClick={shouldRowClickOpen && row?.id ? () => handleRowClick(row.id) : undefined}
                           >
                             {/* Row action indicator (desktop only) */}
                             {canOpenRecord && (
                               <td
                                 className="px-2 py-1 w-8"
-                                onClick={(e) => !isMobile && handleOpenRecordClick(e, row.id)}
+                                onClick={(e) => !isMobile && row?.id && handleOpenRecordClick(e, row.id)}
                               >
                                 {!isMobile && (
                                   <button
@@ -1118,35 +1324,60 @@ export default function GridView({
                                 </div>
                               </td>
                             )}
-                            {visibleFields.map((field) => {
-                              const tableField = safeTableFields.find(f => f.name === field.field_name)
-                              const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
-                              const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
-                              return (
-                                <td
-                                  key={field.field_name}
-                                  className="px-0 py-0"
-                                  style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Cell
-                                    value={row[field.field_name]}
-                                    fieldName={field.field_name}
-                                    fieldType={tableField?.type}
-                                    fieldOptions={tableField?.options}
-                                    isVirtual={isVirtual}
-                                    editable={canEdit && !isVirtual}
-                                    wrapText={wrapText}
-                                    rowHeight={rowHeightPixels}
-                                    onSave={async (value) => {
-                                      if (!isVirtual) {
-                                        await handleCellSave(row.id, field.field_name, value)
-                                      }
-                                    }}
-                                  />
-                                </td>
-                              )
-                            })}
+                            {safeVisibleFields.length > 0
+                              ? safeVisibleFields
+                                  .filter((field): field is NonNullable<typeof field> => {
+                                    // CRITICAL: Filter out null/undefined and ensure field_name exists
+                                    return field !== null && 
+                                           field !== undefined && 
+                                           typeof field === 'object' &&
+                                           field.field_name && 
+                                           typeof field.field_name === 'string'
+                                  })
+                                  .map((field) => {
+                                    // CRITICAL: Defensive access to tableField, columnWidth, and row.id
+                                    const tableField = Array.isArray(safeTableFields) 
+                                      ? safeTableFields.find(f => 
+                                          f && 
+                                          typeof f === 'object' && 
+                                          (f.name === field.field_name || f.id === field.field_name)
+                                        )
+                                      : undefined
+                                    
+                                    const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                                    const columnWidth = typeof columnWidths === 'object' && columnWidths !== null
+                                      ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
+                                      : COLUMN_DEFAULT_WIDTH
+                                    
+                                    // CRITICAL: Ensure row.id exists before using it
+                                    const rowId = row && typeof row === 'object' && row.id ? row.id : null
+                                    
+                                    return (
+                                      <td
+                                        key={field.field_name}
+                                        className="px-0 py-0"
+                                        style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Cell
+                                          value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                          fieldName={field.field_name}
+                                          fieldType={tableField?.type}
+                                          fieldOptions={tableField?.options}
+                                          isVirtual={isVirtual}
+                                          editable={canEdit && !isVirtual && rowId !== null}
+                                          wrapText={wrapText}
+                                          rowHeight={rowHeightPixels}
+                                          onSave={async (value) => {
+                                            if (!isVirtual && rowId) {
+                                              await handleCellSave(rowId, field.field_name, value)
+                                            }
+                                          }}
+                                        />
+                                      </td>
+                                    )
+                                  })
+                              : null}
                           </tr>
                           )
                         })}
@@ -1165,10 +1396,10 @@ export default function GridView({
                   
                   return (
                   <tr
-                    key={row.id}
+                    key={row?.id || `row-${Math.random()}`}
                     className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
                     style={{ ...borderColor, height: `${rowHeightPixels}px` }}
-                    onClick={shouldRowClickOpen ? () => handleRowClick(row.id) : undefined}
+                    onClick={shouldRowClickOpen && row?.id ? () => handleRowClick(row.id) : undefined}
                   >
                     {/* Row action indicator (desktop only) */}
                     {canOpenRecord && (
@@ -1205,35 +1436,60 @@ export default function GridView({
                         </div>
                       </td>
                     )}
-                    {visibleFields.map((field) => {
-                      const tableField = safeTableFields.find(f => f.name === field.field_name)
-                      const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
-                      const columnWidth = columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH
-                      return (
-                        <td
-                          key={field.field_name}
-                          className="px-0 py-0"
-                          style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Cell
-                            value={row[field.field_name]}
-                            fieldName={field.field_name}
-                            fieldType={tableField?.type}
-                            fieldOptions={tableField?.options}
-                            isVirtual={isVirtual}
-                            editable={canEdit && !isVirtual}
-                            wrapText={wrapText}
-                            rowHeight={rowHeightPixels}
-                            onSave={async (value) => {
-                              if (!isVirtual) {
-                                await handleCellSave(row.id, field.field_name, value)
-                              }
-                            }}
-                          />
-                        </td>
-                      )
-                    })}
+                    {safeVisibleFields.length > 0
+                      ? safeVisibleFields
+                          .filter((field): field is NonNullable<typeof field> => {
+                            // CRITICAL: Filter out null/undefined and ensure field_name exists
+                            return field !== null && 
+                                   field !== undefined && 
+                                   typeof field === 'object' &&
+                                   field.field_name && 
+                                   typeof field.field_name === 'string'
+                          })
+                          .map((field) => {
+                            // CRITICAL: Defensive access to tableField, columnWidth, and row.id
+                            const tableField = Array.isArray(safeTableFields) 
+                              ? safeTableFields.find(f => 
+                                  f && 
+                                  typeof f === 'object' && 
+                                  (f.name === field.field_name || f.id === field.field_name)
+                                )
+                              : undefined
+                            
+                            const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                            const columnWidth = typeof columnWidths === 'object' && columnWidths !== null
+                              ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
+                              : COLUMN_DEFAULT_WIDTH
+                            
+                            // CRITICAL: Ensure row.id exists before using it
+                            const rowId = row && typeof row === 'object' && row.id ? row.id : null
+                            
+                            return (
+                              <td
+                                key={field.field_name}
+                                className="px-0 py-0"
+                                style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Cell
+                                  value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                  fieldName={field.field_name}
+                                  fieldType={tableField?.type}
+                                  fieldOptions={tableField?.options}
+                                  isVirtual={isVirtual}
+                                  editable={canEdit && !isVirtual && rowId !== null}
+                                  wrapText={wrapText}
+                                  rowHeight={rowHeightPixels}
+                                  onSave={async (value) => {
+                                    if (!isVirtual && rowId) {
+                                      await handleCellSave(rowId, field.field_name, value)
+                                    }
+                                  }}
+                                />
+                              </td>
+                            )
+                          })
+                      : null}
                   </tr>
                   )
                 })
@@ -1268,8 +1524,8 @@ export default function GridView({
             )}
           </div>
           <div className="text-sm text-gray-500">
-            {filteredRows.length} {filteredRows.length === 1 ? "row" : "rows"}
-            {searchTerm && filteredRows.length !== safeRows.length && (
+            {Array.isArray(filteredRows) ? filteredRows.length : 0} {Array.isArray(filteredRows) && filteredRows.length === 1 ? "row" : "rows"}
+            {searchTerm && Array.isArray(filteredRows) && Array.isArray(safeRows) && filteredRows.length !== safeRows.length && (
               <span className="ml-1">(filtered from {safeRows.length})</span>
             )}
           </div>

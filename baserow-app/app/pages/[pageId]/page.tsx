@@ -22,6 +22,10 @@ export default async function PagePage({
   let pageName = "Interface Page"
   let initialData: any[] = []
 
+  if (isDev) {
+    console.log('[Page Render] Loading page:', { pageId, found: !!page })
+  }
+
   // If not found in new system, try old system for backward compatibility
   if (!page) {
     const { data: view } = await supabase
@@ -32,9 +36,10 @@ export default async function PagePage({
 
     if (!view || view.type !== 'interface') {
       // Page not found - render with null page so InterfacePageClient shows "not found" UI
-      // DO NOT redirect - let the component handle it
+      // DO NOT redirect - this is a valid state (page doesn't exist)
+      // The default page router should only redirect if page doesn't exist, not on render errors
       if (isDev) {
-        console.warn('[Redirect] Page not found, rendering null page:', pageId)
+        console.warn('[Page Render] ✗ Page not found:', pageId)
       }
       page = null
       pageName = "Page Not Found"
@@ -42,35 +47,51 @@ export default async function PagePage({
       // Check permissions for old system
       if (view.is_admin_only && !admin) {
         // Permission denied - render with null page so component shows access denied UI
-        // DO NOT redirect - let the component handle it
+        // DO NOT redirect - this is a valid state (page not accessible)
         if (isDev) {
-          console.warn('[Redirect] Access denied, rendering null page:', pageId)
+          console.warn('[Page Render] ✗ Access denied:', pageId)
         }
         page = null
         pageName = "Access Denied"
       } else {
         pageName = view.name || "Interface Page"
+        if (isDev) {
+          console.log('[Page Render] ✓ Page found in views table:', pageId)
+        }
       }
     }
   } else {
     // Check permissions for new system
     if (page.is_admin_only && !admin) {
       // Permission denied - render with null page so component shows access denied UI
-      // DO NOT redirect - let the component handle it
+      // DO NOT redirect - this is a valid state (page not accessible)
       if (isDev) {
-        console.warn('[Redirect] Access denied, rendering null page:', pageId)
+        console.warn('[Page Render] ✗ Access denied:', pageId)
       }
       page = null
       pageName = "Access Denied"
     } else {
       pageName = page.name || "Interface Page"
+      if (isDev) {
+        console.log('[Page Render] ✓ Page found in interface_pages:', pageId)
+      }
 
       // Load initial data from SQL view if source_view is set
+      // CRITICAL: Errors loading data are NOT reasons to redirect
+      // If data fails to load, the page should still render and show an error state
       if (page.source_view) {
         try {
           initialData = await querySqlView(page.source_view, page.config?.default_filters || {})
+          if (isDev) {
+            console.log('[Page Render] Loaded initial data:', { count: initialData.length })
+          }
         } catch (error) {
-          console.error('Error loading initial SQL view data:', error)
+          // Data load error - log but continue rendering
+          // The page component will handle showing the error state
+          console.error('[Page Render] Error loading initial SQL view data (continuing to render):', error)
+          if (isDev) {
+            console.log('[Page Render] Page will render with empty data - component will handle error state')
+          }
           // Continue without data - PageRenderer will handle loading state
         }
       }
@@ -78,9 +99,15 @@ export default async function PagePage({
   }
 
   // ALWAYS render - never redirect away from explicitly requested page
-  // Invalid pages will show setup UI via PageRenderer
+  // CRITICAL: Only redirect if page doesn't exist or is not accessible
+  // DO NOT redirect on render errors (missing blocks, data errors, etc.)
+  // Those should be shown on the page itself
   // Hide RecordPanel for record_review pages since they have their own record detail panel
   const hideRecordPanel = page ? isRecordReviewPage(page.page_type as any) : false
+  
+  if (isDev && page) {
+    console.log('[Page Render] Rendering page:', { pageId, pageName, hasData: initialData.length > 0 })
+  }
   
   return (
     <WorkspaceShellWrapper title={pageName} hideTopbar={true} hideRecordPanel={hideRecordPanel}>
