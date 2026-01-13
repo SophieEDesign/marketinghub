@@ -66,20 +66,23 @@ export default function AirtableSidebar({
   const { mode, toggleMode } = useSidebarMode()
   const isMobileOrTablet = useIsMobileOrTablet()
   
-  // Load initial state from localStorage or default to interfaces expanded
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem("sidebar-sections-expanded")
-      if (saved) {
-        try {
-          return new Set(JSON.parse(saved))
-        } catch (e) {
-          // Ignore parse errors
-        }
+  // Load initial state - use default on server, sync from localStorage on client after mount
+  // This prevents hydration mismatches
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["interfaces"]))
+  const [isMounted, setIsMounted] = useState(false)
+  
+  // Sync from localStorage after mount to prevent hydration issues
+  useEffect(() => {
+    setIsMounted(true)
+    const saved = localStorage.getItem("sidebar-sections-expanded")
+    if (saved) {
+      try {
+        setExpandedSections(new Set(JSON.parse(saved)))
+      } catch (e) {
+        // Ignore parse errors
       }
     }
-    return new Set(["interfaces"])
-  })
+  }, [])
   
   // For mobile/tablet: use controlled state from parent, default to closed
   // For desktop: use internal collapsed state
@@ -113,23 +116,12 @@ export default function AirtableSidebar({
     }
   }, [isMobileOrTablet, isOpen, onClose])
 
-  // Load persisted expand/collapse state from localStorage on mount
+  // Save expand/collapse state to localStorage when it changes (only after mount)
   useEffect(() => {
-    const saved = localStorage.getItem("sidebar-sections-expanded")
-    if (saved) {
-      try {
-        const expanded = JSON.parse(saved)
-        setExpandedSections(new Set(expanded))
-      } catch (e) {
-        // Ignore parse errors, use default
-      }
+    if (isMounted) {
+      localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(expandedSections)))
     }
-  }, [])
-
-  // Save expand/collapse state to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(expandedSections)))
-  }, [expandedSections])
+  }, [expandedSections, isMounted])
 
   function toggleSection(section: string) {
     setExpandedSections(prev => {
@@ -139,8 +131,10 @@ export default function AirtableSidebar({
       } else {
         next.add(section)
       }
-      // Persist to localStorage
-      localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(next)))
+      // Persist to localStorage (only after mount to avoid hydration issues)
+      if (isMounted) {
+        localStorage.setItem("sidebar-sections-expanded", JSON.stringify(Array.from(next)))
+      }
       return next
     })
   }
@@ -288,6 +282,16 @@ export default function AirtableSidebar({
 
         {/* Recents & Favorites */}
         <RecentsFavoritesSection primaryColor={primaryColor} sidebarTextColor={sidebarTextColor} />
+
+        {/* Debug: Show tables count in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="px-3 py-1 text-xs text-gray-500 border-t border-gray-100">
+            Debug: tables.length = {tables.length}
+            {tables.length > 0 && (
+              <div className="mt-1">Tables: {tables.map(t => t.name).join(', ')}</div>
+            )}
+          </div>
+        )}
 
         {/* Core Data Section - Collapsed by default */}
         {tables.length > 0 && (

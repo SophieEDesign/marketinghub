@@ -40,18 +40,15 @@ export default async function WorkspaceShellWrapper({
   // Fetch all data in parallel using existing functions from baserow-app/lib/crud
   const [tables, userRole, brandingSettings] = await Promise.all([
     getTables().catch((error) => {
-      // Log error but don't crash the app
-      console.error('[WorkspaceShellWrapper] Error loading tables:', error)
+      // Log error but don't crash the app (only in development)
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[WorkspaceShellWrapper] Error loading tables:', error)
+      }
       return []
     }),
     getUserRole(),
     getWorkspaceSettings().catch(() => null),
   ])
-  
-  // Log tables count for debugging
-  if (typeof window === 'undefined') {
-    console.log('[WorkspaceShellWrapper] Loaded tables:', tables.length)
-  }
   
   const userIsAdmin = await isAdmin()
 

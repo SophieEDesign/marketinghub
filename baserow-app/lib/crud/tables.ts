@@ -32,7 +32,15 @@ export async function getTables() {
     throw error
   }
   
-  console.log('[getTables] Successfully loaded tables:', data?.length || 0)
+  // Log success (server-side only to avoid hydration issues)
+  if (typeof window === 'undefined') {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[getTables] Successfully loaded tables:', data?.length || 0)
+    }
+  } else {
+    // Client-side: always log for debugging
+    console.log('[getTables] Client-side: Loaded tables:', data?.length || 0, data?.map(t => t.name))
+  }
   return (data || []) as Table[]
 }
 
