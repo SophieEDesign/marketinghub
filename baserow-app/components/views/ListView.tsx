@@ -714,7 +714,7 @@ export default function ListView({
                 {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
+                Configure {groupDialogOpen ? 'grouping' : 'filter'} settings in the block settings panel (Data tab).
               </p>
               <Button onClick={() => {
                 setGroupDialogOpen(false)
@@ -800,7 +800,7 @@ export default function ListView({
                 {groupDialogOpen ? 'Grouping Settings' : 'Filter Settings'}
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                {groupDialogOpen ? 'Grouping' : 'Filter'} settings require a view to be configured. Please configure a view in the block settings.
+                Configure {groupDialogOpen ? 'grouping' : 'filter'} settings in the block settings panel (Data tab).
               </p>
               <Button onClick={() => {
                 setGroupDialogOpen(false)
