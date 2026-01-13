@@ -30,6 +30,7 @@ export type FilterOperator =
   | 'date_after'
   | 'date_on_or_before'
   | 'date_on_or_after'
+  | 'date_range'
 
 export type GroupOperator = 'AND' | 'OR'
 
