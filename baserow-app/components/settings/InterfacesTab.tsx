@@ -136,26 +136,41 @@ export default function InterfacesTab() {
     // This matches the sidebar: interfaces are the containers, pages belong to them
     let groupsData: any[] = []
     try {
-      const { data, error } = await supabase
+      // Start with minimal query to avoid 400 errors
+      const { data: minimalData, error: minimalError } = await supabase
         .from('interface_groups')
-        .select('id, name, order_index, is_system, is_admin_only, icon')
+        .select('id, name, order_index')
         .order('order_index', { ascending: true })
       
-      if (!error && data) {
-        groupsData = data
-      } else if (error) {
-        console.error('Error loading interface_groups:', error)
-        // Check if it's a column error
-        if (error.code === '42703' || error.message?.includes('column "is_system" does not exist')) {
-          // Column doesn't exist - fetch without it
-          const { data: fallbackData, error: fallbackError } = await supabase
+      if (minimalError) {
+        console.error('Error loading interface_groups:', minimalError)
+        // If minimal query fails, try even simpler
+        const { data: basicData, error: basicError } = await supabase
+          .from('interface_groups')
+          .select('id, name')
+          .order('order_index', { ascending: true })
+        
+        if (!basicError && basicData) {
+          groupsData = basicData.map((g: any) => ({ ...g, order_index: 0, is_system: false, is_admin_only: false, icon: null }))
+        }
+      } else if (minimalData) {
+        // Try to get full data with optional columns
+        try {
+          const { data: fullData } = await supabase
             .from('interface_groups')
-            .select('id, name, order_index, is_admin_only, icon')
+            .select('id, name, order_index, is_system, is_admin_only, icon')
             .order('order_index', { ascending: true })
           
-          if (!fallbackError && fallbackData) {
-            groupsData = fallbackData.map((g: any) => ({ ...g, is_system: false, is_admin_only: g.is_admin_only ?? true }))
-          } else if (fallbackError) {
+          if (fullData) {
+            groupsData = fullData
+          } else {
+            // Use minimal data with defaults
+            groupsData = minimalData.map((g: any) => ({ ...g, is_system: false, is_admin_only: false, icon: null }))
+          }
+        } catch (e) {
+          // Some columns don't exist - use minimal data with defaults
+          groupsData = minimalData.map((g: any) => ({ ...g, is_system: false, is_admin_only: false, icon: null }))
+        } else if (fallbackError) {
             console.error('Error loading interface_groups (fallback):', fallbackError)
           }
         } else {

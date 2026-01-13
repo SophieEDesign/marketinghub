@@ -35,13 +35,45 @@ export default async function Sidebar() {
   }>> = new Map()
   
   try {
-    // Load interface groups (interfaces) - try with is_system and is_admin_only first, fallback if columns don't exist
+    // Load interface groups (interfaces) - start with minimal query, then try to add optional columns
+    // Start with columns that definitely exist
     let groupsQuery = supabase
       .from('interface_groups')
-      .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
+      .select('id, name, order_index')
       .order('order_index', { ascending: true })
     
-    const { data: groupsData, error: groupsError } = await groupsQuery
+    let groupsData: any[] | null = null
+    let groupsError: any = null
+    
+    // Try the minimal query first
+    const { data: minimalData, error: minimalError } = await groupsQuery
+    
+    if (minimalError) {
+      groupsError = minimalError
+    } else if (minimalData) {
+      groupsData = minimalData
+      
+      // Try to fetch additional columns if they exist
+      try {
+        const { data: fullData } = await supabase
+          .from('interface_groups')
+          .select('id, name, order_index, collapsed, is_system, is_admin_only, icon')
+          .order('order_index', { ascending: true })
+        
+        if (fullData) {
+          groupsData = fullData
+        }
+      } catch (e) {
+        // Some columns don't exist - use minimal data and add defaults
+        groupsData = minimalData.map((g: any) => ({
+          ...g,
+          collapsed: false,
+          is_system: false,
+          is_admin_only: false,
+          icon: null,
+        }))
+      }
+    }
     
     // Load interface pages FIRST - we need this to determine which groups to show
     let pagesQuery = supabase
@@ -93,43 +125,21 @@ export default async function Sidebar() {
 
     // Now filter groups based on whether they have pages and permissions
     // Include system groups ONLY if they have pages assigned
-    if (groupsError && (groupsError.code === '42703' || groupsError.message?.includes('column'))) {
-      // Fallback: columns don't exist, try without them
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('interface_groups')
-        .select('id, name, order_index, collapsed, is_admin_only, icon')
-        .order('order_index', { ascending: true })
-      
-      if (!fallbackError && fallbackData) {
-        interfaceGroups = fallbackData
-          .filter(g => {
-            // Filter admin-only interfaces for non-admins
-            if (!userIsAdmin && g.is_admin_only) {
-              return false
-            }
-            // Include groups that have pages (or if name is "Ungrouped" and we have ungrouped pages)
-            const hasPages = interfacePagesByGroup.has(g.id)
-            const isUngrouped = g.name === 'Ungrouped'
-            const hasUngroupedPages = interfacePagesByGroup.has('__ungrouped__')
-            return hasPages || (isUngrouped && hasUngroupedPages)
-          })
-          .map(g => ({
-            id: g.id,
-            name: g.name,
-            order_index: g.order_index || 0,
-            collapsed: g.collapsed || false,
-            icon: g.icon || null,
-          }))
-      } else if (fallbackError) {
-        console.error('Error loading interface groups:', fallbackError)
-      }
-    } else if (!groupsError && groupsData) {
+    if (groupsError) {
+      // If there's an error, log it but continue with empty groups
+      console.error('Error loading interface groups:', groupsError)
+      interfaceGroups = []
+    } else if (groupsData) {
       interfaceGroups = groupsData
         .filter(g => {
+          // Check if it's a system group (default to false if column doesn't exist)
+          const isSystem = g.is_system === true
+          
           // Include non-system groups (with permission check)
-          if (!g.is_system) {
-            // Filter admin-only interfaces for non-admins
-            return userIsAdmin || !g.is_admin_only
+          if (!isSystem) {
+            // Filter admin-only interfaces for non-admins (default to false if column doesn't exist)
+            const isAdminOnly = g.is_admin_only === true
+            return userIsAdmin || !isAdminOnly
           }
           // For system groups, only include if they have pages assigned
           const hasPages = interfacePagesByGroup.has(g.id)
@@ -142,8 +152,9 @@ export default async function Sidebar() {
           collapsed: g.collapsed || false,
           icon: g.icon || null,
         }))
-    } else if (groupsError) {
-      console.error('Error loading interface groups:', groupsError)
+    } else {
+      // No data and no error - table might not exist or be empty
+      interfaceGroups = []
     }
   } catch (error) {
     console.error('Error loading interfaces:', error)
