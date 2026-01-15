@@ -6,6 +6,7 @@ export type BlockType =
   | 'kpi'
   | 'text'
   | 'image'
+  | 'gallery'
   | 'divider'
   | 'button'
   | 'action'

@@ -111,6 +111,20 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       image_alt: '',
     },
   },
+  gallery: {
+    type: 'gallery',
+    label: 'Gallery',
+    icon: 'Images',
+    defaultWidth: 12,
+    defaultHeight: 8,
+    minWidth: 4,
+    minHeight: 4,
+    defaultConfig: {
+      title: 'Gallery',
+      table_id: '',
+      view_type: 'gallery',
+    },
+  },
   divider: {
     type: 'divider',
     label: 'Divider',

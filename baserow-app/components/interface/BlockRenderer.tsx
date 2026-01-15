@@ -20,6 +20,7 @@ import FieldBlock from "./blocks/FieldBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
 import TimelineBlock from "./blocks/TimelineBlock"
+import GalleryBlock from "./blocks/GalleryBlock"
 import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
@@ -273,6 +274,14 @@ export default function BlockRenderer({
         return (
           <LazyBlockWrapper enabled={!isEditing}>
             <TimelineBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+          </LazyBlockWrapper>
+        )
+
+      case "gallery":
+        // Gallery block - wrapper around GridBlock with view_type='gallery'
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <GalleryBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
           </LazyBlockWrapper>
         )
 

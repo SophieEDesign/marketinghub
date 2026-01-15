@@ -157,6 +157,19 @@ async function checkBlockConfigs() {
         }
         break
 
+      case 'kanban':
+      case 'timeline':
+      case 'list':
+      case 'gallery':
+        if (!config.table_id) {
+          errors.push({
+            type: 'block_missing_config',
+            id: block.id,
+            message: `Block ${block.id} (${blockType}) is missing required table_id.`,
+          })
+        }
+        break
+
       case 'calendar':
       case 'kpi':
         // Calendar and KPI blocks can inherit table_id from page context (page.base_table)
@@ -184,16 +197,6 @@ async function checkBlockConfigs() {
             type: 'block_missing_config',
             id: block.id,
             message: `Block ${block.id} (form) is missing required table_id.`,
-          })
-        }
-        break
-
-      case 'calendar':
-        if (!config.date_field && config.table_id) {
-          errors.push({
-            type: 'block_missing_config',
-            id: block.id,
-            message: `Block ${block.id} (calendar) is missing required date_field.`,
           })
         }
         break

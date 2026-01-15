@@ -7,6 +7,7 @@ import GridViewWrapper from "@/components/grid/GridViewWrapper"
 import CalendarView from "@/components/views/CalendarView"
 import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
+import GalleryView from "@/components/views/GalleryView"
 import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
@@ -450,16 +451,33 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
       }
       
       case 'gallery': {
-        // Gallery view - show unsupported state for now
-        return (
-          <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
-            <div className="text-center">
-              <p className="mb-2">Gallery view is not yet available</p>
-              {isEditing && (
-                <p className="text-xs text-gray-400">Gallery view will be available in a future update.</p>
-              )}
+        if (!tableId) {
+          return (
+            <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+              <div className="text-center">
+                <p className="mb-2">{isEditing ? "Gallery view requires a table connection." : "No table configured"}</p>
+                {isEditing && (
+                  <p className="text-xs text-gray-400">Configure a table in block settings.</p>
+                )}
+              </div>
             </div>
-          </div>
+          )
+        }
+
+        return (
+          <GalleryView
+            tableId={tableId}
+            viewId={viewId || undefined}
+            fieldIds={fieldIds}
+            searchQuery=""
+            tableFields={tableFields}
+            filters={allFilters}
+            onRecordClick={onRecordClick}
+            blockConfig={config}
+            colorField={appearance.color_field}
+            imageField={appearance.image_field}
+            fitImageSize={appearance.fit_image_size}
+          />
         )
       }
       

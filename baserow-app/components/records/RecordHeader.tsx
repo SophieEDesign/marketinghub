@@ -1,9 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Copy, Trash2, Copy as CopyIcon, Save, Edit2, Check, X } from "lucide-react"
+import { Copy, Trash2, Copy as CopyIcon } from "lucide-react"
 import { formatDateUK } from "@/lib/utils"
-import { useToast } from "@/components/ui/use-toast"
 import type { TableField } from "@/types/fields"
 
 interface RecordHeaderProps {
@@ -35,7 +34,6 @@ export default function RecordHeader({
   hasChanges,
   loading,
 }: RecordHeaderProps) {
-  const { toast } = useToast()
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -68,12 +66,8 @@ export default function RecordHeader({
   const handleNameSave = () => {
     if (primaryNameField) {
       onFieldChange(primaryNameField.name, nameValue)
-      setIsEditingName(false)
-      // Auto-save if there are changes
-      if (hasChanges) {
-        onSave()
-      }
     }
+    setIsEditingName(false)
   }
 
   const handleNameCancel = () => {
@@ -131,34 +125,19 @@ export default function RecordHeader({
               className="flex-1 text-2xl font-semibold text-gray-900 border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
               placeholder="Record name"
             />
-            <button
-              onClick={handleNameSave}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
-            >
-              <Check className="h-4 w-4 text-green-600" />
-            </button>
-            <button
-              onClick={handleNameCancel}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
-            >
-              <X className="h-4 w-4 text-gray-600" />
-            </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3 group">
-            <h1 className="text-2xl font-semibold text-gray-900 flex-1 min-w-0">
-              {recordName || "Untitled"}
-            </h1>
-            {primaryNameField && (
-              <button
-                onClick={() => setIsEditingName(true)}
-                className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
-                title="Edit name"
-              >
-                <Edit2 className="h-4 w-4 text-gray-600" />
-              </button>
-            )}
-          </div>
+          <h1
+            className={`text-2xl font-semibold text-gray-900 flex-1 min-w-0 truncate ${
+              primaryNameField ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
+            }`}
+            onClick={() => {
+              if (primaryNameField) setIsEditingName(true)
+            }}
+            title={primaryNameField ? "Click to edit" : undefined}
+          >
+            {recordName || "Untitled"}
+          </h1>
         )}
 
         {/* Status and Metadata Row */}
@@ -196,18 +175,7 @@ export default function RecordHeader({
 
       {/* Quick Actions */}
       <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <button
-              onClick={onSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {saving ? "Saving..." : "Save"}
-            </button>
-          )}
-        </div>
+        <div />
         <div className="flex items-center gap-1">
           <button
             onClick={onDuplicate}

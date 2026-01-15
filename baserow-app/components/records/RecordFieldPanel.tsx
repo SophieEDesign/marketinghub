@@ -147,11 +147,6 @@ export default function RecordFieldPanel({
 
         // Notify parent
         onFieldChange?.(fieldName, value)
-
-        toast({
-          title: "Field updated",
-          description: "The field has been saved successfully.",
-        })
       } catch (error: any) {
         console.error("Error updating field:", error)
         toast({
@@ -236,6 +231,7 @@ export default function RecordFieldPanel({
                           onEditEnd={() => setEditingField(null)}
                           onLinkedRecordClick={handleLinkedRecordClick}
                           onAddLinkedRecord={handleAddLinkedRecord}
+                          showLabel={false}
                         />
                       ) : (
                         <div className="py-1">
@@ -248,6 +244,7 @@ export default function RecordFieldPanel({
                             onEditEnd={() => {}}
                             onLinkedRecordClick={handleLinkedRecordClick}
                             onAddLinkedRecord={handleAddLinkedRecord}
+                            showLabel={false}
                           />
                         </div>
                       )}
@@ -279,6 +276,7 @@ export default function RecordFieldPanel({
                       onEditEnd={() => setEditingField(null)}
                       onLinkedRecordClick={handleLinkedRecordClick}
                       onAddLinkedRecord={handleAddLinkedRecord}
+                      showLabel={false}
                     />
                   ) : (
                     <InlineFieldEditor
@@ -290,6 +288,7 @@ export default function RecordFieldPanel({
                       onEditEnd={() => {}}
                       onLinkedRecordClick={handleLinkedRecordClick}
                       onAddLinkedRecord={handleAddLinkedRecord}
+                      showLabel={false}
                     />
                   )}
                 </div>

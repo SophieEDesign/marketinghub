@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react"
-import { ChevronDown, ChevronRight, Link2, Plus, X } from "lucide-react"
+import { useState, useCallback, useEffect, useMemo } from "react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
@@ -190,53 +190,67 @@ export default function RecordFields({
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* Render all groups - all fields are grouped (ungrouped go to "General") */}
       {Object.entries(groupedFields)
         .filter(([_, groupFields]) => groupFields.length > 0) // Hide empty groups
         .map(([groupName, groupFields]) => {
           const isCollapsed = collapsedGroups.has(groupName)
           return (
-            <div key={groupName} className="border border-gray-200/60 rounded-lg overflow-hidden bg-white">
+            <section key={groupName} className="space-y-3">
               <button
                 onClick={() => toggleGroup(groupName)}
-                className="w-full px-5 py-3.5 bg-gray-50/80 hover:bg-gray-100/80 transition-colors flex items-center justify-between border-b border-gray-200/60"
+                className="w-full flex items-center justify-between text-left"
                 aria-expanded={!isCollapsed}
                 aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
               >
-                <span className="font-semibold text-sm text-gray-900">{groupName}</span>
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                )}
+                <span className="text-sm font-semibold text-gray-900">{groupName}</span>
+                <span className="text-gray-400">
+                  {isCollapsed ? (
+                    <ChevronRight className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </span>
               </button>
               {!isCollapsed && (
-                <div className="p-5 space-y-6">
+                <div className="grid grid-cols-[160px_1fr] gap-x-8 gap-y-3">
                   {groupFields.map((field) => {
                     const fieldEditable = isFieldEditable(field.name)
-                    // Always show fields as editable (no edit button needed) - auto-update on change
+                    const isThisEditing = editingField === field.id
                     return (
-                      <InlineFieldEditor
-                        key={field.id}
-                        field={field}
-                        value={formData[field.name]}
-                        onChange={(value) => onFieldChange(field.name, value)}
-                        isEditing={fieldEditable} // Always in edit mode for editable fields
-                        onEditStart={() => {}} // No-op - fields are always editable
-                        onEditEnd={() => {}} // No-op - auto-saves on change
-                        onLinkedRecordClick={handleLinkedRecordClick}
-                        onAddLinkedRecord={handleAddLinkedRecord}
-                        isReadOnly={!fieldEditable}
-                        tableId={tableId}
-                        recordId={recordId}
-                        tableName={tableName}
-                      />
+                      <div key={field.id} className="contents">
+                        <div className="pt-2 text-xs font-medium text-gray-500">
+                          {field.name}
+                        </div>
+                        <div>
+                          <InlineFieldEditor
+                            field={field}
+                            value={formData[field.name]}
+                            onChange={(value) => onFieldChange(field.name, value)}
+                            isEditing={isThisEditing}
+                            onEditStart={() => {
+                              if (!fieldEditable) return
+                              setEditingField(field.id)
+                            }}
+                            onEditEnd={() => {
+                              setEditingField((prev) => (prev === field.id ? null : prev))
+                            }}
+                            onLinkedRecordClick={handleLinkedRecordClick}
+                            onAddLinkedRecord={handleAddLinkedRecord}
+                            isReadOnly={!fieldEditable}
+                            showLabel={false}
+                            tableId={tableId}
+                            recordId={recordId}
+                            tableName={tableName}
+                          />
+                        </div>
+                      </div>
                     )
                   })}
                 </div>
               )}
-            </div>
+            </section>
           )
         })}
 

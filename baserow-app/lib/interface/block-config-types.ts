@@ -153,6 +153,12 @@ export interface ImageBlockConfig extends BaseBlockConfig {
   }
 }
 
+// Gallery Block Config (table-based, card/grid layout)
+// Uses the same base config as Grid blocks, with view_type='gallery'
+export interface GalleryBlockConfig extends GridBlockConfig {
+  view_type?: 'gallery'
+}
+
 // Divider Block Config
 export interface DividerBlockConfig extends BaseBlockConfig {
   appearance?: BaseBlockConfig['appearance'] & {
@@ -223,6 +229,7 @@ export type BlockConfigUnion =
   | (KPIBlockConfig & { _type: 'kpi' })
   | (TextBlockConfig & { _type: 'text' })
   | (ImageBlockConfig & { _type: 'image' })
+  | (GalleryBlockConfig & { _type: 'gallery' })
   | (DividerBlockConfig & { _type: 'divider' })
   | (ButtonBlockConfig & { _type: 'button' })
   | (ActionBlockConfig & { _type: 'action' })
@@ -359,6 +366,7 @@ export function validateBlockConfig(
 
     case 'calendar':
     case 'kanban':
+    case 'gallery':
     case 'timeline':
     case 'list':
       // These blocks are wrappers around GridBlock, so they need table_id

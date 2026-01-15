@@ -424,6 +424,7 @@ export default function SettingsPanel({
       case "calendar":
       case "kanban":
       case "timeline":
+      case "gallery":
         // Calendar, Kanban, and Timeline blocks use the same settings as Grid blocks
         // They're grid blocks with different view_type values
         return <GridDataSettings {...commonProps} />
@@ -537,6 +538,7 @@ export default function SettingsPanel({
       case "calendar":
       case "kanban":
       case "timeline":
+      case "gallery":
         // List, Calendar, Kanban, and Timeline blocks use the same appearance settings as Grid blocks
         return (
           <>

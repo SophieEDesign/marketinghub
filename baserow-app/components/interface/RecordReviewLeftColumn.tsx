@@ -19,6 +19,8 @@ import type { TableField } from "@/types/fields"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { formatDateUK } from "@/lib/utils"
+import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
 interface RecordReviewLeftColumnProps {
   tableId: string | null // From page.settings.tableId
@@ -222,6 +224,63 @@ export default function RecordReviewLeftColumn({
     }
   }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId])
 
+  const renderValue = useCallback((field: TableField | null, value: any) => {
+    if (!field) return <span className="text-gray-400">—</span>
+    if (value === null || value === undefined || value === "") {
+      return <span className="text-gray-400">—</span>
+    }
+
+    // Dates
+    if (field.type === "date") {
+      return <span>{formatDateUK(String(value), "—")}</span>
+    }
+
+    // Multi-select pills
+    if (field.type === "multi_select") {
+      const values = Array.isArray(value) ? value : [value]
+      return (
+        <div className="flex flex-wrap gap-1">
+          {values.slice(0, 4).map((v: any, i: number) => {
+            const normalizedColor = normalizeHexColor(
+              resolveChoiceColor(String(v), "multi_select", field.options, false)
+            )
+            const textColor = getTextColorForBackground(normalizedColor)
+            return (
+              <Badge
+                key={`${field.id}-${i}`}
+                className={`text-[11px] font-medium ${textColor} border border-opacity-20`}
+                style={{ backgroundColor: normalizedColor }}
+              >
+                {String(v)}
+              </Badge>
+            )
+          })}
+          {values.length > 4 && (
+            <span className="text-[11px] text-gray-500">+{values.length - 4}</span>
+          )}
+        </div>
+      )
+    }
+
+    // Single select pill
+    if (field.type === "single_select") {
+      const normalizedColor = normalizeHexColor(
+        resolveChoiceColor(String(value), "single_select", field.options, true)
+      )
+      const textColor = getTextColorForBackground(normalizedColor)
+      return (
+        <Badge
+          className={`text-[11px] font-medium ${textColor} border border-opacity-20`}
+          style={{ backgroundColor: normalizedColor }}
+        >
+          {String(value)}
+        </Badge>
+      )
+    }
+
+    return <span>{String(value)}</span>
+  }, [])
+
   if (!tableId) {
     return (
       <div className="w-80 border-r border-gray-200 bg-gray-50 p-4">
@@ -274,7 +333,7 @@ export default function RecordReviewLeftColumn({
                   <button
                     key={record.id}
                     onClick={() => onRecordSelect(record.id)}
-                    className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
+                    className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors ${
                       isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
                     }`}
                   >
@@ -285,22 +344,16 @@ export default function RecordReviewLeftColumn({
                     
                     {/* Subtitle */}
                     {subtitleValue && (
-                      <div className="text-xs text-gray-600 truncate mt-0.5">
-                        {String(subtitleValue)}
+                      <div className="mt-1 text-xs text-gray-600 truncate">
+                        {renderValue(subtitleField, subtitleValue)}
                       </div>
                     )}
                     
                     {/* Additional Field */}
                     {additionalValue && (
-                      <div className="text-xs text-gray-500 truncate mt-0.5">
-                        {String(additionalValue)}
+                      <div className="mt-1 text-xs text-gray-500 truncate">
+                        {renderValue(additionalField, additionalValue)}
                       </div>
-                    )}
-                    
-                    {isSelected && (
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        Selected
-                      </Badge>
                     )}
                   </button>
                 )
@@ -319,7 +372,7 @@ export default function RecordReviewLeftColumn({
                   <button
                     key={record.id}
                     onClick={() => onRecordSelect(record.id)}
-                    className={`w-full text-left p-3 hover:bg-gray-50 transition-colors ${
+                    className={`w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors ${
                       isSelected ? "bg-blue-50 border-l-4 border-blue-500" : ""
                     } ${compact ? "py-2" : ""}`}
                   >
@@ -330,11 +383,6 @@ export default function RecordReviewLeftColumn({
                       <div className="text-xs text-gray-500 mt-0.5">
                         {displayField.name}
                       </div>
-                    )}
-                    {isSelected && (
-                      <Badge variant="secondary" className="mt-1 text-xs">
-                        Selected
-                      </Badge>
                     )}
                   </button>
                 )

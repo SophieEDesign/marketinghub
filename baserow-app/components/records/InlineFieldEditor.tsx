@@ -28,6 +28,8 @@ interface InlineFieldEditorProps {
   onLinkedRecordClick: (tableId: string, recordId: string) => void
   onAddLinkedRecord: (field: TableField) => void
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
+  showLabel?: boolean // Whether to render the field label (default: true)
+  labelClassName?: string // Optional label classes
   tableId?: string // For attachment uploads
   recordId?: string // For attachment uploads
   tableName?: string // For attachment uploads (supabase table name)
@@ -43,15 +45,27 @@ export default function InlineFieldEditor({
   onLinkedRecordClick,
   onAddLinkedRecord,
   isReadOnly: propIsReadOnly,
+  showLabel: propShowLabel = true,
+  labelClassName: propLabelClassName,
   tableId,
   recordId,
   tableName,
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
   const [localValue, setLocalValue] = useState(value)
-  const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const showLabel = propShowLabel
+  const labelClassName = propLabelClassName || "block text-sm font-medium text-gray-700"
+  const containerClassName = showLabel ? "space-y-2.5" : ""
+  const displayBoxClassName = showLabel
+    ? "px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
+    : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-900 hover:bg-gray-50 hover:ring-1 hover:ring-gray-200 transition-colors cursor-pointer"
+  const readOnlyBoxClassName = showLabel
+    ? "px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic"
+    : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-600"
+  const inputBoxClassName = showLabel
+    ? "w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    : "w-full px-2 py-1.5 rounded-md ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
 
   useEffect(() => {
     setLocalValue(value)
@@ -66,28 +80,11 @@ export default function InlineFieldEditor({
     }
   }, [isEditing])
 
-  const debouncedSave = useCallback(
-    (newValue: any) => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
-      }
-      saveTimeoutRef.current = setTimeout(() => {
-        onChange(newValue)
-      }, 500) // 500ms debounce
-    },
-    [onChange]
-  )
-
   const handleChange = (newValue: any) => {
     setLocalValue(newValue)
-    debouncedSave(newValue)
   }
 
   const handleBlur = () => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-      saveTimeoutRef.current = null
-    }
     onChange(localValue)
     onEditEnd()
   }
@@ -197,14 +194,16 @@ export default function InlineFieldEditor({
     // LOOKUP FIELDS (derived, read-only) - Show as informational pills
     if (isLookupField) {
       return (
-        <div className="space-y-2.5" onPaste={handlePaste}>
-          <label className="block text-sm font-medium text-gray-600 flex items-center gap-2">
-            {field.name}
-            <span title="Derived field (read-only)" className="flex items-center gap-1 text-xs text-gray-400 font-normal">
-              <LinkIcon className="h-3 w-3" />
-              <span>Derived</span>
-            </span>
-          </label>
+        <div className={containerClassName} onPaste={handlePaste}>
+          {showLabel && (
+            <label className={`${labelClassName} flex items-center gap-2`}>
+              {field.name}
+              <span title="Derived field (read-only)" className="flex items-center gap-1 text-xs text-gray-400 font-normal">
+                <LinkIcon className="h-3 w-3" />
+                <span>Derived</span>
+              </span>
+            </label>
+          )}
           {lookupConfig ? (
             <LookupFieldPicker
               field={field}
@@ -217,7 +216,7 @@ export default function InlineFieldEditor({
               isLookupField={true}
             />
           ) : (
-            <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-500 italic">
+            <div className={readOnlyBoxClassName}>
               {value !== null && value !== undefined ? String(value) : "—"}
             </div>
           )}
@@ -227,10 +226,10 @@ export default function InlineFieldEditor({
 
     // LINKED FIELDS (editable) - Show as editable with clear affordances
     return (
-      <div className="space-y-2.5" onPaste={handlePaste}>
-        <label className="block text-sm font-medium text-gray-700">
-          {field.name}
-        </label>
+      <div className={containerClassName} onPaste={handlePaste}>
+        {showLabel && (
+          <label className={labelClassName}>{field.name}</label>
+        )}
         {lookupConfig ? (
           <LookupFieldPicker
             field={field}
@@ -244,7 +243,7 @@ export default function InlineFieldEditor({
             isLookupField={false}
           />
         ) : (
-          <div className="px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500">
+          <div className={readOnlyBoxClassName}>
             Configure linked table in field settings
           </div>
         )}
@@ -258,15 +257,17 @@ export default function InlineFieldEditor({
     const isMulti = field.type === "multi_select"
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         <InlineSelectDropdown
           value={isMulti ? (Array.isArray(value) ? value : value ? [value] : []) : value}
           choices={choices}
@@ -295,8 +296,8 @@ export default function InlineFieldEditor({
 
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2.5">
-          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+        <div className={containerClassName}>
+          {showLabel && <label className={labelClassName}>{field.name}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="date"
@@ -304,30 +305,32 @@ export default function InlineFieldEditor({
             onChange={(e) => handleChange(e.target.value || null)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputBoxClassName}
           />
         </div>
       )
     }
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
+          <div className={readOnlyBoxClassName}>
             {dateValueForDisplay || "—"}
           </div>
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
+            className={displayBoxClassName}
           >
             {dateValueForDisplay || <span className="text-gray-400">Click to set date...</span>}
           </div>
@@ -339,17 +342,19 @@ export default function InlineFieldEditor({
   // Checkbox
   if (field.type === "checkbox") {
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
+          <div className={readOnlyBoxClassName}>
             {value ? "Yes" : "No"}
           </div>
         ) : (
@@ -371,8 +376,8 @@ export default function InlineFieldEditor({
   if (field.type === "long_text") {
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2.5">
-          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+        <div className={containerClassName}>
+          {showLabel && <label className={labelClassName}>{field.name}</label>}
           <RichTextEditor
             value={localValue ?? ""}
             onChange={handleChange}
@@ -381,30 +386,24 @@ export default function InlineFieldEditor({
             showToolbar={true}
             minHeight="150px"
           />
-          <div className="flex gap-2">
-            <button
-              onClick={handleBlur}
-              className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
-            >
-              Done
-            </button>
-          </div>
         </div>
       )
     }
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 min-h-[60px]">
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[60px]" : ""}`}>
             {value ? (
               <div 
                 className="prose prose-sm max-w-none"
@@ -417,7 +416,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[60px]"
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[60px]" : ""}`}
           >
             {value ? (
               <div 
@@ -454,15 +453,17 @@ export default function InlineFieldEditor({
     
     // Display mode - show previews
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {attachments.length > 0 ? (
           <AttachmentPreview
             attachments={attachments}
@@ -471,7 +472,7 @@ export default function InlineFieldEditor({
             displayStyle={field.options?.attachment_display_style || 'thumbnails'}
           />
         ) : (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+          <div className={`${readOnlyBoxClassName} flex items-center gap-2 ${showLabel ? "" : "text-gray-400 italic"}`}>
             <Paperclip className="h-4 w-4" />
             No attachments
           </div>
@@ -502,8 +503,8 @@ export default function InlineFieldEditor({
 
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2.5">
-          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+        <div className={containerClassName}>
+          {showLabel && <label className={labelClassName}>{field.name}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="url"
@@ -511,7 +512,7 @@ export default function InlineFieldEditor({
             onChange={(e) => handleChange(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputBoxClassName}
             placeholder="https://example.com"
           />
         </div>
@@ -519,17 +520,19 @@ export default function InlineFieldEditor({
     }
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic min-h-[40px] flex items-center">
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : ""}`}>
             {value ? (
               <a
                 href={getFullUrl(value)}
@@ -547,7 +550,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm min-h-[40px] flex items-center group"
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center group" : "group"}`}
             title={value || undefined}
           >
             {value ? (
@@ -574,8 +577,8 @@ export default function InlineFieldEditor({
   if (field.type === "email") {
     if (isEditing && !isReadOnly) {
       return (
-        <div className="space-y-2.5">
-          <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+        <div className={containerClassName}>
+          {showLabel && <label className={labelClassName}>{field.name}</label>}
           <input
             ref={inputRef as React.RefObject<HTMLInputElement>}
             type="email"
@@ -583,7 +586,7 @@ export default function InlineFieldEditor({
             onChange={(e) => handleChange(e.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={inputBoxClassName}
             placeholder="email@example.com"
           />
         </div>
@@ -591,17 +594,19 @@ export default function InlineFieldEditor({
     }
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-          {field.name}
-          {isVirtual && (
-            <span title="Formula or lookup field">
-              <Calculator className="h-3 w-3 text-gray-400" />
-            </span>
-          )}
-        </label>
+      <div className={containerClassName}>
+        {showLabel && (
+          <label className={`${labelClassName} flex items-center gap-2`}>
+            {field.name}
+            {isVirtual && (
+              <span title="Formula or lookup field">
+                <Calculator className="h-3 w-3 text-gray-400" />
+              </span>
+            )}
+          </label>
+        )}
         {isReadOnly ? (
-          <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic min-h-[40px] flex items-center gap-1">
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[40px] flex items-center gap-1" : "flex items-center gap-1"}`}>
             {value ? (
               <>
                 <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
@@ -619,7 +624,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm min-h-[40px] flex items-center"
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : "flex items-center"}`}
             title={value || undefined}
           >
             {value ? (
@@ -647,8 +652,8 @@ export default function InlineFieldEditor({
     const inputType = field.type === "number" ? "number" : "text"
 
     return (
-      <div className="space-y-2.5">
-        <label className="block text-sm font-medium text-gray-700">{field.name}</label>
+      <div className={containerClassName}>
+        {showLabel && <label className={labelClassName}>{field.name}</label>}
         <input
           ref={inputRef as React.RefObject<HTMLInputElement>}
           type={inputType}
@@ -658,7 +663,7 @@ export default function InlineFieldEditor({
           }
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={inputBoxClassName}
           placeholder={`Enter ${field.name}...`}
         />
       </div>
@@ -666,17 +671,19 @@ export default function InlineFieldEditor({
   }
 
   return (
-    <div className="space-y-2.5">
-      <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-        {field.name}
-        {isVirtual && (
-          <span title="Formula or lookup field">
-            <Calculator className="h-3 w-3 text-gray-400" />
-          </span>
-        )}
-      </label>
+    <div className={containerClassName}>
+      {showLabel && (
+        <label className={`${labelClassName} flex items-center gap-2`}>
+          {field.name}
+          {isVirtual && (
+            <span title="Formula or lookup field">
+              <Calculator className="h-3 w-3 text-gray-400" />
+            </span>
+          )}
+        </label>
+      )}
       {isReadOnly ? (
-        <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic">
+        <div className={readOnlyBoxClassName}>
           {value !== null && value !== undefined ? String(value) : "—"}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
@@ -687,7 +694,7 @@ export default function InlineFieldEditor({
       ) : (
         <div
           onClick={onEditStart}
-          className="px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900 min-h-[40px] flex items-center"
+          className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : ""}`}
         >
           {value !== null && value !== undefined ? (
             String(value)

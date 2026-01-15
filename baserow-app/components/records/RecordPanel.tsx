@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft, Save } from "lucide-react"
+import { X, Pin, PinOff, Maximize2, Minimize2, Copy, Trash2, Copy as CopyIcon, ChevronLeft } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
@@ -22,8 +22,6 @@ export default function RecordPanel() {
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   const resizeRef = useRef<HTMLDivElement>(null)
@@ -37,14 +35,12 @@ export default function RecordPanel() {
     } else {
       setRecord(null)
       setFormData({})
-      setHasChanges(false)
     }
   }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
 
   useEffect(() => {
     if (record) {
       setFormData({ ...record })
-      setHasChanges(false)
     }
   }, [record])
 
@@ -57,18 +53,11 @@ export default function RecordPanel() {
       if (e.key === "Escape" && !state.isPinned) {
         closeRecord()
       }
-      // Save on Cmd/Ctrl + S
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-        e.preventDefault()
-        if (hasChanges) {
-          handleSave()
-        }
-      }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [state.isOpen, state.isPinned, hasChanges, closeRecord])
+  }, [state.isOpen, state.isPinned, closeRecord])
 
   // Resize handler
   useEffect(() => {
@@ -192,47 +181,32 @@ export default function RecordPanel() {
     // RecordFields component uses field.group_name directly from the fields array
   }
 
-  const handleSave = useCallback(async () => {
-    if (!state.recordId || !state.tableName || saving || !hasChanges) return
+  const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
+    if (!state.recordId || !state.tableName) return
 
-    setSaving(true)
+    // Optimistic local update
+    setFormData((prev) => ({ ...prev, [fieldName]: value }))
+    setRecord((prev) => (prev ? { ...prev, [fieldName]: value } : prev))
+
     try {
       const supabase = createClient()
       const { error } = await supabase
         .from(state.tableName)
-        .update(formData)
+        .update({ [fieldName]: value })
         .eq("id", state.recordId)
 
-      if (error) {
-        throw error
-      }
-
-      await loadRecord()
-      setHasChanges(false)
-      toast({
-        variant: "success",
-        title: "Record saved",
-        description: "Changes have been saved successfully.",
-      })
+      if (error) throw error
     } catch (error: any) {
-      console.error("Error saving record:", error)
+      console.error("Error updating field:", error)
       toast({
-        title: "Failed to save record",
+        title: "Failed to update field",
         description: error.message || "Please try again",
         variant: "destructive",
       })
-    } finally {
-      setSaving(false)
+      // Revert by reloading record from server
+      loadRecord()
     }
-  }, [state.recordId, state.tableName, formData, saving, hasChanges, toast])
-
-  const handleFieldChange = useCallback((fieldName: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [fieldName]: value,
-    }))
-    setHasChanges(true)
-  }, [])
+  }, [state.recordId, state.tableName, toast])
 
   const handleDelete = useCallback(async () => {
     if (!state.recordId || !state.tableName) return
@@ -370,12 +344,12 @@ export default function RecordPanel() {
           fields={fields}
           formData={formData}
           onFieldChange={handleFieldChange}
-          onSave={handleSave}
+          onSave={() => {}}
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
           onCopyLink={handleCopyLink}
-          saving={saving}
-          hasChanges={hasChanges}
+          saving={false}
+          hasChanges={false}
           loading={loading}
         />
 
@@ -390,15 +364,6 @@ export default function RecordPanel() {
               >
                 <ChevronLeft className="h-4 w-4 text-gray-600" />
               </button>
-            )}
-            {hasChanges && (
-              <span className="text-xs text-blue-600 flex items-center gap-1">
-                <span className="w-2 h-2 bg-blue-600 rounded-full" />
-                Unsaved changes
-              </span>
-            )}
-            {saving && (
-              <span className="text-xs text-gray-500">Saving...</span>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -471,6 +436,7 @@ export default function RecordPanel() {
                 fieldGroups={fieldGroups}
                 tableId={state.tableId || ""}
                 recordId={state.recordId || ""}
+                tableName={state.tableName || undefined}
               />
 
               {/* Activity Section */}

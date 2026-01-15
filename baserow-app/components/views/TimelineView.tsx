@@ -324,7 +324,15 @@ export default function TimelineView({
         null
       
       if (titleFieldName) {
-        resolvedTitleField = allVisibleFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
+        // IMPORTANT: title field may not be included in visible_fields.
+        // Prefer resolving against the full tableFields list so user-selected title always works.
+        resolvedTitleField =
+          tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || null
+
+        // Don't allow a date field as the title (would be confusing, and is usually the timeline axis)
+        if (resolvedTitleField && dateFieldNames.has(resolvedTitleField.name)) {
+          resolvedTitleField = null
+        }
       }
       
       // If no explicit title field, use first non-date field from visible_fields
@@ -705,6 +713,16 @@ export default function TimelineView({
     }
   }, [blockConfig, rowSize])
 
+  // Absolute-positioned cards do NOT contribute to parent height.
+  // Compute consistent pixel metrics so lanes reserve enough space and don't overlap.
+  const laneLayout = useMemo(() => {
+    const cardHeightPx =
+      rowSizeSpacing.cardHeight === 'h-8' ? 32 : rowSizeSpacing.cardHeight === 'h-16' ? 64 : 40
+    const stackGapPx =
+      rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70
+    return { cardHeightPx, stackGapPx }
+  }, [rowSizeSpacing.cardHeight])
+
   // Calculate pixel positions for events
   const getEventPosition = useCallback(
     (event: TimelineEvent) => {
@@ -1063,7 +1081,17 @@ export default function TimelineView({
           </div>
 
           {/* Events - Grouped or Ungrouped */}
-          <div className="relative" style={{ minHeight: "400px" }}>
+          <div
+            className="relative"
+            style={{
+              height: `${Math.max(
+                400,
+                visibleEvents.length > 0
+                  ? (visibleEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 20
+                  : 400
+              )}px`,
+            }}
+          >
             {resolvedGroupByField ? (
               // Render grouped lanes
               Object.entries(groupedEvents).map(([groupKey, groupEvents], groupIndex) => {
@@ -1084,8 +1112,6 @@ export default function TimelineView({
                   groupColor = normalizeHexColor(hexColor)
                 }
 
-                const laneTop = groupIndex * (rowSizeSpacing.cardHeight === 'h-8' ? 60 : rowSizeSpacing.cardHeight === 'h-16' ? 100 : 80)
-
                 return (
                   <div key={groupKey} className={rowSizeSpacing.laneSpacing}>
                     {/* Group header */}
@@ -1103,7 +1129,17 @@ export default function TimelineView({
                     </div>
 
                     {/* Group events */}
-                    <div className="relative" style={{ minHeight: "60px" }}>
+                    <div
+                      className="relative"
+                      style={{
+                        height: `${Math.max(
+                          60,
+                          groupEvents.length > 0
+                            ? (groupEvents.length - 1) * laneLayout.stackGapPx + laneLayout.cardHeightPx + 12
+                            : 60
+                        )}px`,
+                      }}
+                    >
                       {groupEvents.map((event, eventIndex) => {
                         const { left, width } = getEventPosition(event)
                         const isDragging = draggingEvent === event.id
@@ -1116,7 +1152,7 @@ export default function TimelineView({
                             style={{
                               left: `${left}px`,
                               width: `${width}px`,
-                              top: `${eventIndex * (rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70)}px`,
+                              top: `${eventIndex * laneLayout.stackGapPx}px`,
                             }}
                           >
                             <Card
@@ -1207,7 +1243,7 @@ export default function TimelineView({
                     style={{
                       left: `${left}px`,
                       width: `${width}px`,
-                      top: `${index * (rowSizeSpacing.cardHeight === 'h-8' ? 50 : rowSizeSpacing.cardHeight === 'h-16' ? 90 : 70)}px`,
+                      top: `${index * laneLayout.stackGapPx}px`,
                     }}
                   >
                     <Card

@@ -83,14 +83,13 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     description: 'Chronological timeline view',
     requiredFields: ['date'] as FieldType[],
   },
-  // TODO: Gallery - not yet implemented
-  // {
-  //   type: 'gallery',
-  //   label: 'Gallery',
-  //   icon: ImageIcon,
-  //   description: 'Card-based visual layout',
-  //   requiredFields: [],
-  // },
+  {
+    type: 'gallery',
+    label: 'Gallery',
+    icon: ImageIcon,
+    description: 'Card-based visual layout',
+    requiredFields: [],
+  },
 ]
 
 export default function GridDataSettings({

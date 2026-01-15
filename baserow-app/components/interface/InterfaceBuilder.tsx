@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { Save, Eye, Edit2, Plus, Trash2, Settings } from "lucide-react"
+import { Save, Eye, Edit2, Plus, Trash2, Settings, MoreVertical } from "lucide-react"
 import { useBranding } from "@/contexts/BrandingContext"
 import { useBlockEditMode } from "@/contexts/EditModeContext"
 import { FilterStateProvider } from "@/lib/interface/filter-state"
@@ -13,6 +13,13 @@ import type { PageBlock, LayoutItem, Page } from "@/lib/interface/types"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
 import type { BlockType } from "@/lib/interface/types"
 import { useToast } from "@/components/ui/use-toast"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { formatDateTimeUK } from "@/lib/utils"
 import {
   registerMount,
@@ -1100,14 +1107,28 @@ export default function InterfaceBuilder({
                 </div>
               </>
             ) : (
-              <button
-                onClick={() => enterBlockEdit()}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2 transition-colors"
-              >
-                <Edit2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Edit interface</span>
-                <span className="sm:hidden">Edit</span>
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                    aria-label="Page actions"
+                    title="Actions"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => enterBlockEdit()}>
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit interface
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setPageSettingsOpen(true)}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Page settings
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             </div>
           </div>

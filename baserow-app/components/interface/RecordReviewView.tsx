@@ -600,11 +600,6 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
         .eq('id', selectedRecordId)
 
       if (error) throw error
-
-      toast({
-        title: 'Field updated',
-        description: `${fieldName} has been updated`,
-      })
     } catch (error: any) {
       console.error('Error updating field:', error)
       toast({

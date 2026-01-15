@@ -16,15 +16,21 @@
  */
 
 import { useMemo, useCallback, useState, useEffect, useRef } from "react"
-import { Copy, Trash2, X, Save, Edit2, Check } from "lucide-react"
+import { Copy, Trash2, X, MoreVertical } from "lucide-react"
 import { formatDateUK } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
-import { Button } from "@/components/ui/button"
 import RecordFields from "@/components/records/RecordFields"
 import RecordActivity from "@/components/records/RecordActivity"
 import InterfaceBuilder from "./InterfaceBuilder"
 import type { TableField } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface RecordDetailsPanelProps {
   record: Record<string, any> | null
@@ -77,12 +83,9 @@ export default function RecordDetailsPanel({
   blocksLoading = false,
 }: RecordDetailsPanelProps) {
   const { toast } = useToast()
-  const [hasChanges, setHasChanges] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
-  const previousFormDataRef = useRef<Record<string, any>>({})
 
   // Find primary name field (for editable title)
   // Priority: titleField config > field named "name" > "title" > "subject" > first text field (excluding "id")
@@ -127,13 +130,6 @@ export default function RecordDetailsPanel({
     return recordId?.substring(0, 8) || "Untitled"
   }, [formData, fields, titleField, recordId])
 
-  // Track form data changes
-  useEffect(() => {
-    const hasFormChanges = JSON.stringify(formData) !== JSON.stringify(previousFormDataRef.current)
-    setHasChanges(hasFormChanges)
-    previousFormDataRef.current = { ...formData }
-  }, [formData])
-
   // Update name value when record title changes
   useEffect(() => {
     setNameValue(String(recordTitle || ""))
@@ -164,52 +160,13 @@ export default function RecordDetailsPanel({
   const createdAt = record?.created_at ? formatDateUK(record.created_at) : null
   const updatedAt = record?.updated_at ? formatDateUK(record.updated_at) : null
 
-  // Handle save
-  const handleSave = useCallback(async () => {
-    if (!recordId || !tableName || !hasChanges) return
-
-    setSaving(true)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from(tableName)
-        .update(formData)
-        .eq("id", recordId)
-
-      if (error) throw error
-
-      toast({
-        title: "Record saved",
-        description: "Changes have been saved successfully.",
-      })
-
-      setHasChanges(false)
-      previousFormDataRef.current = { ...formData }
-    } catch (error: any) {
-      console.error("Error saving record:", error)
-      toast({
-        variant: "destructive",
-        title: "Failed to save record",
-        description: error.message || "Please try again",
-      })
-    } finally {
-      setSaving(false)
-    }
-  }, [recordId, tableName, formData, hasChanges, toast])
-
   // Handle name edit
   const handleNameSave = useCallback(() => {
     if (primaryNameField && nameValue !== recordTitle) {
       onFieldChange(primaryNameField.name, nameValue)
-      setIsEditingName(false)
-      // Auto-save if there are changes
-      if (hasChanges) {
-        handleSave()
-      }
-    } else {
-      setIsEditingName(false)
     }
-  }, [primaryNameField, nameValue, recordTitle, onFieldChange, hasChanges, handleSave])
+    setIsEditingName(false)
+  }, [primaryNameField, nameValue, recordTitle, onFieldChange])
 
   const handleNameCancel = useCallback(() => {
     setNameValue(String(recordTitle || ""))
@@ -304,9 +261,8 @@ export default function RecordDetailsPanel({
 
   return (
     <div className="flex-1 border-l border-gray-200 flex flex-col overflow-hidden bg-white">
-      {/* Header - Enhanced with editable title and status */}
+      {/* Header - Record context */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
-        {/* Primary Name - Editable */}
         <div className="px-6 py-4">
           {isEditingName && primaryNameField ? (
             <div className="flex items-center gap-2">
@@ -326,126 +282,92 @@ export default function RecordDetailsPanel({
                 className="flex-1 text-2xl font-semibold text-gray-900 border-none outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
                 placeholder="Record name"
               />
-              <button
-                onClick={handleNameSave}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <Check className="h-4 w-4 text-green-600" />
-              </button>
-              <button
-                onClick={handleNameCancel}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-              >
-                <X className="h-4 w-4 text-gray-600" />
-              </button>
             </div>
           ) : (
-            <div className="flex items-center gap-3 group">
-              <h1 className="text-2xl font-semibold text-gray-900 flex-1 min-w-0">
-                {recordTitle || "Untitled"}
-              </h1>
-              {primaryNameField && pageEditable && (
-                <button
-                  onClick={() => setIsEditingName(true)}
-                  className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-100 rounded transition-all"
-                  title="Edit name"
+            <div className="flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <h1
+                  className={`text-2xl font-semibold text-gray-900 min-w-0 truncate ${
+                    primaryNameField && pageEditable ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
+                  }`}
+                  onClick={() => {
+                    if (primaryNameField && pageEditable) setIsEditingName(true)
+                  }}
+                  title={primaryNameField && pageEditable ? "Click to edit" : undefined}
                 >
-                  <Edit2 className="h-4 w-4 text-gray-600" />
-                </button>
-              )}
-              {onClose && (
-                <button
-                  onClick={onClose}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                  aria-label="Collapse panel"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
-              )}
+                  {recordTitle || "Untitled"}
+                </h1>
+
+                {/* Status and Metadata Row */}
+                <div className="flex items-center gap-3 mt-3">
+                  {statusField && statusValue && (
+                    <div
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        statusField.type === "checkbox"
+                          ? statusValue
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-600"
+                          : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {statusField.type === "checkbox"
+                        ? statusValue
+                          ? "Active"
+                          : "Inactive"
+                        : String(statusValue)}
+                    </div>
+                  )}
+                  {createdAt && (
+                    <div className="text-xs text-gray-500">
+                      Created {createdAt}
+                      {updatedAt && updatedAt !== createdAt && ` • Updated ${updatedAt}`}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                      aria-label="Record actions"
+                      title="Actions"
+                    >
+                      <MoreVertical className="h-4 w-4 text-gray-600" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleCopyLink}>
+                      Copy link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleDuplicate} disabled={loading || !pageEditable}>
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDelete}
+                      disabled={loading || !pageEditable}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {onClose && (
+                  <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                    aria-label="Collapse panel"
+                    title="Close"
+                  >
+                    <X className="h-4 w-4 text-gray-600" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
-
-          {/* Status and Metadata Row */}
-          <div className="flex items-center gap-4 mt-3">
-            {/* Status Pill */}
-            {statusField && statusValue && (
-              <div
-                className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  statusField.type === "checkbox"
-                    ? statusValue
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-600"
-                    : "bg-blue-100 text-blue-800"
-                }`}
-              >
-                {statusField.type === "checkbox"
-                  ? statusValue
-                    ? "Active"
-                    : "Inactive"
-                  : String(statusValue)}
-              </div>
-            )}
-
-            {/* Metadata */}
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              {createdAt && (
-                <span>
-                  Created {createdAt}
-                  {updatedAt && updatedAt !== createdAt && ` • Updated ${updatedAt}`}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions Toolbar */}
-        <div className="px-6 py-3 border-t border-gray-100 flex items-center justify-between bg-gray-50">
-          <div className="flex items-center gap-2">
-            {hasChanges && (
-              <button
-                onClick={handleSave}
-                disabled={saving || !pageEditable}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? "Saving..." : "Save"}
-              </button>
-            )}
-            {hasChanges && !saving && (
-              <span className="text-xs text-blue-600 flex items-center gap-1">
-                <span className="w-2 h-2 bg-blue-600 rounded-full" />
-                Unsaved changes
-              </span>
-            )}
-            {saving && (
-              <span className="text-xs text-gray-500">Saving...</span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleDuplicate}
-              disabled={loading || !pageEditable}
-              className="p-2 hover:bg-gray-200 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Duplicate record"
-            >
-              <Copy className="h-4 w-4 text-gray-600" />
-            </button>
-            <button
-              onClick={handleCopyLink}
-              className="p-2 hover:bg-gray-200 rounded transition-colors"
-              title="Copy link"
-            >
-              <Copy className="h-4 w-4 text-gray-600" />
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={loading || !pageEditable}
-              className="p-2 hover:bg-red-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Delete record"
-            >
-              <Trash2 className="h-4 w-4 text-red-600" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -459,7 +381,25 @@ export default function RecordDetailsPanel({
           </div>
         ) : (
           <>
-            {/* Blocks Section - All fields are blocks (field blocks + other blocks) */}
+            {/* Structured record fields (Airtable-style) */}
+            <div className="px-6 py-6">
+              <RecordFields
+                fields={visibleFields}
+                formData={formData}
+                onFieldChange={onFieldChange}
+                fieldGroups={fieldGroups}
+                tableId={tableId}
+                recordId={recordId}
+                tableName={tableName}
+                isFieldEditable={(fieldName) => {
+                  if (!pageEditable) return false
+                  if (!editableFieldNames || editableFieldNames.length === 0) return true
+                  return editableFieldNames.includes(fieldName)
+                }}
+              />
+            </div>
+
+            {/* Blocks Section - optional, excludes field blocks (fields are shown above) */}
             {page ? (
               <div className="flex-1">
                 {blocksLoading ? (
@@ -480,7 +420,7 @@ export default function RecordDetailsPanel({
                   <InterfaceBuilder
                     key={`record-${recordId}`}
                     page={page as any}
-                    initialBlocks={blocks}
+                    initialBlocks={blocks.filter((b: any) => b.type !== "record" && b.type !== "field")}
                     hideHeader={true}
                     pageTableId={pageTableId || undefined}
                     recordId={recordId || undefined}

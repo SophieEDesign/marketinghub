@@ -80,6 +80,7 @@ function getDefaultConfigForType(blockType: BlockType): BlockConfig {
     kpi: { table_id: '', kpi_aggregate: 'count' },
     text: { content: '' },
     image: { image_url: '' },
+    gallery: { table_id: '', view_type: 'gallery' },
     divider: {},
     button: { button_label: '' },
     action: { action_type: 'navigate', label: '' },

@@ -2,8 +2,15 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Edit2, Settings } from "lucide-react"
+import { Edit2, Settings, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
@@ -1068,39 +1075,34 @@ function InterfacePageClientInternal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isBlockEditing ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => exitBlockEdit()}
-              >
-                Done Editing
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Enter block edit mode
-                    enterBlockEdit()
-                    // Blocks are already loaded (loaded in useEffect on mount)
-                    // No need to await - edit mode doesn't require fresh data
-                  }}
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit interface
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" title="Actions">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleOpenPageSettings}
-                  title="Page Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isBlockEditing ? (
+                  <DropdownMenuItem onClick={() => exitBlockEdit()}>
+                    Done editing
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      enterBlockEdit()
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit interface
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleOpenPageSettings}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Page settings
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       )}
