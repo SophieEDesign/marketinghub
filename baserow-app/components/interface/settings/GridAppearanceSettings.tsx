@@ -174,7 +174,7 @@ export default function GridAppearanceSettings({
       {/* Add Record Button */}
       <div className="flex items-center justify-between">
         <div>
-          <Label htmlFor="show-add-record">Show "Add record" button</Label>
+          <Label htmlFor="show-add-record">Show &quot;Add record&quot; button</Label>
           <p className="text-xs text-gray-500 mt-1">
             Display an add button inside this block (Grid, Calendar, Kanban, Timeline, Gallery, List)
           </p>

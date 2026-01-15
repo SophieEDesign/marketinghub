@@ -68,7 +68,8 @@ export default function AttachmentPreview({
     return getFileIconForAttachment(attachment)
   }
 
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = (bytes?: number | null): string => {
+    if (bytes === null || bytes === undefined) return '—'
     return formatBytes(bytes)
   }
 
