@@ -214,16 +214,19 @@ export default function RecordFields({
                 </span>
               </button>
               {!isCollapsed && (
-                <div className="grid grid-cols-[160px_1fr] gap-x-8 gap-y-3">
+                <div className="space-y-3">
                   {groupFields.map((field) => {
                     const fieldEditable = isFieldEditable(field.name)
                     const isThisEditing = editingField === field.id
                     return (
-                      <div key={field.id} className="contents">
+                      <div
+                        key={field.id}
+                        className="grid grid-cols-[180px_minmax(0,1fr)] gap-x-8 items-start"
+                      >
                         <div className="pt-2 text-xs font-medium text-gray-500">
                           {field.name}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <InlineFieldEditor
                             field={field}
                             value={formData[field.name]}
