@@ -211,6 +211,8 @@ export default function RecordModal({
                     value={value}
                     onChange={(newValue) => handleFieldChange(field.name, newValue)}
                     required={field.required || false}
+                    recordId={recordId || undefined}
+                    tableName={supabaseTableName || undefined}
                   />
                 )
               })}

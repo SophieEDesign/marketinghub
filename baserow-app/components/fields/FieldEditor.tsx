@@ -1,13 +1,264 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
-import { Calculator, Link as LinkIcon } from "lucide-react"
+import { useRef, useEffect, useCallback, useMemo, useState } from "react"
+import { Calculator, Link as LinkIcon, Paperclip, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
+import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
+
+function AttachmentFieldEditor({
+  field,
+  value,
+  onChange,
+  isReadOnly,
+  showLabel,
+  labelClassName,
+  required,
+  recordId,
+  tableName,
+}: {
+  field: TableField
+  value: any
+  onChange: (value: any) => void
+  isReadOnly: boolean
+  showLabel: boolean
+  labelClassName: string
+  required: boolean
+  recordId?: string
+  tableName?: string
+}) {
+  const { toast } = useToast()
+  const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null)
+
+  const attachments: Attachment[] = useMemo(() => {
+    if (Array.isArray(value)) return value as Attachment[]
+    if (typeof value === "string" && value.trim()) {
+      try {
+        const parsed = JSON.parse(value)
+        return Array.isArray(parsed) ? (parsed as Attachment[]) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  }, [value])
+
+  const canUpload = !isReadOnly && !!recordId && !!tableName
+
+  const generateUUID = (): string => {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === "x" ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  const handleFiles = async (files: FileList) => {
+    if (!canUpload || uploading) {
+      if (!recordId || !tableName) {
+        toast({
+          variant: "destructive",
+          title: "Upload unavailable",
+          description: "Save the record first, then upload files.",
+        })
+      }
+      return
+    }
+
+    setUploading(true)
+    const uploaded: Attachment[] = []
+
+    try {
+      for (const file of Array.from(files)) {
+        const ext = file.name.split(".").pop() || "bin"
+        const filePath = `attachments/${tableName}/${recordId}/${field.name}/${generateUUID()}.${ext}`
+
+        const { error: uploadError } = await supabase.storage
+          .from("attachments")
+          .upload(filePath, file, { upsert: false })
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError)
+          toast({
+            variant: "destructive",
+            title: "Upload failed",
+            description: `Failed to upload ${file.name}`,
+          })
+          continue
+        }
+
+        const { data: urlData } = supabase.storage.from("attachments").getPublicUrl(filePath)
+
+        uploaded.push({
+          url: urlData.publicUrl,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      }
+
+      if (uploaded.length > 0) {
+        onChange([...attachments, ...uploaded])
+        toast({
+          title: "Uploaded",
+          description: `${uploaded.length} file${uploaded.length !== 1 ? "s" : ""} uploaded successfully`,
+        })
+      }
+    } catch (error) {
+      console.error("Error uploading files:", error)
+      toast({
+        variant: "destructive",
+        title: "Upload error",
+        description: "An error occurred while uploading files",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDelete = async (index: number) => {
+    if (isReadOnly) return
+    const file = attachments[index]
+    if (!file) return
+
+    setDeletingIndex(index)
+    try {
+      // Extract storage path from public URL
+      const urlParts = file.url.split("/storage/v1/object/public/attachments/")
+      const storagePath = urlParts[1]
+
+      if (storagePath) {
+        const { error } = await supabase.storage.from("attachments").remove([storagePath])
+        if (error) {
+          console.error("Error deleting file from storage:", error)
+        }
+      }
+
+      const updated = attachments.filter((_, i) => i !== index)
+      onChange(updated)
+      toast({
+        title: "Deleted",
+        description: "File deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting file:", error)
+      toast({
+        variant: "destructive",
+        title: "Delete error",
+        description: "Failed to delete file",
+      })
+    } finally {
+      setDeletingIndex(null)
+    }
+  }
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    if (canUpload) setDragActive(true)
+  }
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+  }
+
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+    if (canUpload && e.dataTransfer.files.length > 0) {
+      await handleFiles(e.dataTransfer.files)
+    }
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {showLabel && (
+        <label className={`${labelClassName} flex items-center gap-2`}>
+          {field.name}
+          {required && <span className="text-red-500">*</span>}
+        </label>
+      )}
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        className="hidden"
+        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+      />
+
+      <div
+        className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+          dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
+        } ${canUpload ? "cursor-pointer hover:border-gray-400" : "opacity-60 cursor-not-allowed"}`}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => canUpload && fileInputRef.current?.click()}
+      >
+        <div className="text-center">
+          <Paperclip className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+          <p className="text-sm text-gray-600 mb-1">
+            {uploading
+              ? "Uploading..."
+              : canUpload
+                ? "Click or drag files to upload"
+                : isReadOnly
+                  ? "Uploads disabled (read-only)"
+                  : "Save the record first to enable uploads"}
+          </p>
+          <p className="text-xs text-gray-400">Multiple files supported</p>
+        </div>
+      </div>
+
+      {attachments.length > 0 && (
+        <div className="space-y-2">
+          <AttachmentPreview
+            attachments={attachments}
+            maxVisible={10}
+            size={field.options?.attachment_preview_size || "medium"}
+            displayStyle={field.options?.attachment_display_style || "thumbnails"}
+          />
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((attachment, index) => (
+              <div
+                key={`${attachment.url}-${index}`}
+                className="flex items-center gap-2 px-2 py-1 bg-gray-100 rounded text-xs"
+              >
+                <span className="truncate max-w-[200px]">{attachment.name}</span>
+                {!isReadOnly && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(index)
+                    }}
+                    className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                    aria-label="Delete"
+                    disabled={deletingIndex === index}
+                    title={deletingIndex === index ? "Deleting..." : "Delete"}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Default color scheme for select options (vibrant, accessible colors)
 const DEFAULT_COLORS = [
@@ -79,6 +330,9 @@ export interface FieldEditorProps {
   onCreateRecord?: (tableId: string) => Promise<string | null> // For linked fields with allowCreate
   autoFocus?: boolean // Auto-focus the input when mounted
   required?: boolean // Show required indicator
+  // Optional: enable attachment uploads (used by record modals/drawers)
+  recordId?: string
+  tableName?: string
 }
 
 /**
@@ -106,6 +360,8 @@ export default function FieldEditor({
   onCreateRecord,
   autoFocus = false,
   required = false,
+  recordId,
+  tableName,
 }: FieldEditorProps) {
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
@@ -123,6 +379,23 @@ export default function FieldEditor({
   // Determine if this is a lookup field (derived) vs linked field (editable)
   const isLookupField = field.type === "lookup"
   const isLinkedField = field.type === "link_to_table"
+
+  // Attachment fields (upload + preview + delete)
+  if (field.type === "attachment") {
+    return (
+      <AttachmentFieldEditor
+        field={field}
+        value={value}
+        onChange={onChange}
+        isReadOnly={isReadOnly}
+        showLabel={showLabel}
+        labelClassName={labelClassName}
+        required={required}
+        recordId={recordId}
+        tableName={tableName}
+      />
+    )
+  }
 
   // Handle paste - block for lookup fields
   const handlePaste = useCallback((e: React.ClipboardEvent) => {

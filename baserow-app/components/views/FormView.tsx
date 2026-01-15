@@ -191,6 +191,8 @@ export default function FormView({ tableId, viewId, fieldIds, rowId }: FormViewP
                   value={value}
                   onChange={(newValue) => handleFieldChange(field.name, newValue)}
                   required={field.required || false}
+                  recordId={rowId || undefined}
+                  tableName={supabaseTableName || undefined}
                 />
               )
             })

@@ -191,6 +191,8 @@ export default function RecordDrawer({
                         value={value}
                         onChange={(newValue) => handleFieldChange(fieldName, newValue)}
                         required={tableField.required || false}
+                        recordId={rowId || undefined}
+                        tableName={tableName}
                       />
                     )
                   }
@@ -235,6 +237,8 @@ export default function RecordDrawer({
                         value={value}
                         onChange={(newValue) => handleFieldChange(key, newValue)}
                         required={tableField.required || false}
+                        recordId={rowId || undefined}
+                        tableName={tableName}
                       />
                     )
                   }
