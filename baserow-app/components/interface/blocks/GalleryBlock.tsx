@@ -11,6 +11,7 @@ interface GalleryBlockProps {
   pageId?: string | null
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  pageShowAddRecord?: boolean
 }
 
 /**
@@ -24,6 +25,7 @@ export default function GalleryBlock({
   pageId = null,
   filters = [],
   onRecordClick,
+  pageShowAddRecord = false,
 }: GalleryBlockProps) {
   const galleryBlock: PageBlock = {
     ...block,
@@ -41,6 +43,7 @@ export default function GalleryBlock({
       pageId={pageId}
       filters={filters}
       onRecordClick={onRecordClick}
+      pageShowAddRecord={pageShowAddRecord}
     />
   )
 }

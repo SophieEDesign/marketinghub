@@ -42,6 +42,7 @@ interface CanvasProps {
   recordId?: string | null // Record ID for record review pages
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  pageShowAddRecord?: boolean // Page-level default for showing "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
 }
@@ -68,6 +69,7 @@ export default function Canvas({
   recordId = null,
   mode = 'view', // Default to view mode
   onRecordClick,
+  pageShowAddRecord = false,
   pageEditable,
   editableFieldNames = [],
 }: CanvasProps) {
@@ -1480,6 +1482,7 @@ export default function Canvas({
                     filters={getFiltersForBlock(block.id)}
                     onRecordClick={onRecordClick}
                     aggregateData={aggregateData[block.id]}
+                    pageShowAddRecord={pageShowAddRecord}
                     pageEditable={pageEditable}
                     editableFieldNames={editableFieldNames}
                     hideEditButton={topTwoFieldBlockIds.has(block.id)}

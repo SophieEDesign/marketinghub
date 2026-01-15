@@ -71,6 +71,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
+  const [tableName, setTableName] = useState<string | null>(null)
   
   // Apply filters with proper precedence:
   // 1. Block base filters (config.filters) - always applied
@@ -93,13 +94,13 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     // - Table ID
     // - Metric type (always required)
     // - For non-count metrics: metric field is required
-    // - For count metrics with group by: group by field serves as X-axis
+    // - For count metrics: group by / x-axis are optional (single "All" bucket is allowed)
     // - For non-count metrics without group by: xAxis field is required
     const hasRequiredConfig = tableId && metricType && (
       metricType === "count" || metricField
     ) && (
-      metricType === "count" && groupBy || // Count with group by
-      metricType !== "count" && (groupBy || xAxis) // Non-count: group by or x-axis
+      metricType === "count" || // Count can render without group/x-axis (single bucket)
+      (metricType !== "count" && (groupBy || xAxis)) // Non-count: group by or x-axis required
     )
     
     if (hasRequiredConfig) {
@@ -131,7 +132,8 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     // Validation: ensure we have required configuration
     if (!tableId || !metricType) return
     if (metricType !== "count" && !metricField) return
-    if (!groupBy && !xAxis) return
+    // For non-count metrics, we need a category axis (groupBy or xAxis). Count can render as a single bucket.
+    if (metricType !== "count" && !groupBy && !xAxis) return
 
     setLoading(true)
     setError(null)
@@ -142,12 +144,15 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
       // Get table name
       const { data: table } = await supabase
         .from("tables")
-        .select("supabase_table")
+        .select("supabase_table, name")
         .eq("id", tableId)
         .single()
 
       if (!table?.supabase_table) {
         throw new Error("Table not found")
+      }
+      if (table?.name) {
+        setTableName(String(table.name))
       }
 
       // Determine which fields we need to select
@@ -615,7 +620,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const isConfigComplete = metricType && (
     metricType === "count" || metricField
   ) && (
-    groupBy || xAxis
+    metricType === "count" || groupBy || xAxis
   )
   
   if (!isConfigComplete) {
@@ -683,8 +688,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
-  const title = appearance.title || config.title
-  const showTitle = appearance.show_title !== false && title
+  // View mode: show only a "table title" (table name or appearance.title), not the block's config.title.
+  const title = appearance.title || (isEditing ? config.title : tableName)
+  const showTitle = (appearance.showTitle ?? (appearance as any).show_title) !== false && title
 
   return (
     <div 
@@ -702,7 +708,8 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
       )}
-      <div className="flex-1 min-h-0">
+      {/* Recharts needs a non-zero height; min-height ensures charts render even in auto-height layouts. */}
+      <div className="flex-1 min-h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
           {renderChart()}
         </ResponsiveContainer>

@@ -225,6 +225,8 @@ export interface BlockConfig {
   list_image_field?: string
   list_pill_fields?: string[]
   list_meta_fields?: string[]
+  // List view grouping behavior (choice fields)
+  list_choice_groups_default_collapsed?: boolean
   [key: string]: any
 }
 
@@ -269,6 +271,16 @@ export interface PageSettings {
   access?: 'public' | 'authenticated' | 'roles'
   allowed_roles?: string[]
   primary_table_id?: string
+  /**
+   * Page-level default for showing an "Add record" button in data blocks.
+   * Blocks can override via block.config.appearance.show_add_record:
+   * - true: always show
+   * - false: never show
+   * - undefined: follow this page default
+   */
+  show_add_record?: boolean
+  // Backward compatibility / convenience (camelCase)
+  showAddRecord?: boolean
   layout?: {
     cols?: number
     rowHeight?: number

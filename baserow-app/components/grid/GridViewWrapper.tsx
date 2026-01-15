@@ -562,6 +562,7 @@ export default function GridViewWrapper({
           enableRecordOpen={appearance.enable_record_open !== false}
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
           modalFields={modalFields}
+          onTableFieldsRefresh={loadFields}
         />
       </div>
       <FieldBuilderDrawer

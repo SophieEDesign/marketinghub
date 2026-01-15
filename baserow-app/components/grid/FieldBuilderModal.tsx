@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client"
 import { validateFieldOptions } from "@/lib/fields/validation"
 import type { FieldType, TableField, FieldOptions, ChoiceColorTheme } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
-import { CHOICE_COLOR_THEME_LABELS, resolveChoiceColor } from "@/lib/field-colors"
+import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 
 interface FieldBuilderModalProps {
@@ -189,7 +189,11 @@ export default function FieldBuilderModal({
             <div className="space-y-2 rounded-md border border-gray-200 p-3 bg-gray-50/50">
               <Label className="text-xs text-gray-700">Colour theme</Label>
               <Select
-                value={(options.choiceColorTheme || 'vibrant') as ChoiceColorTheme}
+                value={
+                  (isChoiceColorTheme(options.choiceColorTheme)
+                    ? options.choiceColorTheme
+                    : 'vibrant') as ChoiceColorTheme
+                }
                 onValueChange={(theme) => {
                   const next: FieldOptions = { ...options }
                   if (theme === 'vibrant') {

@@ -11,13 +11,22 @@ interface KanbanBlockProps {
   pageId?: string | null
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  pageShowAddRecord?: boolean
 }
 
 /**
  * KanbanBlock - Wrapper around GridBlock with view_type='kanban'
  * Displays data in a kanban board view
  */
-export default function KanbanBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: KanbanBlockProps) {
+export default function KanbanBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  onRecordClick,
+  pageShowAddRecord = false,
+}: KanbanBlockProps) {
   // Create a modified block config with view_type='kanban'
   const kanbanBlock: PageBlock = {
     ...block,
@@ -35,6 +44,7 @@ export default function KanbanBlock({ block, isEditing = false, pageTableId = nu
       pageId={pageId}
       filters={filters}
       onRecordClick={onRecordClick}
+      pageShowAddRecord={pageShowAddRecord}
     />
   )
 }

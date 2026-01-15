@@ -102,16 +102,6 @@ export default function CalendarView({
     event_density?: 'compact' | 'expanded'
   } | null>(null)
 
-  // Calendar card field configuration (two-row cards)
-  const calendarCardField1 = useMemo(() => {
-    const f = (blockConfig as any)?.appearance?.calendar_card_field_1
-    return typeof f === 'string' && f.trim() !== '' ? f : null
-  }, [blockConfig])
-  const calendarCardField2 = useMemo(() => {
-    const f = (blockConfig as any)?.appearance?.calendar_card_field_2
-    return typeof f === 'string' && f.trim() !== '' ? f : null
-  }, [blockConfig])
-
   function formatCardValue(fieldName: string, rowData: Record<string, any> | null | undefined): string | null {
     if (!rowData) return null
     const raw = rowData[fieldName]
@@ -1177,19 +1167,38 @@ export default function CalendarView({
               rowData: row.data,
               image: eventImage,
               fitImageSize,
-              cardLines: (() => {
-                const lines: string[] = []
-                // Row 1: configured field or default title
-                const line1 = calendarCardField1
-                  ? formatCardValue(calendarCardField1, row.data)
-                  : (title || "Untitled")
-                if (line1) lines.push(line1)
-                // Row 2: optional configured field
-                if (calendarCardField2) {
-                  const line2 = formatCardValue(calendarCardField2, row.data)
-                  if (line2) lines.push(line2)
-                }
-                return lines.slice(0, 2)
+              // Calendar cards use the ordered "Fields to Show on Cards/Table" selection (fieldIds).
+              // We display up to 3 fields (values) to avoid overly tall events.
+              cardFields: (() => {
+                const exclude = new Set<string>([
+                  'id',
+                  'created_at',
+                  'updated_at',
+                  actualFieldName || '',
+                  actualFromFieldName || '',
+                  actualToFieldName || '',
+                ])
+
+                const resolvedNames = (Array.isArray(fieldIds) ? fieldIds : [])
+                  .map((fid) => {
+                    const f = loadedTableFields.find((x) => x.name === fid || x.id === fid)
+                    return f?.name || fid
+                  })
+                  .filter((name) => name && !exclude.has(name))
+
+                const items = resolvedNames
+                  .map((name) => {
+                    const field = loadedTableFields.find((f) => f.name === name)
+                    if (!field) return null
+                    // Skip non-card-friendly types
+                    if (field.type === 'date' || field.type === 'attachment') return null
+
+                    const value = formatCardValue(name, row.data)
+                    return value ? { name, value } : null
+                  })
+                  .filter((x): x is { name: string; value: string } => Boolean(x))
+
+                return items.slice(0, 3)
               })(),
             },
           }
@@ -1498,13 +1507,21 @@ export default function CalendarView({
           eventContent={(eventInfo) => {
             const image = eventInfo.event.extendedProps?.image
             const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
-            const cardLinesRaw = eventInfo.event.extendedProps?.cardLines
-            const cardLines = Array.isArray(cardLinesRaw) ? cardLinesRaw.filter(Boolean).map(String) : []
-            const primaryLine = cardLines[0] || eventInfo.event.title
-            const secondaryLine = cardLines[1]
+            const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
+            const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
+            const values = cardFields.map((f: any) => String(f?.value || '')).filter(Boolean).slice(0, 3)
+            const tooltip =
+              cardFields.length > 0
+                ? cardFields
+                    .slice(0, 3)
+                    .map((f: any) => `${String(f?.name || '')}: ${String(f?.value || '')}`)
+                    .filter((s: string) => s.trim() !== ':')
+                    .join(' • ')
+                : String(eventInfo.event.title || '')
+            const contentValues = values.length > 0 ? values : [String(eventInfo.event.title || '')]
             
             return (
-              <div className="flex items-center gap-1.5 h-full min-w-0">
+              <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
                 {image && (
                   <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                     <img
@@ -1517,11 +1534,17 @@ export default function CalendarView({
                     />
                   </div>
                 )}
-                <div className="min-w-0 flex flex-col leading-tight">
-                  <span className="truncate text-xs font-medium">{primaryLine}</span>
-                  {secondaryLine && (
-                    <span className="truncate text-[10px] opacity-90">{secondaryLine}</span>
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="grid grid-cols-3 gap-x-1.5 min-w-0">
+                    {contentValues.slice(0, 3).map((v, idx) => (
+                      <div
+                        key={`${eventInfo.event.id}-cf-${idx}`}
+                        className={idx === 0 ? 'truncate text-xs font-medium' : 'truncate text-[10px] opacity-90'}
+                      >
+                        {v}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )

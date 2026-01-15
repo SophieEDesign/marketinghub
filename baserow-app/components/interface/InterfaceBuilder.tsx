@@ -1170,6 +1170,9 @@ export default function InterfaceBuilder({
               recordId={recordId}
               mode={mode}
               onRecordClick={onRecordClick}
+              pageShowAddRecord={
+                (page.settings?.show_add_record ?? (page.settings as any)?.showAddRecord) === true
+              }
               pageEditable={pageEditable}
               editableFieldNames={editableFieldNames}
             />

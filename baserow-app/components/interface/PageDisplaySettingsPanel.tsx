@@ -83,6 +83,7 @@ export default function PageDisplaySettingsPanel({
   const [detailFields, setDetailFields] = useState<string[]>([])
   const [selectedFieldsForBlocks, setSelectedFieldsForBlocks] = useState<string[]>([]) // Fields selected for blocks
   const [recordReviewGroupBy, setRecordReviewGroupBy] = useState<string>("") // Group field for record review pages
+  const [pageShowAddRecord, setPageShowAddRecord] = useState<boolean>(false) // Page-level default for Add record buttons
   const [loading, setLoading] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [addingFields, setAddingFields] = useState(false)
@@ -102,9 +103,13 @@ export default function PageDisplaySettingsPanel({
     // TypeScript guard: page is non-null after the check above
     const currentPage = page
 
+    // Load page config (used by all page types, including content pages)
+    const config = currentPage.config || {}
+    setPageShowAddRecord(config.show_add_record === true || config.showAddRecord === true)
+
     // UNIFIED: All pages use blocks - settings panel is for page metadata only
     // Block-specific settings are handled in block settings panels
-    // Content pages don't need view-specific settings
+    // Content pages don't need view-specific settings (but can still use config defaults)
     if (currentPage.page_type === 'content') {
       return
     }
@@ -127,6 +132,7 @@ export default function PageDisplaySettingsPanel({
       setTimelineColorField("")
       setPreviewFields([])
       setDetailFields([])
+      setPageShowAddRecord(false)
       setIsInitialLoad(true)
       return
     }
@@ -204,8 +210,7 @@ export default function PageDisplaySettingsPanel({
         }
       }
 
-      // Load page config
-      const config = currentPage.config || {}
+      // Load page config (already defined above, but keep local var in this scope)
       // CRITICAL: Layout is determined by blocks only, not by page type or visualisation
       // This setting is informational only - it does NOT affect layout
       setLayout(config.visualisation || 'content')
@@ -329,6 +334,8 @@ export default function PageDisplaySettingsPanel({
         row_height: density,
         read_only: readOnly,
         default_focus: defaultFocus,
+        // Page-level default for Add record buttons (blocks can override)
+        show_add_record: pageShowAddRecord,
         // Store filters and sorts in block format
         filters: blockFilters,
         sorts: blockSorts,
@@ -404,7 +411,7 @@ export default function PageDisplaySettingsPanel({
       console.error('Error saving settings:', error)
       alert(error?.message || 'Failed to save settings. Please try again.')
     }
-  }, [page, layout, recordPreview, density, readOnly, defaultFocus, filters, sorts, groupBy, recordReviewGroupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, timelineColorField, previewFields, detailFields, onUpdate])
+  }, [page, layout, recordPreview, density, readOnly, defaultFocus, pageShowAddRecord, filters, sorts, groupBy, recordReviewGroupBy, tableFields, selectedTableId, supportsGrouping, startDateField, endDateField, calendarDisplayFields, timelineColorField, previewFields, detailFields, onUpdate])
 
   // Reset initial load flag when panel closes
   useEffect(() => {
@@ -474,6 +481,25 @@ export default function PageDisplaySettingsPanel({
 
   // Content pages don't show data settings - they're block-based only
   if (currentPage.page_type === 'content') {
+    const handleSaveContentPageConfig = async (showAdd: boolean) => {
+      if (!page) return
+      try {
+        const supabase = createClient()
+        const newConfig = {
+          ...(page.config || {}),
+          show_add_record: showAdd,
+        }
+        await supabase
+          .from('interface_pages')
+          .update({ config: newConfig })
+          .eq('id', page.id)
+        onUpdate()
+      } catch (error: any) {
+        console.error('Error saving page config:', error)
+        alert(error?.message || 'Failed to save page settings. Please try again.')
+      }
+    }
+
     const handleSaveContentPageName = async () => {
       if (!page || contentPageName.trim() === page.name) return
       
@@ -540,6 +566,21 @@ export default function PageDisplaySettingsPanel({
             <div className="space-y-2">
               <Label>Page Type</Label>
               <Input value="Content Page" disabled className="bg-gray-50" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Default “Add record” buttons</Label>
+                <div className="text-sm text-gray-500">
+                  Show “Add record” inside data blocks by default (blocks can override)
+                </div>
+              </div>
+              <Switch
+                checked={pageShowAddRecord}
+                onCheckedChange={(checked) => {
+                  setPageShowAddRecord(checked)
+                  handleSaveContentPageConfig(checked)
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label>Interface</Label>
@@ -1193,6 +1234,17 @@ export default function PageDisplaySettingsPanel({
             </TabsContent>
 
             <TabsContent value="behaviour" className="mt-6 space-y-6">
+              {/* Default "Add record" buttons */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Default “Add record” buttons</Label>
+                  <div className="text-sm text-gray-500">
+                    Show “Add record” inside data blocks by default (blocks can override)
+                  </div>
+                </div>
+                <Switch checked={pageShowAddRecord} onCheckedChange={setPageShowAddRecord} />
+              </div>
+
               {/* Read-only */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">

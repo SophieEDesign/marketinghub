@@ -394,6 +394,7 @@ export default function AirtableViewPage({
             rowHeight={rowHeight}
             editable={true}
             fields={tableFields}
+            onTableFieldsRefresh={loadFields}
             onAddField={handleAddField}
             onEditField={handleEditField}
             groupBy={groupBy || undefined}

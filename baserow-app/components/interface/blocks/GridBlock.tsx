@@ -8,13 +8,19 @@ import CalendarView from "@/components/views/CalendarView"
 import KanbanView from "@/components/views/KanbanView"
 import TimelineView from "@/components/views/TimelineView"
 import GalleryView from "@/components/views/GalleryView"
-import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import {
+  mergeFilters,
+  mergeViewDefaultFiltersWithUserQuickFilters,
+  normalizeFilter,
+  type FilterConfig,
+} from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import QuickFilterBar from "@/components/filters/QuickFilterBar"
 
 interface GridBlockProps {
   block: PageBlock
@@ -23,9 +29,18 @@ interface GridBlockProps {
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level or filter block filters
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  pageShowAddRecord?: boolean // Page-level default for showing Add record
 }
 
-export default function GridBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: GridBlockProps) {
+export default function GridBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  onRecordClick,
+  pageShowAddRecord = false,
+}: GridBlockProps) {
   const { config } = block
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
@@ -52,13 +67,25 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     : (config?.visible_fields ? [config.visible_fields] : [])
   const blockBaseFilters = Array.isArray(config?.filters) ? config.filters : []
   const sortsConfig = Array.isArray(config?.sorts) ? config.sorts : []
-  
-  // Merge filters with proper precedence: block base filters + filter block filters
+
+  const viewDefaultFilters = useMemo<FilterConfig[]>(() => {
+    return (blockBaseFilters || []).map((f: any) => normalizeFilter(f))
+  }, [blockBaseFilters])
+
+  const [userQuickFilters, setUserQuickFilters] = useState<FilterConfig[]>([])
+
+  const viewFiltersWithUserOverrides = useMemo(() => {
+    return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
+  }, [viewDefaultFilters, userQuickFilters])
+
+  // Merge filters with proper precedence:
+  // - builder-owned view defaults (with session-only user overrides)
+  // - filter block filters (additive, cannot override)
   const allFilters = useMemo(() => {
-    return mergeFilters(blockBaseFilters, filters, [])
-  }, [blockBaseFilters, filters])
+    return mergeFilters(viewFiltersWithUserOverrides, filters, [])
+  }, [viewFiltersWithUserOverrides, filters])
   const [loading, setLoading] = useState(true)
-  const [table, setTable] = useState<{ supabase_table: string } | null>(null)
+  const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<any[]>([])
   const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
   
@@ -147,7 +174,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
         // Load table first
         const tableRes = await supabase
           .from("tables")
-          .select("supabase_table")
+          .select("supabase_table, name")
           .eq("id", tableId)
           .maybeSingle()
 
@@ -270,7 +297,9 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
-  const showAddRecord = (appearance as any).show_add_record === true
+  const blockShowAddRecord = (appearance as any).show_add_record
+  const showAddRecord =
+    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
 
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}
@@ -630,7 +659,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {((appearance.show_title !== false && (appearance.title || config.title)) || showAddRecord) && (
+      {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
         <div
           className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
           style={{
@@ -639,8 +668,8 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           }}
         >
           <div className="min-w-0 flex-1">
-            {(appearance.show_title !== false && (appearance.title || config.title)) && (
-              <h3 className="text-lg font-semibold truncate">{appearance.title || config.title}</h3>
+            {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
+              <h3 className="text-lg font-semibold truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
             )}
           </div>
           {showAddRecord && (
@@ -662,6 +691,17 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
           )}
         </div>
       )}
+
+      {/* Airtable-style quick filters (session-only; never saved to the view) */}
+      {!isEditing && (
+        <QuickFilterBar
+          storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+          tableFields={safeTableFields}
+          viewDefaultFilters={viewDefaultFilters}
+          onChange={setUserQuickFilters}
+        />
+      )}
+
       {renderView()}
     </div>
   )

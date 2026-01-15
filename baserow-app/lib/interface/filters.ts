@@ -37,6 +37,65 @@ export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfi
 }
 
 /**
+ * Merge view defaults with user quick filters (Airtable-style).
+ *
+ * - View defaults are the baseline (builder-owned) and are never mutated.
+ * - User quick filters are session-only and may override defaults by field.
+ * - If user quick filters include a field, all default conditions for that field are replaced.
+ *
+ * This intentionally differs from mergeFilters() (which prevents overrides) because
+ * quick filters are meant to be user-owned overrides on top of a view.
+ */
+export function mergeViewDefaultFiltersWithUserQuickFilters(
+  viewDefaultFilters: FilterConfig[] = [],
+  userQuickFilters: FilterConfig[] = []
+): FilterConfig[] {
+  const safeDefaults = Array.isArray(viewDefaultFilters) ? viewDefaultFilters : []
+  const safeUser = Array.isArray(userQuickFilters) ? userQuickFilters : []
+
+  const userFields = new Set(
+    safeUser
+      .filter((f) => !!f && typeof f.field === 'string' && f.field.trim() !== '' && typeof f.operator === 'string')
+      .map((f) => f.field)
+  )
+
+  const merged: FilterConfig[] = []
+
+  // Keep all default filters except those overridden by user quick filters.
+  for (const f of safeDefaults) {
+    if (!f || typeof f.field !== 'string' || f.field.trim() === '' || typeof f.operator !== 'string') continue
+    if (userFields.has(f.field)) continue
+    merged.push(f)
+  }
+
+  // Add user quick filters (as the effective filters for their fields).
+  for (const f of safeUser) {
+    if (!f || typeof f.field !== 'string' || f.field.trim() === '' || typeof f.operator !== 'string') continue
+    merged.push(f)
+  }
+
+  return merged
+}
+
+/**
+ * Stable serialization for comparing filter sets (order-insensitive).
+ * Useful for "Filters modified" UI badges.
+ */
+export function serializeFiltersForComparison(filters: FilterConfig[] = []): string {
+  const safe = Array.isArray(filters) ? filters : []
+  const normalized = safe
+    .filter((f) => !!f && typeof f.field === 'string' && typeof f.operator === 'string')
+    .map((f) => ({
+      field: f.field,
+      operator: f.operator,
+      value: f.value ?? null,
+      value2: (f as any).value2 ?? null,
+    }))
+    .sort((a, b) => (a.field === b.field ? a.operator.localeCompare(b.operator) : a.field.localeCompare(b.field)))
+  return JSON.stringify(normalized)
+}
+
+/**
  * Applies filters to a Supabase query builder
  * This is the shared filter logic used by all blocks
  * 
@@ -89,7 +148,7 @@ export function applySearchToFilters(
  * Preserves source information (sourceBlockId, sourceBlockTitle) from filter blocks
  */
 export function mergeFilters(
-  blockBaseFilters: BlockFilter[] = [],
+  blockBaseFilters: Array<BlockFilter | FilterConfig> = [],
   filterBlockFilters: FilterConfig[] = [],
   temporaryFilters: FilterConfig[] = []
 ): FilterConfig[] {

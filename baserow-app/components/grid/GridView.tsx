@@ -23,6 +23,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
 import Cell from "./Cell"
+import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import RecordModal from "./RecordModal"
@@ -78,6 +79,7 @@ interface GridViewProps {
   enableRecordOpen?: boolean // Enable record opening (default: true)
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
 }
 
 const ITEMS_PER_PAGE = 100
@@ -231,6 +233,7 @@ export default function GridView({
   enableRecordOpen = true,
   recordOpenStyle = 'side_panel',
   modalFields,
+  onTableFieldsRefresh,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -1353,6 +1356,8 @@ export default function GridView({
                                     // CRITICAL: Ensure row.id exists before using it
                                     const rowId = row && typeof row === 'object' && row.id ? row.id : null
                                     
+                                    const canUseCellFactory = !!tableField && rowId !== null
+
                                     return (
                                       <td
                                         key={field.field_name}
@@ -1360,21 +1365,39 @@ export default function GridView({
                                         style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                         onClick={(e) => e.stopPropagation()}
                                       >
-                                        <Cell
-                                          value={row && typeof row === 'object' ? row[field.field_name] : undefined}
-                                          fieldName={field.field_name}
-                                          fieldType={tableField?.type}
-                                          fieldOptions={tableField?.options}
-                                          isVirtual={isVirtual}
-                                          editable={canEdit && !isVirtual && rowId !== null}
-                                          wrapText={wrapText}
-                                          rowHeight={rowHeightPixels}
-                                          onSave={async (value) => {
-                                            if (!isVirtual && rowId) {
-                                              await handleCellSave(rowId, field.field_name, value)
-                                            }
-                                          }}
-                                        />
+                                        {canUseCellFactory ? (
+                                          <CellFactory
+                                            field={tableField!}
+                                            value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                            rowId={String(rowId)}
+                                            tableName={supabaseTableName}
+                                            editable={canEdit && !isVirtual && rowId !== null}
+                                            wrapText={wrapText}
+                                            rowHeight={rowHeightPixels}
+                                            onSave={async (value) => {
+                                              if (!isVirtual && rowId) {
+                                                await handleCellSave(rowId, field.field_name, value)
+                                              }
+                                            }}
+                                            onFieldOptionsUpdate={onTableFieldsRefresh}
+                                          />
+                                        ) : (
+                                          <Cell
+                                            value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                            fieldName={field.field_name}
+                                            fieldType={tableField?.type}
+                                            fieldOptions={tableField?.options}
+                                            isVirtual={isVirtual}
+                                            editable={canEdit && !isVirtual && rowId !== null}
+                                            wrapText={wrapText}
+                                            rowHeight={rowHeightPixels}
+                                            onSave={async (value) => {
+                                              if (!isVirtual && rowId) {
+                                                await handleCellSave(rowId, field.field_name, value)
+                                              }
+                                            }}
+                                          />
+                                        )}
                                       </td>
                                     )
                                   })
@@ -1465,6 +1488,8 @@ export default function GridView({
                             // CRITICAL: Ensure row.id exists before using it
                             const rowId = row && typeof row === 'object' && row.id ? row.id : null
                             
+                            const canUseCellFactory = !!tableField && rowId !== null
+
                             return (
                               <td
                                 key={field.field_name}
@@ -1472,21 +1497,39 @@ export default function GridView({
                                 style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <Cell
-                                  value={row && typeof row === 'object' ? row[field.field_name] : undefined}
-                                  fieldName={field.field_name}
-                                  fieldType={tableField?.type}
-                                  fieldOptions={tableField?.options}
-                                  isVirtual={isVirtual}
-                                  editable={canEdit && !isVirtual && rowId !== null}
-                                  wrapText={wrapText}
-                                  rowHeight={rowHeightPixels}
-                                  onSave={async (value) => {
-                                    if (!isVirtual && rowId) {
-                                      await handleCellSave(rowId, field.field_name, value)
-                                    }
-                                  }}
-                                />
+                                {canUseCellFactory ? (
+                                  <CellFactory
+                                    field={tableField!}
+                                    value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                    rowId={String(rowId)}
+                                    tableName={supabaseTableName}
+                                    editable={canEdit && !isVirtual && rowId !== null}
+                                    wrapText={wrapText}
+                                    rowHeight={rowHeightPixels}
+                                    onSave={async (value) => {
+                                      if (!isVirtual && rowId) {
+                                        await handleCellSave(rowId, field.field_name, value)
+                                      }
+                                    }}
+                                    onFieldOptionsUpdate={onTableFieldsRefresh}
+                                  />
+                                ) : (
+                                  <Cell
+                                    value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                    fieldName={field.field_name}
+                                    fieldType={tableField?.type}
+                                    fieldOptions={tableField?.options}
+                                    isVirtual={isVirtual}
+                                    editable={canEdit && !isVirtual && rowId !== null}
+                                    wrapText={wrapText}
+                                    rowHeight={rowHeightPixels}
+                                    onSave={async (value) => {
+                                      if (!isVirtual && rowId) {
+                                        await handleCellSave(rowId, field.field_name, value)
+                                      }
+                                    }}
+                                  />
+                                )}
                               </td>
                             )
                           })

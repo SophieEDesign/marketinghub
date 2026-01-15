@@ -48,6 +48,7 @@ interface AirtableGridViewProps {
   groupBy?: string
   userRole?: "admin" | "editor" | "viewer" | null
   disableRecordPanel?: boolean // If true, clicking rows won't open record panel
+  onTableFieldsRefresh?: () => void // Refresh field metadata after option updates
 }
 
 const ROW_HEIGHT_SHORT = 32
@@ -78,6 +79,7 @@ export default function AirtableGridView({
   groupBy,
   userRole = "editor",
   disableRecordPanel = false,
+  onTableFieldsRefresh,
 }: AirtableGridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -1109,6 +1111,7 @@ export default function AirtableGridView({
                             wrapText={wrapText}
                             rowHeight={ROW_HEIGHT}
                             onSave={(value) => handleCellSave(row.id, field.name, value)}
+                            onFieldOptionsUpdate={onTableFieldsRefresh}
                           />
                         </div>
                       </div>

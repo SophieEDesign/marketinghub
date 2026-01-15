@@ -76,6 +76,10 @@ export const CHOICE_COLOR_THEME_LABELS: Record<ChoiceColorTheme, string> = {
   blues: 'Blue variations',
 }
 
+export function isChoiceColorTheme(value: unknown): value is ChoiceColorTheme {
+  return value === 'vibrant' || value === 'pastel' || value === 'blues'
+}
+
 export const CHOICE_COLOR_THEME_PALETTES: Record<
   Exclude<ChoiceColorTheme, 'vibrant'>,
   { single: readonly string[]; multi: readonly string[] }
@@ -193,9 +197,10 @@ export function getChoiceThemePalette(
   fieldOptions?: FieldOptions,
   useSemanticColors: boolean = true
 ): readonly string[] {
-  const theme = fieldOptions?.choiceColorTheme
-  if (theme && theme !== 'vibrant') {
-    const palettes = CHOICE_COLOR_THEME_PALETTES[theme]
+  // Defensive: DB might contain unexpected string values.
+  const themeUnknown: unknown = fieldOptions?.choiceColorTheme
+  if (isChoiceColorTheme(themeUnknown) && themeUnknown !== 'vibrant') {
+    const palettes = CHOICE_COLOR_THEME_PALETTES[themeUnknown]
     return fieldType === 'single_select' ? palettes.single : palettes.multi
   }
 

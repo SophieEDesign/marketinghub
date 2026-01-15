@@ -54,6 +54,7 @@ export default function EventCard({
     safeDisplayFields.length === 0
       ? []
       : safeDisplayFields
+          .slice(0, 3)
           .map((fieldName) => {
             const value = event.rowData?.[fieldName]
             const field = tableFields.find((f) => f.name === fieldName)

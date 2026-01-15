@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -12,7 +12,6 @@ import {
 import { X, Plus } from "lucide-react"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -28,7 +27,7 @@ interface ListDataSettingsProps {
 export default function ListDataSettings({
   config,
   tables,
-  views,
+  views: _views,
   fields,
   onUpdate,
   onTableChange,
@@ -43,6 +42,7 @@ export default function ListDataSettings({
   const metaFields = config.list_meta_fields || []
   const groupBy = config.group_by || ""
   const blockFilters = Array.isArray(config.filters) ? config.filters : []
+  const choiceGroupsDefaultCollapsed = (config as any)?.list_choice_groups_default_collapsed ?? true
 
   // Get available fields for selection
   const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
@@ -243,7 +243,6 @@ export default function ListDataSettings({
       <div className="space-y-2">
         <Label>Subtitle Fields (Optional, up to 3)</Label>
         {subtitleFields.map((fieldName, index) => {
-          const field = fields.find(f => f.name === fieldName)
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
@@ -325,7 +324,6 @@ export default function ListDataSettings({
       <div className="space-y-2">
         <Label>Pill Fields (Optional)</Label>
         {pillFields.map((fieldName, index) => {
-          const field = fields.find(f => f.name === fieldName)
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
@@ -384,7 +382,6 @@ export default function ListDataSettings({
       <div className="space-y-2">
         <Label>Meta Fields (Optional)</Label>
         {metaFields.map((fieldName, index) => {
-          const field = fields.find(f => f.name === fieldName)
           return (
             <div key={index} className="flex items-center gap-2">
               <Select
@@ -468,6 +465,35 @@ export default function ListDataSettings({
           </p>
         </div>
       )}
+
+      {/* Choice Group Load Behavior */}
+      {config.table_id && fields.length > 0 && groupBy && groupBy !== "__none__" && (() => {
+        const groupField = fields.find(f => f.name === groupBy || f.id === groupBy)
+        const isChoice = groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')
+        if (!isChoice) return null
+        return (
+          <div className="space-y-2">
+            <Label>Choice options on load</Label>
+            <Select
+              value={choiceGroupsDefaultCollapsed ? "closed" : "open"}
+              onValueChange={(value) => {
+                onUpdate({ list_choice_groups_default_collapsed: value === "closed" } as any)
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="closed">Closed (collapsed)</SelectItem>
+                <SelectItem value="open">Open (expanded)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              When grouping by a choice field, control whether all choice groups start expanded or collapsed.
+            </p>
+          </div>
+        )
+      })()}
 
       {/* Filters (Optional) */}
       {config.table_id && fields.length > 0 && (

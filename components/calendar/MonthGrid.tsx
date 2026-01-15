@@ -11,7 +11,7 @@ import type { TableField } from '@/types/fields'
 // Helper function to format display text (same logic as EventCard)
 function formatDisplayText(event: CalendarEvent, displayFields: string[] | null | undefined, tableFields: TableField[]): string {
   // Ensure displayFields is always an array
-  const safeDisplayFields = Array.isArray(displayFields) ? displayFields : []
+  const safeDisplayFields = (Array.isArray(displayFields) ? displayFields : []).slice(0, 3)
   if (safeDisplayFields.length === 0) {
     return event.title
   }

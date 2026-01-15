@@ -42,6 +42,7 @@ interface BlockRendererProps {
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
+  pageShowAddRecord?: boolean // Page-level default for "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
   editableFieldNames?: string[] // Field-level editable list (for field blocks)
   hideEditButton?: boolean // Hide Edit button for top field blocks (inline editing only)
@@ -60,6 +61,7 @@ export default function BlockRenderer({
   filters = [],
   onRecordClick,
   aggregateData,
+  pageShowAddRecord = false,
   pageEditable,
   editableFieldNames = [],
   hideEditButton = false,
@@ -144,7 +146,15 @@ export default function BlockRenderer({
         // Disable lazy loading in edit mode so users can see all blocks immediately
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <GridBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <GridBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 
@@ -257,7 +267,15 @@ export default function BlockRenderer({
         // Calendar block - wrapper around GridBlock with view_type='calendar'
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <CalendarBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <CalendarBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 
@@ -265,7 +283,15 @@ export default function BlockRenderer({
         // Kanban block - wrapper around GridBlock with view_type='kanban'
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <KanbanBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <KanbanBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 
@@ -273,7 +299,15 @@ export default function BlockRenderer({
         // Timeline block - wrapper around GridBlock with view_type='timeline'
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <TimelineBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <TimelineBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 
@@ -281,7 +315,15 @@ export default function BlockRenderer({
         // Gallery block - wrapper around GridBlock with view_type='gallery'
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <GalleryBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <GalleryBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 
@@ -289,7 +331,15 @@ export default function BlockRenderer({
         // List block - wrapper around GridBlock with view_type='grid'
         return (
           <LazyBlockWrapper enabled={!isEditing}>
-            <ListBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} onRecordClick={onRecordClick} />
+            <ListBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
           </LazyBlockWrapper>
         )
 

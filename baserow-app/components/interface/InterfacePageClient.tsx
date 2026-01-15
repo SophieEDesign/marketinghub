@@ -845,6 +845,9 @@ function InterfacePageClientInternal({
         leftPanel: pageConfig.left_panel || pageConfig.leftPanel || null,
         left_panel: pageConfig.left_panel || pageConfig.leftPanel || null, // Also include snake_case for direct access
         primary_table_id: page.base_table || pageTableId || null,
+        // Page-level default for "Add record" buttons inside data blocks
+        show_add_record: pageConfig.show_add_record ?? pageConfig.showAddRecord ?? false,
+        showAddRecord: pageConfig.showAddRecord ?? pageConfig.show_add_record ?? false,
       }
     } as any
   }, [page?.id, page?.name, page?.base_table, pageTableId]) // CRITICAL: NOT page?.page_type, NOT page?.config

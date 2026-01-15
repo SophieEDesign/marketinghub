@@ -11,13 +11,22 @@ interface CalendarBlockProps {
   pageId?: string | null
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  pageShowAddRecord?: boolean
 }
 
 /**
  * CalendarBlock - Wrapper around GridBlock with view_type='calendar'
  * Displays data in a calendar view
  */
-export default function CalendarBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: CalendarBlockProps) {
+export default function CalendarBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  onRecordClick,
+  pageShowAddRecord = false,
+}: CalendarBlockProps) {
   // Create a modified block config with view_type='calendar'
   const calendarBlock: PageBlock = {
     ...block,
@@ -35,6 +44,7 @@ export default function CalendarBlock({ block, isEditing = false, pageTableId = 
       pageId={pageId}
       filters={filters}
       onRecordClick={onRecordClick}
+      pageShowAddRecord={pageShowAddRecord}
     />
   )
 }

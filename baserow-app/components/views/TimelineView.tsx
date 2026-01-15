@@ -311,21 +311,19 @@ export default function TimelineView({
       dateFieldId,
     ].filter(Boolean))
 
-    // Priority: Use visible_fields from blockConfig if available (new system)
+    // Priority: Use fieldIds (derived from "Fields to Show on Cards/Table") if available (new system)
     // Otherwise fall back to timeline_field_1/2/3 (old system for backward compatibility)
     let allVisibleFields: TableField[] = []
     let cardFields: TableField[] = []
     let resolvedTitleField: TableField | null = null
     
-    if (blockConfig?.visible_fields && Array.isArray(blockConfig.visible_fields) && blockConfig.visible_fields.length > 0) {
-      // Use visible_fields from page settings (new system)
-      allVisibleFields = blockConfig.visible_fields
-        .map((fieldName: string) => 
-          tableFields.find(f => f.name === fieldName || f.id === fieldName)
-        )
+    if (Array.isArray(fieldIds) && fieldIds.length > 0) {
+      // Use the visible field order passed into this view (new system)
+      allVisibleFields = fieldIds
+        .map((fieldName: string) => tableFields.find((f) => f.name === fieldName || f.id === fieldName))
         .filter((f): f is TableField => f !== undefined)
       
-      // Resolve title field: explicit config > first non-date field from visible_fields
+      // Resolve title field: explicit config > first non-date field from visible fields
       const titleFieldName = titleFieldProp || 
         blockConfig?.timeline_title_field || 
         blockConfig?.card_title_field ||
@@ -361,7 +359,9 @@ export default function TimelineView({
       const titleFieldNameToExclude = resolvedTitleField?.name
       cardFields = allVisibleFields.filter(f => 
         f.name !== titleFieldNameToExclude && 
-        !dateFieldNames.has(f.name)
+        !dateFieldNames.has(f.name) &&
+        // Skip non-card-friendly types
+        f.type !== 'attachment'
       )
     } else {
       // Fall back to old system (backward compatibility)
@@ -393,7 +393,7 @@ export default function TimelineView({
       titleField: resolvedTitleField,
       cardFields,
     }
-  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId])
+  }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
   // Resolve group by field
   const resolvedGroupByField = useMemo(() => {

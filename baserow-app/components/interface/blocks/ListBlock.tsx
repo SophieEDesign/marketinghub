@@ -4,12 +4,18 @@ import { useEffect, useState, useMemo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import ListView from "@/components/views/ListView"
-import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import {
+  mergeFilters,
+  mergeViewDefaultFiltersWithUserQuickFilters,
+  normalizeFilter,
+  type FilterConfig,
+} from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import QuickFilterBar from "@/components/filters/QuickFilterBar"
 
 interface ListBlockProps {
   block: PageBlock
@@ -18,27 +24,50 @@ interface ListBlockProps {
   pageId?: string | null
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  pageShowAddRecord?: boolean // Page-level default for showing Add record
 }
 
-export default function ListBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: ListBlockProps) {
+export default function ListBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  onRecordClick,
+  pageShowAddRecord = false,
+}: ListBlockProps) {
   const { config } = block
   const tableId = config?.table_id || pageTableId || config?.base_table || null
   const viewId = config?.view_id
   const blockBaseFilters = Array.isArray(config?.filters) ? config.filters : []
   const sortsConfig = Array.isArray(config?.sorts) ? config.sorts : []
   
-  // Merge filters
+  const viewDefaultFilters = useMemo<FilterConfig[]>(() => {
+    return (blockBaseFilters || []).map((f: any) => normalizeFilter(f))
+  }, [blockBaseFilters])
+
+  const [userQuickFilters, setUserQuickFilters] = useState<FilterConfig[]>([])
+
+  const viewFiltersWithUserOverrides = useMemo(() => {
+    return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
+  }, [viewDefaultFilters, userQuickFilters])
+
+  // Merge filters (view defaults + session-only user overrides) + filter block filters
   const allFilters = useMemo(() => {
-    return mergeFilters(blockBaseFilters, filters, [])
-  }, [blockBaseFilters, filters])
+    return mergeFilters(viewFiltersWithUserOverrides, filters, [])
+  }, [viewFiltersWithUserOverrides, filters])
 
   const [loading, setLoading] = useState(true)
-  const [table, setTable] = useState<{ supabase_table: string } | null>(null)
+  const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   
   // Get groupBy from block config (not view config)
   const groupBy = config?.group_by
   
+  // Choice-group default collapse behavior (List view specific)
+  // Default: collapsed/closed unless explicitly set to false.
+  const defaultChoiceGroupsCollapsed = config?.list_choice_groups_default_collapsed ?? true
+
   // Use cached metadata hook
   const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
 
@@ -92,7 +121,7 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
 
         const tableRes = await supabase
           .from("tables")
-          .select("supabase_table")
+          .select("supabase_table, name")
           .eq("id", tableId)
           .maybeSingle()
 
@@ -170,7 +199,9 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
-  const showAddRecord = (appearance as any).show_add_record === true
+  const blockShowAddRecord = (appearance as any).show_add_record
+  const showAddRecord =
+    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const permissions = config.permissions || {}
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
@@ -213,7 +244,7 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {((appearance.show_title !== false && (appearance.title || config.title)) || showAddRecord) && (
+      {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
         <div
           className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
           style={{
@@ -222,8 +253,8 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
           }}
         >
           <div className="min-w-0 flex-1">
-            {(appearance.show_title !== false && (appearance.title || config.title)) && (
-              <h3 className="text-lg font-semibold truncate">{appearance.title || config.title}</h3>
+            {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
+              <h3 className="text-lg font-semibold truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
             )}
           </div>
           {showAddRecord && (
@@ -241,6 +272,17 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
           )}
         </div>
       )}
+
+      {/* Airtable-style quick filters (session-only; never saved to the view) */}
+      {!isEditing && (
+        <QuickFilterBar
+          storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+          tableFields={safeTableFields}
+          viewDefaultFilters={viewDefaultFilters}
+          onChange={setUserQuickFilters}
+        />
+      )}
+
       <ListView
         tableId={tableId}
         viewId={viewId || undefined}
@@ -249,6 +291,7 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
         filters={allFilters}
         sorts={activeSorts}
         groupBy={groupBy}
+        defaultChoiceGroupsCollapsed={defaultChoiceGroupsCollapsed}
         searchQuery=""
         onRecordClick={onRecordClick}
         showAddRecord={showAddRecord}

@@ -226,6 +226,9 @@ export default function FilterBlock({
   // Persist filter tree to config when it changes (debounced)
   useEffect(() => {
     if (!onUpdate) return
+    // CRITICAL: In view mode, user changes must never persist to the interface/view config.
+    // Advanced filter editing is builder-only.
+    if (!isEditing) return
     
     const timeoutId = setTimeout(() => {
       onUpdate(block.id, { 
@@ -392,21 +395,34 @@ export default function FilterBlock({
       {/* Filter Summary */}
       {!isEmpty && (
         <div className="mb-3">
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            variant="outline"
-            size="sm"
-            className="w-full justify-between text-sm"
-          >
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <span>Filter</span>
-              <Badge variant="secondary" className="text-xs">
-                {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
-              </Badge>
+          {isEditing ? (
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              variant="outline"
+              size="sm"
+              className="w-full justify-between text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span>Filter results</span>
+                <Badge variant="secondary" className="text-xs">
+                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <span className="text-gray-400">Edit filters</span>
+            </Button>
+          ) : (
+            <div className="w-full flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-gray-600" />
+                <span className="text-gray-700">Filter results</span>
+                <Badge variant="secondary" className="text-xs">
+                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <span className="text-xs text-gray-400">Default view</span>
             </div>
-            <span className="text-gray-400">{isEditing ? 'Edit filters' : 'View filters'}</span>
-          </Button>
+          )}
         </div>
       )}
 
@@ -436,63 +452,65 @@ export default function FilterBlock({
         <div className="mt-3 pt-2 border-t text-xs text-gray-500 flex items-start gap-2">
           <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
           <span>
-            These filters are applied on top of each element&apos;s own filters.
+            These filters refine results in connected elements.
           </span>
         </div>
       )}
 
       {/* Filter Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Filter Control</DialogTitle>
-            <DialogDescription>
-              Configure filters that will be applied to connected elements.
-            </DialogDescription>
-          </DialogHeader>
+      {isEditing && (
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Filters</DialogTitle>
+              <DialogDescription>
+                Configure filters that will be applied to connected elements.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Connection Info */}
-            {connectedBlocks.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 text-sm text-blue-800">
-                    <p className="font-medium mb-1">Connected to {connectedBlocks.length} element{connectedBlocks.length !== 1 ? 's' : ''}</p>
-                    <p className="text-xs text-blue-700">
-                      These filters are applied in addition to each element&apos;s own filters.
-                    </p>
+            <div className="space-y-4 py-4">
+              {/* Connection Info */}
+              {connectedBlocks.length > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 text-sm text-blue-800">
+                      <p className="font-medium mb-1">
+                        Connected to {connectedBlocks.length} element{connectedBlocks.length !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        These filters are applied in addition to each element&apos;s own filters.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Filter Builder */}
-            <FilterBuilder
-              filterTree={filterTree}
-              tableFields={availableFields}
-              onChange={setFilterTree}
-            />
+              {/* Filter Builder */}
+              <FilterBuilder
+                filterTree={filterTree}
+                tableFields={availableFields}
+                onChange={setFilterTree}
+              />
 
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="flex items-center gap-2">
-                {hasDefaults && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReset}
-                    disabled={isAtDefaults}
-                    className="text-xs"
-                    title="Reset filters to default values"
-                  >
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    Reset to Defaults
-                  </Button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {isEditing && (
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  {hasDefaults && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleReset}
+                      disabled={isAtDefaults}
+                      className="text-xs"
+                      title="Reset filters to default values"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset to Defaults
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -505,19 +523,19 @@ export default function FilterBlock({
                     <Settings className="h-4 w-4 mr-1" />
                     Settings
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  Done
-                </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsModalOpen(false)}
+                  >
+                    Done
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

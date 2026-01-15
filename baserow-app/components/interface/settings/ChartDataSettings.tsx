@@ -47,8 +47,8 @@ export default function ChartDataSettings({
 
   // Determine if X-Axis field should be shown
   // Hide X-Axis when Group By is selected (X-axis is inferred from Group By)
-  // Also hide when metric type is count and no group by (can use count without explicit X-axis)
-  const showXAxis = metricType !== "count" && !groupBy && chartType !== "pie"
+  // Note: Count charts may still need an X-axis (e.g. count by date/status), so don't hide it just because metricType is count.
+  const showXAxis = !groupBy && chartType !== "pie"
 
   // Clear metric field when switching to count
   const handleMetricTypeChange = (value: string) => {

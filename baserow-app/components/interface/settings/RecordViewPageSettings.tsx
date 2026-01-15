@@ -1266,6 +1266,19 @@ export default function RecordViewPageSettings({
               />
             </div>
 
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Default “Add record” buttons</Label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Show “Add record” inside data blocks by default (blocks can override).
+                </p>
+              </div>
+              <Switch
+                checked={(config as any).show_add_record === true}
+                onCheckedChange={(checked) => onUpdate({ show_add_record: checked } as any)}
+              />
+            </div>
+
             {/* Field Sections (Future) */}
             <div className="border-t pt-4">
               <Label className="text-sm text-gray-500">Field Sections (Coming Soon)</Label>

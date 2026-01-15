@@ -67,6 +67,7 @@ export default function PageViewBlockWrapper({
         pageTableId={pageTableId}
         pageId={page.id}
         filters={filters || []}
+        pageShowAddRecord={(page as any)?.config?.show_add_record === true || (page as any)?.config?.showAddRecord === true}
       />
     </div>
   )

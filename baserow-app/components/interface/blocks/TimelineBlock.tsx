@@ -11,13 +11,22 @@ interface TimelineBlockProps {
   pageId?: string | null
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  pageShowAddRecord?: boolean
 }
 
 /**
  * TimelineBlock - Wrapper around GridBlock with view_type='timeline'
  * Displays data in a timeline view
  */
-export default function TimelineBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], onRecordClick }: TimelineBlockProps) {
+export default function TimelineBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  onRecordClick,
+  pageShowAddRecord = false,
+}: TimelineBlockProps) {
   // Create a modified block config with view_type='timeline'
   const timelineBlock: PageBlock = {
     ...block,
@@ -35,6 +44,7 @@ export default function TimelineBlock({ block, isEditing = false, pageTableId = 
       pageId={pageId}
       filters={filters}
       onRecordClick={onRecordClick}
+      pageShowAddRecord={pageShowAddRecord}
     />
   )
 }

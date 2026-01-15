@@ -335,7 +335,13 @@ export default function InlineSelectDropdown({
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         {/* Dropdown trigger */}
-        <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer">
+        <div
+          className="cell-editor w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer"
+          onClick={(e) => {
+            // Prevent row-level click handlers (e.g. open record) from firing
+            e.stopPropagation()
+          }}
+        >
           {selectedValues.length > 0 ? (
             selectedValues.map((val: string) => {
               const hexColor = getChoiceColor(val)

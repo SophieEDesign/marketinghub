@@ -23,6 +23,8 @@ interface ListViewProps {
   filters?: FilterConfig[]
   sorts?: Array<{ field_name: string; direction: 'asc' | 'desc' }>
   groupBy?: string
+  /** When grouping by a choice field, should groups start collapsed? Default: true (closed). */
+  defaultChoiceGroupsCollapsed?: boolean
   searchQuery?: string
   onRecordClick?: (recordId: string) => void
   // Creation controls (wired from block settings)
@@ -47,6 +49,7 @@ export default function ListView({
   filters = [],
   sorts = [],
   groupBy,
+  defaultChoiceGroupsCollapsed = true,
   searchQuery = "",
   onRecordClick,
   showAddRecord = false,
@@ -64,6 +67,8 @@ export default function ListView({
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const prevGroupByRef = useRef<string | undefined>(undefined)
+  const didInitChoiceGroupCollapseRef = useRef(false)
   const [tableName, setTableName] = useState<string | null>(null)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
@@ -211,6 +216,54 @@ export default function ListView({
 
     return groups
   }, [filteredRows, currentGroupBy, tableFields])
+
+  const groupFieldForCurrentGroupBy = useMemo(() => {
+    if (!currentGroupBy) return null
+    return tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy) || null
+  }, [currentGroupBy, tableFields])
+
+  const isChoiceGroupBy = !!groupFieldForCurrentGroupBy &&
+    (groupFieldForCurrentGroupBy.type === 'single_select' || groupFieldForCurrentGroupBy.type === 'multi_select')
+
+  // When grouping by a choice field, allow "start collapsed" behavior (default: collapsed).
+  // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
+  // so we don't override the user's manual expand/collapse interactions mid-session.
+  useEffect(() => {
+    const groupByChanged = prevGroupByRef.current !== currentGroupBy
+    prevGroupByRef.current = currentGroupBy
+
+    if (groupByChanged) {
+      didInitChoiceGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+    }
+
+    // No grouping: always open (nothing to collapse)
+    if (!currentGroupBy) {
+      didInitChoiceGroupCollapseRef.current = false
+      return
+    }
+
+    // Only apply this default behavior for choice fields (single/multi select)
+    if (!isChoiceGroupBy) {
+      didInitChoiceGroupCollapseRef.current = false
+      return
+    }
+
+    // If the setting is "open", force-expand (clear collapsed set).
+    if (!defaultChoiceGroupsCollapsed) {
+      didInitChoiceGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+      return
+    }
+
+    // Setting is "closed": collapse all groups once, when we have keys.
+    if (didInitChoiceGroupCollapseRef.current) return
+    if ('ungrouped' in groupedRows) return
+    const keys = Object.keys(groupedRows)
+    if (keys.length === 0) return
+    setCollapsedGroups(new Set(keys))
+    didInitChoiceGroupCollapseRef.current = true
+  }, [currentGroupBy, isChoiceGroupBy, defaultChoiceGroupsCollapsed, groupedRows])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {

@@ -18,7 +18,7 @@ import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import type { FieldType, FieldOptions, ChoiceColorTheme } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
-import { CHOICE_COLOR_THEME_LABELS, resolveChoiceColor } from "@/lib/field-colors"
+import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
 import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
 import { format as formatDate } from "date-fns"
 
@@ -234,7 +234,11 @@ export default function FieldDataSettings({
               <div className="space-y-2 rounded-md border border-gray-200 p-3 bg-gray-50/50">
                 <Label className="text-xs text-gray-700">Colour theme</Label>
                 <Select
-                  value={(options.choiceColorTheme || 'vibrant') as ChoiceColorTheme}
+                  value={
+                    (isChoiceColorTheme(options.choiceColorTheme)
+                      ? options.choiceColorTheme
+                      : 'vibrant') as ChoiceColorTheme
+                  }
                   onValueChange={(theme) => {
                     const next: FieldOptions = { ...options }
                     if (theme === 'vibrant') {
