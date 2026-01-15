@@ -17,7 +17,7 @@ import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { format } from "date-fns"
-import type { EventInput } from "@fullcalendar/core"
+import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
@@ -94,6 +94,44 @@ export default function CalendarView({
     show_weekends?: boolean
     event_density?: 'compact' | 'expanded'
   } | null>(null)
+
+  // Calendar card field configuration (two-row cards)
+  const calendarCardField1 = useMemo(() => {
+    const f = (blockConfig as any)?.appearance?.calendar_card_field_1
+    return typeof f === 'string' && f.trim() !== '' ? f : null
+  }, [blockConfig])
+  const calendarCardField2 = useMemo(() => {
+    const f = (blockConfig as any)?.appearance?.calendar_card_field_2
+    return typeof f === 'string' && f.trim() !== '' ? f : null
+  }, [blockConfig])
+
+  function formatCardValue(fieldName: string, rowData: Record<string, any> | null | undefined): string | null {
+    if (!rowData) return null
+    const raw = rowData[fieldName]
+    if (raw === null || raw === undefined || raw === '') return null
+    const field = loadedTableFields.find(f => f.name === fieldName || f.id === fieldName)
+
+    // Multi-select might be stored as array
+    if (Array.isArray(raw)) {
+      const joined = raw.filter(Boolean).map(String).join(', ')
+      return joined.trim() ? joined : null
+    }
+
+    if (field?.type === 'checkbox') {
+      return raw ? '✓' : null
+    }
+
+    if (field?.type === 'date') {
+      const d = raw instanceof Date ? raw : new Date(String(raw))
+      if (!isNaN(d.getTime())) {
+        // DD/MM/YYYY
+        return format(d, 'dd/MM/yyyy')
+      }
+    }
+
+    const s = String(raw).trim()
+    return s ? s : null
+  }
   
   // Date range filter state
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
@@ -587,6 +625,150 @@ export default function CalendarView({
     )
   }, [viewConfig, loadedTableFields])
 
+  function resolveCalendarDateFieldNames(): { fromFieldName: string; toFieldName: string | null } {
+    // Primary ("from") field resolution: block config > view config (start) > resolvedDateFieldId
+    const blockFromField =
+      blockConfig?.date_from ||
+      blockConfig?.from_date_field ||
+      blockConfig?.start_date_field ||
+      blockConfig?.calendar_start_field
+
+    const resolvedFromField = blockFromField
+      ? loadedTableFields.find(
+          (f) => (f.name === blockFromField || f.id === blockFromField) && f.type === "date"
+        )
+      : null
+
+    const viewStartField = viewConfig?.calendar_start_field
+    const resolvedViewStartField = viewStartField
+      ? loadedTableFields.find(
+          (f) => (f.name === viewStartField || f.id === viewStartField) && f.type === "date"
+        )
+      : null
+
+    const fromFieldName =
+      resolvedFromField?.name ||
+      startField?.name ||
+      resolvedViewStartField?.name ||
+      (typeof viewStartField === "string" ? viewStartField : "") ||
+      resolvedDateFieldId ||
+      ""
+
+    // Secondary ("to") field resolution: block config > view config (end) > null
+    const blockToField =
+      blockConfig?.date_to ||
+      blockConfig?.to_date_field ||
+      blockConfig?.end_date_field ||
+      blockConfig?.calendar_end_field
+
+    const resolvedToField = blockToField
+      ? loadedTableFields.find(
+          (f) => (f.name === blockToField || f.id === blockToField) && f.type === "date"
+        )
+      : null
+
+    const viewEndField = viewConfig?.calendar_end_field
+    const resolvedViewEndField = viewEndField
+      ? loadedTableFields.find(
+          (f) => (f.name === viewEndField || f.id === viewEndField) && f.type === "date"
+        )
+      : null
+
+    const toFieldName =
+      resolvedToField?.name ||
+      endField?.name ||
+      resolvedViewEndField?.name ||
+      (typeof viewEndField === "string" ? viewEndField : "") ||
+      null
+
+    return { fromFieldName, toFieldName }
+  }
+
+  async function handleEventDrop(info: EventDropArg) {
+    const rowId = info.event?.id
+    const newStart = info.event?.start
+
+    if (!rowId || !newStart) {
+      return
+    }
+
+    if (!supabaseTableName) {
+      console.warn("Calendar: Cannot persist drop - missing supabaseTableName")
+      info.revert()
+      return
+    }
+
+    const { fromFieldName, toFieldName } = resolveCalendarDateFieldNames()
+    if (!fromFieldName) {
+      console.warn("Calendar: Cannot persist drop - missing fromFieldName", {
+        rowId,
+        resolvedDateFieldId,
+        viewConfig,
+        blockConfig,
+      })
+      info.revert()
+      return
+    }
+
+    // Prefer original values from our row state, fallback to FullCalendar's oldEvent.
+    const currentRow = rows.find((r) => r.id === rowId)
+    const currentRowData = currentRow?.data || (info.event.extendedProps as any)?.rowData
+
+    const oldFromRaw = currentRowData?.[fromFieldName]
+    const oldFromDate =
+      oldFromRaw && !isNaN(new Date(oldFromRaw).getTime())
+        ? new Date(oldFromRaw)
+        : info.oldEvent?.start || null
+
+    const newFromValue = format(newStart, "yyyy-MM-dd")
+
+    // Update end field (if configured) by shifting it by the same delta as the start date.
+    const updates: Record<string, any> = { [fromFieldName]: newFromValue }
+    if (toFieldName && currentRowData?.[toFieldName] && oldFromDate && !isNaN(oldFromDate.getTime())) {
+      const oldToRaw = currentRowData[toFieldName]
+      const oldToDate = new Date(oldToRaw)
+      if (!isNaN(oldToDate.getTime())) {
+        const deltaMs = newStart.getTime() - oldFromDate.getTime()
+        const newToDate = new Date(oldToDate.getTime() + deltaMs)
+        updates[toFieldName] = format(newToDate, "yyyy-MM-dd")
+      }
+    }
+
+    // Optimistic UI update (so the event stays put even if we don't reload immediately).
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === rowId
+          ? {
+              ...r,
+              data: {
+                ...(r.data || {}),
+                ...updates,
+              },
+            }
+          : r
+      )
+    )
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from(supabaseTableName).update(updates).eq("id", rowId)
+      if (error) {
+        throw error
+      }
+
+      // Ensure the UI is in sync with any DB-side transforms.
+      await loadRows()
+    } catch (error) {
+      console.error("Calendar: Failed to persist event drop", error, {
+        rowId,
+        supabaseTableName,
+        updates,
+      })
+      info.revert()
+      await loadRows()
+    }
+  }
+
   function getEvents(): EventInput[] {
     // Use resolved date field from config or fallback
     const effectiveDateField = dateField
@@ -988,6 +1170,20 @@ export default function CalendarView({
               rowData: row.data,
               image: eventImage,
               fitImageSize,
+              cardLines: (() => {
+                const lines: string[] = []
+                // Row 1: configured field or default title
+                const line1 = calendarCardField1
+                  ? formatCardValue(calendarCardField1, row.data)
+                  : (title || "Untitled")
+                if (line1) lines.push(line1)
+                // Row 2: optional configured field
+                if (calendarCardField2) {
+                  const line2 = formatCardValue(calendarCardField2, row.data)
+                  if (line2) lines.push(line2)
+                }
+                return lines.slice(0, 2)
+              })(),
             },
           }
         })
@@ -1272,6 +1468,7 @@ export default function CalendarView({
           events={calendarEvents}
           key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`}
           editable={true}
+          eventDrop={handleEventDrop}
           headerToolbar={{
             left: "prev,next today",
             center: "title",
@@ -1294,9 +1491,13 @@ export default function CalendarView({
           eventContent={(eventInfo) => {
             const image = eventInfo.event.extendedProps?.image
             const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
+            const cardLinesRaw = eventInfo.event.extendedProps?.cardLines
+            const cardLines = Array.isArray(cardLinesRaw) ? cardLinesRaw.filter(Boolean).map(String) : []
+            const primaryLine = cardLines[0] || eventInfo.event.title
+            const secondaryLine = cardLines[1]
             
             return (
-              <div className="flex items-center gap-1.5 h-full">
+              <div className="flex items-center gap-1.5 h-full min-w-0">
                 {image && (
                   <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                     <img
@@ -1309,7 +1510,12 @@ export default function CalendarView({
                     />
                   </div>
                 )}
-                <span className="truncate text-xs font-medium">{eventInfo.event.title}</span>
+                <div className="min-w-0 flex flex-col leading-tight">
+                  <span className="truncate text-xs font-medium">{primaryLine}</span>
+                  {secondaryLine && (
+                    <span className="truncate text-[10px] opacity-90">{secondaryLine}</span>
+                  )}
+                </div>
               </div>
             )
           }}

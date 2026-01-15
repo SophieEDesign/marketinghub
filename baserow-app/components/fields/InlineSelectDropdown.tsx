@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Plus, Edit2, Palette, X, Check } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   resolveChoiceColor,
   getTextColorForBackground,
@@ -46,7 +47,6 @@ export default function InlineSelectDropdown({
   const [editingColor, setEditingColor] = useState<string | null>(null)
   const [newChoiceName, setNewChoiceName] = useState('')
   const [updatingOptions, setUpdatingOptions] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const isMulti = fieldType === 'multi_select'
@@ -61,23 +61,15 @@ export default function InlineSelectDropdown({
     return value ? [value] : []
   }, [value, isMulti])
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-        setSearchTerm('')
-        setEditingChoice(null)
-        setEditingColor(null)
-        setNewChoiceName('')
-      }
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open)
+    if (!open) {
+      setSearchTerm('')
+      setEditingChoice(null)
+      setEditingColor(null)
+      setNewChoiceName('')
     }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
+  }
 
   // Focus search input when dropdown opens
   useEffect(() => {
@@ -122,8 +114,7 @@ export default function InlineSelectDropdown({
       await onValueChange(newValues)
     } else {
       await onValueChange(choice)
-      setIsOpen(false)
-      setSearchTerm('')
+      handleOpenChange(false)
     }
   }
 
@@ -163,7 +154,7 @@ export default function InlineSelectDropdown({
         await onValueChange([...selectedValues, newChoice])
       } else {
         await onValueChange(newChoice)
-        setIsOpen(false)
+        handleOpenChange(false)
       }
 
       setSearchTerm('')
@@ -347,35 +338,37 @@ export default function InlineSelectDropdown({
   }
 
   return (
-    <div ref={dropdownRef} className="relative w-full">
-      {/* Dropdown trigger */}
-      <div
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer"
-      >
-        {selectedValues.length > 0 ? (
-          selectedValues.map((val: string) => {
-            const hexColor = getChoiceColor(val)
-            const textColorClass = getTextColorForBackground(hexColor)
-            const bgColor = normalizeHexColor(hexColor)
-            return (
-              <span
-                key={val}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-                style={{ backgroundColor: bgColor }}
-              >
-                {val}
-              </span>
-            )
-          })
-        ) : (
-          <span className="text-gray-400 italic text-sm">{placeholder}</span>
-        )}
-      </div>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        {/* Dropdown trigger */}
+        <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer">
+          {selectedValues.length > 0 ? (
+            selectedValues.map((val: string) => {
+              const hexColor = getChoiceColor(val)
+              const textColorClass = getTextColorForBackground(hexColor)
+              const bgColor = normalizeHexColor(hexColor)
+              return (
+                <span
+                  key={val}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                  style={{ backgroundColor: bgColor }}
+                >
+                  {val}
+                </span>
+              )
+            })
+          ) : (
+            <span className="text-gray-400 italic text-sm">{placeholder}</span>
+          )}
+        </div>
+      </PopoverTrigger>
 
-      {/* Dropdown menu */}
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col">
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={4}
+        className="z-[100] w-[var(--radix-popper-anchor-width)] p-0 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col"
+      >
           {/* Search input */}
           <div className="p-2 border-b border-gray-200">
             <input
@@ -561,8 +554,7 @@ export default function InlineSelectDropdown({
               </div>
             )}
           </div>
-        </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   )
 }

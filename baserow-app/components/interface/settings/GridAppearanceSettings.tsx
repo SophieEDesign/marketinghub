@@ -70,6 +70,30 @@ export default function GridAppearanceSettings({
   // Get view type from config to show view-specific settings
   const viewType = (config as any)?.view_type || 'grid'
 
+  // Calendar card fields (two-row display)
+  // Stored as appearance.calendar_card_field_1 / appearance.calendar_card_field_2 (field names).
+  // Row 1 can be "Default title" (undefined).
+  const calendarCardField1 = (appearance as any).calendar_card_field_1 || "__none__"
+  const calendarCardField2 = (appearance as any).calendar_card_field_2 || "__none__"
+  const availableCalendarCardFields = fields.filter(
+    (f) =>
+      f.name !== "id" &&
+      f.name !== "created_at" &&
+      f.name !== "updated_at" &&
+      f.type !== "attachment"
+  )
+
+  function updateCalendarCardFields(next1: string | "__none__", next2: string | "__none__") {
+    const f1 = next1 === "__none__" ? undefined : next1
+    let f2 = next2 === "__none__" ? undefined : next2
+    // Avoid duplicates (if user picks the same field twice, drop row 2)
+    if (f1 && f2 && f1 === f2) f2 = undefined
+    onUpdate({
+      calendar_card_field_1: f1,
+      calendar_card_field_2: f2 || undefined,
+    } as any)
+  }
+
   return (
     <div className="space-y-4">
       {/* Row Height / Density */}
@@ -198,6 +222,60 @@ export default function GridAppearanceSettings({
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Appearance</h3>
           <p className="text-xs text-gray-500 mb-4">Configure colors and images for rows, cards, and events</p>
         </div>
+
+        {/* Calendar card fields (two-row cards) */}
+        {viewType === "calendar" && (
+          <div className="space-y-3">
+            <div>
+              <Label>Calendar card fields</Label>
+              <p className="text-xs text-gray-500 mt-1">
+                Choose up to 2 fields to show on each calendar card (two-row view). Leave empty to show the default title only.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-600">Row 1</Label>
+                <Select
+                  value={calendarCardField1}
+                  onValueChange={(value) => updateCalendarCardFields(value as any, calendarCardField2 as any)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select field..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Default title</SelectItem>
+                    {availableCalendarCardFields.map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-gray-600">Row 2 (optional)</Label>
+                <Select
+                  value={calendarCardField2}
+                  onValueChange={(value) => updateCalendarCardFields(calendarCardField1 as any, value as any)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select field..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {availableCalendarCardFields.map((field) => (
+                      <SelectItem key={field.id} value={field.name}>
+                        {field.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Image Field */}
         <div className="space-y-2">

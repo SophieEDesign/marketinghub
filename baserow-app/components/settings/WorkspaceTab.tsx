@@ -24,7 +24,7 @@ export default function SettingsWorkspaceTab() {
   const [originalIcon, setOriginalIcon] = useState('📊')
   const [defaultPageId, setDefaultPageId] = useState<string>('__none__')
   const [originalDefaultPageId, setOriginalDefaultPageId] = useState<string>('__none__')
-  const [interfacePages, setInterfacePages] = useState<Array<{ id: string; name: string }>>([])
+  const [interfacePages, setInterfacePages] = useState<Array<{ id: string; name: string; is_admin_only?: boolean | null }>>([])
   const [loadingPages, setLoadingPages] = useState(false)
 
   useEffect(() => {
@@ -81,16 +81,16 @@ export default function SettingsWorkspaceTab() {
         const { data: settings, error: settingsError } = await supabase
           .from('workspace_settings')
           .select('default_interface_id')
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle()
 
         if (settingsError) {
-          // Check if it's a column doesn't exist error - ignore these gracefully
-          if (settingsError.code === 'PGRST116' || 
-              settingsError.code === '42P01' || 
-              settingsError.code === '42703' ||
-              settingsError.message?.includes('column') ||
-              settingsError.message?.includes('does not exist')) {
-            // Column doesn't exist yet - use default
+          // Treat only schema-missing errors as "no setting"
+          // NOTE: PGRST116 is NOT "column missing" here; it's usually "0 rows" or "multiple rows"
+          if (settingsError.code === '42P01' || settingsError.code === '42703' ||
+              settingsError.message?.includes('column') || settingsError.message?.includes('does not exist') ||
+              settingsError.message?.includes('relation')) {
             setDefaultPageId("__none__")
             setOriginalDefaultPageId("__none__")
           } else {
@@ -109,8 +109,10 @@ export default function SettingsWorkspaceTab() {
           setOriginalDefaultPageId("__none__")
         }
       } catch (error: any) {
-        // Ignore errors if column doesn't exist yet
-        if (error?.code !== 'PGRST116' && error?.code !== '42P01' && error?.code !== '42703') {
+        // Ignore schema-missing errors (expected in some setups)
+        if (error?.code !== '42P01' && error?.code !== '42703' &&
+            !error?.message?.includes('column') && !error?.message?.includes('does not exist') &&
+            !error?.message?.includes('relation')) {
           console.warn('Error loading default page setting:', error)
         }
         setDefaultPageId("__none__")
@@ -132,7 +134,7 @@ export default function SettingsWorkspaceTab() {
       // Don't filter by is_admin_only here - workspace settings should show all pages
       const { data: interfacePagesData, error: interfacePagesError } = await supabase
         .from('interface_pages')
-        .select('id, name')
+        .select('id, name, is_admin_only')
         .order('name', { ascending: true })
 
       if (interfacePagesError) {
@@ -158,7 +160,7 @@ export default function SettingsWorkspaceTab() {
       // Fallback to old views table for backward compatibility
       const { data: viewsData, error: viewsError } = await supabase
         .from('views')
-        .select('id, name')
+        .select('id, name, is_admin_only')
         .eq('type', 'interface')
         .order('name', { ascending: true })
 
@@ -190,11 +192,13 @@ export default function SettingsWorkspaceTab() {
     setMessage(null)
 
     try {
+      let saveHadErrorMessage = false
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
         setMessage({ type: 'error', text: 'You must be logged in to save settings' })
+        saveHadErrorMessage = true
         return
       }
 
@@ -217,6 +221,7 @@ export default function SettingsWorkspaceTab() {
           type: 'error', 
           text: 'Could not save workspace settings. The workspaces table may need to be created.' 
         })
+        saveHadErrorMessage = true
         return
       }
 
@@ -232,18 +237,24 @@ export default function SettingsWorkspaceTab() {
           convertingToNull: defaultPageId === "__none__"
         })
         
-        // First, try to get existing workspace_settings row
+        // Get the first workspace_settings row (single-workspace app); avoid .single() to prevent 406/PGRST116 masking
         const { data: existingSettings, error: fetchError } = await supabase
           .from('workspace_settings')
           .select('id')
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle()
 
         if (fetchError) {
-          if (fetchError.code === 'PGRST116' || fetchError.code === '42P01' || fetchError.code === '42703' ||
-              fetchError.message?.includes('column') || fetchError.message?.includes('does not exist')) {
-            // Column/table doesn't exist - this is okay, treat as success
-            console.log('[WorkspaceTab] workspace_settings table/column does not exist, skipping save')
-            defaultPageSaveSuccess = true
+          if (fetchError.code === '42P01' || fetchError.code === '42703' ||
+              fetchError.message?.includes('column') || fetchError.message?.includes('does not exist') ||
+              fetchError.message?.includes('relation')) {
+            // Schema not present - cannot persist this setting
+            setMessage({
+              type: 'error',
+              text: 'Default page could not be saved: the workspace_settings table/column is missing. Please run the workspace settings migrations.'
+            })
+            saveHadErrorMessage = true
           } else {
             console.error('[WorkspaceTab] Error fetching workspace settings:', fetchError)
             throw fetchError
@@ -251,7 +262,7 @@ export default function SettingsWorkspaceTab() {
         } else if (existingSettings) {
           // Update existing row
           console.log('[WorkspaceTab] Updating existing workspace_settings row:', existingSettings.id)
-          const { data: updatedData, error: updateError } = await supabase
+          const { data: updatedRows, error: updateError } = await supabase
             .from('workspace_settings')
             .update({
               default_interface_id: defaultInterfaceId,
@@ -259,7 +270,6 @@ export default function SettingsWorkspaceTab() {
             })
             .eq('id', existingSettings.id)
             .select('default_interface_id')
-            .single()
           
           if (updateError) {
             console.error('[WorkspaceTab] Update error:', {
@@ -268,76 +278,45 @@ export default function SettingsWorkspaceTab() {
               details: updateError
             })
             throw updateError
-          } else {
+          } else if (updatedRows && updatedRows.length > 0) {
+            const updatedData = updatedRows[0]
             console.log('[WorkspaceTab] Successfully updated default_interface_id:', {
               saved: updatedData?.default_interface_id,
               expected: defaultInterfaceId
             })
             defaultPageSaveSuccess = true
+          } else {
+            // UPDATE succeeded but returned 0 rows: almost always RLS "no update policy" (or wrong filter)
+            throw new Error('Not permitted to update workspace settings (RLS policy may be missing for admins).')
           }
         } else {
-          // No row exists, try to insert new one
-          // First check if there's ANY row (maybe RLS prevented first query)
-          const { data: anyRow } = await supabase
+          // No row exists, insert a new one
+          console.log('[WorkspaceTab] No existing row, inserting new workspace_settings')
+          const { data: insertedRows, error: insertError } = await supabase
             .from('workspace_settings')
-            .select('id')
-            .limit(1)
-            .maybeSingle()
+            .insert({
+              default_interface_id: defaultInterfaceId,
+            })
+            .select('id, default_interface_id')
           
-          if (anyRow) {
-            // Row exists but wasn't returned by first query (RLS issue?) - try update
-            console.log('[WorkspaceTab] Found row on second check, updating:', anyRow.id)
-            const { data: updatedData, error: updateError } = await supabase
-              .from('workspace_settings')
-              .update({
-                default_interface_id: defaultInterfaceId,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', anyRow.id)
-              .select('default_interface_id')
-              .single()
-            
-            if (updateError) {
-              console.error('[WorkspaceTab] Update error on second check:', {
-                code: updateError.code,
-                message: updateError.message,
-                details: updateError
-              })
-              throw updateError
-            } else {
-              console.log('[WorkspaceTab] Successfully updated default_interface_id on second check:', {
-                saved: updatedData?.default_interface_id,
-                expected: defaultInterfaceId
-              })
-              defaultPageSaveSuccess = true
-            }
+          if (insertError) {
+            console.error('[WorkspaceTab] Insert error:', {
+              code: insertError.code,
+              message: insertError.message,
+              details: insertError,
+              hint: insertError.hint
+            })
+            throw insertError
+          } else if (insertedRows && insertedRows.length > 0) {
+            const insertedData = insertedRows[0]
+            console.log('[WorkspaceTab] Successfully inserted workspace_settings:', {
+              id: insertedData?.id,
+              default_interface_id: insertedData?.default_interface_id,
+              expected: defaultInterfaceId
+            })
+            defaultPageSaveSuccess = true
           } else {
-            // No row exists, insert new one (let DB generate UUID)
-            console.log('[WorkspaceTab] No existing row, inserting new workspace_settings')
-            const { data: insertedData, error: insertError } = await supabase
-              .from('workspace_settings')
-              .insert({
-                default_interface_id: defaultInterfaceId,
-              })
-              .select('id, default_interface_id')
-              .single()
-            
-            if (insertError) {
-              console.error('[WorkspaceTab] Insert error:', {
-                code: insertError.code,
-                message: insertError.message,
-                details: insertError,
-                hint: insertError.hint
-              })
-              throw insertError
-            } else {
-              console.log('[WorkspaceTab] Successfully inserted workspace_settings:', {
-                id: insertedData?.id,
-                default_interface_id: insertedData?.default_interface_id,
-                expected: defaultInterfaceId
-              })
-              defaultPageSaveSuccess = true
-            }
+            throw new Error('Not permitted to insert workspace settings (RLS policy may be missing for admins).')
           }
         }
         
@@ -346,6 +325,8 @@ export default function SettingsWorkspaceTab() {
           const { data: verifyData, error: verifyError } = await supabase
             .from('workspace_settings')
             .select('default_interface_id')
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle()
           
           if (!verifyError && verifyData) {
@@ -362,12 +343,11 @@ export default function SettingsWorkspaceTab() {
         }
       } catch (settingsError: any) {
         console.error('[WorkspaceTab] Error saving default page setting:', settingsError)
-        // Only ignore errors if column doesn't exist yet
-        if (settingsError?.code === 'PGRST116' || settingsError?.code === '42P01' || settingsError?.code === '42703' ||
-            settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist')) {
-          // Column doesn't exist - this is okay, treat as success
-          console.log('[WorkspaceTab] Column doesn\'t exist, treating as success')
-          defaultPageSaveSuccess = true
+        // Only treat schema-missing as non-fatal (cannot persist the setting)
+        if (settingsError?.code === '42P01' || settingsError?.code === '42703' ||
+            settingsError?.message?.includes('column') || settingsError?.message?.includes('does not exist') ||
+            settingsError?.message?.includes('relation')) {
+          console.log('[WorkspaceTab] workspace_settings schema missing; cannot save default page')
         } else if (settingsError?.code === '23503') {
           // Foreign key constraint violation - the page ID doesn't exist in interface_pages
           console.error('[WorkspaceTab] Foreign key constraint violation - page ID not found:', {
@@ -378,6 +358,13 @@ export default function SettingsWorkspaceTab() {
             type: 'error', 
             text: `Workspace saved, but default page setting failed: The selected page no longer exists or the foreign key constraint is pointing to the wrong table. Please select a different page.` 
           })
+          saveHadErrorMessage = true
+        } else if (settingsError?.code === '42501' || settingsError?.message?.includes('permission denied')) {
+          setMessage({
+            type: 'error',
+            text: 'Workspace saved, but default page setting failed: permission denied (RLS). Ensure the workspace_settings admin UPDATE/INSERT policies are installed.'
+          })
+          saveHadErrorMessage = true
         } else {
           // Show detailed error message
           const errorMessage = settingsError?.message || settingsError?.code || 'Unknown error'
@@ -390,6 +377,7 @@ export default function SettingsWorkspaceTab() {
             type: 'error', 
             text: `Workspace saved, but default page setting failed: ${errorMessage}` 
           })
+          saveHadErrorMessage = true
         }
       }
 
@@ -397,7 +385,7 @@ export default function SettingsWorkspaceTab() {
       // Reload workspace settings to ensure we have the latest values from database
       await loadWorkspace()
       
-      if (!message) {
+      if (!saveHadErrorMessage) {
         setMessage({ type: 'success', text: 'Workspace settings saved successfully' })
         setTimeout(() => setMessage(null), 3000)
       }
@@ -420,6 +408,7 @@ export default function SettingsWorkspaceTab() {
   }
 
   const hasUnsavedChanges = workspaceName !== originalName || workspaceIcon !== originalIcon || defaultPageId !== originalDefaultPageId
+  const selectedPage = interfacePages.find(p => p.id === defaultPageId)
 
   return (
     <Card>
@@ -465,7 +454,7 @@ export default function SettingsWorkspaceTab() {
                 ) : (
                   interfacePages.map((page) => (
                     <SelectItem key={page.id} value={page.id}>
-                      {page.name}
+                      {page.name}{page.is_admin_only ? ' (admin-only)' : ''}
                     </SelectItem>
                   ))
                 )}
@@ -474,6 +463,11 @@ export default function SettingsWorkspaceTab() {
             <p className="text-xs text-muted-foreground">
               The page users will be redirected to after logging in
             </p>
+            {selectedPage?.is_admin_only && (
+              <p className="text-xs text-amber-600">
+                This page is admin-only. Non-admin users will be redirected to the first page they can access.
+              </p>
+            )}
             {!loadingPages && interfacePages.length === 0 && (
               <p className="text-xs text-amber-600">
                 No interface pages found. Create pages in the Pages tab to set a default page.
