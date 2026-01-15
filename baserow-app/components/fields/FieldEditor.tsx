@@ -496,13 +496,12 @@ export default function FieldEditor({
       : value
         ? [value]
         : []
+
+    // Capture the narrowed type so TS keeps it inside closures.
+    const selectFieldType: "single_select" | "multi_select" = field.type
+    const useSemanticColors = selectFieldType === "single_select"
     const getChoiceColor = (choice: string): string =>
-      resolveChoiceColor(
-        choice,
-        field.type,
-        field.options,
-        field.type === "single_select"
-      )
+      resolveChoiceColor(choice, selectFieldType, field.options, useSemanticColors)
 
     if (isReadOnly) {
       return (
