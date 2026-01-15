@@ -374,11 +374,23 @@ export default function FieldEditor({
 
   const isVirtual = field.type === "formula" || field.type === "lookup"
   // Use prop override first, then check field-level read-only, then virtual
-  const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (isVirtual || field.options?.read_only)
+  const isReadOnly: boolean = propIsReadOnly ?? (isVirtual || !!field.options?.read_only)
   
   // Determine if this is a lookup field (derived) vs linked field (editable)
   const isLookupField = field.type === "lookup"
-  const isLinkedField = field.type === "link_to_table"
+
+  // Handle paste - block for lookup fields
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    if (field.type === "lookup") {
+      e.preventDefault()
+      toast({
+        title: "Cannot edit derived field",
+        description: "This field is derived and can't be edited.",
+        variant: "destructive",
+      })
+      return
+    }
+  }, [field.type, toast])
 
   // Attachment fields (upload + preview + delete)
   if (field.type === "attachment") {
@@ -396,19 +408,6 @@ export default function FieldEditor({
       />
     )
   }
-
-  // Handle paste - block for lookup fields
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    if (field.type === "lookup") {
-      e.preventDefault()
-      toast({
-        title: "Cannot edit derived field",
-        description: "This field is derived and can't be edited.",
-        variant: "destructive",
-      })
-      return
-    }
-  }, [field.type, toast])
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {
