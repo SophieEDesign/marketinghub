@@ -179,7 +179,6 @@ async function checkBlockConfigs() {
 
       case 'kanban':
       case 'timeline':
-      case 'list':
       case 'gallery':
         // These blocks can inherit table_id from page context (page.base_table) OR use legacy config keys.
         // Accept any of: config.table_id, config.base_table, config.table, or page.base_table.
@@ -199,6 +198,11 @@ async function checkBlockConfigs() {
           })
         }
         }
+        break
+      
+      case 'list':
+        // List blocks are often added as placeholders on content pages and can render a safe setup state.
+        // Do not fail deploy for missing table configuration.
         break
 
       case 'calendar':
