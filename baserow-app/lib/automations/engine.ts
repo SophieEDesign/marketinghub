@@ -141,8 +141,7 @@ export async function executeAutomation(
           })
 
           const result = evaluator.evaluate(ast)
-          conditionMet = Boolean(result) && 
-            typeof result !== 'string' || !result.startsWith('#')
+          conditionMet = Boolean(result) && !(typeof result === 'string' && result.startsWith('#'))
         } catch (error) {
           console.error('Error evaluating condition formula:', error)
           conditionMet = false

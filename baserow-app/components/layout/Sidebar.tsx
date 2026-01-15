@@ -58,7 +58,8 @@ export default function Sidebar({
   const { primaryColor, sidebarTextColor } = useBranding()
   const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
 
-  const isActive = (path: string) => pathname && path && (pathname === path || pathname.startsWith(path + "/"))
+  const isActive = (path: string): boolean =>
+    Boolean(pathname && path && (pathname === path || pathname.startsWith(path + "/")))
 
   const SidebarItem = ({
     href,

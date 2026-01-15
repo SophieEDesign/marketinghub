@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
-import { useIsMobileOrTablet } from '../baserow-app/hooks/useResponsive'
+import { useIsMobileOrTablet } from '../../baserow-app/hooks/useResponsive'
 import Sidebar from './Sidebar'
 import { cn } from '@/lib/utils'
 

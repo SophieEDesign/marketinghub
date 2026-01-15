@@ -219,6 +219,8 @@ function formatConditionSummary(
     date_on_or_before: 'is on or before',
     date_on_or_after: 'is on or after',
     date_range: 'is within',
+    date_today: 'is today',
+    date_next_days: 'is within next days',
     has: 'has',
     does_not_have: 'does not have',
   }

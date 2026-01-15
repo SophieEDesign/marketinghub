@@ -7,6 +7,7 @@ import type { TriggerType, ActionType, ActionConfig, TriggerConfig } from "@/lib
 import AutomationConditionBuilder from "./AutomationConditionBuilder"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { filterTreeToFormula } from "@/lib/automations/condition-formula"
+import FormulaEditor from "@/components/fields/FormulaEditor"
 
 interface AutomationBuilderProps {
   automation?: Automation | null
@@ -310,7 +311,7 @@ export default function AutomationBuilder({
             <label className="block text-sm font-medium">Condition Formula</label>
             <FormulaEditor
               value={triggerConfig.formula || ''}
-              onChange={(formula) => setTriggerConfig({ ...triggerConfig, formula })}
+              onChange={(formula: string) => setTriggerConfig({ ...triggerConfig, formula })}
               tableFields={tableFields}
             />
             <div>

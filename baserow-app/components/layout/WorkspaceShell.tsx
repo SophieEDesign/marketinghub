@@ -6,6 +6,9 @@ import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import RecordPanel from "@/components/records/RecordPanel"
 import { useIsMobileOrTablet } from "@/hooks/useResponsive"
+import { useBranding } from "@/contexts/BrandingContext"
+import { Button } from "@/components/ui/button"
+import { Menu } from "lucide-react"
 import type { Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -66,6 +69,7 @@ export default function WorkspaceShell({
   hideRecordPanel = false,
 }: WorkspaceShellProps) {
   const isMobileOrTablet = useIsMobileOrTablet()
+  const { primaryColor } = useBranding()
   // On mobile/tablet: sidebar closed by default
   // On desktop: sidebar open by default (no state needed, handled internally)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -90,6 +94,21 @@ export default function WorkspaceShell({
   return (
     <RecordPanelProvider>
       <div className="flex h-screen bg-gray-50">
+        {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
+        {hideTopbar && isMobileOrTablet && (
+          <div className="fixed top-3 left-3 z-50 desktop:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-10 w-10 p-0 bg-white/90 border border-gray-200 shadow"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="h-5 w-5" style={{ color: primaryColor }} />
+            </Button>
+          </div>
+        )}
+
         <AirtableSidebar
           interfacePages={interfacePages}
           interfaceGroups={interfaceGroups}
