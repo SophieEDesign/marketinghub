@@ -149,12 +149,12 @@ export default function AirtableSidebar({
   if (!isMobile && isCollapsed) {
     return (
       <div 
-        className="w-12 border-r border-gray-200 flex flex-col items-center py-2"
+        className="w-12 border-r border-black/10 flex flex-col items-center py-2"
         style={{ backgroundColor: sidebarColor }}
       >
         <button
           onClick={() => setInternalCollapsed(false)}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
+          className="p-2 hover:bg-black/10 rounded transition-colors"
           style={{ color: sidebarTextColor }}
           title="Expand sidebar"
         >
@@ -187,8 +187,8 @@ export default function AirtableSidebar({
         style={{ backgroundColor: sidebarColor }}
       >
       {/* Header with Branding */}
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between" style={{ borderBottomColor: primaryColor + '20' }}>
-        <Link href="/" className="flex items-center gap-2">
+      <div className="px-4 py-3 border-b border-black/10 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2 min-w-0">
           {logoUrl ? (
             <div className="relative h-5 w-5">
               <Image
@@ -200,92 +200,72 @@ export default function AirtableSidebar({
               />
             </div>
           ) : (
-            <Home className="h-5 w-5" style={{ color: primaryColor }} />
+            <Home className="h-5 w-5" style={{ color: sidebarTextColor }} />
           )}
-          <span className="text-sm font-semibold" style={{ color: primaryColor }}>
+          <span className="text-sm font-semibold truncate" style={{ color: sidebarTextColor }}>
             {brandName}
           </span>
         </Link>
-        <button
-          onClick={() => {
-            if (isMobile && onClose) {
-              onClose()
-            } else {
-              setInternalCollapsed(true)
-            }
-          }}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
-          style={{ color: sidebarTextColor }}
-          title={isMobile ? "Close sidebar" : "Collapse sidebar"}
-        >
-          <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleMode}
+            className={cn(
+              "h-8 px-2 text-xs font-medium rounded transition-colors flex items-center gap-1",
+              isEditMode ? "bg-black/20 hover:bg-black/25" : "hover:bg-black/10"
+            )}
+            style={{ color: sidebarTextColor }}
+            title={isEditMode ? "Done editing" : "Edit sidebar"}
+          >
+            {isEditMode ? (
+              <>
+                <Check className="h-3 w-3" />
+                <span>Done</span>
+              </>
+            ) : (
+              <>
+                <Edit2 className="h-3 w-3" />
+                <span>Edit</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              if (isMobile && onClose) {
+                onClose()
+              } else {
+                setInternalCollapsed(true)
+              }
+            }}
+            className="p-1 hover:bg-black/10 rounded transition-colors"
+            style={{ color: sidebarTextColor }}
+            title={isMobile ? "Close sidebar" : "Collapse sidebar"}
+          >
+            <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
+          </button>
+        </div>
       </div>
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto">
-        {/* Interfaces Section - Primary Navigation */}
-        <div className="py-2 border-b border-gray-200">
-          <div className="px-3 mb-1 flex items-center justify-between gap-2">
-            <button
-              onClick={() => toggleSection("interfaces")}
-              className="flex-1 flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
-              style={{ color: sidebarTextColor }}
-            >
-              <span>Interfaces</span>
-              {expandedSections.has("interfaces") ? (
-                <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
-              ) : (
-                <ChevronRight className="h-3 w-3 flex-shrink-0" style={{ color: sidebarTextColor }} />
-              )}
-            </button>
-            {expandedSections.has("interfaces") && (
-              <button
-                onClick={toggleMode}
-                className={cn(
-                  "px-2 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1",
-                  isEditMode
-                    ? "bg-blue-100 hover:bg-blue-200"
-                    : "hover:bg-gray-100"
-                )}
-                style={{ color: isEditMode ? primaryColor : sidebarTextColor }}
-                title={isEditMode ? "Done editing" : "Edit interfaces"}
-              >
-                {isEditMode ? (
-                  <>
-                    <Check className="h-3 w-3" />
-                    <span>Done</span>
-                  </>
-                ) : (
-                  <>
-                    <Edit2 className="h-3 w-3" />
-                    <span>Edit</span>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-          {expandedSections.has("interfaces") && (
-            <GroupedInterfaces
-              interfacePages={interfacePages}
-              interfaceGroups={interfaceGroups}
-              editMode={isEditMode}
-              onRefresh={() => {
-                window.dispatchEvent(new CustomEvent('pages-updated'))
-                window.location.reload()
-              }}
-            />
-          )}
+        {/* Primary Navigation (Airtable-style) */}
+        <div className="py-2">
+          <GroupedInterfaces
+            interfacePages={interfacePages}
+            interfaceGroups={interfaceGroups}
+            editMode={isEditMode}
+            onRefresh={() => {
+              window.dispatchEvent(new CustomEvent('pages-updated'))
+              window.location.reload()
+            }}
+          />
         </div>
-
-
 
         {/* Recents & Favorites */}
         <RecentsFavoritesSection primaryColor={primaryColor} sidebarTextColor={sidebarTextColor} />
 
         {/* Debug: Show tables count in development */}
         {process.env.NODE_ENV === 'development' && (
-          <div className="px-3 py-1 text-xs text-gray-500 border-t border-gray-100">
+          <div className="px-3 py-1 text-xs opacity-70 border-t border-black/10" style={{ color: sidebarTextColor }}>
             Debug: tables.length = {tables.length}
             {tables.length > 0 && (
               <div className="mt-1">Tables: {tables.map(t => t.name).join(', ')}</div>
@@ -295,11 +275,11 @@ export default function AirtableSidebar({
 
         {/* Core Data Section - Collapsed by default */}
         {tables.length > 0 && (
-          <div className="py-2 border-t border-gray-100">
+          <div className="py-2 border-t border-black/10">
             <div className="px-3 mb-1">
               <button
                 onClick={() => toggleSection("core-data")}
-                className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-50 rounded transition-colors"
+                className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded transition-colors"
                 style={{ color: sidebarTextColor }}
               >
                 <span>Core Data</span>
@@ -319,13 +299,13 @@ export default function AirtableSidebar({
                     <Link
                       key={table.id}
                       href={`/tables/${table.id}`}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100"
-                      style={isTableActive ? { 
-                        backgroundColor: primaryColor + '15', 
-                        color: primaryColor 
-                      } : { color: sidebarTextColor }}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10",
+                        isTableActive && "bg-black/20 font-medium"
+                      )}
+                      style={{ color: sidebarTextColor }}
                     >
-                      <Database className="h-4 w-4 flex-shrink-0" style={{ color: isTableActive ? primaryColor : sidebarTextColor }} />
+                      <Database className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                       <span className="text-sm truncate">{table.name}</span>
                     </Link>
                   )
@@ -337,13 +317,16 @@ export default function AirtableSidebar({
 
         {/* Settings - Admin Only */}
         {isAdmin && (
-        <div className="py-2 border-t border-gray-100">
+        <div className="py-2 border-t border-black/10">
           <Link
             href="/settings"
-            className="flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-gray-100"
-            style={isSettings ? { backgroundColor: primaryColor + '15', color: primaryColor } : { color: sidebarTextColor }}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded transition-colors hover:bg-black/10",
+              isSettings && "bg-black/20 font-medium"
+            )}
+            style={{ color: sidebarTextColor }}
           >
-            <Settings className="h-4 w-4 flex-shrink-0" style={{ color: isSettings ? primaryColor : sidebarTextColor }} />
+            <Settings className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
             <span className="text-sm">Settings</span>
           </Link>
         </div>

@@ -687,7 +687,7 @@ export default function GroupedInterfaces({
         <div className="px-2 py-1">
           <button
             onClick={() => toggleGroup(group.id)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-gray-50 rounded transition-colors"
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-black/10 rounded transition-colors"
             style={{ color: sidebarTextColor }}
           >
             {isCollapsed ? (
@@ -725,12 +725,12 @@ export default function GroupedInterfaces({
         style={style} 
         className={`group ${isOver && canDrag ? 'bg-blue-50 border-l-2 border-blue-400' : ''} ${isDragging ? 'pointer-events-none' : ''}`}
       >
-        <div className="flex items-center gap-1 px-2 py-1 hover:bg-gray-50 rounded">
+        <div className="flex items-center gap-1 px-2 py-1 hover:bg-black/10 rounded">
           {canDrag ? (
             <button
               {...attributes}
               {...listeners}
-              className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing flex-shrink-0"
+              className="p-0.5 hover:bg-black/20 rounded cursor-grab active:cursor-grabbing flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               title="Drag to reorder"
@@ -742,7 +742,7 @@ export default function GroupedInterfaces({
           )}
           <button
             onClick={() => toggleGroup(group.id)}
-            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-gray-100 rounded"
+            className="flex-1 flex items-center gap-1 px-1 py-0.5 text-xs font-semibold uppercase tracking-wider hover:bg-black/10 rounded"
             style={{ color: sidebarTextColor }}
           >
             {isCollapsed ? (
@@ -784,7 +784,7 @@ export default function GroupedInterfaces({
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >
@@ -817,29 +817,25 @@ export default function GroupedInterfaces({
   }
 
   // Navigation Page Component (view mode)
-  function NavigationPage({ page }: { page: InterfacePage }) {
+  function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const isActive = pathname.includes(`/pages/${page.id}`)
 
     return (
       <Link
         href={`/pages/${page.id}`}
         className={cn(
-          "flex items-center gap-2 px-2 py-1.5 rounded transition-colors",
-          "hover:bg-gray-50",
-          // Ensure consistent sizing - active state only changes background and text color, not layout
-          isActive && "font-medium"
+          "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
+          level > 0 && "pl-10",
+          "hover:bg-black/10",
+          isActive && "bg-black/20 font-semibold"
         )}
         onClick={(e) => {
           // Only navigate, don't toggle edit mode
           e.stopPropagation()
         }}
-        style={isActive ? { 
-          backgroundColor: primaryColor + '10', 
-          color: primaryColor 
-        } : { color: sidebarTextColor }}
+        style={{ color: sidebarTextColor }}
       >
-        <Layers className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? primaryColor : sidebarTextColor }} />
-        <span className="text-sm truncate flex-1">{page.name}</span>
+        <span className="truncate flex-1">{page.name}</span>
       </Link>
     )
   }
@@ -890,7 +886,7 @@ export default function GroupedInterfaces({
             <button
               {...attributes}
               {...listeners}
-              className="p-0.5 hover:bg-gray-200 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
+              className="p-0.5 hover:bg-black/20 rounded cursor-grab active:cursor-grabbing opacity-0 group-hover/page:opacity-100 transition-opacity flex-shrink-0"
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -927,7 +923,7 @@ export default function GroupedInterfaces({
           ) : (
             <Link
               href={`/pages/${page.id}`}
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-gray-100"
+              className="flex-1 flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-black/10"
               style={isActive ? { 
                 backgroundColor: primaryColor + '15', 
                 color: primaryColor 
@@ -946,7 +942,7 @@ export default function GroupedInterfaces({
             <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <button 
-                className="p-0.5 hover:bg-gray-200 rounded opacity-0 group-hover/page:opacity-100 transition-opacity"
+                className="p-0.5 hover:bg-black/20 rounded opacity-0 group-hover/page:opacity-100 transition-opacity"
                 disabled={isDragging || isRenaming}
                 onMouseDown={(e) => e.stopPropagation()}
               >
@@ -984,16 +980,16 @@ export default function GroupedInterfaces({
     // If no groups exist but pages do, show pages directly
     if (sortedGroups.length === 0 && pages.length > 0) {
       return (
-        <div className="space-y-1">
+        <div className="space-y-0.5 px-1">
           {pages.map((page) => (
-            <NavigationPage key={page.id} page={page} />
+            <NavigationPage key={page.id} page={page} level={0} />
           ))}
         </div>
       )
     }
     
     return (
-      <div className="space-y-1">
+      <div className="space-y-0.5 px-1">
         {sortedGroups.map((group) => {
           const isCollapsed = collapsedGroups.has(group.id)
           const groupPages = pagesByGroup[group.id] || []
@@ -1002,28 +998,37 @@ export default function GroupedInterfaces({
           if (groupPages.length === 0) return null
           
           return (
-            <div key={group.id} className="px-2 py-1">
+            <div key={group.id} className="py-0.5">
               <button
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
                   toggleGroup(group.id)
                 }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium hover:bg-gray-50 rounded transition-colors"
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
+                  "hover:bg-black/10"
+                )}
                 style={{ color: sidebarTextColor }}
               >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
+                {group.icon ? (
+                  <span style={{ color: sidebarTextColor }}>
+                    {renderIconByName(group.icon, "h-4 w-4")}
+                  </span>
                 ) : (
-                  <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
+                  <Folder className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
                 )}
-                <Folder className="h-4 w-4 flex-shrink-0" style={{ color: sidebarTextColor }} />
-                <span className="flex-1 text-left truncate">{group.name}</span>
+                <span className="flex-1 text-left truncate text-sm font-semibold">{group.name}</span>
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 opacity-70" style={{ color: sidebarTextColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 flex-shrink-0 opacity-70" style={{ color: sidebarTextColor }} />
+                )}
               </button>
               {!isCollapsed && (
-                <div className="ml-6 mt-0.5 space-y-0.5">
+                <div className="mt-0.5 space-y-0.5">
                   {groupPages.map((page) => (
-                    <NavigationPage key={page.id} page={page} />
+                    <NavigationPage key={page.id} page={page} level={1} />
                   ))}
                 </div>
               )}
@@ -1046,7 +1051,7 @@ export default function GroupedInterfaces({
         <div className="px-2 mb-1 flex gap-1">
           <button
             onClick={() => setNewPageModalOpen(true)}
-            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-100 rounded transition-colors"
+            className="flex-1 flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
             style={{ color: sidebarTextColor }}
           >
             <Plus className="h-4 w-4" style={{ color: sidebarTextColor }} />
@@ -1054,7 +1059,7 @@ export default function GroupedInterfaces({
           </button>
           <button
             onClick={handleCreateGroup}
-            className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-100 rounded transition-colors"
+            className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-black/10 rounded transition-colors"
             style={{ color: sidebarTextColor }}
             title="New Interface"
           >
