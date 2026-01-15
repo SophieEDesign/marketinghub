@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { evaluateTrigger } from './triggers'
 import { executeAction } from './actions'
+import { evaluateConditions } from './evaluate-conditions'
 import type { Automation } from '@/types/database'
 import type {
   AutomationContext,
@@ -9,6 +10,7 @@ import type {
   TriggerType,
   ActionConfig,
 } from './types'
+import type { TableField } from '@/types/fields'
 
 export interface AutomationExecutionResult {
   success: boolean
@@ -94,9 +96,81 @@ export async function executeAutomation(
 
     // Evaluate conditions if present
     if (automation.conditions && automation.conditions.length > 0) {
-      // Conditions are evaluated using formula engine
-      // For now, we'll skip if any condition fails
-      // In a full implementation, you'd evaluate each condition
+      const condition = automation.conditions[0]
+      
+      // Get table fields for condition evaluation
+      let tableFields: TableField[] = []
+      if (context.table_id) {
+        const { data: fields } = await supabase
+          .from('table_fields')
+          .select('*')
+          .eq('table_id', context.table_id)
+        
+        tableFields = (fields || []) as TableField[]
+      }
+
+      // Get the record data for evaluation
+      const record = context.trigger_data || {}
+      
+      // Support both new format (filter_tree) and old format (formula)
+      let conditionMet = true
+      
+      if (condition.filter_tree) {
+        // New format: evaluate filter tree
+        conditionMet = await evaluateConditions(
+          condition.filter_tree as any,
+          record,
+          tableFields
+        )
+      } else if (condition.formula) {
+        // Old format: evaluate formula directly
+        // Use the same evaluation logic as evaluateConditions
+        try {
+          const { Tokenizer } = await import('@/lib/formulas/tokenizer')
+          const { Parser } = await import('@/lib/formulas/parser')
+          const { Evaluator } = await import('@/lib/formulas/evaluator')
+          
+          const tokenizer = new Tokenizer(condition.formula)
+          const tokens = tokenizer.tokenize()
+          const parser = new Parser(tokens)
+          const ast = parser.parse()
+
+          const evaluator = new Evaluator({
+            row: record,
+            fields: tableFields.map(f => ({ name: f.name, type: f.type }))
+          })
+
+          const result = evaluator.evaluate(ast)
+          conditionMet = Boolean(result) && 
+            typeof result !== 'string' || !result.startsWith('#')
+        } catch (error) {
+          console.error('Error evaluating condition formula:', error)
+          conditionMet = false
+        }
+      }
+
+      if (!conditionMet) {
+        await supabase
+          .from('automation_runs')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', runId)
+
+        return {
+          success: true,
+          runId,
+          logs: [{
+            id: '',
+            automation_id: automation.id,
+            run_id: runId,
+            level: 'info',
+            message: 'Conditions not met, automation skipped',
+            created_at: new Date().toISOString(),
+          }],
+        }
+      }
     }
 
     // Execute actions

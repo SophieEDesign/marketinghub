@@ -25,7 +25,7 @@ export default function SidebarItem({
   onClick,
 }: SidebarItemProps) {
   const pathname = usePathname()
-  const isActive = pathname === href || pathname?.startsWith(`${href}/`)
+  const isActive = pathname && href && (pathname === href || pathname.startsWith(`${href}/`))
 
   // Dynamically get icon component
   const IconComponent = getIconComponent(icon)

@@ -134,6 +134,32 @@ export default function FilterValueInput({
 
   // Date fields: Date picker
   if (field.type === 'date') {
+    // "Today" operator - no value needed
+    if (operator === 'date_today') {
+      return (
+        <div className="h-9 flex items-center text-xs text-gray-500 px-3">
+          No value needed
+        </div>
+      )
+    }
+
+    // "Next X days" operator - number input
+    if (operator === 'date_next_days') {
+      return (
+        <Input
+          type="number"
+          min="1"
+          value={value as number || ""}
+          onChange={(e) => {
+            const numValue = e.target.value === '' ? null : parseInt(e.target.value) || 1
+            onChange(numValue as any)
+          }}
+          placeholder="Number of days"
+          className="h-9 text-sm"
+        />
+      )
+    }
+
     if (operator === 'date_range') {
       // Date range requires two values
       const rangeValue = value as { start?: string; end?: string } | string | null

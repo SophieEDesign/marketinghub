@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Save, Play, Trash2, Plus, X, GripVertical, AlertCircle } from "lucide-react"
 import type { Automation, TableField } from "@/types/database"
 import type { TriggerType, ActionType, ActionConfig, TriggerConfig } from "@/lib/automations/types"
-import FormulaEditor from "@/components/fields/FormulaEditor"
+import AutomationConditionBuilder from "./AutomationConditionBuilder"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import { filterTreeToFormula } from "@/lib/automations/condition-formula"
 
 interface AutomationBuilderProps {
   automation?: Automation | null
@@ -50,7 +52,7 @@ export default function AutomationBuilder({
   const [triggerConfig, setTriggerConfig] = useState<TriggerConfig>({})
   const [actions, setActions] = useState<ActionConfig[]>([])
   const [enabled, setEnabled] = useState(true)
-  const [condition, setCondition] = useState("")
+  const [conditionFilterTree, setConditionFilterTree] = useState<FilterTree>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingActionIndex, setEditingActionIndex] = useState<number | null>(null)
@@ -63,9 +65,32 @@ export default function AutomationBuilder({
       setTriggerConfig(automation.trigger_config || {})
       setActions((automation.actions as ActionConfig[]) || [])
       setEnabled(automation.enabled ?? true)
-      setCondition(automation.conditions?.[0]?.formula || "")
+      
+      // Handle conditions: support both old formula format and new filter JSON format
+      const conditions = automation.conditions?.[0]
+      if (conditions) {
+        if (conditions.filter_tree) {
+          // New format: filter tree JSON
+          setConditionFilterTree(conditions.filter_tree as FilterTree)
+        } else if (conditions.formula) {
+          // Old format: formula string - convert to empty filter tree
+          // (We can't parse formulas back to filter tree easily, so start fresh)
+          // Users can rebuild conditions using the new UI
+          setConditionFilterTree(null)
+        } else {
+          setConditionFilterTree(null)
+        }
+      } else {
+        setConditionFilterTree(null)
+      }
     }
   }, [automation])
+
+  // Convert filter tree to formula for backward compatibility
+  const conditionFormula = useMemo(() => {
+    if (!conditionFilterTree) return ""
+    return filterTreeToFormula(conditionFilterTree, tableFields)
+  }, [conditionFilterTree, tableFields])
 
   async function handleSave() {
     if (!name.trim()) {
@@ -77,6 +102,12 @@ export default function AutomationBuilder({
     setError(null)
 
     try {
+      // Save both filter_tree (new format) and formula (for backward compatibility)
+      const conditions = conditionFilterTree ? [{
+        filter_tree: conditionFilterTree,
+        formula: conditionFormula, // Generated formula for backward compatibility
+      }] : undefined
+
       await onSave({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -84,7 +115,7 @@ export default function AutomationBuilder({
         trigger_config: triggerConfig,
         actions,
         enabled,
-        conditions: condition ? [{ formula: condition }] : undefined,
+        conditions,
       })
     } catch (err: any) {
       setError(err.message || "Failed to save automation")
@@ -671,14 +702,11 @@ export default function AutomationBuilder({
 
       {/* Conditions */}
       <div className="space-y-4 border-t pt-4">
-        <h3 className="text-lg font-semibold">Conditions (Optional)</h3>
-        <p className="text-sm text-gray-500">
-          Only run automation if this formula evaluates to true
-        </p>
-        <FormulaEditor
-          value={condition}
-          onChange={setCondition}
+        <h3 className="text-lg font-semibold">Only run when…</h3>
+        <AutomationConditionBuilder
+          filterTree={conditionFilterTree}
           tableFields={tableFields}
+          onChange={setConditionFilterTree}
         />
       </div>
 

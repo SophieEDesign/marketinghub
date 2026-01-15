@@ -72,10 +72,10 @@ function formatCondition(
       return formatValueComparison(fieldRef, '≠', condition.value, field)
     
     case 'contains':
-      return `FIND("${escapeString(condition.value)}", ${fieldRef}) > 0`
+      return `FIND("${escapeString(String(condition.value ?? ''))}", ${fieldRef}) > 0`
     
     case 'not_contains':
-      return `FIND("${escapeString(condition.value)}", ${fieldRef}) = 0`
+      return `FIND("${escapeString(String(condition.value ?? ''))}", ${fieldRef}) = 0`
     
     case 'is_empty':
       return `ISBLANK(${fieldRef})`

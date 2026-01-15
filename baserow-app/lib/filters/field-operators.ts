@@ -50,6 +50,8 @@ export function getOperatorsForFieldType(fieldType: string): OperatorOption[] {
         { value: 'date_equal', label: 'Is', requiresValue: true },
         { value: 'date_before', label: 'Before', requiresValue: true },
         { value: 'date_after', label: 'After', requiresValue: true },
+        { value: 'date_today', label: 'Today', requiresValue: false },
+        { value: 'date_next_days', label: 'Next X days', requiresValue: true },
         { value: 'date_on_or_before', label: 'On or before', requiresValue: true },
         { value: 'date_on_or_after', label: 'On or after', requiresValue: true },
         { value: 'date_range', label: 'Is within', requiresValue: true },
