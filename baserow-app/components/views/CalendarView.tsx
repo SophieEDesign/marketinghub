@@ -82,6 +82,13 @@ export default function CalendarView({
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [createRecordDate, setCreateRecordDate] = useState<Date | null>(null) // Date for creating new record
+
+  // Respect block permissions + per-block add-record toggle.
+  const showAddRecord = (blockConfig as any)?.appearance?.show_add_record === true
+  const permissions = (blockConfig as any)?.permissions || {}
+  const isViewOnly = permissions.mode === 'view'
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
   
   // View config state - calendar settings from view config
   const [viewConfig, setViewConfig] = useState<{
@@ -1467,7 +1474,7 @@ export default function CalendarView({
           plugins={[dayGridPlugin, interactionPlugin]}
           events={calendarEvents}
           key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`}
-          editable={true}
+          editable={!isViewOnly}
           eventDrop={handleEventDrop}
           headerToolbar={{
             left: "prev,next today",
@@ -1572,6 +1579,7 @@ export default function CalendarView({
             }
           }}
           dateClick={(info) => {
+            if (!canCreateRecord) return
             // Date clicked - open modal to create new record with pre-filled date
             // info.dateStr is already in YYYY-MM-DD format
             const clickedDate = new Date(info.dateStr + 'T00:00:00') // Ensure it's treated as local date
@@ -1599,7 +1607,7 @@ export default function CalendarView({
       )}
 
       {/* Record Modal for Creating New Record */}
-      {createRecordDate && resolvedTableId && resolvedDateFieldId && (
+      {canCreateRecord && createRecordDate && resolvedTableId && resolvedDateFieldId && (
         <RecordModal
           open={createRecordDate !== null}
           onClose={() => setCreateRecordDate(null)}

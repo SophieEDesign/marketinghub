@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils'
 export interface Attachment {
   url: string
   name: string
-  size: number
-  type: string
+  size?: number | null
+  type?: string | null
 }
 
 interface AttachmentPreviewProps {
@@ -60,8 +60,8 @@ export default function AttachmentPreview({
 
   const remainingCount = attachments.length - visibleAttachments.length
 
-  const isImage = (type: string): boolean => {
-    return type.startsWith('image/')
+  const isImage = (type?: string | null): boolean => {
+    return (type || '').startsWith('image/')
   }
 
   const getFileTypeIcon = (attachment: Attachment) => {
@@ -286,7 +286,7 @@ function AttachmentModal({
   const attachment = attachments[index]
   if (!attachment) return null
 
-  const isImage = attachment.type.startsWith('image/')
+  const isImage = (attachment.type || '').startsWith('image/')
 
   return (
     <div
@@ -319,7 +319,7 @@ function AttachmentModal({
             </div>
             <p className="text-lg font-medium mb-2">{attachment.name}</p>
             <p className="text-sm text-gray-500 mb-4">
-              {formatBytes(attachment.size)}
+              {formatBytes(attachment.size ?? 0)}
             </p>
             <a
               href={attachment.url}
@@ -363,7 +363,7 @@ function AttachmentModal({
 // Helper functions exported for use elsewhere
 function getFileIconForAttachment(attachment: Attachment) {
   const ext = attachment.name.split('.').pop()?.toLowerCase() || ''
-  const type = attachment.type.toLowerCase()
+  const type = (attachment.type || '').toLowerCase()
 
   // Check by MIME type first
   if (type.includes('pdf')) return <FileText className="h-4 w-4 text-red-600" />

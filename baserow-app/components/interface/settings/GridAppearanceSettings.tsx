@@ -171,6 +171,21 @@ export default function GridAppearanceSettings({
         />
       </div>
 
+      {/* Add Record Button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <Label htmlFor="show-add-record">Show "Add record" button</Label>
+          <p className="text-xs text-gray-500 mt-1">
+            Display an add button inside this block (Grid, Calendar, Kanban, Timeline, Gallery, List)
+          </p>
+        </div>
+        <Switch
+          id="show-add-record"
+          checked={(appearance as any).show_add_record === true}
+          onCheckedChange={(checked) => onUpdate({ show_add_record: checked } as any)}
+        />
+      </div>
+
       {/* Show Search */}
       <div className="flex items-center justify-between">
         <div>
@@ -279,7 +294,7 @@ export default function GridAppearanceSettings({
 
         {/* Image Field */}
         <div className="space-y-2">
-          <Label>Image field</Label>
+          <Label>{viewType === 'gallery' ? 'Cover image field *' : 'Image field'}</Label>
           <div className="relative">
             <Select
               value={appearance.image_field || "__none__"}
@@ -307,6 +322,11 @@ export default function GridAppearanceSettings({
               </button>
             )}
           </div>
+          {viewType === 'gallery' && !appearance.image_field && (
+            <p className="text-xs text-amber-600">
+              Gallery view needs a cover image field. Select an attachment or URL field.
+            </p>
+          )}
           {appearance.image_field && (
             <div className="flex items-center justify-between">
               <Label htmlFor="fit-image-size" className="text-xs text-gray-600">

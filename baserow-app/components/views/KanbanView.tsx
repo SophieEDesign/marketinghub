@@ -9,6 +9,7 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
 
 interface KanbanViewProps {
   tableId: string
@@ -21,6 +22,7 @@ interface KanbanViewProps {
   imageField?: string // Field name to use for card images
   fitImageSize?: boolean // Whether to fit image to container size
   blockConfig?: Record<string, any> // Block config for modal_fields
+  onRecordClick?: (recordId: string) => void
 }
 
 export default function KanbanView({ 
@@ -34,10 +36,13 @@ export default function KanbanView({
   imageField,
   fitImageSize = false,
   blockConfig = {},
+  onRecordClick,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
+  const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -129,6 +134,7 @@ export default function KanbanView({
         setLoading(false)
         return
       }
+      setSupabaseTableName(table.supabase_table)
 
       // Load rows from the actual table (not table_rows)
       const { data, error } = await supabase
@@ -156,6 +162,46 @@ export default function KanbanView({
     }
     setLoading(false)
   }
+
+  const showAddRecord = (blockConfig as any)?.appearance?.show_add_record === true
+  const permissions = (blockConfig as any)?.permissions || {}
+  const isViewOnly = permissions.mode === 'view'
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const canCreateRecord = !isViewOnly && allowInlineCreate
+
+  const handleCreateInGroup = useCallback(async (groupName: string) => {
+    if (!showAddRecord || !canCreateRecord) return
+    if (!supabaseTableName || !tableId) return
+    try {
+      const newData: Record<string, any> = {}
+      if (groupName && groupName !== "Uncategorized") {
+        newData[groupingFieldId] = groupName
+      } else {
+        newData[groupingFieldId] = null
+      }
+
+      const { data, error } = await supabase
+        .from(supabaseTableName)
+        .insert([newData])
+        .select()
+        .single()
+
+      if (error) throw error
+      const createdId = (data as any)?.id || (data as any)?.record_id
+      if (!createdId) return
+
+      await loadRows()
+
+      if (onRecordClick) {
+        onRecordClick(String(createdId))
+      } else {
+        openRecord(tableId, String(createdId), supabaseTableName, (blockConfig as any)?.modal_fields)
+      }
+    } catch (error) {
+      console.error("Error creating record:", error)
+      alert("Failed to create record")
+    }
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldId, onRecordClick, openRecord, blockConfig])
 
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
@@ -216,6 +262,14 @@ export default function KanbanView({
                   key={row.id} 
                   className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg"
                   style={borderColor}
+                  onClick={() => {
+                    if (!supabaseTableName) return
+                    if (onRecordClick) {
+                      onRecordClick(String(row.id))
+                      return
+                    }
+                    openRecord(tableId, String(row.id), supabaseTableName, (blockConfig as any)?.modal_fields)
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="space-y-2">
@@ -252,6 +306,15 @@ export default function KanbanView({
                 variant="ghost"
                 size="sm"
                 className="w-full mt-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                onClick={() => handleCreateInGroup(groupName)}
+                disabled={!showAddRecord || !canCreateRecord || !supabaseTableName}
+                title={
+                  !showAddRecord
+                    ? 'Enable "Show Add record button" in block settings to add records'
+                    : !canCreateRecord
+                      ? 'Adding records is disabled for this block'
+                      : 'Add a new record to this column'
+                }
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Card

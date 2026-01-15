@@ -1066,6 +1066,14 @@ function InterfacePageClientInternal({
                 >
                   {page.name}
                 </h1>
+                {isBlockEditing && (
+                  <span
+                    className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded flex-shrink-0"
+                    title="You are editing this interface (layout + block settings)"
+                  >
+                    Editing
+                  </span>
+                )}
                 {page.updated_at && (
                   <span className="text-xs text-gray-500 flex-shrink-0" suppressHydrationWarning>
                     Updated {formatDateUK(page.updated_at)}

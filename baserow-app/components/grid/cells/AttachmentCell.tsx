@@ -83,7 +83,7 @@ export default function AttachmentCell({
             url: urlData.publicUrl,
             name: file.name,
             size: file.size,
-            type: file.type,
+            type: file.type || '',
           })
         }
 
@@ -245,7 +245,7 @@ function AttachmentPreviewModal({
   const file = attachments[index]
   if (!file) return null
 
-  const isImage = file.type.startsWith('image/')
+  const isImage = (file.type || '').startsWith('image/')
   const isDeleting = deletingIndex === index
 
   return (

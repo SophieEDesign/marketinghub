@@ -45,7 +45,7 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !file.type.startsWith('image/')) return
+    if (!file || !file.type?.startsWith('image/')) return
 
     setUploading(true)
     try {

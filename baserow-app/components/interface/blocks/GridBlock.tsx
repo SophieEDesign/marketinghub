@@ -13,6 +13,8 @@ import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 
 interface GridBlockProps {
   block: PageBlock
@@ -268,6 +270,89 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
+  const showAddRecord = (appearance as any).show_add_record === true
+
+  const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
+    const permissions = config.permissions || {}
+    const isViewOnly = permissions.mode === 'view'
+    const allowInlineCreate = permissions.allowInlineCreate ?? true
+    const canCreate = !isViewOnly && allowInlineCreate
+    const disabled = !showAddRecord || !canCreate || isLoading || !table || !tableId
+
+    const handler = async () => {
+      if (disabled || !table || !tableId) return
+      try {
+        const supabase = createClient()
+        const today = new Date()
+        const todayDate = today.toISOString().split('T')[0]
+
+        const newData: Record<string, any> = {}
+
+        // Ensure newly created records show up for date-based views by pre-filling the date field if we can.
+        if (viewType === 'calendar') {
+          const dateField =
+            (config as any).start_date_field ||
+            (config as any).from_date_field ||
+            (config as any).calendar_date_field ||
+            (config as any).calendar_start_field ||
+            (config as any).date_field
+          if (typeof dateField === 'string' && dateField.trim() !== '') {
+            newData[dateField] = todayDate
+          }
+        }
+
+        if (viewType === 'timeline') {
+          const fromField =
+            (config as any).date_from ||
+            (config as any).from_date_field ||
+            (config as any).start_date_field ||
+            (config as any).timeline_date_field ||
+            (config as any).date_field
+          const toField =
+            (config as any).date_to ||
+            (config as any).to_date_field ||
+            (config as any).end_date_field
+
+          if (typeof fromField === 'string' && fromField.trim() !== '') {
+            newData[fromField] = todayDate
+          } else if (typeof toField === 'string' && toField.trim() !== '') {
+            newData[toField] = todayDate
+          }
+          if (typeof toField === 'string' && toField.trim() !== '') {
+            // Default end date to same as start for single-day events.
+            newData[toField] = newData[toField] || todayDate
+          }
+        }
+
+        const { data, error } = await supabase
+          .from(table.supabase_table)
+          .insert([newData])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        const createdId = (data as any)?.id || (data as any)?.record_id
+        if (!createdId) return
+
+        if (onRecordClick) {
+          onRecordClick(String(createdId))
+        } else {
+          window.location.href = `/tables/${tableId}/records/${createdId}`
+        }
+      } catch (error) {
+        console.error('Failed to create record:', error)
+        alert('Failed to create record. Please try again.')
+      }
+    }
+
+    return {
+      canCreateRecord: canCreate,
+      isAddRecordDisabled: disabled,
+      handleAddRecord: handler,
+    }
+  })()
+
   // Render based on view type
   const renderView = () => {
     const fieldIds = visibleFields.map(f => f.field_name)
@@ -392,6 +477,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
             blockConfig={config}
+            onRecordClick={onRecordClick}
           />
         )
       }
@@ -436,6 +522,7 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            onRecordClick={onRecordClick}
             // Card field configuration
             titleField={config.timeline_title_field || config.card_title_field}
             cardField1={config.timeline_field_1 || config.card_field_1}
@@ -543,15 +630,36 @@ export default function GridBlock({ block, isEditing = false, pageTableId = null
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {appearance.show_title !== false && (appearance.title || config.title) && (
+      {((appearance.show_title !== false && (appearance.title || config.title)) || showAddRecord) && (
         <div
-          className="mb-4 pb-2 border-b"
+          className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
           }}
         >
-          <h3 className="text-lg font-semibold">{appearance.title || config.title}</h3>
+          <div className="min-w-0 flex-1">
+            {(appearance.show_title !== false && (appearance.title || config.title)) && (
+              <h3 className="text-lg font-semibold truncate">{appearance.title || config.title}</h3>
+            )}
+          </div>
+          {showAddRecord && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleAddRecord}
+              disabled={isAddRecordDisabled}
+              title={
+                !canCreateRecord
+                  ? 'Adding records is disabled for this block'
+                  : 'Add a new record'
+              }
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add record
+            </Button>
+          )}
         </div>
       )}
       {renderView()}

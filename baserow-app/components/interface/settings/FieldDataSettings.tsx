@@ -20,6 +20,16 @@ import type { FieldType, FieldOptions } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
 import { resolveChoiceColor } from "@/lib/field-colors"
 import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
+import { format as formatDate } from "date-fns"
+
+const DATE_FORMAT_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "yyyy-MM-dd", label: "ISO" },
+  { value: "MM/dd/yyyy", label: "US" },
+  { value: "dd/MM/yyyy", label: "UK" },
+  { value: "MMM d, yyyy", label: "Short month" },
+  { value: "MMMM d, yyyy", label: "Long month" },
+  { value: "dd MMM yyyy", label: "Day first" },
+]
 
 interface FieldDataSettingsProps {
   config: BlockConfig
@@ -413,12 +423,11 @@ export default function FieldDataSettings({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="yyyy-MM-dd">YYYY-MM-DD</SelectItem>
-                <SelectItem value="MM/dd/yyyy">MM/DD/YYYY</SelectItem>
-                <SelectItem value="dd/MM/yyyy">DD/MM/YYYY</SelectItem>
-                <SelectItem value="MMM d, yyyy">MMM D, YYYY</SelectItem>
-                <SelectItem value="MMMM d, yyyy">MMMM D, YYYY</SelectItem>
-                <SelectItem value="dd MMM yyyy">DD MMM YYYY</SelectItem>
+                {DATE_FORMAT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label} ({formatDate(new Date(2026, 0, 15), opt.value)})
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

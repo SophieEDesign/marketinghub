@@ -263,6 +263,7 @@ export default function MonthGrid({
                         <div
                           className={cn(
                             'h-5 rounded text-xs px-1.5 py-0.5 text-white truncate flex items-center cursor-pointer hover:opacity-90',
+                            'shadow-sm ring-1 ring-white/20',
                             isStart && 'rounded-l-none',
                             isEnd && 'rounded-r-none',
                             !isStart && !isEnd && 'rounded-none'

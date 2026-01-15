@@ -31,6 +31,7 @@ interface TimelineViewProps {
   colorField?: string // Field name to use for event colors (single-select field)
   imageField?: string // Field name to use for event images
   fitImageSize?: boolean // Whether to fit image to container size
+  onRecordClick?: (recordId: string) => void
   // Card field configuration
   titleField?: string // Field to use as card title
   cardField1?: string // Secondary field 1
@@ -71,6 +72,7 @@ export default function TimelineView({
   colorField,
   imageField,
   fitImageSize = false,
+  onRecordClick,
   titleField: titleFieldProp,
   cardField1,
   cardField2,
@@ -97,6 +99,12 @@ export default function TimelineView({
 
   // Get table name for opening records
   const [supabaseTableName, setSupabaseTableName] = useState<string>("")
+
+  const showAddRecord = (blockConfig as any)?.appearance?.show_add_record === true
+  const permissions = (blockConfig as any)?.permissions || {}
+  const isViewOnly = permissions.mode === 'view'
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
 
   useEffect(() => {
     loadTableInfo()
@@ -769,10 +777,14 @@ export default function TimelineView({
         return
       }
       if (supabaseTableName && tableId) {
+        if (onRecordClick) {
+          onRecordClick(event.rowId)
+          return
+        }
         openRecord(tableId, event.rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
       }
     },
-    [openRecord, supabaseTableName, tableId, resizingEvent, blockConfig]
+    [openRecord, supabaseTableName, tableId, resizingEvent, blockConfig, onRecordClick]
   )
 
   // Handle event date updates
@@ -1323,50 +1335,57 @@ export default function TimelineView({
             <div className="flex items-center justify-center h-64 text-gray-400">
               <div className="text-center">
                 <p className="mb-2">No events in this time range</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    // Create new record
-                    if (supabaseTableName && tableId) {
-                      const { fromFieldName, toFieldName } = resolvedDateFields
-                      const newData: Record<string, any> = {}
-                      
-                      // Use resolved date fields (from blockConfig, props, or auto-detected)
-                      // Set date to current date in timeline view
-                      const initialDate = currentDate.toISOString()
-                      
-                      if (fromFieldName) {
-                        newData[fromFieldName] = initialDate
-                      } else if (toFieldName) {
-                        newData[toFieldName] = initialDate
-                      } else if (startDateFieldId) {
-                        newData[startDateFieldId] = initialDate
-                      } else if (dateFieldId) {
-                        newData[dateFieldId] = initialDate
+                {canCreateRecord && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      // Create new record
+                      if (supabaseTableName && tableId) {
+                        const { fromFieldName, toFieldName } = resolvedDateFields
+                        const newData: Record<string, any> = {}
+                        
+                        // Use resolved date fields (from blockConfig, props, or auto-detected)
+                        // Set date to current date in timeline view
+                        const initialDate = currentDate.toISOString()
+                        
+                        if (fromFieldName) {
+                          newData[fromFieldName] = initialDate
+                        } else if (toFieldName) {
+                          newData[toFieldName] = initialDate
+                        } else if (startDateFieldId) {
+                          newData[startDateFieldId] = initialDate
+                        } else if (dateFieldId) {
+                          newData[dateFieldId] = initialDate
+                        }
+                        
+                        const { data, error } = await supabase
+                          .from(supabaseTableName)
+                          .insert([newData])
+                          .select()
+                          .single()
+                        
+                        if (error) {
+                          console.error("Error creating event:", error)
+                          alert("Failed to create event")
+                        } else if (data?.id) {
+                          // Reload rows to show the new event
+                          await loadRows()
+                          const createdId = String(data.id)
+                          if (onRecordClick) {
+                            onRecordClick(createdId)
+                            return
+                          }
+                          // Open the record panel so user can edit it
+                          openRecord(tableId, createdId, supabaseTableName, (blockConfig as any)?.modal_fields)
+                        }
                       }
-                      
-                      const { data, error } = await supabase
-                        .from(supabaseTableName)
-                        .insert([newData])
-                        .select()
-                        .single()
-                      
-                      if (error) {
-                        console.error("Error creating event:", error)
-                        alert("Failed to create event")
-                      } else if (data?.id) {
-                        // Reload rows to show the new event
-                        await loadRows()
-                        // Open the record panel so user can edit it
-                        openRecord(tableId, data.id, supabaseTableName, (blockConfig as any)?.modal_fields)
-                      }
-                    }
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Event
-                </Button>
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Event
+                  </Button>
+                )}
               </div>
             </div>
           )}

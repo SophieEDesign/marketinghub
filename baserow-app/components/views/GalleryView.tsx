@@ -228,6 +228,17 @@ export default function GalleryView({
     )
   }
 
+  if (!imageField) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-1">Gallery view needs an image field.</p>
+          <p className="text-xs text-gray-400">Set it in Appearance → Cover image field.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (filteredRows.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">

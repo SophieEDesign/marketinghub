@@ -88,7 +88,7 @@ const VIEW_TYPE_OPTIONS: ViewTypeOption[] = [
     label: 'Gallery',
     icon: ImageIcon,
     description: 'Card-based visual layout',
-    requiredFields: [],
+    requiredFields: ['attachment', 'url'] as FieldType[],
   },
 ]
 
@@ -118,6 +118,38 @@ export default function GridDataSettings({
 
   const compatibleTypes = getCompatibleViewTypes()
   const currentViewType: ViewType = config?.view_type || 'grid'
+
+  const getDefaultGalleryImageFieldName = (): string | null => {
+    // Prefer attachment fields, then URL fields.
+    const attachment = fields.find((f) => f.type === 'attachment')
+    if (attachment?.name) return attachment.name
+    const url = fields.find((f) => f.type === 'url')
+    if (url?.name) return url.name
+    return null
+  }
+
+  const handleSelectViewType = (nextType: ViewType) => {
+    if (!compatibleTypes.includes(nextType)) return
+
+    const updates: Partial<BlockConfig> = { view_type: nextType }
+
+    // Gallery needs an image field to look correct.
+    // Auto-pick a sensible default when switching to gallery if not already set.
+    if (nextType === 'gallery') {
+      const currentAppearance = (config.appearance || {}) as any
+      if (!currentAppearance.image_field) {
+        const defaultImageField = getDefaultGalleryImageFieldName()
+        if (defaultImageField) {
+          updates.appearance = {
+            ...currentAppearance,
+            image_field: defaultImageField,
+          }
+        }
+      }
+    }
+
+    onUpdate(updates)
+  }
 
   // Get available fields for display (exclude system fields)
   const availableDisplayFields = useMemo(() => {
@@ -287,7 +319,7 @@ export default function GridDataSettings({
               <button
                 key={option.type}
                 type="button"
-                onClick={() => isCompatible && onUpdate({ view_type: option.type })}
+                onClick={() => handleSelectViewType(option.type)}
                 disabled={!isCompatible}
                 className={`
                   p-3 border rounded-lg text-left transition-all
@@ -310,7 +342,9 @@ export default function GridDataSettings({
                     </div>
                     {!isCompatible && (
                       <div className="text-xs text-amber-600 mt-1">
-                        Requires date fields
+                        {option.type === 'gallery'
+                          ? 'Requires an attachment or URL field'
+                          : 'Requires date fields'}
                       </div>
                     )}
                   </div>
@@ -320,7 +354,7 @@ export default function GridDataSettings({
           })}
         </div>
         <p className="text-xs text-gray-500">
-          Table, Calendar, Kanban, and Timeline views are supported.
+          Table, Calendar, Kanban, Timeline, and Gallery views are supported.
         </p>
       </div>
 

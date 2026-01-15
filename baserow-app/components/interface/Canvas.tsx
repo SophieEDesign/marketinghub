@@ -1324,7 +1324,7 @@ export default function Canvas({
                 key={block.id}
                 className={`relative ${
                   isEditing
-                    ? `group bg-white border-2 border-dashed border-transparent hover:border-gray-300 rounded-lg ${
+                    ? `group bg-white border-2 border-dashed border-gray-200 hover:border-gray-300 rounded-lg ${
                         selectedBlockId === block.id
                           ? "ring-2 ring-blue-500 border-blue-500"
                           : ""

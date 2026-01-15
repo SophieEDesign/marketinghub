@@ -169,6 +169,8 @@ export interface BlockConfig {
     show_filter?: boolean
     show_sort?: boolean
     wrap_text?: boolean // Whether to wrap cell text (block-level setting)
+    // Data-view blocks (grid/calendar/kanban/timeline/gallery/list)
+    show_add_record?: boolean // Show an "Add record" button inside the block
     // Record opening settings
     enable_record_open?: boolean // Enable/disable record opening (default: true)
     record_open_style?: 'side_panel' | 'modal' // How to open records (default: 'side_panel' for desktop)

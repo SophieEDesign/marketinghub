@@ -25,6 +25,9 @@ interface ListViewProps {
   groupBy?: string
   searchQuery?: string
   onRecordClick?: (recordId: string) => void
+  // Creation controls (wired from block settings)
+  showAddRecord?: boolean
+  canCreateRecord?: boolean
   // List-specific field configuration
   titleField?: string // Required: field name for title
   subtitleFields?: string[] // Optional: up to 3 subtitle fields
@@ -46,6 +49,8 @@ export default function ListView({
   groupBy,
   searchQuery = "",
   onRecordClick,
+  showAddRecord = false,
+  canCreateRecord = false,
   titleField,
   subtitleFields = [],
   imageField,
@@ -370,6 +375,38 @@ export default function ListView({
     }
   }, [onRecordClick, tableId, tableName, openRecord])
 
+  const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
+    if (!showAddRecord || !canCreateRecord) return
+    if (!supabaseTableName || !tableId) return
+    if (!currentGroupBy) return
+
+    try {
+      const supabase = createClient()
+      const newData: Record<string, any> = {}
+
+      // Group key "(Empty)" means null/empty for the group field.
+      newData[currentGroupBy] = groupKey === '(Empty)' ? null : groupKey
+
+      const { data, error } = await supabase
+        .from(supabaseTableName)
+        .insert([newData])
+        .select()
+        .single()
+      if (error) throw error
+
+      const createdId = (data as any)?.id || (data as any)?.record_id
+      if (!createdId) return
+
+      await loadRows()
+
+      // Open the created record
+      handleRecordClick(String(createdId))
+    } catch (error) {
+      console.error('Failed to create record:', error)
+      alert('Failed to create record. Please try again.')
+    }
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, currentGroupBy, handleRecordClick])
+
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
     const recordId = row.id
@@ -597,10 +634,17 @@ export default function ListView({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      // TODO: Implement add record functionality
-                      console.log('Add content to group:', groupKey)
+                      handleAddRecordToGroup(groupKey)
                     }}
                     className="h-7 text-xs"
+                    disabled={!showAddRecord || !canCreateRecord}
+                    title={
+                      !showAddRecord
+                        ? 'Enable "Show Add record button" in block settings to add records'
+                        : !canCreateRecord
+                          ? 'Adding records is disabled for this block'
+                          : 'Add a new record to this group'
+                    }
                   >
                     <Plus className="h-3 w-3 mr-1" />
                     Add content

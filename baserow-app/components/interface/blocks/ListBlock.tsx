@@ -8,6 +8,8 @@ import { mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
+import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 
 interface ListBlockProps {
   block: PageBlock
@@ -168,6 +170,35 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
+  const showAddRecord = (appearance as any).show_add_record === true
+  const permissions = config.permissions || {}
+  const isViewOnly = permissions.mode === 'view'
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const canCreateRecord = !isViewOnly && allowInlineCreate
+
+  const handleAddRecord = async () => {
+    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from(table.supabase_table)
+        .insert([{}])
+        .select()
+        .single()
+      if (error) throw error
+      const createdId = (data as any)?.id || (data as any)?.record_id
+      if (!createdId) return
+      if (onRecordClick) {
+        onRecordClick(String(createdId))
+      } else {
+        window.location.href = `/tables/${tableId}/records/${createdId}`
+      }
+    } catch (error) {
+      console.error('Failed to create record:', error)
+      alert('Failed to create record. Please try again.')
+    }
+  }
+
   // Check if title field is configured
   if (!titleField && !isEditing) {
     return (
@@ -182,15 +213,32 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {appearance.show_title !== false && (appearance.title || config.title) && (
+      {((appearance.show_title !== false && (appearance.title || config.title)) || showAddRecord) && (
         <div
-          className="mb-4 pb-2 border-b"
+          className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
           style={{
             backgroundColor: appearance.header_background,
             color: appearance.header_text_color || appearance.title_color,
           }}
         >
-          <h3 className="text-lg font-semibold">{appearance.title || config.title}</h3>
+          <div className="min-w-0 flex-1">
+            {(appearance.show_title !== false && (appearance.title || config.title)) && (
+              <h3 className="text-lg font-semibold truncate">{appearance.title || config.title}</h3>
+            )}
+          </div>
+          {showAddRecord && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleAddRecord}
+              disabled={!canCreateRecord || isLoading || !table || !tableId}
+              title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add record
+            </Button>
+          )}
         </div>
       )}
       <ListView
@@ -203,6 +251,8 @@ export default function ListBlock({ block, isEditing = false, pageTableId = null
         groupBy={groupBy}
         searchQuery=""
         onRecordClick={onRecordClick}
+        showAddRecord={showAddRecord}
+        canCreateRecord={canCreateRecord}
         titleField={titleField}
         subtitleFields={subtitleFields}
         imageField={imageField}
