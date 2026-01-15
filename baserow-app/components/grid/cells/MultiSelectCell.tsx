@@ -1,6 +1,11 @@
 "use client"
 
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
+import {
+  getTextColorForBackground,
+  normalizeHexColor,
+  resolveChoiceColor,
+} from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 
 interface MultiSelectCellProps {
@@ -37,14 +42,22 @@ export default function MultiSelectCell({
     return (
       <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm">
         {displayValues.length > 0 ? (
-          displayValues.map((val) => (
-            <span
-              key={val}
-              className="px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-blue-100 text-blue-800"
-            >
-              {val}
-            </span>
-          ))
+          displayValues.map((val) => {
+            const hexColor = fieldOptions
+              ? resolveChoiceColor(val, "multi_select", fieldOptions, false)
+              : "#DBEAFE"
+            const textColorClass = getTextColorForBackground(hexColor)
+            const bgColor = normalizeHexColor(hexColor)
+            return (
+              <span
+                key={val}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                style={{ backgroundColor: bgColor }}
+              >
+                {val}
+              </span>
+            )
+          })
         ) : (
           <span className="text-gray-400 italic text-sm">{placeholder}</span>
         )}

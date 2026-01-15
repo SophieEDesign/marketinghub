@@ -16,9 +16,9 @@ import { X, Plus, ExternalLink, Save, AlertCircle } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
-import type { FieldType, FieldOptions } from "@/types/fields"
+import type { FieldType, FieldOptions, ChoiceColorTheme } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
-import { resolveChoiceColor } from "@/lib/field-colors"
+import { CHOICE_COLOR_THEME_LABELS, resolveChoiceColor } from "@/lib/field-colors"
 import FieldSettingsDrawer from "@/components/layout/FieldSettingsDrawer"
 import { format as formatDate } from "date-fns"
 
@@ -230,6 +230,38 @@ export default function FieldDataSettings({
           <div className="space-y-2">
             <Label>Options</Label>
             <div className="space-y-2">
+              {/* Pill colour theme */}
+              <div className="space-y-2 rounded-md border border-gray-200 p-3 bg-gray-50/50">
+                <Label className="text-xs text-gray-700">Colour theme</Label>
+                <Select
+                  value={(options.choiceColorTheme || 'vibrant') as ChoiceColorTheme}
+                  onValueChange={(theme) => {
+                    const next: FieldOptions = { ...options }
+                    if (theme === 'vibrant') {
+                      delete next.choiceColorTheme
+                    } else {
+                      next.choiceColorTheme = theme as ChoiceColorTheme
+                    }
+                    handleFieldUpdate({ options: next })
+                  }}
+                  disabled={saving}
+                >
+                  <SelectTrigger className="text-sm bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CHOICE_COLOR_THEME_LABELS) as ChoiceColorTheme[]).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {CHOICE_COLOR_THEME_LABELS[key]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Applies to pills without a custom colour.
+                </p>
+              </div>
+
               {(options.choices && options.choices.length > 0 ? options.choices : []).map((choice, index) => {
                 const choiceColor = options.choiceColors?.[choice] || resolveChoiceColor(
                   choice,

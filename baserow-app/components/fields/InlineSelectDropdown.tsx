@@ -7,8 +7,7 @@ import {
   resolveChoiceColor,
   getTextColorForBackground,
   normalizeHexColor,
-  SEMANTIC_COLORS,
-  MUTED_COLORS,
+  getChoiceThemePalette,
 } from '@/lib/field-colors'
 import type { FieldOptions } from '@/types/fields'
 
@@ -135,11 +134,6 @@ export default function InlineSelectDropdown({
           options: {
             ...fieldOptions,
             choices: [...choices, newChoice],
-            choiceColors: {
-              ...(fieldOptions?.choiceColors || {}),
-              // Auto-assign color based on field type
-              [newChoice]: getChoiceColor(newChoice),
-            },
           },
         }),
       })
@@ -452,7 +446,7 @@ export default function InlineSelectDropdown({
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
-                          value={hexColor}
+                          value={normalizeHexColor(hexColor)}
                           onChange={(e) => handleChangeColor(choice, e.target.value)}
                           className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
                         />
@@ -466,7 +460,11 @@ export default function InlineSelectDropdown({
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {(fieldType === 'single_select' ? SEMANTIC_COLORS : MUTED_COLORS).map((color) => (
+                        {getChoiceThemePalette(
+                          fieldType,
+                          mergedOptions,
+                          fieldType === 'single_select'
+                        ).map((color) => (
                           <button
                             key={color}
                             onClick={() => handleChangeColor(choice, color)}

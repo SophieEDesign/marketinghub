@@ -11,7 +11,7 @@
  * 4. Neutral fallback
  */
 
-import type { FieldType, FieldOptions } from '@/types/fields'
+import type { FieldType, FieldOptions, ChoiceColorTheme } from '@/types/fields'
 
 // ============================================================================
 // Global Color Palettes
@@ -66,6 +66,86 @@ export const NEUTRAL_COLORS = [
 ]
 
 /**
+ * Fixed, user-selectable palettes for "pill" colours.
+ * Note: `vibrant` intentionally maps to the existing behaviour (semantic/muted)
+ * to keep backwards compatibility when no theme is selected.
+ */
+export const CHOICE_COLOR_THEME_LABELS: Record<ChoiceColorTheme, string> = {
+  vibrant: 'Vibrant (default)',
+  pastel: 'Pastel',
+  blues: 'Blue variations',
+}
+
+export const CHOICE_COLOR_THEME_PALETTES: Record<
+  Exclude<ChoiceColorTheme, 'vibrant'>,
+  { single: readonly string[]; multi: readonly string[] }
+> = {
+  pastel: {
+    // Tailwind-ish 200 range (soft, readable with dark text)
+    single: [
+      '#BFDBFE', // blue-200
+      '#BBF7D0', // green-200
+      '#FDE68A', // amber-200
+      '#FECACA', // red-200
+      '#DDD6FE', // violet-200
+      '#FBCFE8', // pink-200
+      '#A5F3FC', // cyan-200
+      '#99F6E4', // teal-200
+      '#FED7AA', // orange-200
+      '#C7D2FE', // indigo-200
+      '#D9F99D', // lime-200
+      '#E9D5FF', // purple-200
+    ],
+    // Slightly lighter for multi-select where many pills can appear together
+    multi: [
+      '#DBEAFE', // blue-100
+      '#DCFCE7', // green-100
+      '#FEF3C7', // amber-100
+      '#FEE2E2', // red-100
+      '#EDE9FE', // violet-100
+      '#FCE7F3', // pink-100
+      '#CFFAFE', // cyan-100
+      '#CCFBF1', // teal-100
+      '#FFEDD5', // orange-100
+      '#E0E7FF', // indigo-100
+      '#ECFCCB', // lime-100
+      '#F3E8FF', // purple-100
+    ],
+  },
+  blues: {
+    // Blue-only variants (useful for brand-aligned "all blue" tagging)
+    single: [
+      '#1D4ED8', // blue-700
+      '#2563EB', // blue-600
+      '#3B82F6', // blue-500
+      '#60A5FA', // blue-400
+      '#0EA5E9', // sky-500
+      '#0284C7', // sky-600
+      '#6366F1', // indigo-500
+      '#4F46E5', // indigo-600
+      '#06B6D4', // cyan-500
+      '#0891B2', // cyan-600
+      '#93C5FD', // blue-300
+      '#A5B4FC', // indigo-300
+    ],
+    multi: [
+      '#DBEAFE', // blue-100
+      '#BFDBFE', // blue-200
+      '#93C5FD', // blue-300
+      '#CFFAFE', // cyan-100
+      '#A5F3FC', // cyan-200
+      '#E0E7FF', // indigo-100
+      '#C7D2FE', // indigo-200
+      '#E0F2FE', // sky-100
+      '#BAE6FD', // sky-200
+      '#D1FAE5', // green-100 (kept subtle contrast option)
+      '#F1F5F9', // slate-100 (neutral)
+      '#E2E8F0', // slate-200 (neutral)
+    ],
+  },
+}
+
+/**
  * Linked record field default color (neutral blue)
  */
 export const LINKED_RECORD_COLOR = '#3B82F6' // Blue
@@ -104,6 +184,29 @@ function getColorFromString(
 }
 
 /**
+ * Get the palette that should be used for choice colour hashing/pickers.
+ * - Respects `fieldOptions.choiceColorTheme` when present
+ * - Otherwise uses the existing semantic/muted behaviour
+ */
+export function getChoiceThemePalette(
+  fieldType: 'single_select' | 'multi_select',
+  fieldOptions?: FieldOptions,
+  useSemanticColors: boolean = true
+): readonly string[] {
+  const theme = fieldOptions?.choiceColorTheme
+  if (theme && theme !== 'vibrant') {
+    const palettes = CHOICE_COLOR_THEME_PALETTES[theme]
+    return fieldType === 'single_select' ? palettes.single : palettes.multi
+  }
+
+  // Backwards-compatible default behaviour
+  const palette = useSemanticColors
+    ? (fieldType === 'single_select' ? SEMANTIC_COLORS : MUTED_COLORS)
+    : MUTED_COLORS
+  return palette
+}
+
+/**
  * Resolve color for a select/multi-select choice with proper precedence
  * 
  * Precedence order:
@@ -139,9 +242,7 @@ export function resolveChoiceColor(
   }
 
   // 3. Global field-type default
-  const palette = useSemanticColors 
-    ? (fieldType === 'single_select' ? SEMANTIC_COLORS : MUTED_COLORS)
-    : MUTED_COLORS
+  const palette = getChoiceThemePalette(fieldType, fieldOptions, useSemanticColors)
   return getColorFromString(choice, palette)
 }
 

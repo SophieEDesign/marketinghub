@@ -16,6 +16,13 @@ export type FieldType =
   | 'formula'
   | 'lookup'
 
+/**
+ * Predefined colour palettes for select/multi-select "pill" rendering.
+ * - `vibrant`: current default behaviour (semantic for single-select, muted for multi-select)
+ * - Other themes are fixed palettes (useful for brand-aligned or calmer visuals)
+ */
+export type ChoiceColorTheme = 'vibrant' | 'pastel' | 'blues'
+
 export interface TableField {
   id: string
   table_id: string
@@ -35,6 +42,7 @@ export interface FieldOptions {
   // For select fields
   choices?: string[]
   choiceColors?: Record<string, string> // Map of choice value to hex color (option-level override)
+  choiceColorTheme?: ChoiceColorTheme // Palette used when no option-level override exists
   
   // Field-level color override (applies to entire field when no option-level override exists)
   fieldColor?: string // Hex color for the field (applies to linked records, lookups, or as fallback for selects)

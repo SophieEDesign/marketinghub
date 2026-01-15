@@ -1,6 +1,11 @@
 "use client"
 
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
+import {
+  getTextColorForBackground,
+  normalizeHexColor,
+  resolveChoiceColor,
+} from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 
 interface SelectCellProps {
@@ -36,9 +41,21 @@ export default function SelectCell({
     return (
       <div className="w-full min-h-[36px] px-3 py-2 flex items-center gap-2 text-sm">
         {value ? (
-          <span className="px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap bg-blue-100 text-blue-800">
-            {value}
-          </span>
+          (() => {
+            const hexColor = fieldOptions
+              ? resolveChoiceColor(value, "single_select", fieldOptions, true)
+              : "#BFDBFE"
+            const textColorClass = getTextColorForBackground(hexColor)
+            const bgColor = normalizeHexColor(hexColor)
+            return (
+              <span
+                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                style={{ backgroundColor: bgColor }}
+              >
+                {value}
+              </span>
+            )
+          })()
         ) : (
           <span className="text-gray-400 italic text-sm">{placeholder}</span>
         )}

@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { validateFieldOptions } from "@/lib/fields/validation"
-import type { FieldType, TableField, FieldOptions } from "@/types/fields"
+import type { FieldType, TableField, FieldOptions, ChoiceColorTheme } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
-import { resolveChoiceColor } from "@/lib/field-colors"
+import { CHOICE_COLOR_THEME_LABELS, resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 
 interface FieldBuilderModalProps {
@@ -186,6 +186,35 @@ export default function FieldBuilderModal({
         return (
           <div className="space-y-2">
             <Label>Choices</Label>
+            <div className="space-y-2 rounded-md border border-gray-200 p-3 bg-gray-50/50">
+              <Label className="text-xs text-gray-700">Colour theme</Label>
+              <Select
+                value={(options.choiceColorTheme || 'vibrant') as ChoiceColorTheme}
+                onValueChange={(theme) => {
+                  const next: FieldOptions = { ...options }
+                  if (theme === 'vibrant') {
+                    delete next.choiceColorTheme
+                  } else {
+                    next.choiceColorTheme = theme as ChoiceColorTheme
+                  }
+                  setOptions(next)
+                }}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(CHOICE_COLOR_THEME_LABELS) as ChoiceColorTheme[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {CHOICE_COLOR_THEME_LABELS[key]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Applies to pills without a custom colour.
+              </p>
+            </div>
             <div className="space-y-2">
               {(options.choices || [""]).map((choice, index) => {
                 // Use centralized color system for default

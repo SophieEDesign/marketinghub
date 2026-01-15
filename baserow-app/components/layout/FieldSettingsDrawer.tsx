@@ -22,9 +22,9 @@ import {
 } from '@/components/ui/select'
 import { X, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { TableField, FieldType, FieldOptions } from '@/types/fields'
+import type { TableField, FieldType, FieldOptions, ChoiceColorTheme } from '@/types/fields'
 import { FIELD_TYPES } from '@/types/fields'
-import { resolveChoiceColor } from '@/lib/field-colors'
+import { CHOICE_COLOR_THEME_LABELS, resolveChoiceColor } from '@/lib/field-colors'
 import { canChangeType } from '@/lib/fields/validation'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import {
@@ -700,6 +700,35 @@ export default function FieldSettingsDrawer({
           {(type === 'single_select' || type === 'multi_select') && (
             <div className="space-y-2">
               <Label>Choices</Label>
+              <div className="space-y-2 rounded-md border border-gray-200 p-3 bg-gray-50/50">
+                <Label className="text-xs text-gray-700">Colour theme</Label>
+                <Select
+                  value={(options.choiceColorTheme || 'vibrant') as ChoiceColorTheme}
+                  onValueChange={(theme) => {
+                    const next: FieldOptions = { ...options }
+                    if (theme === 'vibrant') {
+                      delete next.choiceColorTheme
+                    } else {
+                      next.choiceColorTheme = theme as ChoiceColorTheme
+                    }
+                    setOptions(next)
+                  }}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(CHOICE_COLOR_THEME_LABELS) as ChoiceColorTheme[]).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {CHOICE_COLOR_THEME_LABELS[key]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Applies to pills without a custom colour.
+                </p>
+              </div>
               <div className="space-y-2">
                 {(options.choices && options.choices.length > 0 ? options.choices : ['']).map((choice, index) => {
                   // Use centralized color system for default
