@@ -223,23 +223,25 @@ export default async function Sidebar() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Quick Actions */}
-        <div className="space-y-1 mb-4">
-          <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Quick Actions
+        {userIsAdmin && (
+          <div className="space-y-1 mb-4">
+            <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Quick Actions
+            </div>
+            <SidebarItem
+              id="import-csv"
+              label="Import CSV"
+              href="/import"
+              icon="upload"
+            />
+            <SidebarItem
+              id="settings"
+              label="Settings"
+              href="/settings"
+              icon="settings"
+            />
           </div>
-          <SidebarItem
-            id="import-csv"
-            label="Import CSV"
-            href="/import"
-            icon="upload"
-          />
-          <SidebarItem
-            id="settings"
-            label="Settings"
-            href="/settings"
-            icon="settings"
-          />
-        </div>
+        )}
 
         {/* Interfaces Section - Primary Navigation */}
         {(interfaceGroups.length > 0 || interfacePagesByGroup.has('__ungrouped__')) && (

@@ -22,7 +22,7 @@ import { useBranding } from "@/contexts/BrandingContext"
 import { useSidebarMode } from "@/contexts/SidebarModeContext"
 import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import { cn } from "@/lib/utils"
-import { useIsMobileOrTablet } from "@/hooks/useResponsive"
+import { useIsMobile } from "@/hooks/useResponsive"
 import type { Automation, Table, View } from "@/types/database"
 
 interface InterfacePage {
@@ -64,7 +64,7 @@ export default function AirtableSidebar({
   const pathname = usePathname()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
-  const isMobileOrTablet = useIsMobileOrTablet()
+  const isMobile = useIsMobile()
   
   // Load initial state - use default on server, sync from localStorage on client after mount
   // This prevents hydration mismatches
@@ -91,7 +91,7 @@ export default function AirtableSidebar({
   
   // Determine if sidebar should be visible
   const isOpen = isOpenProp !== undefined ? isOpenProp : !internalCollapsed
-  const isCollapsed = isMobileOrTablet ? !isOpen : internalCollapsed
+  const isCollapsed = isMobile ? !isOpen : internalCollapsed
   
   const isAdmin = userRole === 'admin'
   const isEditMode = mode === "edit"
@@ -100,9 +100,9 @@ export default function AirtableSidebar({
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
   
-  // Close sidebar on mobile/tablet when navigating
+  // Close sidebar on mobile when navigating
   useEffect(() => {
-    if (isMobileOrTablet && isOpen && onClose) {
+    if (isMobile && isOpen && onClose) {
       // Close on navigation
       const handleRouteChange = () => {
         onClose()
@@ -114,7 +114,7 @@ export default function AirtableSidebar({
         window.removeEventListener('popstate', handleRouteChange)
       }
     }
-  }, [isMobileOrTablet, isOpen, onClose])
+  }, [isMobile, isOpen, onClose])
 
   // Save expand/collapse state to localStorage when it changes (only after mount)
   useEffect(() => {
@@ -140,13 +140,13 @@ export default function AirtableSidebar({
   }
 
 
-  // On mobile/tablet: if closed, don't render (toggle button is in Topbar)
-  if (isMobileOrTablet && !isOpen) {
+  // On mobile: if closed, don't render (toggle button is in Topbar)
+  if (isMobile && !isOpen) {
     return null
   }
 
-  // On desktop: show collapsed state
-  if (!isMobileOrTablet && isCollapsed) {
+  // On tablet/desktop: show collapsed state
+  if (!isMobile && isCollapsed) {
     return (
       <div 
         className="w-12 border-r border-gray-200 flex flex-col items-center py-2"
@@ -166,8 +166,8 @@ export default function AirtableSidebar({
 
   return (
     <>
-      {/* Overlay for mobile/tablet */}
-      {isMobileOrTablet && isOpen && (
+      {/* Overlay for mobile */}
+      {isMobile && isOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 desktop:hidden"
           onClick={onClose}
@@ -179,10 +179,10 @@ export default function AirtableSidebar({
         data-sidebar
         className={cn(
           "flex flex-col h-screen shadow-sm transition-transform duration-300",
-          isMobileOrTablet 
+          isMobile 
             ? "fixed left-0 top-0 z-50 w-64" 
             : "relative w-64",
-          isMobileOrTablet && !isOpen && "-translate-x-full"
+          isMobile && !isOpen && "-translate-x-full"
         )}
         style={{ backgroundColor: sidebarColor }}
       >
@@ -208,7 +208,7 @@ export default function AirtableSidebar({
         </Link>
         <button
           onClick={() => {
-            if (isMobileOrTablet && onClose) {
+            if (isMobile && onClose) {
               onClose()
             } else {
               setInternalCollapsed(true)
@@ -216,7 +216,7 @@ export default function AirtableSidebar({
           }}
           className="p-1 hover:bg-gray-100 rounded transition-colors"
           style={{ color: sidebarTextColor }}
-          title={isMobileOrTablet ? "Close sidebar" : "Collapse sidebar"}
+          title={isMobile ? "Close sidebar" : "Collapse sidebar"}
         >
           <X className="h-4 w-4" style={{ color: sidebarTextColor }} />
         </button>

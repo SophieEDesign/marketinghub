@@ -5,7 +5,7 @@ import AirtableSidebar from "./AirtableSidebar"
 import Topbar from "./Topbar"
 import { RecordPanelProvider } from "@/contexts/RecordPanelContext"
 import RecordPanel from "@/components/records/RecordPanel"
-import { useIsMobileOrTablet } from "@/hooks/useResponsive"
+import { useIsMobile } from "@/hooks/useResponsive"
 import { useBranding } from "@/contexts/BrandingContext"
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
@@ -68,34 +68,34 @@ export default function WorkspaceShell({
   hideTopbar = false,
   hideRecordPanel = false,
 }: WorkspaceShellProps) {
-  const isMobileOrTablet = useIsMobileOrTablet()
+  const isMobile = useIsMobile()
   const { primaryColor } = useBranding()
-  // On mobile/tablet: sidebar closed by default
-  // On desktop: sidebar open by default (no state needed, handled internally)
+  // On mobile: sidebar closed by default
+  // On tablet/desktop: sidebar visible by default (handled internally)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   
   // Persist sidebar state per device type
   useEffect(() => {
-    if (isMobileOrTablet) {
+    if (isMobile) {
       // Load from localStorage with device-specific key
       const saved = localStorage.getItem('sidebar-open-mobile')
       if (saved !== null) {
         setSidebarOpen(JSON.parse(saved))
       }
     }
-  }, [isMobileOrTablet])
+  }, [isMobile])
   
   useEffect(() => {
-    if (isMobileOrTablet) {
+    if (isMobile) {
       localStorage.setItem('sidebar-open-mobile', JSON.stringify(sidebarOpen))
     }
-  }, [sidebarOpen, isMobileOrTablet])
+  }, [sidebarOpen, isMobile])
 
   return (
     <RecordPanelProvider>
       <div className="flex h-screen bg-gray-50">
         {/* When topbar is hidden (some pages have their own toolbar), still provide a mobile hamburger toggle */}
-        {hideTopbar && isMobileOrTablet && (
+        {hideTopbar && isMobile && (
           <div className="fixed top-3 left-3 z-50 desktop:hidden">
             <Button
               variant="ghost"
@@ -115,14 +115,14 @@ export default function WorkspaceShell({
           tables={tables}
           views={views}
           userRole={userRole}
-          isOpen={isMobileOrTablet ? sidebarOpen : undefined}
-          onClose={isMobileOrTablet ? () => setSidebarOpen(false) : undefined}
+          isOpen={isMobile ? sidebarOpen : undefined}
+          onClose={isMobile ? () => setSidebarOpen(false) : undefined}
         />
         <div className="flex-1 flex flex-col overflow-hidden">
           {!hideTopbar && (
             <Topbar 
               title={title} 
-              onSidebarToggle={isMobileOrTablet ? () => setSidebarOpen(!sidebarOpen) : undefined}
+              onSidebarToggle={isMobile ? () => setSidebarOpen(!sidebarOpen) : undefined}
             />
           )}
           <main className="flex-1 overflow-y-auto">
