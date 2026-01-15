@@ -305,53 +305,63 @@ export default function FieldBlock({
     }
   }
 
-  return (
-    <div className="h-full flex flex-col p-4">
-      {/* Field Label - Only show if showTitle is not false */}
-      {showLabel && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          {field.name}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+  const content = isAttachmentField ? (
+    <div className="flex-1">
+      {attachments.length > 0 ? (
+        <AttachmentPreview
+          attachments={attachments}
+          maxVisible={10}
+          size={(config?.appearance as any)?.attachment_size || "medium"}
+          displayStyle={
+            field.options?.attachment_display_style ||
+            (config?.appearance as any)?.attachment_display_style ||
+            "thumbnails"
+          }
+        />
+      ) : (
+        <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+          <Paperclip className="h-4 w-4" />
+          No attachments
+        </div>
       )}
+    </div>
+  ) : (
+    <InlineFieldEditor
+      field={field}
+      value={fieldValue}
+      onChange={handleCommit}
+      isEditing={isEditable && isEditingValue}
+      onEditStart={() => {
+        if (!isEditable) return
+        setIsEditingValue(true)
+      }}
+      onEditEnd={() => setIsEditingValue(false)}
+      onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
+        window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+      }}
+      onAddLinkedRecord={() => {
+        toast({
+          title: "Not implemented",
+          description: "Adding linked records is not available here yet.",
+        })
+      }}
+      isReadOnly={!isEditable}
+      showLabel={false}
+    />
+  )
 
-      {/* Attachment fields: display only (editing handled in record panel / dedicated UI) */}
-      {isAttachmentField ? (
-        <div className="flex-1">
-          {attachments.length > 0 ? (
-            <AttachmentPreview
-              attachments={attachments}
-              maxVisible={10}
-              size={(config?.appearance as any)?.attachment_size || 'medium'}
-              displayStyle={field.options?.attachment_display_style || (config?.appearance as any)?.attachment_display_style || 'thumbnails'}
-            />
-          ) : (
-            <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
-              <Paperclip className="h-4 w-4" />
-              No attachments
-            </div>
-          )}
+  return (
+    <div className="h-full p-4">
+      {showLabel ? (
+        <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-x-6 items-start">
+          <div className="pt-2 text-xs font-medium text-gray-500">
+            {field.name}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </div>
+          <div className="min-w-0">{content}</div>
         </div>
       ) : (
-        <InlineFieldEditor
-          field={field}
-          value={fieldValue}
-          onChange={handleCommit}
-          isEditing={isEditable && isEditingValue}
-          onEditStart={() => {
-            if (!isEditable) return
-            setIsEditingValue(true)
-          }}
-          onEditEnd={() => setIsEditingValue(false)}
-          onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
-            window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
-          }}
-          onAddLinkedRecord={() => {
-            toast({ title: "Not implemented", description: "Adding linked records is not available here yet." })
-          }}
-          isReadOnly={!isEditable}
-          showLabel={false}
-        />
+        content
       )}
     </div>
   )
