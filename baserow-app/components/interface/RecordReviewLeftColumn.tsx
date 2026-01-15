@@ -224,7 +224,7 @@ export default function RecordReviewLeftColumn({
     }
   }, [fields, fieldOrder, isRecordView, titleFieldId, subtitleFieldId, additionalFieldId])
 
-  const renderValue = useCallback((field: TableField | null, value: any) => {
+  const renderValue = useCallback((field: TableField | null | undefined, value: any) => {
     if (!field) return <span className="text-gray-400">—</span>
     if (value === null || value === undefined || value === "") {
       return <span className="text-gray-400">—</span>
@@ -321,9 +321,9 @@ export default function RecordReviewLeftColumn({
               
               if (isRecordView) {
                 // For record_view: display title, subtitle, and additional field
-                const titleField = titleFieldId ? fields.find(f => f.id === titleFieldId) : null
-                const subtitleField = subtitleFieldId ? fields.find(f => f.id === subtitleFieldId) : null
-                const additionalField = additionalFieldId ? fields.find(f => f.id === additionalFieldId) : null
+                const titleField = titleFieldId ? (fields.find(f => f.id === titleFieldId) ?? null) : null
+                const subtitleField = subtitleFieldId ? (fields.find(f => f.id === subtitleFieldId) ?? null) : null
+                const additionalField = additionalFieldId ? (fields.find(f => f.id === additionalFieldId) ?? null) : null
                 
                 const titleValue = titleField ? (record[titleField.name] || record.id) : record.id
                 const subtitleValue = subtitleField ? record[subtitleField.name] : null

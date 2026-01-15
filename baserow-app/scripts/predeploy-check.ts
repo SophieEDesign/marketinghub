@@ -121,6 +121,26 @@ async function checkPageAnchors() {
 async function checkBlockConfigs() {
   console.log('🔍 Checking block configurations...')
   
+  // Load page table context so we can validate blocks that inherit table_id from page.base_table
+  const { data: pages, error: pagesError } = await supabase
+    .from('interface_pages')
+    .select('id, base_table')
+
+  if (pagesError) {
+    console.error('❌ Error loading pages for block config validation:', pagesError)
+    errors.push({
+      type: 'database_error',
+      id: 'pages_for_block_validation',
+      message: `Failed to load pages: ${pagesError.message}`,
+    })
+    return
+  }
+
+  const pageBaseTableById = new Map<string, string | null>()
+  for (const p of pages || []) {
+    pageBaseTableById.set(p.id, (p as any).base_table ?? null)
+  }
+
   const { data: blocks, error } = await supabase
     .from('view_blocks')
     .select('id, type, config, view_id')
@@ -161,12 +181,23 @@ async function checkBlockConfigs() {
       case 'timeline':
       case 'list':
       case 'gallery':
-        if (!config.table_id) {
+        // These blocks can inherit table_id from page context (page.base_table) OR use legacy config keys.
+        // Accept any of: config.table_id, config.base_table, config.table, or page.base_table.
+        {
+          const pageBaseTable = block.view_id ? (pageBaseTableById.get(block.view_id) ?? null) : null
+          const hasAnyTable =
+            !!config.table_id ||
+            !!config.base_table ||
+            !!config.table ||
+            !!pageBaseTable
+
+          if (!hasAnyTable) {
           errors.push({
             type: 'block_missing_config',
             id: block.id,
             message: `Block ${block.id} (${blockType}) is missing required table_id.`,
           })
+        }
         }
         break
 

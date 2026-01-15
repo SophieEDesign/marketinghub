@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import type { PageBlock } from "@/lib/interface/types"
@@ -144,7 +144,6 @@ export default function FieldBlock({
       loadFieldValue()
     } else {
       setFieldValue(null)
-      setEditingValue(null)
     }
   }, [recordId, tableName, field])
 
@@ -272,7 +271,7 @@ export default function FieldBlock({
     ? (Array.isArray(fieldValue) ? fieldValue : [fieldValue])
     : []
 
-  const handleCommit = useCallback(async (newValue: any) => {
+  async function handleCommit(newValue: any) {
     if (!recordId || !tableName || !field) {
       setIsEditingValue(false)
       return
@@ -304,7 +303,7 @@ export default function FieldBlock({
     } finally {
       setIsEditingValue(false)
     }
-  }, [field, fieldValue, recordId, tableName, toast])
+  }
 
   return (
     <div className="h-full flex flex-col p-4">
