@@ -216,7 +216,7 @@ export default async function Sidebar() {
   }
 
   return (
-    <div className="flex h-full w-[260px] flex-col border-r bg-background">
+    <div className="flex h-full w-[260px] flex-col border-r bg-background shadow-lg">
       <div className="flex h-16 items-center border-b px-6">
         <h2 className="text-lg font-semibold">Marketing Hub</h2>
       </div>
