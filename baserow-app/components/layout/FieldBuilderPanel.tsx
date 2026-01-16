@@ -58,7 +58,8 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   async function loadFields() {
     try {
-      const response = await fetch(`/api/tables/${tableId}/fields`)
+      // Bypass any intermediate caching so the UI reflects settings changes immediately.
+      const response = await fetch(`/api/tables/${tableId}/fields`, { cache: "no-store" })
       const data = await response.json()
       if (data.fields) {
         // Sort by order_index, then by position, then by name

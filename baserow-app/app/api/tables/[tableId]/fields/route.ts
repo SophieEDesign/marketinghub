@@ -11,7 +11,6 @@ import {
 } from '@/lib/fields/sqlGenerator'
 import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse } from '@/lib/api/error-handling'
-import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 
 // GET: Get all fields for a table
@@ -23,19 +22,19 @@ export async function GET(
     const { tableId } = await params
     const fields = await getTableFields(tableId)
     
-    // Cache fields for 5 minutes (they don't change frequently)
-    // Use stale-while-revalidate for better UX
-    return cachedJsonResponse(
-      { fields: fields || [] },
-      CACHE_DURATIONS.MEDIUM,
-      CACHE_DURATIONS.MEDIUM
-    )
+    // Do not cache: field metadata changes frequently (settings edits, reorder, etc.)
+    // and caching causes the UI to show stale settings after a successful save.
+    const response = NextResponse.json({ fields: fields || [] })
+    response.headers.set('Cache-Control', 'no-store')
+    return response
   } catch (error: any) {
     // If table doesn't exist, return empty array (graceful degradation)
     if (isTableNotFoundError(error)) {
       const { tableId } = await params
       console.warn(`table_fields table may not exist for table ${tableId}, returning empty fields array`)
-      return cachedJsonResponse({ fields: [] }, CACHE_DURATIONS.SHORT)
+      const response = NextResponse.json({ fields: [] })
+      response.headers.set('Cache-Control', 'no-store')
+      return response
     }
     
     const errorResponse = createErrorResponse(error, 'Failed to fetch fields', 500)
@@ -122,7 +121,8 @@ export async function POST(
           position,
           order_index,
           required: required || false,
-          default_value: default_value || null,
+          // Preserve valid falsy defaults like 0/false
+          default_value: default_value ?? null,
           options: options || {},
         },
       ])

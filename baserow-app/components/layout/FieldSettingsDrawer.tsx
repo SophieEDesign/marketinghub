@@ -150,7 +150,8 @@ export default function FieldSettingsDrawer({
       setRequired(field.required || false)
       setReadOnly(field.options?.read_only || false)
       setGroupName(field.group_name || '')
-      setDefaultValue(field.default_value || null)
+      // Preserve valid falsy defaults like 0/false
+      setDefaultValue(field.default_value ?? null)
       setOptions(field.options || {})
       setTypeChangeWarning(null)
       previousTypeRef.current = field.type
@@ -484,7 +485,8 @@ export default function FieldSettingsDrawer({
           type,
           required,
           group_name: groupName.trim() || null,
-          default_value: defaultValue || null,
+          // Preserve valid falsy defaults like 0/false (only null/undefined become null)
+          default_value: defaultValue ?? null,
           options: (() => {
             const opts: FieldOptions = { ...options }
             
@@ -512,7 +514,9 @@ export default function FieldSettingsDrawer({
               }
             })
             
-            return Object.keys(opts).length > 0 ? opts : undefined
+            // Important: return empty object when clearing options so the API can persist removals
+            // (e.g. unchecking read_only should update options to {} rather than omitting it).
+            return opts
           })(),
         }),
       })
