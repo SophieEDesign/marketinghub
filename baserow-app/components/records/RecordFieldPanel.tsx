@@ -142,11 +142,13 @@ export default function RecordFieldPanel({
     let cancelled = false
     const supabase = createClient()
 
-    supabase
-      .from("tables")
-      .select("id, name")
-      .in("id", mirroredLinkedTableIds)
-      .then(({ data, error }) => {
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("tables")
+          .select("id, name")
+          .in("id", mirroredLinkedTableIds)
+
         if (cancelled) return
         if (error || !data) return
         const map: Record<string, string> = {}
@@ -154,10 +156,11 @@ export default function RecordFieldPanel({
           if (t?.id && t?.name) map[String(t.id)] = String(t.name)
         })
         setLinkedTableNameById(map)
-      })
-      .catch(() => {
-        if (cancelled) return
-      })
+      } catch {
+        // Non-critical. If this fails we simply show "linked table" in the UI.
+        return
+      }
+    })()
 
     return () => {
       cancelled = true

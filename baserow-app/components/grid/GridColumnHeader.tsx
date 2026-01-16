@@ -62,19 +62,21 @@ export default function GridColumnHeader({
     let cancelled = false
     const supabase = createClient()
 
-    supabase
-      .from('tables')
-      .select('name')
-      .eq('id', field.options.linked_table_id)
-      .maybeSingle()
-      .then(({ data }) => {
+    ;(async () => {
+      try {
+        const { data } = await supabase
+          .from('tables')
+          .select('name')
+          .eq('id', field.options.linked_table_id)
+          .maybeSingle()
+
         if (cancelled) return
         setLinkedFromTableName(data?.name ?? null)
-      })
-      .catch(() => {
+      } catch {
         if (cancelled) return
         setLinkedFromTableName(null)
-      })
+      }
+    })()
 
     return () => {
       cancelled = true

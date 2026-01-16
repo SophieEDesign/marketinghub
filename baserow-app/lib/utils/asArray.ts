@@ -12,9 +12,13 @@
  * @param value - The value to normalize to an array
  * @returns An array - either the original if already an array, or an empty array
  */
+export function asArray<T>(value: readonly T[] | null | undefined): T[]
+export function asArray<T>(value: unknown): T[]
 export function asArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) {
-    return value
+    // We intentionally trust the caller's generic type when provided.
+    // This utility is meant to normalize "maybe array" values, not validate element shapes.
+    return value as T[]
   }
   // Return empty array for null, undefined, or any non-array value
   return []

@@ -85,6 +85,10 @@ export interface FieldOptions {
   
   // For read-only (stored in options since not in schema)
   read_only?: boolean
+
+  // Some metadata fields are flagged as "system" (not user-editable / hidden from certain UIs).
+  // This is stored in options for backward compatibility with older schemas.
+  system?: boolean
 }
 
 export interface LookupFieldFilter {
