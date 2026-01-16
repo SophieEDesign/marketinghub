@@ -53,10 +53,8 @@ export default function InterfaceViewTabs({
   isEditing,
 }: InterfaceViewTabsProps) {
   // RULE: Views are currently not used; never render this UI unless explicitly enabled.
-  if (!VIEWS_ENABLED) {
-    return null
-  }
-
+  // Important: Hooks must still be called unconditionally (rules-of-hooks).
+  const enabled = VIEWS_ENABLED
   const { toast } = useToast()
   const [tabs, setTabs] = useState<InterfaceViewTab[]>([])
   const [availableViews, setAvailableViews] = useState<View[]>([])
@@ -66,9 +64,10 @@ export default function InterfaceViewTabs({
   const [selectedViewId, setSelectedViewId] = useState<string>("")
 
   useEffect(() => {
+    if (!enabled) return
     loadTabs()
     loadAvailableViews()
-  }, [pageId])
+  }, [pageId, enabled])
 
   async function loadTabs() {
     try {
@@ -243,6 +242,10 @@ export default function InterfaceViewTabs({
   }
 
   if (loading) {
+    return null
+  }
+
+  if (!enabled) {
     return null
   }
 

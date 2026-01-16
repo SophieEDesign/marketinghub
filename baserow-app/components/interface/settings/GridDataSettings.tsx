@@ -161,8 +161,8 @@ export default function GridDataSettings({
   }, [fields])
 
   // Get currently selected display fields in order
-  const selectedDisplayFields = useMemo(() => {
-    const selectedKeys = config.visible_fields || []
+  const selectedDisplayFields = useMemo<Array<{ key: string; field: TableField }>>(() => {
+    const selectedKeys: string[] = Array.isArray(config.visible_fields) ? config.visible_fields : []
     return selectedKeys
       .map((key: string) => {
         const field = availableDisplayFields.find((f: TableField) => f.name === key || f.id === key)
@@ -172,8 +172,8 @@ export default function GridDataSettings({
   }, [config.visible_fields, availableDisplayFields])
 
   // Get currently selected modal fields in order
-  const selectedModalFields = useMemo(() => {
-    const selectedKeys = (config as any).modal_fields || []
+  const selectedModalFields = useMemo<Array<{ key: string; field: TableField }>>(() => {
+    const selectedKeys: string[] = Array.isArray((config as any).modal_fields) ? (config as any).modal_fields : []
     return selectedKeys
       .map((key: string) => {
         const field = availableDisplayFields.find((f: TableField) => f.name === key || f.id === key)

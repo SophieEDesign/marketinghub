@@ -94,6 +94,10 @@ function safeDateOnly(d: Date) {
   return format(d, "yyyy-MM-dd")
 }
 
+function isSelectField(field: TableField): field is TableField & { type: "single_select" | "multi_select" } {
+  return field.type === "single_select" || field.type === "multi_select"
+}
+
 export default function MultiTimelineView({
   blockId,
   pageId = null,
@@ -182,12 +186,12 @@ export default function MultiTimelineView({
             .select("*")
             .eq("view_id", s.view_id)
           nextViewDefaults[s.id] = asArray<any>(viewFiltersRes.data).map((f: any) =>
+            // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
             normalizeFilter({
-              id: f.id || "",
-              field_name: f.field_name,
+              field: f.field_name,
               operator: f.operator,
               value: f.value,
-            })
+            } as any)
           )
         } else {
           nextViewDefaults[s.id] = []
@@ -279,9 +283,8 @@ export default function MultiTimelineView({
         let eventColor = sourceColor
         if (s.color_field) {
           const colorFieldObj = tableFields.find(
-            (f) =>
-              (f.name === s.color_field || f.id === s.color_field) &&
-              (f.type === "single_select" || f.type === "multi_select")
+            (f): f is TableField & { type: "single_select" | "multi_select" } =>
+              (f.name === s.color_field || f.id === s.color_field) && isSelectField(f)
           )
           if (colorFieldObj) {
             const rawValue = row[colorFieldObj.name]

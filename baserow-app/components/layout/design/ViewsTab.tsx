@@ -22,18 +22,17 @@ interface View {
 
 const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
   // RULE: Views are currently not used; hide this tab unless explicitly enabled.
-  if (!VIEWS_ENABLED) {
-    return null
-  }
-
+  // Important: Hooks must still be called unconditionally (rules-of-hooks).
+  const enabled = VIEWS_ENABLED
   const router = useRouter()
   const [views, setViews] = useState<View[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!enabled) return
     loadViews()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId])
+  }, [tableId, enabled])
 
   async function loadViews() {
     try {
@@ -88,6 +87,10 @@ const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
 
   if (loading) {
     return <div className="text-center py-8 text-gray-500">Loading views...</div>
+  }
+
+  if (!enabled) {
+    return null
   }
 
   return (

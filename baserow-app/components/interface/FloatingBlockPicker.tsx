@@ -26,8 +26,10 @@ const iconMap: Record<BlockType, React.ElementType> = {
   filter: Filter,
   field: Square,
   calendar: Calendar,
+  multi_calendar: Calendar,
   kanban: Columns,
   timeline: GitBranch,
+  multi_timeline: GitBranch,
   list: List,
   number: Hash,
 }
