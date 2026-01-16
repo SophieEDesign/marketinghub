@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { createClient } from "@/lib/supabase/client"
+import { validateFieldOptions } from "@/lib/fields/validation"
 import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
@@ -242,6 +244,8 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       {showNewField && (
         <NewFieldForm
+          tableId={tableId}
+          tableFields={fields}
           onSave={handleCreateField}
           onCancel={() => setShowNewField(false)}
         />
@@ -318,9 +322,13 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 })
 
 function NewFieldForm({
+  tableId,
+  tableFields,
   onSave,
   onCancel,
 }: {
+  tableId: string
+  tableFields: TableField[]
   onSave: (fieldData: Partial<TableField>) => void
   onCancel: () => void
 }) {
@@ -328,26 +336,327 @@ function NewFieldForm({
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
   const [options, setOptions] = useState<FieldOptions>({})
+  const [error, setError] = useState<string | null>(null)
+
+  const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingTables, setLoadingTables] = useState(false)
+  const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [loadingLookupFields, setLoadingLookupFields] = useState(false)
 
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
 
+  // Seed options when switching to types that require configuration.
+  useEffect(() => {
+    setError(null)
+    if (type === "single_select" || type === "multi_select") {
+      setOptions((prev) => ({
+        ...prev,
+        choices: prev.choices && prev.choices.length > 0 ? prev.choices : [""],
+      }))
+      return
+    }
+    // For other types, keep options as-is to avoid surprising resets (e.g. formula editor).
+  }, [type])
+
+  // Load tables for link_to_table and lookup fields.
+  useEffect(() => {
+    if (type !== "link_to_table" && type !== "lookup") return
+    let cancelled = false
+    async function loadTables() {
+      setLoadingTables(true)
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from("tables")
+          .select("id, name")
+          .order("name", { ascending: true })
+        if (!cancelled && !error && data) {
+          setTables(data)
+        }
+      } catch (e) {
+        console.error("Error loading tables:", e)
+      } finally {
+        if (!cancelled) setLoadingTables(false)
+      }
+    }
+    loadTables()
+    return () => {
+      cancelled = true
+    }
+  }, [type])
+
+  // Load fields for lookup table selection.
+  useEffect(() => {
+    if (type !== "lookup" || !options.lookup_table_id) {
+      setLookupTableFields([])
+      return
+    }
+    let cancelled = false
+    async function loadFields() {
+      setLoadingLookupFields(true)
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from("table_fields")
+          .select("id, name, type")
+          .eq("table_id", options.lookup_table_id)
+          .order("position", { ascending: true })
+        if (!cancelled && !error && data) {
+          setLookupTableFields(data)
+        }
+      } catch (e) {
+        console.error("Error loading lookup fields:", e)
+        if (!cancelled) setLookupTableFields([])
+      } finally {
+        if (!cancelled) setLoadingLookupFields(false)
+      }
+    }
+    loadFields()
+    return () => {
+      cancelled = true
+    }
+  }, [type, options.lookup_table_id])
+
+  function getCleanOptions(): FieldOptions | undefined {
+    const next: FieldOptions = { ...options }
+
+    // Trim/filter select choices
+    if (next.choices) {
+      next.choices = next.choices.map((c) => c.trim()).filter((c) => c.length > 0)
+      if (next.choices.length === 0) {
+        delete next.choices
+      }
+    }
+
+    // Remove undefined / null / empty array values
+    Object.keys(next).forEach((k) => {
+      const key = k as keyof FieldOptions
+      const value = next[key]
+      if (
+        value === undefined ||
+        value === null ||
+        (Array.isArray(value) && value.length === 0)
+      ) {
+        delete next[key]
+      }
+    })
+
+    return Object.keys(next).length > 0 ? next : undefined
+  }
+
   function handleSubmit() {
     if (!name.trim()) {
-      alert("Field name is required")
+      setError("Field name is required")
+      return
+    }
+
+    const cleanOptions = getCleanOptions()
+    const validation = validateFieldOptions(type, cleanOptions)
+    if (!validation.valid) {
+      setError(validation.error || "Invalid field configuration")
       return
     }
 
     onSave({
       name: name.trim(),
       type,
-      required,
-      options: Object.keys(options).length > 0 ? options : undefined,
+      required: isVirtual ? false : required,
+      options: cleanOptions,
     })
+  }
+
+  function renderTypeSpecificOptions() {
+    switch (type) {
+      case "single_select":
+      case "multi_select": {
+        const choices = options.choices && options.choices.length > 0 ? options.choices : [""]
+        return (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-gray-700">Choices</Label>
+            <div className="space-y-2">
+              {choices.map((choice, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    value={choice}
+                    onChange={(e) => {
+                      const next = [...choices]
+                      next[idx] = e.target.value
+                      setOptions({ ...options, choices: next })
+                    }}
+                    placeholder="Option name"
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const next = choices.filter((_, i) => i !== idx)
+                      setOptions({ ...options, choices: next.length ? next : [""] })
+                    }}
+                    className="h-8 px-2"
+                    title="Remove"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOptions({ ...options, choices: [...choices, ""] })}
+                className="h-8 text-sm"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add choice
+              </Button>
+              <p className="text-xs text-gray-500">
+                At least one choice is required.
+              </p>
+            </div>
+          </div>
+        )
+      }
+
+      case "formula":
+        return (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-gray-700">Formula</Label>
+            <div className="rounded-md border border-gray-200 bg-white p-2">
+              <FormulaEditor
+                value={options.formula || ""}
+                onChange={(formula) => setOptions({ ...options, formula })}
+                tableFields={tableFields.filter((f) => f.type !== "formula")}
+              />
+            </div>
+          </div>
+        )
+
+      case "link_to_table":
+        return (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-gray-700">Linked table</Label>
+            <Select
+              value={options.linked_table_id || undefined}
+              onValueChange={(v) =>
+                setOptions({
+                  ...options,
+                  linked_table_id: v || undefined,
+                })
+              }
+            >
+              <SelectTrigger className="mt-1 h-8 text-sm">
+                <SelectValue placeholder={loadingTables ? "Loading..." : "Select a table"} />
+              </SelectTrigger>
+              <SelectContent>
+                {loadingTables ? (
+                  <SelectItem value="__loading__" disabled>
+                    Loading tables...
+                  </SelectItem>
+                ) : (
+                  tables
+                    .filter((t) => t.id !== tableId)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              Required to create a link field.
+            </p>
+          </div>
+        )
+
+      case "lookup":
+        return (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Lookup table</Label>
+              <Select
+                value={options.lookup_table_id || undefined}
+                onValueChange={(v) =>
+                  setOptions({
+                    ...options,
+                    lookup_table_id: v || undefined,
+                    lookup_field_id: undefined,
+                  })
+                }
+              >
+                <SelectTrigger className="mt-1 h-8 text-sm">
+                  <SelectValue placeholder={loadingTables ? "Loading..." : "Select a table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingTables ? (
+                    <SelectItem value="__loading__" disabled>
+                      Loading tables...
+                    </SelectItem>
+                  ) : (
+                    tables
+                      .filter((t) => t.id !== tableId)
+                      .map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {options.lookup_table_id && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-gray-700">Lookup field</Label>
+                <Select
+                  value={options.lookup_field_id || undefined}
+                  onValueChange={(v) =>
+                    setOptions({
+                      ...options,
+                      lookup_field_id: v || undefined,
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-1 h-8 text-sm">
+                    <SelectValue placeholder={loadingLookupFields ? "Loading..." : "Select a field"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingLookupFields ? (
+                      <SelectItem value="__loading__" disabled>
+                        Loading fields...
+                      </SelectItem>
+                    ) : (
+                      lookupTableFields.map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name} ({f.type})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              Required to create a lookup field.
+            </p>
+          </div>
+        )
+
+      default:
+        return null
+    }
   }
 
   return (
     <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+      {error && (
+        <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+          {error}
+        </div>
+      )}
       <div>
         <Label className="text-xs font-medium text-gray-700">Field Name</Label>
         <Input
@@ -360,7 +669,15 @@ function NewFieldForm({
 
       <div>
         <Label className="text-xs font-medium text-gray-700">Field Type</Label>
-        <Select value={type} onValueChange={(v) => setType(v as FieldType)}>
+        <Select
+          value={type}
+          onValueChange={(v) => {
+            setType(v as FieldType)
+            setError(null)
+            // Reset any type-specific options that don't make sense across types.
+            setOptions({})
+          }}
+        >
           <SelectTrigger className="mt-1 h-8 text-sm">
             <SelectValue />
           </SelectTrigger>
@@ -373,6 +690,8 @@ function NewFieldForm({
           </SelectContent>
         </Select>
       </div>
+
+      {renderTypeSpecificOptions()}
 
       {!isVirtual && (
         <div className="flex items-center gap-2">

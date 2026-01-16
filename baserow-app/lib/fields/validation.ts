@@ -1,5 +1,9 @@
 import type { FieldType, FieldOptions } from '@/types/fields'
-import { RESERVED_WORDS } from '@/types/fields'
+import { FIELD_TYPES, RESERVED_WORDS } from '@/types/fields'
+
+const FIELD_TYPE_LABELS: Partial<Record<FieldType, string>> = Object.fromEntries(
+  FIELD_TYPES.map((t) => [t.type, t.label])
+) as Partial<Record<FieldType, string>>
 
 /**
  * Sanitize field name for database use
@@ -61,7 +65,8 @@ export function validateFieldOptions(
 ): { valid: boolean; error?: string } {
   if (!options) {
     if (fieldType === 'single_select' || fieldType === 'multi_select' || fieldType === 'link_to_table' || fieldType === 'lookup') {
-      return { valid: false, error: `${fieldType} requires options to be configured` }
+      const label = FIELD_TYPE_LABELS[fieldType] || fieldType
+      return { valid: false, error: `${label} requires options to be configured` }
     }
     return { valid: true }
   }
