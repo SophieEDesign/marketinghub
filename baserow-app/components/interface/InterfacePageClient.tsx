@@ -22,16 +22,14 @@ import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
+import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 
-function quoteSelectIdent(name: string): string {
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
+// PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
 interface InterfacePageClientProps {
   pageId: string
@@ -636,7 +634,10 @@ function InterfacePageClientInternal({
           const fieldName = sort.field_name || sort.field_id
           if (!fieldName) continue
           const ascending = sort.direction === 'asc' || sort.order_direction === 'asc'
-          query = query.order(quoteSelectIdent(fieldName), { ascending })
+          const col = toPostgrestColumn(fieldName)
+          if (col) {
+            query = query.order(col, { ascending })
+          }
         }
       } else {
         // Default sort by created_at descending

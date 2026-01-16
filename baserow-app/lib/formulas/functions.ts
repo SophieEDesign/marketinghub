@@ -117,6 +117,13 @@ export const FORMULA_FUNCTIONS: Record<string, FormulaFunction> = {
     return today
   },
 
+  // Utility
+  ISBLANK: (value) => {
+    if (value === null || value === undefined) return true
+    if (typeof value === 'string') return value.trim().length === 0
+    return false
+  },
+
   DATEADD: (date, amount, unit) => {
     if (date === null || amount === null || unit === null) return '#VALUE!'
     

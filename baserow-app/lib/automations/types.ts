@@ -49,6 +49,11 @@ export interface ActionConfig {
   table_id?: string
   record_id?: string
   field_updates?: Record<string, any>
+  /**
+   * UI-friendly alternative to `field_updates`.
+   * Each mapping becomes a key/value in `field_updates` at execution time.
+   */
+  field_update_mappings?: Array<{ field: string; value: any }>
   
   // For send_email
   to?: string

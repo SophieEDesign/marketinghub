@@ -15,7 +15,8 @@ interface FormulaEditorProps {
 const FUNCTION_HINTS = [
   'CONCAT', 'UPPER', 'LOWER', 'LEFT', 'RIGHT', 'LEN',
   'FIND', 'SUBSTITUTE', 'ROUND', 'FLOOR', 'CEILING',
-  'IF', 'SWITCH', 'DATEADD', 'DATETIME_FORMAT', 'NOW', 'TODAY'
+  'IF', 'SWITCH', 'DATEADD', 'DATETIME_FORMAT', 'NOW', 'TODAY',
+  'ISBLANK'
 ]
 
 export default function FormulaEditor({

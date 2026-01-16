@@ -314,6 +314,20 @@ export default function AutomationBuilder({
               onChange={(formula: string) => setTriggerConfig({ ...triggerConfig, formula })}
               tableFields={tableFields}
             />
+            <div className="text-xs text-gray-500 space-y-2">
+              <p>
+                Tip: for “after today” you can use <span className="font-mono">{`{YourDateField} > TODAY()`}</span>.
+              </p>
+              {conditionFormula.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setTriggerConfig({ ...triggerConfig, formula: conditionFormula })}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  Use “Only run when…” conditions as formula
+                </button>
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium mb-1">Check Interval (seconds)</label>
               <input
@@ -393,6 +407,10 @@ export default function AutomationBuilder({
     switch (action.type) {
       case 'update_record':
       case 'create_record':
+        const mappings = action.field_update_mappings || []
+        const triggerFieldOptions = tableFields
+          .filter(f => f.type !== 'formula')
+          .map(f => f.name)
         return (
           <>
             <div>
@@ -418,19 +436,114 @@ export default function AutomationBuilder({
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium mb-1">Field Updates (JSON)</label>
-              <textarea
-                value={JSON.stringify(action.field_updates || {}, null, 2)}
-                onChange={(e) => {
-                  try {
-                    const updates = JSON.parse(e.target.value)
-                    updateAction(index, { field_updates: updates })
-                  } catch {}
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
-                rows={4}
-                placeholder='{"field_name": "value", "another_field": "{{field_from_trigger}}"}'
-              />
+              <label className="block text-sm font-medium mb-1">Field Updates</label>
+
+              {/* Mapping UI */}
+              <div className="space-y-2">
+                {mappings.length === 0 && (
+                  <div className="text-xs text-gray-500">
+                    Add a field mapping below. You can pull values from the trigger record using <span className="font-mono">{`{{field_name}}`}</span>.
+                  </div>
+                )}
+
+                {mappings.map((m, mIndex) => (
+                  <div key={mIndex} className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-4">
+                      <label className="block text-xs text-gray-600 mb-1">Field</label>
+                      <select
+                        value={m.field || ''}
+                        onChange={(e) => {
+                          const next = [...mappings]
+                          next[mIndex] = { ...next[mIndex], field: e.target.value }
+                          updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="">Select field...</option>
+                        {tableFields.map(f => (
+                          <option key={f.id || f.name} value={f.name}>{f.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-3">
+                      <label className="block text-xs text-gray-600 mb-1">Pull from</label>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const template = e.target.value ? `{{${e.target.value}}}` : ''
+                          const next = [...mappings]
+                          next[mIndex] = { ...next[mIndex], value: template }
+                          updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      >
+                        <option value="">(custom)</option>
+                        {triggerFieldOptions.map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="col-span-4">
+                      <label className="block text-xs text-gray-600 mb-1">Value</label>
+                      <input
+                        type="text"
+                        value={typeof m.value === 'string' ? m.value : (m.value ?? '')}
+                        onChange={(e) => {
+                          const next = [...mappings]
+                          next[mIndex] = { ...next[mIndex], value: e.target.value }
+                          updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        placeholder='e.g. {{status}} or Static text or =FORMULA(...)'
+                      />
+                    </div>
+
+                    <div className="col-span-1 flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = mappings.filter((_, i) => i !== mIndex)
+                          updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                        }}
+                        className="h-9 w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 rounded"
+                        title="Remove mapping"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = [...mappings, { field: '', value: '' }]
+                    updateAction(index, { field_update_mappings: next, field_updates: undefined })
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-700"
+                >
+                  + Add field update
+                </button>
+              </div>
+
+              {/* Advanced JSON (optional) */}
+              <div className="mt-3">
+                <label className="block text-xs text-gray-600 mb-1">Advanced (JSON)</label>
+                <textarea
+                  value={JSON.stringify(action.field_updates || {}, null, 2)}
+                  onChange={(e) => {
+                    try {
+                      const updates = JSON.parse(e.target.value)
+                      updateAction(index, { field_updates: updates, field_update_mappings: undefined })
+                    } catch {}
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"
+                  rows={4}
+                  placeholder='{"field_name": "value", "another_field": "{{field_from_trigger}}"}'
+                />
+              </div>
             </div>
           </>
         )
@@ -687,8 +800,15 @@ export default function AutomationBuilder({
           <select
             value={triggerType}
             onChange={(e) => {
-              setTriggerType(e.target.value as TriggerType)
-              setTriggerConfig({ table_id: tableId })
+              const nextType = e.target.value as TriggerType
+              setTriggerType(nextType)
+              // Convenience: if user already built "Only run when..." conditions
+              // and selects the "When conditions match" trigger, seed the trigger formula.
+              if (nextType === 'condition' && conditionFormula.trim()) {
+                setTriggerConfig({ table_id: tableId, formula: conditionFormula })
+              } else {
+                setTriggerConfig({ table_id: tableId })
+              }
             }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >

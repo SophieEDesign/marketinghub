@@ -65,6 +65,18 @@ export class Parser {
       case 'FUNCTION':
         return this.parseFunctionCall()
 
+      case 'LOGICAL':
+        // Support unary NOT
+        if (token.value === 'NOT') {
+          this.advance()
+          return {
+            type: 'UNARY_OP',
+            operator: 'NOT',
+            operand: this.parsePrimary(),
+          }
+        }
+        throw new Error(`Unexpected logical operator ${token.value} at position ${token.position}`)
+
       case 'LPAREN':
         this.advance()
         const expr = this.parseExpression()

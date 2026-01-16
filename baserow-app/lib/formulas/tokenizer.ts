@@ -6,7 +6,8 @@ const FUNCTIONS = [
   'CONCAT', 'UPPER', 'LOWER', 'LEFT', 'RIGHT', 'LEN',
   'FIND', 'SUBSTITUTE', 'ROUND', 'FLOOR', 'CEILING',
   'IF', 'SWITCH', 'DATEADD', 'DATETIME_FORMAT',
-  'NOW', 'TODAY'
+  'NOW', 'TODAY',
+  'ISBLANK'
 ]
 
 export class Tokenizer {

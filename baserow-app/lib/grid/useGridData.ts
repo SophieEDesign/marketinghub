@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
 import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
+import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 
 export interface GridRow {
   id: string
@@ -32,12 +33,7 @@ export interface UseGridDataReturn {
 const DEFAULT_LIMIT = 500
 const MAX_SAFE_LIMIT = 2000 // Hard cap to prevent crashes
 
-function quoteSelectIdent(name: string): string {
-  // PostgREST select supports quoted identifiers for columns with spaces/special chars.
-  // Escape embedded quotes by doubling them.
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
+// NOTE: PostgREST select/order must use unquoted identifiers; see `lib/supabase/postgrest`.
 
 export function useGridData({
   tableName,
@@ -103,10 +99,15 @@ export function useGridData({
         .filter((f) => f && typeof f === 'object' && f.name && f.type !== 'formula' && f.type !== 'lookup')
         .map((f) => f.name)
 
-      const selectClause =
-        physicalFieldNames.length > 0
-          ? [quoteSelectIdent('id'), ...physicalFieldNames.map(quoteSelectIdent)].join(',')
-          : '*'
+      const invalidFieldNames = physicalFieldNames.filter((n) => !toPostgrestColumn(n))
+      if (invalidFieldNames.length > 0) {
+        console.warn(
+          '[useGridData] Skipping invalid column names (would cause PostgREST 400):',
+          invalidFieldNames
+        )
+      }
+
+      const selectClause = buildSelectClause(physicalFieldNames, { includeId: true, fallback: '*' })
 
       let query: any = supabase.from(tableName).select(selectClause)
 
@@ -126,8 +127,12 @@ export function useGridData({
 
       // Apply sorts
       currentSorts.forEach((sort) => {
-        // Use quoted identifier to support columns with spaces/special characters
-        query = query.order(quoteSelectIdent(sort.field), { ascending: sort.direction === 'asc' })
+        const col = toPostgrestColumn(sort.field)
+        if (!col) {
+          console.warn('[useGridData] Skipping sort on invalid column:', sort.field)
+          return
+        }
+        query = query.order(col, { ascending: sort.direction === 'asc' })
       })
 
       // Apply limit with safety cap

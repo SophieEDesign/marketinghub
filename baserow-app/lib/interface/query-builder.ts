@@ -13,12 +13,9 @@
 
 import type { FilterConfig } from './filters'
 import { applyFiltersToQuery } from './filters'
+import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 
-function quoteSelectIdent(name: string): string {
-  // PostgREST select/order support quoted identifiers for columns with spaces/special chars.
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
+// PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
 export interface QueryBuilderOptions {
   tableId: string
@@ -61,10 +58,10 @@ export function buildQuery(
         return field?.name || fieldName
       })
       .filter(Boolean)
-      .map(quoteSelectIdent)
-      .join(',')
+
+    const selectClause = buildSelectClause(columns as string[], { includeId: false, fallback: '*' })
     
-    query = query.select(columns)
+    query = query.select(selectClause)
   } else {
     query = query.select('*')
   }
@@ -76,11 +73,13 @@ export function buildQuery(
   for (const sort of sorts) {
     const field = tableFields.find(f => f.name === sort.field || f.id === sort.field)
     const fieldName = field?.name || sort.field
+    const col = toPostgrestColumn(fieldName)
+    if (!col) continue
     
     if (sort.direction === 'asc') {
-      query = query.order(quoteSelectIdent(fieldName), { ascending: true })
+      query = query.order(col, { ascending: true })
     } else {
-      query = query.order(quoteSelectIdent(fieldName), { ascending: false })
+      query = query.order(col, { ascending: false })
     }
   }
 

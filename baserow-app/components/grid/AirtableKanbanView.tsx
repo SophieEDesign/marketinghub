@@ -48,11 +48,9 @@ import type { TableField } from "@/types/fields"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 import { CellFactory } from "./CellFactory"
+import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 
-function quoteSelectIdent(name: string): string {
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
+// PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
 interface AirtableKanbanViewProps {
   tableId: string
@@ -184,7 +182,12 @@ export default function AirtableKanbanView({
       // Apply sorting at query level (for fields that don't need client-side sorting)
       if (viewSorts.length > 0 && !needsClientSideSort) {
         for (const sort of viewSorts) {
-          query = query.order(quoteSelectIdent(sort.field_name), {
+          const col = toPostgrestColumn(sort.field_name)
+          if (!col) {
+            console.warn('[AirtableKanbanView] Skipping sort on invalid column:', sort.field_name)
+            continue
+          }
+          query = query.order(col, {
             ascending: sort.direction === "asc",
           })
         }

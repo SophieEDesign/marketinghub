@@ -15,11 +15,9 @@ import { Button } from "@/components/ui/button"
 import GroupDialog from "../grid/GroupDialog"
 import FilterDialog from "../grid/FilterDialog"
 import { CellFactory } from "../grid/CellFactory"
+import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 
-function quoteSelectIdent(name: string): string {
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
+// PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
 interface ListViewProps {
   tableId: string
@@ -172,7 +170,12 @@ export default function ListView({
       if (sorts.length > 0) {
         sorts.forEach((sort, index) => {
           if (index === 0) {
-            query = query.order(quoteSelectIdent(sort.field_name), { ascending: sort.direction === 'asc' })
+            const col = toPostgrestColumn(sort.field_name)
+            if (!col) {
+              console.warn('[ListView] Skipping sort on invalid column:', sort.field_name)
+              return
+            }
+            query = query.order(col, { ascending: sort.direction === 'asc' })
           } else {
             // Supabase only supports one order() call, so we'd need to sort in memory for multiple sorts
             // For now, just use the first sort

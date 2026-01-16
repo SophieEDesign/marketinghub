@@ -33,6 +33,7 @@ CREATE OR REPLACE FUNCTION public.fallback_user_id()
 RETURNS uuid
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public, auth
 STABLE
 AS $$
   SELECT COALESCE(
@@ -48,6 +49,7 @@ CREATE OR REPLACE FUNCTION public.current_actor_id()
 RETURNS uuid
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public, auth
 STABLE
 AS $$
   SELECT COALESCE(auth.uid(), public.fallback_user_id());
@@ -64,6 +66,7 @@ CREATE OR REPLACE FUNCTION public.handle_audit_fields()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 DECLARE
   actor uuid;
@@ -101,6 +104,7 @@ CREATE OR REPLACE FUNCTION public.ensure_audit_fields_for_table(p_schema text, p
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 DECLARE
   full_table text;
@@ -245,6 +249,7 @@ CREATE OR REPLACE FUNCTION public.prevent_system_field_mutations()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 BEGIN
   IF OLD.name IN ('created_at', 'created_by', 'updated_at', 'updated_by') THEN
@@ -315,10 +320,11 @@ CREATE OR REPLACE FUNCTION public.create_dynamic_table(table_name text)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 BEGIN
   EXECUTE format('
-    CREATE TABLE IF NOT EXISTS %I (
+    CREATE TABLE IF NOT EXISTS public.%I (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       created_at timestamptz NOT NULL DEFAULT now(),
       created_by uuid NOT NULL DEFAULT public.current_actor_id(),
@@ -342,6 +348,7 @@ CREATE OR REPLACE FUNCTION public.add_column_to_table(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 BEGIN
   -- Prevent adding columns that collide with system fields
@@ -349,7 +356,7 @@ BEGIN
     RAISE EXCEPTION 'Column name "%" is reserved for system audit fields.', column_name;
   END IF;
 
-  EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS %I %s;',
+  EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS %I %s;',
     table_name, column_name, column_type);
 END;
 $$;
@@ -364,6 +371,7 @@ CREATE OR REPLACE FUNCTION public.create_table_with_columns(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 DECLARE
   col jsonb;
@@ -392,6 +400,7 @@ CREATE OR REPLACE FUNCTION public.get_table_columns(table_name text)
 RETURNS TABLE(column_name text, data_type text)
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, auth
 AS $$
 BEGIN
   RETURN QUERY

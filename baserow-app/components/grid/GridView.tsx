@@ -35,6 +35,7 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { createClient } from "@/lib/supabase/client"
+import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -83,11 +84,6 @@ interface GridViewProps {
 }
 
 const ITEMS_PER_PAGE = 100
-
-function quoteSelectIdent(name: string): string {
-  const safe = String(name).replace(/"/g, '""')
-  return `"${safe}"`
-}
 
 function extractCurlyFieldRefs(formula: string): string[] {
   if (!formula || typeof formula !== 'string') return []
@@ -735,10 +731,15 @@ export default function GridView({
         ? '*'
         : Array.from(baseColumnNames)
             .filter((n) => typeof n === 'string' && n.trim().length > 0)
-            .map(quoteSelectIdent)
+            .map((n) => String(n))
             .join(',')
 
-      let query = supabase.from(supabaseTableName).select(selectClause || '*')
+      // PostgREST expects unquoted identifiers in `select=...`; validate and strip anything unsafe.
+      const safeSelectClause = shouldFallbackToStar
+        ? '*'
+        : buildSelectClause(selectClause.split(','), { includeId: true, fallback: '*' })
+
+      let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
 
       // Use standardized filters if provided, otherwise fall back to viewFilters format
       if (safeFilters.length > 0) {
@@ -767,7 +768,11 @@ export default function GridView({
         // Apply multiple sorts if needed
         for (let i = 0; i < safeViewSorts.length; i++) {
           const sort = safeViewSorts[i]
-          const orderColumn = quoteSelectIdent(sort.field_name)
+          const orderColumn = toPostgrestColumn(sort.field_name)
+          if (!orderColumn) {
+            console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
+            continue
+          }
           if (i === 0) {
             query = query.order(orderColumn, {
               ascending: sort.direction === "asc",
@@ -798,6 +803,24 @@ export default function GridView({
       const { data, error } = await query
 
       if (error) {
+        // If a view references a column that no longer exists in the physical table,
+        // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
+        if ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('does not exist')) {
+          console.warn('[GridView] Column missing for view; retrying with "*" select.', {
+            message: (error as any)?.message,
+            code: (error as any)?.code,
+          })
+          const retry = await supabase.from(supabaseTableName).select('*').limit(ITEMS_PER_PAGE)
+          if (!retry.error) {
+            let dataArray = asArray<Record<string, any>>(retry.data)
+            setTableError(
+              'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
+            )
+            setRows(dataArray)
+            setLoading(false)
+            return
+          }
+        }
         console.error("Error loading rows:", {
           code: (error as any)?.code,
           message: (error as any)?.message,

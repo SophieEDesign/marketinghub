@@ -108,9 +108,22 @@ async function executeUpdateRecord(
     }
   }
 
+  const mappingsToObject = (
+    mappings: ActionConfig['field_update_mappings']
+  ): Record<string, any> => {
+    const result: Record<string, any> = {}
+    for (const m of mappings || []) {
+      if (!m || typeof m.field !== 'string') continue
+      const key = m.field.trim()
+      if (!key) continue
+      result[key] = m.value
+    }
+    return result
+  }
+
   // Replace variables in field updates
   const fieldUpdates = replaceVariablesInObject(
-    action.field_updates || {},
+    action.field_updates || mappingsToObject(action.field_update_mappings),
     context
   )
 
@@ -196,9 +209,22 @@ async function executeCreateRecord(
     }
   }
 
+  const mappingsToObject = (
+    mappings: ActionConfig['field_update_mappings']
+  ): Record<string, any> => {
+    const result: Record<string, any> = {}
+    for (const m of mappings || []) {
+      if (!m || typeof m.field !== 'string') continue
+      const key = m.field.trim()
+      if (!key) continue
+      result[key] = m.value
+    }
+    return result
+  }
+
   // Replace variables in field updates
   const fieldUpdates = replaceVariablesInObject(
-    action.field_updates || {},
+    action.field_updates || mappingsToObject(action.field_update_mappings),
     context
   )
 

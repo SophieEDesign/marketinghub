@@ -12,6 +12,13 @@ import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model
 import { normalizeFilterTree } from './canonical-model'
 import type { TableField } from '@/types/fields'
 
+function resolveDateOnlyDynamicValue(value: unknown): unknown {
+  if (value === '__TODAY__') {
+    return toDateOnlyLocal(new Date())
+  }
+  return value
+}
+
 function isDateOnlyString(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
@@ -63,7 +70,8 @@ function toDateOnlyLocal(d: Date): string {
  * Used for OR groups where we need to build filter strings
  */
 function conditionToSupabaseString(condition: FilterCondition): string {
-  const { field_id, operator, value } = condition
+  const { field_id, operator } = condition
+  const value = resolveDateOnlyDynamicValue(condition.value)
   const fieldName = field_id
   const fieldValue = value ?? ''
   
@@ -178,7 +186,8 @@ function applyCondition(
   condition: FilterCondition,
   tableFields?: TableField[]
 ): any {
-  const { field_id, operator, value } = condition
+  const { field_id, operator } = condition
+  const value = resolveDateOnlyDynamicValue(condition.value)
   const fieldName = field_id
   
   // Find field definition for field-aware filtering
@@ -462,7 +471,8 @@ export function evaluateFilterTree(
   }
   
   function evaluateCondition(condition: FilterCondition): boolean {
-    const { field_id, operator, value } = condition
+    const { field_id, operator } = condition
+    const value = resolveDateOnlyDynamicValue(condition.value)
     const fieldValue = getFieldValue 
       ? getFieldValue(row, field_id)
       : row[field_id]

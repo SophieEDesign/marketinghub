@@ -69,7 +69,7 @@ function formatCondition(
       return formatValueComparison(fieldRef, '=', condition.value, field)
     
     case 'not_equal':
-      return formatValueComparison(fieldRef, '≠', condition.value, field)
+      return formatValueComparison(fieldRef, '!=', condition.value, field)
     
     case 'contains':
       return `FIND("${escapeString(String(condition.value ?? ''))}", ${fieldRef}) > 0`
@@ -109,6 +109,10 @@ function formatCondition(
     
     case 'date_on_or_after':
       return formatValueComparison(fieldRef, '>=', condition.value, field)
+
+    case 'date_today':
+      // A date value can include time, so treat "today" as [TODAY(), TODAY()+1 day)
+      return `(${fieldRef} >= TODAY()) AND (${fieldRef} < DATEADD(TODAY(), 1, "DAY"))`
     
     default:
       return `${fieldRef} = ${formatValue(condition.value, field)}`
@@ -127,6 +131,11 @@ function formatValueComparison(
 function formatValue(value: any, field: TableField | undefined): string {
   if (value === null || value === undefined) {
     return '""'
+  }
+
+  // Dynamic values
+  if (value === '__TODAY__') {
+    return 'TODAY()'
   }
 
   // Boolean values

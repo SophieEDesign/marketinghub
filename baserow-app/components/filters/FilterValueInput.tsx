@@ -134,6 +134,14 @@ export default function FilterValueInput({
 
   // Date fields: Date picker
   if (field.type === 'date') {
+    const singleDateOperators: FilterOperator[] = [
+      'date_equal',
+      'date_before',
+      'date_after',
+      'date_on_or_before',
+      'date_on_or_after',
+    ]
+
     // "Today" operator - no value needed
     if (operator === 'date_today') {
       return (
@@ -185,7 +193,46 @@ export default function FilterValueInput({
         </div>
       )
     }
-    
+
+    // Single-date operators: allow dynamic "Today" without hardcoding a date
+    if (singleDateOperators.includes(operator)) {
+      const isToday = value === '__TODAY__'
+      const mode = isToday ? 'today' : 'specific'
+
+      return (
+        <div className="flex gap-2 items-center">
+          <Select
+            value={mode}
+            onValueChange={(val) => {
+              if (val === 'today') {
+                onChange('__TODAY__')
+              } else {
+                // Switch back to specific date; keep current date if it exists, otherwise clear.
+                onChange(isToday ? '' : (value as any) ?? '')
+              }
+            }}
+          >
+            <SelectTrigger className="h-9 w-32 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="specific">Specific</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Input
+            type="date"
+            value={isToday ? '' : (value as string || "")}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Select date"
+            className="h-9 text-sm flex-1"
+            disabled={isToday}
+          />
+        </div>
+      )
+    }
+
     return (
       <Input
         type="date"

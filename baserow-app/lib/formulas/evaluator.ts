@@ -8,6 +8,17 @@ export class Evaluator {
     this.context = context
   }
 
+  private isValidDate(d: Date): boolean {
+    return d instanceof Date && !isNaN(d.getTime())
+  }
+
+  private toDate(value: FormulaValue): Date | null {
+    if (value === null || value === undefined) return null
+    if (value instanceof Date) return this.isValidDate(value) ? value : null
+    const d = new Date(String(value))
+    return this.isValidDate(d) ? d : null
+  }
+
   private getFieldValue(fieldName: string): FormulaValue | FormulaError {
     // Find field by name (case-insensitive)
     const field = this.context.fields.find(
@@ -50,6 +61,31 @@ export class Evaluator {
         return left === right
       }
       return false
+    }
+
+    // Date comparisons (supports Date objects and date-like strings)
+    const leftDate = this.toDate(left)
+    const rightDate = this.toDate(right)
+    if (leftDate && rightDate) {
+      const l = leftDate.getTime()
+      const r = rightDate.getTime()
+      switch (operator) {
+        case '=':
+        case '==':
+          return l === r
+        case '!=':
+          return l !== r
+        case '>':
+          return l > r
+        case '<':
+          return l < r
+        case '>=':
+          return l >= r
+        case '<=':
+          return l <= r
+        default:
+          return false
+      }
     }
 
     // Type coercion for comparisons
@@ -208,6 +244,9 @@ export class Evaluator {
           if (node.operator === '-') {
             const num = typeof operand === 'number' ? operand : parseFloat(String(operand))
             return isNaN(num) ? '#VALUE!' : -num
+          }
+          if (node.operator === 'NOT') {
+            return !Boolean(operand)
           }
           return '#ERROR!'
 
