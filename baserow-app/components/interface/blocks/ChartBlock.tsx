@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import type { PageBlock } from "@/lib/interface/types"
+import type { AggregateType, PageBlock } from "@/lib/interface/types"
 import { applyFiltersToQuery, mergeFilters, type FilterConfig } from "@/lib/interface/filters"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import type { TableField } from "@/types/fields"
@@ -57,7 +57,8 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   // Chart block MUST have table_id configured - no fallback to page table
   const tableId = config?.table_id
   const chartType = config?.chart_type || "bar"
-  const metricType = config?.chart_aggregate || "count"
+  // Explicitly type metricType so comparisons against "count" are valid in TS.
+  const metricType: AggregateType = (config?.chart_aggregate as AggregateType) || "count"
   const metricField = config?.metric_field
   const groupBy = config?.group_by_field
   // X-axis is inferred from Group By when Group By is selected

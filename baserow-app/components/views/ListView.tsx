@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
