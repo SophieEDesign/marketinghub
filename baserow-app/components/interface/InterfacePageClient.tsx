@@ -21,6 +21,7 @@ import PageSetupState from "./PageSetupState"
 import PageDisplaySettingsPanel from "./PageDisplaySettingsPanel"
 import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -231,8 +232,11 @@ function InterfacePageClientInternal({
     if (sourceView) {
       loadSqlViewData()
     } else if (savedViewId) {
-      // Load data for pages with saved_view_id
-      loadListViewData()
+      // RULE: Views are currently not used; ignore saved_view_id unless explicitly enabled.
+      if (VIEWS_ENABLED) {
+        // Load data for pages with saved_view_id
+        loadListViewData()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page?.source_view, page?.saved_view_id, page?.page_type, page?.config, page?.base_table])
@@ -240,6 +244,15 @@ function InterfacePageClientInternal({
   // CRITICAL: Watch for view updates when page uses saved_view_id
   // This ensures that when a view is edited, the interface page refreshes
   useEffect(() => {
+    // RULE: Views are currently not used; disable saved_view_id polling entirely unless enabled.
+    if (!VIEWS_ENABLED) {
+      if (viewCheckIntervalRef.current) {
+        clearInterval(viewCheckIntervalRef.current)
+        viewCheckIntervalRef.current = null
+      }
+      return
+    }
+
     if (!page?.saved_view_id) {
       // Clear interval if no saved_view_id
       if (viewCheckIntervalRef.current) {
@@ -517,6 +530,8 @@ function InterfacePageClientInternal({
   }
 
   async function loadListViewData() {
+    // RULE: Views are currently not used; don't load list view data unless explicitly enabled.
+    if (!VIEWS_ENABLED) return
     if (!page?.saved_view_id) return
     
     // Prevent concurrent calls

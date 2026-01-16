@@ -8,6 +8,7 @@ import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 import { useIsMobile } from '@/hooks/useResponsive'
 import { createClient } from '@/lib/supabase/client'
+import { getFieldDisplayName } from '@/lib/fields/display'
 
 const COLUMN_MIN_WIDTH = 100
 
@@ -177,7 +178,7 @@ export default function GridColumnHeader({
         </span>
         <div className="min-w-0">
           <div className="text-sm font-medium text-gray-700 truncate">
-            {field.name}
+            {getFieldDisplayName(field)}
           </div>
           {isMirroredLinkedField && (
             <div className="text-[11px] text-gray-400 truncate">

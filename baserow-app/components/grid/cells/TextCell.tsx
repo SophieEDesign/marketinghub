@@ -45,6 +45,7 @@ export default function TextCell({
       setEditing(false)
     } catch (error) {
       console.error('Error saving text cell:', error)
+      alert((error as any)?.message || 'Failed to save. Please check your permissions and try again.')
     } finally {
       setSaving(false)
     }

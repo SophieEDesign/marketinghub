@@ -9,7 +9,7 @@ if (typeof window !== 'undefined' && !window.Papa) {
 export interface ParsedColumn {
   name: string
   sanitizedName: string
-  type: 'text' | 'number' | 'boolean' | 'date'
+  type: 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'
   sampleValues: any[]
 }
 
@@ -142,6 +142,40 @@ function inferColumnType(values: any[]): 'text' | 'number' | 'boolean' | 'date' 
 }
 
 /**
+ * Detect if a "text-ish" column is better represented as a select field.
+ * We only call this when the base inferred type is 'text' to avoid misclassifying
+ * genuine number/date columns.
+ *
+ * Multi-select is detected when values are frequently separated by ',' or ';'.
+ */
+function detectSelectColumnType(values: any[]): 'single_select' | 'multi_select' | null {
+  if (!Array.isArray(values)) return null
+
+  const nonEmpty = values
+    .filter(v => v !== null && v !== undefined && v !== '')
+    .map(v => String(v).trim())
+    .filter(v => v.length > 0)
+
+  if (nonEmpty.length < 3) return null
+
+  const delimiterMatches = nonEmpty.filter(v => /[,;]/.test(v)).length
+  if (delimiterMatches >= Math.ceil(nonEmpty.length * 0.4)) {
+    return 'multi_select'
+  }
+
+  // Categorical heuristic: few unique values relative to sample size
+  const unique = new Set(nonEmpty.map(v => v.toLowerCase()))
+  const uniqueCount = unique.size
+  const totalCount = nonEmpty.length
+
+  if (uniqueCount <= 15 || uniqueCount <= Math.max(2, Math.floor(totalCount * 0.5))) {
+    return 'single_select'
+  }
+
+  return null
+}
+
+/**
  * Sanitize column name for use in database
  */
 export function sanitizeColumnName(name: string): string {
@@ -246,7 +280,8 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
               : []
 
             // Ensure safe array operations for type inference
-            const typeInferenceRows = Array.isArray(dataArray) ? dataArray.slice(0, 100) : []
+            // Use more rows for better select detection, but keep it bounded.
+            const typeInferenceRows = Array.isArray(dataArray) ? dataArray.slice(0, 200) : []
             const typeInferenceValues = Array.isArray(typeInferenceRows)
               ? typeInferenceRows.map((row: any) => {
                   if (!row || typeof row !== 'object') return null
@@ -259,7 +294,9 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
                 }).filter((v: any) => v !== null && v !== undefined)
               : []
             
-            const type = inferColumnType(typeInferenceValues)
+            const baseType = inferColumnType(typeInferenceValues)
+            const selectType = baseType === 'text' ? detectSelectColumnType(typeInferenceValues) : null
+            const type = (selectType ?? baseType) as ParsedColumn['type']
 
             return {
               name: name.trim(),

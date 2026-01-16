@@ -158,6 +158,33 @@ export function assertBlockConfig(
         }
       }
       break
+    
+    case 'multi_calendar':
+    case 'multi_timeline': {
+      const sources = Array.isArray((config as any).sources) ? (config as any).sources : []
+      if (sources.length === 0) {
+        return {
+          valid: false,
+          reason: `${blockType} requires at least one source table`,
+          missingFields: ['sources'],
+          showSetupUI: true,
+        }
+      }
+
+      const hasAnyCompleteSource = sources.some((s: any) => {
+        return !!(s?.table_id && s?.title_field && s?.start_date_field)
+      })
+
+      if (!hasAnyCompleteSource) {
+        return {
+          valid: false,
+          reason: `${blockType} requires at least one fully configured source (table, title field, start date field)`,
+          missingFields: ['sources.table_id', 'sources.title_field', 'sources.start_date_field'],
+          showSetupUI: true,
+        }
+      }
+      break
+    }
 
     case 'text':
       // Text block can be empty (show setup UI)

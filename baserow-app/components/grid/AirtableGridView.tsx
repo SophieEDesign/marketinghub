@@ -925,14 +925,14 @@ export default function AirtableGridView({
         <div className="flex" style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content' }}>
           {/* Record open column (chevron) - sticky */}
           <div
-            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky left-0 z-20"
+            className="flex-shrink-0 border-r border-gray-100 bg-gray-50 flex items-center justify-center sticky left-0 z-20"
             style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: HEADER_HEIGHT }}
             aria-hidden="true"
           />
 
           {/* Checkbox column - sticky */}
           <div
-            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky z-20"
+            className="flex-shrink-0 border-r border-gray-100 bg-gray-50 flex items-center justify-center sticky z-20"
             style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
             onClick={(e) => {
               e.stopPropagation()
@@ -955,7 +955,7 @@ export default function AirtableGridView({
           {/* Frozen row number column - sticky on mobile/tablet for better navigation */}
           <div
             className={cn(
-              "flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center text-xs font-medium text-gray-500 z-20",
+              "flex-shrink-0 border-r border-gray-100 bg-gray-50 flex items-center justify-center text-xs font-medium text-gray-500 z-20",
               (isMobile || isTablet) && "sticky"
             )}
             style={{
@@ -1070,11 +1070,21 @@ export default function AirtableGridView({
               const isEven = actualIndex % 2 === 0
               const isSelected = selectedRowIds.has(row.id)
               const rowIndex = filteredRows.findIndex((r: any) => r.id === row.id)
+              const stickyBgClass = isSelected
+                ? 'bg-blue-50'
+                : isEven
+                  ? 'bg-white'
+                  : 'bg-gray-50'
+              const stickyHoverClass = isSelected
+                ? 'group-hover:bg-blue-50'
+                : isEven
+                  ? 'group-hover:bg-gray-50'
+                  : 'group-hover:bg-gray-100'
               
               return (
                 <div
                   key={row.id}
-                  className={`flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
+                  className={`group flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
                     'cursor-default'
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/30'
@@ -1105,7 +1115,11 @@ export default function AirtableGridView({
                 >
                   {/* Record open chevron - FIRST column */}
                   <div
-                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky left-0 z-10"
+                    className={cn(
+                      "flex-shrink-0 border-r border-gray-100 flex items-center justify-center sticky left-0 z-10",
+                      stickyBgClass,
+                      stickyHoverClass
+                    )}
                     style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: ROW_HEIGHT }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -1127,7 +1141,11 @@ export default function AirtableGridView({
 
                   {/* Checkbox - sticky on all screen sizes */}
                   <div
-                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky z-10"
+                    className={cn(
+                      "flex-shrink-0 border-r border-gray-100 flex items-center justify-center sticky z-10",
+                      stickyBgClass,
+                      stickyHoverClass
+                    )}
                     style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -1151,7 +1169,11 @@ export default function AirtableGridView({
                   {/* Frozen row number */}
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
-                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center text-xs text-gray-400 font-medium sticky z-10"
+                    className={cn(
+                      "flex-shrink-0 border-r border-gray-100 flex items-center justify-center text-xs text-gray-400 font-medium sticky z-10",
+                      stickyBgClass,
+                      stickyHoverClass
+                    )}
                     style={{
                       width: FROZEN_COLUMN_WIDTH,
                       height: ROW_HEIGHT,

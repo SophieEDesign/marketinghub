@@ -8,6 +8,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import type { InterfacePage } from './page-types-only'
+import { VIEWS_ENABLED } from '@/lib/featureFlags'
 
 /**
  * Extract tableId from a page
@@ -38,6 +39,10 @@ export async function getPageTableId(page: InterfacePage): Promise<string | null
 
   // Check saved_view_id -> view -> table_id
   if (page.saved_view_id) {
+    // RULE: Views are currently not used; do not resolve table_id via views unless explicitly enabled.
+    if (!VIEWS_ENABLED) {
+      return null
+    }
     try {
       const supabase = createClient()
       const { data: view, error } = await supabase

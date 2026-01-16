@@ -19,6 +19,7 @@ import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import CreateRecordModal from "@/components/records/CreateRecordModal"
 import { useToast } from "@/components/ui/use-toast"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 interface ListBlockProps {
   block: PageBlock
@@ -42,7 +43,8 @@ export default function ListBlock({
   const { toast } = useToast()
   const { config } = block
   const tableId = config?.table_id || pageTableId || config?.base_table || null
-  const viewId = config?.view_id
+  // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
+  const viewId = VIEWS_ENABLED ? config?.view_id : null
   const blockBaseFilters = Array.isArray(config?.filters) ? config.filters : []
   const sortsConfig = Array.isArray(config?.sorts) ? config.sorts : []
   

@@ -126,7 +126,13 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
           console.warn("table_rows table does not exist. Run migration to create it.")
           setRows([])
         } else {
-          console.error("Error loading rows:", error)
+          console.error("Error loading rows:", {
+            code: (error as any)?.code,
+            message: (error as any)?.message,
+            details: (error as any)?.details,
+            hint: (error as any)?.hint,
+            raw: error,
+          })
           // CRITICAL: Do NOT retry automatically on network failure
           // Keep existing rows if available
           if (rows.length === 0) {

@@ -139,6 +139,7 @@ export default function GridViewWrapper({
   // Track previous values to prevent infinite loops
   const prevInitialFiltersRef = useRef<string>('')
   const prevInitialSortsRef = useRef<string>('')
+  const prevInitialGroupByRef = useRef<string>('')
   
   // Sync filters and sorts when initial props change (e.g., from block config)
   useEffect(() => {
@@ -156,6 +157,14 @@ export default function GridViewWrapper({
       setSorts(safeInitialSorts)
     }
   }, [safeInitialSorts])
+
+  useEffect(() => {
+    const groupKey = initialGroupBy || ''
+    if (prevInitialGroupByRef.current !== groupKey) {
+      prevInitialGroupByRef.current = groupKey
+      setGroupBy(initialGroupBy)
+    }
+  }, [initialGroupBy])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {

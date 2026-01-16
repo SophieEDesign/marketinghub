@@ -234,6 +234,19 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       view_type: 'calendar',
     },
   },
+  multi_calendar: {
+    type: 'multi_calendar',
+    label: 'Multi Calendar',
+    icon: 'Calendar',
+    defaultWidth: 12,
+    defaultHeight: 10,
+    minWidth: 6,
+    minHeight: 8,
+    defaultConfig: {
+      title: 'Multi Calendar',
+      sources: [],
+    },
+  },
   kanban: {
     type: 'kanban',
     label: 'Kanban',
@@ -260,6 +273,19 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
       title: 'Timeline',
       table_id: '',
       view_type: 'timeline',
+    },
+  },
+  multi_timeline: {
+    type: 'multi_timeline',
+    label: 'Multi Timeline',
+    icon: 'GitBranch',
+    defaultWidth: 12,
+    defaultHeight: 8,
+    minWidth: 6,
+    minHeight: 6,
+    defaultConfig: {
+      title: 'Multi Timeline',
+      sources: [],
     },
   },
   list: {

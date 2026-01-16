@@ -14,8 +14,10 @@ export type BlockType =
   | 'filter'
   | 'field'
   | 'calendar'
+  | 'multi_calendar'
   | 'kanban'
   | 'timeline'
+  | 'multi_timeline'
   | 'list'
   | 'number'
 

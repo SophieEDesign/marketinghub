@@ -12,6 +12,7 @@ import FieldsTab from "./design/FieldsTab"
 import ViewsTab from "./design/ViewsTab"
 import PermissionsTab from "./design/PermissionsTab"
 import ImportCSVTab from "./design/ImportCSVTab"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 interface DesignSidebarProps {
   isOpen: boolean
@@ -39,9 +40,12 @@ export default function DesignSidebar({
     onFieldsUpdated()
   }, [onFieldsUpdated])
 
+  // RULE: Views are currently not used; force-hide Views tab unless explicitly enabled.
+  const effectiveHideViewsTab = hideViewsTab || !VIEWS_ENABLED
+
   // Calculate number of tabs for grid layout
-  const tabCount = hideViewsTab ? 3 : 4
-  const gridCols = hideViewsTab ? "grid-cols-3" : "grid-cols-4"
+  const tabCount = effectiveHideViewsTab ? 3 : 4
+  const gridCols = effectiveHideViewsTab ? "grid-cols-3" : "grid-cols-4"
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -55,7 +59,7 @@ export default function DesignSidebar({
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
           <TabsList className={`grid w-full ${gridCols}`}>
             <TabsTrigger value="fields" className="text-xs">Fields</TabsTrigger>
-            {!hideViewsTab && (
+            {!effectiveHideViewsTab && (
               <TabsTrigger value="views" className="text-xs">Views</TabsTrigger>
             )}
             <TabsTrigger value="permissions" className="text-xs">Permissions</TabsTrigger>
@@ -70,7 +74,7 @@ export default function DesignSidebar({
             />
           </TabsContent>
 
-          {!hideViewsTab && (
+          {!effectiveHideViewsTab && (
             <TabsContent value="views" className="mt-4">
               <ViewsTab
                 tableId={tableId}

@@ -26,6 +26,7 @@ import type { TableField, FieldType, FieldOptions, ChoiceColorTheme } from '@/ty
 import { FIELD_TYPES } from '@/types/fields'
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from '@/lib/field-colors'
 import { canChangeType } from '@/lib/fields/validation'
+import { getFieldDisplayName } from '@/lib/fields/display'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import {
   Dialog,
@@ -73,7 +74,7 @@ export default function FieldSettingsDrawer({
   const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
   const [loadingTables, setLoadingTables] = useState(false)
   const [typeChangeWarning, setTypeChangeWarning] = useState<string | null>(null)
-  const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; type: string }>>([])
+  const [lookupTableFields, setLookupTableFields] = useState<Array<{ id: string; name: string; label?: string | null; type: string }>>([])
   const [loadingLookupFields, setLoadingLookupFields] = useState(false)
   const [showAddOptionsDialog, setShowAddOptionsDialog] = useState(false)
   const [foundOptions, setFoundOptions] = useState<string[]>([])
@@ -127,7 +128,7 @@ export default function FieldSettingsDrawer({
       const supabase = createClient()
       const { data, error } = await supabase
         .from('table_fields')
-        .select('id, name, type')
+        .select('id, name, label, type')
         .eq('table_id', tableId)
         .order('position', { ascending: true })
 
@@ -145,7 +146,7 @@ export default function FieldSettingsDrawer({
   // Reset form when field changes
   useEffect(() => {
     if (field && open) {
-      setName(field.name)
+      setName(getFieldDisplayName(field))
       setType(field.type)
       setRequired(field.required || false)
       setReadOnly(field.options?.read_only || false)
@@ -444,7 +445,7 @@ export default function FieldSettingsDrawer({
       
       // Show success message
       setTimeout(() => {
-        alert(`✓ Conversion complete!\n\n- Created "${duplicateName}" with your original data\n- Converted "${field.name}" to a ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field\n\nYou can configure the ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field settings now.`)
+        alert(`✓ Conversion complete!\n\n- Created "${duplicateName}" with your original data\n- Converted "${getFieldDisplayName(field)}" to a ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field\n\nYou can configure the ${pendingLookupType === 'lookup' ? 'lookup' : 'formula'} field settings now.`)
       }, 100)
     } catch (error) {
       console.error('Error duplicating field:', error)
@@ -481,7 +482,7 @@ export default function FieldSettingsDrawer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fieldId: field.id,
-          name: name.trim(),
+          label: name.trim(),
           type,
           required,
           group_name: groupName.trim() || null,
@@ -961,7 +962,7 @@ export default function FieldSettingsDrawer({
                           .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                           .map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -1005,7 +1006,7 @@ export default function FieldSettingsDrawer({
                                 .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                                 .map((field) => (
                                   <SelectItem key={field.id} value={field.name}>
-                                    {field.name}
+                                    {getFieldDisplayName(field)}
                                   </SelectItem>
                                 ))}
                             </SelectContent>
@@ -1124,7 +1125,7 @@ export default function FieldSettingsDrawer({
                   return (
                     <p className="text-xs text-muted-foreground">
                       {linkField 
-                        ? `This field shows information pulled from records in the "${linkField.name}" field.`
+                        ? `This field shows information pulled from records in the "${getFieldDisplayName(linkField)}" field.`
                         : `This field shows information pulled from records in the linked table.`}
                     </p>
                   )
@@ -1149,7 +1150,7 @@ export default function FieldSettingsDrawer({
                         ) : (
                           lookupTableFields.map((field) => (
                             <SelectItem key={field.id} value={field.id}>
-                              {field.name} ({field.type})
+                              {getFieldDisplayName(field)} ({field.type})
                             </SelectItem>
                           ))
                         )}
@@ -1178,7 +1179,7 @@ export default function FieldSettingsDrawer({
                             .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -1222,7 +1223,7 @@ export default function FieldSettingsDrawer({
                                   .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
                                   .map((field) => (
                                     <SelectItem key={field.id} value={field.name}>
-                                      {field.name}
+                                      {getFieldDisplayName(field)}
                                     </SelectItem>
                                   ))}
                               </SelectContent>

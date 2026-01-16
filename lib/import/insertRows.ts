@@ -3,7 +3,10 @@
 /**
  * Convert CSV value to proper type for database
  */
-function convertValue(value: any, type: 'text' | 'number' | 'boolean' | 'date'): any {
+function convertValue(
+  value: any,
+  type: 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'
+): any {
   if (value === null || value === undefined || value === '') {
     return null
   }
@@ -18,9 +21,25 @@ function convertValue(value: any, type: 'text' | 'number' | 'boolean' | 'date'):
     case 'date':
       const date = new Date(value)
       return isNaN(date.getTime()) ? null : date.toISOString()
+    case 'multi_select': {
+      // Values can be "a, b" or "a; b" (or already an array).
+      if (Array.isArray(value)) {
+        const cleaned = value.map(v => String(v).trim()).filter(v => v.length > 0)
+        return cleaned.length > 0 ? cleaned : null
+      }
+      const parts = String(value)
+        .split(/[,;]/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+      return parts.length > 0 ? parts : null
+    }
+    case 'single_select': {
+      const s = String(value).trim()
+      return s.length > 0 ? s : null
+    }
     case 'text':
     default:
-      return String(value)
+      return Array.isArray(value) ? value.join(', ') : String(value)
   }
 }
 
@@ -31,7 +50,7 @@ function convertValue(value: any, type: 'text' | 'number' | 'boolean' | 'date'):
 export async function insertRows(
   tableName: string,
   rows: Record<string, any>[],
-  columnTypes: Record<string, 'text' | 'number' | 'boolean' | 'date'>,
+  columnTypes: Record<string, 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'>,
   columnNameMap?: Record<string, string>
 ): Promise<{ success: boolean; inserted: number; error?: string }> {
   const BATCH_SIZE = 500

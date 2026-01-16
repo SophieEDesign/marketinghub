@@ -24,6 +24,7 @@ import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { parseCSV, type ParsedCSV } from "@/lib/import/csvParser"
 import { sanitizeFieldName, formatFieldNameForDisplay } from "@/lib/fields/validation"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
@@ -1254,7 +1255,7 @@ export default function CSVImportModal({
                             <SelectItem value="new">+ Create new field</SelectItem>
                             {tableFields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {formatFieldNameForDisplay(field.name)} ({FIELD_TYPES.find(t => t.type === field.type)?.label || field.type})
+                                {getFieldDisplayName(field)} ({FIELD_TYPES.find(t => t.type === field.type)?.label || field.type})
                               </SelectItem>
                             ))}
                           </SelectContent>

@@ -18,8 +18,10 @@ import LinkPreviewBlock from "./blocks/LinkPreviewBlock"
 import FilterBlock from "./blocks/FilterBlock"
 import FieldBlock from "./blocks/FieldBlock"
 import CalendarBlock from "./blocks/CalendarBlock"
+import MultiCalendarBlock from "./blocks/MultiCalendarBlock"
 import KanbanBlock from "./blocks/KanbanBlock"
 import TimelineBlock from "./blocks/TimelineBlock"
+import MultiTimelineBlock from "./blocks/MultiTimelineBlock"
 import GalleryBlock from "./blocks/GalleryBlock"
 import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
@@ -40,7 +42,7 @@ interface BlockRendererProps {
   recordId?: string | null // Record ID for record review pages
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
-  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
   pageShowAddRecord?: boolean // Page-level default for "Add record" buttons in data blocks
   pageEditable?: boolean // Page-level editability (for field blocks)
@@ -279,6 +281,20 @@ export default function BlockRenderer({
             />
           </LazyBlockWrapper>
         )
+      
+      case "multi_calendar":
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <MultiCalendarBlock
+              block={safeBlock}
+              isEditing={canEdit}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
+          </LazyBlockWrapper>
+        )
 
       case "kanban":
         // Kanban block - wrapper around GridBlock with view_type='kanban'
@@ -304,6 +320,20 @@ export default function BlockRenderer({
               block={safeBlock}
               isEditing={canEdit}
               pageTableId={pageTableId}
+              pageId={pageId}
+              filters={filters}
+              onRecordClick={onRecordClick}
+              pageShowAddRecord={pageShowAddRecord}
+            />
+          </LazyBlockWrapper>
+        )
+      
+      case "multi_timeline":
+        return (
+          <LazyBlockWrapper enabled={!isEditing}>
+            <MultiTimelineBlock
+              block={safeBlock}
+              isEditing={canEdit}
               pageId={pageId}
               filters={filters}
               onRecordClick={onRecordClick}

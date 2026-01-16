@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FieldConfig {
   field: string // Field name or ID
@@ -279,7 +280,7 @@ export default function RecordFieldPanel({
                   <tr key={field.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 w-1/3">
                       <div className="min-w-0">
-                        <div className="truncate">{field.name}</div>
+                        <div className="truncate">{getFieldDisplayName(field)}</div>
                         {isMirroredLinkedField && (
                           <div className="text-[11px] text-gray-500 font-normal truncate">
                             Linked from {linkedFromTableName}
@@ -338,7 +339,7 @@ export default function RecordFieldPanel({
             return (
               <div key={field.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="text-sm font-medium text-gray-700 mb-2">
-                  <div className="truncate">{field.name}</div>
+                  <div className="truncate">{getFieldDisplayName(field)}</div>
                   {isMirroredLinkedField && (
                     <div className="text-[11px] text-gray-500 font-normal truncate">
                       Linked from {linkedFromTableName}

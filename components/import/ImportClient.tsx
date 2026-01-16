@@ -101,7 +101,7 @@ export default function ImportClient() {
 
       // 2. Insert rows
       // Map original column names to sanitized names for type lookup
-      const columnTypes: Record<string, 'text' | 'number' | 'boolean' | 'date'> = {}
+      const columnTypes: Record<string, 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'> = {}
       const columnNameMap: Record<string, string> = {}
       parsedData.columns.forEach(col => {
         columnTypes[col.sanitizedName] = col.type
@@ -125,7 +125,8 @@ export default function ImportClient() {
       const metadataResult = await createImportMetadata(
         sanitizedName,
         tableName.trim(),
-        parsedData.columns
+        parsedData.columns,
+        parsedData.rows
       )
 
       if (!metadataResult.success) {
@@ -137,11 +138,16 @@ export default function ImportClient() {
 
       // Redirect after a short delay
       setTimeout(() => {
-        if (metadataResult.tableId && metadataResult.viewId) {
-          router.push(`/data/${metadataResult.tableId}/views/${metadataResult.viewId}`)
-        } else {
-          router.push('/data')
-        }
+        const href =
+          metadataResult.tableId && metadataResult.viewId
+            ? `/data/${metadataResult.tableId}/views/${metadataResult.viewId}`
+            : '/data'
+
+        router.push(href)
+        // Force a route refresh so the destination page fetches fresh rows/fields immediately.
+        router.refresh()
+        // Extra safety: refresh again shortly after navigation completes.
+        setTimeout(() => router.refresh(), 250)
       }, 2000)
     } catch (err: any) {
       setError(err.message || 'Failed to import table')

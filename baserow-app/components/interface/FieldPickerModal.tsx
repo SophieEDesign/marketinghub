@@ -28,10 +28,19 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Search } from "lucide-react"
 import { getFieldIcon } from "@/lib/icons"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import { cn } from "@/lib/utils"
 
 interface FieldPickerModalProps {
@@ -55,7 +64,12 @@ export default function FieldPickerModal({
   const [loading, setLoading] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null)
   const [fieldSearch, setFieldSearch] = useState("")
+  const [fieldSort, setFieldSort] = useState<"position" | "name_asc" | "name_desc" | "type_asc">(
+    "position"
+  )
   const [localSelectedFields, setLocalSelectedFields] = useState<string[]>(selectedFields)
+  const [pasteText, setPasteText] = useState("")
+  const [pasteSummary, setPasteSummary] = useState<{ added: number; missing: number } | null>(null)
 
   // Load fields and table name
   useEffect(() => {
@@ -68,6 +82,8 @@ export default function FieldPickerModal({
       setLocalSelectedFields(selectedFields)
       setFieldSearch("")
       setSelectedRecord(null)
+      setPasteText("")
+      setPasteSummary(null)
     }
   }, [open, tableId, selectedFields])
 
@@ -141,12 +157,51 @@ export default function FieldPickerModal({
     }
   }
 
-  // Filter fields by search
+  const normalizeToken = useCallback((value: string) => {
+    return (value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+  }, [])
+
+  const parsePasteList = useCallback((value: string) => {
+    // Supports newline / comma / tab / semicolon separated lists (Airtable-style paste)
+    const raw = (value || "")
+      .split(/[\n\r\t,;]+/g)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const seen = new Set<string>()
+    const tokens: string[] = []
+    for (const t of raw) {
+      const n = normalizeToken(t)
+      if (!n || seen.has(n)) continue
+      seen.add(n)
+      tokens.push(t)
+    }
+    return tokens
+  }, [normalizeToken])
+
+  // Filter + sort fields for list
   const filteredFields = useMemo(() => {
-    if (!fieldSearch) return fields
-    const searchLower = fieldSearch.toLowerCase()
-    return fields.filter((f) => f.name.toLowerCase().includes(searchLower))
-  }, [fields, fieldSearch])
+    const searchLower = fieldSearch.trim().toLowerCase()
+
+    const base = searchLower
+      ? fields.filter((f) => f.name.toLowerCase().includes(searchLower))
+      : fields
+
+    const sorted = [...base]
+    sorted.sort((a, b) => {
+      if (fieldSort === "position") {
+        // keep DB position order (already ordered), but preserve stable behavior if we filtered
+        return (a.position ?? 0) - (b.position ?? 0)
+      }
+      if (fieldSort === "name_asc") return a.name.localeCompare(b.name)
+      if (fieldSort === "name_desc") return b.name.localeCompare(a.name)
+      if (fieldSort === "type_asc") return (a.type || "").localeCompare(b.type || "") || a.name.localeCompare(b.name)
+      return 0
+    })
+    return sorted
+  }, [fields, fieldSearch, fieldSort])
 
   const handleFieldToggle = (fieldName: string, checked: boolean) => {
     if (checked) {
@@ -162,6 +217,45 @@ export default function FieldPickerModal({
 
   const handleSelectNone = () => {
     setLocalSelectedFields([])
+  }
+
+  const handleInvertSelection = () => {
+    const selected = new Set(localSelectedFields)
+    setLocalSelectedFields(fields.filter((f) => !selected.has(f.name)).map((f) => f.name))
+  }
+
+  const applyPaste = (mode: "add" | "replace") => {
+    const tokens = parsePasteList(pasteText)
+    if (tokens.length === 0) {
+      setPasteSummary({ added: 0, missing: 0 })
+      return
+    }
+
+    const fieldNameByNorm = new Map<string, string>()
+    for (const f of fields) {
+      fieldNameByNorm.set(normalizeToken(f.name), f.name)
+    }
+
+    const matched: string[] = []
+    let missing = 0
+    for (const t of tokens) {
+      const match = fieldNameByNorm.get(normalizeToken(t))
+      if (match) matched.push(match)
+      else missing += 1
+    }
+
+    const next =
+      mode === "replace"
+        ? Array.from(new Set(matched))
+        : Array.from(new Set([...localSelectedFields, ...matched]))
+
+    const addedCount =
+      mode === "replace"
+        ? next.length
+        : next.filter((n) => !localSelectedFields.includes(n)).length
+
+    setLocalSelectedFields(next)
+    setPasteSummary({ added: addedCount, missing })
   }
 
   const handleSave = () => {
@@ -210,6 +304,22 @@ export default function FieldPickerModal({
                   className="pl-8 h-8 text-sm"
                 />
               </div>
+
+              <div className="mt-2">
+                <Label className="text-xs text-gray-600">Sort</Label>
+                <Select value={fieldSort} onValueChange={(v) => setFieldSort(v as any)}>
+                  <SelectTrigger className="h-8 text-sm mt-1">
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="position">Default (table order)</SelectItem>
+                    <SelectItem value="name_asc">Name (A → Z)</SelectItem>
+                    <SelectItem value="name_desc">Name (Z → A)</SelectItem>
+                    <SelectItem value="type_asc">Type (A → Z)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div className="flex gap-2 mt-2">
                 <button
                   type="button"
@@ -226,6 +336,49 @@ export default function FieldPickerModal({
                 >
                   Select None
                 </button>
+                <span className="text-xs text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={handleInvertSelection}
+                  className="text-xs text-blue-600 hover:text-blue-700 underline"
+                >
+                  Invert
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                <Label className="text-xs text-gray-600">Paste list (field names)</Label>
+                <Textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  placeholder={"Paste field names (one per line, or comma-separated)"}
+                  className="text-xs min-h-[70px]"
+                />
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPaste("add")}>
+                    Add
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPaste("replace")}>
+                    Replace
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs ml-auto"
+                    onClick={() => {
+                      setPasteText("")
+                      setPasteSummary(null)
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                {pasteSummary && (
+                  <div className="text-xs text-gray-500">
+                    Added: {pasteSummary.added} · Not found: {pasteSummary.missing}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -252,7 +405,7 @@ export default function FieldPickerModal({
                         <div className="flex-shrink-0">{FieldIcon}</div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-900 truncate">
-                            {field.name}
+                            {getFieldDisplayName(field)}
                           </div>
                           <div className="text-xs text-gray-500">{field.type}</div>
                         </div>
@@ -352,7 +505,7 @@ export default function FieldPickerModal({
                         return (
                           <div key={field.id}>
                             <Label className="text-xs font-medium text-gray-500 uppercase">
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </Label>
                             <div className="mt-1 text-sm text-gray-900">
                               {value !== null && value !== undefined ? (

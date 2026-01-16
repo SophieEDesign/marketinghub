@@ -57,9 +57,14 @@ export async function POST(
   try {
     const { tableId } = await params
     const body = await request.json()
-    const { name, type, required, default_value, options } = body
+    const { name, label, type, required, default_value, options } = body
 
-    if (!name || !type) {
+    // Backward compatibility:
+    // - older clients send `name` as the human-facing title
+    // - newer clients should send `label`
+    const rawLabel = String((label ?? name) ?? '').trim()
+
+    if (!rawLabel || !type) {
       return NextResponse.json(
         { error: 'Field name and type are required' },
         { status: 400 }
@@ -80,7 +85,7 @@ export async function POST(
     const existingNames = existingFields.map(f => f.name.toLowerCase())
 
     // Sanitize field name first (handles reserved words)
-    const sanitizedName = sanitizeFieldName(name)
+    const sanitizedName = sanitizeFieldName(rawLabel)
     
     // Check if sanitized name is a reserved word and handle it
     const { RESERVED_WORDS } = await import('@/types/fields')
@@ -129,6 +134,7 @@ export async function POST(
         {
           table_id: tableId,
           name: finalSanitizedName,
+          label: rawLabel,
           type: type as FieldType,
           position,
           order_index,
@@ -254,7 +260,7 @@ export async function PATCH(
   try {
     const { tableId } = await params
     const body = await request.json()
-    const { fieldId, name, type, required, default_value, options, group_name } = body
+    const { fieldId, name, label, internal_name, type, required, default_value, options, group_name } = body
 
     if (!fieldId) {
       return NextResponse.json(
@@ -297,14 +303,28 @@ export async function PATCH(
     let sqlOperations: string[] = []
     let isDestructive = false
 
-    // Handle name change
-    if (name && name !== existingField.name) {
+    // Handle label change (preferred).
+    // Backward compatibility: if `label` not provided, treat `name` as label-only and do not rename the underlying column.
+    const nextLabel =
+      typeof label === 'string'
+        ? label.trim()
+        : typeof name === 'string'
+          ? name.trim()
+          : undefined
+
+    if (nextLabel !== undefined && nextLabel !== (existingField.label ?? '')) {
+      updates.label = nextLabel || null
+    }
+
+    // Handle internal identifier change (rare; renames DB column + updates view_fields)
+    if (internal_name && internal_name !== existingField.name) {
       const existingFields = await getTableFields(tableId)
       const existingNames = existingFields
         .filter(f => f.id !== fieldId)
         .map(f => f.name.toLowerCase())
 
-      const nameValidation = validateFieldName(name, existingNames)
+      const desiredInternalName = sanitizeFieldName(String(internal_name))
+      const nameValidation = validateFieldName(desiredInternalName, existingNames)
       if (!nameValidation.valid) {
         return NextResponse.json(
           { error: nameValidation.error },
@@ -312,7 +332,7 @@ export async function PATCH(
         )
       }
 
-      const newSanitizedName = sanitizeFieldName(name)
+      const newSanitizedName = desiredInternalName
       updates.name = newSanitizedName
 
       // Only rename SQL column if field is not virtual

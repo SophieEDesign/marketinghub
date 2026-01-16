@@ -1,0 +1,659 @@
+"use client"
+
+import { useEffect, useMemo, useRef, useState } from "react"
+import { format } from "date-fns"
+import FullCalendar from "@fullcalendar/react"
+import dayGridPlugin from "@fullcalendar/daygrid"
+import interactionPlugin from "@fullcalendar/interaction"
+import type { EventDropArg, EventInput } from "@fullcalendar/core"
+import { createClient } from "@/lib/supabase/client"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Plus } from "lucide-react"
+import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
+import QuickFilterBar from "@/components/filters/QuickFilterBar"
+import type { TableRow } from "@/types/database"
+import type { TableField } from "@/types/fields"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import {
+  applyFiltersToQuery,
+  deriveDefaultValuesFromFilters,
+  normalizeFilter,
+  type FilterConfig,
+} from "@/lib/interface/filters"
+import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
+import { asArray } from "@/lib/utils/asArray"
+
+type MultiSource = {
+  id: string
+  enabled?: boolean
+  label?: string
+  table_id: string
+  view_id?: string
+  title_field: string
+  start_date_field: string
+  end_date_field?: string
+  color_field?: string
+  type_field?: string
+}
+
+interface MultiCalendarViewProps {
+  blockId: string
+  pageId?: string | null
+  sources: MultiSource[]
+  filters?: FilterConfig[]
+  blockConfig?: Record<string, any>
+  isEditing?: boolean
+  onRecordClick?: (recordId: string, tableId?: string) => void
+  pageShowAddRecord?: boolean
+}
+
+const SOURCE_COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#ec4899",
+]
+
+function pickSourceColor(index: number) {
+  return SOURCE_COLORS[index % SOURCE_COLORS.length]
+}
+
+function safeDateOnly(d: Date) {
+  return format(d, "yyyy-MM-dd")
+}
+
+export default function MultiCalendarView({
+  blockId,
+  pageId = null,
+  sources,
+  filters = [],
+  blockConfig = {},
+  isEditing = false,
+  onRecordClick,
+  pageShowAddRecord = false,
+}: MultiCalendarViewProps) {
+  const supabase = useMemo(() => createClient(), [])
+  const { openRecord } = useRecordPanel()
+
+  // Respect block permissions + per-block add-record toggle (same contract as GridBlock).
+  const appearance = (blockConfig as any)?.appearance || {}
+  const permissions = (blockConfig as any)?.permissions || {}
+  const isViewOnly = permissions.mode === "view"
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const blockShowAddRecord = appearance.show_add_record
+  const showAddRecord = blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
+  const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate && !isEditing
+
+  const enabledSourceIdsDefault = useMemo(() => {
+    return sources.filter((s) => s.enabled !== false).map((s) => s.id)
+  }, [sources])
+  const [enabledSourceIds, setEnabledSourceIds] = useState<string[]>(enabledSourceIdsDefault)
+  useEffect(() => setEnabledSourceIds(enabledSourceIdsDefault), [enabledSourceIdsDefault])
+
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+
+  const [tablesBySource, setTablesBySource] = useState<Record<string, { tableId: string; supabaseTable: string; name: string }>>({})
+  const [fieldsBySource, setFieldsBySource] = useState<Record<string, TableField[]>>({})
+  const [viewDefaultFiltersBySource, setViewDefaultFiltersBySource] = useState<Record<string, FilterConfig[]>>({})
+  const [rowsBySource, setRowsBySource] = useState<Record<string, TableRow[]>>({})
+
+  const [quickFiltersBySource, setQuickFiltersBySource] = useState<Record<string, FilterConfig[]>>({})
+  const [quickFilterSourceId, setQuickFilterSourceId] = useState<string>(() => enabledSourceIdsDefault[0] || sources[0]?.id || "")
+
+  // Creation flow
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createSourceId, setCreateSourceId] = useState<string>("")
+  const [createDate, setCreateDate] = useState<Date>(new Date())
+
+  const loadingRef = useRef(false)
+
+  const effectiveEnabledSources = useMemo(() => {
+    const enabledSet = new Set(enabledSourceIds)
+    return sources.filter((s) => enabledSet.has(s.id) && s.table_id)
+  }, [sources, enabledSourceIds])
+
+  function isFilterCompatible(filter: FilterConfig, tableFields: TableField[]) {
+    const fieldName = (filter as any)?.field_name || (filter as any)?.field
+    if (!fieldName) return false
+    return tableFields.some((f) => f.name === fieldName || f.id === fieldName)
+  }
+
+  async function loadAll() {
+    if (loadingRef.current) return
+    loadingRef.current = true
+    setLoading(true)
+    try {
+      const nextTables: Record<string, { tableId: string; supabaseTable: string; name: string }> = {}
+      const nextFields: Record<string, TableField[]> = {}
+      const nextViewDefaults: Record<string, FilterConfig[]> = {}
+      const nextRows: Record<string, TableRow[]> = {}
+
+      // Serialize all requests (connection exhaustion guard).
+      for (const s of sources) {
+        if (!s?.table_id) continue
+
+        const tableRes = await supabase
+          .from("tables")
+          .select("id, name, supabase_table")
+          .eq("id", s.table_id)
+          .single()
+
+        if (!tableRes.data?.supabase_table) continue
+        nextTables[s.id] = {
+          tableId: s.table_id,
+          supabaseTable: tableRes.data.supabase_table,
+          name: tableRes.data.name || "Untitled table",
+        }
+
+        const fieldsRes = await supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", s.table_id)
+          .order("position", { ascending: true })
+        nextFields[s.id] = asArray<TableField>(fieldsRes.data)
+
+        // View default filters (optional per source)
+        if (s.view_id) {
+          const viewFiltersRes = await supabase
+            .from("view_filters")
+            .select("*")
+            .eq("view_id", s.view_id)
+          const vf = asArray<any>(viewFiltersRes.data).map((f: any) =>
+            normalizeFilter({
+              id: f.id || "",
+              field_name: f.field_name,
+              operator: f.operator,
+              value: f.value,
+            })
+          )
+          nextViewDefaults[s.id] = vf
+        } else {
+          nextViewDefaults[s.id] = []
+        }
+      }
+
+      // Now load rows per source (serialized).
+      for (const s of sources) {
+        if (!s?.table_id) continue
+        const table = nextTables[s.id]
+        const tableFields = nextFields[s.id] || []
+        if (!table?.supabaseTable) continue
+
+        const viewDefaults = nextViewDefaults[s.id] || []
+        const userQuick = quickFiltersBySource[s.id] || []
+
+        const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
+        const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
+
+        // Rule: quick filters apply on top; they must not overwrite view defaults.
+        const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
+
+        let query = supabase.from(table.supabaseTable).select("*")
+        const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
+        query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
+        query = query.order("created_at", { ascending: false })
+
+        const rowsRes = await query
+        const data = asArray<any>(rowsRes.data)
+        nextRows[s.id] = data.map((row) => ({
+          id: row.id,
+          table_id: table.tableId,
+          data: row,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
+        })) as TableRow[]
+      }
+
+      setTablesBySource(nextTables)
+      setFieldsBySource(nextFields)
+      setViewDefaultFiltersBySource(nextViewDefaults)
+      setRowsBySource(nextRows)
+    } finally {
+      setLoading(false)
+      loadingRef.current = false
+    }
+  }
+
+  // Reload whenever sources change (and on first mount). Quick filters are applied via dedicated reload button (keeps it predictable).
+  useEffect(() => {
+    loadAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(sources), JSON.stringify(filters)])
+
+  const events = useMemo<EventInput[]>(() => {
+    const enabledSet = new Set(enabledSourceIds)
+
+    const out: EventInput[] = []
+    sources.forEach((s, idx) => {
+      if (!enabledSet.has(s.id)) return
+      if (!s.table_id || !s.title_field || !s.start_date_field) return
+
+      const table = tablesBySource[s.id]
+      const tableFields = fieldsBySource[s.id] || []
+      const rows = rowsBySource[s.id] || []
+      if (!table) return
+
+      const sourceLabel = (s.label || "").trim() || table.name
+      const sourceColor = pickSourceColor(idx)
+
+      const startField = s.start_date_field
+      const endField = s.end_date_field
+      const titleField = s.title_field
+
+      const isStartEditable = tableFields.some((f) => (f.name === startField || f.id === startField) && f.type === "date")
+
+      rows.forEach((r) => {
+        const row = r.data || {}
+        const startRaw = row[startField]
+        const endRaw = endField ? row[endField] : null
+        if (!startRaw) return
+
+        const start = new Date(startRaw)
+        if (isNaN(start.getTime())) return
+
+        const end = endRaw ? new Date(endRaw) : start
+        const finalEnd = isNaN(end.getTime()) ? start : end
+
+        const title = row[titleField] ? String(row[titleField]) : "Untitled"
+        if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return
+
+        // Date range filter (UI-level)
+        if (dateFrom && start < dateFrom) return
+        if (dateTo && start > dateTo) return
+
+        let eventColor = sourceColor
+        if (s.color_field) {
+          const colorFieldObj = tableFields.find(
+            (f) =>
+              (f.name === s.color_field || f.id === s.color_field) &&
+              (f.type === "single_select" || f.type === "multi_select")
+          )
+          if (colorFieldObj) {
+            const rawValue = row[colorFieldObj.name]
+            if (rawValue) {
+              eventColor = normalizeHexColor(
+                resolveChoiceColor(
+                  String(rawValue).trim(),
+                  colorFieldObj.type,
+                  colorFieldObj.options,
+                  colorFieldObj.type === "single_select"
+                )
+              )
+            }
+          }
+        }
+
+        const eventId = `${s.id}:${r.id}`
+
+        out.push({
+          id: eventId,
+          title,
+          start,
+          end: finalEnd || undefined,
+          backgroundColor: eventColor,
+          borderColor: eventColor,
+          editable: isStartEditable && !isViewOnly && !isEditing,
+          startEditable: isStartEditable && !isViewOnly && !isEditing,
+          extendedProps: {
+            sourceId: s.id,
+            sourceLabel,
+            tableId: table.tableId,
+            supabaseTableName: table.supabaseTable,
+            rowId: r.id,
+            mapping: s,
+            rowData: row,
+            sourceColor,
+          },
+        })
+      })
+    })
+
+    return out
+  }, [
+    sources,
+    enabledSourceIds,
+    tablesBySource,
+    fieldsBySource,
+    rowsBySource,
+    searchQuery,
+    dateFrom,
+    dateTo,
+    isViewOnly,
+    isEditing,
+  ])
+
+  async function handleEventDrop(info: EventDropArg) {
+    const ext = info.event.extendedProps as any
+    const mapping = ext?.mapping as MultiSource | undefined
+    const tableId = ext?.tableId as string | undefined
+    const supabaseTableName = ext?.supabaseTableName as string | undefined
+    const rowId = ext?.rowId as string | undefined
+    const newStart = info.event?.start
+
+    if (!mapping || !tableId || !supabaseTableName || !rowId || !newStart) {
+      info.revert()
+      return
+    }
+
+    const tableFields = fieldsBySource[mapping.id] || []
+    const startFieldName = mapping.start_date_field
+    const hasStart = tableFields.some((f) => (f.name === startFieldName || f.id === startFieldName) && f.type === "date")
+    if (!hasStart) {
+      info.revert()
+      return
+    }
+
+    // Shift end date by the same delta, if an end field exists.
+    const currentRow = (rowsBySource[mapping.id] || []).find((r) => r.id === rowId)
+    const currentRowData = currentRow?.data || ext?.rowData || {}
+    const oldFromRaw = currentRowData?.[startFieldName]
+    const oldFromDate = oldFromRaw && !isNaN(new Date(oldFromRaw).getTime()) ? new Date(oldFromRaw) : info.oldEvent?.start || null
+
+    const updates: Record<string, any> = { [startFieldName]: safeDateOnly(newStart) }
+
+    if (mapping.end_date_field && currentRowData?.[mapping.end_date_field] && oldFromDate && !isNaN(oldFromDate.getTime())) {
+      const oldToRaw = currentRowData[mapping.end_date_field]
+      const oldToDate = new Date(oldToRaw)
+      if (!isNaN(oldToDate.getTime())) {
+        const deltaMs = newStart.getTime() - oldFromDate.getTime()
+        const newToDate = new Date(oldToDate.getTime() + deltaMs)
+        updates[mapping.end_date_field] = safeDateOnly(newToDate)
+      }
+    }
+
+    // Optimistic update
+    setRowsBySource((prev) => ({
+      ...prev,
+      [mapping.id]: (prev[mapping.id] || []).map((r) =>
+        r.id === rowId
+          ? { ...r, data: { ...(r.data || {}), ...updates } }
+          : r
+      ),
+    }))
+
+    try {
+      const { error } = await supabase.from(supabaseTableName).update(updates).eq("id", rowId)
+      if (error) throw error
+    } catch (e) {
+      info.revert()
+      await loadAll()
+    }
+  }
+
+  async function handleCreate() {
+    const sid = createSourceId
+    const mapping = sources.find((s) => s.id === sid)
+    if (!mapping?.table_id) return
+    const table = tablesBySource[sid]
+    const tableFields = fieldsBySource[sid] || []
+    if (!table?.supabaseTable) return
+
+    const startField = mapping.start_date_field
+    const endField = mapping.end_date_field
+
+    const viewDefaults = viewDefaultFiltersBySource[sid] || []
+    const userQuick = quickFiltersBySource[sid] || []
+    const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
+    const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
+    const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
+
+    const defaultsFromFilters = deriveDefaultValuesFromFilters(effectiveFilters, tableFields)
+
+    const newData: Record<string, any> = {
+      ...defaultsFromFilters,
+    }
+    // Ensure date fields are set so record appears in view
+    if (startField) newData[startField] = safeDateOnly(createDate)
+    if (endField) newData[endField] = newData[endField] || safeDateOnly(createDate)
+
+    try {
+      const { error } = await supabase.from(table.supabaseTable).insert([newData])
+      if (error) throw error
+      setCreateOpen(false)
+      await loadAll()
+    } catch (e) {
+      console.error("MultiCalendar: Failed to create record", e)
+      alert("Failed to create record. Please try again.")
+    }
+  }
+
+  const legendItems = useMemo(() => {
+    return sources
+      .filter((s) => s.table_id)
+      .map((s, idx) => {
+        const table = tablesBySource[s.id]
+        const label = (s.label || "").trim() || table?.name || "Untitled"
+        return { sourceId: s.id, label, color: pickSourceColor(idx) }
+      })
+  }, [sources, tablesBySource])
+
+  if (loading) {
+    return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>
+  }
+
+  return (
+    <div className="h-full w-full flex flex-col">
+      {/* Unified header: toggles + quick filters + add */}
+      {!isEditing && (
+        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
+                {legendItems.map((item) => {
+                  const checked = enabledSourceIds.includes(item.sourceId)
+                  return (
+                    <label key={item.sourceId} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          const on = Boolean(v)
+                          setEnabledSourceIds((prev) => {
+                            const set = new Set(prev)
+                            if (on) set.add(item.sourceId)
+                            else set.delete(item.sourceId)
+                            return Array.from(set)
+                          })
+                        }}
+                      />
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-gray-700">{item.label}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search titles…"
+                className="h-8 w-48 bg-white"
+              />
+              {canCreateRecord && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="bg-white"
+                  onClick={() => {
+                    const firstEnabled = enabledSourceIds[0] || sources[0]?.id || ""
+                    setCreateSourceId(firstEnabled)
+                    setCreateDate(new Date())
+                    setCreateOpen(true)
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick filters per source (session-only) */}
+          {effectiveEnabledSources.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="min-w-[220px]">
+                <Label className="text-xs text-gray-600">Quick filters for</Label>
+                <Select
+                  value={quickFilterSourceId || "__none__"}
+                  onValueChange={(v) => setQuickFilterSourceId(v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 bg-white">
+                    <SelectValue placeholder="Select source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {effectiveEnabledSources.map((s) => {
+                      const table = tablesBySource[s.id]
+                      const label = (s.label || "").trim() || table?.name || "Untitled"
+                      return (
+                        <SelectItem key={s.id} value={s.id}>
+                          {label}
+                        </SelectItem>
+                      )
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {quickFilterSourceId && (
+                <QuickFilterBar
+                  storageKey={`mh:multiQuickFilters:${pageId || "page"}:${blockId}:${quickFilterSourceId}`}
+                  tableFields={fieldsBySource[quickFilterSourceId] || []}
+                  viewDefaultFilters={viewDefaultFiltersBySource[quickFilterSourceId] || []}
+                  onChange={(next) =>
+                    setQuickFiltersBySource((prev) => ({ ...prev, [quickFilterSourceId]: next }))
+                  }
+                />
+              )}
+
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="bg-white"
+                onClick={() => loadAll()}
+                disabled={loadingRef.current}
+                title="Apply quick filters"
+              >
+                Apply
+              </Button>
+            </div>
+          )}
+
+          <CalendarDateRangeControls
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateFromChange={setDateFrom}
+            onDateToChange={setDateTo}
+            disabled={false}
+          />
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0">
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          height="100%"
+          events={events}
+          editable={!isViewOnly && !isEditing}
+          eventDrop={handleEventDrop}
+          eventClick={(info) => {
+            const ext = info.event.extendedProps as any
+            const recordId = String(ext?.rowId || "")
+            const tableId = String(ext?.tableId || "")
+            const tableName = String(ext?.supabaseTableName || "")
+            if (!recordId || !tableId || !tableName) return
+            if (onRecordClick) {
+              onRecordClick(recordId, tableId)
+              return
+            }
+            openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields)
+          }}
+          dateClick={(arg) => {
+            if (!canCreateRecord) return
+            const firstEnabled = enabledSourceIds[0] || sources[0]?.id || ""
+            setCreateSourceId(firstEnabled)
+            setCreateDate(arg.date)
+            setCreateOpen(true)
+          }}
+        />
+      </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add record</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Source</Label>
+              <Select value={createSourceId || "__none__"} onValueChange={(v) => setCreateSourceId(v === "__none__" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select…</SelectItem>
+                  {sources
+                    .filter((s) => s.table_id && s.enabled !== false)
+                    .map((s) => {
+                      const table = tablesBySource[s.id]
+                      const label = (s.label || "").trim() || table?.name || "Untitled"
+                      return (
+                        <SelectItem key={s.id} value={s.id}>
+                          {label}
+                        </SelectItem>
+                      )
+                    })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input value={safeDateOnly(createDate)} readOnly />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!createSourceId}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { ViewField, ViewFilter, ViewSort } from "@/types/database"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 export interface ViewMetadata {
   fields: ViewField[]
@@ -34,6 +35,15 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
   const tableIdRef = useRef<string | null | undefined>(null)
 
   useEffect(() => {
+    // Global rule: views are currently disabled unless explicitly enabled.
+    // Treat any viewId/tableId as "no view metadata" in this mode.
+    if (!VIEWS_ENABLED) {
+      setMetadata(null)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     // Skip if no viewId or tableId
     if (!viewId || !tableId) {
       if (metadataRef.current) {

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Upload, FileText, Check, ArrowRight, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +17,7 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField, FieldType } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { sanitizeFieldName, formatFieldNameForDisplay } from "@/lib/fields/validation"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
@@ -162,6 +164,7 @@ export default function CSVImportPanel({
   supabaseTableName,
   onImportComplete,
 }: CSVImportPanelProps) {
+  const router = useRouter()
   const [step, setStep] = useState<ImportStep>("upload")
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvRows, setCsvRows] = useState<CSVRow[]>([])
@@ -1176,6 +1179,8 @@ export default function CSVImportPanel({
         setShowSummary(true)
         setStep("complete")
         onImportComplete()
+        // Ensure the page/grid re-renders with the newly inserted rows
+        router.refresh()
       } else {
         throw new Error("No rows were imported. Please check your data and field mappings.")
       }
@@ -1293,7 +1298,7 @@ export default function CSVImportPanel({
                         <SelectItem value="new">+ Create new field</SelectItem>
                         {tableFields.map((field) => (
                           <SelectItem key={field.id} value={field.name}>
-                            {formatFieldNameForDisplay(field.name)} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
+                            {getFieldDisplayName(field)} ({FIELD_TYPES.find(t => t.type === field.type)?.label})
                           </SelectItem>
                         ))}
                       </SelectContent>

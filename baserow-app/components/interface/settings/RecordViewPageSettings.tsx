@@ -33,6 +33,7 @@ import type { PageConfig } from "@/lib/interface/page-config"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import FieldPickerModal from "../FieldPickerModal"
 import FilterBuilder from "@/components/filters/FilterBuilder"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
@@ -428,7 +429,7 @@ export default function RecordViewPageSettings({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <div className="text-sm font-medium text-gray-900 truncate">
-              {field.name}
+              {getFieldDisplayName(field)}
             </div>
             {colorBadge}
           </div>
@@ -658,7 +659,7 @@ export default function RecordViewPageSettings({
                   <SelectItem value="__none__">None (use record ID)</SelectItem>
                   {fields.map((field) => (
                     <SelectItem key={field.id} value={field.name}>
-                      {field.name}
+                      {getFieldDisplayName(field)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -783,7 +784,7 @@ export default function RecordViewPageSettings({
                         >
                           <div className="flex-1 min-w-0">
                             <div className="text-sm text-gray-600 truncate">
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </div>
                             <div className="text-xs text-gray-400">{field.type}</div>
                           </div>
@@ -903,7 +904,7 @@ export default function RecordViewPageSettings({
                             <SelectItem value="__none__">None</SelectItem>
                             {fields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -962,7 +963,7 @@ export default function RecordViewPageSettings({
                             .filter(f => f.type === 'single_select' || f.type === 'multi_select')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -1005,7 +1006,7 @@ export default function RecordViewPageSettings({
                             .filter(f => f.type === 'single_select' || f.type === 'multi_select')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -1041,7 +1042,7 @@ export default function RecordViewPageSettings({
                             .filter(f => f.type === 'attachment' || f.type === 'url')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
-                                {field.name}
+                                {getFieldDisplayName(field)}
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -1077,7 +1078,7 @@ export default function RecordViewPageSettings({
                           <SelectItem value="__none__">None</SelectItem>
                           {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1111,7 +1112,7 @@ export default function RecordViewPageSettings({
                           <SelectItem value="__none__">None</SelectItem>
                           {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1145,7 +1146,7 @@ export default function RecordViewPageSettings({
                           <SelectItem value="__none__">None</SelectItem>
                           {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
-                              {field.name}
+                              {getFieldDisplayName(field)}
                             </SelectItem>
                           ))}
                         </SelectContent>

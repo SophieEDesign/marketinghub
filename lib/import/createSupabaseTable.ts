@@ -2,7 +2,7 @@
 
 export interface ColumnDefinition {
   name: string
-  type: 'text' | 'number' | 'boolean' | 'date'
+  type: 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'
 }
 
 /**
@@ -22,6 +22,14 @@ function mapToPostgresType(type: 'text' | 'number' | 'boolean' | 'date'): string
   }
 }
 
+function mapImportTypeToPostgresType(
+  type: ColumnDefinition['type']
+): string {
+  if (type === 'single_select') return 'text'
+  if (type === 'multi_select') return 'text[]'
+  return mapToPostgresType(type)
+}
+
 /**
  * Create a Supabase table dynamically
  */
@@ -36,7 +44,7 @@ export async function createSupabaseTable(
     // Build SQL to create table
     const columnDefinitions = columns
       .map(col => {
-        const pgType = mapToPostgresType(col.type)
+        const pgType = mapImportTypeToPostgresType(col.type)
         return `"${col.name}" ${pgType}`
       })
       .join(',\n    ')
@@ -55,7 +63,7 @@ export async function createSupabaseTable(
     // Try to use enhanced RPC function first (create_table_with_columns)
     const columnsJson = columns.map(col => ({
       name: col.name,
-      type: mapToPostgresType(col.type)
+      type: mapImportTypeToPostgresType(col.type)
     }))
     
     const { error: rpcError } = await supabase.rpc('create_table_with_columns', {
@@ -78,7 +86,7 @@ export async function createSupabaseTable(
 
       // Add columns one by one
       for (const column of columns) {
-        const pgType = mapToPostgresType(column.type)
+        const pgType = mapImportTypeToPostgresType(column.type)
         const { error: addColumnError } = await supabase.rpc('add_column_to_table', {
           table_name: tableName,
           column_name: column.name,

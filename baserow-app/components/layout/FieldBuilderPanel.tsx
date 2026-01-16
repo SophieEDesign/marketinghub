@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { validateFieldOptions } from "@/lib/fields/validation"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
@@ -459,7 +460,7 @@ function NewFieldForm({
     }
 
     onSave({
-      name: name.trim(),
+      label: name.trim(),
       type,
       required: isVirtual ? false : required,
       options: cleanOptions,
@@ -775,7 +776,7 @@ function SortableFieldItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-900 truncate">
-              {field.name}
+              {getFieldDisplayName(field)}
             </span>
             {field.required && (
               <span className="text-xs text-red-600">*</span>

@@ -34,7 +34,9 @@ import type { Table, View, TableField } from "@/types/database"
 import type { FieldType } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import BlockFilterEditor from "./BlockFilterEditor"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface GridDataSettingsProps {
   config: BlockConfig
@@ -160,18 +162,24 @@ export default function GridDataSettings({
 
   // Get currently selected display fields in order
   const selectedDisplayFields = useMemo(() => {
-    const selectedFieldNames = config.visible_fields || []
-    return selectedFieldNames
-      .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
-      .filter((f: TableField | undefined): f is TableField => f !== undefined)
+    const selectedKeys = config.visible_fields || []
+    return selectedKeys
+      .map((key: string) => {
+        const field = availableDisplayFields.find((f: TableField) => f.name === key || f.id === key)
+        return field ? { key, field } : null
+      })
+      .filter((item): item is { key: string; field: TableField } => item !== null)
   }, [config.visible_fields, availableDisplayFields])
 
   // Get currently selected modal fields in order
   const selectedModalFields = useMemo(() => {
-    const selectedFieldNames = (config as any).modal_fields || []
-    return selectedFieldNames
-      .map((fieldName: string) => availableDisplayFields.find((f: TableField) => f.name === fieldName || f.id === fieldName))
-      .filter((f: TableField | undefined): f is TableField => f !== undefined)
+    const selectedKeys = (config as any).modal_fields || []
+    return selectedKeys
+      .map((key: string) => {
+        const field = availableDisplayFields.find((f: TableField) => f.name === key || f.id === key)
+        return field ? { key, field } : null
+      })
+      .filter((item): item is { key: string; field: TableField } => item !== null)
   }, [(config as any).modal_fields, availableDisplayFields])
 
   // Get fields that can be added to display (not already selected)
@@ -235,10 +243,16 @@ export default function GridDataSettings({
   }
 
   // Handle removing a field from display
-  const handleRemoveField = (fieldName: string) => {
+  const handleRemoveField = (fieldKey: string) => {
     const currentFields = config.visible_fields || []
+    const field = fields.find((f) => f.name === fieldKey || f.id === fieldKey)
+    const keysToRemove = new Set<string>([fieldKey])
+    if (field) {
+      keysToRemove.add(field.name)
+      keysToRemove.add(field.id)
+    }
     onUpdate({
-      visible_fields: currentFields.filter((f: string) => f !== fieldName && f !== fieldName)
+      visible_fields: currentFields.filter((f: string) => !keysToRemove.has(f))
     })
   }
 
@@ -253,10 +267,16 @@ export default function GridDataSettings({
   }
 
   // Handle removing a field from modal
-  const handleRemoveModalField = (fieldName: string) => {
+  const handleRemoveModalField = (fieldKey: string) => {
     const currentFields = (config as any).modal_fields || []
+    const field = fields.find((f) => f.name === fieldKey || f.id === fieldKey)
+    const keysToRemove = new Set<string>([fieldKey])
+    if (field) {
+      keysToRemove.add(field.name)
+      keysToRemove.add(field.id)
+    }
     onUpdate({
-      modal_fields: currentFields.filter((f: string) => f !== fieldName)
+      modal_fields: currentFields.filter((f: string) => !keysToRemove.has(f))
     } as any)
   }
 
@@ -370,6 +390,30 @@ export default function GridDataSettings({
                 Choose which fields appear in the view. Drag to reorder.
               </p>
             </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // Select all fields (in table order)
+                  const allFieldNames = availableDisplayFields.map((f) => f.name)
+                  onUpdate({ visible_fields: allFieldNames })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select All
+              </button>
+              <span className="text-xs text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Select none
+                  onUpdate({ visible_fields: [] })
+                }}
+                className="text-xs text-blue-600 hover:text-blue-700 underline"
+              >
+                Select None
+              </button>
+            </div>
           </div>
 
           {/* Add Field Dropdown */}
@@ -388,7 +432,7 @@ export default function GridDataSettings({
               <SelectContent>
                 {availableToAdd.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
-                    {field.name} ({field.type})
+                    {getFieldDisplayName(field)} ({field.type})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -402,16 +446,17 @@ export default function GridDataSettings({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={selectedDisplayFields.map((f: TableField) => f.name)}
+              items={selectedDisplayFields.map((item) => item.key)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
                 {selectedDisplayFields.length > 0 ? (
-                  selectedDisplayFields.map((field: TableField) => (
+                  selectedDisplayFields.map(({ field, key }) => (
                     <SortableFieldItem
-                      key={field.id}
+                      key={key}
+                      id={key}
                       field={field}
-                      onRemove={() => handleRemoveField(field.name)}
+                      onRemove={() => handleRemoveField(key)}
                     />
                   ))
                 ) : (
@@ -484,7 +529,7 @@ export default function GridDataSettings({
               <SelectContent>
                 {availableToAddModal.map((field) => (
                   <SelectItem key={field.id} value={field.name}>
-                    {field.name} ({field.type})
+                    {getFieldDisplayName(field)} ({field.type})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -498,16 +543,17 @@ export default function GridDataSettings({
             onDragEnd={handleModalDragEnd}
           >
             <SortableContext
-              items={selectedModalFields.map((f: TableField) => f.name)}
+              items={selectedModalFields.map((item) => item.key)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2 max-h-[200px] overflow-y-auto border border-gray-200 rounded-md p-2">
                 {selectedModalFields.length > 0 ? (
-                  selectedModalFields.map((field: TableField) => (
+                  selectedModalFields.map(({ field, key }) => (
                     <SortableFieldItem
-                      key={field.id}
+                      key={key}
+                      id={key}
                       field={field}
-                      onRemove={() => handleRemoveModalField(field.name)}
+                      onRemove={() => handleRemoveModalField(key)}
                     />
                   ))
                 ) : (
@@ -579,7 +625,7 @@ export default function GridDataSettings({
                   <SelectContent>
                     {fields.map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -624,6 +670,40 @@ export default function GridDataSettings({
         </div>
       )}
 
+      {/* Grouping (optional) - Only for Table view */}
+      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Group by (optional)</Label>
+          </div>
+          <Select
+            value={(config as any).group_by_field || (config as any).group_by || "__none__"}
+            onValueChange={(value) => {
+              const next = value === "__none__" ? undefined : value
+              onUpdate({
+                group_by_field: next,
+                group_by: next,
+              } as any)
+            }}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Select a field" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">None (no grouping)</SelectItem>
+              {availableDisplayFields.map((field) => (
+                <SelectItem key={field.id} value={field.name}>
+                  {getFieldDisplayName(field)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Group rows into collapsible sections by the selected field.
+          </p>
+        </div>
+      )}
+
       {/* Calendar-Specific Settings - Airtable Style */}
       {currentViewType === 'calendar' && config.table_id && fields.length > 0 && (
         <>
@@ -646,7 +726,7 @@ export default function GridDataSettings({
                     .filter(field => field.type === 'date')
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -674,7 +754,7 @@ export default function GridDataSettings({
                     .filter(field => field.type === 'date')
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -702,10 +782,10 @@ export default function GridDataSettings({
                 <SelectItem value="__none__">None</SelectItem>
                 {fields.flatMap((field) => [
                   <SelectItem key={`${field.id}-asc`} value={`${field.name}:asc`}>
-                    {field.name} (Ascending)
+                    {getFieldDisplayName(field)} (Ascending)
                   </SelectItem>,
                   <SelectItem key={`${field.id}-desc`} value={`${field.name}:desc`}>
-                    {field.name} (Descending)
+                    {getFieldDisplayName(field)} (Descending)
                   </SelectItem>
                 ])}
               </SelectContent>
@@ -714,65 +794,12 @@ export default function GridDataSettings({
           </div>
 
           {/* Fields Section - Airtable Style */}
-          <div className="space-y-3 pt-2 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Fields</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allFieldNames = fields.map(f => f.name)
-                    onUpdate({ visible_fields: allFieldNames })
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Select All
-                </button>
-                <span className="text-xs text-gray-300">|</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onUpdate({ visible_fields: [] })
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Select None
-                </button>
-              </div>
-            </div>
-            <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
-              {fields.map((field) => {
-                const visibleFields = config.visible_fields || []
-                const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
-                return (
-                  <label
-                    key={field.id}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
-                  >
-                    <Checkbox
-                      checked={isVisible}
-                      onCheckedChange={(checked) => {
-                        const currentFields = config.visible_fields || []
-                        if (checked) {
-                          if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
-                            onUpdate({ visible_fields: [...currentFields, field.name] })
-                          }
-                        } else {
-                          onUpdate({
-                            visible_fields: currentFields.filter(
-                              (f: string) => f !== field.name && f !== field.id
-                            ),
-                          })
-                        }
-                      }}
-                    />
-                    <span className="text-sm flex-1">{field.name}</span>
-                    <span className="text-xs text-gray-400 capitalize">{field.type.replace('_', ' ')}</span>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
+          <FieldVisibilityPicker
+            label="Fields"
+            fields={fields}
+            visibleFieldNames={Array.isArray(config.visible_fields) ? config.visible_fields : []}
+            onChange={(next) => onUpdate({ visible_fields: next })}
+          />
         </>
       )}
 
@@ -796,7 +823,7 @@ export default function GridDataSettings({
                   .filter(field => field.type === 'single_select' || field.type === 'multi_select')
                   .map((field) => (
                     <SelectItem key={field.id} value={field.name}>
-                      {field.name}
+                      {getFieldDisplayName(field)}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -840,7 +867,7 @@ export default function GridDataSettings({
                     .filter(field => field.type === 'date')
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -872,7 +899,7 @@ export default function GridDataSettings({
                     .filter(field => field.type === 'date')
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -902,7 +929,7 @@ export default function GridDataSettings({
                     .filter(field => field.type === 'single_select' || field.type === 'multi_select')
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {field.name}
+                        {getFieldDisplayName(field)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -928,76 +955,216 @@ export default function GridDataSettings({
           </div>
 
           {/* Fields Section - Airtable Style */}
-          <div className="space-y-3 pt-2 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Fields</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const allFieldNames = fields.map(f => f.name)
-                    onUpdate({ visible_fields: allFieldNames })
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Select All
-                </button>
-                <span className="text-xs text-gray-300">|</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onUpdate({ visible_fields: [] })
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 underline"
-                >
-                  Select None
-                </button>
-              </div>
-            </div>
-            <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
-              {fields.map((field) => {
-                const visibleFields = config.visible_fields || []
-                const isVisible = visibleFields.includes(field.name) || visibleFields.includes(field.id)
-                return (
-                  <label
-                    key={field.id}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
-                  >
-                    <Checkbox
-                      checked={isVisible}
-                      onCheckedChange={(checked) => {
-                        const currentFields = config.visible_fields || []
-                        if (checked) {
-                          if (!currentFields.includes(field.name) && !currentFields.includes(field.id)) {
-                            onUpdate({ visible_fields: [...currentFields, field.name] })
-                          }
-                        } else {
-                          onUpdate({
-                            visible_fields: currentFields.filter(
-                              (f: string) => f !== field.name && f !== field.id
-                            ),
-                          })
-                        }
-                      }}
-                    />
-                    <span className="text-sm flex-1">{field.name}</span>
-                    <span className="text-xs text-gray-400 capitalize">{field.type.replace('_', ' ')}</span>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
+          <FieldVisibilityPicker
+            label="Fields"
+            fields={fields}
+            visibleFieldNames={Array.isArray(config.visible_fields) ? config.visible_fields : []}
+            onChange={(next) => onUpdate({ visible_fields: next })}
+          />
         </>
       )}
     </div>
   )
 }
 
+function FieldVisibilityPicker({
+  label,
+  fields,
+  visibleFieldNames,
+  onChange,
+}: {
+  label: string
+  fields: TableField[]
+  visibleFieldNames: string[]
+  onChange: (next: string[]) => void
+}) {
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<"position" | "name_asc" | "name_desc" | "type_asc">("position")
+  const [pasteText, setPasteText] = useState("")
+  const [pasteSummary, setPasteSummary] = useState<{ added: number; missing: number } | null>(null)
+
+  const normalizeToken = (value: string) =>
+    (value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+
+  const parsePasteList = (value: string) => {
+    const raw = (value || "")
+      .split(/[\n\r\t,;]+/g)
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const seen = new Set<string>()
+    const tokens: string[] = []
+    for (const t of raw) {
+      const n = normalizeToken(t)
+      if (!n || seen.has(n)) continue
+      seen.add(n)
+      tokens.push(t)
+    }
+    return tokens
+  }
+
+  const displayFields = useMemo(() => {
+    const s = search.trim().toLowerCase()
+    const base = s ? fields.filter((f) => f.name.toLowerCase().includes(s)) : fields
+    if (sort === "position") return base
+    const sorted = [...base]
+    sorted.sort((a, b) => {
+      if (sort === "name_asc") return a.name.localeCompare(b.name)
+      if (sort === "name_desc") return b.name.localeCompare(a.name)
+      if (sort === "type_asc") return (a.type || "").localeCompare(b.type || "") || a.name.localeCompare(b.name)
+      return 0
+    })
+    return sorted
+  }, [fields, search, sort])
+
+  const selectAll = () => onChange(fields.map((f) => f.name))
+  const selectNone = () => onChange([])
+  const invert = () => {
+    const selected = new Set(visibleFieldNames || [])
+    onChange(fields.filter((f) => !selected.has(f.name)).map((f) => f.name))
+  }
+
+  const applyPaste = (mode: "add" | "replace") => {
+    const tokens = parsePasteList(pasteText)
+    if (tokens.length === 0) {
+      setPasteSummary({ added: 0, missing: 0 })
+      return
+    }
+
+    const fieldNameByNorm = new Map<string, string>()
+    for (const f of fields) fieldNameByNorm.set(normalizeToken(f.name), f.name)
+
+    const matched: string[] = []
+    let missing = 0
+    for (const t of tokens) {
+      const match = fieldNameByNorm.get(normalizeToken(t))
+      if (match) matched.push(match)
+      else missing += 1
+    }
+
+    const current = visibleFieldNames || []
+    const next = mode === "replace" ? Array.from(new Set(matched)) : Array.from(new Set([...current, ...matched]))
+    const addedCount = mode === "replace" ? next.length : next.filter((n) => !current.includes(n)).length
+
+    onChange(next)
+    setPasteSummary({ added: addedCount, missing })
+  }
+
+  return (
+    <div className="space-y-3 pt-2 border-t border-gray-200">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-semibold">{label}</Label>
+        <div className="flex gap-2">
+          <button type="button" onClick={selectAll} className="text-xs text-blue-600 hover:text-blue-700 underline">
+            Select All
+          </button>
+          <span className="text-xs text-gray-300">|</span>
+          <button type="button" onClick={selectNone} className="text-xs text-blue-600 hover:text-blue-700 underline">
+            Select None
+          </button>
+          <span className="text-xs text-gray-300">|</span>
+          <button type="button" onClick={invert} className="text-xs text-blue-600 hover:text-blue-700 underline">
+            Invert
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-600">Search</Label>
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search fields..." className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-gray-600">Sort</Label>
+          <Select value={sort} onValueChange={(v) => setSort(v as any)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="position">Default (table order)</SelectItem>
+              <SelectItem value="name_asc">Name (A → Z)</SelectItem>
+              <SelectItem value="name_desc">Name (Z → A)</SelectItem>
+              <SelectItem value="type_asc">Type (A → Z)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs text-gray-600">Paste list (field names)</Label>
+        <Textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          placeholder={"Paste field names (one per line, or comma-separated)"}
+          className="text-xs min-h-[70px]"
+        />
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPaste("add")}>
+            Add
+          </Button>
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => applyPaste("replace")}>
+            Replace
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs ml-auto"
+            onClick={() => {
+              setPasteText("")
+              setPasteSummary(null)
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+        {pasteSummary && (
+          <div className="text-xs text-gray-500">
+            Added: {pasteSummary.added} · Not found: {pasteSummary.missing}
+          </div>
+        )}
+      </div>
+
+      <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
+        {displayFields.map((field) => {
+          const currentFields = visibleFieldNames || []
+          const isVisible = currentFields.includes(field.name) || currentFields.includes((field as any).id)
+          return (
+            <label
+              key={(field as any).id || field.name}
+              className="flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded transition-colors"
+            >
+              <Checkbox
+                checked={isVisible}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    if (!currentFields.includes(field.name) && !currentFields.includes((field as any).id)) {
+                      onChange([...currentFields, field.name])
+                    }
+                  } else {
+                    onChange(currentFields.filter((f: string) => f !== field.name && f !== (field as any).id))
+                  }
+                }}
+              />
+              <span className="text-sm flex-1">{getFieldDisplayName(field)}</span>
+              <span className="text-xs text-gray-400 capitalize">{(field.type || "").replace("_", " ")}</span>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // Sortable field item component
 function SortableFieldItem({
+  id,
   field,
   onRemove,
 }: {
+  id: string
   field: TableField
   onRemove: () => void
 }) {
@@ -1008,7 +1175,7 @@ function SortableFieldItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: field.name })
+  } = useSortable({ id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -1028,7 +1195,7 @@ function SortableFieldItem({
       
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-gray-900">
-          {field.name}
+          {getFieldDisplayName(field)}
         </div>
         <div className="text-xs text-gray-500">{field.type}</div>
       </div>

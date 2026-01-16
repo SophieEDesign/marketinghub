@@ -13,6 +13,7 @@ import type { FieldType, TableField, FieldOptions, ChoiceColorTheme } from "@/ty
 import { FIELD_TYPES } from "@/types/fields"
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FieldBuilderModalProps {
   isOpen: boolean
@@ -49,7 +50,7 @@ export default function FieldBuilderModal({
 
   useEffect(() => {
     if (field) {
-      setName(field.name)
+      setName(getFieldDisplayName(field))
       setType(field.type)
       setRequired(field.required || false)
       setDefaultValue(field.default_value)
@@ -142,14 +143,14 @@ export default function FieldBuilderModal({
       const body = isEdit
         ? {
             fieldId: field!.id,
-            name: name.trim(),
+            label: name.trim(),
             type,
             required,
             default_value: defaultValue,
             options,
           }
         : {
-            name: name.trim(),
+            label: name.trim(),
             type,
             required,
             default_value: defaultValue,

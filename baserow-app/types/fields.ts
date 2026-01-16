@@ -27,6 +27,11 @@ export interface TableField {
   id: string
   table_id: string
   name: string
+  /**
+   * Human-friendly field title as entered by the user (spaces/casing preserved).
+   * If missing (older data), UI should fall back to formatting `name`.
+   */
+  label?: string | null
   type: FieldType
   position: number
   order_index?: number

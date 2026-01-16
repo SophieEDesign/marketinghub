@@ -5,6 +5,7 @@ import { Calculator, Link as LinkIcon, Paperclip, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 import {
   resolveChoiceColor,
   getTextColorForBackground,
@@ -190,7 +191,7 @@ function AttachmentFieldEditor({
     <div className="space-y-2.5">
       {showLabel && (
         <label className={`${labelClassName} flex items-center gap-2`}>
-          {field.name}
+          {getFieldDisplayName(field)}
           {required && <span className="text-red-500">*</span>}
         </label>
       )}
@@ -379,7 +380,7 @@ export default function FieldEditor({
         <div className="space-y-2.5" onPaste={handlePaste}>
           {showLabel && (
             <label className={`${labelClassName} flex items-center gap-2`}>
-              {field.name}
+              {getFieldDisplayName(field)}
               {required && <span className="text-red-500">*</span>}
               <span title="Derived field (read-only)" className="flex items-center gap-1 text-xs text-gray-400 font-normal">
                 <LinkIcon className="h-3 w-3" />
@@ -412,7 +413,7 @@ export default function FieldEditor({
       <div className="space-y-2.5" onPaste={handlePaste}>
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
           </label>
         )}
@@ -423,7 +424,7 @@ export default function FieldEditor({
             onChange={onChange}
             config={lookupConfig}
             disabled={isReadOnly}
-            placeholder={`Select ${field.name}...`}
+            placeholder={`Select ${getFieldDisplayName(field)}...`}
             onRecordClick={onLinkedRecordClick}
             onCreateRecord={onCreateRecord || (lookupConfig.allowCreate ? async (tableId: string) => {
               try {
@@ -508,7 +509,7 @@ export default function FieldEditor({
         <div className="space-y-2.5">
           {showLabel && (
             <label className={`${labelClassName} flex items-center gap-2`}>
-              {field.name}
+              {getFieldDisplayName(field)}
               {required && <span className="text-red-500">*</span>}
               {isVirtual && (
                 <span title="Formula or lookup field">
@@ -546,7 +547,7 @@ export default function FieldEditor({
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
           </label>
         )}
@@ -642,7 +643,7 @@ export default function FieldEditor({
         <div className="space-y-2.5">
           {showLabel && (
             <label className={`${labelClassName} flex items-center gap-2`}>
-              {field.name}
+              {getFieldDisplayName(field)}
               {required && <span className="text-red-500">*</span>}
               {isVirtual && (
                 <span title="Formula or lookup field">
@@ -662,7 +663,7 @@ export default function FieldEditor({
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
           </label>
         )}
@@ -693,7 +694,7 @@ export default function FieldEditor({
               required={required}
             />
             <span>
-              {field.name}
+              {getFieldDisplayName(field)}
               {required && <span className="text-red-500 ml-1">*</span>}
             </span>
             {isVirtual && (
@@ -723,7 +724,7 @@ export default function FieldEditor({
         <div className="space-y-2.5">
           {showLabel && (
             <label className={`${labelClassName} flex items-center gap-2`}>
-              {field.name}
+              {getFieldDisplayName(field)}
               {required && <span className="text-red-500">*</span>}
               {isVirtual && (
                 <span title="Formula or lookup field">
@@ -750,7 +751,7 @@ export default function FieldEditor({
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
           </label>
         )}
@@ -780,7 +781,7 @@ export default function FieldEditor({
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
-            {field.name}
+            {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
             {isVirtual && (
               <span title="Formula or lookup field">
@@ -805,7 +806,7 @@ export default function FieldEditor({
     <div className="space-y-2.5">
       {showLabel && (
         <label className={`${labelClassName} flex items-center gap-2`}>
-          {field.name}
+          {getFieldDisplayName(field)}
           {required && <span className="text-red-500">*</span>}
         </label>
       )}
@@ -817,7 +818,7 @@ export default function FieldEditor({
           onChange(inputType === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)
         }
         className={`w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${inputClassName}`}
-        placeholder={`Enter ${field.name}...`}
+        placeholder={`Enter ${getFieldDisplayName(field)}...`}
         required={required}
       />
     </div>

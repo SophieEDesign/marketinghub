@@ -7,6 +7,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface RecordFieldsProps {
   fields: TableField[]
@@ -236,7 +237,7 @@ export default function RecordFields({
                         className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start"
                       >
                         <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
-                          {field.name}
+                          {getFieldDisplayName(field)}
                         </div>
                         <div className="min-w-0">
                           <InlineFieldEditor

@@ -10,7 +10,7 @@ interface TimelineBlockProps {
   pageTableId?: string | null
   pageId?: string | null
   filters?: FilterConfig[]
-  onRecordClick?: (recordId: string) => void
+  onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
 }
 

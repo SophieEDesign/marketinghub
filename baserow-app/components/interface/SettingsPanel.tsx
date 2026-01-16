@@ -34,6 +34,7 @@ import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSetti
 import GridDataSettings from "./settings/GridDataSettings"
 import GridAppearanceSettings from "./settings/GridAppearanceSettings"
 import ListDataSettings from "./settings/ListDataSettings"
+import MultiSourceDataSettings from "./settings/MultiSourceDataSettings"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 import RecordDataSettings from "./settings/RecordDataSettings"
@@ -421,6 +422,9 @@ export default function SettingsPanel({
       case "list":
         // List blocks have their own settings for field configuration
         return <ListDataSettings {...commonProps} />
+      case "multi_calendar":
+      case "multi_timeline":
+        return <MultiSourceDataSettings {...commonProps} />
       case "calendar":
       case "kanban":
       case "timeline":
@@ -536,8 +540,10 @@ export default function SettingsPanel({
         )
       case "list":
       case "calendar":
+      case "multi_calendar":
       case "kanban":
       case "timeline":
+      case "multi_timeline":
       case "gallery":
         // List, Calendar, Kanban, and Timeline blocks use the same appearance settings as Grid blocks
         return (

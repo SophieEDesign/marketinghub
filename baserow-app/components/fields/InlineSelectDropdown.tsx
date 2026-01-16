@@ -338,6 +338,11 @@ export default function InlineSelectDropdown({
         <button
           type="button"
           className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
+          onMouseDown={(e) => {
+            // Prevent row-level mouse handlers from ever seeing this interaction.
+            // Some grids select rows on mousedown/click; we want the dropdown to be isolated.
+            e.stopPropagation()
+          }}
           onClick={(e) => {
             // Prevent row-level click handlers (e.g. open record) from firing
             e.stopPropagation()
@@ -369,6 +374,14 @@ export default function InlineSelectDropdown({
         side="bottom"
         sideOffset={4}
         className="z-[100] w-[var(--radix-popper-anchor-width)] p-0 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-hidden flex flex-col"
+        onMouseDown={(e) => {
+          // Critical: PopoverContent is rendered inline (not in a portal) in this app's Popover.
+          // Without stopping propagation, clicking options can bubble to the grid row and select it.
+          e.stopPropagation()
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+        }}
       >
           {/* Search input */}
           <div className="p-2 border-b border-gray-200">
@@ -377,6 +390,8 @@ export default function InlineSelectDropdown({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               placeholder="Search or type to create..."
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={updatingOptions || !!editingChoice || !!editingColor}
@@ -486,13 +501,20 @@ export default function InlineSelectDropdown({
                     // Normal display
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleSelectChoice(choice)}
+                        type="button"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSelectChoice(choice)
+                        }}
                         className="flex items-center gap-2 flex-1 text-left"
                       >
                         <input
                           type={isMulti ? 'checkbox' : 'radio'}
                           checked={isSelected}
                           onChange={() => {}}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-4 h-4"
                         />
                         <span
@@ -505,6 +527,7 @@ export default function InlineSelectDropdown({
                       {canEditOptions && (
                         <div className="flex items-center gap-1">
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               setEditingChoice(choice)
@@ -516,6 +539,7 @@ export default function InlineSelectDropdown({
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               setEditingColor(choice)
@@ -527,6 +551,7 @@ export default function InlineSelectDropdown({
                           </button>
                           {!isSelected && (
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleDeleteChoice(choice)
@@ -549,7 +574,12 @@ export default function InlineSelectDropdown({
             {canCreateNewOption && (
               <div className="px-3 py-2 border-t border-gray-200 bg-blue-50/50">
                 <button
-                  onClick={handleCreateOption}
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCreateOption()
+                  }}
                   disabled={updatingOptions}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-700 hover:bg-blue-100 rounded transition-colors disabled:opacity-50"
                 >

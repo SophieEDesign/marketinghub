@@ -798,9 +798,15 @@ export default function GridView({
       const { data, error } = await query
 
       if (error) {
-        console.error("Error loading rows:", error)
+        console.error("Error loading rows:", {
+          code: (error as any)?.code,
+          message: (error as any)?.message,
+          details: (error as any)?.details,
+          hint: (error as any)?.hint,
+          raw: error,
+        })
         // Check if table doesn't exist - check multiple error patterns
-        const errorMessage = error.message || ''
+        const errorMessage = (error as any)?.message || ''
         const isTableNotFound = 
           error.code === "42P01" || 
           error.code === "PGRST116" ||
@@ -840,7 +846,8 @@ export default function GridView({
             setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically. Please create it manually in Supabase.`)
           }
         } else {
-          setTableError(`Error loading data: ${error.message}`)
+          const msg = (error as any)?.message || 'Unknown error'
+          setTableError(`Error loading data: ${msg}`)
         }
         setRows([])
       } else {
@@ -873,6 +880,11 @@ export default function GridView({
       }
     } catch (error) {
       console.error("Error loading rows:", error)
+      const msg =
+        (error as any)?.message ||
+        (typeof error === 'string' ? error : '') ||
+        String(error)
+      setTableError(`Error loading data: ${msg}`)
       setRows([])
     } finally {
       setLoading(false)

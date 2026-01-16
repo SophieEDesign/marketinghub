@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 interface GridBlockProps {
   block: PageBlock
@@ -31,7 +32,7 @@ interface GridBlockProps {
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages (used to detect record context)
   filters?: FilterConfig[] // Page-level or filter block filters
-  onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
+  onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   pageShowAddRecord?: boolean // Page-level default for showing Add record
 }
 
@@ -51,7 +52,8 @@ export default function GridBlock({
   // Backward compatibility: some legacy data used camelCase `tableId`
   const legacyTableId = (config as any)?.tableId
   const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
-  const viewId = config?.view_id
+  // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
+  const viewId = VIEWS_ENABLED ? config?.view_id : null
   const viewType: ViewType = config?.view_type || 'grid'
   
   // DEBUG_LIST: Log tableId resolution
@@ -203,7 +205,8 @@ export default function GridBlock({
         setTableFields(normalizedFields)
 
         // Load view config if viewId provided (separate from metadata)
-        if (viewId) {
+        // RULE: Views are disabled by default; only load when explicitly enabled.
+        if (VIEWS_ENABLED && viewId) {
           const viewRes = await supabase
             .from("views")
             .select("config")
@@ -645,6 +648,16 @@ export default function GridBlock({
         const allowInlineDelete = permissions.allowInlineDelete ?? true
         const allowOpenRecord = permissions.allowOpenRecord ?? true
 
+        // Grouping (optional) for grid/table view:
+        // Allow block config to override view-level grouping (views.config.groupBy).
+        const groupByFromConfigRaw = (config as any).group_by_field || (config as any).group_by
+        const groupByFromConfigResolved = (() => {
+          if (!groupByFromConfigRaw || typeof groupByFromConfigRaw !== 'string') return undefined
+          const match = safeTableFields.find((f) => f.name === groupByFromConfigRaw || f.id === groupByFromConfigRaw)
+          return match?.name || groupByFromConfigRaw
+        })()
+        const effectiveGroupBy = groupByFromConfigResolved || groupBy
+
         // Determine if record clicks should be enabled
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((recordId) => {
@@ -670,7 +683,7 @@ export default function GridBlock({
             initialFilters={activeFilters}
             standardizedFilters={allFilters}
             initialSorts={activeSorts}
-            initialGroupBy={groupBy}
+            initialGroupBy={effectiveGroupBy}
             initialTableFields={tableFields}
             isEditing={isEditing}
             onRecordClick={handleRecordClick}

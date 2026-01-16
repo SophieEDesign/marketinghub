@@ -6,6 +6,7 @@ import type { FieldType, TableField, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
+import { getFieldDisplayName } from "@/lib/fields/display"
 
 interface FieldBuilderDrawerProps {
   isOpen: boolean
@@ -40,7 +41,7 @@ export default function FieldBuilderDrawer({
 
   useEffect(() => {
     if (field) {
-      setName(field.name)
+      setName(getFieldDisplayName(field))
       setType(field.type)
       setRequired(field.required || false)
       setDefaultValue(field.default_value)
@@ -73,14 +74,14 @@ export default function FieldBuilderDrawer({
       const body = isEdit
         ? {
             fieldId: field!.id,
-            name: name.trim(),
+            label: name.trim(),
             type,
             required,
             default_value: defaultValue,
             options,
           }
         : {
-            name: name.trim(),
+            label: name.trim(),
             type,
             required,
             default_value: defaultValue,

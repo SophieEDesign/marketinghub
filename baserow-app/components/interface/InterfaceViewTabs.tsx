@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 interface InterfaceViewTab {
   id: string
@@ -51,6 +52,11 @@ export default function InterfaceViewTabs({
   onViewChange,
   isEditing,
 }: InterfaceViewTabsProps) {
+  // RULE: Views are currently not used; never render this UI unless explicitly enabled.
+  if (!VIEWS_ENABLED) {
+    return null
+  }
+
   const { toast } = useToast()
   const [tabs, setTabs] = useState<InterfaceViewTab[]>([])
   const [availableViews, setAvailableViews] = useState<View[]>([])

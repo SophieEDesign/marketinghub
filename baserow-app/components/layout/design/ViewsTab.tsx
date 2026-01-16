@@ -5,6 +5,7 @@ import { Plus, Edit, Trash2, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
 interface ViewsTabProps {
   tableId: string
@@ -20,6 +21,11 @@ interface View {
 }
 
 const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
+  // RULE: Views are currently not used; hide this tab unless explicitly enabled.
+  if (!VIEWS_ENABLED) {
+    return null
+  }
+
   const router = useRouter()
   const [views, setViews] = useState<View[]>([])
   const [loading, setLoading] = useState(true)

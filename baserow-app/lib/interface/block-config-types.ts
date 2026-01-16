@@ -374,6 +374,21 @@ export function validateBlockConfig(
         errors.push(`${blockType} block requires table_id`)
       }
       break
+    
+    case 'multi_calendar':
+    case 'multi_timeline': {
+      const sources = Array.isArray(config.sources) ? config.sources : []
+      if (sources.length === 0) {
+        errors.push(`${blockType} block requires at least one source table`)
+        break
+      }
+      sources.forEach((s: any, idx: number) => {
+        if (!s?.table_id) errors.push(`Source ${idx + 1}: table_id is required`)
+        if (!s?.title_field) errors.push(`Source ${idx + 1}: title_field is required`)
+        if (!s?.start_date_field) errors.push(`Source ${idx + 1}: start_date_field is required`)
+      })
+      break
+    }
 
     case 'number':
       // Number block requires table_id and field_id
