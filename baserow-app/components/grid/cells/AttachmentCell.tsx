@@ -63,7 +63,7 @@ export default function AttachmentCell({
 
       try {
         for (const file of Array.from(files)) {
-          const ext = file.name.split('.').pop() || 'bin'
+          const ext = (file?.name || '').split('.').pop() || 'bin'
           const filePath = `attachments/${tableName}/${rowId}/${fieldName}/${generateUUID()}.${ext}`
 
           const { data: uploadData, error: uploadError } = await supabase.storage

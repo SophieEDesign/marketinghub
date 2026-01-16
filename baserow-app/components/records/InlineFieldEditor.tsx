@@ -754,7 +754,7 @@ function AttachmentFieldEditor({
 
     try {
       for (const file of Array.from(files)) {
-        const ext = file.name.split('.').pop() || 'bin'
+        const ext = (file?.name || '').split('.').pop() || 'bin'
         const filePath = `attachments/${tableName}/${recordId}/${field.name}/${generateUUID()}.${ext}`
 
         const { data: uploadData, error: uploadError } = await supabase.storage

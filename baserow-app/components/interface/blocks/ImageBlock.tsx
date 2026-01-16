@@ -50,7 +50,7 @@ export default function ImageBlock({ block, isEditing = false, onUpdate }: Image
     setUploading(true)
     try {
       const supabase = createClient()
-      const ext = file.name.split('.').pop() || 'jpg'
+      const ext = (file?.name || '').split('.').pop() || 'jpg'
       const filePath = `interface-images/${generateUUID()}.${ext}`
 
       const { error: uploadError } = await supabase.storage

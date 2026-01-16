@@ -74,7 +74,9 @@ export default function GalleryView({
   // Load rows
   useEffect(() => {
     async function loadRows() {
-      if (!supabaseTableName) {
+      // Guardrail: during page transitions/unmounts, tableId can temporarily be undefined
+      // while supabaseTableName is still set from a previous render. Never call split on it.
+      if (!supabaseTableName || !tableId) {
         setRows([])
         setLoading(false)
         return

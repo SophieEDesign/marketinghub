@@ -155,6 +155,98 @@ export default function ListBlock({
 
   const isLoading = loading || metaLoading
 
+  // Get list-specific field configuration (must be declared before any early return)
+  const titleField = config.list_title_field || config.title_field || ""
+  const subtitleFields = config.list_subtitle_fields || []
+  const imageField = config.list_image_field || config.image_field || ""
+  const pillFields = config.list_pill_fields || []
+  const metaFields = config.list_meta_fields || []
+
+  // Apply appearance settings (must be declared before any early return)
+  const appearance = config.appearance || {}
+  const blockStyle: React.CSSProperties = {
+    backgroundColor: appearance.background_color,
+    borderColor: appearance.border_color,
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : "1px",
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : "8px",
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : "16px",
+  }
+
+  const blockShowAddRecord = (appearance as any).show_add_record
+  const showAddRecord =
+    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
+  const permissions = config.permissions || {}
+  const isViewOnly = permissions.mode === "view"
+  const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const canCreateRecord = !isViewOnly && allowInlineCreate
+
+  const titleFieldObj = useMemo(() => {
+    if (!titleField) return null
+    return safeTableFields.find((f) => f.name === titleField || f.id === titleField) ?? null
+  }, [safeTableFields, titleField])
+
+  const canPrefillTitle =
+    titleFieldObj?.type === "text" ||
+    titleFieldObj?.type === "long_text" ||
+    titleFieldObj?.type === "email" ||
+    titleFieldObj?.type === "url"
+
+  const handleOpenCreateModal = () => {
+    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+    if (creating) return
+    setCreateModalOpen(true)
+  }
+
+  const handleCreateRecord = useCallback(
+    async (primaryValue: string) => {
+      if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+      if (creating) return
+
+      setCreating(true)
+      try {
+        const supabase = createClient()
+        const newData: Record<string, any> = {}
+
+        if (canPrefillTitle && titleFieldObj?.name && primaryValue) {
+          newData[titleFieldObj.name] = primaryValue
+        }
+
+        const { data, error } = await supabase
+          .from(table.supabase_table)
+          .insert([newData])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        const createdId = (data as any)?.id || (data as any)?.record_id
+        if (!createdId) return
+
+        toast({ title: "Record created" })
+
+        if (onRecordClick) {
+          onRecordClick(String(createdId))
+        } else {
+          window.location.href = `/tables/${tableId}/records/${createdId}`
+        }
+      } finally {
+        setCreating(false)
+      }
+    },
+    [
+      canCreateRecord,
+      canPrefillTitle,
+      creating,
+      isLoading,
+      onRecordClick,
+      showAddRecord,
+      table,
+      tableId,
+      titleFieldObj?.name,
+      toast,
+    ]
+  )
+
   if (!tableId) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
@@ -186,95 +278,6 @@ export default function ListBlock({
       </div>
     )
   }
-
-  // Get list-specific field configuration
-  const titleField = config.list_title_field || config.title_field || ''
-  const subtitleFields = config.list_subtitle_fields || []
-  const imageField = config.list_image_field || config.image_field || ''
-  const pillFields = config.list_pill_fields || []
-  const metaFields = config.list_meta_fields || []
-
-  const titleFieldObj = useMemo(() => {
-    if (!titleField) return null
-    return safeTableFields.find((f) => f.name === titleField || f.id === titleField) ?? null
-  }, [safeTableFields, titleField])
-
-  const canPrefillTitle =
-    titleFieldObj?.type === "text" ||
-    titleFieldObj?.type === "long_text" ||
-    titleFieldObj?.type === "email" ||
-    titleFieldObj?.type === "url"
-
-  // Apply appearance settings
-  const appearance = config.appearance || {}
-  const blockStyle: React.CSSProperties = {
-    backgroundColor: appearance.background_color,
-    borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
-    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
-  }
-
-  const blockShowAddRecord = (appearance as any).show_add_record
-  const showAddRecord =
-    blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
-  const permissions = config.permissions || {}
-  const isViewOnly = permissions.mode === 'view'
-  const allowInlineCreate = permissions.allowInlineCreate ?? true
-  const canCreateRecord = !isViewOnly && allowInlineCreate
-
-  const handleOpenCreateModal = () => {
-    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-    if (creating) return
-    setCreateModalOpen(true)
-  }
-
-  const handleCreateRecord = useCallback(async (primaryValue: string) => {
-    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
-    if (creating) return
-
-    setCreating(true)
-    try {
-      const supabase = createClient()
-      const newData: Record<string, any> = {}
-
-      if (canPrefillTitle && titleFieldObj?.name && primaryValue) {
-        newData[titleFieldObj.name] = primaryValue
-      }
-
-      const { data, error } = await supabase
-        .from(table.supabase_table)
-        .insert([newData])
-        .select()
-        .single()
-
-      if (error) throw error
-
-      const createdId = (data as any)?.id || (data as any)?.record_id
-      if (!createdId) return
-
-      toast({ title: "Record created" })
-
-      if (onRecordClick) {
-        onRecordClick(String(createdId))
-      } else {
-        window.location.href = `/tables/${tableId}/records/${createdId}`
-      }
-    } finally {
-      setCreating(false)
-    }
-  }, [
-    canCreateRecord,
-    canPrefillTitle,
-    creating,
-    isLoading,
-    onRecordClick,
-    showAddRecord,
-    table,
-    tableId,
-    titleFieldObj?.name,
-    toast,
-  ])
 
   // Check if title field is configured
   if (!titleField && !isEditing) {

@@ -69,7 +69,7 @@ export default function SettingsBrandingTab() {
     setIsUploading(true)
     try {
       const supabase = createClient()
-      const fileExt = file.name.split('.').pop()
+      const fileExt = (file?.name || '').split('.').pop()
       const fileName = `logo-${Date.now()}.${fileExt}`
       const filePath = `branding/${fileName}`
 

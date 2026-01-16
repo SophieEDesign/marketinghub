@@ -237,7 +237,7 @@ export default function AttachmentPreview({
                 <div className="w-full h-full flex flex-col items-center justify-center p-1">
                   {getFileTypeIcon(attachment)}
                   <span className={cn("text-gray-600 truncate w-full text-center px-0.5", sizeConfig.text)}>
-                    {attachment.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                    {(attachment.name || '').split('.').pop()?.toUpperCase() || 'FILE'}
                   </span>
                 </div>
               )}
@@ -363,7 +363,7 @@ function AttachmentModal({
 
 // Helper functions exported for use elsewhere
 function getFileIconForAttachment(attachment: Attachment) {
-  const ext = attachment.name.split('.').pop()?.toLowerCase() || ''
+  const ext = (attachment.name || '').split('.').pop()?.toLowerCase() || ''
   const type = (attachment.type || '').toLowerCase()
 
   // Check by MIME type first
