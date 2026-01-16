@@ -97,11 +97,12 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     // - For non-count metrics: metric field is required
     // - For count metrics: group by / x-axis are optional (single "All" bucket is allowed)
     // - For non-count metrics without group by: xAxis field is required
+    const isCountMetric = String(metricType) === "count"
     const hasRequiredConfig = tableId && metricType && (
-      metricType === "count" || metricField
+      isCountMetric || metricField
     ) && (
-      metricType === "count" || // Count can render without group/x-axis (single bucket)
-      (metricType !== "count" && (groupBy || xAxis)) // Non-count: group by or x-axis required
+      isCountMetric || // Count can render without group/x-axis (single bucket)
+      (!isCountMetric && (groupBy || xAxis)) // Non-count: group by or x-axis required
     )
     
     if (hasRequiredConfig) {
@@ -619,9 +620,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   
   // Validation: check if configuration is complete
   const isConfigComplete = metricType && (
-    metricType === "count" || metricField
+    String(metricType) === "count" || metricField
   ) && (
-    metricType === "count" || groupBy || xAxis
+    String(metricType) === "count" || groupBy || xAxis
   )
   
   if (!isConfigComplete) {
@@ -634,7 +635,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
             <p className="text-xs text-gray-400">
               {!metricType 
                 ? "Select a metric type (e.g., Count records) in block settings."
-                : metricType !== "count" && !metricField
+                : String(metricType) !== "count" && !metricField
                 ? "Select a field to measure in block settings."
                 : "Select how to group or categorize your data in block settings."}
             </p>
