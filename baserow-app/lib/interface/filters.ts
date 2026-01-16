@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Shared Filter System
  * Filters are defined once per page and passed down to blocks
  * All blocks use the same filter logic to generate SQL queries
@@ -235,7 +235,6 @@ export function mergePageAndBlockFilters(
   return mergeFilters(blockFilters, pageFilters, [])
 }
 
-
 function valuesLooselyEqual(a: any, b: any): boolean {
   if (a === b) return true
   if (a == null || b == null) return false
@@ -251,9 +250,9 @@ function valuesLooselyEqual(a: any, b: any): boolean {
  * Airtable-style: derive default field values from the *active* filters.
  *
  * Safety rules:
- * - Only supports simple equality operators (currently: 'equal')
+ * - Only supports simple equality-ish operators (currently: 'equal')
  * - Only scalar values, or single-item arrays
- * - Skips computed fields (formula/lookup) when tableFields are provided
+ * - Skips virtual/read-only computed fields (formula/lookup) when tableFields are provided
  * - If multiple eligible filters target the same field with conflicting values, that field is skipped
  */
 export function deriveDefaultValuesFromFilters(
@@ -295,7 +294,7 @@ export function deriveDefaultValuesFromFilters(
       value = [String(value)]
     }
 
-    // Checkbox: accept 'true'/'false' strings (common from UI/query)
+    // Checkbox: accept 'true'/'false' strings (common from querystring/UI)
     if (field?.type === 'checkbox' && typeof value === 'string') {
       if (value === 'true') value = true
       if (value === 'false') value = false
