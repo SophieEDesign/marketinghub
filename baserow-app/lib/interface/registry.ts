@@ -93,7 +93,9 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minWidth: 2,
     minHeight: 2,
     defaultConfig: {
-      title: 'Text Block',
+      // Text blocks shouldn't show a generic header by default.
+      // (If users want a heading, they can add it as content, or set appearance.title explicitly.)
+      title: '',
       text_content: '',
     },
   },

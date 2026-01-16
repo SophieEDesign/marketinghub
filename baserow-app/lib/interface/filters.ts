@@ -10,7 +10,25 @@ import { applyFiltersToQuery as applyFiltersToQueryUnified } from '@/lib/filters
 
 export interface FilterConfig {
   field: string
-  operator: 'equal' | 'not_equal' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'greater_than_or_equal' | 'less_than_or_equal' | 'date_range'
+  operator:
+    | 'equal'
+    | 'not_equal'
+    | 'contains'
+    | 'not_contains'
+    | 'greater_than'
+    | 'less_than'
+    | 'is_empty'
+    | 'is_not_empty'
+    | 'greater_than_or_equal'
+    | 'less_than_or_equal'
+    | 'date_equal'
+    | 'date_before'
+    | 'date_after'
+    | 'date_on_or_before'
+    | 'date_on_or_after'
+    | 'date_range'
+    | 'date_today'
+    | 'date_next_days'
   value: any
   // For date_range operator
   value2?: any
@@ -26,7 +44,23 @@ export interface PageFilters {
  */
 export function normalizeFilter(filter: BlockFilter | FilterConfig): FilterConfig {
   if ('operator' in filter && filter.operator === 'date_range') {
-    return filter as FilterConfig
+    const asConfig = filter as FilterConfig
+    // If the range comes in split across value/value2, normalize to object form.
+    if (
+      asConfig.value &&
+      typeof asConfig.value === 'object' &&
+      'start' in asConfig.value &&
+      'end' in asConfig.value
+    ) {
+      return asConfig
+    }
+    if (asConfig.value2 !== undefined) {
+      return {
+        ...asConfig,
+        value: { start: asConfig.value, end: asConfig.value2 },
+      }
+    }
+    return asConfig
   }
   
   return {

@@ -151,6 +151,7 @@ export default function BlockRenderer({
               isEditing={canEdit}
               pageTableId={pageTableId}
               pageId={pageId}
+              recordId={recordId}
               filters={filters}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}

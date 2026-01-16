@@ -310,6 +310,8 @@ export async function deleteInterfacePage(pageId: string): Promise<void> {
     const { data: workspaceSettings } = await supabase
       .from('workspace_settings')
       .select('id, default_interface_id')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (workspaceSettings?.default_interface_id === pageId) {

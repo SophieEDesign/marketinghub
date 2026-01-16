@@ -314,6 +314,9 @@ export default function InterfacesTab() {
       const { data: defaultInterface, error: settingsError } = await supabase
         .from('workspace_settings')
         .select('default_interface_id')
+        // Single-workspace app: choose deterministic row even if duplicates exist
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       if (settingsError) {
@@ -499,6 +502,8 @@ export default function InterfacesTab() {
         const { data: existing, error: fetchError } = await supabase
           .from('workspace_settings')
           .select('id')
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle()
 
         // Handle case where table/column doesn't exist or RLS blocks access

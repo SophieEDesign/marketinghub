@@ -317,7 +317,7 @@ export default function InlineSelectDropdown({
             return (
               <span
                 key={val}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
                 style={{ backgroundColor: bgColor }}
               >
                 {val}
@@ -335,8 +335,9 @@ export default function InlineSelectDropdown({
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         {/* Dropdown trigger */}
-        <div
-          className="cell-editor w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer"
+        <button
+          type="button"
+          className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
           onClick={(e) => {
             // Prevent row-level click handlers (e.g. open record) from firing
             e.stopPropagation()
@@ -350,7 +351,7 @@ export default function InlineSelectDropdown({
               return (
                 <span
                   key={val}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                  className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
                   style={{ backgroundColor: bgColor }}
                 >
                   {val}
@@ -360,7 +361,7 @@ export default function InlineSelectDropdown({
           ) : (
             <span className="text-gray-400 italic text-sm">{placeholder}</span>
           )}
-        </div>
+        </button>
       </PopoverTrigger>
 
       <PopoverContent

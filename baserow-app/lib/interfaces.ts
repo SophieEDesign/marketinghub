@@ -350,6 +350,10 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
     const { data: workspaceSettings, error: settingsError } = await supabase
       .from('workspace_settings')
       .select('default_interface_id')
+      // Single-workspace app: pick the most recently created row to avoid PGRST116
+      // when duplicates exist (NULL workspace_id allows multiple rows under the UNIQUE constraint).
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
     
     if (isDev) {
@@ -429,6 +433,8 @@ export async function resolveLandingPage(): Promise<{ pageId: string | null; rea
       const { data: workspaceSettings } = await supabase
         .from('workspace_settings')
         .select('default_interface_id')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
       
       if (workspaceSettings?.default_interface_id) {

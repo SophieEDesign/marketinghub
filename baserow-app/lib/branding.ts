@@ -23,6 +23,9 @@ export async function getWorkspaceSettings(): Promise<WorkspaceSettings | null> 
   const { data, error } = await supabase
     .from('workspace_settings')
     .select('*')
+    // Single-workspace app: avoid maybeSingle() failure when multiple rows exist
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
   
   // If table doesn't exist, return null (graceful degradation)
@@ -47,6 +50,8 @@ export async function updateWorkspaceSettings(settings: Partial<WorkspaceSetting
   const { data: existing } = await supabase
     .from('workspace_settings')
     .select('id')
+    .order('created_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
   
   if (existing) {

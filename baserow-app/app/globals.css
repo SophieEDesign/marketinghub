@@ -71,6 +71,12 @@
   color: inherit;
 }
 
+/* Text block: make the editor fill the available block height so it doesn't look like a small inner box */
+.text-block-editor .ProseMirror {
+  height: 100%;
+  min-height: 100%;
+}
+
 /* Ensure editor is visible and has proper spacing */
 .ProseMirror:focus {
   outline: none;

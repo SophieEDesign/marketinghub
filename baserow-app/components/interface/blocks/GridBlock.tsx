@@ -27,6 +27,7 @@ interface GridBlockProps {
   isEditing?: boolean
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
+  recordId?: string | null // Record ID for record review pages (used to detect record context)
   filters?: FilterConfig[] // Page-level or filter block filters
   onRecordClick?: (recordId: string) => void // Callback for record clicks (for RecordReview integration)
   pageShowAddRecord?: boolean // Page-level default for showing Add record
@@ -37,6 +38,7 @@ export default function GridBlock({
   isEditing = false,
   pageTableId = null,
   pageId = null,
+  recordId = null,
   filters = [],
   onRecordClick,
   pageShowAddRecord = false,
@@ -44,7 +46,9 @@ export default function GridBlock({
   const { config } = block
   // Grid block table_id resolution: use config.table_id first, fallback to pageTableId
   // This ensures calendar/list/kanban pages work even if table_id isn't explicitly set in block config
-  const tableId = config?.table_id || pageTableId || config?.base_table || null
+  // Backward compatibility: some legacy data used camelCase `tableId`
+  const legacyTableId = (config as any)?.tableId
+  const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
   const viewId = config?.view_id
   const viewType: ViewType = config?.view_type || 'grid'
   
@@ -287,14 +291,15 @@ export default function GridBlock({
     )
   }
 
-  // Apply appearance settings
+  // Apply appearance settings (legacy inline styles only; new appearance is handled by BlockAppearanceWrapper)
   const appearance = config.appearance || {}
   const blockStyle: React.CSSProperties = {
     backgroundColor: appearance.background_color,
     borderColor: appearance.border_color,
-    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
-    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+    borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : undefined,
+    borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : undefined,
+    // Only apply legacy numeric padding here; string padding ('compact'|'normal'|'spacious') is handled in wrapper
+    padding: typeof (appearance as any).padding === 'number' ? `${(appearance as any).padding}px` : undefined,
   }
 
   const blockShowAddRecord = (appearance as any).show_add_record
@@ -381,6 +386,22 @@ export default function GridBlock({
       handleAddRecord: handler,
     }
   })()
+
+  // Detect whether the BlockAppearanceWrapper will render the title/header.
+  // If it will, GridBlock must NOT render its own title/header (otherwise we get duplicate titles).
+  const wrapperHasAppearanceSettings = !!(appearance && (
+    (appearance as any).background ||
+    (appearance as any).border ||
+    (appearance as any).radius ||
+    (appearance as any).shadow ||
+    (appearance as any).padding ||
+    (appearance as any).margin ||
+    (appearance as any).accent ||
+    (appearance as any).showTitle !== undefined ||
+    (appearance as any).titleSize ||
+    (appearance as any).titleAlign ||
+    (appearance as any).showDivider !== undefined
+  ))
 
   // Render based on view type
   const renderView = () => {
@@ -616,11 +637,11 @@ export default function GridBlock({
             }))
           : undefined // Disable record clicks if not allowed
 
-        // CRITICAL: In record view pages, GridBlocks in the right column (x >= 4) should hide empty state
-        // These blocks are for record detail display, not grid views
-        // Left column blocks (x < 4) are for record lists and should show empty state if needed
+        // CRITICAL: Only hide the "No columns configured" empty state in RECORD contexts.
+        // Previously this was based solely on layout (x >= 4) which caused normal pages to render a blank block.
         const isRightColumnBlock = block.x !== undefined && block.x >= 4
-        const hideEmptyState = isRightColumnBlock
+        const isRecordContext = !!recordId
+        const hideEmptyState = isRecordContext && isRightColumnBlock
 
         return (
           <GridViewWrapper
@@ -659,36 +680,56 @@ export default function GridBlock({
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
-      {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
-        <div
-          className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <div className="min-w-0 flex-1">
-            {((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) && (
-              <h3 className="text-lg font-semibold truncate">{appearance.title || (isEditing ? config.title : table?.name)}</h3>
+      {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
+      {!wrapperHasAppearanceSettings &&
+        (((appearance.showTitle ?? (appearance as any).show_title) !== false &&
+          (appearance.title || (isEditing ? config.title : table?.name))) ||
+          showAddRecord) && (
+          <div
+            className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
+            style={{
+              backgroundColor: appearance.header_background,
+              color: appearance.header_text_color || appearance.title_color,
+            }}
+          >
+            <div className="min-w-0 flex-1">
+              {((appearance.showTitle ?? (appearance as any).show_title) !== false &&
+                (appearance.title || (isEditing ? config.title : table?.name))) && (
+                <h3 className="text-lg font-semibold truncate">
+                  {appearance.title || (isEditing ? config.title : table?.name)}
+                </h3>
+              )}
+            </div>
+            {showAddRecord && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddRecord}
+                disabled={isAddRecordDisabled}
+                title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add record
+              </Button>
             )}
           </div>
-          {showAddRecord && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleAddRecord}
-              disabled={isAddRecordDisabled}
-              title={
-                !canCreateRecord
-                  ? 'Adding records is disabled for this block'
-                  : 'Add a new record'
-              }
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add record
-            </Button>
-          )}
+        )}
+
+      {/* New appearance wrapper active: it renders the title header. Keep Add record available without duplicating the title. */}
+      {wrapperHasAppearanceSettings && showAddRecord && (
+        <div className="mb-3 flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleAddRecord}
+            disabled={isAddRecordDisabled}
+            title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add record
+          </Button>
         </div>
       )}
 

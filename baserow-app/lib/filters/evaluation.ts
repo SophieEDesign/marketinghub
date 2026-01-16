@@ -12,6 +12,25 @@ import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model
 import { normalizeFilterTree } from './canonical-model'
 import type { TableField } from '@/types/fields'
 
+function isDateOnlyString(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function getLocalDayBoundsFromDateOnly(dateOnly: string): { startIso: string; nextDayStartIso: string } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly)
+  if (!match) return null
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const day = Number(match[3])
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || !Number.isFinite(day)) return null
+  // Interpret date-only inputs as a *local* day and convert to ISO for timestamptz comparisons.
+  const start = new Date(year, monthIndex, day, 0, 0, 0, 0)
+  if (Number.isNaN(start.getTime())) return null
+  const nextDayStart = new Date(year, monthIndex, day + 1, 0, 0, 0, 0)
+  if (Number.isNaN(nextDayStart.getTime())) return null
+  return { startIso: start.toISOString(), nextDayStartIso: nextDayStart.toISOString() }
+}
+
 /**
  * Convert a filter condition to a Supabase filter string
  * 
@@ -44,15 +63,57 @@ function conditionToSupabaseString(condition: FilterCondition): string {
     case 'less_than_or_equal':
       return `${fieldName}.lte.${fieldValue}`
     case 'date_equal':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `and(${fieldName}.gte.${bounds.startIso},${fieldName}.lt.${bounds.nextDayStartIso})`
+      }
       return `${fieldName}.eq.${fieldValue}`
     case 'date_before':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `${fieldName}.lt.${bounds.startIso}`
+      }
       return `${fieldName}.lt.${fieldValue}`
     case 'date_after':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `${fieldName}.gte.${bounds.nextDayStartIso}`
+      }
       return `${fieldName}.gt.${fieldValue}`
     case 'date_on_or_before':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `${fieldName}.lt.${bounds.nextDayStartIso}`
+      }
       return `${fieldName}.lte.${fieldValue}`
     case 'date_on_or_after':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `${fieldName}.gte.${bounds.startIso}`
+      }
       return `${fieldName}.gte.${fieldValue}`
+    case 'date_range': {
+      // Prefer object form: { start, end }
+      if (typeof value === 'object' && value !== null && 'start' in value && 'end' in value) {
+        const start = (value as any).start
+        const end = (value as any).end
+        // If end is a date-only string, treat it as inclusive and use < nextDayStart
+        if (isDateOnlyString(start) && isDateOnlyString(end)) {
+          const startBounds = getLocalDayBoundsFromDateOnly(start)
+          const endBounds = getLocalDayBoundsFromDateOnly(end)
+          if (startBounds && endBounds) {
+            return `and(${fieldName}.gte.${startBounds.startIso},${fieldName}.lt.${endBounds.nextDayStartIso})`
+          }
+        }
+        return `and(${fieldName}.gte.${String(start)},${fieldName}.lte.${String(end)})`
+      }
+      // Fallback to equality on a single value
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return `and(${fieldName}.gte.${bounds.startIso},${fieldName}.lt.${bounds.nextDayStartIso})`
+      }
+      return `${fieldName}.eq.${fieldValue}`
+    }
     default:
       return ''
   }
@@ -139,26 +200,64 @@ function applyCondition(
       return query.lte(fieldName, value)
       
     case 'date_equal':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.gte(fieldName, bounds.startIso).lt(fieldName, bounds.nextDayStartIso)
+      }
       return query.eq(fieldName, value)
       
     case 'date_before':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.lt(fieldName, bounds.startIso)
+      }
       return query.lt(fieldName, value)
       
     case 'date_after':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.gte(fieldName, bounds.nextDayStartIso)
+      }
       return query.gt(fieldName, value)
       
     case 'date_on_or_before':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.lt(fieldName, bounds.nextDayStartIso)
+      }
       return query.lte(fieldName, value)
       
     case 'date_on_or_after':
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.gte(fieldName, bounds.startIso)
+      }
       return query.gte(fieldName, value)
       
     case 'date_range':
       // Date range: value should be { start, end } or two separate values
       if (typeof value === 'object' && value !== null && 'start' in value && 'end' in value) {
-        return query.gte(fieldName, value.start).lte(fieldName, value.end)
+        const start = (value as any).start
+        const end = (value as any).end
+        if (isDateOnlyString(start) && isDateOnlyString(end)) {
+          const startBounds = getLocalDayBoundsFromDateOnly(start)
+          const endBounds = getLocalDayBoundsFromDateOnly(end)
+          if (startBounds && endBounds) {
+            return query.gte(fieldName, startBounds.startIso).lt(fieldName, endBounds.nextDayStartIso)
+          }
+        }
+        // If the end is a date-only string, treat it as inclusive day and use < nextDayStart
+        if (typeof start === 'string' && typeof end === 'string' && isDateOnlyString(end)) {
+          const endBounds = getUtcDayBoundsFromDateOnly(end)
+          if (endBounds) return query.gte(fieldName, start).lt(fieldName, endBounds.nextDayStartIso)
+        }
+        return query.gte(fieldName, start).lte(fieldName, end)
       }
       // Fallback: treat as single date
+      if (isDateOnlyString(value)) {
+        const bounds = getLocalDayBoundsFromDateOnly(value)
+        if (bounds) return query.gte(fieldName, bounds.startIso).lt(fieldName, bounds.nextDayStartIso)
+      }
       return query.eq(fieldName, value)
       
     case 'has':
@@ -293,6 +392,12 @@ export function evaluateFilterTree(
       ? getFieldValue(row, field_id)
       : row[field_id]
     
+    const asDate = (v: any): Date | null => {
+      if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v
+      const d = new Date(String(v))
+      return Number.isNaN(d.getTime()) ? null : d
+    }
+
     switch (operator) {
       case 'equal':
         return String(fieldValue) === String(value)
@@ -315,14 +420,43 @@ export function evaluateFilterTree(
       case 'less_than_or_equal':
         return Number(fieldValue) <= Number(value)
       case 'date_equal':
+        if (isDateOnlyString(value)) {
+          const bounds = getLocalDayBoundsFromDateOnly(value)
+          const d = asDate(fieldValue)
+          if (bounds && d) {
+            const start = new Date(bounds.startIso)
+            const end = new Date(bounds.nextDayStartIso)
+            return d >= start && d < end
+          }
+        }
         return String(fieldValue) === String(value)
       case 'date_before':
+        if (isDateOnlyString(value)) {
+          const bounds = getLocalDayBoundsFromDateOnly(value)
+          const d = asDate(fieldValue)
+          if (bounds && d) return d < new Date(bounds.startIso)
+        }
         return new Date(fieldValue) < new Date(value as string)
       case 'date_after':
+        if (isDateOnlyString(value)) {
+          const bounds = getLocalDayBoundsFromDateOnly(value)
+          const d = asDate(fieldValue)
+          if (bounds && d) return d >= new Date(bounds.nextDayStartIso)
+        }
         return new Date(fieldValue) > new Date(value as string)
       case 'date_on_or_before':
+        if (isDateOnlyString(value)) {
+          const bounds = getLocalDayBoundsFromDateOnly(value)
+          const d = asDate(fieldValue)
+          if (bounds && d) return d < new Date(bounds.nextDayStartIso)
+        }
         return new Date(fieldValue) <= new Date(value as string)
       case 'date_on_or_after':
+        if (isDateOnlyString(value)) {
+          const bounds = getLocalDayBoundsFromDateOnly(value)
+          const d = asDate(fieldValue)
+          if (bounds && d) return d >= new Date(bounds.startIso)
+        }
         return new Date(fieldValue) >= new Date(value as string)
       default:
         return true

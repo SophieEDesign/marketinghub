@@ -81,7 +81,8 @@ export default function SettingsWorkspaceTab() {
         const { data: settings, error: settingsError } = await supabase
           .from('workspace_settings')
           .select('default_interface_id')
-          .order('created_at', { ascending: true })
+          // Single-workspace app: choose most recently created settings row if duplicates exist
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
 
@@ -241,7 +242,7 @@ export default function SettingsWorkspaceTab() {
         const { data: existingSettings, error: fetchError } = await supabase
           .from('workspace_settings')
           .select('id')
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle()
 
@@ -325,7 +326,7 @@ export default function SettingsWorkspaceTab() {
           const { data: verifyData, error: verifyError } = await supabase
             .from('workspace_settings')
             .select('default_interface_id')
-            .order('created_at', { ascending: true })
+            .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
           

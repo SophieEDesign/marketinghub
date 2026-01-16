@@ -319,7 +319,7 @@ export default function FieldBlock({
           }
         />
       ) : (
-        <div className="px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+        <div className="px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
           <Paperclip className="h-4 w-4" />
           No attachments
         </div>
@@ -351,10 +351,10 @@ export default function FieldBlock({
   )
 
   return (
-    <div className="h-full p-4">
+    <div className="h-full p-3">
       {showLabel ? (
-        <div className="grid grid-cols-[160px_minmax(0,1fr)] gap-x-6 items-start">
-          <div className="pt-2 text-xs font-medium text-gray-500">
+        <div className="grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start">
+          <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
             {field.name}
             {field.required && <span className="text-red-500 ml-1">*</span>}
           </div>

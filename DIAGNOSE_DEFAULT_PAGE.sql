@@ -21,9 +21,26 @@ SELECT
   created_at,
   updated_at
 FROM workspace_settings
-LIMIT 1;
+ORDER BY created_at DESC
+LIMIT 5;
+
+-- 2b. If you have multiple workspace_settings rows, the app will use the MOST RECENT one.
+SELECT
+  'Step 2b: workspace_settings rows (newest first)' as step,
+  id,
+  default_interface_id,
+  created_at,
+  updated_at
+FROM workspace_settings
+ORDER BY created_at DESC;
 
 -- 3. Check if the default page exists in interface_pages
+WITH latest_settings AS (
+  SELECT *
+  FROM workspace_settings
+  ORDER BY created_at DESC
+  LIMIT 1
+)
 SELECT 
   'Step 3: Page Existence Check' as step,
   ws.default_interface_id as configured_page_id,
@@ -36,7 +53,7 @@ SELECT
     WHEN ip.is_admin_only = true THEN '⚠️ Page exists but is ADMIN-ONLY'
     ELSE '✅ Page exists and is accessible'
   END as status
-FROM workspace_settings ws
+FROM latest_settings ws
 LEFT JOIN interface_pages ip ON ip.id = ws.default_interface_id;
 
 -- 4. List ALL interface pages in order (this is what getAccessibleInterfacePages returns)
@@ -48,7 +65,7 @@ SELECT
   order_index,
   created_at,
   CASE 
-    WHEN id = (SELECT default_interface_id FROM workspace_settings LIMIT 1) THEN '⭐ DEFAULT PAGE'
+    WHEN id = (SELECT default_interface_id FROM workspace_settings ORDER BY created_at DESC LIMIT 1) THEN '⭐ DEFAULT PAGE'
     WHEN ROW_NUMBER() OVER (ORDER BY order_index, created_at) = 1 THEN '→ First accessible (fallback)'
     ELSE ''
   END as note
@@ -79,9 +96,16 @@ SELECT
     ELSE '⚠️ Query successful but default_interface_id is NULL'
   END as query_result
 FROM workspace_settings
+ORDER BY created_at DESC
 LIMIT 1;
 
 -- 7. Check if default page exists in views table (old system fallback)
+WITH latest_settings AS (
+  SELECT *
+  FROM workspace_settings
+  ORDER BY created_at DESC
+  LIMIT 1
+)
 SELECT 
   'Step 7: Old System Check' as step,
   ws.default_interface_id as configured_page_id,
@@ -94,5 +118,5 @@ SELECT
     WHEN v.type != 'interface' THEN 'Found but wrong type: ' || v.type
     ELSE 'Found in views table (old system)'
   END as status
-FROM workspace_settings ws
+FROM latest_settings ws
 LEFT JOIN views v ON v.id = ws.default_interface_id;

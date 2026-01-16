@@ -194,18 +194,28 @@ export function filterTreeToDbFormat(
  * Convert flat FilterConfig[] (used by FilterBlock) to canonical model
  */
 export function filterConfigsToFilterTree(
-  configs: Array<{ field: string; operator: string; value?: string }>,
+  configs: Array<{ field: string; operator: string; value?: any; value2?: any }>,
   operator: 'AND' | 'OR' = 'AND'
 ): FilterTree {
   if (configs.length === 0) {
     return null
   }
   
-  const conditions: FilterCondition[] = configs.map(c => ({
-    field_id: c.field,
-    operator: c.operator as FilterCondition['operator'],
-    value: c.value,
-  }))
+  const conditions: FilterCondition[] = configs.map(c => {
+    // Special-case date_range which may come in as two separate values (value + value2)
+    if (c.operator === 'date_range' && c.value2 !== undefined) {
+      return {
+        field_id: c.field,
+        operator: c.operator as FilterCondition['operator'],
+        value: { start: c.value, end: c.value2 } as any,
+      }
+    }
+    return {
+      field_id: c.field,
+      operator: c.operator as FilterCondition['operator'],
+      value: c.value,
+    }
+  })
   
   return conditionsToFilterTree(conditions, operator)
 }

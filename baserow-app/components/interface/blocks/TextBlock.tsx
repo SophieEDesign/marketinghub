@@ -211,10 +211,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     // Initialize with empty content if config is loading, otherwise use actual content
     // Content will be set via setContent when config loads (handled in useEffect)
     content: isConfigLoading ? { type: 'doc', content: [] } : getInitialContent(),
-    editable: true, // CRITICAL: Editor must ALWAYS be editable for toolbar commands to work
+    editable: true, // Editor must exist; actual editability is controlled via editor.setEditable(!readOnly)
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[60px] w-full',
+        // Keep typography/layout on the wrapper element. ProseMirror should just fill the available space.
+        class: 'focus:outline-none w-full h-full min-h-0',
         'data-placeholder': isEditing ? 'Start typing…' : '',
         tabindex: isEditing ? '0' : '-1',
         style: config?.appearance?.text_color 
@@ -583,7 +584,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         display: 'flex',
       }}
         onMouseDown={(e) => {
-          e.preventDefault()
+          // Don't let the click bubble to the canvas (would select/drag the block),
+          // but DO NOT preventDefault or Radix Select won't work reliably.
           e.stopPropagation()
         }}
         onMouseEnter={() => {
@@ -595,7 +597,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         }}
         onClick={(e) => {
           e.stopPropagation()
-          e.preventDefault()
           if (editor && !editor.isFocused) {
             setIsBlockEditing(true)
             editor.commands.focus()
@@ -611,26 +612,20 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
             'paragraph'
           }
           onValueChange={(value) => {
-            editor.chain().focus().run()
             if (value === 'paragraph') {
               editor.chain().focus().setParagraph().run()
             } else if (value === 'h1') {
-              editor.chain().focus().toggleHeading({ level: 1 }).run()
+              editor.chain().focus().setHeading({ level: 1 }).run()
             } else if (value === 'h2') {
-              editor.chain().focus().toggleHeading({ level: 2 }).run()
+              editor.chain().focus().setHeading({ level: 2 }).run()
             } else if (value === 'h3') {
-              editor.chain().focus().toggleHeading({ level: 3 }).run()
+              editor.chain().focus().setHeading({ level: 3 }).run()
             }
           }}
         >
           <SelectTrigger 
             className="h-8 px-3 min-w-[100px] text-sm font-medium border-0 shadow-none hover:bg-gray-100 focus:ring-0 bg-transparent"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-            }}
             onMouseDown={(e) => {
-              e.preventDefault()
               e.stopPropagation()
             }}
           >
@@ -686,10 +681,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
+            // Task lists require dedicated extensions which aren't currently installed here.
+            // Keep the toolbar honest by using a bullet list instead of a non-working control.
             editor.chain().focus().toggleBulletList().run()
           }}
           className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-gray-100")}
-          title="Task List"
+          title="Bullet List"
         >
           <CheckSquare className="h-4 w-4" />
         </Button>
@@ -814,7 +811,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         style={blockStyle}
       >
         <div className="text-center">
-          <p className="mb-1 font-medium">Text Block</p>
           <p className="text-xs text-gray-400">Enter edit mode to add content</p>
         </div>
       </div>
@@ -892,7 +888,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor Content - Same source for both edit and view mode */}
       <div 
         className={cn(
-          "flex-1 w-full",
+          "flex-1 w-full min-h-0 h-full",
           !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",
@@ -923,7 +919,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       >
         <div 
           className={cn(
-            "prose prose-sm max-w-none w-full min-h-[60px]",
+            // Make the editor fill the whole block height.
+            // Typography rules live here; ProseMirror is styled to stretch via globals.css.
+            "text-block-editor prose prose-sm max-w-none w-full h-full min-h-0 flex flex-col",
             "prose-headings:font-semibold",
             "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
             "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",

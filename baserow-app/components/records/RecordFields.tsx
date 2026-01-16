@@ -190,17 +190,17 @@ export default function RecordFields({
   )
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {/* Render all groups - all fields are grouped (ungrouped go to "General") */}
       {Object.entries(groupedFields)
         .filter(([_, groupFields]) => groupFields.length > 0) // Hide empty groups
         .map(([groupName, groupFields]) => {
           const isCollapsed = collapsedGroups.has(groupName)
           return (
-            <section key={groupName} className="space-y-3">
+            <section key={groupName} className="space-y-2.5">
               <button
                 onClick={() => toggleGroup(groupName)}
-                className="w-full flex items-center justify-between text-left"
+                className="w-full flex items-center justify-between text-left py-1 -mx-1 px-1 rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 aria-expanded={!isCollapsed}
                 aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${groupName} group`}
               >
@@ -214,16 +214,16 @@ export default function RecordFields({
                 </span>
               </button>
               {!isCollapsed && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {groupFields.map((field) => {
                     const fieldEditable = isFieldEditable(field.name)
                     const isThisEditing = editingField === field.id
                     return (
                       <div
                         key={field.id}
-                        className="grid grid-cols-[180px_minmax(0,1fr)] gap-x-8 items-start"
+                        className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-x-4 gap-y-1 items-start"
                       >
-                        <div className="pt-2 text-xs font-medium text-gray-500">
+                        <div className="text-xs font-medium text-gray-500 leading-5 sm:pt-1.5">
                           {field.name}
                         </div>
                         <div className="min-w-0">

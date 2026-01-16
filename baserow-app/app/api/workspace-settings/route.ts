@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
     const { data: settings, error } = await supabase
       .from('workspace_settings')
       .select('brand_name, logo_url, primary_color, accent_color, sidebar_color, sidebar_text_color')
+      // Single-workspace app: pick deterministic row even if duplicates exist
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (error) {

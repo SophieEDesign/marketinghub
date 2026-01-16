@@ -56,15 +56,15 @@ export default function InlineFieldEditor({
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
   const showLabel = propShowLabel
   const labelClassName = propLabelClassName || "block text-sm font-medium text-gray-700"
-  const containerClassName = showLabel ? "space-y-2.5" : ""
+  const containerClassName = showLabel ? "space-y-1.5" : ""
   const displayBoxClassName = showLabel
-    ? "px-3.5 py-2.5 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
+    ? "px-3 py-2 border border-gray-200 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer text-sm text-gray-900"
     : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-900 hover:bg-gray-50 hover:ring-1 hover:ring-gray-200 transition-colors cursor-pointer"
   const readOnlyBoxClassName = showLabel
-    ? "px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic"
+    ? "px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic"
     : "-mx-2 px-2 py-1.5 rounded-md text-sm text-gray-600"
   const inputBoxClassName = showLabel
-    ? "w-full px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    ? "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
     : "w-full px-2 py-1.5 rounded-md ring-1 ring-gray-200 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
 
   useEffect(() => {
@@ -384,7 +384,7 @@ export default function InlineFieldEditor({
             onBlur={handleBlur}
             editable={true}
             showToolbar={true}
-            minHeight="150px"
+            minHeight="120px"
           />
         </div>
       )
@@ -403,7 +403,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         {isReadOnly ? (
-          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[60px]" : ""}`}>
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}>
             {value ? (
               <div 
                 className="prose prose-sm max-w-none"
@@ -416,7 +416,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[60px]" : ""}`}
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}
           >
             {value ? (
               <div 
@@ -532,7 +532,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         {isReadOnly ? (
-          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : ""}`}>
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""}`}>
             {value ? (
               <a
                 href={getFullUrl(value)}
@@ -550,7 +550,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center group" : "group"}`}
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center group" : "group"}`}
             title={value || undefined}
           >
             {value ? (
@@ -606,7 +606,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         {isReadOnly ? (
-          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[40px] flex items-center gap-1" : "flex items-center gap-1"}`}>
+          <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[36px] flex items-center gap-1" : "flex items-center gap-1"}`}>
             {value ? (
               <>
                 <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
@@ -624,7 +624,7 @@ export default function InlineFieldEditor({
         ) : (
           <div
             onClick={onEditStart}
-            className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : "flex items-center"}`}
+            className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : "flex items-center"}`}
             title={value || undefined}
           >
             {value ? (
@@ -694,7 +694,7 @@ export default function InlineFieldEditor({
       ) : (
         <div
           onClick={onEditStart}
-          className={`${displayBoxClassName} ${showLabel ? "min-h-[40px] flex items-center" : ""}`}
+          className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""}`}
         >
           {value !== null && value !== undefined ? (
             String(value)

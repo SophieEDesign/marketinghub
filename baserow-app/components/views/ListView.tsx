@@ -7,7 +7,7 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
-import type { FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
@@ -121,42 +121,16 @@ export default function ListView({
       const supabase = createClient()
       let query = supabase.from(supabaseTableName).select("*")
 
-      // Apply filters
-      currentFilters.forEach((filter) => {
-        const { field, operator, value } = filter
-        switch (operator) {
-          case 'equal':
-            query = query.eq(field, value)
-            break
-          case 'not_equal':
-            query = query.neq(field, value)
-            break
-          case 'greater_than':
-            query = query.gt(field, value)
-            break
-          case 'greater_than_or_equal':
-            query = query.gte(field, value)
-            break
-          case 'less_than':
-            query = query.lt(field, value)
-            break
-          case 'less_than_or_equal':
-            query = query.lte(field, value)
-            break
-          case 'contains':
-            query = query.ilike(field, `%${value}%`)
-            break
-          case 'not_contains':
-            query = query.not('ilike', field, `%${value}%`)
-            break
-          case 'is_empty':
-            query = query.is(field, null)
-            break
-          case 'is_not_empty':
-            query = query.not(field, 'is', null)
-            break
-        }
-      })
+      // Apply filters using shared unified filter engine (includes date operators)
+      if (currentFilters.length > 0) {
+        const normalizedFields = tableFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          id: f.id,
+          options: (f as any).options,
+        }))
+        query = applyFiltersToQuery(query, currentFilters, normalizedFields)
+      }
 
       // Apply sorting
       if (sorts.length > 0) {
