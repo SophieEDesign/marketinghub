@@ -21,6 +21,7 @@ import { getFieldDisplayName } from "@/lib/fields/display"
 import { RESERVED_WORDS } from "@/types/fields"
 import { normalizeValue, checkDuplicates, filterDuplicateRows } from "@/lib/import/duplicateDetection"
 import ImportSummaryModal from "@/components/import/ImportSummaryModal"
+import { getPrimaryFieldName } from "@/lib/fields/primary"
 
 /**
  * Sanitize field name and handle reserved words
@@ -1021,17 +1022,16 @@ export default function CSVImportPanel({
       }
 
       // Duplicate Detection
-      // Identify first column as primary key field
-      const firstColumn = csvHeaders[0]
-      if (!firstColumn) {
-        throw new Error('CSV file has no columns')
-      }
-
-      const primaryKeyField = allFieldMappings[firstColumn]
+      // Use the table's primary field for duplicate detection (core data)
+      const primaryKeyField = getPrimaryFieldName(tableFields)
       if (!primaryKeyField) {
+        throw new Error('This table has no fields. Create a primary field first, then re-try the import.')
+      }
+      const isPrimaryFieldMapped = Object.values(allFieldMappings).some((mapped) => mapped === primaryKeyField)
+      if (!isPrimaryFieldMapped) {
         throw new Error(
-          `The first column "${firstColumn}" must be mapped to a field for duplicate detection. ` +
-          `Please map this column to an existing field or create a new field for it.`
+          `The table primary field "${primaryKeyField}" must be mapped for duplicate detection. ` +
+          `Please map a CSV column to "${primaryKeyField}" (or rename a column to match it).`
         )
       }
 

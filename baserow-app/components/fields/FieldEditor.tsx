@@ -366,8 +366,6 @@ export default function FieldEditor({
     // Build lookup config from field options
     const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
       lookupTableId: linkedTableId,
-      primaryLabelField: field.options?.primary_label_field || 'name',
-      secondaryLabelFields: field.options?.secondary_label_fields || [],
       relationshipType: field.options?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
       maxSelections: field.options?.max_selections,
       required: field.required || required,

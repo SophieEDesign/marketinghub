@@ -7,10 +7,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { cn } from "@/lib/utils"
+import { getPrimaryFieldName } from "@/lib/fields/primary"
+import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 
 export interface LookupFieldConfig {
-  // Required: field to use as primary label
-  primaryLabelField: string
+  // Optional: field to use as primary label (defaults to the table's primary field)
+  primaryLabelField?: string
   
   // Optional: up to 2 fields for secondary context
   secondaryLabelFields?: string[]
@@ -87,9 +89,9 @@ export default function LookupFieldPicker({
     (field.type === 'link_to_table' ? field.options?.linked_table_id : field.options?.lookup_table_id) ||
     field.options?.linked_table_id
 
-  // Get primary and secondary label fields
-  const primaryLabelField = config?.primaryLabelField || 'name' // Default fallback
-  const secondaryLabelFields = config?.secondaryLabelFields || []
+  // Requested label fields (may be undefined); effective fields are resolved per-table after loading fields.
+  const requestedPrimaryLabelField = config?.primaryLabelField
+  const requestedSecondaryLabelFields = config?.secondaryLabelFields || []
 
   // Get table name for display
   const [tableName, setTableName] = useState<string | null>(null)
@@ -179,11 +181,38 @@ export default function LookupFieldPicker({
         return
       }
 
+      // Also fetch physical columns, because table_fields metadata can drift from the real table schema.
+      // If we select a non-existent column, PostgREST returns 400 and the picker breaks.
+      const { data: physicalCols, error: colsError } = await supabase.rpc('get_table_columns', {
+        table_name: table.supabase_table,
+      })
+      const physicalColSet = new Set(
+        Array.isArray(physicalCols)
+          ? physicalCols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean)
+          : []
+      )
+      const hasPhysical = physicalColSet.size > 0 && !colsError
+
+      const candidatePrimary =
+        (requestedPrimaryLabelField && lookupFields?.some((f: any) => f.name === requestedPrimaryLabelField))
+          ? requestedPrimaryLabelField
+          : (getPrimaryFieldName(lookupFields as any) || 'id')
+
+      const effectivePrimaryLabelField =
+        candidatePrimary !== 'id' && (!toPostgrestColumn(candidatePrimary) || (hasPhysical && !physicalColSet.has(candidatePrimary)))
+          ? 'id'
+          : candidatePrimary
+
+      const effectiveSecondaryLabelFields = (requestedSecondaryLabelFields || [])
+        .filter((fieldName) => fieldName && fieldName !== effectivePrimaryLabelField)
+        .filter((fieldName) => lookupFields?.some((f: any) => f.name === fieldName))
+        .slice(0, 2)
+
       // Build select query - include primary label field and secondary fields
       const fieldsToSelect = [
         'id',
-        primaryLabelField,
-        ...secondaryLabelFields.slice(0, 2), // Max 2 secondary fields
+        effectivePrimaryLabelField,
+        ...effectiveSecondaryLabelFields, // Max 2 secondary fields
       ].filter(Boolean)
 
       // Query records
@@ -195,13 +224,13 @@ export default function LookupFieldPicker({
       // Apply search filter if query provided
       if (query.trim()) {
         // Search in primary label field
-        const primaryField = lookupFields.find(f => f.name === primaryLabelField)
+        const primaryField = lookupFields.find((f: any) => f.name === effectivePrimaryLabelField)
         if (primaryField) {
           if (primaryField.type === 'text' || primaryField.type === 'long_text') {
-            queryBuilder = queryBuilder.ilike(primaryLabelField, `%${query}%`)
+            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
           } else {
             // For other types, use contains
-            queryBuilder = queryBuilder.ilike(primaryLabelField, `%${query}%`)
+            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
           }
         }
       }
@@ -216,11 +245,11 @@ export default function LookupFieldPicker({
 
       // Transform records to options
       const transformedOptions: RecordOption[] = (records || []).map((record: any) => {
-        const primaryLabel = record[primaryLabelField] 
-          ? String(record[primaryLabelField])
+        const primaryLabel = record[effectivePrimaryLabelField] 
+          ? String(record[effectivePrimaryLabelField])
           : "Untitled"
         
-        const secondaryLabels = secondaryLabelFields
+        const secondaryLabels = effectiveSecondaryLabelFields
           .map(fieldName => record[fieldName])
           .filter(Boolean)
           .map(String)
@@ -257,10 +286,27 @@ export default function LookupFieldPicker({
 
       if (!table) return
 
+      // Load fields so we can resolve the effective primary/secondary label fields.
+      const { data: lookupFields } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", lookupTableId)
+        .order("position", { ascending: true })
+
+      const effectivePrimaryLabelField =
+        (requestedPrimaryLabelField && lookupFields?.some((f: any) => f.name === requestedPrimaryLabelField))
+          ? requestedPrimaryLabelField
+          : (getPrimaryFieldName(lookupFields as any) || 'id')
+
+      const effectiveSecondaryLabelFields = (requestedSecondaryLabelFields || [])
+        .filter((fieldName) => fieldName && fieldName !== effectivePrimaryLabelField)
+        .filter((fieldName) => lookupFields?.some((f: any) => f.name === fieldName))
+        .slice(0, 2)
+
       const fieldsToSelect = [
         'id',
-        primaryLabelField,
-        ...secondaryLabelFields.slice(0, 2),
+        effectivePrimaryLabelField,
+        ...effectiveSecondaryLabelFields,
       ].filter(Boolean)
 
       const { data: records } = await supabase
@@ -271,10 +317,10 @@ export default function LookupFieldPicker({
       if (records) {
         const transformed: RecordOption[] = records.map((record: any) => ({
           id: record.id,
-          primaryLabel: record[primaryLabelField] 
-            ? String(record[primaryLabelField])
+          primaryLabel: record[effectivePrimaryLabelField] 
+            ? String(record[effectivePrimaryLabelField])
             : "Untitled",
-          secondaryLabels: secondaryLabelFields
+          secondaryLabels: effectiveSecondaryLabelFields
             .map(fieldName => record[fieldName])
             .filter(Boolean)
             .map(String),

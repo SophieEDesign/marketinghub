@@ -37,6 +37,10 @@ import type { FilterConfig } from '@/lib/interface/filters'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
+export type AirtableGridActions = {
+  createNewRow: () => Promise<GridRow | null>
+}
+
 interface AirtableGridViewProps {
   tableName: string
   tableId?: string // Table ID for opening records
@@ -57,6 +61,7 @@ interface AirtableGridViewProps {
   userRole?: "admin" | "editor" | "viewer" | null
   disableRecordPanel?: boolean // If true, clicking rows won't open record panel
   onTableFieldsRefresh?: () => void // Refresh field metadata after option updates
+  onActionsReady?: (actions: AirtableGridActions) => void
 }
 
 const ROW_HEIGHT_SHORT = 32
@@ -90,6 +95,7 @@ export default function AirtableGridView({
   userRole = "editor",
   disableRecordPanel = false,
   onTableFieldsRefresh,
+  onActionsReady,
 }: AirtableGridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -181,7 +187,7 @@ export default function AirtableGridView({
       }))
   }, [viewFilters])
 
-  const { rows: allRows, loading, error, updateCell, refresh } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, insertRow } = useGridData({
     tableName,
     fields,
     filters: standardizedFilters,
@@ -235,6 +241,31 @@ export default function AirtableGridView({
   const filteredRows = useMemo(() => {
     return filterRowsBySearch(safeRows, safeFields, searchQuery, visibleFieldNames)
   }, [safeRows, safeFields, searchQuery, visibleFieldNames])
+
+  const createNewRow = useCallback(async (): Promise<GridRow | null> => {
+    const newRow = await insertRow({})
+
+    // Spreadsheet-style UX: jump to the newly created row and select the first visible field
+    if (newRow && visibleFields.length > 0) {
+      setSelectedCell({ rowId: newRow.id, fieldName: visibleFields[0].name })
+      setSelectedRowIds(new Set())
+      setSelectedColumnId(null)
+
+      requestAnimationFrame(() => {
+        if (bodyScrollRef.current) {
+          bodyScrollRef.current.scrollTop = bodyScrollRef.current.scrollHeight
+        }
+      })
+    }
+
+    return newRow
+  }, [insertRow, visibleFields])
+
+  // Expose actions to parent (toolbar lives outside this component)
+  useEffect(() => {
+    if (!onActionsReady) return
+    onActionsReady({ createNewRow })
+  }, [onActionsReady, createNewRow])
 
   // Data view service for copy/paste/duplicate
   const dataView = useDataView({

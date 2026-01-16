@@ -83,8 +83,6 @@ export default function LinkedRecordCell({
   const lookupConfig: LookupFieldConfig | undefined = linkedTableId
     ? {
         lookupTableId: linkedTableId,
-        primaryLabelField: field.options?.primary_label_field || "name",
-        secondaryLabelFields: field.options?.secondary_label_fields || [],
         relationshipType: field.options?.relationship_type || "one-to-many",
         maxSelections: field.options?.max_selections,
         required: field.required,

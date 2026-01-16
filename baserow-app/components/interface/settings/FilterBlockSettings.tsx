@@ -450,8 +450,6 @@ export default function FilterBlockSettings({
                           if (isLookupField && linkedTableId) {
                             const lookupConfig: LookupFieldConfig = {
                               lookupTableId: linkedTableId,
-                              primaryLabelField: (selectedField.options as any)?.primary_label_field || 'name',
-                              secondaryLabelFields: (selectedField.options as any)?.secondary_label_fields || [],
                               relationshipType: (selectedField.options as any)?.relationship_type || (selectedField.type === 'link_to_table' ? 'one-to-many' : 'one-to-one'),
                               maxSelections: (selectedField.options as any)?.max_selections,
                             }

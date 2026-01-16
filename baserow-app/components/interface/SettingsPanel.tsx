@@ -91,7 +91,27 @@ export default function SettingsPanel({
   // Initialize config from block - only when block changes or panel opens
   useEffect(() => {
     if (block && isOpen) {
-      const blockConfig = block.config || {}
+      /**
+       * NOTE: Many table-based blocks can render using the page-level table fallback (pageTableId)
+       * even when block.config.table_id is empty (legacy data / older pages).
+       *
+       * If we don't hydrate a table_id here, the Settings UI can't load fields and
+       * validation will block saves (making it look like "settings don't pull through").
+       */
+      const blockConfig = { ...(block.config || {}) } as BlockConfig
+
+      // Hydrate table_id from the page when missing (keeps legacy pages editable)
+      const legacyTableId = (blockConfig as any)?.tableId
+      const fallbackTableId =
+        (blockConfig as any)?.table_id ||
+        legacyTableId ||
+        pageTableId ||
+        (blockConfig as any)?.base_table ||
+        undefined
+      if (!blockConfig.table_id && fallbackTableId) {
+        blockConfig.table_id = fallbackTableId
+      }
+
       // Ensure calendar/kanban/timeline/table blocks have the correct view_type
       if (block.type === 'calendar' && !blockConfig.view_type) {
         blockConfig.view_type = 'calendar'
@@ -109,7 +129,7 @@ export default function SettingsPanel({
       previousConfigRef.current = JSON.stringify(blockConfig)
       isInitialLoadRef.current = true
     }
-  }, [block?.id, isOpen])
+  }, [block?.id, isOpen, pageTableId])
 
   // Reset initial load flag after a short delay to allow initial render
   useEffect(() => {
@@ -178,10 +198,23 @@ export default function SettingsPanel({
     }
     
     // Pre-deployment guard: Ensure shallow merge (don't overwrite unrelated config)
-    const safeConfig = validateShallowMerge(
+    let safeConfig = validateShallowMerge(
       currentConfig as Record<string, any>,
       configToSave as Record<string, any>
     ) as BlockConfig
+
+    // Ensure table_id is persisted for legacy pages that relied on pageTableId fallback.
+    // Without this, calendar/kanban/etc. may render (via fallback) but settings can't persist reliably.
+    const legacyTableId = (safeConfig as any)?.tableId
+    const fallbackTableId =
+      safeConfig.table_id ||
+      legacyTableId ||
+      pageTableId ||
+      (safeConfig as any)?.base_table ||
+      undefined
+    if (!safeConfig.table_id && fallbackTableId) {
+      safeConfig = { ...safeConfig, table_id: fallbackTableId }
+    }
     
     // Validate config before saving
     const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
@@ -229,7 +262,7 @@ export default function SettingsPanel({
     } finally {
       setSaving(false)
     }
-  }, [block, onSave, toast])
+  }, [block, onSave, toast, pageTableId])
 
   // Validate config on change (for UI feedback)
   useEffect(() => {

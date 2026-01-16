@@ -7,7 +7,6 @@ import {
   ArrowUpDown,
   Group,
   Eye,
-  Save,
   MoreVertical,
   Grid3x3,
   Layout,
@@ -73,7 +72,6 @@ interface ViewBuilderToolbarProps {
   onGroupChange?: (fieldName: string | null) => void
   onRowHeightChange?: (height: "short" | "medium" | "tall") => void
   onHiddenFieldsChange?: (fields: string[]) => void
-  onSaveView?: () => void
   onViewAction?: (action: "duplicate" | "rename" | "delete" | "setDefault") => void
   onDesign?: () => void
   onAddField?: () => void
@@ -98,7 +96,6 @@ export default function ViewBuilderToolbar({
   onGroupChange,
   onRowHeightChange,
   onHiddenFieldsChange,
-  onSaveView,
   onViewAction,
   onDesign,
   onAddField,
@@ -327,16 +324,6 @@ export default function ViewBuilderToolbar({
 
           {canManageViews && (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onSaveView}
-                className="h-7 px-2.5 text-xs font-normal text-blue-600 hover:bg-blue-50"
-              >
-                <Save className="h-3.5 w-3.5 mr-1.5" />
-                Save View
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

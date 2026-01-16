@@ -7,6 +7,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import type { TableField, LinkedField } from '@/types/fields'
+import { getPrimaryFieldName } from '@/lib/fields/primary'
 
 /**
  * Resolve a linked field value to display labels
@@ -44,8 +45,8 @@ export async function resolveLinkedFieldDisplay(
 
   // Determine which field to use for display
   // Explicit fallback order:
-  // 1. primary_label_field (if set in field options)
-  // 2. Table's configured primary field (if system has one)
+  // 1. Table's primary field (core data)
+  // 2. linked_field_id (if set)
   // 3. First text-like field
   // 4. Finally ID display
   const { data: targetFields } = await supabase
@@ -54,45 +55,29 @@ export async function resolveLinkedFieldDisplay(
     .eq('table_id', linkedTableId)
     .order('position', { ascending: true })
 
-  const primaryLabelField = field.options?.primary_label_field
   const linkedFieldId = field.options?.linked_field_id
 
   let displayFieldName: string | null = null
 
-  // 1. primary_label_field (if set)
-  if (primaryLabelField) {
-    displayFieldName = primaryLabelField
-  } else {
-    // 2. Table's configured primary field (if system has one)
-    // Note: Check if target table has a primary_field_id or similar in its config
-    // For now, we'll check the first field (position 0) as a proxy for "primary"
-    // This can be enhanced when table-level primary field configuration is added
-    const { data: targetTable } = await supabase
-      .from('tables')
-      .select('*')
-      .eq('id', linkedTableId)
-      .single()
+  // 1. Table's primary field
+  displayFieldName = getPrimaryFieldName(targetFields as any)
 
-    // If table has a primary field concept, use it here
-    // For now, we'll skip to step 3
-
-    // 3. linked_field_id (if set)
-    if (!displayFieldName && linkedFieldId && targetFields) {
-      // linked_field_id can be either a field ID or field name
-      const linkedField = targetFields.find(f => f.id === linkedFieldId || f.name === linkedFieldId)
-      if (linkedField) {
-        displayFieldName = linkedField.name
-      }
+  // 2. linked_field_id (if set)
+  if (!displayFieldName && linkedFieldId && targetFields) {
+    // linked_field_id can be either a field ID or field name
+    const linkedField = targetFields.find(f => f.id === linkedFieldId || f.name === linkedFieldId)
+    if (linkedField) {
+      displayFieldName = linkedField.name
     }
+  }
 
-    // 4. First text-like field
-    if (!displayFieldName && targetFields) {
-      const textField = targetFields.find(f => 
-        ['text', 'long_text', 'email', 'url'].includes(f.type)
-      )
-      if (textField) {
-        displayFieldName = textField.name
-      }
+  // 3. First text-like field
+  if (!displayFieldName && targetFields) {
+    const textField = targetFields.find(f =>
+      ['text', 'long_text', 'email', 'url'].includes(f.type)
+    )
+    if (textField) {
+      displayFieldName = textField.name
     }
   }
 
@@ -182,25 +167,21 @@ export async function resolvePastedLinkedValue(
   }
 
   // Determine search fields using same fallback order as display resolution
-  // 1. primary_label_field (if set)
-  // 2. Table's configured primary field (if system has one)
-  // 3. All text-like fields
-  // 4. All fields as last resort
-  const primaryLabelField = field.options?.primary_label_field
+  // 1. Table's primary field
+  // 2. All text-like fields
+  // 3. All fields as last resort
   const searchFields: string[] = []
 
-  if (primaryLabelField) {
-    searchFields.push(primaryLabelField)
-  } else {
-    // Check for table's primary field (if system has one)
-    // For now, we'll use text fields as primary search targets
-    
-    // Use all text-like fields for search
-    const textFields = targetFields.filter(f =>
-      ['text', 'long_text', 'email', 'url'].includes(f.type)
-    )
-    searchFields.push(...textFields.map(f => f.name))
+  const primaryName = getPrimaryFieldName(targetFields as any)
+  if (primaryName) {
+    searchFields.push(primaryName)
   }
+
+  // Use all text-like fields for search
+  const textFields = targetFields.filter(f =>
+    ['text', 'long_text', 'email', 'url'].includes(f.type)
+  )
+  searchFields.push(...textFields.map(f => f.name))
 
   // If no search fields found, fall back to all fields
   if (searchFields.length === 0) {

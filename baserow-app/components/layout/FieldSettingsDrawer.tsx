@@ -27,6 +27,7 @@ import { FIELD_TYPES } from '@/types/fields'
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from '@/lib/field-colors'
 import { canChangeType } from '@/lib/fields/validation'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import { getPrimaryFieldName } from '@/lib/fields/primary'
 import FormulaEditor from '@/components/fields/FormulaEditor'
 import {
   Dialog,
@@ -126,14 +127,19 @@ export default function FieldSettingsDrawer({
     setLoadingLookupFields(true)
     try {
       const supabase = createClient()
+      // Prefer a minimal select to avoid PostgREST 400s in environments where `table_fields.label`
+      // hasn't been migrated yet. UI can still display `name` as the label fallback.
       const { data, error } = await supabase
         .from('table_fields')
-        .select('id, name, label, type')
+        .select('id, name, type')
         .eq('table_id', tableId)
         .order('position', { ascending: true })
 
       if (!error && data) {
-        setLookupTableFields(data)
+        setLookupTableFields(data as any)
+      } else {
+        console.error('Error loading lookup table fields:', error)
+        setLookupTableFields([])
       }
     } catch (error) {
       console.error('Error loading lookup table fields:', error)
@@ -945,77 +951,12 @@ export default function FieldSettingsDrawer({
                 <div className="space-y-3 border-t pt-4">
                   <Label>Display Configuration</Label>
                   <div className="space-y-2">
-                    <Label htmlFor="link-primary-label-field" className="text-sm font-normal">
-                      Primary Label Field <span className="text-red-500">*</span>
-                    </Label>
-                    <Select
-                      value={options.primary_label_field || 'name'}
-                      onValueChange={(fieldName) =>
-                        setOptions({ ...options, primary_label_field: fieldName })
-                      }
-                    >
-                      <SelectTrigger id="link-primary-label-field">
-                        <SelectValue placeholder="Select field" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {lookupTableFields
-                          .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
-                          .map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {getFieldDisplayName(field)}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Field used as the main label when selecting records
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="link-secondary-label-fields" className="text-sm font-normal">
-                      Secondary Label Fields (optional, max 2)
-                    </Label>
-                    <div className="space-y-2">
-                      {[0, 1].map((idx) => {
-                        const currentValue = (options.secondary_label_fields || [])[idx]
-                        return (
-                          <Select
-                            key={idx}
-                            value={currentValue || '__none__'}
-                            onValueChange={(fieldName) => {
-                              const current = options.secondary_label_fields || []
-                              const updated: string[] = [...current]
-                              if (fieldName === '__none__') {
-                                updated.splice(idx, 1)
-                              } else {
-                                updated[idx] = fieldName
-                              }
-                              setOptions({ 
-                                ...options, 
-                                secondary_label_fields: updated.filter(Boolean) as string[]
-                              })
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">None</SelectItem>
-                              {lookupTableFields
-                                .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
-                                .map((field) => (
-                                  <SelectItem key={field.id} value={field.name}>
-                                    {getFieldDisplayName(field)}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        )
-                      })}
+                    <Label className="text-sm font-normal">Primary Field</Label>
+                    <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700">
+                      {getPrimaryFieldName(lookupTableFields as any) || '(no fields found)'}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Additional context shown below the primary label
+                      This is the table’s core “primary field” used to identify records (also used for CSV import and record pickers).
                     </p>
                   </div>
 
@@ -1162,77 +1103,12 @@ export default function FieldSettingsDrawer({
                   <div className="space-y-3 border-t pt-4">
                     <Label>Display Configuration</Label>
                     <div className="space-y-2">
-                      <Label htmlFor="primary-label-field" className="text-sm font-normal">
-                        Primary Label Field <span className="text-red-500">*</span>
-                      </Label>
-                      <Select
-                        value={options.primary_label_field || 'name'}
-                        onValueChange={(fieldName) =>
-                          setOptions({ ...options, primary_label_field: fieldName })
-                        }
-                      >
-                        <SelectTrigger id="primary-label-field">
-                          <SelectValue placeholder="Select field" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {lookupTableFields
-                            .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
-                            .map((field) => (
-                              <SelectItem key={field.id} value={field.name}>
-                                {getFieldDisplayName(field)}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Field used as the main label in lookup results
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="secondary-label-fields" className="text-sm font-normal">
-                        Secondary Label Fields (optional, max 2)
-                      </Label>
-                      <div className="space-y-2">
-                        {[0, 1].map((idx) => {
-                          const currentValue = (options.secondary_label_fields || [])[idx]
-                          return (
-                            <Select
-                              key={idx}
-                              value={currentValue || '__none__'}
-                              onValueChange={(fieldName) => {
-                                const current = options.secondary_label_fields || []
-                                const updated: string[] = [...current]
-                                if (fieldName === '__none__') {
-                                  updated.splice(idx, 1)
-                                } else {
-                                  updated[idx] = fieldName
-                                }
-                                setOptions({ 
-                                  ...options, 
-                                  secondary_label_fields: updated.filter(Boolean) as string[]
-                                })
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder={`Secondary field ${idx + 1} (optional)`} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">None</SelectItem>
-                                {lookupTableFields
-                                  .filter(f => ['text', 'long_text', 'number', 'date'].includes(f.type))
-                                  .map((field) => (
-                                    <SelectItem key={field.id} value={field.name}>
-                                      {getFieldDisplayName(field)}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          )
-                        })}
+                      <Label className="text-sm font-normal">Primary Field</Label>
+                      <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-700">
+                        {getPrimaryFieldName(lookupTableFields as any) || '(no fields found)'}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Additional context shown below the primary label
+                        This is the table’s core “primary field” used to identify records (also used for CSV import and record pickers).
                       </p>
                     </div>
 

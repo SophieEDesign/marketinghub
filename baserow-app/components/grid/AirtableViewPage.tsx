@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import ViewBuilderToolbar from "./ViewBuilderToolbar"
-import AirtableGridView from "./AirtableGridView"
+import AirtableGridView, { type AirtableGridActions } from "./AirtableGridView"
 import AirtableKanbanView from "./AirtableKanbanView"
 import FieldBuilderModal from "./FieldBuilderModal"
 import DesignSidebar from "@/components/layout/DesignSidebar"
@@ -65,6 +65,11 @@ export default function AirtableViewPage({
   initialGridSettings,
 }: AirtableViewPageProps) {
   const router = useRouter()
+  const gridActionsRef = useRef<AirtableGridActions | null>(null)
+  const handleGridActionsReady = useCallback((actions: AirtableGridActions) => {
+    gridActionsRef.current = actions
+  }, [])
+
   const [viewFields, setViewFields] = useState(initialViewFields)
   const [tableFields, setTableFields] = useState<TableField[]>(initialTableFields)
   const [filters, setFilters] = useState(initialViewFilters)
@@ -239,115 +244,21 @@ export default function AirtableViewPage({
     }
   }
 
-  async function handleSaveView() {
-    const name = prompt("Enter name for the new view:")
-    if (!name || !name.trim()) return
-
-    try {
-      // Get current view data
-      const { data: currentView } = await supabase
-        .from("views")
-        .select("*")
-        .eq("id", viewId)
-        .single()
-
-      if (!currentView) {
-        alert("Current view not found")
-        return
-      }
-
-      // Get view fields, filters, sorts
-      const [fieldsRes, filtersRes, sortsRes] = await Promise.all([
-        supabase.from("view_fields").select("*").eq("view_id", viewId),
-        supabase.from("view_filters").select("*").eq("view_id", viewId),
-        supabase.from("view_sorts").select("*").eq("view_id", viewId),
-      ])
-
-      // Create new view with current config
-      const newConfig = {
-        groupBy: groupBy || null,
-        row_height: rowHeight,
-        hidden_columns: hiddenFields,
-      }
-
-      const { data: newView, error: viewError } = await supabase
-        .from("views")
-        .insert([
-          {
-            table_id: tableId,
-            name: name.trim(),
-            type: currentView.type,
-            config: newConfig,
-          },
-        ])
-        .select()
-        .single()
-
-      if (viewError || !newView) {
-        alert("Failed to create new view")
-        return
-      }
-
-      // Copy view fields
-      if (fieldsRes.data && fieldsRes.data.length > 0) {
-        await supabase.from("view_fields").insert(
-          fieldsRes.data.map((f) => ({
-            view_id: newView.id,
-            field_name: f.field_name,
-            visible: f.visible,
-            position: f.position,
-          }))
-        )
-      }
-
-      // Copy filters
-      if (filtersRes.data && filtersRes.data.length > 0) {
-        await supabase.from("view_filters").insert(
-          filtersRes.data.map((f) => ({
-            view_id: newView.id,
-            field_name: f.field_name,
-            operator: f.operator,
-            value: f.value,
-          }))
-        )
-      }
-
-      // Copy sorts
-      if (sortsRes.data && sortsRes.data.length > 0) {
-        await supabase.from("view_sorts").insert(
-          sortsRes.data.map((f) => ({
-            view_id: newView.id,
-            field_name: f.field_name,
-            direction: f.direction,
-            order_index: f.order_index,
-          }))
-        )
-      }
-
-      router.push(`/tables/${tableId}/views/${newView.id}`)
-    } catch (error) {
-      console.error("Error saving view:", error)
-      alert("Failed to save view")
-    }
-  }
-
   // View type is locked at creation - cannot be changed
   // Users should create a new view instead
 
   async function handleNewRecord() {
     try {
-      const { data, error } = await supabase
-        .from(table.supabase_table)
-        .insert([{}])
-        .select()
-        .single()
-
-      if (error) {
-        console.error("Error creating record:", error)
-        alert("Failed to create record")
-      } else {
-        router.refresh()
+      // Prefer grid-owned insert so the new row shows immediately (spreadsheet-style)
+      const actions = gridActionsRef.current
+      if (actions) {
+        await actions.createNewRow()
+        return
       }
+
+      // Fallback: insert directly (e.g. grid not mounted yet)
+      const { error } = await supabase.from(table.supabase_table).insert([{}])
+      if (error) throw error
     } catch (error) {
       console.error("Error creating record:", error)
       alert("Failed to create record")
@@ -423,7 +334,6 @@ export default function AirtableViewPage({
             setHiddenFields(fields)
             router.refresh()
           }}
-          onSaveView={handleSaveView}
           onViewAction={(action) => {
             if (action === "delete") {
               // ViewManagementDialog handles the deletion and redirect
@@ -455,6 +365,7 @@ export default function AirtableViewPage({
             groupBy={groupBy || undefined}
             userRole={userRole}
             disableRecordPanel={false}
+            onActionsReady={handleGridActionsReady}
           />
         ) : view.type === "kanban" ? (
           <AirtableKanbanView

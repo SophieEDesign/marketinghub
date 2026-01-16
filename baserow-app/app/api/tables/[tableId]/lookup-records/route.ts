@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { applyLookupFilters } from '@/lib/lookups/applyLookupFilters'
 import type { LookupFieldFilter } from '@/types/fields'
+import { getPrimaryFieldName } from '@/lib/fields/primary'
 
 export async function POST(
   request: NextRequest,
@@ -115,8 +116,8 @@ export async function POST(
     const currentUserEmail = user?.email
     
     // Build base query
-    const primaryLabelField = options.primary_label_field || 'name'
-    const secondaryLabelFields = options.secondary_label_fields || []
+    const primaryLabelField = getPrimaryFieldName(lookupTableFields as any) || 'id'
+    const secondaryLabelFields: string[] = [] // table-level secondary labels can be added later
     const fieldsToSelect = [
       'id',
       primaryLabelField,
