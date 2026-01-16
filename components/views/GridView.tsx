@@ -3,9 +3,7 @@
 import { useState } from 'react'
 import { createClientSupabaseClient } from '@/lib/supabase'
 import { updateRowClient } from '@/lib/data'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import ViewToolbar from './ViewToolbar'
 import FilterBar from './FilterBar'
 import SortBar from './SortBar'
@@ -19,8 +17,6 @@ interface GridViewProps {
   filters: ViewFilter[]
   sorts: ViewSort[]
 }
-
-const ITEMS_PER_PAGE = 50
 
 export default function GridView({
   tableId,
@@ -56,7 +52,7 @@ export default function GridView({
 
   const saveEdit = () => {
     if (editingCell) {
-      handleCellEdit(editingCell.rowId, editingCell.fieldId, editValue)
+      handleCellEdit(editingCell.rowId, editingCell.fieldName, editValue)
       setEditingCell(null)
     }
   }

@@ -14,6 +14,7 @@ import UrlCell from './cells/UrlCell'
 import EmailCell from './cells/EmailCell'
 import JsonCell from './cells/JsonCell'
 import LookupCell from './cells/LookupCell'
+import LinkedRecordCell from './cells/LinkedRecordCell'
 
 interface CellFactoryProps {
   field: TableField
@@ -116,6 +117,14 @@ export function CellFactory({
       return <JsonCell {...commonProps} editable={false} />
 
     case 'link_to_table':
+      return (
+        <LinkedRecordCell
+          value={value}
+          fieldName={field.name}
+          fieldOptions={field.options}
+        />
+      )
+
     case 'formula':
       // These are read-only or need special handling
       return <TextCell {...commonProps} editable={false} />

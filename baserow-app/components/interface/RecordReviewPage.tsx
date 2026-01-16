@@ -53,6 +53,13 @@ export default function RecordReviewPage({
   const pageTableId = pageConfig.tableId || pageConfig.primary_table_id || page.settings?.tableId || page.settings?.primary_table_id || null
   // Check both left_panel (snake_case) and leftPanel (camelCase) for backward compatibility
   const leftPanelSettings = pageConfig.left_panel || pageConfig.leftPanel || page.settings?.left_panel || page.settings?.leftPanel
+
+  // Page-level default for "Add record" (used across the interface; blocks can override)
+  const pageShowAddRecord =
+    pageConfig.show_add_record === true ||
+    pageConfig.showAddRecord === true ||
+    (page.settings as any)?.show_add_record === true ||
+    (page.settings as any)?.showAddRecord === true
   
   // Determine page type from page object (for record_view vs record_review)
   const pageType = (page as any).page_type || (page as any).type || 'record_review'
@@ -78,6 +85,7 @@ export default function RecordReviewPage({
         onRecordSelect={handleRecordSelect}
         leftPanelSettings={leftPanelSettings}
         pageType={pageType as 'record_view' | 'record_review'}
+        showAddRecord={pageShowAddRecord}
       />
 
       {/* Right Canvas - Blocks Only */}

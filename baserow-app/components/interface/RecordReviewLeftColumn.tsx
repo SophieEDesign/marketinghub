@@ -16,9 +16,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
-import { Search } from "lucide-react"
+import { Plus, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { formatDateUK } from "@/lib/utils"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
@@ -26,6 +27,7 @@ interface RecordReviewLeftColumnProps {
   tableId: string | null // From page.settings.tableId
   selectedRecordId: string | null
   onRecordSelect: (recordId: string) => void
+  showAddRecord?: boolean
   leftPanelSettings?: {
     // For record_review pages: full field list
     visibleFieldIds?: string[]
@@ -48,14 +50,17 @@ export default function RecordReviewLeftColumn({
   tableId,
   selectedRecordId,
   onRecordSelect,
+  showAddRecord = false,
   leftPanelSettings,
   pageType = 'record_review', // Default to record_review for backward compatibility
 }: RecordReviewLeftColumnProps) {
   const [records, setRecords] = useState<any[]>([])
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [tableName, setTableName] = useState<string | null>(null)
+  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   
   // Get settings based on page type
   const isRecordView = pageType === 'record_view'
@@ -129,6 +134,7 @@ export default function RecordReviewLeftColumn({
 
       if (table) {
         setTableName(table.name)
+        setSupabaseTableName(table.supabase_table || null)
         
         // Load fields
         const { data: tableFields } = await supabase
@@ -149,7 +155,7 @@ export default function RecordReviewLeftColumn({
     loadTableInfo()
   }, [tableId])
 
-  const loadRecords = useCallback(async (supabaseTableName: string) => {
+  const loadRecords = useCallback(async (supabaseTableName: string, searchOverride?: string) => {
     if (!supabaseTableName) return
 
     setLoading(true)
@@ -158,9 +164,10 @@ export default function RecordReviewLeftColumn({
       let query = supabase.from(supabaseTableName).select("*").limit(100)
 
       // Apply search filter
-      if (searchQuery.trim()) {
+      const effectiveSearch = (searchOverride ?? searchQuery).trim()
+      if (effectiveSearch) {
         // Simple search - can be enhanced
-        query = query.or(`name.ilike.%${searchQuery}%,id.ilike.%${searchQuery}%`)
+        query = query.or(`name.ilike.%${effectiveSearch}%,id.ilike.%${effectiveSearch}%`)
       }
 
       const { data, error } = await query
@@ -187,11 +194,43 @@ export default function RecordReviewLeftColumn({
         .single()
         .then(({ data: table }) => {
           if (table?.supabase_table) {
+            setSupabaseTableName(table.supabase_table)
             loadRecords(table.supabase_table)
           }
         })
     }
   }, [tableId, loadRecords])
+
+  const handleAddRecord = useCallback(async () => {
+    // Only enable this UX for record_view pages (requested)
+    if (!isRecordView) return
+    if (!showAddRecord || !supabaseTableName || creating) return
+
+    setCreating(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from(supabaseTableName)
+        .insert([{}])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      const createdId = (data as any)?.id || (data as any)?.record_id
+      if (!createdId) return
+
+      // Ensure the newly created record is visible/selectable
+      setSearchQuery("")
+      await loadRecords(supabaseTableName, "")
+      onRecordSelect(String(createdId))
+    } catch (error: any) {
+      console.error("Failed to create record:", error)
+      alert(error?.message ? `Failed to create record: ${error.message}` : "Failed to create record. Please try again.")
+    } finally {
+      setCreating(false)
+    }
+  }, [creating, isRecordView, loadRecords, onRecordSelect, showAddRecord, supabaseTableName])
 
   // Auto-select first record when records are loaded and no record is selected
   useEffect(() => {
@@ -296,15 +335,31 @@ export default function RecordReviewLeftColumn({
         <h3 className="text-sm font-semibold text-gray-900 mb-3">{tableName || "Records"}</h3>
 
         {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search records..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search records..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          {isRecordView && showAddRecord && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 flex-shrink-0"
+              onClick={handleAddRecord}
+              disabled={creating || !supabaseTableName}
+              aria-label="Add record"
+              title={!supabaseTableName ? "No table configured" : "Add a new record"}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 

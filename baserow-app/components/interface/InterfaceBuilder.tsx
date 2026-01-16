@@ -840,8 +840,11 @@ export default function InterfaceBuilder({
 
         // CRITICAL: Update latestLayoutRef before saving (ref → ref comparison)
         latestLayoutRef.current = newLayout
+        // Explicit user action: treat as user-initiated layout change
+        markUserInteraction()
+        layoutModifiedByUserRef.current = true
 
-        await saveLayout(newLayout)
+        await saveLayout(newLayout, true)
         
         // Update local state
         setBlocks((prev) =>
@@ -897,8 +900,11 @@ export default function InterfaceBuilder({
 
         // CRITICAL: Update latestLayoutRef before saving (ref → ref comparison)
         latestLayoutRef.current = newLayout
+        // Explicit user action: treat as user-initiated layout change
+        markUserInteraction()
+        layoutModifiedByUserRef.current = true
 
-        await saveLayout(newLayout)
+        await saveLayout(newLayout, true)
         
         // Update local state
         setBlocks((prev) =>

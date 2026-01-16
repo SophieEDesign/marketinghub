@@ -98,13 +98,7 @@ export default function EmailCell({
       title={value || undefined}
     >
       <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
-      <a
-        href={`mailto:${value}`}
-        onClick={(e) => e.stopPropagation()}
-        className="text-blue-600 hover:text-blue-800 underline truncate"
-      >
-        {value}
-      </a>
+      <span className="text-gray-900 truncate">{value}</span>
     </div>
   )
 }

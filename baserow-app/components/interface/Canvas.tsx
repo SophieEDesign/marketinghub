@@ -133,6 +133,10 @@ export default function Canvas({
   // Track when blocks are updated from user interaction (drag/resize) vs database reload
   // This prevents sync effect from overwriting user changes
   const blocksUpdatedFromUserRef = useRef(false)
+  // CRITICAL: Only treat layout changes as persistable when triggered by explicit user drag/resize.
+  // Environmental changes (window resize, side panels, modals, container size changes, edit mode toggles)
+  // must NEVER propagate as "user layout changes" to the parent.
+  const userInteractionInProgressRef = useRef(false)
   
   // Track if this is the first layout change after mount (to ignore grid's initial "normalization")
   const isFirstLayoutChangeRef = useRef(true)
@@ -159,6 +163,7 @@ export default function Canvas({
       layoutHydratedRef.current = false
       isInitializedRef.current = false
       blocksUpdatedFromUserRef.current = false
+      userInteractionInProgressRef.current = false
       isFirstLayoutChangeRef.current = true // Reset first layout change flag on page change
       setLayout([]) // Clear layout when page changes
       if (process.env.NODE_ENV === 'development') {
@@ -821,6 +826,18 @@ export default function Canvas({
         isFirstLayoutChangeRef.current = false
         return
       }
+
+      // CRITICAL: Ignore environment-driven layout recalculations.
+      // RGL can emit onLayoutChange when container width/height changes (side panels, modals, window resizes),
+      // or when breakpoints/cols change. Those must not be treated as user intent.
+      if (!userInteractionInProgressRef.current) {
+        debugWarn('LAYOUT', '[Canvas] Ignoring layout change (no user drag/resize in progress)', {
+          pageId,
+          isEditing,
+          layoutCount: newLayout.length,
+        })
+        return
+      }
       
       // Mark that we're resizing/dragging
       isResizingRef.current = true
@@ -990,6 +1007,7 @@ export default function Canvas({
         // CRITICAL: Clear all resize state immediately
         // Height must be DERIVED, not remembered - clear all cached heights
         isResizingRef.current = false
+        userInteractionInProgressRef.current = false
         blockHeightsBeforeResizeRef.current.clear() // Clear ALL cached heights
         currentlyResizingBlockIdRef.current = null
         
@@ -1236,6 +1254,7 @@ export default function Canvas({
           isResizable={isEditing}
           onLayoutChange={handleLayoutChange}
           onResizeStart={(layout, oldItem, newItem, placeholder, e, element) => {
+            userInteractionInProgressRef.current = true
             // CRITICAL: Track which block is being resized and store its initial height
             // This allows us to detect shrinkage when resize ends
             const blockId = oldItem.i
@@ -1265,6 +1284,7 @@ export default function Canvas({
             // Compaction will be handled by handleLayoutChange timeout
           }}
           onDragStart={(layout, oldItem, newItem, placeholder, e, element) => {
+            userInteractionInProgressRef.current = true
             // Track drag start position for snap detection
             const blockId = oldItem.i
             currentlyDraggingBlockIdRef.current = blockId

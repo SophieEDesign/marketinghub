@@ -246,6 +246,7 @@ export default function GridView({
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -860,6 +861,18 @@ export default function GridView({
     handleRowClick(rowId)
   }
 
+  function handleRowSelect(rowId: string) {
+    if (!rowId) return
+    setSelectedRowId(rowId)
+  }
+
+  function handleRowDoubleClick(rowId: string) {
+    // Optional secondary behaviour: double-click row background opens record.
+    // Cell contents should stopPropagation on double click to prevent accidental opens.
+    if (!allowOpenRecord || !enableRecordOpen) return
+    handleRowClick(rowId)
+  }
+
   // Apply client-side search
   // CRITICAL: Normalize rows to array before filtering
   const safeRows = asArray<Record<string, any>>(rows)
@@ -1284,30 +1297,32 @@ export default function GridView({
                           const rowImage = getRowImage ? getRowImage(row) : null
                           const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
                           const canOpenRecord = enableRecordOpen && allowOpenRecord
-                          const shouldRowClickOpen = isMobile && canOpenRecord // Mobile: entire row opens
+                          const thisRowId = row?.id ? String(row.id) : null
                           
                           return (
                           <tr
                             key={row?.id || `row-${Math.random()}`}
-                            className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
+                            className={`border-b border-gray-100 transition-colors ${
+                              thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
+                            } cursor-default`}
                             style={{ ...borderColor, height: `${rowHeightPixels}px` }}
-                            onClick={shouldRowClickOpen && row?.id ? () => handleRowClick(row.id) : undefined}
+                            onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
+                            onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                           >
-                            {/* Row action indicator (desktop only) */}
+                            {/* Row open control */}
                             {canOpenRecord && (
                               <td
                                 className="px-2 py-1 w-8"
-                                onClick={(e) => !isMobile && row?.id && handleOpenRecordClick(e, row.id)}
                               >
-                                {!isMobile && (
-                                  <button
-                                    className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
-                                    title="Open record"
-                                    aria-label="Open record"
-                                  >
-                                    <ChevronRight className="h-4 w-4" />
-                                  </button>
-                                )}
+                                <button
+                                  type="button"
+                                  onClick={(e) => row?.id && handleOpenRecordClick(e, row.id)}
+                                  className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
+                                  title="Open record"
+                                  aria-label="Open record"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </button>
                               </td>
                             )}
                             {/* Image cell if image field is configured */}
@@ -1315,6 +1330,7 @@ export default function GridView({
                               <td
                                 className="px-2 py-1 w-12"
                                 onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
                               >
                                 <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                                   <img
@@ -1364,6 +1380,7 @@ export default function GridView({
                                         className="px-0 py-0"
                                         style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                         onClick={(e) => e.stopPropagation()}
+                                        onDoubleClick={(e) => e.stopPropagation()}
                                       >
                                         {canUseCellFactory ? (
                                           <CellFactory
@@ -1416,30 +1433,32 @@ export default function GridView({
                   const rowImage = getRowImage ? getRowImage(row) : null
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
                   const canOpenRecord = enableRecordOpen && allowOpenRecord
-                  const shouldRowClickOpen = isMobile && canOpenRecord // Mobile: entire row opens
+                  const thisRowId = row?.id ? String(row.id) : null
                   
                   return (
                   <tr
                     key={row?.id || `row-${Math.random()}`}
-                    className={`border-b border-gray-100 ${shouldRowClickOpen ? 'hover:bg-blue-50 transition-colors cursor-pointer' : 'cursor-default'}`}
+                    className={`border-b border-gray-100 transition-colors ${
+                      thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
+                    } cursor-default`}
                     style={{ ...borderColor, height: `${rowHeightPixels}px` }}
-                    onClick={shouldRowClickOpen && row?.id ? () => handleRowClick(row.id) : undefined}
+                    onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
+                    onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                   >
-                    {/* Row action indicator (desktop only) */}
+                    {/* Row open control */}
                     {canOpenRecord && (
                       <td
                         className="px-2 py-1 w-8"
-                        onClick={(e) => !isMobile && handleOpenRecordClick(e, row.id)}
                       >
-                        {!isMobile && (
-                          <button
-                            className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
-                            title="Open record"
-                            aria-label="Open record"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleOpenRecordClick(e, row.id)}
+                          className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
+                          title="Open record"
+                          aria-label="Open record"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
                       </td>
                     )}
                     {/* Image cell if image field is configured */}
@@ -1447,6 +1466,7 @@ export default function GridView({
                       <td
                         className="px-2 py-1 w-12"
                         onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={(e) => e.stopPropagation()}
                       >
                         <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                           <img
@@ -1496,6 +1516,7 @@ export default function GridView({
                                 className="px-0 py-0"
                                 style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                 onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
                               >
                                 {canUseCellFactory ? (
                                   <CellFactory

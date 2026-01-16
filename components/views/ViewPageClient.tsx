@@ -70,10 +70,15 @@ export default function ViewPageClient({
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
 
   async function handleNewRecord() {
-    const supabase = createClientSupabaseClient()
-    const { createRowClient } = await import('@/lib/data')
-    await createRowClient(supabase, tableId, {})
-    router.refresh()
+    try {
+      const supabase = createClientSupabaseClient()
+      const { createRowClient } = await import('@/lib/data')
+      await createRowClient(supabase, tableId, {})
+      router.refresh()
+    } catch (error: any) {
+      console.error('Failed to create record:', error)
+      alert(error?.message ? `Failed to create record: ${error.message}` : 'Failed to create record')
+    }
   }
 
   function handleFieldsUpdated() {

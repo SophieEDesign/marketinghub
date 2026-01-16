@@ -205,12 +205,13 @@ export async function loadRows(options: LoadRowsOptions) {
 
 export async function loadRow(tableId: string, rowId: string) {
   const supabase = await createServerSupabaseClient()
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
   
   // Try table_rows first (matches how blocks load data)
   const { data: tableRow, error: tableRowError } = await supabase
     .from('table_rows')
     .select('*')
-    .eq('table_id', tableId)
+    .eq('table_id', sanitizedTableId)
     .eq('id', rowId)
     .single()
 
@@ -230,11 +231,11 @@ export async function loadRow(tableId: string, rowId: string) {
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { data, error } = await supabase
@@ -249,6 +250,7 @@ export async function loadRow(tableId: string, rowId: string) {
 
 export async function createRow(tableId: string, data: Record<string, any>) {
   const supabase = await createServerSupabaseClient()
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -257,11 +259,11 @@ export async function createRow(tableId: string, data: Record<string, any>) {
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { data: row, error } = await supabase
@@ -280,15 +282,19 @@ export async function createRowClient(
   tableId: string,
   data: Record<string, any>
 ) {
+  // Defensive: some callers may accidentally pass malformed IDs like `${tableId}:${viewId}`
+  // (we already sanitize similarly in some view components). Ensure we always query with the real table UUID.
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
+
   // Load table to get supabase_table name
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { data: row, error } = await supabase
@@ -303,16 +309,17 @@ export async function createRowClient(
 
 export async function updateRow(tableId: string, rowId: string, data: Record<string, any>) {
   const supabase = await createServerSupabaseClient()
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
 
   // Load table to get supabase_table name
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { data: row, error } = await supabase
@@ -333,15 +340,18 @@ export async function updateRowClient(
   rowId: string,
   data: Record<string, any>
 ) {
+  // Defensive: some callers may accidentally pass malformed IDs like `${tableId}:${viewId}`
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
+
   // Load table to get supabase_table name
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { data: row, error } = await supabase
@@ -357,16 +367,17 @@ export async function updateRowClient(
 
 export async function deleteRow(tableId: string, rowId: string) {
   const supabase = await createServerSupabaseClient()
+  const sanitizedTableId = typeof tableId === 'string' ? tableId.split(':')[0].trim() : tableId
 
   // Load table to get supabase_table name
   const { data: table, error: tableError } = await supabase
     .from('tables')
     .select('supabase_table')
-    .eq('id', tableId)
+    .eq('id', sanitizedTableId)
     .single()
 
   if (tableError || !table) {
-    throw new Error(`Table not found: ${tableId}`)
+    throw new Error(`Table not found: ${sanitizedTableId}`)
   }
 
   const { error } = await supabase

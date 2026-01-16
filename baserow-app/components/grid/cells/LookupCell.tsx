@@ -136,6 +136,7 @@ function LookupPill({ item, lookupTableId, lookupFieldId, onOpenRecord }: Lookup
   return (
     <button
       onClick={handleClick}
+      onDoubleClick={(e) => e.stopPropagation()}
       disabled={loading}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-gray-200"
       title="Click to open record"
@@ -220,6 +221,7 @@ export default function LookupCell({
         // Prevent cell selection when clicking pills
         e.stopPropagation()
       }}
+      onDoubleClick={(e) => e.stopPropagation()}
     >
       {validValues.map((item, index) => (
         <LookupPill

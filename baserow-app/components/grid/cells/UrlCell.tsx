@@ -74,14 +74,6 @@ export default function UrlCell({
     }
   }
 
-  const getFullUrl = (url: string): string => {
-    if (!url) return ''
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url
-    }
-    return `https://${url}`
-  }
-
   if (editing && editable) {
     return (
       <input
@@ -115,16 +107,11 @@ export default function UrlCell({
       className="w-full h-full px-2 gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group flex items-center"
       title={value || undefined}
     >
-      <a
-        href={getFullUrl(value)}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1 truncate"
-      >
-        {formatUrl(value)}
-        <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-      </a>
+      <span className="text-gray-900 truncate">{formatUrl(value)}</span>
+      <ExternalLink
+        className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+        aria-hidden="true"
+      />
     </div>
   )
 }
