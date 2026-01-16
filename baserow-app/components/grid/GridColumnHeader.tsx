@@ -54,7 +54,8 @@ export default function GridColumnHeader({
   const [linkedFromTableName, setLinkedFromTableName] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isMirroredLinkedField || !field.options?.linked_table_id) {
+    const linkedTableId = field.options?.linked_table_id
+    if (!isMirroredLinkedField || !linkedTableId) {
       setLinkedFromTableName(null)
       return
     }
@@ -67,7 +68,7 @@ export default function GridColumnHeader({
         const { data } = await supabase
           .from('tables')
           .select('name')
-          .eq('id', field.options.linked_table_id)
+          .eq('id', linkedTableId)
           .maybeSingle()
 
         if (cancelled) return
