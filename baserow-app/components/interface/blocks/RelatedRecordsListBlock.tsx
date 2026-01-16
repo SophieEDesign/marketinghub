@@ -14,6 +14,8 @@ import { ChevronRight, Plus, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { PageBlock, BlockFilter } from "@/lib/interface/types"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { CellFactory } from "@/components/grid/CellFactory"
 
 interface RelatedRecordsListBlockProps {
   block: PageBlock
@@ -30,8 +32,10 @@ export default function RelatedRecordsListBlock({
   isEditing = false,
   recordId = null,
   pageTableId = null,
+  onRecordClick,
 }: RelatedRecordsListBlockProps) {
   const { toast } = useToast()
+  const { openRecord } = useRecordPanel()
   const { config } = block
   
   // Configuration
@@ -49,6 +53,7 @@ export default function RelatedRecordsListBlock({
   const [tableName, setTableName] = useState<string>("")
   const [loading, setLoading] = useState(false)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
 
   // Convert BlockFilter[] to FilterConfig[]
   const filterConfigs: FilterConfig[] = useMemo(() => {
@@ -130,12 +135,27 @@ export default function RelatedRecordsListBlock({
     loadRelatedRecords()
   }, [relatedTableId, recordId, linkFieldName, filterConfigs, toast])
 
-  // Handle record click
-  const handleRecordClick = (clickedRecordId: string) => {
-    if (!allowOpenRecord || !relatedTableId) return
-    
-    // Navigate to record view
-    window.location.href = `/tables/${relatedTableId}/records/${clickedRecordId}`
+  const handleOpenRecord = (clickedRecordId: string) => {
+    if (!allowOpenRecord || !relatedTableId || !supabaseTableName) return
+    if (onRecordClick) {
+      onRecordClick(clickedRecordId, relatedTableId)
+      return
+    }
+    openRecord(relatedTableId, clickedRecordId, supabaseTableName)
+  }
+
+  const handleCellSave = async (clickedRecordId: string, fieldName: string, value: any) => {
+    if (!supabaseTableName) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from(supabaseTableName)
+      .update({ [fieldName]: value })
+      .eq("id", clickedRecordId)
+    if (error) throw error
+
+    setRecords((prev) =>
+      (prev || []).map((r) => (String(r?.id) === String(clickedRecordId) ? { ...(r || {}), [fieldName]: value } : r))
+    )
   }
 
   // Handle create new record
@@ -218,25 +238,58 @@ export default function RelatedRecordsListBlock({
               return (
                 <div
                   key={record.id}
-                  className="px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => handleRecordClick(record.id)}
+                  className={`px-4 py-3 hover:bg-gray-50 transition-colors cursor-default ${
+                    selectedRecordId === String(record.id) ? "bg-blue-50/60" : ""
+                  }`}
+                  onClick={() => setSelectedRecordId(String(record.id))}
+                  onDoubleClick={() => handleOpenRecord(String(record.id))}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
+                    {/* Row open control */}
+                    {allowOpenRecord && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleOpenRecord(String(record.id))
+                        }}
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                        title="Open record"
+                        aria-label="Open record"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    )}
                     <div className="flex-1 min-w-0">
                       {primaryField && (
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {getFieldValue(record, primaryField.name)}
+                        <div className="text-sm font-medium text-gray-900 truncate" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          <CellFactory
+                            field={primaryField}
+                            value={record[primaryField.name]}
+                            rowId={String(record.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!primaryField.options?.read_only && primaryField.type !== "formula" && primaryField.type !== "lookup"}
+                            wrapText={false}
+                            rowHeight={32}
+                            onSave={(value) => handleCellSave(String(record.id), primaryField.name, value)}
+                          />
                         </div>
                       )}
                       {secondaryField && (
-                        <div className="text-xs text-gray-500 truncate mt-0.5">
-                          {getFieldValue(record, secondaryField.name)}
+                        <div className="text-xs text-gray-500 truncate mt-0.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                          <CellFactory
+                            field={secondaryField}
+                            value={record[secondaryField.name]}
+                            rowId={String(record.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!secondaryField.options?.read_only && secondaryField.type !== "formula" && secondaryField.type !== "lookup"}
+                            wrapText={false}
+                            rowHeight={28}
+                            onSave={(value) => handleCellSave(String(record.id), secondaryField.name, value)}
+                          />
                         </div>
                       )}
                     </div>
-                    {allowOpenRecord && (
-                      <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
-                    )}
                   </div>
                 </div>
               )
@@ -247,15 +300,45 @@ export default function RelatedRecordsListBlock({
               return (
                 <div
                   key={record.id}
-                  className="px-4 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => handleRecordClick(record.id)}
+                  className={`px-4 py-2 hover:bg-gray-50 transition-colors cursor-default ${
+                    selectedRecordId === String(record.id) ? "bg-blue-50/60" : ""
+                  }`}
+                  onClick={() => setSelectedRecordId(String(record.id))}
+                  onDoubleClick={() => handleOpenRecord(String(record.id))}
                 >
                   <div className="grid grid-cols-4 gap-4">
+                    {/* Open column */}
+                    {allowOpenRecord && (
+                      <div className="min-w-0">
+                        <div className="text-xs text-gray-500 mb-0.5">&nbsp;</div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenRecord(String(record.id))
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                          title="Open record"
+                          aria-label="Open record"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                     {visibleFields.map((field) => (
-                      <div key={field.id} className="min-w-0">
+                      <div key={field.id} className="min-w-0" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                         <div className="text-xs text-gray-500 mb-0.5">{field.name}</div>
                         <div className="text-sm text-gray-900 truncate">
-                          {getFieldValue(record, field.name)}
+                          <CellFactory
+                            field={field}
+                            value={record[field.name]}
+                            rowId={String(record.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!field.options?.read_only && field.type !== "formula" && field.type !== "lookup"}
+                            wrapText={false}
+                            rowHeight={32}
+                            onSave={(value) => handleCellSave(String(record.id), field.name, value)}
+                          />
                         </div>
                       </div>
                     ))}
@@ -267,15 +350,43 @@ export default function RelatedRecordsListBlock({
               return (
                 <div
                   key={record.id}
-                  className="px-4 py-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => handleRecordClick(record.id)}
+                  className={`px-4 py-4 hover:bg-gray-50 transition-colors cursor-default ${
+                    selectedRecordId === String(record.id) ? "bg-blue-50/60" : ""
+                  }`}
+                  onClick={() => setSelectedRecordId(String(record.id))}
+                  onDoubleClick={() => handleOpenRecord(String(record.id))}
                 >
                   <div className="space-y-2">
+                    {allowOpenRecord && (
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenRecord(String(record.id))
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                          title="Open record"
+                          aria-label="Open record"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                     {(Array.isArray(fields) ? fields : []).slice(0, 3).map((field) => (
-                      <div key={field.id}>
+                      <div key={field.id} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
                         <div className="text-xs text-gray-500 mb-0.5">{field.name}</div>
                         <div className="text-sm text-gray-900">
-                          {getFieldValue(record, field.name)}
+                          <CellFactory
+                            field={field}
+                            value={record[field.name]}
+                            rowId={String(record.id)}
+                            tableName={supabaseTableName || ""}
+                            editable={!field.options?.read_only && field.type !== "formula" && field.type !== "lookup"}
+                            wrapText={true}
+                            rowHeight={32}
+                            onSave={(value) => handleCellSave(String(record.id), field.name, value)}
+                          />
                         </div>
                       </div>
                     ))}

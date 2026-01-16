@@ -48,6 +48,7 @@ export default function RecordFieldPanel({
   const [recordData, setRecordData] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
+  const [linkedTableNameById, setLinkedTableNameById] = useState<Record<string, string>>({})
 
   // Create a map of field name/id to field config
   const fieldConfigMap = new Map<string, FieldConfig>()
@@ -117,6 +118,52 @@ export default function RecordFieldPanel({
     loadRecord()
   }, [tableId, recordId, toast])
 
+  // Load linked table names for mirrored linked fields (read-only link_to_table)
+  useEffect(() => {
+    const mirroredLinkedTableIds = Array.from(
+      new Set(
+        allFields
+          .filter(
+            (f) =>
+              f.type === "link_to_table" &&
+              !!f.options?.read_only &&
+              typeof f.options?.linked_table_id === "string" &&
+              f.options.linked_table_id.length > 0
+          )
+          .map((f) => f.options!.linked_table_id as string)
+      )
+    )
+
+    if (mirroredLinkedTableIds.length === 0) {
+      setLinkedTableNameById({})
+      return
+    }
+
+    let cancelled = false
+    const supabase = createClient()
+
+    supabase
+      .from("tables")
+      .select("id, name")
+      .in("id", mirroredLinkedTableIds)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error || !data) return
+        const map: Record<string, string> = {}
+        data.forEach((t: any) => {
+          if (t?.id && t?.name) map[String(t.id)] = String(t.name)
+        })
+        setLinkedTableNameById(map)
+      })
+      .catch(() => {
+        if (cancelled) return
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [allFields])
+
   // Handle field value change
   const handleFieldChange = useCallback(
     async (fieldName: string, value: any) => {
@@ -162,6 +209,10 @@ export default function RecordFieldPanel({
   // Handle linked record click
   const handleLinkedRecordClick = useCallback(
     async (linkedTableId: string, linkedRecordId: string) => {
+      // Never open the current record (self-link edge case)
+      if (linkedTableId === tableId && linkedRecordId === recordId) {
+        return
+      }
       if (onLinkedRecordClick) {
         onLinkedRecordClick(linkedTableId, linkedRecordId)
       } else {
@@ -169,7 +220,7 @@ export default function RecordFieldPanel({
         window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       }
     },
-    [onLinkedRecordClick]
+    [onLinkedRecordClick, tableId, recordId]
   )
 
   // Handle add linked record (placeholder)
@@ -214,11 +265,24 @@ export default function RecordFieldPanel({
               {selectedFields.map(({ field, config }) => {
                 const value = recordData[field.name]
                 const isEditable = config.editable && !field.options?.read_only && field.type !== "formula" && field.type !== "lookup"
+                const isMirroredLinkedField =
+                  field.type === "link_to_table" && !!field.options?.read_only && !!field.options?.linked_table_id
+                const linkedFromTableName =
+                  isMirroredLinkedField && field.options?.linked_table_id
+                    ? linkedTableNameById[field.options.linked_table_id] || "linked table"
+                    : null
 
                 return (
                   <tr key={field.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 w-1/3">
-                      {field.name}
+                      <div className="min-w-0">
+                        <div className="truncate">{field.name}</div>
+                        {isMirroredLinkedField && (
+                          <div className="text-[11px] text-gray-500 font-normal truncate">
+                            Linked from {linkedFromTableName}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900">
                       {isEditable ? (
@@ -261,10 +325,23 @@ export default function RecordFieldPanel({
           {selectedFields.map(({ field, config }) => {
             const value = recordData[field.name]
             const isEditable = config.editable && !field.options?.read_only && field.type !== "formula" && field.type !== "lookup"
+            const isMirroredLinkedField =
+              field.type === "link_to_table" && !!field.options?.read_only && !!field.options?.linked_table_id
+            const linkedFromTableName =
+              isMirroredLinkedField && field.options?.linked_table_id
+                ? linkedTableNameById[field.options.linked_table_id] || "linked table"
+                : null
 
             return (
               <div key={field.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="text-sm font-medium text-gray-700 mb-2">{field.name}</div>
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                  <div className="truncate">{field.name}</div>
+                  {isMirroredLinkedField && (
+                    <div className="text-[11px] text-gray-500 font-normal truncate">
+                      Linked from {linkedFromTableName}
+                    </div>
+                  )}
+                </div>
                 <div>
                   {isEditable ? (
                     <InlineFieldEditor

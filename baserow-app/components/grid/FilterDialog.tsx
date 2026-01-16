@@ -336,17 +336,24 @@ export default function FilterDialog({
 
       // Insert all filters
       if (filtersToInsert.length > 0) {
-        await supabase.from("view_filters").insert(filtersToInsert)
-      }
+        const { data: insertedFilters, error: insertFiltersError } = await supabase
+          .from("view_filters")
+          .insert(filtersToInsert)
+          .select("id, field_name, operator, value")
 
-      // Notify parent component (flattened for backward compatibility)
-      const flattenedFilters = filtersToInsert.map((f) => ({
-        id: f.id,
-        field_name: f.field_name,
-        operator: f.operator,
-        value: f.value,
-      }))
-      onFiltersChange?.(flattenedFilters)
+        if (insertFiltersError) throw insertFiltersError
+
+        // Notify parent component (flattened for backward compatibility)
+        const flattenedFilters = (insertedFilters || []).map((f) => ({
+          id: f.id,
+          field_name: f.field_name,
+          operator: f.operator,
+          value: f.value,
+        }))
+        onFiltersChange?.(flattenedFilters)
+      } else {
+        onFiltersChange?.([])
+      }
 
       onClose()
     } catch (error) {

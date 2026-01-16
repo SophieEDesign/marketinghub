@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon, X } from "lucide-react"
+import { CalendarIcon, ChevronRight, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
@@ -23,6 +23,8 @@ import type { TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
 import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWarn } from '@/lib/interface/debug-flags'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
+import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
+import TimelineFieldValue from "@/components/views/TimelineFieldValue"
 
 interface CalendarViewProps {
   tableId: string
@@ -37,6 +39,13 @@ interface CalendarViewProps {
   colorField?: string // Field name to use for event colors (single-select field)
   imageField?: string // Field name to use for event images
   fitImageSize?: boolean // Whether to fit image to container size
+  /** Optional external control of date range filter UI/state (used by Calendar block unified header) */
+  dateFrom?: Date
+  dateTo?: Date
+  onDateFromChange?: (date?: Date) => void
+  onDateToChange?: (date?: Date) => void
+  /** If false, CalendarView will not render the date range controls (caller can render them elsewhere). */
+  showDateRangeControls?: boolean
 }
 
 export default function CalendarView({ 
@@ -52,6 +61,11 @@ export default function CalendarView({
   colorField,
   imageField,
   fitImageSize = false,
+  dateFrom: controlledDateFrom,
+  dateTo: controlledDateTo,
+  onDateFromChange,
+  onDateToChange,
+  showDateRangeControls = true,
 }: CalendarViewProps) {
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
@@ -81,6 +95,7 @@ export default function CalendarView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [createRecordDate, setCreateRecordDate] = useState<Date | null>(null) // Date for creating new record
 
   // Respect block permissions + per-block add-record toggle.
@@ -131,8 +146,12 @@ export default function CalendarView({
   }
   
   // Date range filter state
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+  const [internalDateFrom, setInternalDateFrom] = useState<Date | undefined>(undefined)
+  const [internalDateTo, setInternalDateTo] = useState<Date | undefined>(undefined)
+  const dateFrom = controlledDateFrom ?? internalDateFrom
+  const dateTo = controlledDateTo ?? internalDateTo
+  const setDateFrom = onDateFromChange ?? setInternalDateFrom
+  const setDateTo = onDateToChange ?? setInternalDateTo
   
   // Use refs to track previous values and prevent infinite loops
   const prevTableFieldsRef = useRef<string>('')
@@ -1084,20 +1103,21 @@ export default function CalendarView({
           
           // Extract title from row data
           let title = "Untitled"
+          let titleValue: any = null
           if (titleFieldName && row.data[titleFieldName]) {
+            titleValue = row.data[titleFieldName]
             title = String(row.data[titleFieldName])
           } else if (titleFieldId && row.data[titleFieldId]) {
+            titleValue = row.data[titleFieldId]
             title = String(row.data[titleFieldId])
           } else {
             // Fallback: use first non-date, non-id field
             for (const [key, value] of Object.entries(row.data)) {
               if (key !== 'id' && key !== actualFromFieldName && key !== actualToFieldName && key !== actualFieldName && value) {
+                titleValue = value
                 title = String(value)
                 break
               }
-            }
-            if (title === "Untitled") {
-              title = `Event ${row.id.substring(0, 8)}`
             }
           }
 
@@ -1167,6 +1187,8 @@ export default function CalendarView({
               rowData: row.data,
               image: eventImage,
               fitImageSize,
+              titleField: titleFieldObj,
+              titleValue,
               // Calendar cards use the ordered "Fields to Show on Cards/Table" selection (fieldIds).
               // We display up to 3 fields (values) to avoid overly tall events.
               cardFields: (() => {
@@ -1193,10 +1215,16 @@ export default function CalendarView({
                     // Skip non-card-friendly types
                     if (field.type === 'date' || field.type === 'attachment') return null
 
-                    const value = formatCardValue(name, row.data)
-                    return value ? { name, value } : null
+                    const raw = (row.data as any)?.[field.name]
+                    const isEmpty =
+                      raw === null ||
+                      raw === undefined ||
+                      raw === "" ||
+                      (Array.isArray(raw) && raw.length === 0)
+                    if (isEmpty) return null
+                    return { field, value: raw }
                   })
-                  .filter((x): x is { name: string; value: string } => Boolean(x))
+                  .filter((x): x is { field: TableField; value: any } => Boolean(x))
 
                 return items.slice(0, 3)
               })(),
@@ -1347,127 +1375,17 @@ export default function CalendarView({
     )
   }
 
-  // Render date range filters and other filters above calendar
+  // Render date range filters above calendar (other filters are shown via QuickFilterBar in blocks)
   const renderFilters = () => {
-    const hasOtherFilters = filters && filters.length > 0
-    
+    if (!resolvedDateFieldId || !showDateRangeControls) return null
     return (
-      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-        {/* Date Range Filters - Always show if resolvedDateFieldId is available */}
-        {resolvedDateFieldId && (
-          <div className="space-y-2">
-            <div className="text-xs font-semibold text-gray-600">Date Range</div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="date-from" className="text-xs text-gray-600 whitespace-nowrap">
-                  From:
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="date-from"
-                      variant="outline"
-                      size="sm"
-                      className="w-[140px] justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateFrom}
-                      onSelect={setDateFrom}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {dateFrom && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setDateFrom(undefined)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Label htmlFor="date-to" className="text-xs text-gray-600 whitespace-nowrap">
-                  To:
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="date-to"
-                      variant="outline"
-                      size="sm"
-                      className="w-[140px] justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, "PPP") : "Select date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateTo}
-                      onSelect={setDateTo}
-                      disabled={(date) => dateFrom ? date < dateFrom : false}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {dateTo && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setDateTo(undefined)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-              
-              {(dateFrom || dateTo) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs"
-                  onClick={() => {
-                    setDateFrom(undefined)
-                    setDateTo(undefined)
-                  }}
-                >
-                  Clear range
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Other Filters */}
-        {hasOtherFilters && (
-          <div className="space-y-2">
-            <div className="text-xs font-semibold text-gray-600">Other Filters</div>
-            <div className="flex flex-wrap gap-2">
-              {filters.map((filter, idx) => (
-                <div
-                  key={idx}
-                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs"
-                >
-                  <span className="font-medium">{filter.field}</span>
-                  <span className="mx-1 text-gray-400">{filter.operator}</span>
-                  <span className="text-gray-600">{String(filter.value || '')}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="mb-4">
+        <CalendarDateRangeControls
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onDateFromChange={setDateFrom}
+          onDateToChange={setDateTo}
+        />
       </div>
     )
   }
@@ -1496,7 +1414,10 @@ export default function CalendarView({
           dayMaxEvents={3}
           moreLinkClick="popover"
           eventDisplay="block"
-          eventClassNames="cursor-pointer hover:opacity-80 transition-opacity rounded-md"
+          eventClassNames={(arg) => [
+            "hover:opacity-80 transition-opacity rounded-md",
+            selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
+          ]}
           dayCellClassNames="hover:bg-gray-50 transition-colors"
           dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
           eventTextColor="#1f2937"
@@ -1505,23 +1426,32 @@ export default function CalendarView({
           dayHeaderFormat={{ weekday: 'short' }}
           firstDay={1}
           eventContent={(eventInfo) => {
+            const recordId = String(eventInfo.event.id || "")
             const image = eventInfo.event.extendedProps?.image
             const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
             const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
             const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
-            const values = cardFields.map((f: any) => String(f?.value || '')).filter(Boolean).slice(0, 3)
-            const tooltip =
-              cardFields.length > 0
-                ? cardFields
-                    .slice(0, 3)
-                    .map((f: any) => `${String(f?.name || '')}: ${String(f?.value || '')}`)
-                    .filter((s: string) => s.trim() !== ':')
-                    .join(' • ')
-                : String(eventInfo.event.title || '')
-            const contentValues = values.length > 0 ? values : [String(eventInfo.event.title || '')]
+            const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
+            const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
+            const tooltip = String(eventInfo.event.title || "")
             
             return (
               <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
+                {/* Open record control (explicit) */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!recordId) return
+                    if (onRecordClick) onRecordClick(recordId)
+                    else setSelectedRecordId(recordId)
+                  }}
+                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                  title="Open record"
+                  aria-label="Open record"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
                 {image && (
                   <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                     <img
@@ -1535,13 +1465,21 @@ export default function CalendarView({
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="grid grid-cols-3 gap-x-1.5 min-w-0">
-                    {contentValues.slice(0, 3).map((v, idx) => (
-                      <div
-                        key={`${eventInfo.event.id}-cf-${idx}`}
-                        className={idx === 0 ? 'truncate text-xs font-medium' : 'truncate text-[10px] opacity-90'}
-                      >
-                        {v}
+                  <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
+                    <div className="truncate text-xs font-medium">
+                      {titleField ? (
+                        <TimelineFieldValue field={titleField} value={titleValue ?? eventInfo.event.title} compact={true} />
+                      ) : (
+                        String(eventInfo.event.title || "Untitled")
+                      )}
+                    </div>
+                    {cardFields.slice(0, 2).map((f: any, idx: number) => (
+                      <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
+                        {f?.field ? (
+                          <TimelineFieldValue field={f.field as TableField} value={f.value} compact={true} />
+                        ) : (
+                          String(f?.value || "")
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1558,8 +1496,9 @@ export default function CalendarView({
             }
           }}
           eventClick={(info) => {
-            // CRITICAL: Handle event click - use onRecordClick callback if provided, otherwise use modal
+            // Contract: single click selects event only (never opens record).
             const recordId = info.event.id
+            setSelectedEventId(recordId ? String(recordId) : null)
             
             // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
             // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
@@ -1583,22 +1522,31 @@ export default function CalendarView({
               willUseModal: !onRecordClick
             })
             
-            if (recordId) {
-              // If onRecordClick callback provided (e.g., from RecordReview), use it
-              if (onRecordClick) {
-                if (debugEnabled || process.env.NODE_ENV === 'development') {
-                  console.log('[Calendar] Calling onRecordClick callback', { recordId })
-                }
-                onRecordClick(recordId)
-              } else {
-                // Otherwise, open modal (default behavior)
-                if (debugEnabled || process.env.NODE_ENV === 'development') {
-                  console.log('[Calendar] Opening record modal', { recordId })
-                }
-                setSelectedRecordId(recordId)
-              }
-            } else {
+            if (!recordId) {
               console.warn('[Calendar] Event clicked but no recordId found', { event: info.event })
+            }
+          }}
+          eventDidMount={(info) => {
+            // Optional: double-click event opens record.
+            const el = info.el as any
+            const recordId = String(info.event.id || "")
+            const onDblClick = (e: MouseEvent) => {
+              // Ignore if user double-clicks an inner control (e.g., open chevron)
+              const target = e.target as HTMLElement | null
+              if (target?.closest('button')) return
+              if (!recordId) return
+              if (onRecordClick) onRecordClick(recordId)
+              else setSelectedRecordId(recordId)
+            }
+            el.__calendarDblClickHandler = onDblClick
+            info.el.addEventListener("dblclick", onDblClick)
+          }}
+          eventWillUnmount={(info) => {
+            const el = info.el as any
+            const handler = el.__calendarDblClickHandler as ((e: MouseEvent) => void) | undefined
+            if (handler) {
+              info.el.removeEventListener("dblclick", handler)
+              delete el.__calendarDblClickHandler
             }
           }}
           dateClick={(info) => {

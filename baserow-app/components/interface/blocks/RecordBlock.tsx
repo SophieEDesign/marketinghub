@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import { canOpenRecords } from "@/lib/interface/block-permissions"
+import RecordFieldPanel from "@/components/records/RecordFieldPanel"
 
 interface RecordBlockProps {
   block: PageBlock
@@ -22,7 +22,6 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   const tableId = config?.table_id
   // Use config record_id first, fallback to page context recordId prop
   const recordId = config?.record_id || pageRecordId
-  const { openRecord } = useRecordPanel()
   const [tableName, setTableName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [tableFields, setTableFields] = useState<TableField[]>([])
@@ -75,15 +74,6 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   // Check permissions
   const canOpen = canOpenRecords(config)
 
-  // Open record panel when recordId changes (for record review pages)
-  // Only open if permissions allow
-  useEffect(() => {
-    if (tableId && recordId && tableName && canOpen) {
-      openRecord(tableId, recordId, tableName)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, recordId, tableName, canOpen])
-
   async function loadTableName() {
     if (!tableId) return
 
@@ -101,18 +91,15 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
         setTableName(table.supabase_table)
       }
 
-      // Load table fields for preview in edit mode
-      if (isEditing) {
-        const { data: fields } = await supabase
-          .from("table_fields")
-          .select("id, name, type")
-          .eq("table_id", tableId)
-          .order("position", { ascending: true })
-          .limit(10) // Limit to first 10 fields for preview
+      // Load table fields for record view + edit preview
+      const { data: fields } = await supabase
+        .from("table_fields")
+        .select("*")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
 
-        if (fields) {
-          setTableFields(fields as TableField[])
-        }
+      if (fields) {
+        setTableFields(fields as TableField[])
       }
     } catch (error) {
       console.error("Error loading table:", error)
@@ -184,14 +171,12 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
-        Loading record...
+        Loading record…
       </div>
     )
   }
 
-  // Record block now opens the global record panel
-  // The panel will handle displaying the record
-  // But check permissions first
+  // Check permissions
   if (!canOpen) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -203,12 +188,37 @@ export default function RecordBlock({ block, isEditing = false, pageTableId = nu
     )
   }
 
-  return (
-    <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-      <div className="text-center">
-        <p className="mb-2">Record panel opened</p>
-        <p className="text-xs text-gray-500">View and edit the record in the side panel</p>
+  if (!tableId || !recordId || !tableName) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">Record not available</p>
+          <p className="text-xs text-gray-500">Please check the table/record configuration.</p>
+        </div>
       </div>
+    )
+  }
+
+  const modalFields = (config as any)?.modal_fields
+  const selected = Array.isArray(modalFields) && modalFields.length > 0
+    ? modalFields
+    : tableFields.map((f: any) => f?.name).filter(Boolean)
+
+  const fieldConfigs = selected.map((f: string, idx: number) => ({
+    field: f,
+    editable: true,
+    order: idx,
+  }))
+
+  return (
+    <div className="h-full overflow-auto">
+      <RecordFieldPanel
+        tableId={tableId}
+        recordId={String(recordId)}
+        fields={fieldConfigs}
+        allFields={tableFields as any}
+        compact={false}
+      />
     </div>
   )
 }

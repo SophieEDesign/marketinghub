@@ -20,6 +20,10 @@ interface RecordFieldsProps {
 }
 
 const DEFAULT_GROUP_NAME = "General"
+const SYSTEM_FIELD_NAMES = new Set(["created_at", "created_by", "updated_at", "updated_by"])
+function isSystemFieldName(name: string) {
+  return SYSTEM_FIELD_NAMES.has(String(name || "").toLowerCase())
+}
 
 // Get localStorage key for collapsed groups state
 const getCollapsedGroupsKey = (tableId: string) => `record-view-collapsed-groups-${tableId}`
@@ -93,10 +97,13 @@ export default function RecordFields({
       })
     })
 
-    // Group all fields - use field.group_name as primary source, fallback to fieldGroups prop
+    // Group all fields - use field.group_name as primary source, fallback to fieldGroups prop.
+    // System fields are shown in the dedicated Activity section (RecordActivity), not as raw fields.
     const groups: Record<string, TableField[]> = {}
 
-    fields.forEach((field) => {
+    fields
+      .filter((field) => !isSystemFieldName(field.name) && !field.options?.system)
+      .forEach((field) => {
       // Priority: field.group_name > fieldGroups prop > DEFAULT_GROUP_NAME
       const groupName = field.group_name || fieldToGroupMap[field.name] || DEFAULT_GROUP_NAME
 
@@ -146,6 +153,11 @@ export default function RecordFields({
   const handleLinkedRecordClick = useCallback(
     async (linkedTableId: string, linkedRecordId: string) => {
       try {
+        // Never open the current record (self-link edge case)
+        if (linkedTableId === tableId && linkedRecordId === recordId) {
+          return
+        }
+
         // If RecordPanel context is available, use it
         if (navigateToLinkedRecord) {
           const supabase = createClient()

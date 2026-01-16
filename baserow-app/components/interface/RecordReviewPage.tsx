@@ -25,6 +25,7 @@ import { useState, useCallback, useMemo } from "react"
 import RecordReviewLeftColumn from "./RecordReviewLeftColumn"
 import InterfaceBuilder from "./InterfaceBuilder"
 import type { Page, PageBlock } from "@/lib/interface/types"
+import type { PageConfig } from "@/lib/interface/page-config"
 
 interface RecordReviewPageProps {
   page: Page
@@ -49,7 +50,7 @@ export default function RecordReviewPage({
   // Get tableId and leftPanel settings from page.settings or page.config (single source of truth)
   // InterfacePage uses config, Page type uses settings - handle both
   // CRITICAL: RecordViewPageSettings saves to config.left_panel (snake_case), so check both formats
-  const pageConfig = (page as any).config || page.settings || {}
+  const pageConfig: PageConfig | any = (page as any).config || page.settings || {}
   const pageTableId = pageConfig.tableId || pageConfig.primary_table_id || page.settings?.tableId || page.settings?.primary_table_id || null
   // Check both left_panel (snake_case) and leftPanel (camelCase) for backward compatibility
   const leftPanelSettings = pageConfig.left_panel || pageConfig.leftPanel || page.settings?.left_panel || page.settings?.leftPanel
@@ -80,12 +81,14 @@ export default function RecordReviewPage({
       {/* Fixed Left Column - Always Present */}
       {/* CRITICAL: Left column reads from page.settings.leftPanel - not from blocks or props */}
       <RecordReviewLeftColumn
+        pageId={page.id}
         tableId={pageTableId}
         selectedRecordId={selectedRecordId}
         onRecordSelect={handleRecordSelect}
         leftPanelSettings={leftPanelSettings}
         pageType={pageType as 'record_view' | 'record_review'}
         showAddRecord={pageShowAddRecord}
+        pageConfig={pageConfig}
       />
 
       {/* Right Canvas - Blocks Only */}

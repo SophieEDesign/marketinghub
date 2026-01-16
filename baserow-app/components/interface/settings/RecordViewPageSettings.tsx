@@ -575,6 +575,14 @@ export default function RecordViewPageSettings({
   const hiddenFieldConfigs = fieldConfigList.filter((f) => !f.visible)
   const pageEditable = config.allow_editing !== false
 
+  // Record action permissions (create/delete) for record pages
+  const recordActions = ((config as any).record_actions || {}) as {
+    create?: 'admin' | 'both'
+    delete?: 'admin' | 'both'
+  }
+  const recordCreatePermission: 'admin' | 'both' = recordActions.create || 'both'
+  const recordDeletePermission: 'admin' | 'both' = recordActions.delete || 'admin'
+
   // Group visible fields by their group_name
   const groupedVisibleFields = useMemo(() => {
     const groups: Record<string, typeof visibleFieldConfigs> = {}
@@ -1221,6 +1229,63 @@ export default function RecordViewPageSettings({
                 </p>
               </div>
             )}
+
+            <div className="border-t pt-4 space-y-4">
+              <div>
+                <Label>Record actions</Label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Control who can create and delete records from this Record View page UI.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Create records (+)</Label>
+                  <Select
+                    value={recordCreatePermission}
+                    onValueChange={(value) =>
+                      onUpdate({
+                        record_actions: {
+                          ...(recordActions || {}),
+                          create: value as any,
+                        },
+                      } as any)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin only</SelectItem>
+                      <SelectItem value="both">Admins + members</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Delete records (−)</Label>
+                  <Select
+                    value={recordDeletePermission}
+                    onValueChange={(value) =>
+                      onUpdate({
+                        record_actions: {
+                          ...(recordActions || {}),
+                          delete: value as any,
+                        },
+                      } as any)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin only</SelectItem>
+                      <SelectItem value="both">Admins + members</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
 
             <div className="border-t pt-4">
               <p className="text-xs text-gray-500">

@@ -54,8 +54,11 @@ interface CategoricalLegendItem {
 export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
-  // Chart block MUST have table_id configured - no fallback to page table
-  const tableId = config?.table_id
+  // Chart block table_id resolution:
+  // Prefer explicit config.table_id, but fall back to the page's table context for usability/compatibility.
+  // Backward compatibility: some legacy data used camelCase `tableId`.
+  const legacyTableId = (config as any)?.tableId
+  const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
   const chartType = config?.chart_type || "bar"
   // Explicitly type metricType so comparisons against "count" are valid in TS.
   const metricType: AggregateType = (config?.chart_aggregate as AggregateType) || "count"
@@ -72,7 +75,6 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
-  const [tableName, setTableName] = useState<string | null>(null)
   
   // Apply filters with proper precedence:
   // 1. Block base filters (config.filters) - always applied
@@ -154,7 +156,7 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
         throw new Error("Table not found")
       }
       if (table?.name) {
-        setTableName(String(table.name))
+        // Keep for debugging/optional UI, but do not auto-title charts from table name in view mode.
       }
 
       // Determine which fields we need to select
@@ -690,8 +692,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
     padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
   }
 
-  // View mode: show only a "table title" (table name or appearance.title), not the block's config.title.
-  const title = appearance.title || (isEditing ? config.title : tableName)
+  // Titles should be explicit: appearance.title (preferred) or config.title (legacy).
+  // Do NOT auto-title from table name; it often duplicates the page title.
+  const title = appearance.title || config.title
   const showTitle = (appearance.showTitle ?? (appearance as any).show_title) !== false && title
 
   return (

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { format } from "date-fns"
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -769,23 +769,25 @@ export default function TimelineView({
     return labels
   }, [timelineRange, zoomLevel])
 
-  const handleEventClick = useCallback(
-    (event: TimelineEvent, e: React.MouseEvent) => {
-      // Don't open record if we're resizing
-      if (resizingEvent) {
-        e.stopPropagation()
-        return
-      }
-      if (supabaseTableName && tableId) {
-        if (onRecordClick) {
-          onRecordClick(event.rowId)
-          return
-        }
-        openRecord(tableId, event.rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
-      }
-    },
-    [openRecord, supabaseTableName, tableId, resizingEvent, blockConfig, onRecordClick]
-  )
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+
+  const handleOpenEventRecord = useCallback((rowId: string) => {
+    if (!supabaseTableName || !tableId) return
+    if (onRecordClick) {
+      onRecordClick(rowId)
+      return
+    }
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
+
+  const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
+    // Don't change selection if we're resizing/dragging.
+    if (resizingEvent || draggingEvent) {
+      e.stopPropagation()
+      return
+    }
+    setSelectedEventId(event.rowId)
+  }, [draggingEvent, resizingEvent])
 
   // Handle event date updates
   const handleEventUpdate = useCallback(
@@ -1172,15 +1174,39 @@ export default function TimelineView({
                                 event.color ? `border-l-4` : ""
                               } ${isDragging || isResizing ? 'opacity-75' : ''} ${
                                 draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
-                              }`}
+                              } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
                               style={{
                                 borderLeftColor: event.color,
                                 backgroundColor: event.color ? `${event.color}15` : "white",
                               }}
                               onMouseDown={(e) => handleDragStart(event, e)}
-                              onClick={(e) => handleEventClick(event, e)}
+                              onClick={(e) => handleEventSelect(event, e)}
+                              onDoubleClick={(e) => {
+                                // Optional: double-click background opens record.
+                                const target = e.target as HTMLElement
+                                if (target.closest('[data-timeline-open="true"]')) return
+                                if (target.closest('[data-timeline-field="true"]')) return
+                                if (target.closest('[data-timeline-resize="true"]')) return
+                                handleOpenEventRecord(event.rowId)
+                              }}
                             >
                               <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
+                                {/* Record open control (explicit) */}
+                                <div className="absolute top-1 right-1">
+                                  <button
+                                    type="button"
+                                    data-timeline-open="true"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleOpenEventRecord(event.rowId)
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                                    title="Open record"
+                                    aria-label="Open record"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </button>
+                                </div>
                                 {/* Image if configured */}
                                 {event.image && (
                                   <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
@@ -1201,6 +1227,7 @@ export default function TimelineView({
                                   onMouseDown={(e) => handleResizeStart(event, 'start', e)}
                                   style={{ marginLeft: '-3px' }}
                                   title="Drag to resize start date"
+                                  data-timeline-resize="true"
                                 />
                                 
                                 {/* Title */}
@@ -1210,7 +1237,7 @@ export default function TimelineView({
 
                                 {/* Card fields */}
                                 {resolvedCardFields.cardFields.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-0.5">
+                                  <div className="flex flex-wrap gap-1 mt-0.5" data-timeline-field="true" onClick={(e) => e.stopPropagation()}>
                                     {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
                                       const value = event.rowData[field.name]
                                       return (
@@ -1263,15 +1290,40 @@ export default function TimelineView({
                         event.color ? `border-l-4` : ""
                       } ${isDragging || isResizing ? 'opacity-75' : ''} ${
                         draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
-                      }`}
+                      } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
                       style={{
                         borderLeftColor: event.color,
                         backgroundColor: event.color ? `${event.color}15` : "white",
                       }}
                       onMouseDown={(e) => handleDragStart(event, e)}
-                      onClick={(e) => handleEventClick(event, e)}
+                      onClick={(e) => handleEventSelect(event, e)}
+                      onDoubleClick={(e) => {
+                        // Optional: double-click background opens record.
+                        const target = e.target as HTMLElement
+                        if (target.closest('[data-timeline-open="true"]')) return
+                        if (target.closest('[data-timeline-field="true"]')) return
+                        if (target.closest('[data-timeline-resize="true"]')) return
+                        handleOpenEventRecord(event.rowId)
+                      }}
                     >
                       <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
+                        {/* Record open control (explicit) */}
+                        <div className="absolute top-1 right-1">
+                          <button
+                            type="button"
+                            data-timeline-open="true"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenEventRecord(event.rowId)
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                            title="Open record"
+                            aria-label="Open record"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+
                         {/* Image if configured */}
                         {event.image && (
                           <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
@@ -1292,6 +1344,7 @@ export default function TimelineView({
                           onMouseDown={(e) => handleResizeStart(event, 'start', e)}
                           style={{ marginLeft: '-3px' }}
                           title="Drag to resize start date"
+                          data-timeline-resize="true"
                         />
                         
                         {/* Title */}
@@ -1301,7 +1354,7 @@ export default function TimelineView({
 
                         {/* Card fields */}
                         {resolvedCardFields.cardFields.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
+                          <div className="flex flex-wrap gap-1 mt-0.5" data-timeline-field="true" onClick={(e) => e.stopPropagation()}>
                             {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
                               const value = event.rowData[field.name]
                               return (
@@ -1322,6 +1375,7 @@ export default function TimelineView({
                           onMouseDown={(e) => handleResizeStart(event, 'end', e)}
                           style={{ marginRight: '-3px' }}
                           title="Drag to resize end date"
+                          data-timeline-resize="true"
                         />
                       </CardContent>
                     </Card>
@@ -1344,6 +1398,8 @@ export default function TimelineView({
                       if (supabaseTableName && tableId) {
                         const { fromFieldName, toFieldName } = resolvedDateFields
                         const newData: Record<string, any> = {}
+
+                        const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields as any)
                         
                         // Use resolved date fields (from blockConfig, props, or auto-detected)
                         // Set date to current date in timeline view
@@ -1359,7 +1415,11 @@ export default function TimelineView({
                           newData[dateFieldId] = initialDate
                         }
                         
-                        const { data, error } = await supabase
+                        if (Object.keys(defaultsFromFilters).length > 0) {
+                          Object.assign(newData, defaultsFromFilters)
+                        }
+
+                                                const { data, error } = await supabase
                           .from(supabaseTableName)
                           .insert([newData])
                           .select()
@@ -1376,8 +1436,9 @@ export default function TimelineView({
                             onRecordClick(createdId)
                             return
                           }
-                          // Open the record panel so user can edit it
-                          openRecord(tableId, createdId, supabaseTableName, (blockConfig as any)?.modal_fields)
+                          // Contract: creating a record must NOT auto-open it.
+                          // User can open via the dedicated chevron (or optional double-click).
+                          setSelectedEventId(createdId)
                         }
                       }
                     }}
@@ -1497,4 +1558,5 @@ function formatDateRange(start: Date, end: Date, zoom: ZoomLevel): string {
     return "Invalid Date Range"
   }
 }
+
 

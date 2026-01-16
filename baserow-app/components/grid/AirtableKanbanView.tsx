@@ -27,8 +27,6 @@ import {
   MoreVertical,
   ChevronDown,
   ChevronRight,
-  Edit,
-  Trash2,
   GripVertical,
 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
@@ -49,6 +47,12 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableField } from "@/types/fields"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
+import { CellFactory } from "./CellFactory"
+
+function quoteSelectIdent(name: string): string {
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
 
 interface AirtableKanbanViewProps {
   tableId: string
@@ -100,9 +104,8 @@ export default function AirtableKanbanView({
   const [columns, setColumns] = useState<KanbanColumn[]>([])
   const [groupField, setGroupField] = useState<TableField | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [editingCard, setEditingCard] = useState<{ rowId: string; fieldName: string } | null>(null)
-  const [cardValue, setCardValue] = useState("")
-  const [selectedRow, setSelectedRow] = useState<Record<string, any> | null>(null)
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const [openRow, setOpenRow] = useState<Record<string, any> | null>(null)
   const [columnManagementOpen, setColumnManagementOpen] = useState(false)
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set())
 
@@ -181,7 +184,7 @@ export default function AirtableKanbanView({
       // Apply sorting at query level (for fields that don't need client-side sorting)
       if (viewSorts.length > 0 && !needsClientSideSort) {
         for (const sort of viewSorts) {
-          query = query.order(sort.field_name, {
+          query = query.order(quoteSelectIdent(sort.field_name), {
             ascending: sort.direction === "asc",
           })
         }
@@ -375,6 +378,28 @@ export default function AirtableKanbanView({
       .slice(0, 3)
   }, [cardFields, tableFields, groupField])
 
+  const handleCellSave = useCallback(
+    async (rowId: string, fieldName: string, value: any) => {
+      if (!supabaseTableName) return
+      try {
+        const { error } = await supabase
+          .from(supabaseTableName)
+          .update({ [fieldName]: value })
+          .eq("id", rowId)
+        if (error) throw error
+        setRows((prev) => prev.map((r) => (String(r.id) === String(rowId) ? { ...r, [fieldName]: value } : r)))
+      } catch (error) {
+        console.error("Error saving card field:", error)
+        alert("Failed to save. Please try again.")
+      }
+    },
+    [supabaseTableName]
+  )
+
+  const handleOpenRow = useCallback((row: Record<string, any>) => {
+    setOpenRow(row)
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -483,12 +508,12 @@ export default function AirtableKanbanView({
                   displayFields={displayCardFields}
                   groupField={groupField}
                   canEdit={canEdit}
-                  onCardClick={(row) => setSelectedRow(row)}
-                  onCardEdit={(rowId, fieldName, value) => {
-                    setEditingCard({ rowId, fieldName })
-                    setCardValue(String(value || ""))
-                  }}
+                  onCardSelect={(row) => setSelectedRowId(String(row.id))}
+                  onCardOpen={handleOpenRow}
                   tableFields={tableFields}
+                  selectedRowId={selectedRowId}
+                  tableName={supabaseTableName}
+                  onCellSave={handleCellSave}
                 />
               )
             })}
@@ -527,21 +552,21 @@ export default function AirtableKanbanView({
         />
       )}
 
-      {selectedRow && (
+      {openRow && (
         <RecordDrawer
-          isOpen={!!selectedRow}
-          onClose={() => setSelectedRow(null)}
+          isOpen={!!openRow}
+          onClose={() => setOpenRow(null)}
           tableName={supabaseTableName}
-          rowId={selectedRow.id}
+          rowId={openRow.id}
           fieldNames={tableFields.map((f) => f.name)}
           tableFields={tableFields}
           onSave={async () => {
             await loadRows()
-            setSelectedRow(null)
+            setOpenRow(null)
           }}
           onDelete={async () => {
             await loadRows()
-            setSelectedRow(null)
+            setOpenRow(null)
           }}
         />
       )}
@@ -558,9 +583,12 @@ interface KanbanColumnProps {
   displayFields: TableField[]
   groupField: TableField
   canEdit: boolean
-  onCardClick: (row: Record<string, any>) => void
-  onCardEdit: (rowId: string, fieldName: string, value: any) => void
+  onCardSelect: (row: Record<string, any>) => void
+  onCardOpen: (row: Record<string, any>) => void
   tableFields: TableField[]
+  selectedRowId: string | null
+  tableName: string
+  onCellSave: (rowId: string, fieldName: string, value: any) => Promise<void>
 }
 
 function KanbanColumn({
@@ -572,9 +600,12 @@ function KanbanColumn({
   displayFields,
   groupField,
   canEdit,
-  onCardClick,
-  onCardEdit,
+  onCardSelect,
+  onCardOpen,
   tableFields,
+  selectedRowId,
+  tableName,
+  onCellSave,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: `column-${column.id}`,
@@ -644,9 +675,12 @@ function KanbanColumn({
                     row={row}
                     displayFields={displayFields}
                     tableFields={tableFields}
-                    onClick={() => onCardClick(row)}
-                    onEdit={onCardEdit}
+                    selected={selectedRowId === String(row.id)}
+                    onSelect={() => onCardSelect(row)}
+                    onOpen={() => onCardOpen(row)}
                     canEdit={canEdit}
+                    tableName={tableName}
+                    onCellSave={onCellSave}
                   />
                 ))
               )}
@@ -677,12 +711,15 @@ interface KanbanCardProps {
   row: Record<string, any>
   displayFields: TableField[]
   tableFields: TableField[]
-  onClick: () => void
-  onEdit: (rowId: string, fieldName: string, value: any) => void
+  selected: boolean
+  onSelect: () => void
+  onOpen: () => void
   canEdit: boolean
+  tableName: string
+  onCellSave: (rowId: string, fieldName: string, value: any) => Promise<void>
 }
 
-function KanbanCard({ row, displayFields, tableFields, onClick, onEdit, canEdit }: KanbanCardProps) {
+function KanbanCard({ row, displayFields, tableFields, selected, onSelect, onOpen, canEdit, tableName, onCellSave }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.id,
     disabled: !canEdit,
@@ -705,102 +742,21 @@ function KanbanCard({ row, displayFields, tableFields, onClick, onEdit, canEdit 
     return fullField || field
   }
 
-  // Format field values based on type
-  const formatValue = (field: TableField, value: any): string => {
-    if (value === null || value === undefined || value === "") return "—"
-    
-    if (field.type === "date") {
-      if (!value) return "—"
-      try {
-        const date = new Date(value)
-        return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
-      } catch {
-        return String(value)
-      }
-    }
-    
-    if (field.type === "checkbox") {
-      return value ? "✓" : "—"
-    }
-    
-    if (Array.isArray(value)) {
-      return value.join(", ")
-    }
-    
-    return String(value)
-  }
-
-  // Render field value with appropriate styling
-  const renderFieldValue = (field: TableField, value: any) => {
-    if (!field || value === null || value === undefined || value === "") {
-      return <span className="text-gray-400">—</span>
-    }
-
-    // Get full field definition with options
-    const fullField = getFullField(field)
-
-    // Handle select fields with colored pills
-    if (fullField.type === "single_select" || fullField.type === "multi_select") {
-      const values = Array.isArray(value) ? value : [value]
-      const fieldType = fullField.type as 'single_select' | 'multi_select'
-      return (
-        <div className="flex flex-wrap gap-1.5">
-          {values.map((val: string, idx: number) => {
-            if (!val) return null
-            const hexColor = resolveChoiceColor(
-              val,
-              fieldType,
-              fullField.options,
-              fieldType === 'single_select'
-            )
-            const bgColor = normalizeHexColor(hexColor)
-            const textColorClass = getTextColorForBackground(bgColor)
-            
-            return (
-              <span
-                key={idx}
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${textColorClass}`}
-                style={{ backgroundColor: bgColor }}
-              >
-                {val}
-              </span>
-            )
-          })}
-        </div>
-      )
-    }
-
-    // Handle date fields with "Date" or "Date Due" prefix
-    if (fullField.type === "date") {
-      const formattedDate = formatValue(fullField, value)
-      const isDueDate = fullField.name.toLowerCase().includes('due')
-      return (
-        <span className="text-gray-700">
-          {isDueDate ? 'Date Due ' : 'Date '}
-          <span className="font-medium">{formattedDate}</span>
-        </span>
-      )
-    }
-
-    // Handle checkbox
-    if (fullField.type === "checkbox") {
-      return value ? (
-        <span className="text-green-600 font-semibold">✓</span>
-      ) : (
-        <span className="text-gray-400">—</span>
-      )
-    }
-
-    // Default text display
-    return <span className="text-gray-900">{formatValue(fullField, value)}</span>
-  }
-
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className="cursor-pointer hover:shadow-lg transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm"
-      onClick={onClick}
+      className={`group hover:shadow-lg transition-all duration-200 bg-white border border-gray-200 rounded-lg shadow-sm cursor-default ${
+        selected ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+      }`}
+      onClick={() => onSelect()}
+      onDoubleClick={(e) => {
+        const target = e.target as HTMLElement
+        if (target.closest('[data-kanban-open="true"]')) return
+        if (target.closest('[data-kanban-field="true"]')) return
+        if (target.closest('[data-kanban-drag="true"]')) return
+        onOpen()
+      }}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-2">
@@ -808,24 +764,63 @@ function KanbanCard({ row, displayFields, tableFields, onClick, onEdit, canEdit 
             <div
               {...attributes}
               {...listeners}
+              data-kanban-drag="true"
               className="mt-0.5 cursor-grab active:cursor-grabbing flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           )}
+          <button
+            type="button"
+            data-kanban-open="true"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen()
+            }}
+            className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+            title="Open record"
+            aria-label="Open record"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
           <div className="flex-1 space-y-2.5 min-w-0">
             {primaryField && (
-              <div className="font-semibold text-sm text-gray-900 break-words leading-tight">
-                {formatValue(primaryField, primaryValue) || "Unnamed content"}
+              <div className="font-semibold text-sm text-gray-900 break-words leading-tight" data-kanban-field="true" onClick={(e) => e.stopPropagation()}>
+                <CellFactory
+                  field={getFullField(primaryField)}
+                  value={primaryValue}
+                  rowId={String(row.id)}
+                  tableName={tableName}
+                  editable={canEdit && !getFullField(primaryField).options?.read_only}
+                  wrapText={true}
+                  rowHeight={32}
+                  onSave={(value) => onCellSave(String(row.id), getFullField(primaryField).name, value)}
+                />
               </div>
             )}
             {otherFields.map((field) => {
               if (!field || !field.name) return null
-              const value = row[field.name]
+              const full = getFullField(field)
+              const value = row[full.name]
               
               return (
-                <div key={field.name} className="text-xs break-words">
-                  {renderFieldValue(field, value)}
+                <div
+                  key={field.name}
+                  className="text-xs break-words"
+                  data-kanban-field="true"
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                >
+                  <CellFactory
+                    field={full}
+                    value={value}
+                    rowId={String(row.id)}
+                    tableName={tableName}
+                    editable={canEdit && !full.options?.read_only && full.type !== "lookup" && full.type !== "formula"}
+                    wrapText={true}
+                    rowHeight={28}
+                    onSave={(v) => onCellSave(String(row.id), full.name, v)}
+                  />
                 </div>
               )
             })}

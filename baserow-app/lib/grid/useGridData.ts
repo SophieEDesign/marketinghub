@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
+import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
 
 export interface GridRow {
   id: string
@@ -11,7 +12,7 @@ export interface GridRow {
 export interface UseGridDataOptions {
   tableName: string
   fields?: TableField[]
-  filters?: any[]
+  filters?: FilterConfig[]
   sorts?: Array<{ field: string; direction: 'asc' | 'desc' }>
   limit?: number
 }
@@ -109,45 +110,24 @@ export function useGridData({
 
       let query: any = supabase.from(tableName).select(selectClause)
 
-      // Apply filters
-      currentFilters.forEach((filter) => {
-        const { field, operator, value } = filter
-        switch (operator) {
-          case 'eq':
-            query = query.eq(field, value)
-            break
-          case 'neq':
-            query = query.neq(field, value)
-            break
-          case 'gt':
-            query = query.gt(field, value)
-            break
-          case 'gte':
-            query = query.gte(field, value)
-            break
-          case 'lt':
-            query = query.lt(field, value)
-            break
-          case 'lte':
-            query = query.lte(field, value)
-            break
-          case 'like':
-            query = query.like(field, `%${value}%`)
-            break
-          case 'ilike':
-            query = query.ilike(field, `%${value}%`)
-            break
-          case 'is':
-            if (value === null) {
-              query = query.is(field, null)
-            }
-            break
-        }
-      })
+      // Apply filters using shared unified filter engine (supports date operators, selects, etc.)
+      const safeFilterConfigs = asArray<FilterConfig>(currentFilters as any).filter(
+        (f) => !!f && typeof (f as any).field === 'string' && typeof (f as any).operator === 'string'
+      )
+      if (safeFilterConfigs.length > 0) {
+        const normalizedFields = safeFields.map((f) => ({
+          name: f.name,
+          type: f.type,
+          id: f.id,
+          options: (f as any).options,
+        }))
+        query = applyFiltersToQuery(query, safeFilterConfigs, normalizedFields as any)
+      }
 
       // Apply sorts
       currentSorts.forEach((sort) => {
-        query = query.order(sort.field, { ascending: sort.direction === 'asc' })
+        // Use quoted identifier to support columns with spaces/special characters
+        query = query.order(quoteSelectIdent(sort.field), { ascending: sort.direction === 'asc' })
       })
 
       // Apply limit with safety cap

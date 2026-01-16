@@ -24,6 +24,8 @@ import RecordActivity from "@/components/records/RecordActivity"
 import InterfaceBuilder from "./InterfaceBuilder"
 import type { TableField } from "@/types/fields"
 import { createClient } from "@/lib/supabase/client"
+import { useUserRole } from "@/lib/hooks/useUserRole"
+import { canDeleteRecord } from "@/lib/interface/record-actions"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,9 +85,13 @@ export default function RecordDetailsPanel({
   blocksLoading = false,
 }: RecordDetailsPanelProps) {
   const { toast } = useToast()
+  const { role: userRole } = useUserRole()
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState("")
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const pageConfig = (page as any)?.config || (page as any)?.settings || {}
+  const canDeleteThisRecord = pageEditable && canDeleteRecord(userRole, pageConfig)
 
   // Find primary name field (for editable title)
   // Priority: titleField config > field named "name" > "title" > "subject" > first text field (excluding "id")
@@ -127,7 +133,7 @@ export default function RecordDetailsPanel({
     if (firstTextField && formData[firstTextField.name]) {
       return String(formData[firstTextField.name])
     }
-    return recordId?.substring(0, 8) || "Untitled"
+    return "Untitled"
   }, [formData, fields, titleField, recordId])
 
   // Update name value when record title changes
@@ -208,15 +214,33 @@ export default function RecordDetailsPanel({
   const handleDelete = useCallback(async () => {
     if (!recordId || !tableName) return
 
+    if (!canDeleteThisRecord) {
+      toast({
+        variant: "destructive",
+        title: "Not allowed",
+        description: "You don't have permission to delete records on this page.",
+      })
+      return
+    }
+
     if (!confirm("Are you sure you want to delete this record? This action cannot be undone.")) {
       return
     }
 
     try {
-      const supabase = createClient()
-      const { error } = await supabase.from(tableName).delete().eq("id", recordId)
+      // Prefer server-side enforcement for interface pages
+      const pageId = (page as any)?.id as string | undefined
+      if (!pageId) {
+        throw new Error('Missing page ID for delete action.')
+      }
 
-      if (error) throw error
+      const res = await fetch(`/api/interface-pages/${pageId}/records/${recordId}`, {
+        method: 'DELETE',
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Failed to delete record')
+      }
 
       toast({
         title: "Record deleted",
@@ -234,7 +258,7 @@ export default function RecordDetailsPanel({
         description: error.message || "Please try again",
       })
     }
-  }, [recordId, tableName, toast, onRecordDelete])
+  }, [canDeleteThisRecord, recordId, tableName, toast, onRecordDelete])
 
   const handleCopyLink = useCallback(() => {
     if (!recordId) return
@@ -264,7 +288,12 @@ export default function RecordDetailsPanel({
       {/* Header - Record context */}
       <div className="border-b border-gray-200 bg-white flex-shrink-0">
         <div className="px-6 py-4">
-          {isEditingName && primaryNameField ? (
+          {loading ? (
+            <div className="space-y-3">
+              <div className="h-7 w-64 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+            </div>
+          ) : isEditingName && primaryNameField ? (
             <div className="flex items-center gap-2">
               <input
                 ref={nameInputRef}
@@ -327,6 +356,17 @@ export default function RecordDetailsPanel({
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
+                {canDeleteThisRecord && (
+                  <button
+                    onClick={handleDelete}
+                    className="p-2 hover:bg-red-50 rounded-md transition-colors"
+                    aria-label="Delete record"
+                    title="Delete"
+                    disabled={loading}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                  </button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
@@ -347,7 +387,7 @@ export default function RecordDetailsPanel({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={handleDelete}
-                      disabled={loading || !pageEditable}
+                      disabled={loading || !canDeleteThisRecord}
                       className="text-red-600 focus:text-red-600"
                     >
                       Delete

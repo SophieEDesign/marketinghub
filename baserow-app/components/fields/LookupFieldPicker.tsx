@@ -110,6 +110,22 @@ export default function LookupFieldPicker({
     }
   }, [lookupTableId])
 
+  const isMirroredLinkedField =
+    field.type === 'link_to_table' &&
+    !isLookupField &&
+    disabled &&
+    !!field.options?.read_only
+
+  const handleNavigateToRecord = useCallback(
+    (e: React.MouseEvent, recordId: string) => {
+      e.stopPropagation()
+      if (onRecordClick && lookupTableId) {
+        onRecordClick(lookupTableId, recordId)
+      }
+    },
+    [onRecordClick, lookupTableId]
+  )
+
   // Load options when search query changes
   useEffect(() => {
     if (open && lookupTableId) {
@@ -202,7 +218,7 @@ export default function LookupFieldPicker({
       const transformedOptions: RecordOption[] = (records || []).map((record: any) => {
         const primaryLabel = record[primaryLabelField] 
           ? String(record[primaryLabelField])
-          : `Record ${record.id.substring(0, 8)}`
+          : "Untitled"
         
         const secondaryLabels = secondaryLabelFields
           .map(fieldName => record[fieldName])
@@ -257,7 +273,7 @@ export default function LookupFieldPicker({
           id: record.id,
           primaryLabel: record[primaryLabelField] 
             ? String(record[primaryLabelField])
-            : `Record ${record.id.substring(0, 8)}`,
+            : "Untitled",
           secondaryLabels: secondaryLabelFields
             .map(fieldName => record[fieldName])
             .filter(Boolean)
@@ -349,6 +365,11 @@ export default function LookupFieldPicker({
   if (isLookupField || disabled) {
     return (
       <div className="space-y-2" ref={containerRef}>
+        {isMirroredLinkedField && (
+          <div className="text-xs text-gray-500">
+            Linked from {tableName || 'linked table'}
+          </div>
+        )}
         <div
           className={cn(
             "min-h-[40px] w-full rounded-md border border-gray-200/50 bg-gray-50/50 px-3 py-2.5 text-sm",
@@ -358,8 +379,9 @@ export default function LookupFieldPicker({
         >
           {selectedOptions.length > 0 ? (
             selectedOptions.map((option) => (
-              <span
+              <button
                 key={option.id}
+                type="button"
                 className={cn(
                   "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
                   isLookupField 
@@ -368,22 +390,14 @@ export default function LookupFieldPicker({
                   onRecordClick && "group"
                 )}
                 style={{ boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' }}
+                onClick={(e) => handleNavigateToRecord(e, option.id)}
+                title="Open linked record"
+                aria-label={`Open linked record: ${option.primaryLabel}`}
               >
-                {/* Only the label text is clickable for navigation */}
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (onRecordClick && lookupTableId) {
-                      onRecordClick(lookupTableId, option.id)
-                    }
-                  }}
-                  className={cn(
-                    onRecordClick && "cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                  )}
-                >
+                <span className={cn(onRecordClick && "hover:text-blue-600 hover:underline transition-colors")}>
                   {option.primaryLabel}
                 </span>
-              </span>
+              </button>
             ))
           ) : (
             <span className="text-gray-400 italic">{placeholder}</span>
@@ -417,16 +431,18 @@ export default function LookupFieldPicker({
                     style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      // Don't navigate on pill click - only on label click
+                      // Clicking the pill navigates to the linked record (Airtable mental model).
+                      if (onRecordClick && lookupTableId) {
+                        onRecordClick(lookupTableId, option.id)
+                      }
                     }}
+                    title="Open linked record"
+                    role="button"
                   >
-                    {/* Only the label text is clickable for navigation */}
                     <span
                       onClick={(e) => {
-                        e.stopPropagation()
-                        if (onRecordClick && lookupTableId) {
-                          onRecordClick(lookupTableId, option.id)
-                        }
+                        // Already handled by pill click; keep for accessibility/selection.
+                        handleNavigateToRecord(e, option.id)
                       }}
                       className="cursor-pointer hover:text-blue-800 hover:underline transition-colors"
                     >

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -7,13 +7,19 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
 import GroupDialog from "../grid/GroupDialog"
 import FilterDialog from "../grid/FilterDialog"
+import { CellFactory } from "../grid/CellFactory"
+
+function quoteSelectIdent(name: string): string {
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
 
 interface ListViewProps {
   tableId: string
@@ -39,6 +45,8 @@ interface ListViewProps {
   // Callbacks for block config updates (when not using views)
   onGroupByChange?: (fieldName: string | null) => void
   onFiltersChange?: (filters: FilterConfig[]) => void
+  /** Optional external trigger to reload rows (e.g. after create in a parent block). */
+  reloadKey?: any
 }
 
 export default function ListView({
@@ -61,11 +69,13 @@ export default function ListView({
   metaFields = [],
   onGroupByChange,
   onFiltersChange,
+  reloadKey,
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const prevGroupByRef = useRef<string | undefined>(undefined)
   const didInitChoiceGroupCollapseRef = useRef(false)
@@ -93,6 +103,32 @@ export default function ListView({
     }
   }, [tableId, tableName])
 
+  const handleOpenRecord = useCallback((recordId: string) => {
+    if (onRecordClick) {
+      onRecordClick(recordId)
+      return
+    }
+    const effectiveTableName = tableName || supabaseTableName
+    if (tableId && effectiveTableName) {
+      openRecord(tableId, recordId, effectiveTableName)
+    }
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName])
+
+  const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
+    if (!rowId || !supabaseTableName) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from(supabaseTableName)
+      .update({ [fieldName]: value })
+      .eq("id", rowId)
+    if (error) throw error
+
+    // Update local state for snappy UX
+    setRows((prev) =>
+      prev.map((r) => (String(r?.id) === String(rowId) ? { ...(r || {}), [fieldName]: value } : r))
+    )
+  }, [supabaseTableName])
+
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {
     setCurrentGroupBy(groupBy)
@@ -107,7 +143,7 @@ export default function ListView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, supabaseTableName, currentFilters, sorts])
+  }, [tableId, supabaseTableName, currentFilters, sorts, reloadKey])
 
   async function loadRows() {
     if (!supabaseTableName) {
@@ -136,7 +172,7 @@ export default function ListView({
       if (sorts.length > 0) {
         sorts.forEach((sort, index) => {
           if (index === 0) {
-            query = query.order(sort.field_name, { ascending: sort.direction === 'asc' })
+            query = query.order(quoteSelectIdent(sort.field_name), { ascending: sort.direction === 'asc' })
           } else {
             // Supabase only supports one order() call, so we'd need to sort in memory for multiple sorts
             // For now, just use the first sort
@@ -348,7 +384,7 @@ export default function ListView({
   // Helper to format field value for display
   const formatFieldValue = useCallback((field: TableField, value: any): string => {
     if (value === null || value === undefined || value === '') {
-      return '—'
+      return 'â€”'
     }
 
     switch (field.type) {
@@ -370,7 +406,7 @@ export default function ListView({
         if (Array.isArray(value)) {
           return `${value.length} file${value.length !== 1 ? 's' : ''}`
         }
-        return '—'
+        return 'â€”'
       default:
         return String(value)
     }
@@ -393,14 +429,9 @@ export default function ListView({
     )
   }, [])
 
-  // Handle record click
-  const handleRecordClick = useCallback((recordId: string) => {
-    if (onRecordClick) {
-      onRecordClick(recordId)
-    } else if (tableId && tableName) {
-      openRecord(tableId, recordId, tableName)
-    }
-  }, [onRecordClick, tableId, tableName, openRecord])
+  const isVirtualField = useCallback((field?: TableField | null) => {
+    return field?.type === 'formula' || field?.type === 'lookup'
+  }, [])
 
   const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
     if (!showAddRecord || !canCreateRecord) return
@@ -410,6 +441,11 @@ export default function ListView({
     try {
       const supabase = createClient()
       const newData: Record<string, any> = {}
+
+      const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields)
+      if (Object.keys(defaultsFromFilters).length > 0) {
+        Object.assign(newData, defaultsFromFilters)
+      }
 
       // Group key "(Empty)" means null/empty for the group field.
       newData[currentGroupBy] = groupKey === '(Empty)' ? null : groupKey
@@ -426,13 +462,14 @@ export default function ListView({
 
       await loadRows()
 
-      // Open the created record
-      handleRecordClick(String(createdId))
+      // Contract: creating a record must NOT auto-open it.
+      // User can open via the dedicated chevron (or optional double-click).
+      setSelectedRecordId(String(createdId))
     } catch (error) {
       console.error('Failed to create record:', error)
       alert('Failed to create record. Please try again.')
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, currentGroupBy, handleRecordClick])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, currentGroupBy, handleOpenRecord])
 
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
@@ -440,63 +477,35 @@ export default function ListView({
 
     // Get title field
     const titleFieldObj = tableFields.find(f => f.name === titleField || f.id === titleField)
-    const title = titleFieldObj ? formatFieldValue(titleFieldObj, row[titleField!]) : 'Untitled'
+    const titleValue = titleFieldObj && titleField ? row[titleField] : null
 
     // Get image
     const imageUrl = getImageUrl(row)
 
-    // Get subtitle values
-    const subtitleValues = subtitleFields
-      .slice(0, 3) // Max 3 subtitles
-      .map(fieldName => {
-        const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-        if (!field) return null
-        return {
-          field,
-          value: formatFieldValue(field, row[fieldName]),
-        }
-      })
-      .filter(Boolean) as Array<{ field: TableField; value: string }>
-
-    // Get pill values
-    const pillValues = pillFields
-      .map(fieldName => {
-        const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-        if (!field || (field.type !== 'single_select' && field.type !== 'multi_select')) {
-          return null
-        }
-        const value = row[fieldName]
-        if (!value) return null
-
-        const values = Array.isArray(value) ? value : [value]
-        return values.map(v => ({
-          field,
-          value: String(v),
-          color: getPillColor(field, v),
-        }))
-      })
-      .filter(Boolean)
-      .flat() as Array<{ field: TableField; value: string; color: string | null }>
-
-    // Get meta values
-    const metaValues = metaFields
-      .map(fieldName => {
-        const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-        if (!field) return null
-        return {
-          field,
-          value: formatFieldValue(field, row[fieldName]),
-        }
-      })
-      .filter(Boolean) as Array<{ field: TableField; value: string }>
-
     return (
       <div
         key={recordId}
-        onClick={() => handleRecordClick(recordId)}
-        className="group cursor-pointer border-b border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+        onClick={() => setSelectedRecordId(String(recordId))}
+        onDoubleClick={() => handleOpenRecord(String(recordId))}
+        className={`group border-b border-gray-200 transition-colors touch-manipulation cursor-default ${
+          selectedRecordId === String(recordId) ? "bg-blue-50/60" : "hover:bg-gray-50 active:bg-gray-100"
+        }`}
       >
         <div className={`flex items-start gap-3 ${isMobile ? 'p-3' : 'p-4'}`}>
+          {/* Row open control */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenRecord(String(recordId))
+            }}
+            className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+            title="Open record"
+            aria-label="Open record"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+
           {/* Image */}
           {imageUrl && (
             <div className={`flex-shrink-0 rounded-md overflow-hidden bg-gray-100 ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}`}>
@@ -514,42 +523,90 @@ export default function ListView({
           {/* Content */}
           <div className="flex-1 min-w-0">
             {/* Title */}
-            <div className={`font-medium text-gray-900 mb-1 group-hover:text-blue-600 transition-colors ${isMobile ? 'text-sm' : 'text-base'} break-words`}>
-              {title}
+            <div
+              className={`font-medium text-gray-900 mb-1 ${isMobile ? 'text-sm' : 'text-base'} break-words`}
+              onDoubleClick={(e) => e.stopPropagation()}
+            >
+              {titleFieldObj ? (
+                <CellFactory
+                  field={titleFieldObj}
+                  value={titleValue}
+                  rowId={String(recordId)}
+                  tableName={supabaseTableName}
+                  editable={!titleFieldObj.options?.read_only && !isVirtualField(titleFieldObj)}
+                  wrapText={true}
+                  rowHeight={isMobile ? 32 : 40}
+                  onSave={(value) => handleCellSave(String(recordId), titleFieldObj.name, value)}
+                />
+              ) : (
+                <span className="text-gray-700">Untitled</span>
+              )}
             </div>
 
             {/* Subtitles */}
-            {subtitleValues.length > 0 && (
-              <div className={`text-gray-600 space-y-0.5 mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                {subtitleValues.map(({ field, value }, idx) => (
-                  <div key={idx} className="break-words">{value}</div>
-                ))}
+            {subtitleFields.slice(0, 3).length > 0 && (
+              <div className={`text-gray-700 space-y-1 mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+                {subtitleFields.slice(0, 3).map((fieldName) => {
+                  const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+                  if (!field) return null
+                  return (
+                    <div key={fieldName} className="min-w-0" onDoubleClick={(e) => e.stopPropagation()}>
+                      <CellFactory
+                        field={field}
+                        value={row[field.name]}
+                        rowId={String(recordId)}
+                        tableName={supabaseTableName}
+                        editable={!field.options?.read_only && !isVirtualField(field)}
+                        wrapText={true}
+                        rowHeight={isMobile ? 32 : 40}
+                        onSave={(value) => handleCellSave(String(recordId), field.name, value)}
+                      />
+                    </div>
+                  )
+                })}
               </div>
             )}
 
-            {/* Pills and Meta */}
+            {/* Pills + meta */}
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              {/* Pills */}
-              {pillValues.map(({ field, value, color }, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                  style={{
-                    backgroundColor: color ? `${color}20` : undefined,
-                    color: color || undefined,
-                    border: color ? `1px solid ${color}40` : undefined,
-                  }}
-                >
-                  {value}
-                </span>
-              ))}
+              {pillFields.map((fieldName) => {
+                const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+                if (!field) return null
+                return (
+                  <div key={`pill-${fieldName}`} onDoubleClick={(e) => e.stopPropagation()}>
+                    <CellFactory
+                      field={field}
+                      value={row[field.name]}
+                      rowId={String(recordId)}
+                      tableName={supabaseTableName}
+                      editable={!field.options?.read_only && !isVirtualField(field)}
+                      wrapText={false}
+                      rowHeight={isMobile ? 32 : 40}
+                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
+                    />
+                  </div>
+                )
+              })}
 
-              {/* Meta */}
-              {metaValues.map(({ field, value }, idx) => (
-                <span key={idx} className={`text-gray-500 ${isMobile ? 'text-[10px]' : 'text-xs'}`}>
-                  {field.name}: {value}
-                </span>
-              ))}
+              {metaFields.map((fieldName) => {
+                const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
+                if (!field) return null
+                return (
+                  <div key={`meta-${fieldName}`} className="flex items-center gap-1" onDoubleClick={(e) => e.stopPropagation()}>
+                    <span className={`text-gray-500 ${isMobile ? 'text-[10px]' : 'text-xs'}`}>{field.name}:</span>
+                    <CellFactory
+                      field={field}
+                      value={row[field.name]}
+                      rowId={String(recordId)}
+                      tableName={supabaseTableName}
+                      editable={!field.options?.read_only && !isVirtualField(field)}
+                      wrapText={false}
+                      rowHeight={isMobile ? 32 : 40}
+                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
+                    />
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -563,9 +620,12 @@ export default function ListView({
     pillFields,
     metaFields,
     getImageUrl,
-    formatFieldValue,
-    getPillColor,
-    handleRecordClick,
+    handleOpenRecord,
+    handleCellSave,
+    isVirtualField,
+    isMobile,
+    selectedRecordId,
+    supabaseTableName,
   ])
 
   if (loading) {
@@ -678,7 +738,7 @@ export default function ListView({
                   </Button>
                 </div>
 
-                {/* Group Items - Card View (Lists ≠ Tables) */}
+                {/* Group Items - Card View (Lists â‰  Tables) */}
                 {!isCollapsed && (
                   <div className="bg-white">
                     {groupRows.map((row) => renderListItem(row))}
@@ -897,3 +957,4 @@ export default function ListView({
     </div>
   )
 }
+

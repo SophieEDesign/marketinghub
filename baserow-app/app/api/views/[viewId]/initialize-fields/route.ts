@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
+function isSystemFieldName(name: string) {
+  return SYSTEM_FIELD_NAMES.has(String(name || '').toLowerCase())
+}
+
 /**
  * POST /api/views/[viewId]/initialize-fields
  * Initialize view_fields for a view by adding all table fields
@@ -74,7 +79,8 @@ export async function POST(
       .map((field, index) => ({
         view_id: viewId,
         field_name: field.name,
-        visible: true,
+        // System fields should exist for sorting/filtering but stay hidden by default.
+        visible: !isSystemFieldName(field.name),
         position: field.order_index ?? field.position ?? index,
       }))
 

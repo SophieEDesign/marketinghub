@@ -308,7 +308,7 @@ export default function FieldPickerModal({
                           </div>
                         ) : (
                           <div className="text-sm font-medium text-gray-900">
-                            {record.id?.substring(0, 8) || "Record"}
+                            {"Record"}
                           </div>
                         )}
                       </div>
@@ -336,7 +336,7 @@ export default function FieldPickerModal({
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
                       {previewFields.length > 0 && selectedRecord[previewFields[0]]
                         ? String(selectedRecord[previewFields[0]]).substring(0, 50)
-                        : selectedRecord.id?.substring(0, 8) || "Untitled"}
+                        : "Untitled"}
                     </h3>
                   </div>
 

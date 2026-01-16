@@ -7,6 +7,7 @@ import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText }
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 import { useIsMobile } from '@/hooks/useResponsive'
+import { createClient } from '@/lib/supabase/client'
 
 const COLUMN_MIN_WIDTH = 100
 
@@ -44,6 +45,41 @@ export default function GridColumnHeader({
   onSort,
 }: GridColumnHeaderProps) {
   const isMobile = useIsMobile()
+
+  const isMirroredLinkedField =
+    field.type === 'link_to_table' &&
+    !!field.options?.read_only &&
+    !!field.options?.linked_table_id
+
+  const [linkedFromTableName, setLinkedFromTableName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isMirroredLinkedField || !field.options?.linked_table_id) {
+      setLinkedFromTableName(null)
+      return
+    }
+
+    let cancelled = false
+    const supabase = createClient()
+
+    supabase
+      .from('tables')
+      .select('name')
+      .eq('id', field.options.linked_table_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        setLinkedFromTableName(data?.name ?? null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setLinkedFromTableName(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isMirroredLinkedField, field.options?.linked_table_id])
   const {
     attributes,
     listeners,
@@ -136,9 +172,16 @@ export default function GridColumnHeader({
         <span className="text-gray-400 flex-shrink-0">
           {getFieldIcon(field.type)}
         </span>
-        <span className="text-sm font-medium text-gray-700 truncate">
-          {field.name}
-        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-gray-700 truncate">
+            {field.name}
+          </div>
+          {isMirroredLinkedField && (
+            <div className="text-[11px] text-gray-400 truncate">
+              Linked from {linkedFromTableName || 'linked table'}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Wrap text button */}

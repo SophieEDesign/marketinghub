@@ -119,9 +119,11 @@ export function CellFactory({
     case 'link_to_table':
       return (
         <LinkedRecordCell
+          field={field}
           value={value}
-          fieldName={field.name}
-          fieldOptions={field.options}
+          rowId={rowId}
+          editable={editable}
+          onSave={onSave}
         />
       )
 

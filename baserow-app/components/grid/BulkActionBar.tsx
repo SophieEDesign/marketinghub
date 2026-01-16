@@ -86,6 +86,7 @@ export default function BulkActionBar({
           tableName={tableName}
           tableFields={tableFields}
           userRole={userRole}
+          onDelete={onBulkDelete}
           onSave={async (updates) => {
             await onBulkUpdate(updates)
             setBulkEditOpen(false)

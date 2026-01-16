@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -7,6 +7,7 @@ import ListView from "@/components/views/ListView"
 import {
   mergeFilters,
   mergeViewDefaultFiltersWithUserQuickFilters,
+  deriveDefaultValuesFromFilters,
   normalizeFilter,
   type FilterConfig,
 } from "@/lib/interface/filters"
@@ -63,6 +64,7 @@ export default function ListBlock({
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   
@@ -207,6 +209,11 @@ export default function ListBlock({
         const supabase = createClient()
         const newData: Record<string, any> = {}
 
+        const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
+        if (Object.keys(defaultsFromFilters).length > 0) {
+          Object.assign(newData, defaultsFromFilters)
+        }
+
         if (canPrefillTitle && titleFieldObj?.name && primaryValue) {
           newData[titleFieldObj.name] = primaryValue
         }
@@ -223,12 +230,10 @@ export default function ListBlock({
         if (!createdId) return
 
         toast({ title: "Record created" })
-
-        if (onRecordClick) {
-          onRecordClick(String(createdId))
-        } else {
-          window.location.href = `/tables/${tableId}/records/${createdId}`
-        }
+        // Contract: creating a record must NOT auto-open it.
+        // User can open via the dedicated chevron (or optional double-click) in the list.
+        setCreateModalOpen(false)
+        setRefreshKey((k) => k + 1)
       } finally {
         setCreating(false)
       }
@@ -361,7 +366,9 @@ export default function ListBlock({
         imageField={imageField}
         pillFields={pillFields}
         metaFields={metaFields}
+        reloadKey={refreshKey}
       />
     </div>
   )
 }
+

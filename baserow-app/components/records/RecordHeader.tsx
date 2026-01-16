@@ -50,7 +50,7 @@ export default function RecordHeader({
 
   const recordName = primaryNameField
     ? formData[primaryNameField.name] || ""
-    : record?.id?.substring(0, 8) || "Untitled"
+    : "Untitled"
 
   useEffect(() => {
     setNameValue(String(recordName || ""))

@@ -1041,8 +1041,8 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
                                     // Fallback: show name and status if no preview fields configured
                                     <>
                                       <div className="font-medium text-gray-900">
-                                        {String(record[nameField] || record.id || 'Untitled').substring(0, 30)}
-                                        {String(record[nameField] || record.id || 'Untitled').length > 30 ? '...' : ''}
+                                        {String(record[nameField] || 'Untitled').substring(0, 30)}
+                                        {String(record[nameField] || 'Untitled').length > 30 ? '...' : ''}
                                       </div>
                                       {record[statusField] && (() => {
                                         const statusFieldDef = tableFields.find(f => f.name === statusField)

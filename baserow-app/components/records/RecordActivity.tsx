@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Clock, User, Edit } from "lucide-react"
-import { formatDateTimeUK } from "@/lib/utils"
+import { ChevronDown, ChevronRight, Clock } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 interface RecordActivityProps {
@@ -13,32 +12,53 @@ interface RecordActivityProps {
 export default function RecordActivity({ record, tableId }: RecordActivityProps) {
   const [createdBy, setCreatedBy] = useState<string | null>(null)
   const [modifiedBy, setModifiedBy] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(true)
 
   useEffect(() => {
     loadActivityMetadata()
   }, [record, tableId])
 
-  async function loadActivityMetadata() {
-    // For now, we'll use created_at and updated_at
-    // In future, this can be expanded to show:
-    // - Comments
-    // - Field change history
-    // - Mentions
-    // - Collaborators
+  function formatFriendlyDate(dateValue: string | null | undefined) {
+    if (!dateValue) return null
+    try {
+      const d = new Date(dateValue)
+      if (Number.isNaN(d.getTime())) return null
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(d)
+    } catch {
+      return null
+    }
+  }
 
-    // Try to get user info if owner_id exists
+  function formatUserDisplayName(emailOrNull: string | null) {
+    if (!emailOrNull) return "Unknown"
+    const email = String(emailOrNull)
+    const local = email.split("@")[0] || email
+    const parts = local
+      .replace(/[._-]+/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    return parts.join(" ") || email
+  }
+
+  async function loadActivityMetadata() {
     if (record.created_by || record.updated_by) {
       try {
         const supabase = createClient()
         const userIds = [record.created_by, record.updated_by].filter(Boolean)
         if (userIds.length > 0) {
+          // Use a safe view that exposes auth.users email (sync_users_and_profiles.sql)
           const { data: users } = await supabase
-            .from("profiles")
-            .select("id, email, full_name")
-            .in("id", userIds)
+            .from("user_profile_sync_status")
+            .select("user_id, email")
+            .in("user_id", userIds)
 
           if (users) {
-            const userMap = new Map(users.map((u) => [u.id, u.email || u.full_name || "Unknown"]))
+            const userMap = new Map(users.map((u: any) => [u.user_id, u.email || null]))
             if (record.created_by) {
               setCreatedBy(userMap.get(record.created_by) || null)
             }
@@ -48,73 +68,47 @@ export default function RecordActivity({ record, tableId }: RecordActivityProps)
           }
         }
       } catch (error) {
-        // Profiles table may not exist - this is fine
-        console.warn("Could not load user metadata:", error)
+        // View may not exist yet - fail gracefully
+        console.warn("Could not load audit user metadata:", error)
       }
     }
   }
 
-  // UK format: DD/MM/YYYY HH:mm
-  const createdAt = record.created_at
-    ? formatDateTimeUK(record.created_at)
-    : null
-
-  const updatedAt = record.updated_at
-    ? formatDateTimeUK(record.updated_at)
-    : null
-
-  const isModified = updatedAt && createdAt && record.updated_at !== record.created_at
+  const createdAt = formatFriendlyDate(record.created_at)
+  const updatedAt = formatFriendlyDate(record.updated_at)
+  const isModified = !!(updatedAt && createdAt && record.updated_at !== record.created_at)
 
   return (
     <div className="border-t border-gray-200 pt-6">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Clock className="h-4 w-4" />
-        Activity
-      </h3>
-      <div className="space-y-3">
-        {/* Created */}
-        {createdAt && (
-          <div className="flex items-start gap-3 text-sm">
-            <div className="mt-0.5">
-              <div className="w-2 h-2 bg-green-500 rounded-full" />
-            </div>
-            <div className="flex-1">
-              <div className="text-gray-900">
-                Record created
-                {createdBy && (
-                  <span className="text-gray-600"> by {createdBy}</span>
-                )}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">{createdAt}</div>
-            </div>
-          </div>
-        )}
+      <button
+        type="button"
+        onClick={() => setCollapsed((v) => !v)}
+        className="w-full flex items-center justify-between text-left"
+        aria-expanded={!collapsed}
+      >
+        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <Clock className="h-4 w-4" />
+          Activity
+        </h3>
+        <span className="text-gray-400">
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </span>
+      </button>
 
-        {/* Modified */}
-        {isModified && updatedAt && (
-          <div className="flex items-start gap-3 text-sm">
-            <div className="mt-0.5">
-              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+      {!collapsed && (
+        <div className="mt-4 space-y-3 text-sm">
+          {createdAt && (
+            <div className="text-gray-900">
+              Created by {formatUserDisplayName(createdBy)} on {createdAt}
             </div>
-            <div className="flex-1">
-              <div className="text-gray-900">
-                Record updated
-                {modifiedBy && (
-                  <span className="text-gray-600"> by {modifiedBy}</span>
-                )}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">{updatedAt}</div>
+          )}
+          {isModified && updatedAt && (
+            <div className="text-gray-900">
+              Last modified by {formatUserDisplayName(modifiedBy)} on {updatedAt}
             </div>
-          </div>
-        )}
-
-        {/* Placeholder for future features */}
-        <div className="pt-4 border-t border-gray-100">
-          <p className="text-xs text-gray-400 italic">
-            Comments and field change history coming soon
-          </p>
+          )}
         </div>
-      </div>
+      )}
     </div>
   )
 }

@@ -33,6 +33,7 @@ interface BulkEditModalProps {
   tableFields: TableField[]
   userRole?: "admin" | "editor" | "viewer" | null
   onSave: (updates: Record<string, any>) => Promise<void>
+  onDelete?: () => Promise<void>
 }
 
 type Operation = "set" | "clear" | "append" | "add" | "remove"
@@ -45,11 +46,13 @@ export default function BulkEditModal({
   tableFields,
   userRole = "editor",
   onSave,
+  onDelete,
 }: BulkEditModalProps) {
   const [selectedFieldName, setSelectedFieldName] = useState<string>("")
   const [operation, setOperation] = useState<Operation>("set")
   const [value, setValue] = useState<any>("")
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Filter editable fields based on permissions
   const editableFields = useMemo(() => {
@@ -73,6 +76,7 @@ export default function BulkEditModal({
   }, [tableFields, userRole])
 
   const selectedField = editableFields.find((f) => f.name === selectedFieldName)
+  const canDelete = userRole === "admin"
 
   // Get available operations for the selected field type
   const availableOperations = useMemo(() => {
@@ -135,6 +139,28 @@ export default function BulkEditModal({
       alert(error.message || "Failed to save changes")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    if (
+      !confirm(
+        `Are you sure you want to delete ${selectedCount} record${selectedCount !== 1 ? "s" : ""}? This action cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      await onDelete()
+      onClose()
+    } catch (error: any) {
+      console.error("Error deleting records:", error)
+      alert(error.message || "Failed to delete records")
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -342,10 +368,20 @@ export default function BulkEditModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-4 border-t">
+          {canDelete && onDelete && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={saving || deleting}
+              className="mr-auto"
+            >
+              {deleting ? "Deleting..." : `Delete ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || !selectedFieldName}>
+          <Button onClick={handleSave} disabled={saving || deleting || !selectedFieldName}>
             {saving ? "Saving..." : `Apply to ${selectedCount} Record${selectedCount !== 1 ? "s" : ""}`}
           </Button>
         </div>

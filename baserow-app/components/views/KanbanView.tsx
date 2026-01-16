@@ -1,15 +1,17 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus } from "lucide-react"
+import { ChevronRight, Plus } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { CellFactory } from "../grid/CellFactory"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 
 interface KanbanViewProps {
   tableId: string
@@ -18,6 +20,7 @@ interface KanbanViewProps {
   fieldIds: string[]
   searchQuery?: string
   tableFields?: any[]
+  filters?: FilterConfig[] // Active filters applied to this view
   colorField?: string // Field name to use for card colors (single-select field)
   imageField?: string // Field name to use for card images
   fitImageSize?: boolean // Whether to fit image to container size
@@ -32,6 +35,7 @@ export default function KanbanView({
   fieldIds,
   searchQuery = "",
   tableFields = [],
+  filters = [],
   colorField,
   imageField,
   fitImageSize = false,
@@ -43,6 +47,7 @@ export default function KanbanView({
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
   // Filter rows by search query
   const filteredRows = useMemo(() => {
@@ -137,9 +142,13 @@ export default function KanbanView({
       setSupabaseTableName(table.supabase_table)
 
       // Load rows from the actual table (not table_rows)
-      const { data, error } = await supabase
+      let query = supabase
         .from(table.supabase_table)
         .select("*")
+
+      query = applyFiltersToQuery(query, filters, tableFields as any)
+
+      const { data, error } = await query
         .order("created_at", { ascending: false })
 
       if (error) {
@@ -169,11 +178,41 @@ export default function KanbanView({
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const canCreateRecord = !isViewOnly && allowInlineCreate
 
+  const handleOpenRecord = useCallback((recordId: string) => {
+    if (!supabaseTableName) return
+    if (onRecordClick) {
+      onRecordClick(recordId)
+      return
+    }
+    openRecord(tableId, recordId, supabaseTableName, (blockConfig as any)?.modal_fields)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
+
+  const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
+    if (!supabaseTableName) return
+    const { error } = await supabase
+      .from(supabaseTableName)
+      .update({ [fieldName]: value })
+      .eq("id", rowId)
+    if (error) throw error
+
+    setRows((prev) =>
+      prev.map((r) =>
+        String(r.id) === String(rowId)
+          ? { ...r, data: { ...(r.data || {}), [fieldName]: value } }
+          : r
+      )
+    )
+  }, [supabaseTableName])
+
   const handleCreateInGroup = useCallback(async (groupName: string) => {
     if (!showAddRecord || !canCreateRecord) return
     if (!supabaseTableName || !tableId) return
     try {
       const newData: Record<string, any> = {}
+      const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields as any)
+      if (Object.keys(defaultsFromFilters).length > 0) {
+        Object.assign(newData, defaultsFromFilters)
+      }
       if (groupName && groupName !== "Uncategorized") {
         newData[groupingFieldId] = groupName
       } else {
@@ -192,16 +231,14 @@ export default function KanbanView({
 
       await loadRows()
 
-      if (onRecordClick) {
-        onRecordClick(String(createdId))
-      } else {
-        openRecord(tableId, String(createdId), supabaseTableName, (blockConfig as any)?.modal_fields)
-      }
+      // Contract: creating a record must NOT auto-open it.
+      // User can open via the dedicated chevron (or optional double-click).
+      setSelectedCardId(String(createdId))
     } catch (error) {
       console.error("Error creating record:", error)
       alert("Failed to create record")
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldId, onRecordClick, openRecord, blockConfig])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldId, handleOpenRecord])
 
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
@@ -260,19 +297,31 @@ export default function KanbanView({
                 return (
                 <Card 
                   key={row.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg"
+                  className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg cursor-default ${
+                    selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+                  }`}
                   style={borderColor}
-                  onClick={() => {
-                    if (!supabaseTableName) return
-                    if (onRecordClick) {
-                      onRecordClick(String(row.id))
-                      return
-                    }
-                    openRecord(tableId, String(row.id), supabaseTableName, (blockConfig as any)?.modal_fields)
-                  }}
+                  onClick={() => setSelectedCardId(String(row.id))}
+                  onDoubleClick={() => handleOpenRecord(String(row.id))}
                 >
                   <CardContent className="p-4">
                     <div className="space-y-2">
+                      {/* Row open control */}
+                      <div className="flex items-start justify-end">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenRecord(String(row.id))
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                          title="Open record"
+                          aria-label="Open record"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+
                       {/* Image if configured */}
                       {cardImage && (
                         <div className={`w-full ${fitImageSize ? 'h-auto' : 'h-32'} rounded overflow-hidden bg-gray-100 mb-2`}>
@@ -289,14 +338,38 @@ export default function KanbanView({
                       {(Array.isArray(fieldIds) ? fieldIds : [])
                         .filter((fid) => fid !== groupingFieldId)
                         .slice(0, 3)
-                        .map((fieldId) => (
-                          <div key={fieldId} className="text-sm">
-                            <span className="text-gray-500 font-medium text-xs uppercase tracking-wide">
-                              {fieldId}:{" "}
-                            </span>
-                            <span className="text-gray-900">{String(row.data[fieldId] || "—")}</span>
-                          </div>
-                        ))}
+                        .map((fieldId) => {
+                          const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
+                            (f: any) => f?.name === fieldId || f?.id === fieldId
+                          ) as TableField | undefined
+                          if (!fieldObj) return null
+                          const fieldName = fieldObj.name
+                          const isVirtual = fieldObj.type === "formula" || fieldObj.type === "lookup"
+                          return (
+                            <div
+                              key={fieldId}
+                              className="text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                              onDoubleClick={(e) => e.stopPropagation()}
+                            >
+                              <div className="text-gray-500 font-medium text-xs uppercase tracking-wide">
+                                {fieldObj.name}:
+                              </div>
+                              <div className="text-gray-900">
+                                <CellFactory
+                                  field={fieldObj}
+                                  value={(row.data || {})[fieldName]}
+                                  rowId={String(row.id)}
+                                  tableName={supabaseTableName || ""}
+                                  editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
+                                  wrapText={true}
+                                  rowHeight={32}
+                                  onSave={(value) => handleCellSave(String(row.id), fieldName, value)}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
                     </div>
                   </CardContent>
                 </Card>
@@ -326,3 +399,4 @@ export default function KanbanView({
     </div>
   )
 }
+

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
     
-    // Try to create table using RPC function
+    // Try to create table using RPC function (must create system audit fields too)
     // This requires a PostgreSQL function to be created in Supabase:
     // CREATE OR REPLACE FUNCTION create_dynamic_table(table_name text)
     // RETURNS void AS $$
@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
     //   EXECUTE format('CREATE TABLE IF NOT EXISTS %I (
     //     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     //     created_at timestamptz DEFAULT now(),
+    //     created_by uuid DEFAULT auth.uid(),
     //     updated_at timestamptz DEFAULT now()
+    //     updated_by uuid DEFAULT auth.uid()
     //   )', table_name);
     // END;
     // $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -44,8 +46,10 @@ export async function POST(request: NextRequest) {
       // If RPC doesn't exist or fails, try using execute_sql_safe if available
       const sql = `CREATE TABLE IF NOT EXISTS "${tableName}" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        created_at timestamptz DEFAULT now(),
-        updated_at timestamptz DEFAULT now()
+        created_at timestamptz NOT NULL DEFAULT now(),
+        created_by uuid NOT NULL DEFAULT auth.uid(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        updated_by uuid NOT NULL DEFAULT auth.uid()
       );`
       
       // Try execute_sql_safe as fallback

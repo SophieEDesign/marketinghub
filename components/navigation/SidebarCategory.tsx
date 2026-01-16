@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight } from 'lucide-react'
 import { getIconComponent } from '@/lib/icons'
@@ -27,10 +28,22 @@ export default function SidebarCategory({
   items,
   children,
 }: SidebarCategoryProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const pathname = usePathname()
+
+  const isActiveCategory = useMemo(() => {
+    if (!pathname) return false
+    return items.some((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
+  }, [pathname, items])
+
+  const [isOpen, setIsOpen] = useState(() => isActiveCategory)
 
   // Dynamically get icon component
   const IconComponent = getIconComponent(icon)
+
+  // If the user navigates to an item inside this category, ensure the category is expanded.
+  useEffect(() => {
+    if (isActiveCategory) setIsOpen(true)
+  }, [isActiveCategory])
 
   return (
     <div className="space-y-1">

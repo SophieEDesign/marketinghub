@@ -11,6 +11,9 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import RecordFields from "@/components/records/RecordFields"
 import type { TableField } from "@/types/fields"
+import { useToast } from "@/components/ui/use-toast"
+import { useUserRole } from "@/lib/hooks/useUserRole"
+import { Trash2 } from "lucide-react"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -32,7 +35,10 @@ export default function RecordModal({
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
+  const { role: userRole } = useUserRole()
 
   useEffect(() => {
     if (isOpen && recordId && tableName) {
@@ -106,13 +112,73 @@ export default function RecordModal({
     }
   }
 
+  async function handleDeleteRecord() {
+    if (!tableName || !recordId) return
+    if (userRole !== 'admin') {
+      toast({
+        variant: "destructive",
+        title: "Not allowed",
+        description: "Only admins can delete records here.",
+      })
+      return
+    }
+
+    if (!confirm("Are you sure you want to delete this record? This action cannot be undone.")) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const { error } = await supabase.from(tableName).delete().eq("id", recordId)
+      if (error) throw error
+
+      toast({
+        title: "Record deleted",
+        description: "The record has been deleted.",
+      })
+      onClose()
+    } catch (error: any) {
+      console.error("Error deleting record:", error)
+      toast({
+        variant: "destructive",
+        title: "Failed to delete record",
+        description: error.message || "Please try again",
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!isOpen) return null
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Record Details</DialogTitle>
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle>Record Details</DialogTitle>
+            <div className="flex items-center gap-2">
+              {userRole === 'admin' && (
+                <button
+                  onClick={handleDeleteRecord}
+                  disabled={deleting || loading}
+                  className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
+                  aria-label="Delete record"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-md hover:bg-gray-100 transition-colors"
+                aria-label="Close"
+                title="Close"
+              >
+                <X className="h-4 w-4 text-gray-600" />
+              </button>
+            </div>
+          </div>
         </DialogHeader>
         <div className="mt-4">
           {loading ? (

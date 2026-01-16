@@ -44,8 +44,10 @@ export async function createSupabaseTable(
     const sql = `
       CREATE TABLE IF NOT EXISTS "${tableName}" (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        created_at timestamptz DEFAULT now(),
-        updated_at timestamptz DEFAULT now(),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        created_by uuid NOT NULL DEFAULT auth.uid(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        updated_by uuid NOT NULL DEFAULT auth.uid(),
         ${columnDefinitions}
       );
     `

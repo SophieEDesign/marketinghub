@@ -6,6 +6,16 @@
 
 ---
 
+## Canonical UI Contracts (Must Stay Updated)
+
+This checklist is validated against the canonical Core Data UI contracts:
+
+- `CORE_DATA_UI_RULES_ENFORCEMENT.md`
+
+When new rules are introduced, **update the canonical doc first**, then update this checklist (and refactor code) to match.
+
+---
+
 ## 1. Fields & Data Model (Source of Truth)
 
 ### Select / Multi-Select

@@ -84,9 +84,13 @@ export default function RecordView({
 
   // Handle linked record click
   const handleLinkedRecordClick = useCallback((linkedTableId: string, linkedRecordId: string) => {
+    // Never open the current record (self-link edge case)
+    if (linkedTableId === tableId && linkedRecordId === recordId) {
+      return
+    }
     // Navigate to the linked record's record view
     window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
-  }, [])
+  }, [tableId, recordId])
 
   // Get edit mode from InterfaceBuilder
   const handleEditModeChange = useCallback((editing: boolean) => {

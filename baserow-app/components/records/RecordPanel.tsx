@@ -21,7 +21,10 @@ export default function RecordPanel() {
   const router = useRouter()
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
-  const [loading, setLoading] = useState(false)
+  const [recordLoading, setRecordLoading] = useState(false)
+  const [fieldsLoading, setFieldsLoading] = useState(false)
+  const [recordLoaded, setRecordLoaded] = useState(false)
+  const [fieldsLoaded, setFieldsLoaded] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   const resizeRef = useRef<HTMLDivElement>(null)
@@ -29,12 +32,17 @@ export default function RecordPanel() {
 
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
+      setRecordLoaded(false)
+      setFieldsLoaded(false)
       loadRecord()
       loadFields()
       loadFieldGroups()
     } else {
       setRecord(null)
       setFormData({})
+      setFields([])
+      setRecordLoaded(false)
+      setFieldsLoaded(false)
     }
   }, [state.isOpen, state.tableId, state.recordId, state.modalFields])
 
@@ -88,7 +96,8 @@ export default function RecordPanel() {
   async function loadRecord() {
     if (!state.tableId || !state.recordId || !state.tableName) return
 
-    setLoading(true)
+    setRecordLoading(true)
+    setRecordLoaded(false)
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -120,13 +129,16 @@ export default function RecordPanel() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setRecordLoading(false)
+      setRecordLoaded(true)
     }
   }
 
   async function loadFields() {
     if (!state.tableId) return
 
+    setFieldsLoading(true)
+    setFieldsLoaded(false)
     try {
       const supabase = createClient()
       // Load ALL fields, ordered by order_index (fallback to position)
@@ -172,6 +184,9 @@ export default function RecordPanel() {
       }
     } catch (error) {
       console.error("Error loading fields:", error)
+    } finally {
+      setFieldsLoading(false)
+      setFieldsLoaded(true)
     }
   }
 
@@ -299,6 +314,8 @@ export default function RecordPanel() {
 
   if (!state.isOpen) return null
 
+  const headerLoading = !recordLoaded || !fieldsLoaded || recordLoading || fieldsLoading
+
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history
   const canGoBack = state.isFullscreen || state.history.length > 1
@@ -350,7 +367,7 @@ export default function RecordPanel() {
           onCopyLink={handleCopyLink}
           saving={false}
           hasChanges={false}
-          loading={loading}
+          loading={headerLoading}
         />
 
         {/* Toolbar */}
@@ -412,11 +429,15 @@ export default function RecordPanel() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Loading record...</p>
+          {headerLoading ? (
+            <div className="p-6 space-y-6">
+              <div className="space-y-3">
+                <div className="h-4 w-1/3 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-1/4 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-1/3 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
             </div>
           ) : !record ? (

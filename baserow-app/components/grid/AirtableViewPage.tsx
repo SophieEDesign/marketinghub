@@ -69,6 +69,7 @@ export default function AirtableViewPage({
   const [tableFields, setTableFields] = useState<TableField[]>(initialTableFields)
   const [filters, setFilters] = useState(initialViewFilters)
   const [sorts, setSorts] = useState(initialViewSorts)
+  const [userRole, setUserRole] = useState<"admin" | "editor">("editor")
   const [groupBy, setGroupBy] = useState<string | null>(initialGroupBy ?? null)
   const [rowHeight, setRowHeight] = useState<"short" | "medium" | "tall">(
     initialGridSettings?.row_height || (view.config as { row_height?: "short" | "medium" | "tall" })?.row_height || "medium"
@@ -85,6 +86,58 @@ export default function AirtableViewPage({
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [designSidebarOpen, setDesignSidebarOpen] = useState(false)
+
+  // Load user role from profiles so we can correctly gate actions (e.g. bulk delete).
+  // Mapping: profiles.admin -> "admin"; profiles.member -> "editor" (can edit, cannot delete).
+  useEffect(() => {
+    loadUserRole()
+  }, [])
+
+  async function loadUserRole() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setUserRole("editor")
+        return
+      }
+
+      // Try profiles table first (new system)
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("user_id", user.id)
+        .maybeSingle()
+
+      if (!profileError && profile?.role) {
+        setUserRole(profile.role === "admin" ? "admin" : "editor")
+        return
+      }
+
+      // Fallback to user_roles table (legacy support)
+      if (
+        profileError?.code === "PGRST116" ||
+        profileError?.message?.includes("relation") ||
+        profileError?.message?.includes("does not exist")
+      ) {
+        const { data: legacyRole, error: legacyError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .maybeSingle()
+
+        if (!legacyError && legacyRole?.role) {
+          setUserRole(legacyRole.role === "admin" || legacyRole.role === "editor" ? "admin" : "editor")
+          return
+        }
+      }
+
+      // Default to editor so existing edit flows keep working; server still enforces admin-only deletes.
+      setUserRole("editor")
+    } catch (error) {
+      console.error("Error loading user role:", error)
+      setUserRole("editor")
+    }
+  }
 
   async function loadFields() {
     try {
@@ -316,7 +369,7 @@ export default function AirtableViewPage({
           groupBy={groupBy || undefined}
           rowHeight={rowHeight}
           hiddenFields={hiddenFields}
-          userRole="editor"
+          userRole={userRole}
           onFiltersChange={(newFilters) => {
             setFilters(newFilters as typeof filters)
             router.refresh()
@@ -391,6 +444,8 @@ export default function AirtableViewPage({
             tableName={table.supabase_table}
             tableId={tableId}
             viewName={view.name}
+            viewId={viewId}
+            viewFilters={filters}
             rowHeight={rowHeight}
             editable={true}
             fields={tableFields}
@@ -398,7 +453,7 @@ export default function AirtableViewPage({
             onAddField={handleAddField}
             onEditField={handleEditField}
             groupBy={groupBy || undefined}
-            userRole="editor"
+            userRole={userRole}
             disableRecordPanel={false}
           />
         ) : view.type === "kanban" ? (
@@ -412,7 +467,7 @@ export default function AirtableViewPage({
             viewSorts={sorts}
             kanbanGroupField={kanbanGroupField}
             cardFields={cardFields}
-            userRole="editor"
+            userRole={userRole}
           />
         ) : null}
       </div>

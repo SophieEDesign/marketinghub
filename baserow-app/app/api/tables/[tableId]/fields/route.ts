@@ -13,6 +13,11 @@ import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 
+const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
+function isSystemFieldName(name: string) {
+  return SYSTEM_FIELD_NAMES.has(String(name || '').toLowerCase())
+}
+
 // GET: Get all fields for a table
 export async function GET(
   request: NextRequest,
@@ -89,6 +94,13 @@ export async function POST(
     if (!nameValidation.valid) {
       return NextResponse.json(
         { error: nameValidation.error },
+        { status: 400 }
+      )
+    }
+
+    if (isSystemFieldName(finalSanitizedName)) {
+      return NextResponse.json(
+        { error: `Field name "${finalSanitizedName}" is reserved for system audit fields.` },
         { status: 400 }
       )
     }
@@ -262,6 +274,13 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Field not found' },
         { status: 404 }
+      )
+    }
+
+    if (isSystemFieldName(existingField.name)) {
+      return NextResponse.json(
+        { error: `System field "${existingField.name}" cannot be edited.` },
+        { status: 400 }
       )
     }
 
@@ -507,6 +526,13 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Field not found' },
         { status: 404 }
+      )
+    }
+
+    if (isSystemFieldName(field.name)) {
+      return NextResponse.json(
+        { error: `System field "${field.name}" cannot be deleted.` },
+        { status: 400 }
       )
     }
 

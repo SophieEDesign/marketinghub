@@ -14,6 +14,12 @@
 import type { FilterConfig } from './filters'
 import { applyFiltersToQuery } from './filters'
 
+function quoteSelectIdent(name: string): string {
+  // PostgREST select/order support quoted identifiers for columns with spaces/special chars.
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
+
 export interface QueryBuilderOptions {
   tableId: string
   supabaseTableName: string
@@ -55,7 +61,8 @@ export function buildQuery(
         return field?.name || fieldName
       })
       .filter(Boolean)
-      .join(', ')
+      .map(quoteSelectIdent)
+      .join(',')
     
     query = query.select(columns)
   } else {
@@ -71,9 +78,9 @@ export function buildQuery(
     const fieldName = field?.name || sort.field
     
     if (sort.direction === 'asc') {
-      query = query.order(fieldName, { ascending: true })
+      query = query.order(quoteSelectIdent(fieldName), { ascending: true })
     } else {
-      query = query.order(fieldName, { ascending: false })
+      query = query.order(quoteSelectIdent(fieldName), { ascending: false })
     }
   }
 

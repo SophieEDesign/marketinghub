@@ -56,6 +56,19 @@ export interface PageConfig {
   editable_fields?: string[] // Fields that are editable (page-level, subset of visible_fields)
   show_field_list?: boolean // Toggle to show/hide structured field list (page-level)
   show_blocks_section?: boolean // Toggle to show/hide blocks section (page-level)
+
+  /**
+   * Record actions permissions for record-based pages (record_view / record_review).
+   * Controls who can create/delete records from record-page UI surfaces.
+   *
+   * Defaults (if omitted):
+   * - create: 'both'
+   * - delete: 'admin'
+   */
+  record_actions?: {
+    create?: 'admin' | 'both'
+    delete?: 'admin' | 'both'
+  }
   
   // Left Panel (Record List) settings
   left_panel?: {

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -11,6 +11,7 @@ import GalleryView from "@/components/views/GalleryView"
 import {
   mergeFilters,
   mergeViewDefaultFiltersWithUserQuickFilters,
+  deriveDefaultValuesFromFilters,
   normalizeFilter,
   type FilterConfig,
 } from "@/lib/interface/filters"
@@ -21,6 +22,7 @@ import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
+import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 
 interface GridBlockProps {
   block: PageBlock
@@ -77,6 +79,9 @@ export default function GridBlock({
   }, [blockBaseFilters])
 
   const [userQuickFilters, setUserQuickFilters] = useState<FilterConfig[]>([])
+  // Calendar-only: date range filter state (lifted here so we can render controls in a unified header panel)
+  const [calendarDateFrom, setCalendarDateFrom] = useState<Date | undefined>(undefined)
+  const [calendarDateTo, setCalendarDateTo] = useState<Date | undefined>(undefined)
 
   const viewFiltersWithUserOverrides = useMemo(() => {
     return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
@@ -302,6 +307,11 @@ export default function GridBlock({
     padding: typeof (appearance as any).padding === 'number' ? `${(appearance as any).padding}px` : undefined,
   }
 
+  // In view mode, do NOT auto-title a grid block from the underlying table name.
+  // This commonly duplicates the page title (e.g. page name == table name) and creates "two titles" UX.
+  // Titles should be explicit: appearance.title (preferred) or config.title (legacy).
+  const blockTitle = appearance.title || config.title
+
   const blockShowAddRecord = (appearance as any).show_add_record
   const showAddRecord =
     blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
@@ -321,6 +331,8 @@ export default function GridBlock({
         const todayDate = today.toISOString().split('T')[0]
 
         const newData: Record<string, any> = {}
+
+        const defaultsFromFilters = deriveDefaultValuesFromFilters(allFilters, safeTableFields)
 
         // Ensure newly created records show up for date-based views by pre-filling the date field if we can.
         if (viewType === 'calendar') {
@@ -358,7 +370,11 @@ export default function GridBlock({
           }
         }
 
-        const { data, error } = await supabase
+        if (Object.keys(defaultsFromFilters).length > 0) {
+          Object.assign(newData, defaultsFromFilters)
+        }
+
+                const { data, error } = await supabase
           .from(table.supabase_table)
           .insert([newData])
           .select()
@@ -369,11 +385,8 @@ export default function GridBlock({
         const createdId = (data as any)?.id || (data as any)?.record_id
         if (!createdId) return
 
-        if (onRecordClick) {
-          onRecordClick(String(createdId))
-        } else {
-          window.location.href = `/tables/${tableId}/records/${createdId}`
-        }
+        // Contract: creating a record must NOT auto-open it.
+        // User can open via the dedicated chevron (or optional double-click) in the grid.
       } catch (error) {
         console.error('Failed to create record:', error)
         alert('Failed to create record. Please try again.')
@@ -476,6 +489,11 @@ export default function GridBlock({
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            dateFrom={calendarDateFrom}
+            dateTo={calendarDateTo}
+            onDateFromChange={setCalendarDateFrom}
+            onDateToChange={setCalendarDateTo}
+            showDateRangeControls={false}
           />
         )
       }
@@ -682,8 +700,7 @@ export default function GridBlock({
     <div className="h-full w-full overflow-auto" style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
-        (((appearance.showTitle ?? (appearance as any).show_title) !== false &&
-          (appearance.title || (isEditing ? config.title : table?.name))) ||
+        (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
           showAddRecord) && (
           <div
             className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
@@ -693,10 +710,9 @@ export default function GridBlock({
             }}
           >
             <div className="min-w-0 flex-1">
-              {((appearance.showTitle ?? (appearance as any).show_title) !== false &&
-                (appearance.title || (isEditing ? config.title : table?.name))) && (
+              {((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) && (
                 <h3 className="text-lg font-semibold truncate">
-                  {appearance.title || (isEditing ? config.title : table?.name)}
+                  {blockTitle}
                 </h3>
               )}
             </div>
@@ -716,8 +732,53 @@ export default function GridBlock({
           </div>
         )}
 
+      {(() => {
+        const showUnifiedCalendarHeader = !isEditing && viewType === "calendar"
+        if (!showUnifiedCalendarHeader) return null
+        const hasAnyDateField = (safeTableFields || []).some((f) => f && f.type === "date")
+
+        return (
+          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <QuickFilterBar
+                storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+                tableFields={safeTableFields}
+                viewDefaultFilters={viewDefaultFilters}
+                onChange={setUserQuickFilters}
+              />
+
+              {showAddRecord && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddRecord}
+                  disabled={isAddRecordDisabled}
+                  title={!canCreateRecord ? "Adding records is disabled for this block" : "Add a new record"}
+                  className="bg-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add record
+                </Button>
+              )}
+            </div>
+
+            {/* Date Range (calendar-only) */}
+            {hasAnyDateField && (
+              <CalendarDateRangeControls
+                dateFrom={calendarDateFrom}
+                dateTo={calendarDateTo}
+                onDateFromChange={setCalendarDateFrom}
+                onDateToChange={setCalendarDateTo}
+                disabled={false}
+              />
+            )}
+          </div>
+        )
+      })()}
+
       {/* New appearance wrapper active: it renders the title header. Keep Add record available without duplicating the title. */}
-      {wrapperHasAppearanceSettings && showAddRecord && (
+      {wrapperHasAppearanceSettings && showAddRecord && viewType !== "calendar" && (
         <div className="mb-3 flex justify-end">
           <Button
             type="button"
@@ -734,7 +795,7 @@ export default function GridBlock({
       )}
 
       {/* Airtable-style quick filters (session-only; never saved to the view) */}
-      {!isEditing && (
+      {!isEditing && viewType !== "calendar" && (
         <QuickFilterBar
           storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
           tableFields={safeTableFields}
@@ -747,3 +808,4 @@ export default function GridBlock({
     </div>
   )
 }
+

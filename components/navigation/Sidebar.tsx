@@ -221,7 +221,7 @@ export default async function Sidebar() {
         <h2 className="text-lg font-semibold">Marketing Hub</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="sidebar-scroll flex-1 overflow-y-auto p-4 space-y-4">
         {/* Quick Actions */}
         {userIsAdmin && (
           <div className="space-y-1 mb-4">
@@ -264,7 +264,7 @@ export default async function Sidebar() {
                     interfaceId={group.id}
                     interfaceName={group.name}
                     pages={pages}
-                    defaultCollapsed={group.collapsed}
+                    defaultCollapsed={true}
                     isAdmin={userIsAdmin}
                     icon={group.icon}
                   />
@@ -277,7 +277,7 @@ export default async function Sidebar() {
                 interfaceId="__ungrouped__"
                 interfaceName="Ungrouped"
                 pages={interfacePagesByGroup.get('__ungrouped__') || []}
-                defaultCollapsed={false}
+                defaultCollapsed={true}
                 isAdmin={userIsAdmin}
               />
             )}

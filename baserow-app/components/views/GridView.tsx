@@ -171,7 +171,8 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       const updatedData = { ...row.data, [fieldName]: value }
       await supabase
         .from("table_rows")
-        .update({ data: updatedData, updated_at: new Date().toISOString() })
+        // System-managed audit fields (updated_at/updated_by) are handled in DB triggers.
+        .update({ data: updatedData })
         .eq("id", rowId)
 
       loadRows()
@@ -185,11 +186,9 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
       const newRow = {
         table_id: tableId,
         data: {},
-        created_by: user?.id,
       }
 
       const { error } = await supabase.from("table_rows").insert([newRow])
@@ -314,7 +313,7 @@ function EditableCell({
       onClick={() => setEditing(true)}
       className="min-h-[32px] flex items-center cursor-pointer hover:bg-muted/50 px-2 rounded"
     >
-      {value || <span className="text-muted-foreground">Empty</span>}
+      {value || <span className="text-muted-foreground italic">—</span>}
     </div>
   )
 }

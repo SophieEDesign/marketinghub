@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared Filter System
  * Filters are defined once per page and passed down to blocks
  * All blocks use the same filter logic to generate SQL queries
@@ -7,6 +7,7 @@
 import type { BlockFilter } from './types'
 import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 import { applyFiltersToQuery as applyFiltersToQueryUnified } from '@/lib/filters/evaluation'
+import type { TableField } from '@/types/fields'
 
 export interface FilterConfig {
   field: string
@@ -234,3 +235,91 @@ export function mergePageAndBlockFilters(
   return mergeFilters(blockFilters, pageFilters, [])
 }
 
+
+function valuesLooselyEqual(a: any, b: any): boolean {
+  if (a === b) return true
+  if (a == null || b == null) return false
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+    return true
+  }
+  return false
+}
+
+/**
+ * Airtable-style: derive default field values from the *active* filters.
+ *
+ * Safety rules:
+ * - Only supports simple equality operators (currently: 'equal')
+ * - Only scalar values, or single-item arrays
+ * - Skips computed fields (formula/lookup) when tableFields are provided
+ * - If multiple eligible filters target the same field with conflicting values, that field is skipped
+ */
+export function deriveDefaultValuesFromFilters(
+  activeFilters: FilterConfig[] = [],
+  tableFields: TableField[] = []
+): Record<string, any> {
+  const safeFilters = Array.isArray(activeFilters) ? activeFilters : []
+  const safeFields = Array.isArray(tableFields) ? tableFields : []
+
+  const fieldByName = new Map<string, TableField>()
+  for (const f of safeFields) {
+    if (f?.name) fieldByName.set(f.name, f)
+  }
+
+  const defaults: Record<string, any> = {}
+  const conflicted = new Set<string>()
+
+  for (const f of safeFilters) {
+    if (!f || typeof f.field !== 'string' || f.field.trim() === '') continue
+    if (f.operator !== 'equal') continue
+
+    const fieldName = f.field
+    if (conflicted.has(fieldName)) continue
+
+    const field = fieldByName.get(fieldName)
+    if (field?.type === 'formula' || field?.type === 'lookup') continue
+
+    let value: any = f.value
+    if (Array.isArray(value)) {
+      if (value.length !== 1) continue
+      value = value[0]
+    }
+
+    if (value === undefined) continue
+    if (typeof value === 'string' && value.trim() === '') continue
+
+    // Minimal type-aware shaping for fields that store arrays.
+    if (field?.type === 'multi_select') {
+      value = [String(value)]
+    }
+
+    // Checkbox: accept 'true'/'false' strings (common from UI/query)
+    if (field?.type === 'checkbox' && typeof value === 'string') {
+      if (value === 'true') value = true
+      if (value === 'false') value = false
+    }
+
+    // Numeric-ish fields: accept number-like strings.
+    if (
+      (field?.type === 'number' || field?.type === 'percent' || field?.type === 'currency') &&
+      typeof value === 'string'
+    ) {
+      const n = Number(value)
+      if (Number.isFinite(n)) value = n
+    }
+
+    if (Object.prototype.hasOwnProperty.call(defaults, fieldName)) {
+      if (!valuesLooselyEqual(defaults[fieldName], value)) {
+        delete defaults[fieldName]
+        conflicted.add(fieldName)
+      }
+      continue
+    }
+
+    defaults[fieldName] = value
+  }
+
+  return defaults
+}

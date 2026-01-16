@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Save, Edit2, X, Copy, Trash2, MoreVertical } from "lucide-react"
+import { ArrowLeft, Trash2, MoreVertical } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
@@ -46,10 +46,8 @@ export default function RecordPageClient({
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [fieldsLoaded, setFieldsLoaded] = useState(false)
+  const [fieldsLoadError, setFieldsLoadError] = useState<string | null>(null)
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({})
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -63,57 +61,47 @@ export default function RecordPageClient({
 
   async function loadData() {
     setLoading(true)
+    setFieldsLoaded(false)
+    setFieldsLoadError(null)
     try {
       const supabase = createClient()
 
-      // Load record
-      const { data: recordData, error: recordError } = await supabase
-        .from(supabaseTableName)
-        .select("*")
-        .eq("id", recordId)
-        .single()
+      const [{ data: recordData, error: recordError }, { data: fieldsData, error: fieldsError }] =
+        await Promise.all([
+          supabase
+            .from(supabaseTableName)
+            .select("*")
+            .eq("id", recordId)
+            .single(),
+          supabase
+            .from("table_fields")
+            .select("*")
+            .eq("table_id", tableId)
+            .order("position"),
+        ])
 
       if (recordError) throw recordError
       setRecord(recordData)
-      setFormData(recordData || {})
 
-      // Load fields
-      const { data: fieldsData, error: fieldsError } = await supabase
-        .from("table_fields")
-        .select("*")
-        .eq("table_id", tableId)
-        .order("position")
-
-      if (!fieldsError && fieldsData) {
-        setFields(fieldsData as TableField[])
-      }
-
-      // Load field groups from table_fields (using group_name column)
-      // Field groups are stored as group_name on table_fields, not in a separate table
-      try {
-        const { data: fieldsWithGroups, error: groupsError } = await supabase
-          .from("table_fields")
-          .select("name, group_name")
-          .eq("table_id", tableId)
-          .not("group_name", "is", null)
-
-        if (!groupsError && fieldsWithGroups) {
-          const groups: Record<string, string[]> = {}
-          fieldsWithGroups.forEach((field: any) => {
-            if (field.group_name) {
-              if (!groups[field.group_name]) {
-                groups[field.group_name] = []
-              }
-              groups[field.group_name].push(field.name)
-            }
-          })
-          setFieldGroups(groups)
-        }
-      } catch (error) {
-        // Field groups may not be available - this is fine, continue without them
-        console.warn("Field groups not available:", error)
+      if (fieldsError) {
+        setFields([])
         setFieldGroups({})
+        setFieldsLoadError(fieldsError.message || "Failed to load fields")
+      } else {
+        const tableFields = (fieldsData || []) as TableField[]
+        setFields(tableFields)
+
+        const groups: Record<string, string[]> = {}
+        tableFields.forEach((field: any) => {
+          if (field.group_name) {
+            if (!groups[field.group_name]) groups[field.group_name] = []
+            groups[field.group_name].push(field.name)
+          }
+        })
+        setFieldGroups(groups)
       }
+
+      setFieldsLoaded(true)
     } catch (error: any) {
       console.error("Error loading record:", error)
       toast({
@@ -123,39 +111,6 @@ export default function RecordPageClient({
       })
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleSave() {
-    if (!record || !hasChanges) return
-
-    setSaving(true)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase
-        .from(supabaseTableName)
-        .update(formData)
-        .eq("id", recordId)
-
-      if (error) throw error
-
-      toast({
-        title: "Saved",
-        description: "Record updated successfully",
-      })
-
-      setEditing(false)
-      setHasChanges(false)
-      loadData()
-    } catch (error: any) {
-      console.error("Error saving record:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to save record",
-      })
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -189,25 +144,83 @@ export default function RecordPageClient({
     }
   }
 
-  function handleFieldChange(fieldName: string, value: any) {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }))
-    setHasChanges(true)
-  }
+  const fieldsByName = useMemo(() => {
+    const m = new Map<string, TableField>()
+    for (const f of fields) m.set(f.name, f)
+    return m
+  }, [fields])
 
-  function handleCopyId() {
-    navigator.clipboard.writeText(recordId)
-    toast({
-      title: "Copied",
-      description: "Record ID copied to clipboard",
-    })
-  }
+  const isFieldEditable = useCallback((fieldName: string) => {
+    const f = fieldsByName.get(fieldName)
+    if (!f) return false
+    if (f.options?.read_only) return false
+    if (f.type === "lookup" || f.type === "formula") return false
+    return true
+  }, [fieldsByName])
+
+  const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
+    // Optimistic UI update
+    setRecord((prev) => ({ ...(prev || {}), [fieldName]: value }))
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from(supabaseTableName)
+        .update({ [fieldName]: value })
+        .eq("id", recordId)
+
+      if (error) throw error
+    } catch (error: any) {
+      console.error("Error saving field:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save field",
+      })
+      // Re-sync from server after failure (avoids stale UI)
+      loadData()
+    }
+  }, [recordId, supabaseTableName, toast])
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-2"></div>
-          <p className="text-sm text-gray-500">Loading record...</p>
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-4 py-4 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
+            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-6xl mx-auto px-6 py-6">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="space-y-6 lg:col-span-2">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="h-4 w-1/3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 w-1/4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                  <div className="p-6 space-y-3">
+                    <div className="h-3 w-3/4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 w-2/3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -222,6 +235,32 @@ export default function RecordPageClient({
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Table
           </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!fieldsLoaded) {
+    return (
+      <div className="h-screen flex items-center justify-center text-gray-500 text-sm">
+        Loading…
+      </div>
+    )
+  }
+
+  if (fieldsLoadError) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <p className="text-lg font-semibold mb-2">Unable to load record</p>
+          <p className="text-sm text-gray-500 mb-4">{fieldsLoadError}</p>
+          <div className="flex items-center justify-center gap-2">
+            <Button variant="outline" onClick={() => router.push(`/tables/${tableId}`)}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Table
+            </Button>
+            <Button onClick={loadData}>Retry</Button>
+          </div>
         </div>
       </div>
     )
@@ -244,75 +283,32 @@ export default function RecordPageClient({
             </Button>
             <div className="min-w-0 flex-1">
               <h1 className="text-lg mobile:text-base font-semibold text-gray-900 truncate">
-                {isMobile && titleField && formData[titleField.name]
-                  ? String(formData[titleField.name]).substring(0, 30) + (String(formData[titleField.name]).length > 30 ? '...' : '')
-                  : tableName}
+                {titleField && record?.[titleField.name]
+                  ? String(record?.[titleField.name]).substring(0, 30) +
+                    (String(record?.[titleField.name]).length > 30 ? "..." : "")
+                  : "Untitled"}
               </h1>
-              {!isMobile && (
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Record {recordId.substring(0, 8)}...
-                </p>
-              )}
             </div>
           </div>
           {/* Desktop actions in header */}
           {!isMobile && (
             <div className="flex items-center gap-2">
-              {editing ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setEditing(false)
-                      setFormData({ ...record })
-                      setHasChanges(false)
-                    }}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreVertical className="h-4 w-4" />
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={!hasChanges || saving}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600"
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={handleCopyId}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy Record ID
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setShowDeleteDialog(true)}
-                        className="text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -337,7 +333,7 @@ export default function RecordPageClient({
                     {titleField.name}
                   </div>
                   <div className="text-base font-medium text-gray-900">
-                    {formData[titleField.name] ? String(formData[titleField.name]) : '—'}
+                    {record?.[titleField.name] ? String(record?.[titleField.name]) : '—'}
                   </div>
                 </div>
               )}
@@ -350,11 +346,13 @@ export default function RecordPageClient({
                 <div className="p-6 mobile:p-4">
                   <RecordFields
                     fields={isMobile ? fields.filter(f => f.id !== titleField?.id) : fields}
-                    formData={formData}
+                    formData={record || {}}
                     onFieldChange={handleFieldChange}
                     fieldGroups={fieldGroups}
                     tableId={tableId}
                     recordId={recordId}
+                    isFieldEditable={isFieldEditable}
+                    tableName={supabaseTableName}
                   />
                 </div>
               </div>
@@ -383,69 +381,7 @@ export default function RecordPageClient({
         </div>
       </div>
       
-      {/* Mobile action bar - sticky at bottom */}
-      {isMobile && (
-        <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between gap-2 z-20 shadow-lg">
-          {editing ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => {
-                  setEditing(false)
-                  setFormData({ ...record })
-                  setHasChanges(false)
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={handleSave}
-                disabled={!hasChanges || saving}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? "Saving..." : "Save"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setEditing(true)}
-              >
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleCopyId}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Record ID
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
-        </div>
-      )}
+      {/* Mobile action bar removed: no global edit mode; fields autosave inline. */}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -458,7 +394,7 @@ export default function RecordPageClient({
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
+              Close
             </Button>
             <Button
               onClick={handleDelete}

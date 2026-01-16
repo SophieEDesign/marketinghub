@@ -22,18 +22,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check permissions - admin or editor can bulk update
+    // Check permissions - admins or members (editors) can bulk update
     const admin = await isAdmin()
     if (!admin) {
-      // Check if user has editor role
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+
+      // Under RLS, non-admin users can only see their own profile,
+      // but we still filter by user_id for clarity.
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .single()
+        .eq('user_id', user.id)
+        .maybeSingle()
 
-      if (!profile || (profile.role !== 'admin' && profile.role !== 'editor')) {
+      // Support both current (admin/member) and legacy (admin/editor/viewer) role strings.
+      const role = profile?.role
+      const canBulkUpdate = role === 'admin' || role === 'member' || role === 'editor'
+
+      if (!canBulkUpdate) {
         return NextResponse.json(
-          { error: 'Unauthorized. Editor or admin access required.' },
+          { error: 'Unauthorized. Member/editor or admin access required.' },
           { status: 403 }
         )
       }

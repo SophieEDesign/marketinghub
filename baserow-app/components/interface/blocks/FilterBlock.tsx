@@ -279,14 +279,14 @@ export default function FilterBlock({
   // Apply appearance settings
   const appearance = config.appearance || {}
   const blockStyle: React.CSSProperties = {
-    backgroundColor: appearance.background_color,
-    borderColor: appearance.border_color,
+    backgroundColor: appearance.background_color || '#f9fafb', // Default light grey
+    borderColor: appearance.border_color || '#e5e7eb',
     borderWidth: appearance.border_width !== undefined ? `${appearance.border_width}px` : '1px',
     borderRadius: appearance.border_radius !== undefined ? `${appearance.border_radius}px` : '8px',
-    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '16px',
+    padding: appearance.padding !== undefined ? `${appearance.padding}px` : '0px', // No padding, we'll add it to inner elements
   }
 
-  const title = appearance.title || config.title || "Filter Control"
+  const title = appearance.title || config.title || "Filters"
   const showTitle = appearance.show_title !== false && title
 
   // Count conditions in filter tree
@@ -357,82 +357,48 @@ export default function FilterBlock({
   const isAtDefaults = JSON.stringify(filterTree) === JSON.stringify(defaultFilters)
 
   return (
-    <div className="h-full w-full overflow-auto flex flex-col" style={blockStyle}>
-      {showTitle && (
-        <div
-          className="mb-3 pb-2 border-b"
-          style={{
-            backgroundColor: appearance.header_background,
-            color: appearance.header_text_color || appearance.title_color,
-          }}
-        >
-          <h3 className="text-lg font-semibold">{title}</h3>
-        </div>
-      )}
-      
-      {/* Connection Status */}
-      {isEditing && (
-        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-blue-800">
-              <strong>Connected elements:</strong> {connectedBlocks.length === 0 ? 'None' : `${connectedBlocks.length} element${connectedBlocks.length !== 1 ? 's' : ''}`}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              onClick={() => {
-                // Open settings to manage connections
-                window.dispatchEvent(new CustomEvent('open-block-settings', { detail: { blockId: block.id } }))
-              }}
-            >
-              Manage
-            </Button>
+    <div className="h-full w-full overflow-auto flex flex-col rounded-lg border border-gray-200" style={blockStyle}>
+      {/* Header with title and Filtered button */}
+      <div className="flex items-center justify-between mb-4 px-4 pt-4">
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        {!isEmpty && (
+          <Button
+            onClick={() => isEditing && setIsModalOpen(true)}
+            variant="default"
+            size="sm"
+            className="h-7 px-3 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+            disabled={!isEditing}
+          >
+            <Filter className="h-3 w-3 mr-1.5" />
+            Filtered
+          </Button>
+        )}
+      </div>
+
+      {/* Filter Summary Section */}
+      {!isEmpty ? (
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-4 w-4 text-gray-600" />
+            <span className="text-sm text-gray-700">Filter results</span>
+            <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700 rounded-md px-1.5 py-0.5">
+              {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
+            </Badge>
+            <span className="text-xs text-gray-400 ml-auto">Default view</span>
+          </div>
+
+          {/* Info Message */}
+          <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
+            <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
+            <span>These filters refine results in connected elements.</span>
           </div>
         </div>
-      )}
-
-      {/* Filter Summary */}
-      {!isEmpty && (
-        <div className="mb-3">
-          {isEditing ? (
-            <Button
-              onClick={() => setIsModalOpen(true)}
-              variant="outline"
-              size="sm"
-              className="w-full justify-between text-sm"
-            >
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                <span>Filter results</span>
-                <Badge variant="secondary" className="text-xs">
-                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
-                </Badge>
-              </div>
-              <span className="text-gray-400">Edit filters</span>
-            </Button>
-          ) : (
-            <div className="w-full flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-600" />
-                <span className="text-gray-700">Filter results</span>
-                <Badge variant="secondary" className="text-xs">
-                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
-                </Badge>
-              </div>
-              <span className="text-xs text-gray-400">Default view</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {isEmpty && (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8">
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8 px-4">
           <div className="text-center">
             <Filter className="h-6 w-6 mx-auto mb-2 text-gray-300" />
-            <p className="mb-1">No filters applied</p>
-            <p className="text-xs">Add a condition to control connected elements</p>
+            <p className="mb-1 text-sm">No filters applied</p>
+            <p className="text-xs text-gray-500">Add a condition to control connected elements</p>
             {isEditing && (
               <Button
                 onClick={() => setIsModalOpen(true)}
@@ -447,13 +413,12 @@ export default function FilterBlock({
         </div>
       )}
 
-      {/* Info Message */}
-      {!isEmpty && connectedBlocks.length > 0 && (
-        <div className="mt-3 pt-2 border-t text-xs text-gray-500 flex items-start gap-2">
-          <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
-          <span>
-            These filters refine results in connected elements.
-          </span>
+      {/* Connection Status - only show in edit mode */}
+      {isEditing && connectedBlocks.length > 0 && (
+        <div className="px-4 pb-4 mt-auto">
+          <div className="text-xs text-gray-500">
+            Connected to {connectedBlocks.length} element{connectedBlocks.length !== 1 ? 's' : ''}
+          </div>
         </div>
       )}
 

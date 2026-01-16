@@ -337,6 +337,10 @@ export default function FieldBlock({
       }}
       onEditEnd={() => setIsEditingValue(false)}
       onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
+        // Never open the current record (self-link edge case)
+        if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) {
+          return
+        }
         window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
       }}
       onAddLinkedRecord={() => {

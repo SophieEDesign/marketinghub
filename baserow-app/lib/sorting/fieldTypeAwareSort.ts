@@ -16,6 +16,14 @@ export interface ViewSort {
   order_index?: number
 }
 
+function findFieldByName(tableFields: TableField[], fieldName: string): TableField | undefined {
+  if (!fieldName) return undefined
+  const direct = tableFields.find((f) => f?.name === fieldName)
+  if (direct) return direct
+  const lower = fieldName.toLowerCase()
+  return tableFields.find((f) => typeof f?.name === 'string' && f.name.toLowerCase() === lower)
+}
+
 /**
  * Sort rows based on field type
  */
@@ -43,7 +51,7 @@ export function sortRowsByFieldType(
   // so we apply sorts with highest order_index first, then lowest order_index last
   for (let i = sortedSorts.length - 1; i >= 0; i--) {
     const sort = sortedSorts[i]
-    const field = tableFields.find(f => f.name === sort.field_name)
+    const field = findFieldByName(tableFields, sort.field_name)
 
     if (!field) {
       // Field not found - skip this sort
@@ -51,9 +59,15 @@ export function sortRowsByFieldType(
     }
 
     sortedRows = sortedRows.sort((a, b) => {
+      // Prefer the exact key from the row if present; otherwise fall back to the field's canonical name.
+      const key =
+        Object.prototype.hasOwnProperty.call(a, sort.field_name) ||
+        Object.prototype.hasOwnProperty.call(b, sort.field_name)
+          ? sort.field_name
+          : field.name
       const comparison = compareValues(
-        a[sort.field_name],
-        b[sort.field_name],
+        (a as any)[key],
+        (b as any)[key],
         field,
         sort.direction === 'asc'
       )
@@ -160,7 +174,14 @@ function compareValues(
  * (i.e., cannot be sorted efficiently at the database level)
  */
 export function requiresClientSideSorting(fieldType: string): boolean {
-  return fieldType === 'single_select' || fieldType === 'multi_select'
+  // Virtual fields don't exist as physical DB columns (must sort after computing/expanding).
+  // Selects also need client-side sorting to respect choice order / first multi value.
+  return (
+    fieldType === 'single_select' ||
+    fieldType === 'multi_select' ||
+    fieldType === 'formula' ||
+    fieldType === 'lookup'
+  )
 }
 
 /**
@@ -172,7 +193,7 @@ export function shouldUseClientSideSorting(
 ): boolean {
   // Use client-side sorting if any sort field requires it
   return sorts.some(sort => {
-    const field = tableFields.find(f => f.name === sort.field_name)
+    const field = findFieldByName(tableFields, sort.field_name)
     return field && requiresClientSideSorting(field.type)
   })
 }

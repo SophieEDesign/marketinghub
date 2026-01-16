@@ -32,6 +32,8 @@ import type { Selection } from '@/lib/dataView/types'
 import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
 import { cn } from '@/lib/utils'
 import RecordModal from './RecordModal'
+import type { FilterType } from '@/types/database'
+import type { FilterConfig } from '@/lib/interface/filters'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -40,6 +42,12 @@ interface AirtableGridViewProps {
   tableId?: string // Table ID for opening records
   viewName?: string
   viewId?: string // View ID for saving/loading grid view settings
+  viewFilters?: Array<{
+    id?: string
+    field_name: string
+    operator: FilterType
+    value?: string
+  }>
   rowHeight?: 'short' | 'medium' | 'tall'
   editable?: boolean
   fields?: TableField[]
@@ -58,6 +66,7 @@ const HEADER_HEIGHT = 40
 const COLUMN_MIN_WIDTH = 100
 const COLUMN_DEFAULT_WIDTH = 200
 const FROZEN_COLUMN_WIDTH = 50
+const OPEN_RECORD_COLUMN_WIDTH = 32
 
 // Map row height values: 'compact' -> 'short', 'comfortable' -> 'tall'
 const mapRowHeightToAirtable = (height: string): 'short' | 'medium' | 'tall' => {
@@ -71,6 +80,7 @@ export default function AirtableGridView({
   tableId,
   viewName = 'default',
   viewId,
+  viewFilters = [],
   rowHeight = 'medium',
   editable = true,
   fields = [],
@@ -109,11 +119,11 @@ export default function AirtableGridView({
     }
   }, [tableIdState, tableName, disableRecordPanel])
 
-  const handleRowClick = useCallback((rowId: string) => {
-    if (!disableRecordPanel && tableIdState && tableName) {
-      // Open in modal instead of side panel
-      setModalRecord({ tableId: tableIdState, recordId: rowId, tableName })
-    }
+  const handleOpenRecord = useCallback((rowId: string) => {
+    if (disableRecordPanel) return
+    if (!tableIdState || !tableName) return
+    // Open in modal instead of side panel
+    setModalRecord({ tableId: tableIdState, recordId: rowId, tableName })
   }, [tableIdState, tableName, disableRecordPanel])
   
   // Map row height from props to internal format
@@ -160,9 +170,21 @@ export default function AirtableGridView({
   const searchQuery = searchParams.get("q") || ""
 
   // Load data
+  const standardizedFilters = useMemo<FilterConfig[]>(() => {
+    const safe = asArray(viewFilters)
+    return safe
+      .filter((f) => !!f && typeof f.field_name === 'string' && typeof f.operator === 'string')
+      .map((f) => ({
+        field: f.field_name,
+        operator: f.operator as any,
+        value: f.value ?? '',
+      }))
+  }, [viewFilters])
+
   const { rows: allRows, loading, error, updateCell, refresh } = useGridData({
     tableName,
     fields,
+    filters: standardizedFilters,
     sorts,
   })
 
@@ -651,12 +673,17 @@ export default function AirtableGridView({
   const visibleItems = renderItems.slice(startIndex, endIndex)
   const offsetTop = renderItems.slice(0, startIndex).reduce((sum, item) => sum + getItemHeight(item), 0)
 
-  // Calculate total width (checkbox + row number + columns + add button)
+  // Calculate total width (open chevron + checkbox + row number + columns + add button)
   const totalWidth = useMemo(() => {
     const columnsWidth = columnOrder.reduce((sum, fieldName) => {
       return sum + (columnWidths[fieldName] || COLUMN_DEFAULT_WIDTH)
     }, 0)
-    return FROZEN_COLUMN_WIDTH * 2 + columnsWidth + (onAddField ? FROZEN_COLUMN_WIDTH : 0)
+    return (
+      OPEN_RECORD_COLUMN_WIDTH +
+      (FROZEN_COLUMN_WIDTH * 2) +
+      columnsWidth +
+      (onAddField ? FROZEN_COLUMN_WIDTH : 0)
+    )
   }, [columnOrder, columnWidths, onAddField])
 
   // Handle wrap text toggle
@@ -896,10 +923,17 @@ export default function AirtableGridView({
         }}
       >
         <div className="flex" style={{ width: Math.max(totalWidth, 100), minWidth: 'max-content' }}>
-          {/* Checkbox column - sticky on all screen sizes */}
+          {/* Record open column (chevron) - sticky */}
           <div
             className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky left-0 z-20"
-            style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
+            style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: HEADER_HEIGHT }}
+            aria-hidden="true"
+          />
+
+          {/* Checkbox column - sticky */}
+          <div
+            className="flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center sticky z-20"
+            style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
             onClick={(e) => {
               e.stopPropagation()
               handleSelectAll(!isAllSelected)
@@ -922,9 +956,13 @@ export default function AirtableGridView({
           <div
             className={cn(
               "flex-shrink-0 border-r border-gray-100 bg-gray-50/50 flex items-center justify-center text-xs font-medium text-gray-500 z-20",
-              (isMobile || isTablet) && "sticky left-[50px]"
+              (isMobile || isTablet) && "sticky"
             )}
-            style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
+            style={{
+              width: FROZEN_COLUMN_WIDTH,
+              height: HEADER_HEIGHT,
+              left: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH,
+            }}
           >
             #
           </div>
@@ -1037,23 +1075,60 @@ export default function AirtableGridView({
                 <div
                   key={row.id}
                   className={`flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
-                    disableRecordPanel ? '' : 'cursor-pointer'
+                    'cursor-default'
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/30'
                   } ${isSelected ? 'bg-blue-50/50' : ''}`}
                   style={{ height: ROW_HEIGHT }}
                   onClick={(e) => {
-                    // Don't open panel if clicking checkbox or cell editor
                     const target = e.target as HTMLElement
-                    if (!disableRecordPanel && !target.closest('input[type="checkbox"]') && !target.closest('.cell-editor')) {
-                      handleRowClick(row.id)
-                    }
+                    // Contract: single click selects the row ONLY (never opens a record).
+                    // Ignore clicks originating from cells/editors/open button/checkbox.
+                    if (target.closest('[data-grid-open="true"]')) return
+                    if (target.closest('[data-grid-cell="true"]')) return
+                    if (target.closest('.cell-editor')) return
+                    if (target.closest('input[type="checkbox"]')) return
+
+                    handleRowSelect(row.id, rowIndex, e)
+                    setSelectedColumnId(null)
+                    setSelectedCell(null)
+                  }}
+                  onDoubleClick={(e) => {
+                    const target = e.target as HTMLElement
+                    // Optional: double-click row background opens record.
+                    if (target.closest('[data-grid-open="true"]')) return
+                    if (target.closest('[data-grid-cell="true"]')) return
+                    if (target.closest('.cell-editor')) return
+                    if (target.closest('input[type="checkbox"]')) return
+                    handleOpenRecord(row.id)
                   }}
                 >
-                  {/* Checkbox - sticky on all screen sizes */}
+                  {/* Record open chevron - FIRST column */}
                   <div
                     className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky left-0 z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      data-grid-open="true"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenRecord(row.id)
+                      }}
+                      className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/50 rounded transition-colors"
+                      title="Open record"
+                      aria-label="Open record"
+                      disabled={disableRecordPanel}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* Checkbox - sticky on all screen sizes */}
+                  <div
+                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center sticky z-10"
+                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRowSelect(row.id, rowIndex, e)
@@ -1076,8 +1151,12 @@ export default function AirtableGridView({
                   {/* Frozen row number */}
                   <div
                     ref={actualIndex === 0 ? frozenColumnRef : null}
-                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center text-xs text-gray-400 font-medium sticky left-[50px] z-10"
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    className="flex-shrink-0 border-r border-gray-100 bg-gray-50/30 flex items-center justify-center text-xs text-gray-400 font-medium sticky z-10"
+                    style={{
+                      width: FROZEN_COLUMN_WIDTH,
+                      height: ROW_HEIGHT,
+                      left: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH,
+                    }}
                   >
                     {actualIndex + 1}
                   </div>
@@ -1092,6 +1171,7 @@ export default function AirtableGridView({
                     return (
                       <div
                         key={field.name}
+                        data-grid-cell="true"
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
                           isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
                         }`}
@@ -1099,6 +1179,10 @@ export default function AirtableGridView({
                         onClick={() => {
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
+                        }}
+                        onDoubleClick={(e) => {
+                          // Prevent row double-click from opening record when interacting with a cell.
+                          e.stopPropagation()
                         }}
                       >
                         <div className="w-full h-full flex items-center overflow-hidden">

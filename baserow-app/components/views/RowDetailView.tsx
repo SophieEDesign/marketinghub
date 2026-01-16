@@ -1,14 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { X } from "lucide-react"
-import { format, parseISO, isValid } from "date-fns"
-import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import { CellFactory } from "@/components/grid/CellFactory"
 
 interface RowDetailViewProps {
   tableId: string
@@ -23,120 +21,95 @@ export default function RowDetailView({
   fieldIds,
   onClose,
 }: RowDetailViewProps) {
-  const [row, setRow] = useState<TableRow | null>(null)
+  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [rowData, setRowData] = useState<Record<string, any> | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [formData, setFormData] = useState<Record<string, any>>({})
+  const [error, setError] = useState<string | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
 
   useEffect(() => {
-    loadRow()
-    loadFields()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false
+    async function load() {
+      if (!tableId || !rowId) return
+      setLoading(true)
+      setError(null)
+      try {
+        // Resolve actual supabase table name
+        const tableRes = await supabase
+          .from("tables")
+          .select("supabase_table")
+          .eq("id", tableId)
+          .maybeSingle()
+
+        const tableName = tableRes.data?.supabase_table || null
+        if (cancelled) return
+        setSupabaseTableName(tableName)
+        if (!tableName) {
+          setRowData(null)
+          setError("Table not configured")
+          return
+        }
+
+        const fieldsRes = await supabase
+          .from("table_fields")
+          .select("*")
+          .eq("table_id", tableId)
+          .order("position")
+        if (!cancelled) setFields((fieldsRes.data as TableField[]) || [])
+
+        const rowRes = await supabase
+          .from(tableName)
+          .select("*")
+          .eq("id", rowId)
+          .maybeSingle()
+        if (cancelled) return
+        setRowData((rowRes.data as any) ?? null)
+        if (!rowRes.data) {
+          setError("Record not found")
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Failed to load record")
+          setRowData(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [rowId, tableId])
 
-  async function loadFields() {
-    try {
-      const { data, error } = await supabase
-        .from("table_fields")
-        .select("*")
-        .eq("table_id", tableId)
-        .order("position")
+  const isVirtualField = useCallback((field?: TableField | null) => {
+    return field?.type === "formula" || field?.type === "lookup"
+  }, [])
 
-      if (!error && data) {
-        setFields(data as TableField[])
-      }
-    } catch (error) {
-      console.error("Error loading fields:", error)
-    }
-  }
-
-  async function loadRow() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from("table_rows")
-      .select("*")
-      .eq("id", rowId)
-      .single()
-
-    if (data) {
-      setRow(data)
-      setFormData(data.data || {})
-    }
-    setLoading(false)
-  }
-
-  function formatFieldValue(fieldId: string, value: any): string {
-    if (value === null || value === undefined || value === "") {
-      return "—"
-    }
-
-    // Find the field definition
-    const field = fields.find((f) => f.id === fieldId || f.name === fieldId)
-    
-    // Format date fields
-    if (field?.type === "date") {
-      try {
-        let date: Date
-        if (typeof value === "string") {
-          // Try parsing as ISO first
-          if (value.includes("T") || value.includes("Z")) {
-            date = parseISO(value)
-          } else {
-            // Try parsing as date string
-            date = new Date(value)
-          }
-        } else if (value instanceof Date) {
-          date = value
-        } else {
-          date = new Date(value)
-        }
-        
-        if (isValid(date) && !isNaN(date.getTime())) {
-          return format(date, "MMM d, yyyy")
-        }
-      } catch {
-        // If parsing fails, return as string
-      }
-    }
-
-    return String(value)
-  }
-
-  function getFieldType(fieldId: string): string | null {
-    const field = fields.find((f) => f.id === fieldId || f.name === fieldId)
-    return field?.type || null
-  }
-
-  async function handleSave() {
-    if (!row) return
-
-    const { data: { user } } = await supabase.auth.getUser()
+  const handleCellSave = useCallback(async (fieldName: string, value: any) => {
+    if (!supabaseTableName) return
+    if (!rowId) return
     const { error } = await supabase
-      .from("table_rows")
-      .update({
-        data: formData,
-        updated_at: new Date().toISOString(),
-        updated_by: user?.id,
-      })
+      .from(supabaseTableName)
+      .update({ [fieldName]: value })
       .eq("id", rowId)
+    if (error) throw error
+    setRowData((prev) => ({ ...(prev || {}), [fieldName]: value }))
+  }, [rowId, supabaseTableName])
 
-    if (!error) {
-      setEditing(false)
-      loadRow()
-    }
-  }
-
-  function handleFieldChange(fieldId: string, value: any) {
-    setFormData((prev) => ({ ...prev, [fieldId]: value }))
-  }
+  const fieldDefs = useMemo(() => {
+    return (Array.isArray(fieldIds) ? fieldIds : []).map((fid) => {
+      const f = fields.find((x) => x.id === fid || x.name === fid) || null
+      return { fid, field: f, name: f?.name || String(fid) }
+    })
+  }, [fieldIds, fields])
 
   if (loading) {
-    return <div className="p-4">Loading...</div>
+    return <div className="p-4 text-sm text-gray-500">Loading…</div>
   }
 
-  if (!row) {
-    return <div className="p-4">Row not found</div>
+  if (error) {
+    return <div className="p-4 text-sm text-gray-500">{error}</div>
   }
 
   const content = (
@@ -145,77 +118,36 @@ export default function RowDetailView({
         <div className="flex items-center justify-between">
           <CardTitle>Row Details</CardTitle>
           <div className="flex gap-2">
-            {editing ? (
-              <>
-                <Button variant="outline" onClick={() => setEditing(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSave}>Save</Button>
-              </>
-            ) : (
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                Edit
-              </Button>
-            )}
             {onClose && (
-              <Button variant="ghost" size="icon" onClick={onClose}>
+              <button type="button" onClick={onClose} className="p-2 rounded hover:bg-gray-100" aria-label="Close">
                 <X className="h-4 w-4" />
-              </Button>
+              </button>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {fieldIds.map((fieldId) => {
-            const fieldType = getFieldType(fieldId)
-            const field = fields.find((f) => f.id === fieldId || f.name === fieldId)
-            const fieldName = field?.name || fieldId
-            
+          {fieldDefs.map(({ fid, field, name }) => {
+            const value = field && rowData ? (rowData as any)[field.name] : null
             return (
-              <div key={fieldId} className="space-y-2">
-                <label className="text-sm font-medium">{fieldName}</label>
-                {editing ? (
-                  fieldType === "date" ? (
-                    <input
-                      type="date"
-                      value={
-                        formData[fieldId]
-                          ? (() => {
-                              try {
-                                const dateValue = typeof formData[fieldId] === "string" 
-                                  ? parseISO(formData[fieldId]) 
-                                  : new Date(formData[fieldId])
-                                if (isValid(dateValue) && !isNaN(dateValue.getTime())) {
-                                  return format(dateValue, "yyyy-MM-dd")
-                                }
-                              } catch {
-                                // If parsing fails, return empty
-                              }
-                              return ""
-                            })()
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const dateValue = e.target.value
-                          ? new Date(e.target.value + "T00:00:00").toISOString()
-                          : null
-                        handleFieldChange(fieldId, dateValue)
-                      }}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <div key={String(fid)} className="space-y-2">
+                <label className="text-sm font-medium">{name}</label>
+                {field ? (
+                  <div className="min-h-[36px]" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+                    <CellFactory
+                      field={field}
+                      value={value}
+                      rowId={String(rowId)}
+                      tableName={supabaseTableName || ""}
+                      editable={!field.options?.read_only && !isVirtualField(field) && !!supabaseTableName}
+                      wrapText={true}
+                      rowHeight={40}
+                      onSave={(v) => handleCellSave(field.name, v)}
                     />
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData[fieldId] || ""}
-                      onChange={(e) => handleFieldChange(fieldId, e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    />
-                  )
-                ) : (
-                  <div className="text-sm text-muted-foreground p-2 bg-muted rounded">
-                    {formatFieldValue(fieldId, row.data[fieldId])}
                   </div>
+                ) : (
+                  <div className="text-sm text-gray-400 italic">—</div>
                 )}
               </div>
             )

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import React from "react"
@@ -28,7 +28,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import RecordModal from "./RecordModal"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
@@ -684,7 +684,7 @@ export default function GridView({
       const addBase = (name: string) => {
         if (!name) return
         const field = fieldByName.get(name) || fieldByLowerName.get(name.toLowerCase())
-        // If we don't have metadata, we can’t safely decide if it's virtual; skip to avoid select errors.
+        // If we don't have metadata, we canâ€™t safely decide if it's virtual; skip to avoid select errors.
         // (Fields should normally be in tableFields.)
         if (!field) return
         if (field.type === 'formula') {
@@ -767,14 +767,15 @@ export default function GridView({
         // Apply multiple sorts if needed
         for (let i = 0; i < safeViewSorts.length; i++) {
           const sort = safeViewSorts[i]
+          const orderColumn = quoteSelectIdent(sort.field_name)
           if (i === 0) {
-            query = query.order(sort.field_name, {
+            query = query.order(orderColumn, {
               ascending: sort.direction === "asc",
             })
           } else {
             // For additional sorts, we'd need to chain them
             // Supabase supports multiple order() calls
-            query = query.order(sort.field_name, {
+            query = query.order(orderColumn, {
               ascending: sort.direction === "asc",
             })
           }
@@ -920,6 +921,11 @@ export default function GridView({
         newRow[field.field_name] = null
       })
 
+      const defaultsFromFilters = deriveDefaultValuesFromFilters(safeFilters, safeTableFields)
+      if (Object.keys(defaultsFromFilters).length > 0) {
+        Object.assign(newRow, defaultsFromFilters)
+      }
+
       const { data, error } = await supabase
         .from(supabaseTableName)
         .insert([newRow])
@@ -933,10 +939,8 @@ export default function GridView({
         }
       } else {
         await loadRows()
-        // Open the new record in the global panel
-        if (data && data.id) {
-          openRecord(tableId, data.id, supabaseTableName)
-        }
+        // Contract: creating a row must NOT auto-open the record.
+        // User can open via the dedicated chevron (or optional row double-click).
       }
     } catch (error: any) {
       console.error("Error adding row:", error)
@@ -1725,3 +1729,4 @@ export default function GridView({
     </div>
   )
 }
+

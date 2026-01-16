@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight, Folder, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,11 +26,21 @@ export default function InterfaceSection({
   interfaceId,
   interfaceName,
   pages,
-  defaultCollapsed = false,
+  defaultCollapsed = true,
   isAdmin = false,
   icon,
 }: InterfaceSectionProps) {
-  const [isOpen, setIsOpen] = useState(!defaultCollapsed)
+  const pathname = usePathname()
+
+  const isActiveGroup = useMemo(() => {
+    if (!pathname) return false
+    return pages.some((p) => {
+      const href = `/pages/${p.id}`
+      return pathname === href || pathname.startsWith(`${href}/`)
+    })
+  }, [pathname, pages])
+
+  const [isOpen, setIsOpen] = useState(() => isActiveGroup || !defaultCollapsed)
   const [newPageWizardOpen, setNewPageWizardOpen] = useState(false)
 
   // Sort pages by order_index
@@ -51,6 +62,11 @@ export default function InterfaceSection({
     }
     return page.name
   }
+
+  // If the user navigates to a page inside this group, ensure the group is expanded.
+  useEffect(() => {
+    if (isActiveGroup) setIsOpen(true)
+  }, [isActiveGroup])
 
   return (
     <div className="space-y-1">

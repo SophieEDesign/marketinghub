@@ -8,6 +8,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
+import { ChevronRight } from "lucide-react"
+import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import { CellFactory } from "../grid/CellFactory"
 
 interface GalleryViewProps {
   tableId: string
@@ -38,9 +41,11 @@ export default function GalleryView({
   fitImageSize = false,
   blockConfig = {},
 }: GalleryViewProps) {
+  const { openRecord } = useRecordPanel()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
   // Resolve supabase table name
   useEffect(() => {
@@ -211,6 +216,33 @@ export default function GalleryView({
     return rows.filter((r) => ids.has(r.id))
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
+  const handleOpenRecord = useCallback((recordId: string) => {
+    if (onRecordClick) {
+      onRecordClick(recordId)
+      return
+    }
+    if (!supabaseTableName) return
+    openRecord(tableId, recordId, supabaseTableName)
+  }, [onRecordClick, openRecord, supabaseTableName, tableId])
+
+  const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
+    if (!supabaseTableName) return
+    const supabase = createClient()
+    const { error } = await supabase
+      .from(supabaseTableName)
+      .update({ [fieldName]: value })
+      .eq("id", rowId)
+    if (error) throw error
+
+    setRows((prev) =>
+      prev.map((r) =>
+        String(r.id) === String(rowId)
+          ? { ...r, data: { ...(r.data || {}), [fieldName]: value } as any }
+          : r
+      )
+    )
+  }, [supabaseTableName])
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
@@ -259,24 +291,20 @@ export default function GalleryView({
           const cardColor = getCardColor(row)
           const cardImage = getCardImage(row)
           const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: "4px" } : {}
-
-          const titleRaw = row.data?.[titleField]
-          const title = titleRaw !== undefined && titleRaw !== null && String(titleRaw).trim() !== "" ? String(titleRaw) : "Untitled"
+          const titleFieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
+            (f: any) => f?.name === titleField || f?.id === titleField
+          ) as TableField | undefined
+          const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
 
           return (
             <Card
               key={row.id}
-              className="cursor-pointer hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden"
+              className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden cursor-default ${
+                selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+              }`}
               style={borderColor}
-              onClick={() => {
-                if (onRecordClick) {
-                  onRecordClick(row.id)
-                  return
-                }
-                if (tableId) {
-                  window.location.href = `/tables/${tableId}/records/${row.id}`
-                }
-              }}
+              onClick={() => setSelectedCardId(String(row.id))}
+              onDoubleClick={() => handleOpenRecord(String(row.id))}
             >
               {cardImage && (
                 <div className={`w-full ${fitImageSize ? "h-auto" : "h-40"} bg-gray-100`}>
@@ -291,18 +319,63 @@ export default function GalleryView({
                 </div>
               )}
               <CardContent className="p-4 space-y-2">
-                <div className="text-sm font-semibold text-gray-900 line-clamp-2">{title}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2" onDoubleClick={(e) => e.stopPropagation()}>
+                    {titleFieldObj ? (
+                      <CellFactory
+                        field={titleFieldObj}
+                        value={titleValue}
+                        rowId={String(row.id)}
+                        tableName={supabaseTableName || ""}
+                        editable={!titleFieldObj.options?.read_only && titleFieldObj.type !== "formula" && titleFieldObj.type !== "lookup" && !!supabaseTableName}
+                        wrapText={true}
+                        rowHeight={32}
+                        onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
+                      />
+                    ) : (
+                      <span>{titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== "" ? String(titleValue) : "Untitled"}</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenRecord(String(row.id))
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
+                    title="Open record"
+                    aria-label="Open record"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
                 <div className="space-y-1">
                   {secondaryFields.map((fieldName) => {
                     const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
                       (f: any) => f.name === fieldName || f.id === fieldName
                     ) as TableField | undefined
                     const label = fieldObj?.name || fieldName
-                    const value = row.data?.[fieldObj?.name || fieldName]
+                    const fieldValue = row.data?.[fieldObj?.name || fieldName]
+                    const isVirtual = fieldObj?.type === "formula" || fieldObj?.type === "lookup"
                     return (
                       <div key={fieldName} className="text-xs text-gray-700">
                         <span className="text-gray-500 font-medium">{label}:</span>{" "}
-                        <span className="text-gray-900">{value === null || value === undefined || value === "" ? "—" : String(value)}</span>
+                        <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
+                          {fieldObj ? (
+                            <CellFactory
+                              field={fieldObj}
+                              value={fieldValue}
+                              rowId={String(row.id)}
+                              tableName={supabaseTableName || ""}
+                              editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
+                              wrapText={true}
+                              rowHeight={28}
+                              onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
+                            />
+                          ) : (
+                            <span>{fieldValue === null || fieldValue === undefined || fieldValue === "" ? "—" : String(fieldValue)}</span>
+                          )}
+                        </span>
                       </div>
                     )
                   })}

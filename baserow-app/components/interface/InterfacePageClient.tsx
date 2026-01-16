@@ -27,6 +27,11 @@ const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: fals
 // Lazy load RecordReviewPage for record_review pages
 const RecordReviewPage = dynamic(() => import("./RecordReviewPage"), { ssr: false })
 
+function quoteSelectIdent(name: string): string {
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
+
 interface InterfacePageClientProps {
   pageId: string
   initialPage?: InterfacePage
@@ -616,7 +621,7 @@ function InterfacePageClientInternal({
           const fieldName = sort.field_name || sort.field_id
           if (!fieldName) continue
           const ascending = sort.direction === 'asc' || sort.order_direction === 'asc'
-          query = query.order(fieldName, { ascending })
+          query = query.order(quoteSelectIdent(fieldName), { ascending })
         }
       } else {
         // Default sort by created_at descending
