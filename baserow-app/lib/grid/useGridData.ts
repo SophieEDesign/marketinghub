@@ -31,6 +31,13 @@ export interface UseGridDataReturn {
 const DEFAULT_LIMIT = 500
 const MAX_SAFE_LIMIT = 2000 // Hard cap to prevent crashes
 
+function quoteSelectIdent(name: string): string {
+  // PostgREST select supports quoted identifiers for columns with spaces/special chars.
+  // Escape embedded quotes by doubling them.
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
+
 export function useGridData({
   tableName,
   fields = [],
@@ -88,7 +95,19 @@ export function useGridData({
       const currentFilters = filtersRef.current
       const currentSorts = sortsRef.current
       
-      let query: any = supabase.from(tableName).select('*')
+      // If field metadata is provided, avoid over-fetching.
+      // Only select physical columns; virtual fields (formula/lookup) are computed elsewhere.
+      const safeFields = asArray<TableField>(fields)
+      const physicalFieldNames = safeFields
+        .filter((f) => f && typeof f === 'object' && f.name && f.type !== 'formula' && f.type !== 'lookup')
+        .map((f) => f.name)
+
+      const selectClause =
+        physicalFieldNames.length > 0
+          ? [quoteSelectIdent('id'), ...physicalFieldNames.map(quoteSelectIdent)].join(',')
+          : '*'
+
+      let query: any = supabase.from(tableName).select(selectClause)
 
       // Apply filters
       currentFilters.forEach((filter) => {

@@ -19,6 +19,10 @@ export type FilterType =
   | 'date_on_or_before'
   | 'date_on_or_after'
   | 'date_range'
+  | 'date_today'
+  | 'date_next_days'
+  | 'has'
+  | 'does_not_have'
 
 export type SortDirection = 'asc' | 'desc'
 

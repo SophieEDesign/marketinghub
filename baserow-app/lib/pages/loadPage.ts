@@ -1,13 +1,30 @@
 import { createClient } from '@/lib/supabase/server'
 import type { Page, PageBlock } from '@/lib/interface/types'
 
-export async function loadPage(pageId: string): Promise<Page | null> {
-  const supabase = await createClient()
+export async function loadPage(pageId: string, supabase?: any): Promise<Page | null> {
+  const client = supabase ?? (await createClient())
 
   // Load from views table where type='interface'
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from('views')
-    .select('*')
+    // Avoid over-fetching large configs / columns we never use during render.
+    .select(
+      [
+        'id',
+        'name',
+        'description',
+        'config',
+        'access_level',
+        'created_at',
+        'updated_at',
+        'owner_id',
+        'is_admin_only',
+        'group_id',
+        'default_view',
+        'hide_view_switcher',
+        'type',
+      ].join(',')
+    )
     .eq('id', pageId)
     .eq('type', 'interface')
     .single()
@@ -52,34 +69,31 @@ export async function loadPage(pageId: string): Promise<Page | null> {
  * - Otherwise assumes views.id (uses view_id)
  * - Ensures save/load symmetry
  */
-export async function loadPageBlocks(pageId: string): Promise<PageBlock[]> {
-  console.log('🔥 loadPageBlocks CALLED', pageId)
-  const supabase = await createClient()
+export async function loadPageBlocks(pageId: string, supabase?: any): Promise<PageBlock[]> {
+  const client = supabase ?? (await createClient())
 
-  // Check if this is an interface_pages.id or views.id
-  // Try interface_pages first (new system) - mirrors API route logic
-  const { data: page } = await supabase
-    .from('interface_pages')
-    .select('id')
-    .eq('id', pageId)
-    .maybeSingle()
-
-  let query
-  if (page) {
-    // This is an interface_pages.id - use page_id
-    query = supabase
-      .from('view_blocks')
-      .select('*')
-      .eq('page_id', pageId)
-      .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
-  } else {
-    // This is a views.id - use view_id (backward compatibility)
-    query = supabase
-      .from('view_blocks')
-      .select('*')
-      .eq('view_id', pageId)
-      .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
-  }
+  // Mirror GET /api/pages/[pageId]/blocks: match either page_id OR view_id.
+  // This avoids an extra roundtrip (interface_pages probe) on every page load.
+  const query = client
+    .from('view_blocks')
+    .select(
+      [
+        'id',
+        'page_id',
+        'view_id',
+        'type',
+        'position_x',
+        'position_y',
+        'width',
+        'height',
+        'config',
+        'order_index',
+        'created_at',
+        'updated_at',
+      ].join(',')
+    )
+    .or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
+    .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
 
   // CRITICAL: Order by order_index, then position_y, then position_x
   // This ensures consistent ordering for public and edit view
@@ -116,9 +130,11 @@ export async function loadPageWithBlocks(pageId: string): Promise<{
   page: Page | null
   blocks: PageBlock[]
 }> {
+  // Reuse one Supabase client (cookies read + client creation are non-trivial).
+  const supabase = await createClient()
   const [page, blocks] = await Promise.all([
-    loadPage(pageId),
-    loadPageBlocks(pageId),
+    loadPage(pageId, supabase),
+    loadPageBlocks(pageId, supabase),
   ])
 
   return { page, blocks }

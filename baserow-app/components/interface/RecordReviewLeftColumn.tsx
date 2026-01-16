@@ -20,6 +20,8 @@ import { Plus, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import CreateRecordModal from "@/components/records/CreateRecordModal"
+import { useToast } from "@/components/ui/use-toast"
 import { formatDateUK } from "@/lib/utils"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 
@@ -54,10 +56,12 @@ export default function RecordReviewLeftColumn({
   leftPanelSettings,
   pageType = 'record_review', // Default to record_review for backward compatibility
 }: RecordReviewLeftColumnProps) {
+  const { toast } = useToast()
   const [records, setRecords] = useState<any[]>([])
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [tableName, setTableName] = useState<string | null>(null)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
@@ -117,6 +121,17 @@ export default function RecordReviewLeftColumn({
     const field = fields.find(f => f.name === additionalFieldNameOrId)
     return field?.id || null
   }, [additionalFieldNameOrId, fields])
+
+  const primaryCreateField = useMemo(() => {
+    if (!isRecordView || !titleFieldId) return null
+    return fields.find((f) => f.id === titleFieldId) ?? null
+  }, [fields, isRecordView, titleFieldId])
+
+  const canPrefillPrimaryCreateField =
+    primaryCreateField?.type === "text" ||
+    primaryCreateField?.type === "long_text" ||
+    primaryCreateField?.type === "email" ||
+    primaryCreateField?.type === "url"
 
   // Load table name and fields
   useEffect(() => {
@@ -201,17 +216,29 @@ export default function RecordReviewLeftColumn({
     }
   }, [tableId, loadRecords])
 
-  const handleAddRecord = useCallback(async () => {
+  const handleOpenCreateModal = useCallback(() => {
     // Only enable this UX for record_view pages (requested)
+    if (!isRecordView) return
+    if (!showAddRecord || !supabaseTableName || creating) return
+    setCreateModalOpen(true)
+  }, [creating, isRecordView, showAddRecord, supabaseTableName])
+
+  const handleCreateRecord = useCallback(async (primaryValue: string) => {
     if (!isRecordView) return
     if (!showAddRecord || !supabaseTableName || creating) return
 
     setCreating(true)
     try {
       const supabase = createClient()
+      const newData: Record<string, any> = {}
+
+      if (canPrefillPrimaryCreateField && primaryCreateField?.name && primaryValue) {
+        newData[primaryCreateField.name] = primaryValue
+      }
+
       const { data, error } = await supabase
         .from(supabaseTableName)
-        .insert([{}])
+        .insert([newData])
         .select()
         .single()
 
@@ -224,13 +251,25 @@ export default function RecordReviewLeftColumn({
       setSearchQuery("")
       await loadRecords(supabaseTableName, "")
       onRecordSelect(String(createdId))
-    } catch (error: any) {
-      console.error("Failed to create record:", error)
-      alert(error?.message ? `Failed to create record: ${error.message}` : "Failed to create record. Please try again.")
+
+      toast({
+        title: "Record created",
+        description: "Your new record has been created.",
+      })
     } finally {
       setCreating(false)
     }
-  }, [creating, isRecordView, loadRecords, onRecordSelect, showAddRecord, supabaseTableName])
+  }, [
+    canPrefillPrimaryCreateField,
+    creating,
+    isRecordView,
+    loadRecords,
+    onRecordSelect,
+    primaryCreateField?.name,
+    showAddRecord,
+    supabaseTableName,
+    toast,
+  ])
 
   // Auto-select first record when records are loaded and no record is selected
   useEffect(() => {
@@ -352,7 +391,7 @@ export default function RecordReviewLeftColumn({
               variant="outline"
               size="icon"
               className="h-8 w-8 flex-shrink-0"
-              onClick={handleAddRecord}
+              onClick={handleOpenCreateModal}
               disabled={creating || !supabaseTableName}
               aria-label="Add record"
               title={!supabaseTableName ? "No table configured" : "Add a new record"}
@@ -362,6 +401,23 @@ export default function RecordReviewLeftColumn({
           )}
         </div>
       </div>
+
+      {/* Create record modal (record_view only) */}
+      {isRecordView && (
+        <CreateRecordModal
+          open={createModalOpen}
+          onOpenChange={setCreateModalOpen}
+          tableName={tableName || undefined}
+          primaryFieldLabel={canPrefillPrimaryCreateField ? primaryCreateField?.name : null}
+          primaryFieldPlaceholder={
+            canPrefillPrimaryCreateField && primaryCreateField?.name
+              ? `Enter ${primaryCreateField.name}`
+              : undefined
+          }
+          isSaving={creating}
+          onCreate={handleCreateRecord}
+        />
+      )}
 
       {/* Record List */}
       <div className="flex-1 overflow-y-auto">

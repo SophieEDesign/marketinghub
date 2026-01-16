@@ -33,7 +33,23 @@ export async function GET(
     // We use .or() to match either column, preventing silent filtering failures
     const { data, error } = await supabase
       .from('view_blocks')
-      .select('*')
+      // Only select what the API actually returns/uses (cuts payload and JSON parse time)
+      .select(
+        [
+          'id',
+          'page_id',
+          'view_id',
+          'type',
+          'position_x',
+          'position_y',
+          'width',
+          'height',
+          'config',
+          'order_index',
+          'created_at',
+          'updated_at',
+        ].join(',')
+      )
       .or(`page_id.eq.${pageId},view_id.eq.${pageId}`)
       .eq('is_archived', false) // CRITICAL: Only exclude archived blocks, not by status
       .order('order_index', { ascending: true })
@@ -42,23 +58,25 @@ export async function GET(
 
     // CRITICAL: Log query results for debugging
     // This confirms edit and public fetch identical block IDs + position values
-    console.log(`[API GET /blocks] pageId=${pageId}`, {
-      queryType: 'page_id OR view_id (both checked)',
-      dbRowCount: data?.length || 0,
-      blockIds: data?.map((b: any) => b.id) || [],
-      blockPositions: data?.map((b: any) => ({
-        id: b.id,
-        position_x: b.position_x,
-        position_y: b.position_y,
-        width: b.width,
-        height: b.height,
-      })) || [],
-      blocksWithPageId: data?.filter((b: any) => b.page_id === pageId).length || 0,
-      blocksWithViewId: data?.filter((b: any) => b.view_id === pageId).length || 0,
-      error: error?.message,
-      // CRITICAL: No status filtering - edit and public must see same blocks
-      note: 'No status filtering applied - edit and public fetch identical blocks',
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API GET /blocks] pageId=${pageId}`, {
+        queryType: 'page_id OR view_id (both checked)',
+        dbRowCount: data?.length || 0,
+        blockIds: data?.map((b: any) => b.id) || [],
+        blockPositions: data?.map((b: any) => ({
+          id: b.id,
+          position_x: b.position_x,
+          position_y: b.position_y,
+          width: b.width,
+          height: b.height,
+        })) || [],
+        blocksWithPageId: data?.filter((b: any) => b.page_id === pageId).length || 0,
+        blocksWithViewId: data?.filter((b: any) => b.view_id === pageId).length || 0,
+        error: error?.message,
+        // CRITICAL: No status filtering - edit and public must see same blocks
+        note: 'No status filtering applied - edit and public fetch identical blocks',
+      })
+    }
 
     if (error) {
       console.error(`[API GET /blocks] ERROR: pageId=${pageId}`, {
@@ -125,28 +143,31 @@ export async function GET(
 
     // CRITICAL: Log final response for debugging
     // This confirms edit and public receive identical block IDs + position values
-    console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
-      queryType: 'page_id OR view_id (both checked)',
-      dbRowCount: data?.length || 0,
-      blocksCount: blocks.length,
-      blockIds: blocks.map(b => b.id),
-      blockPositions: blocks.map(b => ({
-        id: b.id,
-        x: b.x,
-        y: b.y,
-        w: b.w,
-        h: b.h,
-      })),
-      blocks: blocks.length > 0 ? blocks : 'EMPTY ARRAY',
-      responseBody: { blocks },
-      // CRITICAL: Verify positions are included in response
-      positionsMatch: blocks.every(b => 
-        typeof b.x === 'number' && 
-        typeof b.y === 'number' && 
-        typeof b.w === 'number' && 
-        typeof b.h === 'number'
-      ),
-    })
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API GET /blocks] RESPONSE: pageId=${pageId}`, {
+        queryType: 'page_id OR view_id (both checked)',
+        dbRowCount: data?.length || 0,
+        blocksCount: blocks.length,
+        blockIds: blocks.map((b) => b.id),
+        blockPositions: blocks.map((b) => ({
+          id: b.id,
+          x: b.x,
+          y: b.y,
+          w: b.w,
+          h: b.h,
+        })),
+        blocks: blocks.length > 0 ? blocks : 'EMPTY ARRAY',
+        responseBody: { blocks },
+        // CRITICAL: Verify positions are included in response
+        positionsMatch: blocks.every(
+          (b) =>
+            typeof b.x === 'number' &&
+            typeof b.y === 'number' &&
+            typeof b.w === 'number' &&
+            typeof b.h === 'number'
+        ),
+      })
+    }
 
     // CRITICAL: Disable caching to prevent stale data
     // Add cache-busting headers to ensure fresh data on every request

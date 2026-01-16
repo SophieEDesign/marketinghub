@@ -31,6 +31,32 @@ function getLocalDayBoundsFromDateOnly(dateOnly: string): { startIso: string; ne
   return { startIso: start.toISOString(), nextDayStartIso: nextDayStart.toISOString() }
 }
 
+function getUtcDayBoundsFromDateOnly(dateOnly: string): { startIso: string; nextDayStartIso: string } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOnly)
+  if (!match) return null
+  const year = Number(match[1])
+  const monthIndex = Number(match[2]) - 1
+  const day = Number(match[3])
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || !Number.isFinite(day)) return null
+
+  const startMs = Date.UTC(year, monthIndex, day, 0, 0, 0, 0)
+  const nextDayStartMs = Date.UTC(year, monthIndex, day + 1, 0, 0, 0, 0)
+  if (!Number.isFinite(startMs) || !Number.isFinite(nextDayStartMs)) return null
+
+  const start = new Date(startMs)
+  const nextDayStart = new Date(nextDayStartMs)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(nextDayStart.getTime())) return null
+
+  return { startIso: start.toISOString(), nextDayStartIso: nextDayStart.toISOString() }
+}
+
+function toDateOnlyLocal(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /**
  * Convert a filter condition to a Supabase filter string
  * 
@@ -113,6 +139,30 @@ function conditionToSupabaseString(condition: FilterCondition): string {
         if (bounds) return `and(${fieldName}.gte.${bounds.startIso},${fieldName}.lt.${bounds.nextDayStartIso})`
       }
       return `${fieldName}.eq.${fieldValue}`
+    }
+    case 'date_today': {
+      const today = toDateOnlyLocal(new Date())
+      const bounds = getLocalDayBoundsFromDateOnly(today)
+      if (!bounds) return ''
+      return `and(${fieldName}.gte.${bounds.startIso},${fieldName}.lt.${bounds.nextDayStartIso})`
+    }
+    case 'date_next_days': {
+      const n = Number(value)
+      if (!Number.isFinite(n) || n < 0) return ''
+
+      const today = new Date()
+      const startDateOnly = toDateOnlyLocal(today)
+      const startBounds = getLocalDayBoundsFromDateOnly(startDateOnly)
+      if (!startBounds) return ''
+
+      // Inclusive of today and the next N days => end exclusive is start of day (today + N + 1)
+      const endExclusiveDateOnly = toDateOnlyLocal(
+        new Date(today.getFullYear(), today.getMonth(), today.getDate() + Math.floor(n) + 1)
+      )
+      const endBounds = getLocalDayBoundsFromDateOnly(endExclusiveDateOnly)
+      if (!endBounds) return ''
+
+      return `and(${fieldName}.gte.${startBounds.startIso},${fieldName}.lt.${endBounds.startIso})`
     }
     default:
       return ''
@@ -199,6 +249,31 @@ function applyCondition(
     case 'less_than_or_equal':
       return query.lte(fieldName, value)
       
+    case 'date_today': {
+      const today = toDateOnlyLocal(new Date())
+      const bounds = getLocalDayBoundsFromDateOnly(today)
+      if (bounds) return query.gte(fieldName, bounds.startIso).lt(fieldName, bounds.nextDayStartIso)
+      return query
+    }
+
+    case 'date_next_days': {
+      const n = Number(value)
+      if (!Number.isFinite(n) || n < 0) return query
+
+      const today = new Date()
+      const startDateOnly = toDateOnlyLocal(today)
+      const startBounds = getLocalDayBoundsFromDateOnly(startDateOnly)
+      if (!startBounds) return query
+
+      const endExclusiveDateOnly = toDateOnlyLocal(
+        new Date(today.getFullYear(), today.getMonth(), today.getDate() + Math.floor(n) + 1)
+      )
+      const endBounds = getLocalDayBoundsFromDateOnly(endExclusiveDateOnly)
+      if (!endBounds) return query
+
+      return query.gte(fieldName, startBounds.startIso).lt(fieldName, endBounds.startIso)
+    }
+
     case 'date_equal':
       if (isDateOnlyString(value)) {
         const bounds = getLocalDayBoundsFromDateOnly(value)

@@ -84,6 +84,25 @@ interface GridViewProps {
 
 const ITEMS_PER_PAGE = 100
 
+function quoteSelectIdent(name: string): string {
+  const safe = String(name).replace(/"/g, '""')
+  return `"${safe}"`
+}
+
+function extractCurlyFieldRefs(formula: string): string[] {
+  if (!formula || typeof formula !== 'string') return []
+  const refs: string[] = []
+  try {
+    for (const match of formula.matchAll(/\{([^}]+)\}/g)) {
+      const ref = (match[1] || '').trim()
+      if (ref) refs.push(ref)
+    }
+  } catch {
+    // ignore
+  }
+  return refs
+}
+
 // Draggable column header component with resize
 function DraggableColumnHeader({
   fieldName,
@@ -628,7 +647,98 @@ export default function GridView({
 
     setLoading(true)
     try {
-      let query = supabase.from(supabaseTableName).select("*")
+      // Build a minimal select list: visible fields + any fields referenced by filters/sorts/grouping/appearance,
+      // plus underlying dependencies needed to compute formula fields client-side.
+      const fieldByName = new Map<string, TableField>()
+      const fieldByLowerName = new Map<string, TableField>()
+      for (const f of safeTableFields) {
+        if (f && typeof f === 'object' && typeof f.name === 'string' && f.name.trim()) {
+          fieldByName.set(f.name, f)
+          fieldByLowerName.set(f.name.toLowerCase(), f)
+        }
+      }
+
+      const requiredNames = new Set<string>()
+      // Visible columns
+      visibleFields.forEach((vf) => {
+        if (vf?.field_name) requiredNames.add(vf.field_name)
+      })
+      // Filters / sorts / grouping
+      safeFilters.forEach((f) => {
+        if (f?.field) requiredNames.add(f.field)
+      })
+      safeViewFilters.forEach((f) => {
+        if (f?.field_name) requiredNames.add(f.field_name)
+      })
+      safeViewSorts.forEach((s) => {
+        if (s?.field_name) requiredNames.add(s.field_name)
+      })
+      if (groupBy) requiredNames.add(groupBy)
+      if (colorField) requiredNames.add(colorField)
+      if (imageField) requiredNames.add(imageField)
+
+      // Expand formula dependencies (brace refs) for formulas that are actually needed.
+      const neededFormulaNames = new Set<string>()
+      const baseColumnNames = new Set<string>()
+
+      const addBase = (name: string) => {
+        if (!name) return
+        const field = fieldByName.get(name) || fieldByLowerName.get(name.toLowerCase())
+        // If we don't have metadata, we can’t safely decide if it's virtual; skip to avoid select errors.
+        // (Fields should normally be in tableFields.)
+        if (!field) return
+        if (field.type === 'formula') {
+          neededFormulaNames.add(field.name)
+          return
+        }
+        if (field.type === 'lookup') {
+          return
+        }
+        baseColumnNames.add(field.name)
+      }
+
+      requiredNames.forEach(addBase)
+
+      const visitedFormula = new Set<string>()
+      const expandFormula = (formulaFieldName: string) => {
+        if (!formulaFieldName || visitedFormula.has(formulaFieldName)) return
+        visitedFormula.add(formulaFieldName)
+        const formulaField = fieldByName.get(formulaFieldName) || fieldByLowerName.get(formulaFieldName.toLowerCase())
+        const formula = formulaField?.options?.formula
+        if (!formulaField || formulaField.type !== 'formula' || typeof formula !== 'string') return
+
+        const refs = extractCurlyFieldRefs(formula)
+        for (const ref of refs) {
+          const refField = fieldByName.get(ref) || fieldByLowerName.get(ref.toLowerCase())
+          if (!refField) continue
+          if (refField.type === 'formula') {
+            neededFormulaNames.add(refField.name)
+            expandFormula(refField.name)
+          } else if (refField.type !== 'lookup') {
+            baseColumnNames.add(refField.name)
+          }
+        }
+      }
+
+      // Closure: formulas referenced by needed formulas
+      Array.from(neededFormulaNames).forEach(expandFormula)
+
+      // Always fetch id
+      baseColumnNames.add('id')
+
+      // Safety fallback: if we know we need specific fields but can't map them to metadata yet,
+      // fall back to "*" to avoid rendering empty cells due to under-fetching.
+      const isOnlyIdSelected = baseColumnNames.size === 1 && baseColumnNames.has('id')
+      const shouldFallbackToStar = isOnlyIdSelected && requiredNames.size > 0
+
+      const selectClause = shouldFallbackToStar
+        ? '*'
+        : Array.from(baseColumnNames)
+            .filter((n) => typeof n === 'string' && n.trim().length > 0)
+            .map(quoteSelectIdent)
+            .join(',')
+
+      let query = supabase.from(supabaseTableName).select(selectClause || '*')
 
       // Use standardized filters if provided, otherwise fall back to viewFilters format
       if (safeFilters.length > 0) {
@@ -736,11 +846,15 @@ export default function GridView({
         // CRITICAL: Normalize data to array - API might return single record or null
         let dataArray = asArray<Record<string, any>>(data)
         
-        // Compute formula fields for each row
-        const formulaFields = safeTableFields.filter(f => f.type === 'formula')
-        let computedRows = dataArray.map(row => 
-          computeFormulaFields(row, formulaFields, safeTableFields)
+        // Compute only formula fields that are actually needed by the view (visible/sort/filter/grouping/appearance),
+        // plus any formula-to-formula dependencies (computed via the closure above).
+        const formulaFieldsToCompute = safeTableFields.filter(
+          (f) => f.type === 'formula' && neededFormulaNames.has(f.name)
         )
+        let computedRows =
+          formulaFieldsToCompute.length > 0
+            ? dataArray.map((row) => computeFormulaFields(row, formulaFieldsToCompute, safeTableFields))
+            : dataArray
         
         // Apply client-side sorting if needed (for single_select by order, multi_select by first value)
         if (needsClientSideSort && safeViewSorts.length > 0) {

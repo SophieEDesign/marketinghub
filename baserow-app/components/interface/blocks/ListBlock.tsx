@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import ListView from "@/components/views/ListView"
@@ -16,6 +16,8 @@ import type { TableField } from "@/types/fields"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
+import CreateRecordModal from "@/components/records/CreateRecordModal"
+import { useToast } from "@/components/ui/use-toast"
 
 interface ListBlockProps {
   block: PageBlock
@@ -36,6 +38,7 @@ export default function ListBlock({
   onRecordClick,
   pageShowAddRecord = false,
 }: ListBlockProps) {
+  const { toast } = useToast()
   const { config } = block
   const tableId = config?.table_id || pageTableId || config?.base_table || null
   const viewId = config?.view_id
@@ -58,6 +61,8 @@ export default function ListBlock({
   }, [viewFiltersWithUserOverrides, filters])
 
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
   const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   
@@ -189,6 +194,17 @@ export default function ListBlock({
   const pillFields = config.list_pill_fields || []
   const metaFields = config.list_meta_fields || []
 
+  const titleFieldObj = useMemo(() => {
+    if (!titleField) return null
+    return safeTableFields.find((f) => f.name === titleField || f.id === titleField) ?? null
+  }, [safeTableFields, titleField])
+
+  const canPrefillTitle =
+    titleFieldObj?.type === "text" ||
+    titleFieldObj?.type === "long_text" ||
+    titleFieldObj?.type === "email" ||
+    titleFieldObj?.type === "url"
+
   // Apply appearance settings
   const appearance = config.appearance || {}
   const blockStyle: React.CSSProperties = {
@@ -207,28 +223,58 @@ export default function ListBlock({
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const canCreateRecord = !isViewOnly && allowInlineCreate
 
-  const handleAddRecord = async () => {
+  const handleOpenCreateModal = () => {
     if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+    if (creating) return
+    setCreateModalOpen(true)
+  }
+
+  const handleCreateRecord = useCallback(async (primaryValue: string) => {
+    if (!showAddRecord || !canCreateRecord || isLoading || !table || !tableId) return
+    if (creating) return
+
+    setCreating(true)
     try {
       const supabase = createClient()
+      const newData: Record<string, any> = {}
+
+      if (canPrefillTitle && titleFieldObj?.name && primaryValue) {
+        newData[titleFieldObj.name] = primaryValue
+      }
+
       const { data, error } = await supabase
         .from(table.supabase_table)
-        .insert([{}])
+        .insert([newData])
         .select()
         .single()
+
       if (error) throw error
+
       const createdId = (data as any)?.id || (data as any)?.record_id
       if (!createdId) return
+
+      toast({ title: "Record created" })
+
       if (onRecordClick) {
         onRecordClick(String(createdId))
       } else {
         window.location.href = `/tables/${tableId}/records/${createdId}`
       }
-    } catch (error) {
-      console.error('Failed to create record:', error)
-      alert('Failed to create record. Please try again.')
+    } finally {
+      setCreating(false)
     }
-  }
+  }, [
+    canCreateRecord,
+    canPrefillTitle,
+    creating,
+    isLoading,
+    onRecordClick,
+    showAddRecord,
+    table,
+    tableId,
+    titleFieldObj?.name,
+    toast,
+  ])
 
   // Check if title field is configured
   if (!titleField && !isEditing) {
@@ -244,6 +290,17 @@ export default function ListBlock({
 
   return (
     <div className="h-full w-full overflow-auto" style={blockStyle}>
+      <CreateRecordModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        tableName={table?.name || undefined}
+        primaryFieldLabel={canPrefillTitle ? (titleFieldObj?.name || null) : null}
+        primaryFieldPlaceholder={
+          canPrefillTitle && titleFieldObj?.name ? `Enter ${titleFieldObj.name}` : undefined
+        }
+        isSaving={creating}
+        onCreate={handleCreateRecord}
+      />
       {(((appearance.showTitle ?? (appearance as any).show_title) !== false && (appearance.title || (isEditing ? config.title : table?.name))) || showAddRecord) && (
         <div
           className="mb-4 pb-2 border-b flex items-center justify-between gap-3"
@@ -262,8 +319,8 @@ export default function ListBlock({
               type="button"
               size="sm"
               variant="outline"
-              onClick={handleAddRecord}
-              disabled={!canCreateRecord || isLoading || !table || !tableId}
+              onClick={handleOpenCreateModal}
+              disabled={!canCreateRecord || isLoading || !table || !tableId || creating}
               title={!canCreateRecord ? 'Adding records is disabled for this block' : 'Add a new record'}
             >
               <Plus className="h-4 w-4 mr-2" />
