@@ -312,7 +312,7 @@ export default function FilterBuilder({
     path: number[],
     isFirst: boolean = true,
     parentOperator?: GroupOperator
-  ) => {
+  ) {
     const pathKey = path.join(',')
     const isCollapsed = isGroupCollapsed(path)
     const isEmpty = group.children.length === 0
