@@ -26,9 +26,21 @@ export default function MultiCalendarBlock({
   onRecordClick,
   pageShowAddRecord = false,
 }: MultiCalendarBlockProps) {
-  const sources = Array.isArray((block.config as any)?.sources)
+  const rawSources = Array.isArray((block.config as any)?.sources)
     ? ((block.config as any).sources as any[])
     : []
+
+  // Backward compatibility: normalize legacy/camelCase keys for older saved configs.
+  const sources = rawSources.map((s: any) => ({
+    ...s,
+    table_id: s?.table_id ?? s?.tableId ?? s?.table ?? "",
+    view_id: s?.view_id ?? s?.viewId,
+    title_field: s?.title_field ?? s?.titleField ?? s?.title ?? "",
+    start_date_field: s?.start_date_field ?? s?.startDateField ?? s?.start_date ?? "",
+    end_date_field: s?.end_date_field ?? s?.endDateField ?? s?.end_date,
+    color_field: s?.color_field ?? s?.colorField,
+    type_field: s?.type_field ?? s?.typeField,
+  }))
 
   if (sources.length === 0) {
     return (

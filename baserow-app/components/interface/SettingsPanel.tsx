@@ -88,6 +88,45 @@ export default function SettingsPanel({
   const previousConfigRef = useRef<string>("")
   const isInitialLoadRef = useRef(true)
 
+  const normalizeMultiSources = useCallback((sources: any[]) => {
+    if (!Array.isArray(sources)) return []
+    return sources.map((s: any) => {
+      if (!s || typeof s !== "object") return s
+      return {
+        ...s,
+        table_id: s.table_id ?? s.tableId ?? s.table ?? "",
+        view_id: s.view_id ?? s.viewId,
+        title_field: s.title_field ?? s.titleField ?? s.title ?? "",
+        start_date_field: s.start_date_field ?? s.startDateField ?? s.start_date ?? "",
+        end_date_field: s.end_date_field ?? s.endDateField ?? s.end_date,
+        color_field: s.color_field ?? s.colorField,
+        type_field: s.type_field ?? s.typeField,
+      }
+    })
+  }, [])
+
+  const normalizeConfigForValidation = useCallback(
+    (blockType: BlockType | undefined, cfg: BlockConfig): BlockConfig => {
+      const next = { ...(cfg || {}) } as any
+
+      // Normalize legacy table ID keys
+      const legacyTableId = next?.tableId
+      const fallbackTableId =
+        next?.table_id || legacyTableId || pageTableId || next?.base_table || undefined
+      if (!next.table_id && fallbackTableId) {
+        next.table_id = fallbackTableId
+      }
+
+      // Normalize multi-source shapes (camelCase → snake_case)
+      if ((blockType === "multi_calendar" || blockType === "multi_timeline") && Array.isArray(next.sources)) {
+        next.sources = normalizeMultiSources(next.sources)
+      }
+
+      return next as BlockConfig
+    },
+    [normalizeMultiSources, pageTableId]
+  )
+
   // Initialize config from block - only when block changes or panel opens
   useEffect(() => {
     if (block && isOpen) {
@@ -112,6 +151,14 @@ export default function SettingsPanel({
         blockConfig.table_id = fallbackTableId
       }
 
+      // Normalize multi-source blocks so settings/validation work with legacy saved configs.
+      if (
+        (block.type === "multi_calendar" || block.type === "multi_timeline") &&
+        Array.isArray((blockConfig as any).sources)
+      ) {
+        ;(blockConfig as any).sources = normalizeMultiSources((blockConfig as any).sources)
+      }
+
       // Ensure calendar/kanban/timeline/table blocks have the correct view_type
       if (block.type === 'calendar' && !blockConfig.view_type) {
         blockConfig.view_type = 'calendar'
@@ -129,7 +176,7 @@ export default function SettingsPanel({
       previousConfigRef.current = JSON.stringify(blockConfig)
       isInitialLoadRef.current = true
     }
-  }, [block?.id, isOpen, pageTableId])
+  }, [block?.id, isOpen, pageTableId, normalizeMultiSources])
 
   // Reset initial load flag after a short delay to allow initial render
   useEffect(() => {
@@ -215,6 +262,9 @@ export default function SettingsPanel({
     if (!safeConfig.table_id && fallbackTableId) {
       safeConfig = { ...safeConfig, table_id: fallbackTableId }
     }
+
+    // Normalize legacy multi-source config keys before validation + save.
+    safeConfig = normalizeConfigForValidation(block.type, safeConfig)
     
     // Validate config before saving
     const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
@@ -262,7 +312,7 @@ export default function SettingsPanel({
     } finally {
       setSaving(false)
     }
-  }, [block, onSave, toast, pageTableId])
+  }, [block, onSave, toast, pageTableId, normalizeConfigForValidation])
 
   // Validate config on change (for UI feedback)
   useEffect(() => {
@@ -270,12 +320,13 @@ export default function SettingsPanel({
     
     const validateConfig = async () => {
       const { validateBlockConfig } = await import("@/lib/interface/block-config-types")
-      const validation = validateBlockConfig(block.type, config)
+      const normalized = normalizeConfigForValidation(block.type, config)
+      const validation = validateBlockConfig(block.type, normalized)
       setValidationErrors(validation.errors)
     }
     
     validateConfig()
-  }, [config, block, isOpen])
+  }, [config, block, isOpen, normalizeConfigForValidation])
 
   // Auto-save disabled - settings only save when Save button is clicked
   // This prevents loops and ensures settings are only saved when user explicitly saves

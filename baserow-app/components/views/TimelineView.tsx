@@ -96,6 +96,9 @@ export default function TimelineView({
   const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
   const [dragStartPos, setDragStartPos] = useState<{ x: number; startDate: Date; endDate: Date } | null>(null)
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { start?: Date; end?: Date }>>({})
+  // Avoid opening a record due to the synthetic click fired after drag/resize.
+  const justInteractedEventIdRef = useRef<string | null>(null)
+  const justInteractedAtRef = useRef<number>(0)
 
   // Get table name for opening records
   const [supabaseTableName, setSupabaseTableName] = useState<string>("")
@@ -781,13 +784,23 @@ export default function TimelineView({
   }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
-    // Don't change selection if we're resizing/dragging.
+    // Don't open/select if we're resizing/dragging.
     if (resizingEvent || draggingEvent) {
       e.stopPropagation()
       return
     }
+
+    // If we just finished a drag/resize on this event, ignore the follow-up click.
+    if (
+      justInteractedEventIdRef.current === event.id &&
+      Date.now() - justInteractedAtRef.current < 250
+    ) {
+      return
+    }
+
     setSelectedEventId(event.rowId)
-  }, [draggingEvent, resizingEvent])
+    handleOpenEventRecord(event.rowId)
+  }, [draggingEvent, handleOpenEventRecord, resizingEvent])
 
   // Handle event date updates
   const handleEventUpdate = useCallback(
@@ -925,6 +938,8 @@ export default function TimelineView({
             end: event.end,
           })
         }
+        justInteractedEventIdRef.current = draggingEvent
+        justInteractedAtRef.current = Date.now()
         // Clear optimistic update after save
         setOptimisticUpdates((prev) => {
           const next = { ...prev }
@@ -942,6 +957,8 @@ export default function TimelineView({
             await handleEventUpdate(resizingEvent.id, { end: event.end })
           }
         }
+        justInteractedEventIdRef.current = resizingEvent.id
+        justInteractedAtRef.current = Date.now()
         // Clear optimistic update after save
         setOptimisticUpdates((prev) => {
           const next = { ...prev }

@@ -69,6 +69,8 @@ export default function BlockRenderer({
   hideEditButton = false,
   allBlocks = [],
 }: BlockRendererProps) {
+  const diagnosticsEnabled = process.env.NODE_ENV === 'development'
+
   // Normalize config to prevent crashes
   const safeConfig = normalizeBlockConfig(block.type, block.config)
   
@@ -121,7 +123,7 @@ export default function BlockRenderer({
     }) && !isEditing) {
       // Return setup UI component (blocks handle this internally)
       // But log for diagnostics
-      if (!warnedBlocks.has(block.id)) {
+      if (diagnosticsEnabled && canEdit && !warnedBlocks.has(block.id)) {
         console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) showing setup UI: ${blockValidity.reason}`)
         warnedBlocks.add(block.id)
       }
@@ -133,7 +135,7 @@ export default function BlockRenderer({
     // Deployment safety: Warn (don't crash) if required config is missing
     // Only warn once per block to avoid console spam
     // Image blocks are always valid (can be empty), so skip warning for them
-    if (!isComplete && !isEditing && normalizedBlockType !== 'image' && !warnedBlocks.has(block.id)) {
+    if (diagnosticsEnabled && canEdit && !isComplete && normalizedBlockType !== 'image' && !warnedBlocks.has(block.id)) {
       // In view mode, log warning but still attempt to render
       console.warn(`[BlockGuard] Block ${block.id} (${normalizedBlockType}) has incomplete config:`, safeConfig)
       warnedBlocks.add(block.id)

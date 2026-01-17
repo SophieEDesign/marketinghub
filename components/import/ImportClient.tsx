@@ -15,6 +15,7 @@ export default function ImportClient() {
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
   const [tableName, setTableName] = useState("")
+  const [ignoredColumns, setIgnoredColumns] = useState<Record<string, boolean>>({})
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
@@ -33,6 +34,7 @@ export default function ImportClient() {
     try {
       const parsed = await parseCSV(selectedFile)
       setParsedData(parsed)
+      setIgnoredColumns({})
       
       // Auto-generate table name from filename
       const nameFromFile = sanitizeTableName(selectedFile.name.replace('.csv', ''))
@@ -79,6 +81,12 @@ export default function ImportClient() {
       return
     }
 
+    const includedColumns = parsedData.columns.filter(col => !ignoredColumns[col.name])
+    if (includedColumns.length === 0) {
+      setError('Please select at least one column to import (uncheck “Ignore” on a column).')
+      return
+    }
+
     setStatus('importing')
     setError(null)
     setProgress('Creating table structure...')
@@ -87,7 +95,7 @@ export default function ImportClient() {
       // 1. Create Supabase table
       const createResult = await createSupabaseTable(
         sanitizedName,
-        parsedData.columns.map(col => ({
+        includedColumns.map(col => ({
           name: col.sanitizedName,
           type: col.type,
         }))
@@ -103,7 +111,7 @@ export default function ImportClient() {
       // Map original column names to sanitized names for type lookup
       const columnTypes: Record<string, 'text' | 'number' | 'boolean' | 'date' | 'single_select' | 'multi_select'> = {}
       const columnNameMap: Record<string, string> = {}
-      parsedData.columns.forEach(col => {
+      includedColumns.forEach(col => {
         columnTypes[col.sanitizedName] = col.type
         columnNameMap[col.name] = col.sanitizedName
       })
@@ -125,7 +133,7 @@ export default function ImportClient() {
       const metadataResult = await createImportMetadata(
         sanitizedName,
         tableName.trim(),
-        parsedData.columns,
+        includedColumns,
         parsedData.rows
       )
 
@@ -212,6 +220,11 @@ export default function ImportClient() {
 
           <div className="space-y-2">
             <h3 className="text-lg font-semibold">Preview</h3>
+            <p className="text-sm text-muted-foreground">
+              Columns: {parsedData.columns.length} total •{' '}
+              {parsedData.columns.filter(c => !ignoredColumns[c.name]).length} importing •{' '}
+              {parsedData.columns.filter(c => ignoredColumns[c.name]).length} ignored
+            </p>
             <div className="border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -219,8 +232,25 @@ export default function ImportClient() {
                     <tr>
                       {parsedData.columns.map((col) => (
                         <th key={col.name} className="px-4 py-2 text-left font-semibold text-gray-700">
-                          {col.name}
-                          <span className="ml-2 text-xs text-gray-500">({col.type})</span>
+                          <div className="flex items-start gap-3">
+                            <div className={ignoredColumns[col.name] ? "opacity-60" : ""}>
+                              {col.name}
+                              <span className="ml-2 text-xs text-gray-500">({col.type})</span>
+                            </div>
+                            <label className="ml-auto flex items-center gap-1 text-xs font-normal text-gray-600">
+                              <input
+                                type="checkbox"
+                                checked={!!ignoredColumns[col.name]}
+                                onChange={(e) =>
+                                  setIgnoredColumns((prev) => ({
+                                    ...prev,
+                                    [col.name]: e.target.checked,
+                                  }))
+                                }
+                              />
+                              Ignore
+                            </label>
+                          </div>
                         </th>
                       ))}
                     </tr>
@@ -229,7 +259,12 @@ export default function ImportClient() {
                     {parsedData.previewRows.map((row, idx) => (
                       <tr key={idx} className="border-b hover:bg-gray-50">
                         {parsedData.columns.map((col) => (
-                          <td key={col.name} className="px-4 py-2">
+                          <td
+                            key={col.name}
+                            className={
+                              "px-4 py-2 " + (ignoredColumns[col.name] ? "opacity-50" : "")
+                            }
+                          >
                             {String(row[col.name] || '').substring(0, 50)}
                           </td>
                         ))}

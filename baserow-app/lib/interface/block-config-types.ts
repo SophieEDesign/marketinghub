@@ -286,28 +286,45 @@ export function validateBlockConfig(
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = []
 
+  // Helpers for backward compatibility with legacy/camelCase config shapes.
+  const resolveLegacyTableId = (cfg: any) => cfg?.table_id || cfg?.tableId || cfg?.base_table || cfg?.baseTable
+  const normalizeMultiSource = (s: any) => {
+    if (!s || typeof s !== 'object') return {}
+    return {
+      ...s,
+      table_id: s.table_id ?? s.tableId ?? s.table ?? '',
+      view_id: s.view_id ?? s.viewId,
+      title_field: s.title_field ?? s.titleField ?? s.title ?? '',
+      start_date_field: s.start_date_field ?? s.startDateField ?? s.start_date ?? '',
+      end_date_field: s.end_date_field ?? s.endDateField ?? s.end_date,
+      color_field: s.color_field ?? s.colorField,
+      type_field: s.type_field ?? s.typeField,
+      enabled: s.enabled,
+    }
+  }
+
   switch (blockType) {
     case 'grid':
       // Grid can use either table_id or source_view
-      if (!config.table_id && !config.source_view) {
+      if (!resolveLegacyTableId(config) && !config.source_view) {
         errors.push('Grid block requires either table_id or source_view')
       }
       break
 
     case 'form':
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push('Form block requires table_id')
       }
       break
 
     case 'record':
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push('Record block requires table_id')
       }
       break
 
     case 'chart':
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push('Chart block requires table_id')
       }
       if (!config.chart_type) {
@@ -316,7 +333,7 @@ export function validateBlockConfig(
       break
 
     case 'kpi':
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push('KPI block requires table_id')
       }
       if (!config.kpi_aggregate) {
@@ -370,19 +387,22 @@ export function validateBlockConfig(
     case 'timeline':
     case 'list':
       // These blocks are wrappers around GridBlock, so they need table_id
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push(`${blockType} block requires table_id`)
       }
       break
     
     case 'multi_calendar':
     case 'multi_timeline': {
-      const sources = Array.isArray(config.sources) ? config.sources : []
+      const sources = Array.isArray(config.sources) ? config.sources.map(normalizeMultiSource) : []
       if (sources.length === 0) {
         errors.push(`${blockType} block requires at least one source table`)
         break
       }
       sources.forEach((s: any, idx: number) => {
+        // If the user disables a source, don't require it to be fully configured.
+        if (s?.enabled === false) return
+
         if (!s?.table_id) errors.push(`Source ${idx + 1}: table_id is required`)
         if (!s?.title_field) errors.push(`Source ${idx + 1}: title_field is required`)
         if (!s?.start_date_field) errors.push(`Source ${idx + 1}: start_date_field is required`)
@@ -392,7 +412,7 @@ export function validateBlockConfig(
 
     case 'number':
       // Number block requires table_id and field_id
-      if (!config.table_id) {
+      if (!resolveLegacyTableId(config)) {
         errors.push('Number block requires table_id')
       }
       if (!config.field_id) {

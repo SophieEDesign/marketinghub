@@ -106,11 +106,8 @@ function SetupPasswordForm() {
       )
       
       // Use window.location for full page reload to ensure cookies are sent
-      if (next && next !== '/login' && next !== '/') {
-        window.location.href = next
-      } else {
-        window.location.href = '/settings?tab=pages'
-      }
+      const safeNext = next && next !== '/login' ? next : '/'
+      window.location.href = safeNext
     }
   }
 

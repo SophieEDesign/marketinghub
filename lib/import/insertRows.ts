@@ -68,10 +68,20 @@ export async function insertRows(
       const convertedBatch = batch.map(row => {
         const converted: Record<string, any> = {}
         Object.keys(row).forEach(key => {
-          // Use column name map if provided, otherwise sanitize
-          const sanitizedName = columnNameMap?.[key] || 
+          // If a columnNameMap is provided, only insert columns explicitly mapped.
+          // This enables features like "Ignore column" during import.
+          if (columnNameMap) {
+            const mapped = columnNameMap[key]
+            if (!mapped) return
+            const type = columnTypes[mapped] || 'text'
+            converted[mapped] = convertValue(row[key], type)
+            return
+          }
+
+          // Otherwise, sanitize all keys.
+          const sanitizedName =
             key.toLowerCase().trim().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_')
-          
+
           const type = columnTypes[sanitizedName] || 'text'
           converted[sanitizedName] = convertValue(row[key], type)
         })

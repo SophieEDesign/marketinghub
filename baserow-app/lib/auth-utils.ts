@@ -122,22 +122,11 @@ export async function getRedirectUrl(
   if (explicitNext && explicitNext !== '/' && explicitNext !== '/login') {
     return explicitNext
   }
-  
-  // Try to get first available page
-  try {
-    const response = await fetch('/api/interface-pages')
-    if (response.ok) {
-      const pages = await response.json()
-      if (pages && pages.length > 0) {
-        return `/pages/${pages[0].id}`
-      }
-    }
-  } catch (error) {
-    // Fallback on error
-  }
-  
-  // Default fallback
-  return '/settings?tab=pages'
+
+  // Default: go to home. The server-side HomePage (`/`) will resolve the actual landing
+  // page using `resolveLandingPage()` (user default -> workspace default -> first accessible),
+  // so this respects the selected "Default Page at Login" setting.
+  return '/'
 }
 
 /**
@@ -336,9 +325,8 @@ export async function performPostAuthRedirect(
     )
     
     // Use window.location for full page reload to ensure cookies are sent
-    if (next && next !== '/login' && next !== '/') {
-      window.location.href = next
-    }
+    const safeNext = next && next !== '/login' ? next : '/'
+    window.location.href = safeNext
   } catch (error: any) {
     const errorMsg = error.message || 'Failed to redirect after authentication'
     if (options?.onError) {
