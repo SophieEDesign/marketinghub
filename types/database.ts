@@ -31,6 +31,7 @@ export type BlockType =
   | 'html'
   | 'embed'
   | 'table'
+  | 'automation'
   | 'stat'
   | 'divider'
 

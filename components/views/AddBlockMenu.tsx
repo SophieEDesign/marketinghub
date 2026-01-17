@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
-import { Plus, Type, Image, Code, BarChart3, Table, FileText, Minus } from 'lucide-react'
+import { Plus, Type, Image, Code, BarChart3, Table, FileText, Minus, Zap } from 'lucide-react'
 import type { BlockType } from '@/types/database'
 
 interface AddBlockMenuProps {
@@ -58,6 +58,12 @@ const blockTypes: Array<{
     label: 'Chart',
     icon: BarChart3,
     defaultSettings: { chartType: 'bar', data: [] },
+  },
+  {
+    type: 'automation',
+    label: 'Automation',
+    icon: Zap,
+    defaultSettings: { automationId: '', status: 'inactive' },
   },
   {
     type: 'html',

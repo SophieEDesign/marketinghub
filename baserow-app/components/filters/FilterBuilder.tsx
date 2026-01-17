@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Plus, X, GripVertical, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, X, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -22,6 +22,7 @@ interface FilterBuilderProps {
   tableFields: TableField[]
   onChange: (filterTree: FilterTree) => void
   className?: string
+  variant?: "default" | "airtable"
 }
 
 /**
@@ -40,6 +41,7 @@ export default function FilterBuilder({
   tableFields,
   onChange,
   className = "",
+  variant = "default",
 }: FilterBuilderProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [draggedItem, setDraggedItem] = useState<{ type: 'condition' | 'group'; path: number[] } | null>(null)
@@ -126,6 +128,83 @@ export default function FilterBuilder({
     const operators = field ? getOperatorsForFieldType(field.type) : []
     const pathKey = path.join(',')
 
+    if (variant === "airtable") {
+      const joinLabel = isFirst ? "Where" : groupOperator.toLowerCase()
+      return (
+        <div key={pathKey} className="flex items-center gap-2">
+          <div className="w-14 text-[11px] font-medium text-gray-600">{joinLabel}</div>
+
+          <Select
+            value={condition.field_id}
+            onValueChange={(value) => {
+              const newField = tableFields.find((f) => f.name === value || f.id === value)
+              updateCondition(path, {
+                field_id: value,
+                operator: newField ? getDefaultOperatorForFieldType(newField.type) : "equal",
+                value: undefined,
+              })
+            }}
+          >
+            <SelectTrigger className="h-8 text-xs min-w-36">
+              <SelectValue placeholder="Field" />
+            </SelectTrigger>
+            <SelectContent>
+              {tableFields.map((f) => (
+                <SelectItem key={f.id || f.name} value={f.name}>
+                  {f.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={condition.operator}
+            onValueChange={(value) => updateCondition(path, { operator: value as FilterCondition["operator"] })}
+          >
+            <SelectTrigger className="h-8 text-xs min-w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {operators.map((op) => (
+                <SelectItem key={op.value} value={op.value}>
+                  {op.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex-1 min-w-44">
+            <FilterValueInput
+              field={field || null}
+              operator={condition.operator}
+              value={condition.value}
+              onChange={(value) => updateCondition(path, { value })}
+              size="sm"
+            />
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => duplicateItem(path)}
+            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700"
+            title="Duplicate"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => removeItem(path)}
+            className="h-8 w-8 p-0 text-gray-400 hover:text-red-700 hover:bg-red-50"
+            title="Remove"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )
+    }
+
     return (
       <div key={pathKey} className="relative">
         {!isFirst && (
@@ -137,7 +216,7 @@ export default function FilterBuilder({
             <div className="flex-1 h-px bg-gray-300"></div>
           </div>
         )}
-        
+
         <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
           <div className="grid grid-cols-12 gap-2 items-end">
             {/* Field selector */}
@@ -225,10 +304,10 @@ export default function FilterBuilder({
         </div>
       </div>
     )
-  }, [tableFields, updateCondition, removeItem, duplicateItem])
+  }, [tableFields, updateCondition, removeItem, duplicateItem, variant])
 
   // Render a group
-  const renderGroup = useCallback((
+  const renderGroup = useCallback(function renderGroupImpl(
     group: FilterGroup,
     path: number[],
     isFirst: boolean = true,
@@ -237,6 +316,47 @@ export default function FilterBuilder({
     const pathKey = path.join(',')
     const isCollapsed = isGroupCollapsed(path)
     const isEmpty = group.children.length === 0
+
+    if (variant === "airtable" && path.length === 0) {
+      return (
+        <div key={pathKey} className="space-y-2">
+          {group.children.length === 0 ? (
+            <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-md p-4">
+              No filters applied
+            </div>
+          ) : (
+            group.children.map((child, index) => {
+              const childPath = [...path, index]
+              if ("field_id" in child) {
+                return renderCondition(child, childPath, index === 0, group.operator)
+              }
+              return renderGroupImpl(child, childPath, index === 0, group.operator)
+            })
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => addCondition(path)}
+              className="h-8 px-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add condition
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => addGroup(path, "AND")}
+              className="h-8 px-2 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add group
+            </Button>
+          </div>
+        </div>
+      )
+    }
 
     return (
       <div key={pathKey} className="relative">
@@ -250,28 +370,28 @@ export default function FilterBuilder({
           </div>
         )}
 
-        <div className={`border-2 rounded-lg ${isEmpty ? 'border-dashed border-gray-300 bg-gray-50' : 'border-blue-200 bg-blue-50'}`}>
+        <div className={`border-2 rounded-lg ${isEmpty ? 'border-dashed border-gray-300 bg-gray-50' : (variant === "airtable" ? 'border-gray-200 bg-white' : 'border-blue-200 bg-blue-50')}`}>
           {/* Group header */}
-          <div className="flex items-center justify-between p-3 border-b border-blue-200">
+          <div className={`flex items-center justify-between p-3 ${variant === "airtable" ? "border-b border-gray-200" : "border-b border-blue-200"}`}>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => toggleGroupCollapse(path)}
-                className="p-1 hover:bg-blue-100 rounded"
+                className={`p-1 rounded ${variant === "airtable" ? "hover:bg-gray-100" : "hover:bg-blue-100"}`}
               >
                 {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-blue-700" />
+                  <ChevronRight className={`h-4 w-4 ${variant === "airtable" ? "text-gray-600" : "text-blue-700"}`} />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-blue-700" />
+                  <ChevronDown className={`h-4 w-4 ${variant === "airtable" ? "text-gray-600" : "text-blue-700"}`} />
                 )}
               </button>
-              <span className="text-sm font-semibold text-blue-900">
+              <span className={`text-sm font-semibold ${variant === "airtable" ? "text-gray-900" : "text-blue-900"}`}>
                 {isEmpty ? 'Empty Group' : `Group (${group.children.length} condition${group.children.length !== 1 ? 's' : ''})`}
               </span>
               <Select
                 value={group.operator}
                 onValueChange={(value) => updateGroupOperator(path, value as GroupOperator)}
               >
-                <SelectTrigger className="h-7 w-20 text-xs border-blue-300">
+                <SelectTrigger className={`h-7 w-20 text-xs ${variant === "airtable" ? "border-gray-300" : "border-blue-300"}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,7 +422,7 @@ export default function FilterBuilder({
 
           {/* Group content */}
           {!isCollapsed && (
-            <div className="p-3 space-y-2">
+            <div className={`p-3 ${variant === "airtable" ? "space-y-2" : "space-y-2"}`}>
               {isEmpty ? (
                 <div className="text-center py-6 text-sm text-gray-500">
                   <p>This group is empty</p>
@@ -316,18 +436,18 @@ export default function FilterBuilder({
                     return renderCondition(child, childPath, index === 0, group.operator)
                   } else {
                     // Nested group
-                    return renderGroup(child, childPath, index === 0, group.operator)
+                    return renderGroupImpl(child, childPath, index === 0, group.operator)
                   }
                 })
               )}
 
               {/* Add buttons */}
-              <div className="flex gap-2 pt-2 border-t border-blue-200">
+              <div className={`flex gap-2 pt-2 ${variant === "airtable" ? "border-t border-gray-200" : "border-t border-blue-200"}`}>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => addCondition(path)}
-                  className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-100"
+                  className={`flex-1 ${variant === "airtable" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "border-blue-300 text-blue-700 hover:bg-blue-100"}`}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Condition
@@ -336,7 +456,7 @@ export default function FilterBuilder({
                   variant="outline"
                   size="sm"
                   onClick={() => addGroup(path, 'AND')}
-                  className="flex-1 border-blue-300 text-blue-700 hover:bg-blue-100"
+                  className={`flex-1 ${variant === "airtable" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "border-blue-300 text-blue-700 hover:bg-blue-100"}`}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Group
@@ -347,7 +467,7 @@ export default function FilterBuilder({
         </div>
       </div>
     )
-  }, [isGroupCollapsed, toggleGroupCollapse, updateGroupOperator, removeItem, duplicateItem, addCondition, addGroup, renderCondition])
+  }, [isGroupCollapsed, toggleGroupCollapse, updateGroupOperator, removeItem, duplicateItem, addCondition, addGroup, renderCondition, variant])
 
   // Helper functions to manipulate filter tree
   function addConditionToPath(tree: FilterGroup, path: number[], condition: FilterCondition): FilterGroup {
@@ -490,7 +610,7 @@ export default function FilterBuilder({
   const isEmpty = isEmptyFilterTree(normalizedTree)
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`${variant === "airtable" ? "space-y-2" : "space-y-4"} ${className}`}>
       {isEmpty ? (
         <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
           <p className="text-sm mb-1">No filters applied</p>

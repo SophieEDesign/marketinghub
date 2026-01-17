@@ -334,14 +334,16 @@ export default function SettingsPanel({
   if (!isOpen || !block) return null
 
   const updateConfig = (updates: Partial<BlockConfig>) => {
-    setConfig({ ...config, ...updates })
+    // Functional update prevents stale-closure merges when multiple updates happen quickly.
+    setConfig((prev) => ({ ...(prev || {}), ...updates }))
   }
 
   const updateAppearance = (updates: Partial<BlockConfig['appearance']>) => {
-    setConfig({
-      ...config,
-      appearance: { ...config.appearance, ...updates }
-    })
+    // Functional update prevents stale-closure merges when multiple updates happen quickly.
+    setConfig((prev) => ({
+      ...(prev || {}),
+      appearance: { ...((prev || {}).appearance || {}), ...updates },
+    }))
   }
 
   const blockTypeLabel = block ? BLOCK_REGISTRY[block.type]?.label || block.type : ''

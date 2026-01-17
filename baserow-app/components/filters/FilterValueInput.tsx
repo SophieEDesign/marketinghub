@@ -22,6 +22,8 @@ interface FilterValueInputProps {
   value: string | number | boolean | string[] | null | undefined
   onChange: (value: string | number | boolean | string[] | null) => void
   placeholder?: string
+  size?: "sm" | "md"
+  className?: string
 }
 
 /**
@@ -42,14 +44,19 @@ export default function FilterValueInput({
   value,
   onChange,
   placeholder = "Enter value...",
+  size = "md",
+  className = "",
 }: FilterValueInputProps) {
+  const controlHeight = size === "sm" ? "h-8" : "h-9"
+  const textSize = size === "sm" ? "text-xs" : "text-sm"
+
   // Operators that don't require a value
   const noValueOperators: FilterOperator[] = ['is_empty', 'is_not_empty']
   const needsValue = !noValueOperators.includes(operator)
 
   if (!needsValue) {
     return (
-      <div className="h-9 flex items-center text-xs text-gray-500 px-3">
+      <div className={`${controlHeight} flex items-center text-xs text-gray-500 px-3 ${className}`}>
         No value needed
       </div>
     )
@@ -62,7 +69,7 @@ export default function FilterValueInput({
         value={value as string || ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 text-sm"
+        className={`${controlHeight} ${textSize} ${className}`}
       />
     )
   }
@@ -73,7 +80,7 @@ export default function FilterValueInput({
     
     if (choices.length === 0) {
       return (
-        <div className="h-9 flex items-center text-xs text-gray-400 px-3">
+        <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 ${className}`}>
           No options available
         </div>
       )
@@ -84,7 +91,7 @@ export default function FilterValueInput({
         value={value as string || ""}
         onValueChange={(val) => onChange(val)}
       >
-        <SelectTrigger className="h-9 text-sm">
+        <SelectTrigger className={`${controlHeight} ${textSize} ${className}`}>
           <SelectValue placeholder="Select value...">
             {value && (
               <div className="flex items-center gap-2">
@@ -145,7 +152,7 @@ export default function FilterValueInput({
     // "Today" operator - no value needed
     if (operator === 'date_today') {
       return (
-        <div className="h-9 flex items-center text-xs text-gray-500 px-3">
+        <div className={`${controlHeight} flex items-center text-xs text-gray-500 px-3 ${className}`}>
           No value needed
         </div>
       )
@@ -163,7 +170,7 @@ export default function FilterValueInput({
             onChange(numValue as any)
           }}
           placeholder="Number of days"
-          className="h-9 text-sm"
+          className={`${controlHeight} ${textSize} ${className}`}
         />
       )
     }
@@ -181,14 +188,14 @@ export default function FilterValueInput({
             value={start}
             onChange={(e) => onChange({ start: e.target.value, end } as any)}
             placeholder="Start date"
-            className="h-9 text-sm"
+            className={`${controlHeight} ${textSize} ${className}`}
           />
           <Input
             type="date"
             value={end}
             onChange={(e) => onChange({ start, end: e.target.value } as any)}
             placeholder="End date"
-            className="h-9 text-sm"
+            className={`${controlHeight} ${textSize} ${className}`}
           />
         </div>
       )
@@ -212,7 +219,7 @@ export default function FilterValueInput({
               }
             }}
           >
-            <SelectTrigger className="h-9 w-32 text-sm">
+            <SelectTrigger className={`${controlHeight} w-32 ${textSize}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -226,7 +233,7 @@ export default function FilterValueInput({
             value={isToday ? '' : (value as string || "")}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Select date"
-            className="h-9 text-sm flex-1"
+            className={`${controlHeight} ${textSize} flex-1 ${className}`}
             disabled={isToday}
           />
         </div>
@@ -239,7 +246,7 @@ export default function FilterValueInput({
         value={value as string || ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Select date"
-        className="h-9 text-sm"
+        className={`${controlHeight} ${textSize} ${className}`}
       />
     )
   }
@@ -255,7 +262,7 @@ export default function FilterValueInput({
           onChange(numValue as any)
         }}
         placeholder="Enter number"
-        className="h-9 text-sm"
+        className={`${controlHeight} ${textSize} ${className}`}
         step={field.type === 'number' ? 'any' : undefined}
       />
     )
@@ -268,7 +275,7 @@ export default function FilterValueInput({
         value={value === true ? 'true' : value === false ? 'false' : ''}
         onValueChange={(val) => onChange(val === 'true')}
       >
-        <SelectTrigger className="h-9 text-sm">
+        <SelectTrigger className={`${controlHeight} ${textSize} ${className}`}>
           <SelectValue placeholder="Select..." />
         </SelectTrigger>
         <SelectContent>
@@ -282,7 +289,7 @@ export default function FilterValueInput({
   // Linked fields: Show placeholder (record picker to be implemented)
   if (field.type === 'link_to_table') {
     return (
-      <div className="h-9 flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md">
+      <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md ${className}`}>
         Record picker (coming soon)
       </div>
     )
@@ -291,7 +298,7 @@ export default function FilterValueInput({
   // Lookup fields: Read-only display
   if (field.type === 'lookup') {
     return (
-      <div className="h-9 flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md bg-gray-50">
+      <div className={`${controlHeight} flex items-center text-xs text-gray-400 px-3 border border-gray-300 rounded-md bg-gray-50 ${className}`}>
         Filter by derived value
       </div>
     )
@@ -304,7 +311,7 @@ export default function FilterValueInput({
       value={value as string || ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="h-9 text-sm"
+      className={`${controlHeight} ${textSize} ${className}`}
     />
   )
 }

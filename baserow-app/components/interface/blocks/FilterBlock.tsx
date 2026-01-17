@@ -359,9 +359,9 @@ export default function FilterBlock({
   return (
     <div className="h-full w-full overflow-auto flex flex-col rounded-lg border border-gray-200" style={blockStyle}>
       {/* Header with title and Filtered button */}
-      <div className="flex items-center justify-between mb-4 px-4 pt-4">
+      <div className={`flex items-center justify-between px-4 pt-4 ${isEditing ? "mb-2" : "mb-4"}`}>
         <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-        {!isEmpty && (
+        {!isEmpty && !isEditing && (
           <Button
             onClick={() => isEditing && setIsModalOpen(true)}
             variant="default"
@@ -375,42 +375,50 @@ export default function FilterBlock({
         )}
       </div>
 
-      {/* Filter Summary Section */}
-      {!isEmpty ? (
-        <div className="px-4 pb-3">
-          <div className="flex items-center gap-2 mb-3">
-            <Filter className="h-4 w-4 text-gray-600" />
-            <span className="text-sm text-gray-700">Filter results</span>
-            <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700 rounded-md px-1.5 py-0.5">
-              {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
-            </Badge>
-            <span className="text-xs text-gray-400 ml-auto">Default view</span>
-          </div>
-
-          {/* Info Message */}
+      {/* Builder mode: show Airtable-like inline filter rows */}
+      {isEditing ? (
+        <div className="px-4 pb-4">
+          <FilterBuilder
+            filterTree={filterTree}
+            tableFields={availableFields}
+            onChange={setFilterTree}
+            variant="airtable"
+          />
           <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
             <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
             <span>These filters refine results in connected elements.</span>
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8 px-4">
-          <div className="text-center">
-            <Filter className="h-6 w-6 mx-auto mb-2 text-gray-300" />
-            <p className="mb-1 text-sm">No filters applied</p>
-            <p className="text-xs text-gray-500">Add a condition to control connected elements</p>
-            {isEditing && (
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                variant="outline"
-                size="sm"
-                className="mt-3"
-              >
-                Add Filter
-              </Button>
-            )}
-          </div>
-        </div>
+        <>
+          {/* View mode: show summary (compact, non-interactive) */}
+          {!isEmpty ? (
+            <div className="px-4 pb-3">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="h-4 w-4 text-gray-600" />
+                <span className="text-sm text-gray-700">Filter results</span>
+                <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700 rounded-md px-1.5 py-0.5">
+                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
+                </Badge>
+                <span className="text-xs text-gray-400 ml-auto">Default view</span>
+              </div>
+
+              {/* Info Message */}
+              <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
+                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
+                <span>These filters refine results in connected elements.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8 px-4">
+              <div className="text-center">
+                <Filter className="h-6 w-6 mx-auto mb-2 text-gray-300" />
+                <p className="mb-1 text-sm">No filters applied</p>
+                <p className="text-xs text-gray-500">Add a condition to control connected elements</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Connection Status - only show in edit mode */}

@@ -256,6 +256,10 @@ export default function GridView({
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [tableError, setTableError] = useState<string | null>(null)
+  // Non-fatal warnings (e.g. view references columns that no longer exist, but we can still load rows)
+  const [tableWarning, setTableWarning] = useState<string | null>(null)
+  // Whether the underlying physical table is missing (as opposed to a view/column mismatch)
+  const [isMissingPhysicalTable, setIsMissingPhysicalTable] = useState(false)
   const [initializingFields, setInitializingFields] = useState(false)
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
@@ -805,7 +809,8 @@ export default function GridView({
       if (error) {
         // If a view references a column that no longer exists in the physical table,
         // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
-        if ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('does not exist')) {
+        // IMPORTANT: only treat as "missing column" for 42703 (missing table is 42P01 and must be handled separately).
+        if ((error as any)?.code === '42703') {
           console.warn('[GridView] Column missing for view; retrying with "*" select.', {
             message: (error as any)?.message,
             code: (error as any)?.code,
@@ -813,7 +818,9 @@ export default function GridView({
           const retry = await supabase.from(supabaseTableName).select('*').limit(ITEMS_PER_PAGE)
           if (!retry.error) {
             let dataArray = asArray<Record<string, any>>(retry.data)
-            setTableError(
+            setIsMissingPhysicalTable(false)
+            setTableError(null)
+            setTableWarning(
               'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
             )
             setRows(dataArray)
@@ -839,6 +846,8 @@ export default function GridView({
           errorMessage.includes("Could not find the table")
         
         if (isTableNotFound) {
+          setIsMissingPhysicalTable(true)
+          setTableWarning(null)
           setTableError(`The table "${supabaseTableName}" does not exist. Attempting to create it...`)
           
           // Try to create the table automatically
@@ -854,7 +863,9 @@ export default function GridView({
             if (createResult.success) {
               // Table created, reload rows after a short delay to allow schema cache to update
               setTimeout(() => {
+                setIsMissingPhysicalTable(false)
                 setTableError(null)
+                setTableWarning(null)
                 loadRows()
               }, 1000)
               return
@@ -869,6 +880,7 @@ export default function GridView({
             setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically. Please create it manually in Supabase.`)
           }
         } else {
+          setIsMissingPhysicalTable(false)
           const msg = (error as any)?.message || 'Unknown error'
           setTableError(`Error loading data: ${msg}`)
         }
@@ -898,7 +910,9 @@ export default function GridView({
           computedRows = computedRows.slice(0, ITEMS_PER_PAGE)
         }
         
+        setIsMissingPhysicalTable(false)
         setTableError(null)
+        setTableWarning(null)
         setRows(computedRows)
       }
     } catch (error) {
@@ -907,7 +921,9 @@ export default function GridView({
         (error as any)?.message ||
         (typeof error === 'string' ? error : '') ||
         String(error)
+      setIsMissingPhysicalTable(false)
       setTableError(`Error loading data: ${msg}`)
+      setTableWarning(null)
       setRows([])
     } finally {
       setLoading(false)
@@ -1141,12 +1157,18 @@ export default function GridView({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="max-w-md p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-2">Table Not Found</h3>
+          <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+            {isMissingPhysicalTable ? "Table Not Found" : "Unable to Load Data"}
+          </h3>
           <p className="text-sm text-yellow-700 mb-4">{tableError}</p>
-          <p className="text-xs text-yellow-600">
-            The table <code className="bg-yellow-100 px-1 py-0.5 rounded">{supabaseTableName}</code> needs to be created in your Supabase database.
-            You can create it manually in the Supabase dashboard or use a migration.
-          </p>
+          {isMissingPhysicalTable && (
+            <p className="text-xs text-yellow-600">
+              The table{" "}
+              <code className="bg-yellow-100 px-1 py-0.5 rounded">{supabaseTableName}</code>{" "}
+              needs to be created in your Supabase database.
+              You can create it manually in the Supabase dashboard or use a migration.
+            </p>
+          )}
         </div>
       </div>
     )
@@ -1318,6 +1340,25 @@ export default function GridView({
             {searchTerm && Array.isArray(filteredRows) && Array.isArray(safeRows) && filteredRows.length !== safeRows.length && (
               <span className="ml-1">(filtered from {safeRows.length})</span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Non-fatal warning (e.g. view references columns that no longer exist) */}
+      {tableWarning && (
+        <div className="flex-shrink-0 mb-3">
+          <div className="px-3 py-2 rounded-md border border-yellow-200 bg-yellow-50 text-yellow-800 text-xs flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="font-medium">Warning:</span>{" "}
+              <span className="break-words">{tableWarning}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTableWarning(null)}
+              className="flex-shrink-0 text-yellow-800/70 hover:text-yellow-900 underline"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}

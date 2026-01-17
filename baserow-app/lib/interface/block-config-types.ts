@@ -391,7 +391,7 @@ export function validateBlockConfig(
         errors.push(`${blockType} block requires table_id`)
       }
       break
-    
+
     case 'multi_calendar':
     case 'multi_timeline': {
       const sources = Array.isArray(config.sources) ? config.sources.map(normalizeMultiSource) : []

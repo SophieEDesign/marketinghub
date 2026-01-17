@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -44,6 +44,11 @@ export default function ListDataSettings({
   const blockFilters = Array.isArray(config.filters) ? config.filters : []
   const choiceGroupsDefaultCollapsed = (config as any)?.list_choice_groups_default_collapsed ?? true
 
+  // Keep the local table select in sync when config.table_id is hydrated/changed upstream.
+  useEffect(() => {
+    setSelectedTableId(config.table_id || "")
+  }, [config.table_id])
+
   // Get available fields for selection
   const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
   const allFields = fields
@@ -59,10 +64,12 @@ export default function ListDataSettings({
   }
 
   const handleTitleFieldChange = (fieldName: string) => {
-    const value = fieldName === "__none__" ? undefined : fieldName
+    // IMPORTANT: Use null (not undefined) to clear persisted keys.
+    // undefined is dropped by JSON.stringify and won't reach the server, so old values "stick".
+    const value = fieldName === "__none__" ? null : fieldName
     onUpdate({
-      list_title_field: value || undefined,
-      title_field: value || undefined, // Backward compatibility
+      list_title_field: value as any,
+      title_field: value as any, // Backward compatibility
     })
   }
 
@@ -81,17 +88,18 @@ export default function ListDataSettings({
   }
 
   const handleImageFieldChange = (fieldName: string) => {
-    const value = fieldName === "__none__" ? undefined : fieldName
+    // IMPORTANT: Use null (not undefined) to clear persisted keys.
+    const value = fieldName === "__none__" ? null : fieldName
     onUpdate({
-      list_image_field: value || undefined,
-      image_field: value || undefined, // Backward compatibility
+      list_image_field: value as any,
+      image_field: value as any, // Backward compatibility
     })
   }
 
   const handlePillFieldAdd = (fieldName: string) => {
     if (fieldName && !pillFields.includes(fieldName)) {
       onUpdate({
-        list_pill_fields: [...pillFields, fieldName],
+        list_pill_fields: [...pillFields, fieldName].filter(Boolean),
       })
     }
   }
@@ -105,7 +113,7 @@ export default function ListDataSettings({
   const handleMetaFieldAdd = (fieldName: string) => {
     if (fieldName && !metaFields.includes(fieldName)) {
       onUpdate({
-        list_meta_fields: [...metaFields, fieldName],
+        list_meta_fields: [...metaFields, fieldName].filter(Boolean),
       })
     }
   }
@@ -250,7 +258,8 @@ export default function ListDataSettings({
                 onValueChange={(newFieldName) => {
                   const updated = [...subtitleFields]
                   updated[index] = newFieldName === "__none__" ? "" : newFieldName
-                  onUpdate({ list_subtitle_fields: updated })
+                  // Never persist empty placeholders
+                  onUpdate({ list_subtitle_fields: updated.filter(Boolean) })
                 }}
               >
                 <SelectTrigger className="flex-1">
@@ -331,7 +340,8 @@ export default function ListDataSettings({
                 onValueChange={(newFieldName) => {
                   const updated = [...pillFields]
                   updated[index] = newFieldName === "__none__" ? "" : newFieldName
-                  onUpdate({ list_pill_fields: updated })
+                  // Never persist empty placeholders
+                  onUpdate({ list_pill_fields: updated.filter(Boolean) })
                 }}
               >
                 <SelectTrigger className="flex-1">
@@ -389,7 +399,8 @@ export default function ListDataSettings({
                 onValueChange={(newFieldName) => {
                   const updated = [...metaFields]
                   updated[index] = newFieldName === "__none__" ? "" : newFieldName
-                  onUpdate({ list_meta_fields: updated })
+                  // Never persist empty placeholders
+                  onUpdate({ list_meta_fields: updated.filter(Boolean) })
                 }}
               >
                 <SelectTrigger className="flex-1">
@@ -444,7 +455,8 @@ export default function ListDataSettings({
             value={groupBy || "__none__"}
             onValueChange={(value) => {
               onUpdate({
-                group_by: value === "__none__" ? undefined : value,
+                // Persist clear as null so the server actually receives it.
+                group_by: value === "__none__" ? (null as any) : value,
               })
             }}
           >

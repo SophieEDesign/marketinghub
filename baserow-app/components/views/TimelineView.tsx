@@ -321,10 +321,19 @@ export default function TimelineView({
     let resolvedTitleField: TableField | null = null
     
     if (Array.isArray(fieldIds) && fieldIds.length > 0) {
-      // Use the visible field order passed into this view (new system)
-      allVisibleFields = fieldIds
-        .map((fieldName: string) => tableFields.find((f) => f.name === fieldName || f.id === fieldName))
-        .filter((f): f is TableField => f !== undefined)
+      // Use the visible field order passed into this view (new system), but de-dupe by field id.
+      // It's possible for configs to contain both id + name references (or duplicates after renames),
+      // which would otherwise render duplicated chips/values on cards.
+      const seenVisible = new Set<string>()
+      allVisibleFields = []
+      for (const fid of fieldIds) {
+        const resolved =
+          tableFields.find((f) => f.name === fid || f.id === fid) || undefined
+        if (!resolved) continue
+        if (resolved.id && seenVisible.has(String(resolved.id))) continue
+        if (resolved.id) seenVisible.add(String(resolved.id))
+        allVisibleFields.push(resolved)
+      }
       
       // Resolve title field: explicit config > first non-date field from visible fields
       const titleFieldName = titleFieldProp || 
@@ -360,8 +369,10 @@ export default function TimelineView({
       
       // Card fields are all visible fields except title and date fields
       const titleFieldNameToExclude = resolvedTitleField?.name
+      const titleFieldIdToExclude = resolvedTitleField?.id
       cardFields = allVisibleFields.filter(f => 
         f.name !== titleFieldNameToExclude && 
+        (titleFieldIdToExclude ? f.id !== titleFieldIdToExclude : true) &&
         !dateFieldNames.has(f.name) &&
         // Skip non-card-friendly types
         f.type !== 'attachment'

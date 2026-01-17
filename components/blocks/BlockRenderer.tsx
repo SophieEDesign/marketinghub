@@ -12,6 +12,7 @@ import EmbedBlock from './EmbedBlock'
 import TableBlock from './TableBlock'
 import StatBlock from './StatBlock'
 import DividerBlock from './DividerBlock'
+import AutomationBlock from './AutomationBlock'
 import { Button } from '@/components/ui/button'
 import { Settings } from 'lucide-react'
 import type { ViewBlock } from '@/types/database'
@@ -57,6 +58,8 @@ export default function BlockRenderer({
         return <EmbedBlock block={block} />
       case 'table':
         return <TableBlock block={block} />
+      case 'automation':
+        return <AutomationBlock block={block} />
       case 'stat':
         return <StatBlock block={block} />
       case 'divider':

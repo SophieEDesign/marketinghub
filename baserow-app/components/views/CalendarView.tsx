@@ -1192,6 +1192,8 @@ export default function CalendarView({
               // Calendar cards use the ordered "Fields to Show on Cards/Table" selection (fieldIds).
               // We display up to 3 fields (values) to avoid overly tall events.
               cardFields: (() => {
+                // Important: the title is rendered separately in eventContent, so exclude the title field
+                // from the cardFields list to avoid duplicate lines (e.g. "Content Name" appearing twice).
                 const exclude = new Set<string>([
                   'id',
                   'created_at',
@@ -1199,14 +1201,24 @@ export default function CalendarView({
                   actualFieldName || '',
                   actualFromFieldName || '',
                   actualToFieldName || '',
+                  titleFieldName || '',
                 ])
 
-                const resolvedNames = (Array.isArray(fieldIds) ? fieldIds : [])
+                const resolvedNamesRaw = (Array.isArray(fieldIds) ? fieldIds : [])
                   .map((fid) => {
                     const f = loadedTableFields.find((x) => x.name === fid || x.id === fid)
                     return f?.name || fid
                   })
                   .filter((name) => name && !exclude.has(name))
+
+                // De-dupe while preserving order (fieldIds may include both id and name forms).
+                const resolvedNames: string[] = []
+                const seen = new Set<string>()
+                for (const name of resolvedNamesRaw) {
+                  if (seen.has(name)) continue
+                  seen.add(name)
+                  resolvedNames.push(name)
+                }
 
                 const items = resolvedNames
                   .map((name) => {

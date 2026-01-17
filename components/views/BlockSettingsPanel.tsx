@@ -242,6 +242,29 @@ export default function BlockSettingsPanel({
               Divider block has no settings.
             </div>
           )}
+
+          {block.type === 'automation' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="automationId">Automation ID</Label>
+                <Input
+                  id="automationId"
+                  value={settings.automationId || ''}
+                  onChange={(e) => handleSettingsChange('automationId', e.target.value)}
+                  placeholder="automation_..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Input
+                  id="status"
+                  value={settings.status || 'inactive'}
+                  onChange={(e) => handleSettingsChange('status', e.target.value)}
+                  placeholder="inactive / active"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
