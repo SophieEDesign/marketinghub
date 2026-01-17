@@ -14,8 +14,9 @@ export function getPrimaryField(fields: TableField[] | null | undefined): TableF
     const ap = Number.isFinite(a.position) ? a.position : 0
     const bp = Number.isFinite(b.position) ? b.position : 0
     if (ap !== bp) return ap - bp
-    const ao = Number.isFinite(a.order_index) ? a.order_index : 0
-    const bo = Number.isFinite(b.order_index) ? b.order_index : 0
+    // `Number.isFinite(x)` is not a TS type guard, so also check `typeof` to keep `ao/bo` as `number`.
+    const ao = typeof a.order_index === "number" && Number.isFinite(a.order_index) ? a.order_index : 0
+    const bo = typeof b.order_index === "number" && Number.isFinite(b.order_index) ? b.order_index : 0
     if (ao !== bo) return ao - bo
     return String(a.name).localeCompare(String(b.name))
   })
