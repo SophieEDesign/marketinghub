@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS public.tables (
   supabase_table text NOT NULL,
   description text DEFAULT ''::text,
   category text,
+  -- Primary field used as the record label (internal DB-safe field name) or 'id'.
+  -- NULL means "auto": first non-system field by position/order.
+  primary_field_name text,
   access_control text DEFAULT 'authenticated'::text CHECK (access_control = ANY (ARRAY['public'::text, 'authenticated'::text, 'role-based'::text, 'owner'::text])),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),

@@ -158,7 +158,7 @@ export default function LookupFieldPicker({
       // Get table info
       const { data: table, error: tableError } = await supabase
         .from("tables")
-        .select("supabase_table, name")
+        .select("supabase_table, name, primary_field_name")
         .eq("id", lookupTableId)
         .single()
 
@@ -193,10 +193,18 @@ export default function LookupFieldPicker({
       )
       const hasPhysical = physicalColSet.size > 0 && !colsError
 
+      const tableConfiguredPrimary =
+        typeof (table as any)?.primary_field_name === "string" &&
+        String((table as any).primary_field_name).trim().length > 0
+          ? String((table as any).primary_field_name).trim()
+          : null
+
       const candidatePrimary =
         (requestedPrimaryLabelField && lookupFields?.some((f: any) => f.name === requestedPrimaryLabelField))
           ? requestedPrimaryLabelField
-          : (getPrimaryFieldName(lookupFields as any) || 'id')
+          : (tableConfiguredPrimary && lookupFields?.some((f: any) => f.name === tableConfiguredPrimary))
+            ? tableConfiguredPrimary
+            : (getPrimaryFieldName(lookupFields as any) || 'id')
 
       const effectivePrimaryLabelField =
         candidatePrimary !== 'id' && (!toPostgrestColumn(candidatePrimary) || (hasPhysical && !physicalColSet.has(candidatePrimary)))

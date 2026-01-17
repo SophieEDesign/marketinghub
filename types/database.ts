@@ -39,6 +39,14 @@ export interface Table {
   id: string
   name: string
   supabase_table: string
+  description?: string | null
+  /**
+   * Per-table record label field.
+   * - null/undefined: auto (first non-system field)
+   * - "id": show the UUID
+   * - otherwise: internal DB-safe field name (snake_case column)
+   */
+  primary_field_name?: string | null
 }
 
 export interface View {

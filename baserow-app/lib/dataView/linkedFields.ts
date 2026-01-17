@@ -8,6 +8,7 @@
 import { createClient } from '@/lib/supabase/client'
 import type { TableField, LinkedField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
+import { toPostgrestColumn } from '@/lib/supabase/postgrest'
 
 /**
  * Resolve a linked field value to display labels
@@ -34,7 +35,7 @@ export async function resolveLinkedFieldDisplay(
   // Get target table info
   const { data: targetTable, error: tableError } = await supabase
     .from('tables')
-    .select('supabase_table')
+    .select('supabase_table, primary_field_name')
     .eq('id', linkedTableId)
     .single()
 
@@ -60,7 +61,24 @@ export async function resolveLinkedFieldDisplay(
   let displayFieldName: string | null = null
 
   // 1. Table's primary field
-  displayFieldName = getPrimaryFieldName(targetFields as any)
+  const configuredPrimary =
+    typeof (targetTable as any)?.primary_field_name === 'string' &&
+    String((targetTable as any).primary_field_name).trim().length > 0
+      ? String((targetTable as any).primary_field_name).trim()
+      : null
+
+  if (configuredPrimary === 'id') {
+    displayFieldName = null
+  } else if (configuredPrimary) {
+    const safe = toPostgrestColumn(configuredPrimary)
+    if (safe && targetFields?.some((f: any) => f.name === safe)) {
+      displayFieldName = safe
+    }
+  }
+
+  if (!displayFieldName) {
+    displayFieldName = getPrimaryFieldName(targetFields as any)
+  }
 
   // 2. linked_field_id (if set)
   if (!displayFieldName && linkedFieldId && targetFields) {

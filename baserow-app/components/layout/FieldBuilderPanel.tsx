@@ -50,14 +50,29 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 }: FieldBuilderPanelProps) {
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(true)
+  const [primaryFieldName, setPrimaryFieldName] = useState<string | null>(null)
+  const [savingPrimary, setSavingPrimary] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [showNewField, setShowNewField] = useState(false)
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
 
   useEffect(() => {
     loadFields()
+    loadTableSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
+
+  async function loadTableSettings() {
+    try {
+      const res = await fetch(`/api/tables/${tableId}`, { cache: "no-store" })
+      const data = await res.json()
+      if (res.ok && data?.table) {
+        setPrimaryFieldName(data.table.primary_field_name ?? null)
+      }
+    } catch (error) {
+      console.warn("Error loading table settings:", error)
+    }
+  }
 
   async function loadFields() {
     try {
@@ -78,6 +93,46 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       console.error("Error loading fields:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const primaryFieldOptions = useMemo(() => {
+    // Exclude virtual/system fields from being a primary label.
+    const isVirtual = (f: TableField) => f.type === "formula" || f.type === "lookup"
+    const isSystem = (f: TableField) => Boolean((f.options as any)?.system)
+    return fields
+      .filter((f) => !isVirtual(f) && !isSystem(f))
+      .sort((a, b) => {
+        const ao = a.order_index ?? a.position ?? 0
+        const bo = b.order_index ?? b.position ?? 0
+        if (ao !== bo) return ao - bo
+        return a.name.localeCompare(b.name)
+      })
+  }, [fields])
+
+  async function savePrimaryField(next: string | null) {
+    if (savingPrimary) return
+    setSavingPrimary(true)
+    try {
+      const res = await fetch(`/api/tables/${tableId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          primary_field_name: next,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data?.error || "Failed to update primary field")
+        return
+      }
+      setPrimaryFieldName(data?.table?.primary_field_name ?? next ?? null)
+      onFieldsUpdated()
+    } catch (error) {
+      console.error("Error saving primary field:", error)
+      alert("Failed to update primary field")
+    } finally {
+      setSavingPrimary(false)
     }
   }
 
@@ -231,6 +286,35 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label className="text-sm font-semibold text-gray-900">Primary / Default Field</Label>
+        <Select
+          value={primaryFieldName ?? "__auto__"}
+          onValueChange={(val) => {
+            if (val === "__auto__") return savePrimaryField(null)
+            if (val === "id") return savePrimaryField("id")
+            return savePrimaryField(val)
+          }}
+          disabled={savingPrimary}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Choose primary field" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__auto__">Auto (first field)</SelectItem>
+            <SelectItem value="id">ID (UUID)</SelectItem>
+            {primaryFieldOptions.map((f) => (
+              <SelectItem key={f.id} value={f.name}>
+                {getFieldDisplayName(f)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500">
+          Used as the record label across pickers, linked records, and titles. “Auto” uses the first non-system field.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">Fields</h3>
         <Button

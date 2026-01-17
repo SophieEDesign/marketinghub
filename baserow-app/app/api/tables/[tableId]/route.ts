@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
 import { isAdmin } from '@/lib/roles'
+import { toPostgrestColumn } from '@/lib/supabase/postgrest'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { tableId: string } }
+) {
+  try {
+    const table = await getTable(params.tableId)
+    if (!table) {
+      return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+    }
+    // No-store: design settings should reflect immediately after updates.
+    const response = NextResponse.json({ table })
+    response.headers.set('Cache-Control', 'no-store')
+    return response
+  } catch (error: any) {
+    console.error('Error fetching table:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch table' },
+      { status: 500 }
+    )
+  }
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -19,13 +42,16 @@ export async function PATCH(
 
     const supabase = await createClient()
     const body = await request.json()
-    const { name, description } = body
+    const { name, description, primary_field_name } = body
 
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Table name is required and must be a non-empty string' },
-        { status: 400 }
-      )
+    // Allow partial updates. Only validate name if it is provided.
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        return NextResponse.json(
+          { error: 'Table name must be a non-empty string' },
+          { status: 400 }
+        )
+      }
     }
 
     const table = await getTable(params.tableId)
@@ -42,6 +68,59 @@ export async function PATCH(
 
     if (name !== undefined) updates.name = name.trim()
     if (description !== undefined) updates.description = description || null
+
+    if (primary_field_name !== undefined) {
+      if (primary_field_name === null || primary_field_name === '') {
+        updates.primary_field_name = null
+      } else if (typeof primary_field_name === 'string') {
+        const candidate = primary_field_name.trim()
+        if (candidate === 'id') {
+          updates.primary_field_name = 'id'
+        } else {
+          const safe = toPostgrestColumn(candidate)
+          if (!safe) {
+            return NextResponse.json(
+              {
+                error:
+                  'Primary field must be "id" or a DB-safe field name (letters/numbers/_).',
+              },
+              { status: 400 }
+            )
+          }
+          // Validate the field exists for this table.
+          const { data: exists, error: existsError } = await supabase
+            .from('table_fields')
+            .select('name')
+            .eq('table_id', params.tableId)
+            .eq('name', safe)
+            .maybeSingle()
+
+          if (existsError) {
+            return NextResponse.json(
+              { error: `Failed to validate primary field: ${existsError.message}` },
+              { status: 500 }
+            )
+          }
+          if (!exists) {
+            return NextResponse.json(
+              { error: `Primary field "${safe}" not found for this table.` },
+              { status: 400 }
+            )
+          }
+          updates.primary_field_name = safe
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'primary_field_name must be a string or null' },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (Object.keys(updates).length === 1) {
+      // Only updated_at is present -> no effective updates
+      return NextResponse.json({ table })
+    }
 
     const { data: updatedTable, error: updateError } = await supabase
       .from('tables')
