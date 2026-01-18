@@ -51,6 +51,45 @@ export default function RecordFieldPanel({
   const [editingField, setEditingField] = useState<string | null>(null)
   const [linkedTableNameById, setLinkedTableNameById] = useState<Record<string, string>>({})
 
+  function normalizeUpdateValue(fieldName: string, value: any): any {
+    // Avoid sending `undefined` to PostgREST.
+    let v: any = value === undefined ? null : value
+
+    const field = allFields.find((f) => f?.name === fieldName)
+    if (!field) return v
+
+    if (field.type !== "link_to_table") return v
+
+    const toId = (x: any): string | null => {
+      if (x == null || x === "") return null
+      if (typeof x === "string") return x
+      if (typeof x === "object" && x && "id" in x) return String((x as any).id)
+      return String(x)
+    }
+
+    const relationshipType = (field.options as any)?.relationship_type as
+      | "one-to-one"
+      | "one-to-many"
+      | "many-to-many"
+      | undefined
+    const maxSelections = (field.options as any)?.max_selections as number | undefined
+    const isMulti =
+      relationshipType === "one-to-many" ||
+      relationshipType === "many-to-many" ||
+      (typeof maxSelections === "number" && maxSelections > 1)
+
+    if (isMulti) {
+      if (v == null) return null
+      if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+      const id = toId(v)
+      return id ? [id] : null
+    }
+
+    // Single-link: always normalize to a single UUID (or null).
+    if (Array.isArray(v)) return toId(v[0])
+    return toId(v)
+  }
+
   // Create a map of field name/id to field config
   const fieldConfigMap = new Map<string, FieldConfig>()
   fields.forEach((config, index) => {
@@ -175,6 +214,7 @@ export default function RecordFieldPanel({
 
       try {
         const supabase = createClient()
+        const normalizedValue = normalizeUpdateValue(fieldName, value)
         
         // Get table info
         const { data: table } = await supabase
@@ -186,18 +226,34 @@ export default function RecordFieldPanel({
         if (!table) return
 
         // Update record
-        const { error } = await supabase
-          .from(table.supabase_table)
-          .update({ [fieldName]: value })
-          .eq("id", recordId)
+        let finalSavedValue: any = normalizedValue
+
+        const doUpdate = async (val: any) => {
+          return await supabase.from(table.supabase_table).update({ [fieldName]: val }).eq("id", recordId)
+        }
+
+        let { error } = await doUpdate(finalSavedValue)
+
+        // See `useGridData.updateCell` for rationale (uuid vs uuid[] mismatch for linked fields)
+        if (
+          error?.code === "22P02" &&
+          Array.isArray(finalSavedValue) &&
+          String(error?.message || "").toLowerCase().includes('invalid input syntax for type uuid')
+        ) {
+          if (finalSavedValue.length <= 1) {
+            finalSavedValue = finalSavedValue[0] ?? null
+            const retry = await doUpdate(finalSavedValue)
+            error = retry.error
+          }
+        }
 
         if (error) throw error
 
         // Update local state
-        setRecordData((prev) => ({ ...prev, [fieldName]: value }))
+        setRecordData((prev) => ({ ...prev, [fieldName]: finalSavedValue }))
 
         // Notify parent
-        onFieldChange?.(fieldName, value)
+        onFieldChange?.(fieldName, finalSavedValue)
       } catch (error: any) {
         console.error("Error updating field:", error)
         toast({

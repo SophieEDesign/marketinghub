@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS public.table_fields (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_id UUID NOT NULL REFERENCES public.tables(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  -- Human-friendly display name (can differ from internal `name`)
+  label TEXT,
   type TEXT NOT NULL CHECK (type IN (
     'text', 'long_text', 'number', 'percent', 'currency', 'date',
     'single_select', 'multi_select', 'checkbox', 'attachment',
@@ -22,6 +24,9 @@ CREATE TABLE IF NOT EXISTS public.table_fields (
   UNIQUE(table_id, name)
 );
 
+-- Backfill/upgrade: ensure newer columns exist on older installs
+ALTER TABLE public.table_fields ADD COLUMN IF NOT EXISTS label TEXT;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_table_fields_table_id ON public.table_fields(table_id);
 CREATE INDEX IF NOT EXISTS idx_table_fields_position ON public.table_fields(table_id, position);
@@ -31,7 +36,11 @@ CREATE INDEX IF NOT EXISTS idx_table_fields_group ON public.table_fields(table_i
 -- RLS Policies (if RLS is enabled)
 ALTER TABLE public.table_fields ENABLE ROW LEVEL SECURITY;
 
+-- Table privileges (RLS policies do not grant privileges by themselves)
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.table_fields TO authenticated;
+
 -- Allow authenticated users to read table_fields
+DROP POLICY IF EXISTS "Allow authenticated users to read table_fields" ON public.table_fields;
 CREATE POLICY "Allow authenticated users to read table_fields"
   ON public.table_fields
   FOR SELECT
@@ -39,6 +48,7 @@ CREATE POLICY "Allow authenticated users to read table_fields"
   USING (true);
 
 -- Allow authenticated users to insert table_fields
+DROP POLICY IF EXISTS "Allow authenticated users to insert table_fields" ON public.table_fields;
 CREATE POLICY "Allow authenticated users to insert table_fields"
   ON public.table_fields
   FOR INSERT
@@ -46,6 +56,7 @@ CREATE POLICY "Allow authenticated users to insert table_fields"
   WITH CHECK (true);
 
 -- Allow authenticated users to update table_fields
+DROP POLICY IF EXISTS "Allow authenticated users to update table_fields" ON public.table_fields;
 CREATE POLICY "Allow authenticated users to update table_fields"
   ON public.table_fields
   FOR UPDATE
@@ -54,6 +65,7 @@ CREATE POLICY "Allow authenticated users to update table_fields"
   WITH CHECK (true);
 
 -- Allow authenticated users to delete table_fields
+DROP POLICY IF EXISTS "Allow authenticated users to delete table_fields" ON public.table_fields;
 CREATE POLICY "Allow authenticated users to delete table_fields"
   ON public.table_fields
   FOR DELETE

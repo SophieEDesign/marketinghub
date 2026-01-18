@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS table_fields (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   table_id UUID NOT NULL REFERENCES tables(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  -- Human-friendly display name (can differ from internal `name`)
+  label TEXT,
   type TEXT NOT NULL CHECK (type IN (
     'text', 'long_text', 'number', 'percent', 'currency', 'date',
     'single_select', 'multi_select', 'checkbox', 'attachment',
@@ -20,6 +22,12 @@ CREATE TABLE IF NOT EXISTS table_fields (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(table_id, name)
 );
+
+-- Backfill/upgrade: ensure newer columns exist on older installs
+ALTER TABLE table_fields ADD COLUMN IF NOT EXISTS label TEXT;
+
+-- Table privileges (RLS policies do not grant privileges by themselves)
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE table_fields TO authenticated;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_table_fields_table_id ON table_fields(table_id);

@@ -40,6 +40,45 @@ export default function RecordModal({
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
 
+  function normalizeUpdateValue(fieldName: string, value: any): any {
+    // Avoid sending `undefined` to PostgREST.
+    let v: any = value === undefined ? null : value
+
+    const field = fields.find((f) => f?.name === fieldName)
+    if (!field) return v
+
+    if (field.type !== "link_to_table") return v
+
+    const toId = (x: any): string | null => {
+      if (x == null || x === "") return null
+      if (typeof x === "string") return x
+      if (typeof x === "object" && x && "id" in x) return String((x as any).id)
+      return String(x)
+    }
+
+    const relationshipType = (field.options as any)?.relationship_type as
+      | "one-to-one"
+      | "one-to-many"
+      | "many-to-many"
+      | undefined
+    const maxSelections = (field.options as any)?.max_selections as number | undefined
+    const isMulti =
+      relationshipType === "one-to-many" ||
+      relationshipType === "many-to-many" ||
+      (typeof maxSelections === "number" && maxSelections > 1)
+
+    if (isMulti) {
+      if (v == null) return null
+      if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+      const id = toId(v)
+      return id ? [id] : null
+    }
+
+    // Single-link: always normalize to a single UUID (or null).
+    if (Array.isArray(v)) return toId(v[0])
+    return toId(v)
+  }
+
   useEffect(() => {
     if (isOpen && recordId && tableName) {
       // Avoid flashing stale data while the next record loads.
@@ -98,10 +137,27 @@ export default function RecordModal({
     if (!record || !tableName) return
 
     try {
-      const { error } = await supabase
-        .from(tableName)
-        .update({ [fieldName]: value })
-        .eq("id", recordId)
+      const normalizedValue = normalizeUpdateValue(fieldName, value)
+      let finalSavedValue: any = normalizedValue
+
+      const doUpdate = async (val: any) => {
+        return await supabase.from(tableName).update({ [fieldName]: val }).eq("id", recordId)
+      }
+
+      let { error } = await doUpdate(finalSavedValue)
+
+      // See `useGridData.updateCell` for rationale (uuid vs uuid[] mismatch for linked fields)
+      if (
+        error?.code === "22P02" &&
+        Array.isArray(finalSavedValue) &&
+        String(error?.message || "").toLowerCase().includes('invalid input syntax for type uuid')
+      ) {
+        if (finalSavedValue.length <= 1) {
+          finalSavedValue = finalSavedValue[0] ?? null
+          const retry = await doUpdate(finalSavedValue)
+          error = retry.error
+        }
+      }
 
       if (error) {
         console.error("Error updating field:", error)
@@ -109,7 +165,7 @@ export default function RecordModal({
       }
 
       // Update local state
-      setRecord((prev) => (prev ? { ...prev, [fieldName]: value } : null))
+      setRecord((prev) => (prev ? { ...prev, [fieldName]: finalSavedValue } : null))
     } catch (error) {
       console.error("Error updating field:", error)
     }

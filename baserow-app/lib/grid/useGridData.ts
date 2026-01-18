@@ -146,7 +146,30 @@ export function useGridData({
           if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
           return String(x)
         }
-        if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+        // IMPORTANT:
+        // Most physical tables store `link_to_table` as a single `uuid` column (one-to-one).
+        // Some configurations may represent multi-link relationships (uuid[]). We must align the
+        // payload shape with the relationship configuration to avoid Postgres cast errors (22P02).
+        const relationshipType = (field as any)?.options?.relationship_type as
+          | 'one-to-one'
+          | 'one-to-many'
+          | 'many-to-many'
+          | undefined
+        const maxSelections = (field as any)?.options?.max_selections as number | undefined
+        const isMulti =
+          relationshipType === 'one-to-many' ||
+          relationshipType === 'many-to-many' ||
+          (typeof maxSelections === 'number' && maxSelections > 1)
+
+        if (isMulti) {
+          if (v == null) return null
+          if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+          const id = toId(v)
+          return id ? [id] : null
+        }
+
+        // Single-link: always normalize to a single UUID (or null).
+        if (Array.isArray(v)) return toId(v[0])
         return toId(v)
       }
 
@@ -369,10 +392,36 @@ export function useGridData({
 
         const normalizedValue = normalizeUpdateValue(fieldName, value)
 
-        const { error: updateError } = await supabase
-          .from(tableName)
-          .update({ [safeColumn]: normalizedValue })
-          .eq('id', rowId)
+        let finalSavedValue: any = normalizedValue
+
+        const doUpdate = async (val: any) => {
+          return await supabase.from(tableName).update({ [safeColumn]: val }).eq('id', rowId)
+        }
+
+        let { error: updateError } = await doUpdate(finalSavedValue)
+
+        // Compatibility rescue:
+        // Some existing tables have link_to_table columns physically created as `uuid` even though
+        // the field is configured as multi-link (and the UI returns an array). In that case Postgres
+        // throws 22P02 "invalid input syntax for type uuid". If the user only selected one value,
+        // we can safely retry with the first element so inline edit doesn't hard-fail.
+        if (
+          updateError?.code === '22P02' &&
+          Array.isArray(finalSavedValue) &&
+          String(updateError?.message || '').toLowerCase().includes('invalid input syntax for type uuid')
+        ) {
+          if (finalSavedValue.length <= 1) {
+            finalSavedValue = finalSavedValue[0] ?? null
+            const retry = await doUpdate(finalSavedValue)
+            updateError = retry.error
+          } else {
+            throw new Error(
+              `This field is configured to allow multiple linked records, but the underlying column ` +
+                `is a single uuid. Please change the field to "One to One" (single) or migrate the ` +
+                `column to uuid[] before saving multiple values.`
+            )
+          }
+        }
 
         if (updateError) {
           // Common root cause for "inline editing doesn't save" on newly created dynamic tables:
@@ -402,7 +451,7 @@ export function useGridData({
         // Optimistically update local state
         setRows((prevRows) =>
           prevRows.map((row) =>
-            row.id === rowId ? { ...row, [fieldName]: normalizedValue } : row
+            row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
           )
         )
       } catch (err: any) {

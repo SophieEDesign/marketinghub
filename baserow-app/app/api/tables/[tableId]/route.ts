@@ -170,6 +170,18 @@ export async function DELETE(
       )
     }
 
+    // Validate tableId to safely embed in SQL when needed.
+    // (Used for deletion that must bypass system-field delete trigger during cascade.)
+    const tableId = params.tableId
+    if (
+      typeof tableId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        tableId
+      )
+    ) {
+      return NextResponse.json({ error: 'Invalid tableId' }, { status: 400 })
+    }
+
     // 0. Before deleting views, identify and handle pages that will lose their anchor
     // Pages with saved_view_id pointing to views from this table will have their anchor
     // set to NULL when views are deleted (ON DELETE CASCADE). We need to handle these pages.
@@ -251,10 +263,15 @@ export async function DELETE(
     }
 
     // 3. Delete all fields associated with this table
-    const { error: fieldsError } = await supabase
-      .from('table_fields')
-      .delete()
-      .eq('table_id', params.tableId)
+    // Note: `public.table_fields` has a trigger that prevents deleting system audit fields.
+    // During full table deletion, we *must* allow deleting those rows (and cascades) or the
+    // `DELETE FROM public.tables` will fail.
+    const { error: fieldsError } = await supabase.rpc('execute_sql_safe', {
+      sql_text: `
+        SELECT set_config('app.allow_system_field_delete', 'on', true);
+        DELETE FROM public.table_fields WHERE table_id = '${tableId}'::uuid;
+      `,
+    })
 
     if (fieldsError) {
       console.error('Error deleting fields:', fieldsError)
@@ -284,10 +301,13 @@ export async function DELETE(
     }
 
     // 6. Delete the table metadata record
-    const { error: deleteError } = await supabase
-      .from('tables')
-      .delete()
-      .eq('id', params.tableId)
+    // Delete via SQL so the cascade can remove system audit field metadata.
+    const { error: deleteError } = await supabase.rpc('execute_sql_safe', {
+      sql_text: `
+        SELECT set_config('app.allow_system_field_delete', 'on', true);
+        DELETE FROM public.tables WHERE id = '${tableId}'::uuid;
+      `,
+    })
 
     if (deleteError) {
       return NextResponse.json(

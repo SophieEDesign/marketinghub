@@ -26,7 +26,19 @@ export function mapFieldTypeToPostgres(fieldType: FieldType, options?: FieldOpti
     case 'json':
       return 'jsonb'
     case 'link_to_table':
-      return 'uuid'
+      // Linked fields can be single (uuid) or multi (uuid[]).
+      // Multi is controlled by relationship_type / max_selections in field options.
+      // Defaulting multi here matches the UI defaults (one-to-many) and prevents 22P02 errors
+      // when the picker returns an array of UUIDs.
+      {
+        const relationshipType = options?.relationship_type
+        const maxSelections = options?.max_selections
+        const isMulti =
+          relationshipType === 'one-to-many' ||
+          relationshipType === 'many-to-many' ||
+          (typeof maxSelections === 'number' && maxSelections > 1)
+        return isMulti ? 'uuid[]' : 'uuid'
+      }
     case 'formula':
     case 'lookup':
       // Virtual fields don't have SQL columns
