@@ -187,7 +187,7 @@ export default function AirtableGridView({
     sorts,
   })
 
-  const canInlineEdit = editable && schemaAvailable
+  const canInlineEdit = editable
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -238,7 +238,6 @@ export default function AirtableGridView({
   }, [safeRows, safeFields, searchQuery, visibleFieldNames])
 
   const createNewRow = useCallback(async (): Promise<GridRow | null> => {
-    if (!schemaAvailable) return null
     const defaultsFromFilters = deriveDefaultValuesFromFilters(standardizedFilters, safeFields)
     const newRow = await insertRow(defaultsFromFilters)
 
@@ -256,7 +255,7 @@ export default function AirtableGridView({
     }
 
     return newRow
-  }, [insertRow, visibleFields, standardizedFilters, safeFields, schemaAvailable])
+  }, [insertRow, visibleFields, standardizedFilters, safeFields])
 
   // Expose actions to parent (toolbar lives outside this component)
   useEffect(() => {
@@ -960,7 +959,7 @@ export default function AirtableGridView({
     <div ref={gridRef} className="flex flex-col h-full bg-gray-50 overflow-hidden w-full">
       {schemaStatus?.available === false && (
         <div className="px-3 py-2 border-b border-amber-200 bg-amber-50 text-amber-900 text-xs">
-          Schema editing is unavailable.
+          Field editing temporarily unavailable — schema is syncing.
         </div>
       )}
       {/* Header */}

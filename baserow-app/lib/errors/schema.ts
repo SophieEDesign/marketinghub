@@ -16,7 +16,7 @@ export function isSchemaError(error: any): boolean {
 
 export function getSchemaSafeMessage(error: any, fallback: string): string {
   if (!isSchemaError(error)) return fallback
-  return "This data schema changed recently. Refresh the page and try again."
+  return "Schema is syncing in the background. Please try again shortly."
 }
 
 export function logSchemaWarning(context: string, error: any) {

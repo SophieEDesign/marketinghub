@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { getSchemaSafeMessage, logSchemaWarning } from '@/lib/errors/schema'
+import { useToast } from '@/components/ui/use-toast'
 
 interface NumberCellProps {
   value: number | null
@@ -27,6 +28,7 @@ export default function NumberCell({
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const canEdit = editable
+  const { toast } = useToast()
 
   useEffect(() => {
     setEditValue(value?.toString() || '')
@@ -55,7 +57,14 @@ export default function NumberCell({
     } catch (error) {
       console.error('Error saving number cell:', error)
       logSchemaWarning('NumberCell save', error)
-      alert(getSchemaSafeMessage(error, 'Failed to save. Please check your permissions and try again.'))
+      toast({
+        variant: 'destructive',
+        title: 'Failed to save',
+        description: getSchemaSafeMessage(
+          error,
+          'Failed to save. Please check your permissions and try again.'
+        ),
+      })
     } finally {
       setSaving(false)
     }

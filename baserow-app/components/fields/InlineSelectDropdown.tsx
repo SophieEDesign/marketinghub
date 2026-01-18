@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Plus, Edit2, Palette, X, Check, GripVertical } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useToast } from '@/components/ui/use-toast'
 import {
   resolveChoiceColor,
   getTextColorForBackground,
@@ -65,6 +66,7 @@ export default function InlineSelectDropdown({
   const [draggedOptionId, setDraggedOptionId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const normalizationRef = useRef<string | null>(null)
+  const { toast } = useToast()
 
   const isMulti = fieldType === 'multi_select'
   const selectedValues = useMemo((): string[] => {
@@ -208,7 +210,11 @@ export default function InlineSelectDropdown({
       console.error('Error updating options:', error)
       setLocalSelectOptions(previousOptions || normalizedSelectOptions)
       logSchemaWarning('InlineSelectDropdown update options', error)
-      alert(getSchemaSafeMessage(error, 'Failed to update options'))
+      toast({
+        variant: 'destructive',
+        title: 'Failed to update options',
+        description: getSchemaSafeMessage(error, 'Failed to update options'),
+      })
     } finally {
       setUpdatingOptions(false)
     }
@@ -275,7 +281,11 @@ export default function InlineSelectDropdown({
     } catch (error: any) {
       console.error('Error renaming option:', error)
       logSchemaWarning('InlineSelectDropdown rename option', error)
-      alert(getSchemaSafeMessage(error, 'Failed to rename option'))
+      toast({
+        variant: 'destructive',
+        title: 'Failed to rename option',
+        description: getSchemaSafeMessage(error, 'Failed to rename option'),
+      })
     }
   }
 
@@ -296,7 +306,11 @@ export default function InlineSelectDropdown({
     } catch (error: any) {
       console.error('Error updating color:', error)
       logSchemaWarning('InlineSelectDropdown update color', error)
-      alert(getSchemaSafeMessage(error, 'Failed to update color'))
+      toast({
+        variant: 'destructive',
+        title: 'Failed to update color',
+        description: getSchemaSafeMessage(error, 'Failed to update color'),
+      })
     }
   }
 
@@ -322,7 +336,11 @@ export default function InlineSelectDropdown({
     } catch (error: any) {
       console.error('Error deleting option:', error)
       logSchemaWarning('InlineSelectDropdown delete option', error)
-      alert(getSchemaSafeMessage(error, 'Failed to delete option'))
+      toast({
+        variant: 'destructive',
+        title: 'Failed to delete option',
+        description: getSchemaSafeMessage(error, 'Failed to delete option'),
+      })
     }
   }
 
