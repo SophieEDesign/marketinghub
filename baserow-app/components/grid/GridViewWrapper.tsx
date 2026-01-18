@@ -4,13 +4,11 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
 import GridView from "./GridView"
-import { normalizeRowHeight } from "@/lib/grid/row-height-utils"
 import Toolbar from "./Toolbar"
 import FieldBuilderDrawer from "./FieldBuilderDrawer"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 interface Filter {
   id?: string
@@ -93,7 +91,6 @@ export default function GridViewWrapper({
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
 }: GridViewWrapperProps) {
-  const { schemaAvailable } = useSchemaContract()
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
   const safeInitialSorts = asArray<Sort>(initialSorts)
@@ -125,7 +122,18 @@ export default function GridViewWrapper({
   
   // CRITICAL: Use block-level appearance settings for row height and wrapping
   // Block settings take precedence over view-level settings
-  const rowHeight = normalizeRowHeight(appearance.row_height)
+  // Map row height from block config (supports 'compact', 'standard', 'comfortable', and legacy 'medium')
+  const mapRowHeight = (height: string | undefined): string => {
+    if (!height) return 'standard'
+    // Legacy support: map old values
+    if (height === 'short') return 'compact'
+    if (height === 'tall') return 'comfortable'
+    if (height === 'medium') return 'standard'
+    return height // Already in correct format
+  }
+  
+  // Use block appearance settings (block-level control)
+  const rowHeight = mapRowHeight(appearance.row_height)
   const wrapText = appearance.wrap_text || false
 
   // Track previous values to prevent infinite loops
@@ -358,9 +366,7 @@ export default function GridViewWrapper({
       if (fetchError) {
         // If table doesn't exist (PGRST205) or 404, skip update
         if (fetchError.code === 'PGRST205' || fetchError.code === '42P01') {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn("grid_view_settings table does not exist. Grid settings will not persist.")
-          }
+          console.warn("grid_view_settings table does not exist. Run migration to create it.")
           // Fallback: update in views.config for backward compatibility
           setGroupBy(fieldName || undefined)
           return
@@ -377,9 +383,7 @@ export default function GridViewWrapper({
 
         if (error) {
           if (error.code === 'PGRST205' || error.code === '42P01') {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn("grid_view_settings table does not exist. Grid settings will not persist.")
-            }
+            console.warn("grid_view_settings table does not exist. Run migration to create it.")
             setGroupBy(fieldName || undefined)
             return
           }
@@ -396,16 +400,14 @@ export default function GridViewWrapper({
               column_widths: {},
               column_order: [],
               column_wrap_text: {},
-              row_height: 'standard',
+              row_height: 'medium',
               frozen_columns: 0,
             },
           ])
 
         if (error) {
           if (error.code === 'PGRST205' || error.code === '42P01') {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn("grid_view_settings table does not exist. Grid settings will not persist.")
-            }
+            console.warn("grid_view_settings table does not exist. Run migration to create it.")
             setGroupBy(fieldName || undefined)
             return
           }
@@ -440,13 +442,11 @@ export default function GridViewWrapper({
   }
 
   function handleAddField() {
-    if (!schemaAvailable) return
     setEditingField(null)
     setFieldBuilderOpen(true)
   }
 
   function handleEditField(fieldName: string) {
-    if (!schemaAvailable) return
     const field = fields.find(f => f.name === fieldName)
     setEditingField(field || null)
     setFieldBuilderOpen(true)
@@ -557,8 +557,8 @@ export default function GridViewWrapper({
         searchTerm={searchTerm}
         groupBy={groupBy}
         tableFields={fields}
-        onAddField={isEditing && schemaAvailable ? handleAddField : undefined}
-        onEditField={isEditing && schemaAvailable ? handleEditField : undefined}
+        onAddField={isEditing ? handleAddField : undefined}
+        onEditField={isEditing ? handleEditField : undefined}
         isEditing={isEditing}
         onRecordClick={onRecordClick}
           rowHeight={rowHeight}

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { format } from "date-fns"
@@ -107,10 +107,6 @@ export default function TimelineView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
-  const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const enableRecordOpen = (blockConfig as any)?.appearance?.enable_record_open ?? true
-  const canOpenRecord = allowOpenRecord && enableRecordOpen
-  const canEdit = !isViewOnly
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
 
   useEffect(() => {
@@ -790,14 +786,13 @@ export default function TimelineView({
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
 
   const handleOpenEventRecord = useCallback((rowId: string) => {
-    if (!canOpenRecord) return
     if (!supabaseTableName || !tableId) return
     if (onRecordClick) {
       onRecordClick(rowId)
       return
     }
-    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields, !canEdit)
-  }, [blockConfig, canEdit, canOpenRecord, onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(tableId, rowId, supabaseTableName, (blockConfig as any)?.modal_fields)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
 
   const handleEventSelect = useCallback((event: TimelineEvent, e: React.MouseEvent) => {
     // Don't open/select if we're resizing/dragging.
@@ -815,21 +810,8 @@ export default function TimelineView({
     }
 
     setSelectedEventId(event.rowId)
-
-    if (!canOpenRecord) return
-
-    const target = e.target as HTMLElement | null
-    if (
-      target?.closest('[data-timeline-open="true"]') ||
-      target?.closest('[data-timeline-field="true"]') ||
-      target?.closest('[data-timeline-resize="true"]') ||
-      target?.closest('button, a, input, textarea, select, [role="button"]')
-    ) {
-      return
-    }
-
     handleOpenEventRecord(event.rowId)
-  }, [canOpenRecord, draggingEvent, handleOpenEventRecord, resizingEvent])
+  }, [draggingEvent, handleOpenEventRecord, resizingEvent])
 
   // Handle event date updates
   const handleEventUpdate = useCallback(
@@ -1238,23 +1220,21 @@ export default function TimelineView({
                             >
                               <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
                                 {/* Record open control (explicit) */}
-                                {canOpenRecord && (
-                                  <div className="absolute top-1 right-1">
-                                    <button
-                                      type="button"
-                                      data-timeline-open="true"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleOpenEventRecord(event.rowId)
-                                      }}
-                                      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                                      title="Open record"
-                                      aria-label="Open record"
-                                    >
-                                      <ChevronRight className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                                )}
+                                <div className="absolute top-1 right-1">
+                                  <button
+                                    type="button"
+                                    data-timeline-open="true"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleOpenEventRecord(event.rowId)
+                                    }}
+                                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                                    title="Open record"
+                                    aria-label="Open record"
+                                  >
+                                    <ChevronRight className="h-4 w-4" />
+                                  </button>
+                                </div>
                                 {/* Image if configured */}
                                 {event.image && (
                                   <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
@@ -1279,19 +1259,8 @@ export default function TimelineView({
                                 />
                                 
                                 {/* Title */}
-                                <div
-                                  className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}
-                                  data-timeline-field="true"
-                                >
-                                  {resolvedCardFields.titleField ? (
-                                    <TimelineFieldValue
-                                      field={resolvedCardFields.titleField}
-                                      value={event.rowData[resolvedCardFields.titleField.name] ?? event.title}
-                                      compact={!wrapTitle}
-                                    />
-                                  ) : (
-                                    event.title
-                                  )}
+                                <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                                  {event.title}
                                 </div>
 
                                 {/* Card fields */}
@@ -1367,23 +1336,21 @@ export default function TimelineView({
                     >
                       <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
                         {/* Record open control (explicit) */}
-                        {canOpenRecord && (
-                          <div className="absolute top-1 right-1">
-                            <button
-                              type="button"
-                              data-timeline-open="true"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleOpenEventRecord(event.rowId)
-                              }}
-                              className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                              title="Open record"
-                              aria-label="Open record"
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="absolute top-1 right-1">
+                          <button
+                            type="button"
+                            data-timeline-open="true"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenEventRecord(event.rowId)
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                            title="Open record"
+                            aria-label="Open record"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
 
                         {/* Image if configured */}
                         {event.image && (
@@ -1409,19 +1376,8 @@ export default function TimelineView({
                         />
                         
                         {/* Title */}
-                        <div
-                          className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}
-                          data-timeline-field="true"
-                        >
-                          {resolvedCardFields.titleField ? (
-                            <TimelineFieldValue
-                              field={resolvedCardFields.titleField}
-                              value={event.rowData[resolvedCardFields.titleField.name] ?? event.title}
-                              compact={!wrapTitle}
-                            />
-                          ) : (
-                            event.title
-                          )}
+                        <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                          {event.title}
                         </div>
 
                         {/* Card fields */}

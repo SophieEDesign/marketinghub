@@ -1,10 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
-import {
-  DEFAULT_TEXT_LINE_HEIGHT,
-  getRowHeightTextLineClamp,
-} from '@/lib/grid/row-height-utils'
+import { useState, useEffect } from 'react'
+import RichTextEditor from '@/components/fields/RichTextEditor'
 
 interface LongTextCellProps {
   value: string | null
@@ -28,18 +25,10 @@ export default function LongTextCell({
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const canEdit = editable
 
   useEffect(() => {
     setEditValue(value || '')
   }, [value])
-
-  useEffect(() => {
-    if (!canEdit && editing) {
-      setEditing(false)
-    }
-  }, [canEdit, editing])
 
   const handleSave = async () => {
     if (saving) return
@@ -70,25 +59,17 @@ export default function LongTextCell({
     return tmp.textContent || tmp.innerText || ''
   }
 
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : undefined
-
-  if (editing && canEdit) {
+  if (editing && editable) {
     return (
-      <div className="relative w-full h-full" style={rowHeightStyle}>
-        <textarea
-          ref={textareaRef}
+      <div className="w-full">
+        <RichTextEditor
           value={editValue}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={handleChange}
           onBlur={handleBlur}
-          className="w-full h-full px-3 py-1 text-sm border border-blue-400 rounded-md outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 box-border resize-none overflow-y-auto"
-          placeholder="Enter notes..."
-          style={rowHeightStyle}
+          editable={true}
+          showToolbar={true}
+          minHeight="120px"
+          className="w-full"
         />
       </div>
     )
@@ -98,46 +79,33 @@ export default function LongTextCell({
   const isPlaceholder = !value
   const plainText = stripHtml(value)
 
-  // Controlled wrapping: single line with ellipsis by default, clamp lines when wrapText enabled
-  const cellStyle: React.CSSProperties = rowHeight
-    ? {
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-        height: `${rowHeight}px`,
-      }
-    : {}
-
-  const lineClamp = getRowHeightTextLineClamp(rowHeight, { wrapText })
-  const wrapStyle: React.CSSProperties = {
-    lineHeight: `${DEFAULT_TEXT_LINE_HEIGHT}px`,
-    ...(lineClamp
-      ? {
-          display: '-webkit-box',
-          WebkitLineClamp: lineClamp,
-          WebkitBoxOrient: 'vertical',
-        }
-      : {}),
+  // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
+  const cellStyle: React.CSSProperties = {
+    minHeight: rowHeight ? `${rowHeight}px` : 'auto',
+    maxHeight: rowHeight ? `${rowHeight}px` : 'none',
   }
+  const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 
   return (
     <div
-      onClick={canEdit ? () => setEditing(true) : undefined}
-      className={`w-full h-full px-3 py-1 text-sm rounded-md transition-colors overflow-hidden flex border border-transparent box-border ${
+      onClick={() => editable && setEditing(true)}
+      className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex ${
         wrapText ? 'items-start' : 'items-center'
-      } ${canEdit ? 'cursor-pointer hover:bg-gray-50/50 text-gray-900' : 'cursor-default text-gray-500'}`}
+      }`}
       style={cellStyle}
       title={plainText || undefined}
     >
       {value && value.trim() && value !== '<p></p>' ? (
-        <div
-          className={`prose prose-sm max-w-none text-gray-900 leading-5 prose-p:leading-5 prose-li:leading-5 ${
-            wrapText ? 'whitespace-normal break-words' : 'whitespace-nowrap'
-          } overflow-hidden prose-p:my-0 prose-ul:my-0 prose-ol:my-0`}
-          style={wrapStyle}
+        <div 
+          className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
+          style={{ 
+            lineHeight: '1.25',
+            maxHeight: wrapText ? contentMaxHeight : 'none',
+          }}
           dangerouslySetInnerHTML={{ __html: value }}
         />
       ) : (
-        <span className="text-gray-400 italic whitespace-nowrap overflow-hidden w-full">
+        <span className={`text-gray-400 italic truncate w-full`}>
           {isPlaceholder ? placeholder : ''}
         </span>
       )}

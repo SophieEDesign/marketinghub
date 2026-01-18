@@ -90,52 +90,104 @@ export default async function HomePage({
       redirect(`/pages/${pageId}`)
     }
     
-    // No default page resolved - do NOT fall back to a random page.
-    if (isDev) {
-      console.warn('[Default Page] No default page resolved - showing empty state')
+    // No default page resolved - fallback to first accessible page
+    if (accessiblePages.length > 0) {
+      const firstPageId = accessiblePages[0].id
+      if (isDev) {
+        console.log('[Default Page] No default set, using first accessible page:', { 
+          reason: 'first_accessible_fallback', 
+          pageId: firstPageId 
+        })
+      }
+      redirect(`/pages/${firstPageId}`)
     }
-
+    
+    // No accessible pages found - show empty state instead of redirecting
+    // Redirecting to "/" creates a loop, so we render an empty state here
+    if (isDev) {
+      console.warn('[Default Page] No accessible pages found - showing empty state')
+    }
+    
     if (admin) {
       redirect("/settings?tab=pages")
-    }
-
-    return (
-      <WorkspaceShellWrapper title="Welcome">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
-          <div className="max-w-md text-center space-y-4">
-            <h1 className="text-2xl font-semibold text-gray-900">No Default Page Set</h1>
-            <p className="text-gray-600">
-              Your workspace does not have a default page configured. Please contact your
-              administrator to set one.
-            </p>
+    } else {
+      // Members can't access settings - show empty state page
+      // Return empty state component instead of redirecting to avoid loop
+      return (
+        <WorkspaceShellWrapper title="Welcome">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+            <div className="max-w-md text-center space-y-4">
+              <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
+              <p className="text-gray-600">
+                No pages are available yet. Please contact an administrator to create pages.
+              </p>
+              <p className="text-sm text-gray-500">
+                If you&#39;re an administrator, you can create pages in Settings.
+              </p>
+            </div>
           </div>
-        </div>
-      </WorkspaceShellWrapper>
-    )
+        </WorkspaceShellWrapper>
+      )
+    }
   } catch (error) {
-    // Error resolving landing page - log and show empty state (no random fallback)
+    // Error resolving landing page - log and fallback
     if (isDev) {
       console.error('[Default Page] Error resolving landing page:', error)
       if (error instanceof Error) {
         console.error('[Default Page] Error details:', error.message, error.stack)
       }
     }
+    
+    // Fallback: try to get first accessible interface from views table
+    try {
+      let firstQuery = supabase
+        .from("views")
+        .select("id")
+        .eq("type", "interface")
+        .order("order_index", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(1)
 
+      if (!admin) {
+        firstQuery = firstQuery.or('is_admin_only.is.null,is_admin_only.eq.false')
+      }
+
+      const { data: firstInterface } = await firstQuery.maybeSingle()
+      if (firstInterface) {
+        if (isDev) {
+          console.log('[Default Page] Fallback to views table:', { 
+            reason: 'fallback_views_table', 
+            pageId: firstInterface.id 
+          })
+        }
+        redirect(`/pages/${firstInterface.id}`)
+      }
+    } catch (fallbackError) {
+      if (isDev) {
+        console.error('[Default Page] Fallback error:', fallbackError)
+      }
+    }
+    
+    // Last resort fallback - show empty state instead of redirecting
     if (admin) {
       redirect("/settings?tab=pages")
-    }
-
-    return (
-      <WorkspaceShellWrapper title="Welcome">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
-          <div className="max-w-md text-center space-y-4">
-            <h1 className="text-2xl font-semibold text-gray-900">Unable to Load Default Page</h1>
-            <p className="text-gray-600">
-              We couldn&#39;t determine a default page. Please contact your administrator.
-            </p>
+    } else {
+      // Show empty state instead of redirecting to avoid loop
+      return (
+        <WorkspaceShellWrapper title="Welcome">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
+            <div className="max-w-md text-center space-y-4">
+              <h1 className="text-2xl font-semibold text-gray-900">No Pages Available</h1>
+              <p className="text-gray-600">
+                No pages are available yet. Please contact an administrator to create pages.
+              </p>
+              <p className="text-sm text-gray-500">
+                If you&#39;re an administrator, you can create pages in Settings.
+              </p>
+            </div>
           </div>
-        </div>
-      </WorkspaceShellWrapper>
-    )
+        </WorkspaceShellWrapper>
+      )
+    }
   }
 }

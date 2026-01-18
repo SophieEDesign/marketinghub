@@ -5,13 +5,16 @@ import { Calculator, Link as LinkIcon, Paperclip, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
-import { getFieldDisplayName, isFieldValueError } from "@/lib/fields/display"
+import { getFieldDisplayName } from "@/lib/fields/display"
+import {
+  resolveChoiceColor,
+  getTextColorForBackground,
+  normalizeHexColor,
+} from "@/lib/field-colors"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
-import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 function AttachmentFieldEditor({
   field,
@@ -268,8 +271,6 @@ export interface FieldEditorProps {
   value: any
   onChange: (value: any) => void
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
-  selectOptionsEditable?: boolean // Allow select option editing
-  suppressDerivedFieldErrors?: boolean // Suppress derived-field error UI
   showLabel?: boolean // Whether to show the field label (default: true)
   labelClassName?: string // Custom classes for the label
   inputClassName?: string // Custom classes for the input container
@@ -300,8 +301,6 @@ export default function FieldEditor({
   value,
   onChange,
   isReadOnly: propIsReadOnly,
-  selectOptionsEditable = true,
-  suppressDerivedFieldErrors = false,
   showLabel = true,
   labelClassName = "block text-sm font-medium text-gray-700",
   inputClassName = "",
@@ -313,7 +312,6 @@ export default function FieldEditor({
   tableName,
 }: FieldEditorProps) {
   const { toast } = useToast()
-  const { schemaAvailable } = useSchemaContract()
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
 
   useEffect(() => {
@@ -324,48 +322,7 @@ export default function FieldEditor({
 
   const isVirtual = field.type === "formula" || field.type === "lookup"
   // Use prop override first, then check field-level read-only, then virtual
-  const schemaLocked = !schemaAvailable
-  const isReadOnly: boolean =
-    propIsReadOnly ?? (schemaLocked || isVirtual || !!field.options?.read_only || !!field.options?.system)
-
-  const isErrorValue = isFieldValueError(value)
-  const safeValue = isErrorValue ? null : value
-
-  const suppressDerivedErrors = suppressDerivedFieldErrors && (field.type === "lookup" || field.type === "formula")
-
-  useEffect(() => {
-    if (isErrorValue && !suppressDerivedErrors) {
-      console.error(`Invalid value for field "${field.name}".`, value)
-    }
-  }, [isErrorValue, suppressDerivedErrors, value, field.name])
-
-  const selectDiagnostics = useMemo(() => {
-    if (field.type !== "single_select" && field.type !== "multi_select") {
-      return null
-    }
-    const choices = field.options?.choices || []
-    const isMulti = field.type === "multi_select"
-    const rawValues = isMulti
-      ? (Array.isArray(safeValue) ? safeValue : safeValue ? [safeValue] : [])
-      : (typeof safeValue === "string" ? [safeValue] : [])
-    const validValues = choices.length > 0
-      ? rawValues.filter((val) => choices.includes(val))
-      : rawValues
-    const normalizedSingleValue = !isMulti ? (validValues[0] ?? null) : null
-    return {
-      choices,
-      isMulti,
-      rawValues,
-      validValues,
-      normalizedSingleValue,
-    }
-  }, [field.type, field.options?.choices, safeValue])
-
-  useEffect(() => {
-    if (selectDiagnostics && selectDiagnostics.rawValues.length !== selectDiagnostics.validValues.length) {
-      console.warn(`Invalid select value for field "${field.name}".`, selectDiagnostics.rawValues)
-    }
-  }, [selectDiagnostics, field.name])
+  const isReadOnly: boolean = propIsReadOnly ?? (isVirtual || !!field.options?.read_only)
   
   // Determine if this is a lookup field (derived) vs linked field (editable)
   const isLookupField = field.type === "lookup"
@@ -374,7 +331,6 @@ export default function FieldEditor({
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     if (field.type === "lookup") {
       e.preventDefault()
-      if (suppressDerivedErrors) return
       toast({
         title: "Cannot edit derived field",
         description: "This field is derived and can't be edited.",
@@ -382,7 +338,7 @@ export default function FieldEditor({
       })
       return
     }
-  }, [field.type, suppressDerivedErrors, toast])
+  }, [field.type, toast])
 
   // Attachment fields (upload + preview + delete)
   if (field.type === "attachment") {
@@ -443,7 +399,7 @@ export default function FieldEditor({
             />
           ) : (
             <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-500 italic ${inputClassName}`}>
-              {safeValue !== null && safeValue !== undefined ? String(safeValue) : "—"}
+              {value !== null && value !== undefined ? String(value) : "—"}
             </div>
           )}
         </div>
@@ -532,41 +488,144 @@ export default function FieldEditor({
 
   // Select fields
   if (field.type === "single_select" || field.type === "multi_select") {
-    const choices = selectDiagnostics?.choices || []
-    const isMulti = selectDiagnostics?.isMulti ?? field.type === "multi_select"
-    const validValues = selectDiagnostics?.validValues || []
-    const normalizedSingleValue = selectDiagnostics?.normalizedSingleValue ?? null
+    const choices = field.options?.choices || []
+    const isMulti = field.type === "multi_select"
+    const selectedValues = isMulti
+      ? (Array.isArray(value) ? value : value ? [value] : [])
+      : value
+        ? [value]
+        : []
 
+    // Capture the narrowed type so TS keeps it inside closures.
+    const selectFieldType: "single_select" | "multi_select" = field.type
+    const useSemanticColors = selectFieldType === "single_select"
+    const getChoiceColor = (choice: string): string =>
+      resolveChoiceColor(choice, selectFieldType, field.options, useSemanticColors)
+
+    if (isReadOnly) {
+      return (
+        <div className="space-y-2.5">
+          {showLabel && (
+            <label className={`${labelClassName} flex items-center gap-2`}>
+              {getFieldDisplayName(field)}
+              {required && <span className="text-red-500">*</span>}
+              {isVirtual && (
+                <span title="Formula or lookup field">
+                  <Calculator className="h-3 w-3 text-gray-400" />
+                </span>
+              )}
+            </label>
+          )}
+          <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm min-h-[40px] flex items-center flex-wrap gap-1.5 ${inputClassName}`}>
+            {selectedValues.length > 0 ? (
+              selectedValues.map((val: string) => {
+                const hexColor = getChoiceColor(val)
+                const textColorClass = getTextColorForBackground(hexColor)
+                const bgColor = normalizeHexColor(hexColor)
+                return (
+                  <span
+                    key={val}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shadow-sm ${textColorClass}`}
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    {val}
+                  </span>
+                )
+              })
+            ) : (
+              <span className="text-gray-400 italic">—</span>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    // Editable select - use dropdown for single, multi-select with checkboxes
     return (
       <div className="space-y-2.5">
         {showLabel && (
           <label className={`${labelClassName} flex items-center gap-2`}>
             {getFieldDisplayName(field)}
             {required && <span className="text-red-500">*</span>}
-            {isVirtual && (
-              <span title="Formula or lookup field">
-                <Calculator className="h-3 w-3 text-gray-400" />
-              </span>
-            )}
           </label>
         )}
-        <InlineSelectDropdown
-          value={isMulti ? validValues : normalizedSingleValue}
-          choices={choices}
-          choiceColors={field.options?.choiceColors}
-          fieldOptions={field.options}
-          fieldType={field.type}
-          fieldId={field.id}
-          tableId={field.table_id}
-          editable={!isReadOnly}
-          canEditOptions={!isReadOnly && selectOptionsEditable}
-          displayVariant="pills"
-          allowClear={!isReadOnly}
-          placeholder={isReadOnly ? "—" : "Select..."}
-          onValueChange={async (newValue) => {
-            onChange(newValue)
-          }}
-        />
+        {isMulti ? (
+          // Multi-select: show color pills that can be toggled
+          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
+            {choices.length === 0 ? (
+              <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
+            ) : (
+              choices.map((choice: string) => {
+                const isSelected = selectedValues.includes(choice)
+                const hexColor = getChoiceColor(choice)
+                const textColorClass = getTextColorForBackground(hexColor)
+                const bgColor = normalizeHexColor(hexColor)
+                
+                return (
+                  <button
+                    key={choice}
+                    type="button"
+                    onClick={() => {
+                      const newValues = isSelected
+                        ? selectedValues.filter((v) => v !== choice)
+                        : [...selectedValues, choice]
+                      onChange(newValues)
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
+                      isSelected 
+                        ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                    style={isSelected ? { backgroundColor: bgColor } : {}}
+                  >
+                    {choice}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        ) : (
+          // Single select: show color pills that can be clicked
+          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
+            {choices.length === 0 ? (
+              <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
+            ) : (
+              <>
+                {choices.map((choice: string) => {
+                  const isSelected = selectedValues.includes(choice)
+                  const hexColor = getChoiceColor(choice)
+                  const textColorClass = getTextColorForBackground(hexColor)
+                  const bgColor = normalizeHexColor(hexColor)
+                  
+                  return (
+                    <button
+                      key={choice}
+                      type="button"
+                      onClick={() => onChange(choice)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
+                        isSelected 
+                          ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                      style={isSelected ? { backgroundColor: bgColor } : {}}
+                    >
+                      {choice}
+                    </button>
+                  )
+                })}
+                {value && (
+                  <button
+                    type="button"
+                    onClick={() => onChange(null)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-300"
+                  >
+                    Clear
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -574,12 +633,10 @@ export default function FieldEditor({
   // Date fields
   if (field.type === "date") {
     // For input: use ISO format (YYYY-MM-DD) - HTML5 date input requires this
-    const parsedDate = safeValue ? new Date(safeValue) : null
-    const isValidDate = !!parsedDate && !isNaN(parsedDate.getTime())
-    const dateValueForInput = isValidDate ? parsedDate.toISOString().split("T")[0] : ""
+    const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
 
     if (isReadOnly) {
-      const dateValueForDisplay = isValidDate ? formatDateUK(parsedDate, "—") : ""
+      const dateValueForDisplay = value ? formatDateUK(value, "—") : ""
       return (
         <div className="space-y-2.5">
           {showLabel && (
@@ -675,10 +732,10 @@ export default function FieldEditor({
             </label>
           )}
           <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 min-h-[60px] ${inputClassName}`}>
-            {safeValue ? (
+            {value ? (
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: safeValue }}
+                dangerouslySetInnerHTML={{ __html: value }}
               />
             ) : (
               <span className="italic">—</span>
@@ -697,7 +754,7 @@ export default function FieldEditor({
           </label>
         )}
         <RichTextEditor
-          value={safeValue ?? ""}
+          value={value ?? ""}
           onChange={onChange}
           editable={true}
           showToolbar={true}
@@ -732,7 +789,7 @@ export default function FieldEditor({
           </label>
         )}
         <div className={`px-3.5 py-2.5 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-600 italic ${inputClassName}`}>
-          {safeValue !== null && safeValue !== undefined ? String(safeValue) : "—"}
+          {value !== null && value !== undefined ? String(value) : "—"}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
               = {field.options.formula}

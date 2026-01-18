@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -40,10 +40,6 @@ interface ListViewProps {
   imageField?: string // Optional: field name for image/attachment
   pillFields?: string[] // Optional: select/multi-select fields to show as pills
   metaFields?: string[] // Optional: date, number, etc. for metadata
-  // Inline editing permission
-  canEdit?: boolean
-  // Record open controls
-  canOpenRecord?: boolean
   // Callbacks for block config updates (when not using views)
   onGroupByChange?: (fieldName: string | null) => void
   onFiltersChange?: (filters: FilterConfig[]) => void
@@ -69,8 +65,6 @@ export default function ListView({
   imageField,
   pillFields = [],
   metaFields = [],
-  canEdit = true,
-  canOpenRecord = true,
   onGroupByChange,
   onFiltersChange,
   reloadKey,
@@ -88,19 +82,6 @@ export default function ListView({
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [currentGroupBy, setCurrentGroupBy] = useState<string | undefined>(groupBy)
   const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(filters)
-
-  const isRecordOpenAllowed = useCallback(
-    (e?: React.MouseEvent) => {
-      if (!canOpenRecord) return false
-      if (!e) return true
-      const target = e.target as HTMLElement | null
-      if (!target) return true
-      return !target.closest(
-        'button, a, input, textarea, select, [role="button"], [data-prevent-record-open="true"]'
-      )
-    },
-    [canOpenRecord]
-  )
 
   // Load table name for record panel
   useEffect(() => {
@@ -127,12 +108,11 @@ export default function ListView({
     }
     const effectiveTableName = tableName || supabaseTableName
     if (tableId && effectiveTableName) {
-      openRecord(tableId, recordId, effectiveTableName, undefined, !canEdit)
+      openRecord(tableId, recordId, effectiveTableName)
     }
-  }, [canEdit, onRecordClick, openRecord, supabaseTableName, tableId, tableName])
+  }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
-    if (!canEdit) return
     if (!rowId || !supabaseTableName) return
     const supabase = createClient()
     const { error } = await supabase
@@ -145,7 +125,7 @@ export default function ListView({
     setRows((prev) =>
       prev.map((r) => (String(r?.id) === String(rowId) ? { ...(r || {}), [fieldName]: value } : r))
     )
-  }, [canEdit, supabaseTableName])
+  }, [supabaseTableName])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {
@@ -488,7 +468,6 @@ export default function ListView({
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
     const recordId = row.id
-    const recordIdString = String(recordId)
 
     // Get title field
     const titleFieldObj = tableFields.find(f => f.name === titleField || f.id === titleField)
@@ -500,37 +479,26 @@ export default function ListView({
     return (
       <div
         key={recordId}
-        onClick={(e) => {
-          setSelectedRecordId(recordIdString)
-          if (isRecordOpenAllowed(e)) {
-            handleOpenRecord(recordIdString)
-          }
-        }}
-        onDoubleClick={(e) => {
-          if (isRecordOpenAllowed(e)) {
-            handleOpenRecord(recordIdString)
-          }
-        }}
+        onClick={() => setSelectedRecordId(String(recordId))}
+        onDoubleClick={() => handleOpenRecord(String(recordId))}
         className={`group border-b border-gray-200 transition-colors touch-manipulation cursor-default ${
-          selectedRecordId === recordIdString ? "bg-blue-50/60" : "hover:bg-gray-50 active:bg-gray-100"
+          selectedRecordId === String(recordId) ? "bg-blue-50/60" : "hover:bg-gray-50 active:bg-gray-100"
         }`}
       >
         <div className={`flex items-start gap-3 ${isMobile ? 'p-3' : 'p-4'}`}>
           {/* Row open control */}
-          {canOpenRecord && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleOpenRecord(recordIdString)
-              }}
-              className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-              title="Open record"
-              aria-label="Open record"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleOpenRecord(String(recordId))
+            }}
+            className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+            title="Open record"
+            aria-label="Open record"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
 
           {/* Image */}
           {imageUrl && (
@@ -552,19 +520,17 @@ export default function ListView({
             <div
               className={`font-medium text-gray-900 mb-1 ${isMobile ? 'text-sm' : 'text-base'} break-words`}
               onDoubleClick={(e) => e.stopPropagation()}
-              data-prevent-record-open="true"
             >
               {titleFieldObj ? (
                 <CellFactory
                   field={titleFieldObj}
                   value={titleValue}
-                  rowId={recordIdString}
+                  rowId={String(recordId)}
                   tableName={supabaseTableName}
-                    editable={canEdit && !titleFieldObj.options?.read_only && !isVirtualField(titleFieldObj)}
-                  contextReadOnly={!canEdit}
+                  editable={!titleFieldObj.options?.read_only && !isVirtualField(titleFieldObj)}
                   wrapText={true}
                   rowHeight={isMobile ? 32 : 40}
-                  onSave={(value) => handleCellSave(recordIdString, titleFieldObj.name, value)}
+                  onSave={(value) => handleCellSave(String(recordId), titleFieldObj.name, value)}
                 />
               ) : (
                 <span className="text-gray-700">Untitled</span>
@@ -573,10 +539,7 @@ export default function ListView({
 
             {/* Subtitles */}
             {subtitleFields.slice(0, 3).length > 0 && (
-              <div
-                className={`text-gray-700 space-y-1 mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}
-                data-prevent-record-open="true"
-              >
+              <div className={`text-gray-700 space-y-1 mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
                 {subtitleFields.slice(0, 3).map((fieldName) => {
                   const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
                   if (!field) return null
@@ -585,13 +548,12 @@ export default function ListView({
                       <CellFactory
                         field={field}
                         value={row[field.name]}
-                        rowId={recordIdString}
+                        rowId={String(recordId)}
                         tableName={supabaseTableName}
-                        editable={canEdit && !field.options?.read_only && !isVirtualField(field)}
-                        contextReadOnly={!canEdit}
+                        editable={!field.options?.read_only && !isVirtualField(field)}
                         wrapText={true}
                         rowHeight={isMobile ? 32 : 40}
-                        onSave={(value) => handleCellSave(recordIdString, field.name, value)}
+                        onSave={(value) => handleCellSave(String(recordId), field.name, value)}
                       />
                     </div>
                   )
@@ -600,7 +562,7 @@ export default function ListView({
             )}
 
             {/* Pills + meta */}
-            <div className="flex flex-wrap items-center gap-2 mt-2" data-prevent-record-open="true">
+            <div className="flex flex-wrap items-center gap-2 mt-2">
               {pillFields.map((fieldName) => {
                 const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
                 if (!field) return null
@@ -609,13 +571,12 @@ export default function ListView({
                     <CellFactory
                       field={field}
                       value={row[field.name]}
-                      rowId={recordIdString}
+                      rowId={String(recordId)}
                       tableName={supabaseTableName}
-                      editable={canEdit && !field.options?.read_only && !isVirtualField(field)}
-                      contextReadOnly={!canEdit}
+                      editable={!field.options?.read_only && !isVirtualField(field)}
                       wrapText={false}
                       rowHeight={isMobile ? 32 : 40}
-                      onSave={(value) => handleCellSave(recordIdString, field.name, value)}
+                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
                     />
                   </div>
                 )
@@ -630,13 +591,12 @@ export default function ListView({
                     <CellFactory
                       field={field}
                       value={row[field.name]}
-                      rowId={recordIdString}
+                      rowId={String(recordId)}
                       tableName={supabaseTableName}
-                      editable={canEdit && !field.options?.read_only && !isVirtualField(field)}
-                      contextReadOnly={!canEdit}
+                      editable={!field.options?.read_only && !isVirtualField(field)}
                       wrapText={false}
                       rowHeight={isMobile ? 32 : 40}
-                      onSave={(value) => handleCellSave(recordIdString, field.name, value)}
+                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
                     />
                   </div>
                 )
@@ -653,13 +613,10 @@ export default function ListView({
     imageField,
     pillFields,
     metaFields,
-    canEdit,
-    canOpenRecord,
     getImageUrl,
     handleOpenRecord,
     handleCellSave,
     isVirtualField,
-    isRecordOpenAllowed,
     isMobile,
     selectedRecordId,
     supabaseTableName,

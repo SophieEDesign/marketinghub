@@ -226,14 +226,6 @@ export function resolveChoiceColor(
   fieldOptions?: FieldOptions,
   useSemanticColors: boolean = true
 ): string {
-  // 0. Check select_options color (new canonical source)
-  if (fieldOptions?.select_options) {
-    const match = fieldOptions.select_options.find((opt) => opt.label === choice)
-    if (match?.color) {
-      return match.color
-    }
-  }
-
   // 1. Check option-level override (highest precedence)
   if (fieldOptions?.choiceColors?.[choice]) {
     return fieldOptions.choiceColors[choice]

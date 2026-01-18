@@ -87,11 +87,6 @@ function isSelectField(field: TableField): field is TableField & { type: "single
   return field.type === "single_select" || field.type === "multi_select"
 }
 
-function resolveFieldByKey(fieldKey: string | undefined, tableFields: TableField[]): TableField | undefined {
-  if (!fieldKey) return undefined
-  return tableFields.find((f) => f.name === fieldKey || f.id === fieldKey)
-}
-
 export default function MultiCalendarView({
   blockId,
   pageId = null,
@@ -110,9 +105,6 @@ export default function MultiCalendarView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === "view"
   const allowInlineCreate = permissions.allowInlineCreate ?? true
-  const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const enableRecordOpen = appearance.enable_record_open ?? true
-  const canOpenRecord = allowOpenRecord && enableRecordOpen
   const blockShowAddRecord = appearance.show_add_record
   const showAddRecord = blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate && !isEditing
@@ -272,16 +264,11 @@ export default function MultiCalendarView({
       const sourceLabel = (s.label || "").trim() || table.name
       const sourceColor = pickSourceColor(idx)
 
-      const startFieldObj = resolveFieldByKey(s.start_date_field, tableFields)
-      const endFieldObj = resolveFieldByKey(s.end_date_field, tableFields)
-      const titleFieldObj = resolveFieldByKey(s.title_field, tableFields)
-      if (!startFieldObj || !titleFieldObj) return
+      const startField = s.start_date_field
+      const endField = s.end_date_field
+      const titleField = s.title_field
 
-      const startField = startFieldObj.name
-      const endField = endFieldObj?.name
-      const titleField = titleFieldObj.name
-
-      const isStartEditable = startFieldObj.type === "date"
+      const isStartEditable = tableFields.some((f) => (f.name === startField || f.id === startField) && f.type === "date")
 
       rows.forEach((r) => {
         const row = r.data || {}
@@ -304,17 +291,19 @@ export default function MultiCalendarView({
 
         let eventColor = sourceColor
         if (s.color_field) {
-          const colorFieldObj = resolveFieldByKey(s.color_field, tableFields)
-          const selectColorField = colorFieldObj && isSelectField(colorFieldObj) ? colorFieldObj : undefined
-          if (selectColorField) {
-            const rawValue = row[selectColorField.name]
+          const colorFieldObj = tableFields.find(
+            (f): f is TableField & { type: "single_select" | "multi_select" } =>
+              (f.name === s.color_field || f.id === s.color_field) && isSelectField(f)
+          )
+          if (colorFieldObj) {
+            const rawValue = row[colorFieldObj.name]
             if (rawValue) {
               eventColor = normalizeHexColor(
                 resolveChoiceColor(
                   String(rawValue).trim(),
-                  selectColorField.type,
-                  selectColorField.options,
-                  selectColorField.type === "single_select"
+                  colorFieldObj.type,
+                  colorFieldObj.options,
+                  colorFieldObj.type === "single_select"
                 )
               )
             }
@@ -374,13 +363,12 @@ export default function MultiCalendarView({
     }
 
     const tableFields = fieldsBySource[mapping.id] || []
-    const startFieldObj = resolveFieldByKey(mapping.start_date_field, tableFields)
-    if (!startFieldObj || startFieldObj.type !== "date") {
+    const startFieldName = mapping.start_date_field
+    const hasStart = tableFields.some((f) => (f.name === startFieldName || f.id === startFieldName) && f.type === "date")
+    if (!hasStart) {
       info.revert()
       return
     }
-    const startFieldName = startFieldObj.name
-    const endFieldName = resolveFieldByKey(mapping.end_date_field, tableFields)?.name
 
     // Shift end date by the same delta, if an end field exists.
     const currentRow = (rowsBySource[mapping.id] || []).find((r) => r.id === rowId)
@@ -390,13 +378,13 @@ export default function MultiCalendarView({
 
     const updates: Record<string, any> = { [startFieldName]: safeDateOnly(newStart) }
 
-    if (endFieldName && currentRowData?.[endFieldName] && oldFromDate && !isNaN(oldFromDate.getTime())) {
-      const oldToRaw = currentRowData[endFieldName]
+    if (mapping.end_date_field && currentRowData?.[mapping.end_date_field] && oldFromDate && !isNaN(oldFromDate.getTime())) {
+      const oldToRaw = currentRowData[mapping.end_date_field]
       const oldToDate = new Date(oldToRaw)
       if (!isNaN(oldToDate.getTime())) {
         const deltaMs = newStart.getTime() - oldFromDate.getTime()
         const newToDate = new Date(oldToDate.getTime() + deltaMs)
-        updates[endFieldName] = safeDateOnly(newToDate)
+        updates[mapping.end_date_field] = safeDateOnly(newToDate)
       }
     }
 
@@ -427,9 +415,8 @@ export default function MultiCalendarView({
     const tableFields = fieldsBySource[sid] || []
     if (!table?.supabaseTable) return
 
-    const startField = resolveFieldByKey(mapping.start_date_field, tableFields)?.name
-    const endField = resolveFieldByKey(mapping.end_date_field, tableFields)?.name
-    if (!startField) return
+    const startField = mapping.start_date_field
+    const endField = mapping.end_date_field
 
     const viewDefaults = viewDefaultFiltersBySource[sid] || []
     const userQuick = quickFiltersBySource[sid] || []
@@ -602,7 +589,6 @@ export default function MultiCalendarView({
           editable={!isViewOnly && !isEditing}
           eventDrop={handleEventDrop}
           eventClick={(info) => {
-            if (!canOpenRecord) return
             const ext = info.event.extendedProps as any
             const recordId = String(ext?.rowId || "")
             const tableId = String(ext?.tableId || "")
@@ -612,7 +598,7 @@ export default function MultiCalendarView({
               onRecordClick(recordId, tableId)
               return
             }
-            openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields, isViewOnly)
+            openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields)
           }}
           dateClick={(arg) => {
             if (!canCreateRecord) return

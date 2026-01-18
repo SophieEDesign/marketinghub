@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
@@ -176,24 +176,18 @@ export default function KanbanView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
-  const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const enableRecordOpen = (blockConfig as any)?.appearance?.enable_record_open ?? true
-  const canOpenRecord = allowOpenRecord && enableRecordOpen
-  const canEdit = !isViewOnly
   const canCreateRecord = !isViewOnly && allowInlineCreate
 
   const handleOpenRecord = useCallback((recordId: string) => {
-    if (!canOpenRecord) return
     if (!supabaseTableName) return
     if (onRecordClick) {
       onRecordClick(recordId)
       return
     }
-    openRecord(tableId, recordId, supabaseTableName, (blockConfig as any)?.modal_fields, isViewOnly)
-  }, [blockConfig, canOpenRecord, isViewOnly, onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(tableId, recordId, supabaseTableName, (blockConfig as any)?.modal_fields)
+  }, [blockConfig, onRecordClick, openRecord, supabaseTableName, tableId])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
-    if (!canEdit) return
     if (!supabaseTableName) return
     const { error } = await supabase
       .from(supabaseTableName)
@@ -208,20 +202,7 @@ export default function KanbanView({
           : r
       )
     )
-  }, [canEdit, supabaseTableName])
-
-  const isRecordOpenAllowed = useCallback(
-    (e?: React.MouseEvent) => {
-      if (!canOpenRecord) return false
-      if (!e) return true
-      const target = e.target as HTMLElement | null
-      if (!target) return true
-      return !target.closest(
-        'button, a, input, textarea, select, [role="button"], [data-prevent-record-open="true"]'
-      )
-    },
-    [canOpenRecord]
-  )
+  }, [supabaseTableName])
 
   const handleCreateInGroup = useCallback(async (groupName: string) => {
     if (!showAddRecord || !canCreateRecord) return
@@ -320,36 +301,25 @@ export default function KanbanView({
                     selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
                   }`}
                   style={borderColor}
-                  onClick={(e) => {
-                    setSelectedCardId(String(row.id))
-                    if (isRecordOpenAllowed(e)) {
-                      handleOpenRecord(String(row.id))
-                    }
-                  }}
-                  onDoubleClick={(e) => {
-                    if (isRecordOpenAllowed(e)) {
-                      handleOpenRecord(String(row.id))
-                    }
-                  }}
+                  onClick={() => setSelectedCardId(String(row.id))}
+                  onDoubleClick={() => handleOpenRecord(String(row.id))}
                 >
                   <CardContent className="p-4">
                     <div className="space-y-2">
                       {/* Row open control */}
                       <div className="flex items-start justify-end">
-                        {canOpenRecord && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOpenRecord(String(row.id))
-                            }}
-                            className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                            title="Open record"
-                            aria-label="Open record"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenRecord(String(row.id))
+                          }}
+                          className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                          title="Open record"
+                          aria-label="Open record"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
                       </div>
 
                       {/* Image if configured */}
@@ -381,7 +351,6 @@ export default function KanbanView({
                               className="text-sm"
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
-                              data-prevent-record-open="true"
                             >
                               <div className="text-gray-500 font-medium text-xs uppercase tracking-wide">
                                 {fieldObj.name}:
@@ -392,8 +361,7 @@ export default function KanbanView({
                                   value={(row.data || {})[fieldName]}
                                   rowId={String(row.id)}
                                   tableName={supabaseTableName || ""}
-                                  editable={canEdit && !fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                                  contextReadOnly={!canEdit}
+                                  editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
                                   wrapText={true}
                                   rowHeight={32}
                                   onSave={(value) => handleCellSave(String(row.id), fieldName, value)}

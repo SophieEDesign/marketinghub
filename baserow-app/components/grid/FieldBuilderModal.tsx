@@ -14,7 +14,6 @@ import { FIELD_TYPES } from "@/types/fields"
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import { getFieldDisplayName } from "@/lib/fields/display"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 interface FieldBuilderModalProps {
   isOpen: boolean
@@ -33,7 +32,6 @@ export default function FieldBuilderModal({
   onSave,
   tableFields = [],
 }: FieldBuilderModalProps) {
-  const { schemaAvailable } = useSchemaContract()
   const [name, setName] = useState("")
   const [type, setType] = useState<FieldType>("text")
   const [required, setRequired] = useState(false)
@@ -49,7 +47,6 @@ export default function FieldBuilderModal({
   const isEdit = !!field
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
-  const schemaLocked = !schemaAvailable
 
   useEffect(() => {
     if (field) {
@@ -70,19 +67,19 @@ export default function FieldBuilderModal({
 
   // Load tables for lookup and link_to_table fields
   useEffect(() => {
-    if (isOpen && schemaAvailable && (type === 'lookup' || type === 'link_to_table')) {
+    if (isOpen && (type === 'lookup' || type === 'link_to_table')) {
       loadTables()
     }
-  }, [isOpen, type, schemaAvailable])
+  }, [isOpen, type])
 
   // Load fields from lookup table when lookup_table_id changes
   useEffect(() => {
-    if (isOpen && schemaAvailable && type === 'lookup' && options.lookup_table_id) {
+    if (isOpen && type === 'lookup' && options.lookup_table_id) {
       loadLookupTableFields(options.lookup_table_id)
     } else {
       setLookupTableFields([])
     }
-  }, [isOpen, type, options.lookup_table_id, schemaAvailable])
+  }, [isOpen, type, options.lookup_table_id])
 
   async function loadTables() {
     setLoadingTables(true)
@@ -125,10 +122,6 @@ export default function FieldBuilderModal({
   }
 
   async function handleSave() {
-    if (!schemaAvailable) {
-      setError("Schema editing is unavailable.")
-      return
-    }
     if (!name.trim()) {
       setError("Field name is required")
       return
@@ -173,9 +166,7 @@ export default function FieldBuilderModal({
       const data = await response.json()
 
       if (!response.ok) {
-        const baseMessage = data.error || "Failed to save field"
-        const detailMessage = data.details ? `\n${data.details}` : ""
-        setError(`${baseMessage}${detailMessage}`)
+        setError(data.error || "Failed to save field")
         setLoading(false)
         return
       }
@@ -478,14 +469,9 @@ export default function FieldBuilderModal({
           </DialogDescription>
         </DialogHeader>
 
-        <fieldset className="space-y-4 py-4" disabled={loading || schemaLocked}>
-          {schemaLocked && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-900">
-              Schema editing is unavailable.
-            </div>
-          )}
+        <div className="space-y-4 py-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 whitespace-pre-line">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
               {error}
             </div>
           )}
@@ -499,7 +485,7 @@ export default function FieldBuilderModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter field name"
-              disabled={loading || schemaLocked}
+              disabled={loading}
             />
           </div>
 
@@ -514,7 +500,7 @@ export default function FieldBuilderModal({
                 setOptions({})
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={loading || schemaLocked}
+              disabled={loading}
             >
               {FIELD_TYPES.map((ft) => (
                 <option key={ft.type} value={ft.type}>
@@ -538,7 +524,7 @@ export default function FieldBuilderModal({
                 checked={required}
                 onChange={(e) => setRequired(e.target.checked)}
                 className="w-4 h-4"
-                disabled={loading || schemaLocked}
+                disabled={loading}
               />
               <Label htmlFor="required">Required</Label>
             </div>
@@ -560,14 +546,14 @@ export default function FieldBuilderModal({
                   }
                 }}
                 placeholder="Default value (optional)"
-                disabled={loading || schemaLocked}
+                disabled={loading}
               />
             </div>
           )}
 
           {/* Type-specific Options */}
           {renderTypeSpecificOptions()}
-        </fieldset>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 pt-4 border-t">
@@ -582,7 +568,7 @@ export default function FieldBuilderModal({
           <Button
             type="button"
             onClick={handleSave}
-            disabled={loading || schemaLocked || !name.trim()}
+            disabled={loading || !name.trim()}
           >
             <Save className="h-4 w-4 mr-2" />
             {loading ? "Saving..." : "Save"}

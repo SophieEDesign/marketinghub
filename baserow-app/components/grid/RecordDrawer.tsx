@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { X, Save, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
-import { getSchemaSafeMessage, logSchemaWarning } from "@/lib/errors/schema"
 
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
@@ -96,16 +95,14 @@ export default function RecordDrawer({
 
       if (error) {
         console.error("Error saving record:", error)
-        logSchemaWarning("RecordDrawer save", error)
-        alert(getSchemaSafeMessage(error, "Failed to save record. Please try again."))
+        alert("Failed to save record: " + error.message)
       } else {
         await loadRecord()
         onSave?.()
       }
     } catch (error: any) {
       console.error("Error saving record:", error)
-      logSchemaWarning("RecordDrawer save", error)
-      alert(getSchemaSafeMessage(error, "Failed to save record. Please try again."))
+      alert("Failed to save record: " + error.message)
     } finally {
       setSaving(false)
     }
@@ -127,16 +124,14 @@ export default function RecordDrawer({
 
       if (error) {
         console.error("Error deleting record:", error)
-        logSchemaWarning("RecordDrawer delete", error)
-        alert(getSchemaSafeMessage(error, "Failed to delete record. Please try again."))
+        alert("Failed to delete record: " + error.message)
       } else {
         onDelete?.()
         onClose()
       }
     } catch (error: any) {
       console.error("Error deleting record:", error)
-      logSchemaWarning("RecordDrawer delete", error)
-      alert(getSchemaSafeMessage(error, "Failed to delete record. Please try again."))
+      alert("Failed to delete record: " + error.message)
     } finally {
       setDeleting(false)
     }

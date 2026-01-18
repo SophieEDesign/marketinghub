@@ -9,7 +9,6 @@ import {
   normalizeHexColor,
 } from "@/lib/field-colors"
 import type { FieldType, FieldOptions } from "@/types/fields"
-import { getInlineEditState } from "@/lib/fields/display"
 
 interface CellProps {
   value: any
@@ -29,12 +28,6 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   const [editValue, setEditValue] = useState(value ?? "")
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
-  const { canEdit, isVirtual: resolvedVirtual } = getInlineEditState({
-    editable,
-    fieldType,
-    fieldOptions,
-    isVirtual,
-  })
 
   useEffect(() => {
     setEditValue(value ?? "")
@@ -49,14 +42,8 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     }
   }, [editing])
 
-  useEffect(() => {
-    if (!canEdit && editing) {
-      setEditing(false)
-    }
-  }, [canEdit, editing])
-
   const handleStartEdit = () => {
-    if (!canEdit) return
+    if (!editable || isVirtual) return
     setEditing(true)
     setEditValue(value ?? "")
   }
@@ -119,16 +106,14 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   const isLongText = fieldType === "long_text"
   
   // Base cell style with row height constraint
-  const cellStyle: React.CSSProperties = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
+  const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
+    maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+    minHeight: rowHeight ? `${rowHeight}px` : '36px',
+  }
 
   // Handle virtual fields (formula/lookup) - read-only
-  if (resolvedVirtual) {
+  if (isVirtual) {
     const displayValue = value !== null && value !== undefined 
       ? String(value) 
       : "—"
@@ -143,9 +128,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
         title={fieldOptions?.formula ? `Formula: ${fieldOptions.formula}` : 'Formula field'}
       >
         <Calculator className="h-3.5 w-3.5 opacity-40 flex-shrink-0" />
-        <span className={`text-sm ${wrapText ? 'whitespace-normal break-words' : 'truncate'} w-full`}>
-          {displayValue}
-        </span>
+        <span className={`text-sm ${wrapText ? 'line-clamp-2' : 'truncate'}`}>{displayValue}</span>
       </div>
     )
   }
@@ -159,8 +142,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
-          className="w-full h-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 box-border"
-          style={cellStyle}
+          className="w-full h-8 px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
           autoFocus
         >
           <option value="">Select...</option>
@@ -178,11 +160,11 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       return (
         <div
           onClick={handleStartEdit}
-        className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
-          canEdit ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default text-gray-500'
+          className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
+            editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
           }`}
           style={cellStyle}
-        title={canEdit ? "Click to edit" : "Read-only"}
+          title={editable ? "Click to edit" : "Read-only"}
         >
           <span className="text-gray-400 italic text-sm">—</span>
         </div>
@@ -201,11 +183,11 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     return (
       <div
         onClick={handleStartEdit}
-      className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
-          canEdit ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default text-gray-500'
+        className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
+          editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
         style={cellStyle}
-        title={canEdit ? "Click to edit" : "Read-only"}
+        title={editable ? "Click to edit" : "Read-only"}
       >
         <span 
           className={`px-2.5 py-1 rounded-md text-xs font-medium ${wrapText ? '' : 'whitespace-nowrap'} transition-all ${textColorClass} hover:opacity-80`}
@@ -227,10 +209,10 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
       <div
         onClick={handleStartEdit}
         className={`flex items-center flex-wrap gap-1.5 px-3 py-2 rounded-md transition-colors overflow-hidden ${
-          canEdit ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default text-gray-500'
+          editable ? 'cursor-pointer hover:bg-gray-50/50' : 'cursor-default'
         }`}
         style={cellStyle}
-        title={canEdit ? "Click to edit" : "Read-only"}
+        title={editable ? "Click to edit" : "Read-only"}
       >
         {displayValues.length === 0 ? (
           <span className="text-gray-400 italic text-sm">—</span>
@@ -265,7 +247,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   if (editing) {
     if (inputType === "checkbox") {
       return (
-        <div className="flex items-center justify-center w-full h-full" style={cellStyle}>
+        <div className="flex items-center justify-center h-8">
           <input
             type="checkbox"
             checked={!!editValue}
@@ -287,8 +269,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
-          className="w-full h-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none overflow-y-auto box-border"
-          style={cellStyle}
+          className="w-full h-20 px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
           placeholder="Enter text..."
         />
       )
@@ -307,8 +288,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
         }}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 box-border"
-        style={cellStyle}
+        className="w-full h-8 px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
         placeholder="Enter value..."
         disabled={saving}
       />
@@ -336,19 +316,19 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
 
   // Apply text wrapping for text-based fields
   const textWrapClass = wrapText && (fieldType === 'text' || fieldType === 'long_text' || !fieldType)
-    ? 'whitespace-normal break-words'
+    ? 'line-clamp-2' 
     : 'truncate'
 
   return (
     <div
-      onClick={resolvedVirtual || !canEdit ? undefined : handleStartEdit}
+      onClick={isVirtual || !editable ? undefined : handleStartEdit}
       className={`flex items-center px-3 py-2 rounded-md transition-colors overflow-hidden ${
-        resolvedVirtual || !canEdit
+        isVirtual || !editable
           ? "text-gray-500 cursor-default" 
           : "cursor-pointer hover:bg-gray-50/50"
       }`}
       style={cellStyle}
-      title={resolvedVirtual ? "Virtual field (read-only)" : canEdit ? "Click to edit" : "Read-only"}
+      title={isVirtual ? "Virtual field (read-only)" : editable ? "Click to edit" : "Read-only"}
     >
       {displayValue ? (
         <span className={`text-sm ${textWrapClass} w-full`}>{displayValue}</span>

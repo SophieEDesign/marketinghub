@@ -15,11 +15,7 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import {
-  applyFiltersToQuery,
-  deriveDefaultValuesFromFilters,
-  type FilterConfig,
-} from "@/lib/interface/filters"
+import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
 import { format } from "date-fns"
 import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
@@ -107,9 +103,6 @@ export default function CalendarView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
-  const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const enableRecordOpen = (blockConfig as any)?.appearance?.enable_record_open ?? true
-  const canOpenRecord = allowOpenRecord && enableRecordOpen
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
   
   // View config state - calendar settings from view config
@@ -1457,22 +1450,20 @@ export default function CalendarView({
             return (
               <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
                 {/* Open record control (explicit) */}
-                {canOpenRecord && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (!recordId) return
-                      if (onRecordClick) onRecordClick(recordId)
-                      else setSelectedRecordId(recordId)
-                    }}
-                    className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                    title="Open record"
-                    aria-label="Open record"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!recordId) return
+                    if (onRecordClick) onRecordClick(recordId)
+                    else setSelectedRecordId(recordId)
+                  }}
+                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
+                  title="Open record"
+                  aria-label="Open record"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
                 {image && (
                   <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                     <img
@@ -1487,7 +1478,7 @@ export default function CalendarView({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
-                    <div className="truncate text-xs font-medium" data-prevent-record-open="true">
+                    <div className="truncate text-xs font-medium">
                       {titleField ? (
                         <TimelineFieldValue field={titleField} value={titleValue ?? eventInfo.event.title} compact={true} />
                       ) : (
@@ -1495,11 +1486,7 @@ export default function CalendarView({
                       )}
                     </div>
                     {cardFields.slice(0, 2).map((f: any, idx: number) => (
-                      <div
-                        key={`${eventInfo.event.id}-cf-${idx}`}
-                        className="truncate text-[10px] opacity-90"
-                        data-prevent-record-open="true"
-                      >
+                      <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
                         {f?.field ? (
                           <TimelineFieldValue field={f.field as TableField} value={f.value} compact={true} />
                         ) : (
@@ -1559,8 +1546,6 @@ export default function CalendarView({
               // Ignore if user double-clicks an inner control (e.g., open chevron)
               const target = e.target as HTMLElement | null
               if (target?.closest('button')) return
-              if (target?.closest('[data-prevent-record-open="true"]')) return
-              if (!canOpenRecord) return
               if (!recordId) return
               if (onRecordClick) onRecordClick(recordId)
               else setSelectedRecordId(recordId)
@@ -1614,13 +1599,8 @@ export default function CalendarView({
           recordId={null}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           initialData={(() => {
-            // Pre-fill defaults based on active filters + clicked date.
+            // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}
-            const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFilters, loadedTableFields)
-            if (Object.keys(defaultsFromFilters).length > 0) {
-              Object.assign(initial, defaultsFromFilters)
-            }
-
             const dateValue = createRecordDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
             
             // Use resolved date field or view config fields

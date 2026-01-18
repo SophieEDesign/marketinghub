@@ -27,7 +27,6 @@ interface AttachmentCellProps {
   rowId: string
   tableName: string
   editable?: boolean
-  rowHeight?: number
   onSave: (value: Attachment[]) => Promise<void>
   placeholder?: string
   fieldOptions?: {
@@ -43,7 +42,6 @@ export default function AttachmentCell({
   rowId,
   tableName,
   editable = true,
-  rowHeight,
   onSave,
   placeholder = '—',
   fieldOptions,
@@ -166,14 +164,6 @@ export default function AttachmentCell({
     setPreviewIndex(index)
   }, [])
 
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
-
   return (
     <>
       <input
@@ -185,10 +175,9 @@ export default function AttachmentCell({
       />
 
       <div
-        className={`w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm box-border overflow-hidden ${
+        className={`w-full h-full px-2 py-1 flex items-center gap-1.5 text-sm ${
           editable ? 'cursor-pointer hover:bg-blue-50' : ''
         } rounded transition-colors relative`}
-        style={rowHeightStyle}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}

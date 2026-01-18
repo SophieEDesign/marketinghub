@@ -9,7 +9,6 @@ import type { TableField } from "@/types/fields"
 import { cn } from "@/lib/utils"
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 export interface LookupFieldConfig {
   // Optional: field to use as primary label (defaults to the table's primary field)
@@ -64,7 +63,6 @@ export default function LookupFieldPicker({
   onCreateRecord,
   isLookupField = false,
 }: LookupFieldPickerProps) {
-  const { schemaAvailable } = useSchemaContract()
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [options, setOptions] = useState<RecordOption[]>([])
@@ -99,14 +97,8 @@ export default function LookupFieldPicker({
 
   // Get table name for display
   const [tableName, setTableName] = useState<string | null>(null)
-  const schemaDisabled = !schemaAvailable
-  const isDisabled = disabled || schemaDisabled
   
   useEffect(() => {
-    if (!schemaAvailable) {
-      setTableName(null)
-      return
-    }
     if (lookupTableId) {
       const supabase = createClient()
       supabase
@@ -120,7 +112,7 @@ export default function LookupFieldPicker({
     } else {
       setTableName(null)
     }
-  }, [lookupTableId, schemaAvailable])
+  }, [lookupTableId])
 
   useEffect(() => {
     loadedSelectedIdsRef.current = ""
@@ -134,7 +126,6 @@ export default function LookupFieldPicker({
 
   const handleNavigateToRecord = useCallback(
     (e: React.MouseEvent, recordId: string) => {
-      e.preventDefault()
       e.stopPropagation()
       if (onRecordClick && lookupTableId) {
         onRecordClick(lookupTableId, recordId)
@@ -145,7 +136,7 @@ export default function LookupFieldPicker({
 
   // Load options when search query changes
   useEffect(() => {
-    if (schemaAvailable && open && lookupTableId) {
+    if (open && lookupTableId) {
       const timeoutId = setTimeout(() => {
         loadOptions(searchQuery)
       }, 300) // Debounce search
@@ -153,15 +144,15 @@ export default function LookupFieldPicker({
       return () => clearTimeout(timeoutId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, searchQuery, lookupTableId, schemaAvailable])
+  }, [open, searchQuery, lookupTableId])
 
   // Load selected records on mount/open
   useEffect(() => {
-    if (schemaAvailable && open && selectedIds.length > 0 && lookupTableId) {
+    if (open && selectedIds.length > 0 && lookupTableId) {
       loadSelectedRecords()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selectedIds.length, lookupTableId, schemaAvailable])
+  }, [open, selectedIds.length, lookupTableId])
 
   const hasMissingSelected = useMemo(() => {
     if (selectedIds.length === 0) return false
@@ -170,16 +161,16 @@ export default function LookupFieldPicker({
   }, [options, selectedIds])
 
   useEffect(() => {
-    if (!schemaAvailable || !lookupTableId || selectedIds.length === 0) return
+    if (!lookupTableId || selectedIds.length === 0) return
     if (!hasMissingSelected) return
     if (loadedSelectedIdsRef.current === selectedIdsKey) return
     loadedSelectedIdsRef.current = selectedIdsKey
     loadSelectedRecords()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupTableId, selectedIdsKey, selectedIds.length, hasMissingSelected, schemaAvailable])
+  }, [lookupTableId, selectedIdsKey, selectedIds.length, hasMissingSelected])
 
   async function loadOptions(query: string = "") {
-    if (!schemaAvailable || !lookupTableId) return
+    if (!lookupTableId) return
 
     setLoading(true)
     try {
@@ -310,7 +301,7 @@ export default function LookupFieldPicker({
   }
 
   async function loadSelectedRecords() {
-    if (!schemaAvailable || !lookupTableId || selectedIds.length === 0) return
+    if (!lookupTableId || selectedIds.length === 0) return
 
     setLoading(true)
     try {
@@ -379,69 +370,49 @@ export default function LookupFieldPicker({
     }
   }
 
-  async function handleSelect(option: RecordOption) {
+  function handleSelect(option: RecordOption) {
     if (disabled) return
 
-    try {
-      if (isMultiSelect) {
-        const newValue = selectedIds.includes(option.id)
-          ? selectedIds.filter(id => id !== option.id)
-          : [...selectedIds, option.id]
-        
-        // Check max selections
-        if (config?.maxSelections && newValue.length > config.maxSelections) {
-          return
-        }
-        
-        // For filters, return comma-separated string; otherwise return array
-        const isFilterContext = typeof value === 'string' && value.includes(',')
-        const nextValue = isFilterContext 
-          ? (newValue.length > 0 ? newValue.join(',') : '')
-          : (newValue.length > 0 ? newValue : null)
-        const result = onChange(nextValue)
-        if (result instanceof Promise) {
-          await result
-        }
-      } else {
-        const result = onChange(option.id)
-        if (result instanceof Promise) {
-          await result
-        }
-        setOpen(false)
+    if (isMultiSelect) {
+      const newValue = selectedIds.includes(option.id)
+        ? selectedIds.filter(id => id !== option.id)
+        : [...selectedIds, option.id]
+      
+      // Check max selections
+      if (config?.maxSelections && newValue.length > config.maxSelections) {
+        return
       }
-    } catch (error) {
-      console.error('Failed to update linked records:', error)
+      
+      // For filters, return comma-separated string; otherwise return array
+      const isFilterContext = typeof value === 'string' && value.includes(',')
+      onChange(isFilterContext 
+        ? (newValue.length > 0 ? newValue.join(',') : '')
+        : (newValue.length > 0 ? newValue : null)
+      )
+    } else {
+      onChange(option.id)
+      setOpen(false)
     }
   }
 
-  async function handleRemove(id: string) {
+  function handleRemove(id: string) {
     if (disabled) return
     
-    try {
-      if (isMultiSelect) {
-        const newValue = selectedIds.filter(selectedId => selectedId !== id)
-        // For filters, return comma-separated string; otherwise return array
-        const isFilterContext = typeof value === 'string' && value.includes(',')
-        const nextValue = isFilterContext 
-          ? (newValue.length > 0 ? newValue.join(',') : '')
-          : (newValue.length > 0 ? newValue : null)
-        const result = onChange(nextValue)
-        if (result instanceof Promise) {
-          await result
-        }
-      } else {
-        const result = onChange(null)
-        if (result instanceof Promise) {
-          await result
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update linked records:', error)
+    if (isMultiSelect) {
+      const newValue = selectedIds.filter(selectedId => selectedId !== id)
+      // For filters, return comma-separated string; otherwise return array
+      const isFilterContext = typeof value === 'string' && value.includes(',')
+      onChange(isFilterContext 
+        ? (newValue.length > 0 ? newValue.join(',') : '')
+        : (newValue.length > 0 ? newValue : null)
+      )
+    } else {
+      onChange(null)
     }
   }
 
   function handleCreateNew() {
-    if (schemaDisabled || !onCreateRecord || !lookupTableId) return
+    if (!onCreateRecord || !lookupTableId) return
     
     onCreateRecord(lookupTableId).then((newRecordId) => {
       if (newRecordId) {
@@ -466,7 +437,7 @@ export default function LookupFieldPicker({
     : options.filter(opt => !selectedIds.includes(opt.id))
 
   // For lookup fields (read-only), render as informational pills without popover
-  if (isLookupField || isDisabled) {
+  if (isLookupField || disabled) {
     return (
       <div className="space-y-2" ref={containerRef}>
         {isMirroredLinkedField && (
@@ -494,10 +465,7 @@ export default function LookupFieldPicker({
                   onRecordClick && "group"
                 )}
                 style={{ boxShadow: isLookupField ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)' }}
-                onClick={(e) => {
-                  handleNavigateToRecord(e, option.id)
-                  setOpen(false)
-                }}
+                onClick={(e) => handleNavigateToRecord(e, option.id)}
                 title="Open linked record"
                 aria-label={`Open linked record: ${option.primaryLabel}`}
               >
@@ -523,11 +491,11 @@ export default function LookupFieldPicker({
             className={cn(
               "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm",
               "flex flex-wrap items-center gap-2 transition-colors",
-              !isDisabled && "cursor-pointer hover:border-blue-300 hover:bg-blue-50/30",
+              !disabled && "cursor-pointer hover:border-blue-300 hover:bg-blue-50/30",
               "focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1",
-              isDisabled && "opacity-50 cursor-not-allowed bg-gray-50"
+              disabled && "opacity-50 cursor-not-allowed bg-gray-50"
             )}
-            onClick={() => !isDisabled && setOpen(true)}
+            onClick={() => !disabled && setOpen(true)}
           >
             {selectedOptions.length > 0 ? (
               <>
@@ -537,13 +505,11 @@ export default function LookupFieldPicker({
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/50"
                     style={{ boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)' }}
                     onClick={(e) => {
-                      e.preventDefault()
                       e.stopPropagation()
                       // Clicking the pill navigates to the linked record (Airtable mental model).
                       if (onRecordClick && lookupTableId) {
                         onRecordClick(lookupTableId, option.id)
                       }
-                      setOpen(false)
                     }}
                     title="Open linked record"
                     role="button"
@@ -557,7 +523,7 @@ export default function LookupFieldPicker({
                     >
                       {option.primaryLabel}
                     </span>
-                    {!isDisabled && (
+                    {!disabled && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -578,7 +544,7 @@ export default function LookupFieldPicker({
                   </span>
                 )}
                 {/* Add button - only show when field is editable and not disabled */}
-                {!isDisabled && (
+                {!disabled && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -595,7 +561,7 @@ export default function LookupFieldPicker({
             ) : (
               <div className="flex items-center justify-between w-full">
                 <span className="text-gray-400 italic">{placeholder}</span>
-                {!isDisabled && (
+                {!disabled && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -666,7 +632,7 @@ export default function LookupFieldPicker({
                   )
                 })}
                 
-                {config?.allowCreate && onCreateRecord && !schemaDisabled && (
+                {config?.allowCreate && onCreateRecord && (
                   <div
                     className="px-3 py-2 border-t border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm text-gray-600"
                     onClick={handleCreateNew}

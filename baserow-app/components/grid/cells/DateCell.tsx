@@ -8,7 +8,6 @@ interface DateCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
-  rowHeight?: number
   onSave: (value: string | null) => Promise<void>
   placeholder?: string
 }
@@ -17,12 +16,10 @@ export default function DateCell({
   value,
   fieldName,
   editable = true,
-  rowHeight,
   onSave,
   placeholder = '—',
 }: DateCellProps) {
   const [editing, setEditing] = useState(false)
-  const canEdit = editable
   const getInitialEditValue = () => {
     if (!value) return ''
     try {
@@ -55,12 +52,6 @@ export default function DateCell({
       inputRef.current.showPicker?.()
     }
   }, [editing])
-
-  useEffect(() => {
-    if (!canEdit && editing) {
-      setEditing(false)
-    }
-  }, [canEdit, editing])
 
   const handleSave = async () => {
     if (saving) return
@@ -105,15 +96,7 @@ export default function DateCell({
     return formatDateUK(val, placeholder)
   }
 
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
-
-  if (editing && canEdit) {
+  if (editing && editable) {
     return (
       <input
         ref={inputRef}
@@ -122,8 +105,7 @@ export default function DateCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-full px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md box-border"
-        style={rowHeightStyle}
+        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
         disabled={saving}
       />
     )
@@ -131,11 +113,8 @@ export default function DateCell({
 
   return (
     <div
-      onClick={canEdit ? () => setEditing(true) : undefined}
-      className={`w-full h-full px-3 py-2 flex items-center text-sm rounded-md transition-colors box-border ${
-        canEdit ? 'text-gray-900 cursor-pointer hover:bg-gray-50/50' : 'text-gray-500 cursor-default'
-      }`}
-      style={rowHeightStyle}
+      onClick={() => editable && setEditing(true)}
+      className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors"
     >
       <span className="truncate">
         {value ? formatDisplayValue(value) : <span className="text-gray-400 italic">{placeholder}</span>}

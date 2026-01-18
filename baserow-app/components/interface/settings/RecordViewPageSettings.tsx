@@ -94,7 +94,6 @@ export default function RecordViewPageSettings({
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false)
-  const selectableFields = useMemo(() => fields.filter((field) => field.name !== "id"), [fields])
   
   // Left panel settings state
   const leftPanelConfig: NonNullable<PageConfig['left_panel']> = config.left_panel || {}
@@ -138,14 +137,11 @@ export default function RecordViewPageSettings({
   const fieldConfigs = useCallback((): FieldConfig[] => {
     const visibleFields = config.visible_fields || config.detail_fields || []
     const editableFields = config.editable_fields || []
-
-    const selectableNames = new Set(selectableFields.map((field) => field.name))
-
+    
     // Build map of configured fields
     const fieldMap = new Map<string, FieldConfig>()
-
+    
     visibleFields.forEach((fieldName: string, index: number) => {
-      if (!selectableNames.has(fieldName)) return
       fieldMap.set(fieldName, {
         field: fieldName,
         visible: true,
@@ -153,21 +149,21 @@ export default function RecordViewPageSettings({
         order: index,
       })
     })
-
+    
     // Add all other fields as hidden
-    selectableFields.forEach((field) => {
+    fields.forEach((field) => {
       if (!fieldMap.has(field.name)) {
         fieldMap.set(field.name, {
           field: field.name,
           visible: false,
           editable: false,
-          order: selectableFields.length + fieldMap.size,
+          order: fields.length + fieldMap.size,
         })
       }
     })
-
+    
     return Array.from(fieldMap.values()).sort((a, b) => a.order - b.order)
-  }, [config.visible_fields, config.detail_fields, config.editable_fields, selectableFields])
+  }, [config.visible_fields, config.detail_fields, config.editable_fields, fields])
 
   const [fieldConfigList, setFieldConfigList] = useState<FieldConfig[]>([])
 
@@ -183,10 +179,10 @@ export default function RecordViewPageSettings({
 
   // Update field config list when fields or config changes
   useEffect(() => {
-    if (selectableFields.length > 0) {
+    if (fields.length > 0) {
       setFieldConfigList(fieldConfigs())
     }
-  }, [selectableFields, fieldConfigs])
+  }, [fields, fieldConfigs])
 
   async function loadFields() {
     if (!selectedTableId) return
@@ -387,7 +383,7 @@ export default function RecordViewPageSettings({
       opacity: isDragging ? 0.5 : 1,
     }
 
-    const field = selectableFields.find((f) => f.name === fieldConfig.field)
+    const field = fields.find((f) => f.name === fieldConfig.field)
     if (!field) return null
 
     // Check if this is a select field and show a sample color pill
@@ -483,7 +479,7 @@ export default function RecordViewPageSettings({
     
     try {
       // Get field IDs from field names
-      const fieldIds = selectableFields
+      const fieldIds = fields
         .filter(f => fieldNames.includes(f.name))
         .map(f => f.id)
       
@@ -594,7 +590,7 @@ export default function RecordViewPageSettings({
     const ungrouped: typeof visibleFieldConfigs = []
     
     visibleFieldConfigs.forEach((fieldConfig) => {
-      const field = selectableFields.find((f) => f.name === fieldConfig.field)
+      const field = fields.find((f) => f.name === fieldConfig.field)
       const groupName = field?.group_name || null
       
       if (groupName) {
@@ -608,7 +604,7 @@ export default function RecordViewPageSettings({
     })
     
     return { groups, ungrouped }
-  }, [visibleFieldConfigs, selectableFields])
+  }, [visibleFieldConfigs, fields])
 
   return (
     <div className="space-y-6">
@@ -654,14 +650,14 @@ export default function RecordViewPageSettings({
                 onValueChange={(value) =>
                   onUpdate({ title_field: value === "__none__" ? undefined : value })
                 }
-                disabled={!selectedTableId || selectableFields.length === 0}
+                disabled={!selectedTableId || fields.length === 0}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a field to use as the record title" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None (use record ID)</SelectItem>
-                  {selectableFields.map((field) => (
+                  {fields.map((field) => (
                     <SelectItem key={field.id} value={field.name}>
                       {getFieldDisplayName(field)}
                     </SelectItem>
@@ -778,7 +774,7 @@ export default function RecordViewPageSettings({
                   <Label className="text-xs text-gray-500">Hidden Fields</Label>
                   <div className="space-y-1 border rounded-lg p-3">
                     {hiddenFieldConfigs.map((fieldConfig) => {
-                      const field = selectableFields.find((f) => f.name === fieldConfig.field)
+                      const field = fields.find((f) => f.name === fieldConfig.field)
                       if (!field) return null
 
                       return (
@@ -808,7 +804,7 @@ export default function RecordViewPageSettings({
                 </div>
               )}
 
-              {selectableFields.length === 0 && (
+              {fields.length === 0 && (
                 <div className="text-sm text-gray-500 py-4 text-center border rounded-lg">
                   No fields available. Select a table first.
                 </div>
@@ -899,14 +895,14 @@ export default function RecordViewPageSettings({
                               }
                             })
                           }}
-                          disabled={!selectedTableId || selectableFields.length === 0}
+                          disabled={!selectedTableId || fields.length === 0}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="None" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">None</SelectItem>
-                            {selectableFields.map((field) => (
+                            {fields.map((field) => (
                               <SelectItem key={field.id} value={field.name}>
                                 {getFieldDisplayName(field)}
                               </SelectItem>
@@ -956,14 +952,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields
+                          {fields
                             .filter(f => f.type === 'single_select' || f.type === 'multi_select')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
@@ -999,14 +995,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields
+                          {fields
                             .filter(f => f.type === 'single_select' || f.type === 'multi_select')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
@@ -1035,14 +1031,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields
+                          {fields
                             .filter(f => f.type === 'attachment' || f.type === 'url')
                             .map((field) => (
                               <SelectItem key={field.id} value={field.name}>
@@ -1073,14 +1069,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a field" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields.map((field) => (
+                          {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
                               {getFieldDisplayName(field)}
                             </SelectItem>
@@ -1107,14 +1103,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields.map((field) => (
+                          {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
                               {getFieldDisplayName(field)}
                             </SelectItem>
@@ -1141,14 +1137,14 @@ export default function RecordViewPageSettings({
                             }
                           })
                         }}
-                        disabled={!selectedTableId || selectableFields.length === 0}
+                        disabled={!selectedTableId || fields.length === 0}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="None" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {selectableFields.map((field) => (
+                          {fields.map((field) => (
                             <SelectItem key={field.id} value={field.name}>
                               {getFieldDisplayName(field)}
                             </SelectItem>

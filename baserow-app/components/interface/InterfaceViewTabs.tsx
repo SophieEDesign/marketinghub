@@ -175,10 +175,7 @@ export default function InterfaceViewTabs({
           toast({
             variant: "destructive",
             title: "Feature not available",
-            description:
-              process.env.NODE_ENV === 'development'
-                ? "Interface views metadata is unavailable."
-                : "Interface views are not available right now.",
+            description: "Interface views table does not exist. Please run database migrations.",
           })
           return
         }

@@ -8,7 +8,6 @@ interface UrlCellProps {
   fieldName: string
   editable?: boolean
   wrapText?: boolean // Deprecated: kept for compatibility but ignored
-  rowHeight?: number
   onSave: (value: string) => Promise<void>
   placeholder?: string
 }
@@ -18,7 +17,6 @@ export default function UrlCell({
   fieldName,
   editable = true,
   wrapText = false, // Deprecated
-  rowHeight,
   onSave,
   placeholder = '—',
 }: UrlCellProps) {
@@ -26,7 +24,6 @@ export default function UrlCell({
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const canEdit = editable
 
   useEffect(() => {
     setEditValue(value || '')
@@ -38,12 +35,6 @@ export default function UrlCell({
       inputRef.current.select()
     }
   }, [editing])
-
-  useEffect(() => {
-    if (!canEdit && editing) {
-      setEditing(false)
-    }
-  }, [canEdit, editing])
 
   const handleSave = async () => {
     if (saving) return
@@ -83,15 +74,7 @@ export default function UrlCell({
     }
   }
 
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
-
-  if (editing && canEdit) {
+  if (editing && editable) {
     return (
       <input
         ref={inputRef}
@@ -100,8 +83,7 @@ export default function UrlCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-full px-2 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded box-border"
-        style={rowHeightStyle}
+        className="w-full h-full px-2 text-sm border-none outline-none bg-white focus:ring-2 focus:ring-blue-500 rounded"
         placeholder="https://example.com"
         disabled={saving}
       />
@@ -111,11 +93,8 @@ export default function UrlCell({
   if (!value) {
     return (
       <div
-        onClick={canEdit ? () => setEditing(true) : undefined}
-        className={`w-full h-full px-2 flex items-center gap-1 text-sm rounded transition-colors box-border ${
-          canEdit ? 'text-gray-400 cursor-pointer hover:bg-blue-50' : 'text-gray-500 cursor-default'
-        }`}
-        style={rowHeightStyle}
+        onClick={() => editable && setEditing(true)}
+        className="w-full h-full px-2 flex items-center gap-1 text-sm text-gray-400 cursor-pointer hover:bg-blue-50 rounded transition-colors"
       >
         <span>{placeholder}</span>
       </div>
@@ -124,11 +103,8 @@ export default function UrlCell({
 
   return (
     <div
-      onClick={canEdit ? () => setEditing(true) : undefined}
-      className={`w-full h-full px-2 gap-1 text-sm rounded transition-colors group flex items-center box-border ${
-        canEdit ? 'cursor-pointer hover:bg-blue-50 text-gray-900' : 'cursor-default text-gray-500'
-      }`}
-      style={rowHeightStyle}
+      onClick={() => editable && setEditing(true)}
+      className="w-full h-full px-2 gap-1 text-sm cursor-pointer hover:bg-blue-50 rounded transition-colors group flex items-center"
       title={value || undefined}
     >
       <span className="text-gray-900 truncate">{formatUrl(value)}</span>

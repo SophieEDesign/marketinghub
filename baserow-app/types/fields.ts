@@ -46,7 +46,6 @@ export interface TableField {
 export interface FieldOptions {
   // For select fields
   choices?: string[]
-  select_options?: SelectOption[]
   choiceColors?: Record<string, string> // Map of choice value to hex color (option-level override)
   choiceColorTheme?: ChoiceColorTheme // Palette used when no option-level override exists
   
@@ -128,14 +127,6 @@ export interface LookupFieldFilter {
   value2?: any
   currentRecordField2?: string
   contextType2?: string
-}
-
-export interface SelectOption {
-  id: string
-  label: string
-  color?: string | null
-  sort_index: number
-  created_at: string
 }
 
 export interface FieldTypeInfo {

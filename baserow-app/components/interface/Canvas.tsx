@@ -152,25 +152,6 @@ export default function Canvas({
   const dragLastPositionRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   const currentlyDraggingBlockIdRef = useRef<string | null>(null)
   
-  const hasActiveLayoutChange = useCallback((newLayout: Layout[]) => {
-    const activeBlockId =
-      currentlyResizingBlockIdRef.current ?? currentlyDraggingBlockIdRef.current
-    if (!activeBlockId) return false
-    
-    const newItem = newLayout.find(item => item.i === activeBlockId)
-    if (!newItem) return false
-    
-    const previous = previousBlockPositionsRef.current.get(activeBlockId)
-    if (!previous) return true
-    
-    return (
-      Math.abs((newItem.x || 0) - previous.x) > 0.01 ||
-      Math.abs((newItem.y || 0) - previous.y) > 0.01 ||
-      Math.abs((newItem.w || 0) - previous.w) > 0.01 ||
-      Math.abs((newItem.h || 0) - previous.h) > 0.01
-    )
-  }, [])
-  
   // Reset hydration state when page changes (Canvas remounts)
   // CRITICAL: This must run BEFORE the hydration effect to ensure refs are reset
   useEffect(() => {
@@ -858,28 +839,6 @@ export default function Canvas({
         return
       }
       
-      const activeBlockId =
-        currentlyResizingBlockIdRef.current ?? currentlyDraggingBlockIdRef.current
-      if (!activeBlockId) {
-        userInteractionInProgressRef.current = false
-        debugWarn('LAYOUT', '[Canvas] Ignoring layout change (no active block)', {
-          pageId,
-          isEditing,
-          layoutCount: newLayout.length,
-        })
-        return
-      }
-      
-      if (!hasActiveLayoutChange(newLayout)) {
-        debugWarn('LAYOUT', '[Canvas] Ignoring layout change (no active block change)', {
-          pageId,
-          isEditing,
-          layoutCount: newLayout.length,
-          activeBlockId,
-        })
-        return
-      }
-      
       // Mark that we're resizing/dragging
       isResizingRef.current = true
       
@@ -1060,7 +1019,7 @@ export default function Canvas({
         resizeTimeoutRef.current = null
       }, 300)
     },
-    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks, applySmartSnap, layoutSettings?.cols, hasActiveLayoutChange]
+    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks, applySmartSnap, layoutSettings?.cols]
   )
   
   // Reset first layout change flag when entering edit mode
@@ -1182,7 +1141,7 @@ export default function Canvas({
     const margin = layoutSettings?.margin || [10, 10]
     
     return {
-      cols: { lg: cols, md: cols, sm: cols, xs: cols, xxs: cols },
+      cols: { lg: cols, md: 10, sm: 6, xs: 4, xxs: 2 },
       rowHeight,
       margin,
       // CRITICAL: Disable compaction - we store absolute positions in DB
@@ -1321,9 +1280,6 @@ export default function Canvas({
             // Old heights must never be cached after collapse
             blockHeightsBeforeResizeRef.current.delete(blockId)
             currentlyResizingBlockIdRef.current = null
-            // CRITICAL: Stop treating layout changes as user-initiated after resize ends.
-            // This prevents modal/panel/browser resizes from being persisted.
-            userInteractionInProgressRef.current = false
             
             // Compaction will be handled by handleLayoutChange timeout
           }}
@@ -1373,9 +1329,6 @@ export default function Canvas({
             
             // Use the same timeout mechanism as resize to ensure layout is stable
             // The handleLayoutChange will be called and will apply snap/compaction after timeout
-            // CRITICAL: Stop treating layout changes as user-initiated after drag ends.
-            // This prevents modal/panel/browser resizes from being persisted.
-            userInteractionInProgressRef.current = false
           }}
           draggableHandle=".drag-handle"
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
@@ -1523,8 +1476,9 @@ export default function Canvas({
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
+            {/* TextBlock toolbar is positioned outside the block bounds; allow overflow in edit mode so it's visible */}
             <div 
-              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 ${isEditing && block.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content

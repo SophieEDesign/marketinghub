@@ -8,7 +8,6 @@ import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
-import { isSystemField } from "@/lib/fields/system"
 
 interface RecordFieldsProps {
   fields: TableField[]
@@ -18,13 +17,14 @@ interface RecordFieldsProps {
   tableId: string
   recordId: string
   isFieldEditable?: (fieldName: string) => boolean // Function to check if a field is editable
-  selectOptionsEditable?: boolean // Allow select option editing
-  suppressDerivedFieldErrors?: boolean // Suppress derived-field error UI
   tableName?: string // Supabase table name (optional, will be fetched if not provided)
 }
 
 const DEFAULT_GROUP_NAME = "General"
-const SYSTEM_GROUP_NAME = "System"
+const SYSTEM_FIELD_NAMES = new Set(["created_at", "created_by", "updated_at", "updated_by"])
+function isSystemFieldName(name: string) {
+  return SYSTEM_FIELD_NAMES.has(String(name || "").toLowerCase())
+}
 
 // Get localStorage key for collapsed groups state
 const getCollapsedGroupsKey = (tableId: string) => `record-view-collapsed-groups-${tableId}`
@@ -37,8 +37,6 @@ export default function RecordFields({
   tableId,
   recordId,
   isFieldEditable = () => true, // Default to all fields editable if not provided
-  selectOptionsEditable = true,
-  suppressDerivedFieldErrors = true,
   tableName: propTableName,
 }: RecordFieldsProps) {
   const { navigateToLinkedRecord } = useRecordPanel()
@@ -101,14 +99,12 @@ export default function RecordFields({
     })
 
     // Group all fields - use field.group_name as primary source, fallback to fieldGroups prop.
+    // System fields are shown in the dedicated Activity section (RecordActivity), not as raw fields.
     const groups: Record<string, TableField[]> = {}
-    const systemFields: TableField[] = []
 
-    fields.forEach((field) => {
-      if (isSystemField(field)) {
-        systemFields.push(field)
-        return
-      }
+    fields
+      .filter((field) => !isSystemFieldName(field.name) && !field.options?.system)
+      .forEach((field) => {
       // Priority: field.group_name > fieldGroups prop > DEFAULT_GROUP_NAME
       const groupName = field.group_name || fieldToGroupMap[field.name] || DEFAULT_GROUP_NAME
 
@@ -117,10 +113,6 @@ export default function RecordFields({
       }
       groups[groupName].push(field)
     })
-
-    if (systemFields.length > 0) {
-      groups[SYSTEM_GROUP_NAME] = systemFields
-    }
 
     // Sort fields within each group by order_index (fallback to position)
     Object.keys(groups).forEach((groupName) => {
@@ -137,9 +129,6 @@ export default function RecordFields({
       // "General" group always first
       if (nameA === DEFAULT_GROUP_NAME) return -1
       if (nameB === DEFAULT_GROUP_NAME) return 1
-      // "System" group always last
-      if (nameA === SYSTEM_GROUP_NAME && nameB !== SYSTEM_GROUP_NAME) return 1
-      if (nameB === SYSTEM_GROUP_NAME && nameA !== SYSTEM_GROUP_NAME) return -1
 
       // Otherwise, sort by minimum order_index in each group
       const minOrderA = Math.min(...fieldsA.map((f) => f.order_index ?? f.position ?? 0))
@@ -266,8 +255,6 @@ export default function RecordFields({
                             onLinkedRecordClick={handleLinkedRecordClick}
                             onAddLinkedRecord={handleAddLinkedRecord}
                             isReadOnly={!fieldEditable}
-                            selectOptionsEditable={selectOptionsEditable}
-                            suppressDerivedFieldErrors={suppressDerivedFieldErrors}
                             showLabel={false}
                             tableId={tableId}
                             recordId={recordId}

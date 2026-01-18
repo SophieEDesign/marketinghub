@@ -115,16 +115,8 @@ export function getAuthErrorMessage(error: any): string {
  */
 export async function getRedirectUrl(
   nextParam: string | null,
-  callbackUrlParam: string | null,
-  options?: { allowExplicitRedirect?: boolean }
+  callbackUrlParam: string | null
 ): Promise<string> {
-  const allowExplicitRedirect = options?.allowExplicitRedirect ?? false
-
-  if (!allowExplicitRedirect) {
-    // Always return `/` so the server can resolve the configured landing page.
-    return '/'
-  }
-
   // Use explicit redirect parameter if provided, but sanitize it carefully.
   // We only allow safe internal paths and we block certain "utility" routes
   // (like Settings) so login respects the configured default landing page.
@@ -350,8 +342,7 @@ export async function performPostAuthRedirect(
     // Get redirect URL using utility function
     const next = await getRedirectUrl(
       searchParams.get('next'),
-      searchParams.get('callbackUrl'),
-      { allowExplicitRedirect: false }
+      searchParams.get('callbackUrl')
     )
     
     // Use window.location for full page reload to ensure cookies are sent

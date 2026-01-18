@@ -2,8 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { isTableNotFoundError } from '@/lib/api/error-handling'
 import type { TableField } from '@/types/fields'
 
-const isDev = process.env.NODE_ENV === 'development'
-
 /**
  * Get all fields for a table
  */
@@ -20,9 +18,7 @@ export async function getTableFields(tableId: string): Promise<TableField[]> {
   if (error) {
     // If table doesn't exist, return empty array (graceful degradation)
     if (isTableNotFoundError(error)) {
-      if (isDev) {
-        console.warn(`table_fields table may not exist (code: ${error.code}), returning empty array`)
-      }
+      console.warn(`table_fields table may not exist (code: ${error.code}), returning empty array`)
       return []
     }
     throw error
@@ -39,41 +35,6 @@ export async function getActualTableColumns(tableName: string): Promise<Array<{ 
   
   // Query information_schema to get actual columns
   const { data, error } = await supabase.rpc('get_table_columns', {
-    table_name: tableName
-  })
-
-  if (error) {
-    // Fallback: Try direct query if RPC doesn't exist
-    // For now, return empty and let the system work with metadata only
-    if (isDev) {
-      console.warn('Could not fetch actual columns:', error)
-    }
-    return []
-  }
-
-  return data || []
-}
-
-/**
- * Create table_fields table if it doesn't exist
- * This should be run as a migration, but we'll provide a helper
- */
-export async function ensureTableFieldsTable(): Promise<void> {
-  const supabase = await createClient()
-  
-  // Try to query the table - if it fails, it doesn't exist
-  const { error } = await supabase
-    .from('table_fields')
-    .select('id')
-    .limit(1)
-
-  if (error && error.code === '42P01') {
-    if (isDev) {
-      console.warn('table_fields table does not exist. Schema editing is unavailable until metadata tables are present.')
-    }
-  }
-}
-table_columns', {
     table_name: tableName
   })
 
@@ -101,8 +62,7 @@ export async function ensureTableFieldsTable(): Promise<void> {
     .limit(1)
 
   if (error && error.code === '42P01') {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('table_fields table does not exist. Schema editing is unavailable until metadata tables are present.')
-    }
+    // Table doesn't exist - would need to create it via migration
+    console.warn('table_fields table does not exist. Please run migration to create it.')
   }
 }

@@ -16,10 +16,8 @@ interface LinkedRecordCellProps {
   value: LinkedValue | null | undefined
   rowId: string
   editable?: boolean
-  rowHeight?: number
   onSave: (value: any) => Promise<void>
   placeholder?: string
-  contextReadOnly?: boolean
 }
 
 export default function LinkedRecordCell({
@@ -27,10 +25,8 @@ export default function LinkedRecordCell({
   value,
   rowId,
   editable = true,
-  rowHeight,
   onSave,
   placeholder = "—",
-  contextReadOnly,
 }: LinkedRecordCellProps) {
   const { openRecord } = useRecordPanel()
   const linkedTableId = field.options?.linked_table_id
@@ -107,7 +103,7 @@ export default function LinkedRecordCell({
 
     // Prefer opening in the record panel when we know the linked table name.
     if (linkedTable?.supabase_table) {
-      openRecord(tableId, recordId, linkedTable.supabase_table, undefined, contextReadOnly)
+      openRecord(tableId, recordId, linkedTable.supabase_table)
       return
     }
 
@@ -115,24 +111,16 @@ export default function LinkedRecordCell({
     window.location.href = `/tables/${tableId}/records/${recordId}`
   }
 
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
-
   if (!linkedTableId || !lookupConfig) {
     return (
-      <div className="w-full h-full px-3 py-2 flex items-center text-sm text-gray-400 italic box-border" style={rowHeightStyle}>
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
         {placeholder}
       </div>
     )
   }
 
   return (
-    <div className="w-full h-full px-2 py-1.5 box-border overflow-hidden" style={rowHeightStyle} onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div className="w-full min-h-[36px] px-2 py-1.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
       <LookupFieldPicker
         field={field}
         value={normalizedIds as any}

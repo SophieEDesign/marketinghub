@@ -197,7 +197,6 @@ export default function RecordPanel() {
   }
 
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
-    if (isReadOnly) return
     if (!state.recordId || !state.tableName) return
 
     // Optimistic local update
@@ -222,7 +221,7 @@ export default function RecordPanel() {
       // Revert by reloading record from server
       loadRecord()
     }
-  }, [isReadOnly, state.recordId, state.tableName, toast])
+  }, [state.recordId, state.tableName, toast])
 
   const handleDelete = useCallback(async () => {
     if (!state.recordId || !state.tableName) return
@@ -316,7 +315,6 @@ export default function RecordPanel() {
   if (!state.isOpen) return null
 
   const headerLoading = !recordLoaded || !fieldsLoaded || recordLoading || fieldsLoading
-  const isReadOnly = !!state.isReadOnly
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history
@@ -370,7 +368,6 @@ export default function RecordPanel() {
           saving={false}
           hasChanges={false}
           loading={headerLoading}
-          isReadOnly={isReadOnly}
         />
 
         {/* Toolbar */}
@@ -461,7 +458,6 @@ export default function RecordPanel() {
                 tableId={state.tableId || ""}
                 recordId={state.recordId || ""}
                 tableName={state.tableName || undefined}
-                isFieldEditable={() => !isReadOnly}
               />
 
               {/* Activity Section */}

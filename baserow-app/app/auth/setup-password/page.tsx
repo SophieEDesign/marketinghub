@@ -102,8 +102,7 @@ function SetupPasswordForm() {
       // Password set successfully, redirect to home
       const next = await getRedirectUrl(
         searchParams.get('next'),
-        null,
-        { allowExplicitRedirect: false }
+        null
       )
       
       // Use window.location for full page reload to ensure cookies are sent

@@ -9,7 +9,6 @@
  */
 
 import type { TableField } from '@/types/fields'
-import { getOrderedSelectLabels } from '@/lib/fields/select-options'
 
 export interface ViewSort {
   field_name: string
@@ -102,8 +101,8 @@ function compareValues(
 
   switch (field.type) {
     case 'single_select': {
-      // Sort by the order in options.select_options / options.choices
-      const choices = getOrderedSelectLabels('single_select', field.options)
+      // Sort by the order in options.choices array
+      const choices = field.options?.choices || []
       const aIndex = choices.indexOf(String(a))
       const bIndex = choices.indexOf(String(b))
       

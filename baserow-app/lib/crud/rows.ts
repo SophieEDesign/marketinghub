@@ -44,9 +44,7 @@ export async function getRows(tableId: string, options?: {
   if (error) {
     // Handle case where table_rows doesn't exist
     if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn("table_rows table does not exist. Row metadata is unavailable.")
-      }
+      console.warn("table_rows table does not exist. Run migration to create it.")
       return []
     }
     throw error

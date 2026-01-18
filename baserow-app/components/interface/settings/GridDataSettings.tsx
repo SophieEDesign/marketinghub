@@ -153,7 +153,9 @@ export default function GridDataSettings({
     onUpdate(updates)
   }
 
-  // Get available fields for display (allow system fields; only hide internal id).
+  // Get available fields for display.
+  // System fields should be available (for sorting/filtering and optional display),
+  // but they are expected to be hidden by default unless explicitly added.
   const availableDisplayFields = useMemo(() => {
     return fields.filter((f) => f.name !== 'id')
   }, [fields])

@@ -12,7 +12,6 @@ interface MultiSelectCellProps {
   value: string[] | null
   fieldName: string
   editable?: boolean
-  rowHeight?: number
   onSave: (value: string[]) => Promise<void>
   placeholder?: string
   choices?: string[]
@@ -20,7 +19,6 @@ interface MultiSelectCellProps {
   fieldOptions?: FieldOptions
   fieldId?: string // Field ID for updating options
   tableId?: string // Table ID for updating options
-  canEditOptions?: boolean
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
 }
 
@@ -28,7 +26,6 @@ export default function MultiSelectCell({
   value,
   fieldName,
   editable = true,
-  rowHeight,
   onSave,
   placeholder = '—',
   choices = [],
@@ -36,23 +33,14 @@ export default function MultiSelectCell({
   fieldOptions,
   fieldId,
   tableId,
-  canEditOptions = true,
   onFieldOptionsUpdate,
 }: MultiSelectCellProps) {
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
-
   if (!fieldId || !tableId) {
     // Basic fallback - just show the values as pills
     const displayValues = value || []
     return (
-      <div className="w-full h-full px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm box-border" style={rowHeightStyle}>
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm">
         {displayValues.length > 0 ? (
           displayValues.map((val) => {
             const hexColor = fieldOptions
@@ -78,7 +66,7 @@ export default function MultiSelectCell({
   }
 
   return (
-    <div className="w-full h-full px-3 py-2 flex items-center box-border" style={rowHeightStyle}>
+    <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
       <InlineSelectDropdown
         value={value}
         choices={choices}
@@ -88,7 +76,7 @@ export default function MultiSelectCell({
         fieldId={fieldId}
         tableId={tableId}
         editable={editable}
-        canEditOptions={editable && canEditOptions} // Gate schema edits separately
+        canEditOptions={editable} // If they can edit the cell, they can edit options
         onValueChange={async (newValue) => {
           await onSave((newValue as string[]) || [])
         }}

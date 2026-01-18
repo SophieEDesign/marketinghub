@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -86,32 +86,16 @@ export default function HideFieldsDialog({
     }
   }
 
-  const nonSystemFields = useMemo(() => {
-    return tableFields.filter((field) => field.name !== "id")
-  }, [tableFields])
-
-  const nonSystemFieldNames = useMemo(() => {
-    return new Set(nonSystemFields.map((field) => field.name))
-  }, [nonSystemFields])
-
-  const filteredViewFields = useMemo(() => {
-    return viewFields.filter((vf) => nonSystemFieldNames.has(vf.field_name))
-  }, [viewFields, nonSystemFieldNames])
-
-  const hideAll = () => setLocalHiddenFields(filteredViewFields.map((vf) => vf.field_name))
+  const hideAll = () => setLocalHiddenFields(viewFields.map((vf) => vf.field_name))
   const showAll = () => setLocalHiddenFields([])
   const invert = () => {
     const hidden = new Set(localHiddenFields)
-    setLocalHiddenFields(
-      filteredViewFields.filter((vf) => !hidden.has(vf.field_name)).map((vf) => vf.field_name)
-    )
+    setLocalHiddenFields(viewFields.filter((vf) => !hidden.has(vf.field_name)).map((vf) => vf.field_name))
   }
 
   const displayViewFields = (() => {
     const s = search.trim().toLowerCase()
-    const base = s
-      ? filteredViewFields.filter((vf) => vf.field_name.toLowerCase().includes(s))
-      : filteredViewFields
+    const base = s ? viewFields.filter((vf) => vf.field_name.toLowerCase().includes(s)) : viewFields
     if (sort === "position") return base
 
     const sorted = [...base]
@@ -119,8 +103,8 @@ export default function HideFieldsDialog({
       if (sort === "name_asc") return a.field_name.localeCompare(b.field_name)
       if (sort === "name_desc") return b.field_name.localeCompare(a.field_name)
       if (sort === "type_asc") {
-        const at = nonSystemFields.find((f) => f.name === a.field_name)?.type || ""
-        const bt = nonSystemFields.find((f) => f.name === b.field_name)?.type || ""
+        const at = tableFields.find((f) => f.name === a.field_name)?.type || ""
+        const bt = tableFields.find((f) => f.name === b.field_name)?.type || ""
         return at.localeCompare(bt) || a.field_name.localeCompare(b.field_name)
       }
       return 0
@@ -136,7 +120,7 @@ export default function HideFieldsDialog({
     }
 
     const fieldNameByNorm = new Map<string, string>()
-    for (const vf of filteredViewFields) fieldNameByNorm.set(normalizeToken(vf.field_name), vf.field_name)
+    for (const vf of viewFields) fieldNameByNorm.set(normalizeToken(vf.field_name), vf.field_name)
 
     const matched: string[] = []
     let missing = 0
@@ -171,7 +155,7 @@ export default function HideFieldsDialog({
   async function handleSave() {
     try {
       // Update view_fields visibility
-      const updates = filteredViewFields.map((vf) => ({
+      const updates = viewFields.map((vf) => ({
         field_name: vf.field_name,
         visible: !localHiddenFields.includes(vf.field_name),
       }))

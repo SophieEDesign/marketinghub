@@ -34,8 +34,6 @@ import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/f
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
 import { useIsMobile } from "@/hooks/useResponsive"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
-import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { generateAddColumnSQL } from "@/lib/fields/sqlGenerator"
@@ -73,7 +71,7 @@ interface GridViewProps {
   onEditField?: (fieldName: string) => void
   isEditing?: boolean // When false, hide builder controls (add row, add field)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
-  rowHeight?: string // Row height: 'compact', 'standard', 'large', 'extra_large' (legacy: 'short', 'medium', 'tall', 'comfortable')
+  rowHeight?: string // Row height: 'compact', 'standard', 'comfortable' (or legacy 'medium')
   wrapText?: boolean // Whether to wrap cell text (block-level setting)
   permissions?: BlockPermissions // Block-level permissions
   colorField?: string // Field name to use for row colors (single-select field)
@@ -87,23 +85,6 @@ interface GridViewProps {
 }
 
 const ITEMS_PER_PAGE = 100
-const isDev = process.env.NODE_ENV === 'development'
-const logGridWarn = (...args: any[]) => {
-  if (isDev) {
-    console.warn(...args)
-  }
-}
-const logGridError = (...args: any[]) => {
-  if (isDev) {
-    console.error(...args)
-  }
-}
-const schemaErrorMessage =
-  'This view is temporarily unavailable. Please refresh or contact an administrator.'
-const missingTableMessage =
-  'This data source is not available yet. Please refresh or contact an administrator.'
-const fallbackWarningMessage =
-  'Some fields could not be loaded. Showing available data.'
 
 function extractCurlyFieldRefs(formula: string): string[] {
   if (!formula || typeof formula !== 'string') return []
@@ -293,8 +274,6 @@ export default function GridView({
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
-  const { toast } = useToast()
-  const { schemaAvailable, status: schemaStatus } = useSchemaContract()
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -307,15 +286,12 @@ export default function GridView({
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
-  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string; isReadOnly?: boolean } | null>(null)
+  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
 
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
   const createTableAttemptedRef = useRef<Set<string>>(new Set())
-  // Track missing columns so we can avoid repeated retries / 42703 loops.
-  const missingColumnsRef = useRef<Set<string>>(new Set())
-  const missingColumnsTableRef = useRef<string | null>(null)
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -420,14 +396,6 @@ export default function GridView({
 
   // Calculate row height in pixels from string setting
   const rowHeightPixels = useMemo(() => getRowHeightPixels(rowHeight), [rowHeight])
-  const rowHeightStyle = useMemo(
-    () => ({
-      height: `${rowHeightPixels}px`,
-      minHeight: `${rowHeightPixels}px`,
-      maxHeight: `${rowHeightPixels}px`,
-    }),
-    [rowHeightPixels]
-  )
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -455,7 +423,7 @@ export default function GridView({
           .maybeSingle()
 
         if (error && error.code !== 'PGRST116') {
-          logGridError('Error loading column settings:', error)
+          console.error('Error loading column settings:', error)
           return
         }
 
@@ -501,7 +469,7 @@ export default function GridView({
           initializeColumnOrder()
         }
       } catch (error) {
-        logGridError('Error loading column settings:', error)
+        console.error('Error loading column settings:', error)
         initializeColumnOrder()
       }
     }
@@ -577,12 +545,12 @@ export default function GridView({
               view_id: viewId,
               ...settingsData,
               column_wrap_text: {},
-              row_height: 'standard',
+              row_height: 'medium',
               frozen_columns: 0,
             }])
         }
       } catch (error) {
-        logGridError('Error saving column settings:', error)
+        console.error('Error saving column settings:', error)
       }
     }
 
@@ -705,19 +673,6 @@ export default function GridView({
 
     setLoading(true)
     try {
-      // Reset missing-column cache when table changes
-      if (missingColumnsTableRef.current !== supabaseTableName) {
-        missingColumnsTableRef.current = supabaseTableName
-        missingColumnsRef.current = new Set()
-      }
-
-      const normalizeColumnKey = (name?: string | null) =>
-        String(name ?? '').trim().toLowerCase()
-      const isLearnedMissing = (name?: string | null) => {
-        const normalized = normalizeColumnKey(name)
-        return normalized.length > 0 && missingColumnsRef.current.has(normalized)
-      }
-
       // Build a minimal select list: visible fields + any fields referenced by filters/sorts/grouping/appearance,
       // plus underlying dependencies needed to compute formula fields client-side.
       const fieldByName = new Map<string, TableField>()
@@ -754,7 +709,6 @@ export default function GridView({
 
       const addBase = (name: string) => {
         if (!name) return
-        if (isLearnedMissing(name)) return
         const field = fieldByName.get(name) || fieldByLowerName.get(name.toLowerCase())
         // If we don't have metadata, we canâ€™t safely decide if it's virtual; skip to avoid select errors.
         // (Fields should normally be in tableFields.)
@@ -817,18 +771,14 @@ export default function GridView({
 
       let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
 
-      const filteredFilters = safeFilters.filter((f) => !isLearnedMissing(f?.field))
-      const filteredViewFilters = safeViewFilters.filter((f) => !isLearnedMissing(f?.field_name))
-      const filteredViewSorts = safeViewSorts.filter((s) => !isLearnedMissing(s?.field_name))
-
       // Use standardized filters if provided, otherwise fall back to viewFilters format
-      if (filteredFilters.length > 0) {
+      if (safeFilters.length > 0) {
         // Convert tableFields to format expected by applyFiltersToQuery
         const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
-        query = applyFiltersToQuery(query, filteredFilters, normalizedFields)
-      } else if (filteredViewFilters.length > 0) {
+        query = applyFiltersToQuery(query, safeFilters, normalizedFields)
+      } else if (safeViewFilters.length > 0) {
         // Legacy: Convert viewFilters format to FilterConfig format
-        const legacyFilters: FilterConfig[] = filteredViewFilters.map(f => ({
+        const legacyFilters: FilterConfig[] = safeViewFilters.map(f => ({
           field: f.field_name,
           operator: f.operator as FilterConfig['operator'],
           value: f.value,
@@ -838,19 +788,19 @@ export default function GridView({
       }
 
       // Check if we need client-side sorting (for single_select by order, multi_select by first value)
-      const needsClientSideSort = filteredViewSorts.length > 0 && shouldUseClientSideSorting(
-        filteredViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+      const needsClientSideSort = safeViewSorts.length > 0 && shouldUseClientSideSorting(
+        safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
         safeTableFields
       )
 
       // Apply sorting at query level (for fields that don't need client-side sorting)
-      if (filteredViewSorts.length > 0 && !needsClientSideSort) {
+      if (safeViewSorts.length > 0 && !needsClientSideSort) {
         // Apply multiple sorts if needed
-        for (let i = 0; i < filteredViewSorts.length; i++) {
-          const sort = filteredViewSorts[i]
+        for (let i = 0; i < safeViewSorts.length; i++) {
+          const sort = safeViewSorts[i]
           const orderColumn = toPostgrestColumn(sort.field_name)
           if (!orderColumn) {
-            logGridWarn('[GridView] Skipping sort on invalid column:', sort.field_name)
+            console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
             continue
           }
           if (i === 0) {
@@ -865,7 +815,7 @@ export default function GridView({
             })
           }
         }
-      } else if (filteredViewSorts.length === 0) {
+      } else if (safeViewSorts.length === 0) {
         // Default sort by id descending
         query = query.order("id", { ascending: false })
       }
@@ -888,27 +838,7 @@ export default function GridView({
         // IMPORTANT: only treat as "missing column" for 42703 (missing table is 42P01 and must be handled separately).
         if ((error as any)?.code === '42703') {
           const missingColumn = extractMissingColumnFromError(error)
-          if (missingColumn) {
-            const normalizedMissing = normalizeColumnKey(missingColumn)
-            if (normalizedMissing) {
-              if (missingColumnsRef.current.has(normalizedMissing)) {
-                // We already tried to recover from this missing column; avoid infinite retries.
-                setIsMissingPhysicalTable(false)
-                setTableWarning(null)
-                setTableError(schemaErrorMessage)
-                logGridWarn('[GridView] Missing column retry already attempted.', {
-                  missingColumn,
-                  table: supabaseTableName,
-                })
-                setRows([])
-                setLoading(false)
-                return
-              }
-              missingColumnsRef.current.add(normalizedMissing)
-            }
-          }
-
-          logGridWarn('[GridView] Column missing for view; retrying with "*" select.', {
+          console.warn('[GridView] Column missing for view; retrying with "*" select.', {
             message: (error as any)?.message,
             code: (error as any)?.code,
             missingColumn,
@@ -916,10 +846,9 @@ export default function GridView({
 
           const isMissingMatch = (fieldName?: string | null) => {
             if (!missingColumn || !fieldName) return false
-            const missingNormalized = normalizeColumnKey(missingColumn)
-            const rawNormalized = normalizeColumnKey(fieldName)
-            const safeNormalized = normalizeColumnKey(toPostgrestColumn(fieldName))
-            return rawNormalized === missingNormalized || safeNormalized === missingNormalized
+            const normalized = String(fieldName).toLowerCase()
+            const missingNormalized = String(missingColumn).toLowerCase()
+            return normalized === missingNormalized
           }
 
           const filteredRetryFilters = missingColumn
@@ -959,7 +888,7 @@ export default function GridView({
               const sort = filteredRetrySorts[i]
               const orderColumn = toPostgrestColumn(sort.field_name)
               if (!orderColumn) {
-                logGridWarn('[GridView] Skipping sort on invalid column:', sort.field_name)
+                console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
                 continue
               }
               retryQuery = retryQuery.order(orderColumn, {
@@ -977,7 +906,9 @@ export default function GridView({
             let dataArray = asArray<Record<string, any>>(retry.data)
             setIsMissingPhysicalTable(false)
             setTableError(null)
-            setTableWarning(fallbackWarningMessage)
+            setTableWarning(
+              'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
+            )
             if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
               dataArray = sortRowsByFieldType(
                 dataArray,
@@ -992,7 +923,7 @@ export default function GridView({
 
           // Retry also failed: treat as schema mismatch (do NOT try to create the table).
           let sqlHint = ''
-          if (isDev && missingColumn) {
+          if (missingColumn) {
             const field = safeTableFields.find(
               (f) => f && typeof f === 'object' && typeof f.name === 'string' && f.name === missingColumn
             )
@@ -1000,7 +931,7 @@ export default function GridView({
             if (field && field.type !== 'formula' && field.type !== 'lookup') {
               try {
                 const sql = generateAddColumnSQL(supabaseTableName, missingColumn, field.type as any, field.options as any)
-                sqlHint = `\n\nSuggested SQL to add the missing column:\n${sql}`
+                sqlHint = `\n\nRun this SQL in Supabase to add the missing column:\n${sql}`
               } catch {
                 // ignore (we'll show generic message)
               }
@@ -1008,17 +939,16 @@ export default function GridView({
           }
           setIsMissingPhysicalTable(false)
           setTableWarning(null)
-          logGridError('[GridView] Missing column retry failed.', {
-            missingColumn,
-            table: supabaseTableName,
-            sqlHint,
-          })
-          setTableError(schemaErrorMessage)
+          setTableError(
+            `This table is missing a column required by the view${missingColumn ? `: "${missingColumn}"` : ''}.` +
+              `\n\nThis is a schema mismatch (error code 42703), not a missing table.` +
+              sqlHint
+          )
           setRows([])
           setLoading(false)
           return
         }
-        logGridError("Error loading rows:", {
+        console.error("Error loading rows:", {
           code: (error as any)?.code,
           message: (error as any)?.message,
           details: (error as any)?.details,
@@ -1040,13 +970,13 @@ export default function GridView({
         if (isTableNotFound) {
           setIsMissingPhysicalTable(true)
           setTableWarning(null)
-          setTableError(missingTableMessage)
+          setTableError(`The table "${supabaseTableName}" does not exist. Attempting to create it...`)
           
           // Try to create the table automatically
           try {
             // Only try once per tableName to avoid infinite loops / resource exhaustion.
             if (createTableAttemptedRef.current.has(supabaseTableName)) {
-              setTableError(missingTableMessage)
+              setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically.`)
               setRows([])
               setLoading(false)
               return
@@ -1071,20 +1001,19 @@ export default function GridView({
               }, 1000)
               return
             } else {
-              logGridError('[GridView] Failed to auto-create missing table.', {
-                table: supabaseTableName,
-                message: createResult.message || createResult.error,
-                sql: createResult.sql,
-              })
-              setTableError(missingTableMessage)
+              // Show the SQL needed to create the table
+              const errorMsg = createResult.message || createResult.error || `Table "${supabaseTableName}" does not exist.`
+              const sqlMsg = createResult.sql ? `\n\nRun this SQL in Supabase:\n${createResult.sql}` : ''
+              setTableError(errorMsg + sqlMsg)
             }
           } catch (createError) {
-            logGridError('Failed to create table:', createError)
-            setTableError(missingTableMessage)
+            console.error('Failed to create table:', createError)
+            setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically. Please create it manually in Supabase.`)
           }
         } else {
           setIsMissingPhysicalTable(false)
-          setTableError('Unable to load data right now. Please try again.')
+          const msg = (error as any)?.message || 'Unknown error'
+          setTableError(`Error loading data: ${msg}`)
         }
         setRows([])
       } else {
@@ -1102,10 +1031,10 @@ export default function GridView({
             : dataArray
         
         // Apply client-side sorting if needed (for single_select by order, multi_select by first value)
-        if (needsClientSideSort && filteredViewSorts.length > 0) {
+        if (needsClientSideSort && safeViewSorts.length > 0) {
           computedRows = sortRowsByFieldType(
             computedRows,
-            filteredViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+            safeViewSorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
             safeTableFields
           )
           // Limit after sorting
@@ -1118,9 +1047,13 @@ export default function GridView({
         setRows(computedRows)
       }
     } catch (error) {
-      logGridError("Error loading rows:", error)
+      console.error("Error loading rows:", error)
+      const msg =
+        (error as any)?.message ||
+        (typeof error === 'string' ? error : '') ||
+        String(error)
       setIsMissingPhysicalTable(false)
-      setTableError('Unable to load data right now. Please try again.')
+      setTableError(`Error loading data: ${msg}`)
       setTableWarning(null)
       setRows([])
     } finally {
@@ -1149,9 +1082,9 @@ export default function GridView({
         .eq("id", rowId)
 
       if (error) {
-        logGridError("Error saving cell:", error)
+        console.error("Error saving cell:", error)
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
-          setTableError(missingTableMessage)
+          setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
         }
         throw error
       }
@@ -1191,9 +1124,9 @@ export default function GridView({
         .single()
 
       if (error) {
-        logGridError("Error adding row:", error)
+        console.error("Error adding row:", error)
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
-          setTableError(missingTableMessage)
+          setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
         }
       } else {
         await loadRows()
@@ -1201,20 +1134,20 @@ export default function GridView({
         // User can open via the dedicated chevron (or optional row double-click).
       }
     } catch (error: any) {
-      logGridError("Error adding row:", error)
+      console.error("Error adding row:", error)
       if (error?.code === "42P01" || error?.message?.includes("does not exist")) {
-        setTableError(missingTableMessage)
+        setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
       }
     }
   }
 
   // Determine permissions
   const isViewOnly = permissions?.mode === 'view'
-  const allowInlineCreate = (permissions?.allowInlineCreate ?? true) && schemaAvailable
-  const allowInlineDelete = (permissions?.allowInlineDelete ?? true) && schemaAvailable
+  const allowInlineCreate = permissions?.allowInlineCreate ?? true
+  const allowInlineDelete = permissions?.allowInlineDelete ?? true
   const allowOpenRecord = permissions?.allowOpenRecord ?? true
   // Allow editing in live view if not view-only (even when not in edit mode)
-  const canEdit = !isViewOnly && schemaAvailable
+  const canEdit = !isViewOnly
 
   function handleRowClick(rowId: string) {
     // Don't open record if not allowed or disabled
@@ -1225,10 +1158,10 @@ export default function GridView({
       onRecordClick(rowId)
     } else if (recordOpenStyle === 'modal') {
       // Open in modal if configured
-      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName, isReadOnly: isViewOnly })
+      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName })
     } else {
       // Otherwise, use RecordPanel context (for views)
-      openRecord(tableId, rowId, supabaseTableName, modalFields, isViewOnly)
+      openRecord(tableId, rowId, supabaseTableName, modalFields)
     }
   }
 
@@ -1240,6 +1173,13 @@ export default function GridView({
   function handleRowSelect(rowId: string) {
     if (!rowId) return
     setSelectedRowId(rowId)
+  }
+
+  function handleRowDoubleClick(rowId: string) {
+    // Optional secondary behaviour: double-click row background opens record.
+    // Cell contents should stopPropagation on double click to prevent accidental opens.
+    if (!allowOpenRecord || !enableRecordOpen) return
+    handleRowClick(rowId)
   }
 
   // Apply client-side search
@@ -1366,7 +1306,7 @@ export default function GridView({
               The table{" "}
               <code className="bg-yellow-100 px-1 py-0.5 rounded">{supabaseTableName}</code>{" "}
               needs to be created in your Supabase database.
-              You can create it manually in your database dashboard.
+              You can create it manually in the Supabase dashboard or use a migration.
             </p>
           )}
         </div>
@@ -1405,7 +1345,7 @@ export default function GridView({
           : data.error || 'Failed to initialize fields'
         
         // Log full error details for debugging
-        logGridError('Error initializing fields:', {
+        console.error('Error initializing fields:', {
           status: response.status,
           error: data.error,
           error_code: data.error_code,
@@ -1431,15 +1371,10 @@ export default function GridView({
         console.log('Fields initialization:', data.message)
       }
     } catch (error: any) {
-      logGridError('Error initializing fields:', error)
-      if (process.env.NODE_ENV === 'development') {
-        const errorMessage = error.message || 'Failed to initialize fields. Please try again.'
-        toast({
-          variant: 'destructive',
-          title: 'Failed to initialize fields',
-          description: errorMessage,
-        })
-      }
+      console.error('Error initializing fields:', error)
+      // Only show alert for unexpected errors
+      const errorMessage = error.message || 'Failed to initialize fields. Please try again.'
+      alert(`Error: ${errorMessage}\n\nIf this problem persists, please check:\n1. You have permission to modify this view\n2. The view is properly connected to a table\n3. The table has fields configured`)
     } finally {
       setInitializingFields(false)
     }
@@ -1532,9 +1467,8 @@ export default function GridView({
             )}
             {onAddField && (
               <button
-                onClick={schemaAvailable ? onAddField : undefined}
-                disabled={!schemaAvailable}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors flex items-center gap-2"
+                onClick={onAddField}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
                 Add Field
@@ -1546,14 +1480,6 @@ export default function GridView({
             {searchTerm && Array.isArray(filteredRows) && Array.isArray(safeRows) && filteredRows.length !== safeRows.length && (
               <span className="ml-1">(filtered from {safeRows.length})</span>
             )}
-          </div>
-        </div>
-      )}
-
-      {schemaStatus?.available === false && (
-        <div className="flex-shrink-0 mb-3">
-          <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-xs">
-            Schema editing is unavailable.
           </div>
         </div>
       )}
@@ -1634,7 +1560,7 @@ export default function GridView({
                                 fieldName={field.field_name}
                                 tableField={tableField}
                                 isVirtual={isVirtual}
-                                onEdit={schemaAvailable ? onEditField : undefined}
+                                onEdit={onEditField}
                                 width={columnWidth}
                                 isResizing={resizingColumn === field.field_name}
                                 onResizeStart={handleResizeStart}
@@ -1713,15 +1639,14 @@ export default function GridView({
                             className={`border-b border-gray-100 transition-colors ${
                               thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                             } cursor-default`}
-                            style={{ ...borderColor, ...rowHeightStyle }}
+                            style={{ ...borderColor, height: `${rowHeightPixels}px` }}
                             onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
-                            onDoubleClick={(e) => e.stopPropagation()}
+                            onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                           >
                             {/* Row open control */}
                             {canOpenRecord && (
                               <td
-                                className="px-2 py-1 w-8 align-top overflow-hidden"
-                                style={rowHeightStyle}
+                                className="px-2 py-1 w-8"
                               >
                                 <button
                                   type="button"
@@ -1737,8 +1662,7 @@ export default function GridView({
                             {/* Image cell if image field is configured */}
                             {rowImage && (
                               <td
-                                className="px-2 py-1 w-12 align-top overflow-hidden"
-                                style={rowHeightStyle}
+                                className="px-2 py-1 w-12"
                                 onClick={(e) => e.stopPropagation()}
                                 onDoubleClick={(e) => e.stopPropagation()}
                               >
@@ -1787,13 +1711,8 @@ export default function GridView({
                                     return (
                                       <td
                                         key={field.field_name}
-                                        className="px-0 py-0 align-top overflow-hidden"
-                                        style={{
-                                          width: `${columnWidth}px`,
-                                          minWidth: `${columnWidth}px`,
-                                          maxWidth: `${columnWidth}px`,
-                                          ...rowHeightStyle,
-                                        }}
+                                        className="px-0 py-0"
+                                        style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                         onClick={(e) => e.stopPropagation()}
                                         onDoubleClick={(e) => e.stopPropagation()}
                                       >
@@ -1804,8 +1723,6 @@ export default function GridView({
                                             rowId={String(rowId)}
                                             tableName={supabaseTableName}
                                             editable={canEdit && !isVirtual && rowId !== null}
-                                            canEditSchema={schemaAvailable}
-                                            contextReadOnly={isViewOnly}
                                             wrapText={wrapText}
                                             rowHeight={rowHeightPixels}
                                             onSave={async (value) => {
@@ -1858,15 +1775,14 @@ export default function GridView({
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}
-                    style={{ ...borderColor, ...rowHeightStyle }}
+                    style={{ ...borderColor, height: `${rowHeightPixels}px` }}
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
-                    onDoubleClick={(e) => e.stopPropagation()}
+                    onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                   >
                     {/* Row open control */}
                     {canOpenRecord && (
                       <td
-                        className="px-2 py-1 w-8 align-top overflow-hidden"
-                        style={rowHeightStyle}
+                        className="px-2 py-1 w-8"
                       >
                         <button
                           type="button"
@@ -1882,8 +1798,7 @@ export default function GridView({
                     {/* Image cell if image field is configured */}
                     {rowImage && (
                       <td
-                        className="px-2 py-1 w-12 align-top overflow-hidden"
-                        style={rowHeightStyle}
+                        className="px-2 py-1 w-12"
                         onClick={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                       >
@@ -1932,13 +1847,8 @@ export default function GridView({
                             return (
                               <td
                                 key={field.field_name}
-                                className="px-0 py-0 align-top overflow-hidden"
-                                style={{
-                                  width: `${columnWidth}px`,
-                                  minWidth: `${columnWidth}px`,
-                                  maxWidth: `${columnWidth}px`,
-                                  ...rowHeightStyle,
-                                }}
+                                className="px-0 py-0"
+                                style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
                                 onClick={(e) => e.stopPropagation()}
                                 onDoubleClick={(e) => e.stopPropagation()}
                               >
@@ -1949,8 +1859,6 @@ export default function GridView({
                                     rowId={String(rowId)}
                                     tableName={supabaseTableName}
                                     editable={canEdit && !isVirtual && rowId !== null}
-                                    canEditSchema={schemaAvailable}
-                                    contextReadOnly={isViewOnly}
                                     wrapText={wrapText}
                                     rowHeight={rowHeightPixels}
                                     onSave={async (value) => {
@@ -2006,9 +1914,8 @@ export default function GridView({
             )}
             {onAddField && (
               <button
-                onClick={schemaAvailable ? onAddField : undefined}
-                disabled={!schemaAvailable}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors flex items-center gap-2"
+                onClick={onAddField}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
               >
                 <Plus className="h-4 w-4" />
                 Add Field
@@ -2033,7 +1940,6 @@ export default function GridView({
           recordId={modalRecord.recordId}
           tableName={modalRecord.tableName}
           modalFields={modalFields}
-          isReadOnly={modalRecord.isReadOnly}
         />
       )}
     </div>

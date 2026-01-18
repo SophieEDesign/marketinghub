@@ -16,7 +16,6 @@ interface LookupCellProps {
     }
   }
   rowId: string
-  rowHeight?: number
   placeholder?: string
 }
 
@@ -161,21 +160,13 @@ export default function LookupCell({
   fieldName,
   field,
   rowId,
-  rowHeight,
   placeholder = '—',
 }: LookupCellProps) {
   const { openRecord } = useRecordPanel()
-  const rowHeightStyle = rowHeight
-    ? {
-        height: `${rowHeight}px`,
-        minHeight: `${rowHeight}px`,
-        maxHeight: `${rowHeight}px`,
-      }
-    : { minHeight: '36px' }
 
   if (!value) {
     return (
-      <div className="w-full h-full px-3 py-2 flex items-center text-sm text-gray-400 italic box-border" style={rowHeightStyle}>
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
         {placeholder}
       </div>
     )
@@ -189,7 +180,7 @@ export default function LookupCell({
 
   if (validValues.length === 0) {
     return (
-      <div className="w-full h-full px-3 py-2 flex items-center text-sm text-gray-400 italic box-border" style={rowHeightStyle}>
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
         {placeholder}
       </div>
     )
@@ -202,7 +193,7 @@ export default function LookupCell({
   if (!lookupTableId || !lookupFieldId) {
     // If lookup config is missing, just display the value(s)
     return (
-      <div className="w-full h-full px-3 py-2 flex items-center gap-1.5 flex-wrap box-border overflow-hidden" style={rowHeightStyle}>
+      <div className="w-full min-h-[36px] px-3 py-2 flex items-center gap-1.5 flex-wrap">
         {validValues.map((item, index) => {
           const displayValue = typeof item === 'string' 
             ? item 
@@ -225,8 +216,7 @@ export default function LookupCell({
 
   return (
     <div 
-      className="w-full h-full px-3 py-2 flex items-center gap-1.5 flex-wrap box-border overflow-hidden"
-      style={rowHeightStyle}
+      className="w-full min-h-[36px] px-3 py-2 flex items-center gap-1.5 flex-wrap"
       onClick={(e) => {
         // Prevent cell selection when clicking pills
         e.stopPropagation()

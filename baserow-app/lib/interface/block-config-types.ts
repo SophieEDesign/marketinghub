@@ -288,11 +288,10 @@ export function validateBlockConfig(
 
   // Helpers for backward compatibility with legacy/camelCase config shapes.
   const resolveLegacyTableId = (cfg: any) => cfg?.table_id || cfg?.tableId || cfg?.base_table || cfg?.baseTable
-  const normalizeMultiSource = (s: any, idx = 0) => {
+  const normalizeMultiSource = (s: any) => {
     if (!s || typeof s !== 'object') return {}
     return {
       ...s,
-      id: s.id ?? s.source_id ?? s.sourceId ?? `source_${idx + 1}`,
       table_id: s.table_id ?? s.tableId ?? s.table ?? '',
       view_id: s.view_id ?? s.viewId,
       title_field: s.title_field ?? s.titleField ?? s.title ?? '',
@@ -395,7 +394,7 @@ export function validateBlockConfig(
 
     case 'multi_calendar':
     case 'multi_timeline': {
-      const sources = Array.isArray(config.sources) ? config.sources.map((s: any, idx: number) => normalizeMultiSource(s, idx)) : []
+      const sources = Array.isArray(config.sources) ? config.sources.map(normalizeMultiSource) : []
       if (sources.length === 0) {
         errors.push(`${blockType} block requires at least one source table`)
         break

@@ -47,25 +47,6 @@ export default function GalleryView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
-  const permissions = (blockConfig as any)?.permissions || {}
-  const allowOpenRecord = permissions.allowOpenRecord ?? true
-  const enableRecordOpen = (blockConfig as any)?.appearance?.enable_record_open ?? true
-  const canOpenRecord = allowOpenRecord && enableRecordOpen
-  const canEdit = permissions.mode !== "view"
-
-  const isRecordOpenAllowed = useCallback(
-    (e?: React.MouseEvent) => {
-      if (!canOpenRecord) return false
-      if (!e) return true
-      const target = e.target as HTMLElement | null
-      if (!target) return true
-      return !target.closest(
-        'button, a, input, textarea, select, [role="button"], [data-prevent-record-open="true"]'
-      )
-    },
-    [canOpenRecord]
-  )
-
   // Resolve supabase table name
   useEffect(() => {
     async function loadTableInfo() {
@@ -236,17 +217,15 @@ export default function GalleryView({
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
   const handleOpenRecord = useCallback((recordId: string) => {
-    if (!canOpenRecord) return
     if (onRecordClick) {
       onRecordClick(recordId)
       return
     }
     if (!supabaseTableName) return
-    openRecord(tableId, recordId, supabaseTableName, undefined, !canEdit)
-  }, [canEdit, canOpenRecord, onRecordClick, openRecord, supabaseTableName, tableId])
+    openRecord(tableId, recordId, supabaseTableName)
+  }, [onRecordClick, openRecord, supabaseTableName, tableId])
 
   const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
-    if (!canEdit) return
     if (!supabaseTableName) return
     const supabase = createClient()
     const { error } = await supabase
@@ -262,7 +241,7 @@ export default function GalleryView({
           : r
       )
     )
-  }, [canEdit, supabaseTableName])
+  }, [supabaseTableName])
 
   if (loading) {
     return (
@@ -324,17 +303,8 @@ export default function GalleryView({
                 selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
               }`}
               style={borderColor}
-              onClick={(e) => {
-                setSelectedCardId(String(row.id))
-                if (isRecordOpenAllowed(e)) {
-                  handleOpenRecord(String(row.id))
-                }
-              }}
-              onDoubleClick={(e) => {
-                if (isRecordOpenAllowed(e)) {
-                  handleOpenRecord(String(row.id))
-                }
-              }}
+              onClick={() => setSelectedCardId(String(row.id))}
+              onDoubleClick={() => handleOpenRecord(String(row.id))}
             >
               {cardImage && (
                 <div className={`w-full ${fitImageSize ? "h-auto" : "h-40"} bg-gray-100`}>
@@ -350,19 +320,14 @@ export default function GalleryView({
               )}
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div
-                    className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2"
-                    onDoubleClick={(e) => e.stopPropagation()}
-                    data-prevent-record-open="true"
-                  >
+                  <div className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2" onDoubleClick={(e) => e.stopPropagation()}>
                     {titleFieldObj ? (
                       <CellFactory
                         field={titleFieldObj}
                         value={titleValue}
                         rowId={String(row.id)}
                         tableName={supabaseTableName || ""}
-                        editable={canEdit && !titleFieldObj.options?.read_only && titleFieldObj.type !== "formula" && titleFieldObj.type !== "lookup" && !!supabaseTableName}
-                        contextReadOnly={!canEdit}
+                        editable={!titleFieldObj.options?.read_only && titleFieldObj.type !== "formula" && titleFieldObj.type !== "lookup" && !!supabaseTableName}
                         wrapText={true}
                         rowHeight={32}
                         onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
@@ -371,20 +336,18 @@ export default function GalleryView({
                       <span>{titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== "" ? String(titleValue) : "Untitled"}</span>
                     )}
                   </div>
-                  {canOpenRecord && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleOpenRecord(String(row.id))
-                      }}
-                      className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
-                      title="Open record"
-                      aria-label="Open record"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOpenRecord(String(row.id))
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
+                    title="Open record"
+                    aria-label="Open record"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
                 </div>
                 <div className="space-y-1">
                   {secondaryFields.map((fieldName) => {
@@ -397,19 +360,14 @@ export default function GalleryView({
                     return (
                       <div key={fieldName} className="text-xs text-gray-700">
                         <span className="text-gray-500 font-medium">{label}:</span>{" "}
-                        <span
-                          className="text-gray-900"
-                          onDoubleClick={(e) => e.stopPropagation()}
-                          data-prevent-record-open="true"
-                        >
+                        <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
                           {fieldObj ? (
                             <CellFactory
                               field={fieldObj}
                               value={fieldValue}
                               rowId={String(row.id)}
                               tableName={supabaseTableName || ""}
-                              editable={canEdit && !fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                              contextReadOnly={!canEdit}
+                              editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
                               wrapText={true}
                               rowHeight={28}
                               onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}

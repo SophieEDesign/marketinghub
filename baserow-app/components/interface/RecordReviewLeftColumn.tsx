@@ -24,7 +24,6 @@ import CreateRecordModal from "@/components/records/CreateRecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { formatDateUK } from "@/lib/utils"
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
-import { getOrderedSelectLabels } from "@/lib/fields/select-options"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { canCreateRecord } from "@/lib/interface/record-actions"
 import { evaluateFilterTree } from "@/lib/filters/evaluation"
@@ -399,8 +398,8 @@ export default function RecordReviewLeftColumn({
 
   const getGroupOrder = useCallback((fieldName: string): string[] => {
     const def = fields.find((f) => f.name === fieldName)
-    if (!def || (def.type !== "single_select" && def.type !== "multi_select")) return []
-    return getOrderedSelectLabels(def.type, def.options)
+    const choices = def?.options?.choices
+    return Array.isArray(choices) ? choices : []
   }, [fields])
 
   const groupRecords = useCallback((rows: any[], groupFields: string[]) => {
@@ -440,7 +439,7 @@ export default function RecordReviewLeftColumn({
       }
 
       const keys = Array.from(buckets.keys())
-      // Prefer select option order if available; otherwise preserve first-seen order. Empty group last.
+      // Prefer select option order if available; otherwise alpha. Empty group last.
       const ordered = keys
         .filter((k) => k !== "")
         .sort((a, b) => {
@@ -451,7 +450,7 @@ export default function RecordReviewLeftColumn({
           if (aIn && bIn) return ai - bi
           if (aIn) return -1
           if (bIn) return 1
-          return 0
+          return a.localeCompare(b)
         })
 
       if (keys.includes("")) ordered.push("")
