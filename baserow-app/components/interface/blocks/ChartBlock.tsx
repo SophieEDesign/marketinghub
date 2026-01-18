@@ -713,10 +713,9 @@ export default function ChartBlock({ block, isEditing = false, pageTableId = nul
           <h3 className="text-lg font-semibold">{title}</h3>
         </div>
       )}
-      {/* Recharts needs a non-zero height. A parent min-height does NOT make `height="100%"` resolvable,
-          so we set `minHeight` directly on ResponsiveContainer to avoid a 0px chart. */}
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%" minHeight={260}>
+      {/* Recharts needs a non-zero height; min-height ensures charts render even in auto-height layouts. */}
+      <div className="flex-1 min-h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
           {renderChart()}
         </ResponsiveContainer>
       </div>

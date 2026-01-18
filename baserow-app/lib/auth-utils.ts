@@ -117,28 +117,10 @@ export async function getRedirectUrl(
   nextParam: string | null,
   callbackUrlParam: string | null
 ): Promise<string> {
-  // Use explicit redirect parameter if provided, but sanitize it carefully.
-  // We only allow safe internal paths and we block certain "utility" routes
-  // (like Settings) so login respects the configured default landing page.
+  // Use explicit redirect parameter if provided
   const explicitNext = nextParam || callbackUrlParam
-  if (explicitNext) {
-    const trimmed = explicitNext.trim()
-    const isInternal =
-      trimmed.startsWith('/') &&
-      !trimmed.startsWith('//') &&
-      !trimmed.toLowerCase().startsWith('/\\') // extra hardening for odd encodings
-
-    const blockedPrefixes = ['/login', '/auth', '/settings']
-    const isBlocked = blockedPrefixes.some((p) => trimmed === p || trimmed.startsWith(p + '/'))
-
-    if (
-      isInternal &&
-      !isBlocked &&
-      trimmed !== '/' &&
-      trimmed !== '/login'
-    ) {
-      return trimmed
-    }
+  if (explicitNext && explicitNext !== '/' && explicitNext !== '/login') {
+    return explicitNext
   }
 
   // Default: go to home. The server-side HomePage (`/`) will resolve the actual landing

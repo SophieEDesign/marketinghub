@@ -27,7 +27,7 @@ interface ListViewProps {
   filters?: FilterConfig[]
   sorts?: Array<{ field_name: string; direction: 'asc' | 'desc' }>
   groupBy?: string
-  /** When grouping, should groups start collapsed? Default: true (closed). */
+  /** When grouping by a choice field, should groups start collapsed? Default: true (closed). */
   defaultChoiceGroupsCollapsed?: boolean
   searchQuery?: string
   onRecordClick?: (recordId: string) => void
@@ -235,7 +235,10 @@ export default function ListView({
     return tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy) || null
   }, [currentGroupBy, tableFields])
 
-  // When grouping, allow "start collapsed" behavior (default: collapsed).
+  const isChoiceGroupBy = !!groupFieldForCurrentGroupBy &&
+    (groupFieldForCurrentGroupBy.type === 'single_select' || groupFieldForCurrentGroupBy.type === 'multi_select')
+
+  // When grouping by a choice field, allow "start collapsed" behavior (default: collapsed).
   // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
   // so we don't override the user's manual expand/collapse interactions mid-session.
   useEffect(() => {
@@ -249,6 +252,12 @@ export default function ListView({
 
     // No grouping: always open (nothing to collapse)
     if (!currentGroupBy) {
+      didInitChoiceGroupCollapseRef.current = false
+      return
+    }
+
+    // Only apply this default behavior for choice fields (single/multi select)
+    if (!isChoiceGroupBy) {
       didInitChoiceGroupCollapseRef.current = false
       return
     }
@@ -267,7 +276,7 @@ export default function ListView({
     if (keys.length === 0) return
     setCollapsedGroups(new Set(keys))
     didInitChoiceGroupCollapseRef.current = true
-  }, [currentGroupBy, defaultChoiceGroupsCollapsed, groupedRows])
+  }, [currentGroupBy, isChoiceGroupBy, defaultChoiceGroupsCollapsed, groupedRows])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
