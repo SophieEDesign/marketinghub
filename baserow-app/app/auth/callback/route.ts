@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { authErrorToMessage } from '@/lib/auth-utils'
+import { authErrorToMessage, getRedirectUrl } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') || '/'
+  const next = await getRedirectUrl(requestUrl.searchParams.get('next'), null)
 
   if (code) {
     const supabase = await createClient()
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(setupUrl)
       }
 
-      // Redirect to home page
+      // Redirect to resolved/sanitized next (or `/` which will resolve the configured landing page)
       return NextResponse.redirect(new URL(next, request.url))
     } else {
       // Error confirming email - use centralized error mapping

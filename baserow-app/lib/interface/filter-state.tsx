@@ -13,6 +13,11 @@ interface FilterBlockState {
   blockId: string
   filters: FilterConfig[]
   targetBlocks: string[] | 'all'
+  /**
+   * A stable signature of the emitted filter payload.
+   * Used to avoid provider update loops when callers re-emit equivalent values.
+   */
+  signature?: string
 }
 
 // Extended filter config with source information
@@ -39,6 +44,16 @@ const FilterStateContext = createContext<FilterStateContextValue | null>(null)
 export function FilterStateProvider({ children }: { children: ReactNode }) {
   const [filterBlocks, setFilterBlocks] = useState<Map<string, FilterBlockState>>(new Map())
   const [filterBlockTitles, setFilterBlockTitles] = useState<Map<string, string>>(new Map())
+
+  const computeSignature = useCallback((
+    blockId: string,
+    filters: FilterConfig[],
+    targetBlocks: string[] | 'all'
+  ) => {
+    // IMPORTANT: We assume caller maintains stable order; this is sufficient to detect "no-op" re-emits.
+    // This is intentionally cheap and avoids deep-equality footguns.
+    return JSON.stringify({ blockId, filters, targetBlocks })
+  }, [])
 
   const getFiltersForBlock = useCallback((blockId: string): FilterConfigWithSource[] => {
     const filters: FilterConfigWithSource[] = []
@@ -80,13 +95,22 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     targetBlocks: string[] | 'all',
     blockTitle?: string
   ) => {
+    const signature = computeSignature(blockId, filters, targetBlocks)
     setFilterBlocks(prev => {
+      const existing = prev.get(blockId)
+      if (existing?.signature === signature) {
+        return prev
+      }
       const next = new Map(prev)
-      next.set(blockId, { blockId, filters, targetBlocks })
+      next.set(blockId, { blockId, filters, targetBlocks, signature })
       return next
     })
     if (blockTitle !== undefined) {
       setFilterBlockTitles(prev => {
+        const current = prev.get(blockId)
+        if ((current || '') === (blockTitle || '')) {
+          return prev
+        }
         const next = new Map(prev)
         if (blockTitle) {
           next.set(blockId, blockTitle)
@@ -96,7 +120,7 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
         return next
       })
     }
-  }, [])
+  }, [computeSignature])
 
   const removeFilterBlock = useCallback((blockId: string) => {
     setFilterBlocks(prev => {
