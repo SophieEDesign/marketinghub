@@ -95,25 +95,6 @@ export default function InlineSelectDropdown({
     }
   }, [isOpen, editingChoice, editingColor])
 
-  const displayOptions = useMemo(() => {
-    if (sortMode === 'manual') return selectOptions
-    return sortSelectOptionsByLabel(selectOptions, sortMode === 'asc' ? 'asc' : 'desc')
-  }, [selectOptions, sortMode])
-
-  // Filter choices based on search term
-  const filteredChoices = useMemo(() => {
-    if (!searchTerm.trim()) return displayOptions
-    const term = searchTerm.toLowerCase()
-    return displayOptions.filter(option => option.label.toLowerCase().includes(term))
-  }, [displayOptions, searchTerm])
-
-  // Check if search term matches a new option to create
-  const canCreateNewOption = useMemo(() => {
-    if (!canEditOptions || !searchTerm.trim()) return false
-    const term = searchTerm.trim()
-    return !selectOptions.some(option => option.label.toLowerCase() === term.toLowerCase())
-  }, [canEditOptions, searchTerm, selectOptions])
-
   // Merge choiceColors into fieldOptions for proper resolution
   const mergedOptions: FieldOptions = useMemo(() => {
     return {
@@ -133,6 +114,25 @@ export default function InlineSelectDropdown({
   }, [normalizedSelectOptions])
 
   const selectOptions = localSelectOptions ?? normalizedSelectOptions
+
+  const displayOptions = useMemo(() => {
+    if (sortMode === 'manual') return selectOptions
+    return sortSelectOptionsByLabel(selectOptions, sortMode === 'asc' ? 'asc' : 'desc')
+  }, [selectOptions, sortMode])
+
+  // Filter choices based on search term
+  const filteredChoices = useMemo(() => {
+    if (!searchTerm.trim()) return displayOptions
+    const term = searchTerm.toLowerCase()
+    return displayOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [displayOptions, searchTerm])
+
+  // Check if search term matches a new option to create
+  const canCreateNewOption = useMemo(() => {
+    if (!canEditOptions || !searchTerm.trim()) return false
+    const term = searchTerm.trim()
+    return !selectOptions.some(option => option.label.toLowerCase() === term.toLowerCase())
+  }, [canEditOptions, searchTerm, selectOptions])
 
   // Ensure missing sort_index/id metadata is persisted once.
   useEffect(() => {

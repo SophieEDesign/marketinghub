@@ -3,7 +3,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react"
 import { Calculator, Link as LinkIcon, Paperclip, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { formatDateUK } from "@/lib/utils"
+import { formatDateObjectUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName, isFieldValueError } from "@/lib/fields/display"
 import { useToast } from "@/components/ui/use-toast"
@@ -579,7 +579,7 @@ export default function FieldEditor({
     const dateValueForInput = isValidDate ? parsedDate.toISOString().split("T")[0] : ""
 
     if (isReadOnly) {
-      const dateValueForDisplay = isValidDate ? formatDateUK(parsedDate, "—") : ""
+      const dateValueForDisplay = isValidDate ? formatDateObjectUK(parsedDate, "—") : ""
       return (
         <div className="space-y-2.5">
           {showLabel && (

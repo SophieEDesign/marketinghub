@@ -37,7 +37,7 @@ export interface LookupFieldConfig {
 export interface LookupFieldPickerProps {
   field: TableField
   value: string | string[] | null
-  onChange: (value: string | string[] | null) => void
+  onChange: (value: string | string[] | null) => void | Promise<void>
   config?: LookupFieldConfig
   disabled?: boolean
   placeholder?: string
@@ -398,15 +398,9 @@ export default function LookupFieldPicker({
         const nextValue = isFilterContext 
           ? (newValue.length > 0 ? newValue.join(',') : '')
           : (newValue.length > 0 ? newValue : null)
-        const result = onChange(nextValue)
-        if (result instanceof Promise) {
-          await result
-        }
+        await Promise.resolve(onChange(nextValue))
       } else {
-        const result = onChange(option.id)
-        if (result instanceof Promise) {
-          await result
-        }
+        await Promise.resolve(onChange(option.id))
         setOpen(false)
       }
     } catch (error) {
@@ -425,15 +419,9 @@ export default function LookupFieldPicker({
         const nextValue = isFilterContext 
           ? (newValue.length > 0 ? newValue.join(',') : '')
           : (newValue.length > 0 ? newValue : null)
-        const result = onChange(nextValue)
-        if (result instanceof Promise) {
-          await result
-        }
+        await Promise.resolve(onChange(nextValue))
       } else {
-        const result = onChange(null)
-        if (result instanceof Promise) {
-          await result
-        }
+        await Promise.resolve(onChange(null))
       }
     } catch (error) {
       console.error('Failed to update linked records:', error)

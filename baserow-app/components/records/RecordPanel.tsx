@@ -196,6 +196,8 @@ export default function RecordPanel() {
     // RecordFields component uses field.group_name directly from the fields array
   }
 
+  const isReadOnly = !!state.isReadOnly
+
   const handleFieldChange = useCallback(async (fieldName: string, value: any) => {
     if (isReadOnly) return
     if (!state.recordId || !state.tableName) return
@@ -316,7 +318,6 @@ export default function RecordPanel() {
   if (!state.isOpen) return null
 
   const headerLoading = !recordLoaded || !fieldsLoaded || recordLoading || fieldsLoading
-  const isReadOnly = !!state.isReadOnly
 
   const panelWidth = state.isFullscreen ? "100%" : `${state.width}px`
   // Show back button if in fullscreen (to go to core data) or if there's history
