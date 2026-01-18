@@ -1210,11 +1210,11 @@ export default function GridView({
 
   // Determine permissions
   const isViewOnly = permissions?.mode === 'view'
-  const allowInlineCreate = permissions?.allowInlineCreate ?? true
-  const allowInlineDelete = permissions?.allowInlineDelete ?? true
+  const allowInlineCreate = (permissions?.allowInlineCreate ?? true) && schemaAvailable
+  const allowInlineDelete = (permissions?.allowInlineDelete ?? true) && schemaAvailable
   const allowOpenRecord = permissions?.allowOpenRecord ?? true
   // Allow editing in live view if not view-only (even when not in edit mode)
-  const canEdit = !isViewOnly
+  const canEdit = !isViewOnly && schemaAvailable
 
   function handleRowClick(rowId: string) {
     // Don't open record if not allowed or disabled
@@ -1553,7 +1553,7 @@ export default function GridView({
       {schemaStatus?.available === false && (
         <div className="flex-shrink-0 mb-3">
           <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-xs">
-            Field editing temporarily unavailable — schema is syncing.
+            Schema editing is unavailable.
           </div>
         </div>
       )}

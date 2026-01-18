@@ -11,26 +11,13 @@ import {
   generateDropColumnSQL,
   isDestructiveTypeChange,
 } from '@/lib/fields/sqlGenerator'
-import { getActualTableColumns, getTableFields } from '@/lib/fields/schema'
+import { getTableFields } from '@/lib/fields/schema'
 import { isTableNotFoundError, createErrorResponse } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
   return SYSTEM_FIELD_NAMES.has(String(name || '').toLowerCase())
-}
-
-function mapColumnTypeToFieldType(columnType: string): FieldType {
-  const lowerType = String(columnType || '').toLowerCase()
-  if (lowerType.includes('bool')) return 'checkbox'
-  if (lowerType.includes('int') || lowerType.includes('numeric') || lowerType.includes('decimal') || lowerType.includes('float') || lowerType.includes('double') || lowerType.includes('real')) {
-    return 'number'
-  }
-  if (lowerType.includes('date') || lowerType.includes('time') || lowerType.includes('timestamp')) {
-    return 'date'
-  }
-  if (lowerType.includes('json')) return 'json'
-  return 'text'
 }
 
 async function getWriteClient() {
@@ -56,46 +43,10 @@ export async function GET(
   try {
     const { tableId } = await params
     const fields = await getTableFields(tableId)
-    let responseFields = fields || []
-    let schemaStatus: { available: boolean; source: 'metadata' | 'physical' | 'unknown' } = {
-      available: responseFields.length > 0,
-      source: responseFields.length > 0 ? 'metadata' : 'unknown',
-    }
-
-    if (responseFields.length === 0) {
-      const table = await getTable(tableId)
-      if (table?.supabase_table) {
-        const columns = await getActualTableColumns(table.supabase_table)
-        const fallbackFields = (columns || [])
-          .map((col: any, index: number) => {
-            const name = String(col?.column_name ?? col?.name ?? '').trim()
-            if (!name) return null
-            const type = mapColumnTypeToFieldType(String(col?.data_type ?? col?.type ?? ''))
-            return {
-              id: `fallback:${tableId}:${name}`,
-              table_id: tableId,
-              name,
-              label: name,
-              type,
-              position: index,
-              order_index: index,
-              required: false,
-              options: {},
-              created_at: new Date().toISOString(),
-            } as TableField
-          })
-          .filter((f): f is TableField => Boolean(f))
-
-        if (fallbackFields.length > 0) {
-          responseFields = fallbackFields
-          schemaStatus = { available: false, source: 'physical' }
-        }
-      }
-    }
     
     // Do not cache: field metadata changes frequently (settings edits, reorder, etc.)
     // and caching causes the UI to show stale settings after a successful save.
-    const response = NextResponse.json({ fields: responseFields, schemaStatus })
+    const response = NextResponse.json({ fields: fields || [] })
     response.headers.set('Cache-Control', 'no-store')
     return response
   } catch (error: any) {
@@ -230,7 +181,7 @@ export async function POST(
         }
         return NextResponse.json(
           { 
-            error: 'Field metadata is temporarily unavailable.',
+            error: 'Schema metadata is unavailable. Field editing is disabled.',
             code: 'SCHEMA_METADATA_MISSING'
           },
           { status: 500 }

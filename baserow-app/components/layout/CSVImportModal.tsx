@@ -1092,8 +1092,8 @@ export default function CSVImportModal({
       if (errorMessage.includes('table_fields table does not exist') || 
           errorMessage.includes('MISSING_TABLE')) {
         const devDetails = process.env.NODE_ENV === 'development'
-          ? 'Field creation during import is temporarily unavailable — schema is syncing.'
-          : 'Field creation during import is temporarily unavailable.'
+          ? 'Schema metadata is unavailable. Field creation during import is disabled.'
+          : 'Schema metadata is unavailable. CSV import cannot create fields.'
         setError(devDetails)
       } else {
         setError(`Failed to import CSV: ${errorMessage}`)

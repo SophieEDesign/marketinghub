@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { X, Save, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { getSchemaSafeMessage, logSchemaWarning } from "@/lib/errors/schema"
-import { useToast } from "@/components/ui/use-toast"
 
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
@@ -35,7 +34,6 @@ export default function RecordDrawer({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
-  const { toast } = useToast()
 
   useEffect(() => {
     if (isOpen && rowId && tableName) {
@@ -99,11 +97,7 @@ export default function RecordDrawer({
       if (error) {
         console.error("Error saving record:", error)
         logSchemaWarning("RecordDrawer save", error)
-        toast({
-          variant: "destructive",
-          title: "Failed to save record",
-          description: getSchemaSafeMessage(error, "Failed to save record. Please try again."),
-        })
+        alert(getSchemaSafeMessage(error, "Failed to save record. Please try again."))
       } else {
         await loadRecord()
         onSave?.()
@@ -111,11 +105,7 @@ export default function RecordDrawer({
     } catch (error: any) {
       console.error("Error saving record:", error)
       logSchemaWarning("RecordDrawer save", error)
-      toast({
-        variant: "destructive",
-        title: "Failed to save record",
-        description: getSchemaSafeMessage(error, "Failed to save record. Please try again."),
-      })
+      alert(getSchemaSafeMessage(error, "Failed to save record. Please try again."))
     } finally {
       setSaving(false)
     }
@@ -138,11 +128,7 @@ export default function RecordDrawer({
       if (error) {
         console.error("Error deleting record:", error)
         logSchemaWarning("RecordDrawer delete", error)
-        toast({
-          variant: "destructive",
-          title: "Failed to delete record",
-          description: getSchemaSafeMessage(error, "Failed to delete record. Please try again."),
-        })
+        alert(getSchemaSafeMessage(error, "Failed to delete record. Please try again."))
       } else {
         onDelete?.()
         onClose()
@@ -150,11 +136,7 @@ export default function RecordDrawer({
     } catch (error: any) {
       console.error("Error deleting record:", error)
       logSchemaWarning("RecordDrawer delete", error)
-      toast({
-        variant: "destructive",
-        title: "Failed to delete record",
-        description: getSchemaSafeMessage(error, "Failed to delete record. Please try again."),
-      })
+      alert(getSchemaSafeMessage(error, "Failed to delete record. Please try again."))
     } finally {
       setDeleting(false)
     }

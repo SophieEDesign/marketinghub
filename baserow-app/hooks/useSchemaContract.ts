@@ -10,16 +10,11 @@ export function useSchemaContract() {
   const [status, setStatus] = useState<SchemaContractStatus | null>(() => getCachedSchemaContractStatus())
   const [loading, setLoading] = useState(status == null)
   const mountedRef = useRef(true)
-  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current)
-        refreshTimeoutRef.current = null
-      }
     }
   }, [])
 
@@ -52,32 +47,6 @@ export function useSchemaContract() {
       cancelled = true
     }
   }, [])
-
-  useEffect(() => {
-    if (!status) return
-    if (status.available) {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current)
-        refreshTimeoutRef.current = null
-      }
-      return
-    }
-    if (refreshTimeoutRef.current) return
-
-    // Self-heal: retry schema contract in the background.
-    refreshTimeoutRef.current = setTimeout(async () => {
-      refreshTimeoutRef.current = null
-      try {
-        const supabase = createClient()
-        const nextStatus = await checkSchemaContract(supabase, { force: true })
-        if (mountedRef.current) {
-          setStatus(nextStatus)
-        }
-      } catch {
-        // Non-fatal; keep current status and retry later.
-      }
-    }, 15000)
-  }, [status])
 
   return {
     status,

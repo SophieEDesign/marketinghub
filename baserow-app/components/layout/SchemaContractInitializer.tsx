@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useRef } from 'react'
+import { useToast } from '@/components/ui/use-toast'
 import { useSchemaContract } from '@/hooks/useSchemaContract'
 import { compareSchemaVersions, fetchSchemaVersion } from '@/lib/schema/contract'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SchemaContractInitializer() {
+  const { toast } = useToast()
   const { status } = useSchemaContract()
   const warnedRef = useRef(false)
   const versionCheckedRef = useRef(false)
@@ -23,7 +25,14 @@ export default function SchemaContractInitializer() {
       console.warn('[schema-contract] Missing metadata tables:', status.missingTables)
     }
 
-  }, [status])
+    toast({
+      title: 'Schema editing is unavailable',
+      description:
+        status.missingTables.length > 0
+          ? `Missing metadata tables: ${status.missingTables.join(', ')}.`
+          : 'Metadata tables are unavailable.',
+    })
+  }, [status, toast])
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return

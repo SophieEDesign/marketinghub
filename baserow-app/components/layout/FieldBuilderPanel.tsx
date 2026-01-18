@@ -36,7 +36,6 @@ import type { TableField, FieldType, FieldOptions } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import FieldSettingsDrawer from "./FieldSettingsDrawer"
-import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 interface FieldBuilderPanelProps {
   tableId: string
@@ -56,24 +55,12 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   const [editingField, setEditingField] = useState<TableField | null>(null)
   const [showNewField, setShowNewField] = useState(false)
   const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const { schemaAvailable } = useSchemaContract()
-  const schemaUnavailableMessage = "Field editing temporarily unavailable — schema is syncing."
 
   useEffect(() => {
     loadFields()
     loadTableSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableId])
-
-  useEffect(() => {
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      setShowNewField(false)
-      return
-    }
-    setNotice(null)
-  }, [schemaAvailable])
 
   async function loadTableSettings() {
     try {
@@ -125,10 +112,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   async function savePrimaryField(next: string | null) {
     if (savingPrimary) return
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      return
-    }
     setSavingPrimary(true)
     try {
       const res = await fetch(`/api/tables/${tableId}`, {
@@ -140,24 +123,20 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       })
       const data = await res.json()
       if (!res.ok) {
-        setNotice(data?.error || "Failed to update primary field")
+        alert(data?.error || "Failed to update primary field")
         return
       }
       setPrimaryFieldName(data?.table?.primary_field_name ?? next ?? null)
       onFieldsUpdated()
     } catch (error) {
       console.error("Error saving primary field:", error)
-      setNotice("Failed to update primary field")
+      alert("Failed to update primary field")
     } finally {
       setSavingPrimary(false)
     }
   }
 
   async function handleReorderFields(newOrder: TableField[]) {
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      return
-    }
     try {
       // Update order_index for all fields
       const updates = newOrder.map((field, index) => ({
@@ -173,7 +152,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       if (!response.ok) {
         const data = await response.json()
-        setNotice(data.error || "Failed to reorder fields")
+        alert(data.error || "Failed to reorder fields")
         await loadFields() // Revert on error
         return
       }
@@ -182,7 +161,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       onFieldsUpdated()
     } catch (error) {
       console.error("Error reordering fields:", error)
-      setNotice("Failed to reorder fields")
+      alert("Failed to reorder fields")
       await loadFields() // Revert on error
     }
   }
@@ -195,7 +174,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   )
 
   function handleDragEnd(event: DragEndEvent) {
-    if (!schemaAvailable) return
     const { active, over } = event
 
     if (over && active.id !== over.id) {
@@ -230,10 +208,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
   }, [fields])
 
   async function handleCreateField(fieldData: Partial<TableField>) {
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      return
-    }
     try {
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: "POST",
@@ -243,11 +217,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       if (!response.ok) {
         const data = await response.json()
-        if (data?.code === "SCHEMA_METADATA_MISSING") {
-          setNotice(schemaUnavailableMessage)
-        } else {
-          setNotice(data.error || "Failed to create field")
-        }
+        alert(data.error || "Failed to create field")
         return
       }
 
@@ -256,15 +226,11 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       setShowNewField(false)
     } catch (error) {
       console.error("Error creating field:", error)
-      setNotice("Failed to create field")
+      alert("Failed to create field")
     }
   }
 
   async function handleUpdateField(fieldId: string, updates: Partial<TableField>) {
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      return
-    }
     try {
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: "PATCH",
@@ -277,11 +243,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       if (!response.ok) {
         const data = await response.json()
-        if (data?.code === "SCHEMA_METADATA_MISSING") {
-          setNotice(schemaUnavailableMessage)
-        } else {
-          setNotice(data.error || "Failed to update field")
-        }
+        alert(data.error || "Failed to update field")
         return
       }
 
@@ -290,15 +252,11 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       setEditingField(null)
     } catch (error) {
       console.error("Error updating field:", error)
-      setNotice("Failed to update field")
+      alert("Failed to update field")
     }
   }
 
   async function handleDeleteField(fieldId: string, fieldName: string) {
-    if (!schemaAvailable) {
-      setNotice(schemaUnavailableMessage)
-      return
-    }
     if (!confirm(`Are you sure you want to delete the field "${fieldName}"? This action cannot be undone.`)) {
       return
     }
@@ -310,11 +268,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
       if (!response.ok) {
         const data = await response.json()
-        if (data?.code === "SCHEMA_METADATA_MISSING") {
-          setNotice(schemaUnavailableMessage)
-        } else {
-          setNotice(data.error || "Failed to delete field")
-        }
+        alert(data.error || "Failed to delete field")
         return
       }
 
@@ -322,7 +276,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
       onFieldsUpdated()
     } catch (error) {
       console.error("Error deleting field:", error)
-      setNotice("Failed to delete field")
+      alert("Failed to delete field")
     }
   }
 
@@ -332,11 +286,6 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
 
   return (
     <div className="space-y-4">
-      {notice && (
-        <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-xs">
-          {notice}
-        </div>
-      )}
       <div className="space-y-2">
         <Label className="text-sm font-semibold text-gray-900">Primary / Default Field</Label>
         <Select
@@ -346,7 +295,7 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
             if (val === "id") return savePrimaryField("id")
             return savePrimaryField(val)
           }}
-          disabled={savingPrimary || !schemaAvailable}
+          disabled={savingPrimary}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Choose primary field" />
@@ -370,15 +319,8 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
         <h3 className="text-sm font-semibold text-gray-900">Fields</h3>
         <Button
           size="sm"
-          onClick={() => {
-            if (!schemaAvailable) {
-              setNotice(schemaUnavailableMessage)
-              return
-            }
-            setShowNewField(true)
-          }}
+          onClick={() => setShowNewField(true)}
           className="h-8 px-3 text-sm"
-          disabled={!schemaAvailable}
         >
           <Plus className="h-4 w-4 mr-1.5" />
           New Field
@@ -412,15 +354,10 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                     key={field.id}
                     field={field}
                     onEdit={() => {
-                      if (!schemaAvailable) {
-                        setNotice(schemaUnavailableMessage)
-                        return
-                      }
                       setEditingField(field)
                       setSettingsDrawerOpen(true)
                     }}
                     onDelete={() => handleDeleteField(field.id, field.name)}
-                    disableActions={!schemaAvailable}
                   />
                 ))}
               </div>
@@ -437,15 +374,10 @@ const FieldBuilderPanel = memo(function FieldBuilderPanel({
                     key={field.id}
                     field={field}
                     onEdit={() => {
-                      if (!schemaAvailable) {
-                        setNotice(schemaUnavailableMessage)
-                        return
-                      }
                       setEditingField(field)
                       setSettingsDrawerOpen(true)
                     }}
                     onDelete={() => handleDeleteField(field.id, field.name)}
-                    disableActions={!schemaAvailable}
                   />
                 ))}
               </div>
@@ -888,12 +820,10 @@ function SortableFieldItem({
   field,
   onEdit,
   onDelete,
-  disableActions = false,
 }: {
   field: TableField
   onEdit: () => void
   onDelete: () => void
-  disableActions?: boolean
 }) {
   const {
     attributes,
@@ -902,7 +832,7 @@ function SortableFieldItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: field.id, disabled: disableActions })
+  } = useSortable({ id: field.id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -923,11 +853,7 @@ function SortableFieldItem({
         <div
           {...attributes}
           {...listeners}
-          className={`flex items-center justify-center mt-0.5 ${
-            disableActions
-              ? "text-gray-300 cursor-not-allowed"
-              : "cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-          }`}
+          className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 mt-0.5"
         >
           <GripVertical className="h-4 w-4" />
         </div>
@@ -955,7 +881,6 @@ function SortableFieldItem({
             variant="ghost"
             onClick={onEdit}
             className="h-7 w-7 p-0"
-            disabled={disableActions}
           >
             <Edit className="h-3.5 w-3.5 text-gray-500" />
           </Button>
@@ -964,7 +889,6 @@ function SortableFieldItem({
             variant="ghost"
             onClick={onDelete}
             className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-            disabled={disableActions}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

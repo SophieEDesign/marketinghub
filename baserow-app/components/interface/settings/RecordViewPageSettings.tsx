@@ -95,10 +95,6 @@ export default function RecordViewPageSettings({
   const [loading, setLoading] = useState(false)
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false)
   const selectableFields = useMemo(() => fields.filter((field) => field.name !== "id"), [fields])
-  const groupableFields = useMemo(
-    () => selectableFields.filter((field) => field.type !== "formula" && field.type !== "lookup"),
-    [selectableFields]
-  )
   
   // Left panel settings state
   const leftPanelConfig: NonNullable<PageConfig['left_panel']> = config.left_panel || {}
@@ -967,15 +963,17 @@ export default function RecordViewPageSettings({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {groupableFields.map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {getFieldDisplayName(field)}
-                            </SelectItem>
-                          ))}
+                          {selectableFields
+                            .filter(f => f.type === 'single_select' || f.type === 'multi_select')
+                            .map((field) => (
+                              <SelectItem key={field.id} value={field.name}>
+                                {getFieldDisplayName(field)}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-gray-500">
-                        Group records by field value. Records with the same value will be grouped together.
+                        Group records by field (select fields only).
                       </p>
                     </div>
                   </div>

@@ -6,7 +6,6 @@ import {
   getRowHeightTextLineClamp,
 } from '@/lib/grid/row-height-utils'
 import { getSchemaSafeMessage, logSchemaWarning } from '@/lib/errors/schema'
-import { useToast } from '@/components/ui/use-toast'
 
 interface TextCellProps {
   value: string | null
@@ -32,7 +31,6 @@ export default function TextCell({
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const canEdit = editable
-  const { toast } = useToast()
 
   useEffect(() => {
     setEditValue(value || '')
@@ -60,14 +58,7 @@ export default function TextCell({
     } catch (error) {
       console.error('Error saving text cell:', error)
       logSchemaWarning('TextCell save', error)
-      toast({
-        variant: 'destructive',
-        title: 'Failed to save',
-        description: getSchemaSafeMessage(
-          error,
-          'Failed to save. Please check your permissions and try again.'
-        ),
-      })
+      alert(getSchemaSafeMessage(error, 'Failed to save. Please check your permissions and try again.'))
     } finally {
       setSaving(false)
     }

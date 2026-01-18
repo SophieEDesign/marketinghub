@@ -24,98 +24,6 @@ function matchesRoute(pathname: string, route: string): boolean {
   return false;
 }
 
-const ACCESS_TOKEN_COOKIE_PATTERNS = [
-  /^sb-access-token$/i,
-  /^sb-.*-access-token$/i,
-]
-const REFRESH_TOKEN_COOKIE_PATTERNS = [
-  /^sb-refresh-token$/i,
-  /^sb-.*-refresh-token$/i,
-]
-const AUTH_TOKEN_COOKIE_PATTERNS = [
-  /^sb-.*-auth-token$/i,
-]
-
-function decodeBase64Url(input: string): string | null {
-  try {
-    const base64 = input.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')
-    return atob(padded)
-  } catch {
-    return null
-  }
-}
-
-function decodeJwtPayload(token: string): { exp?: number } | null {
-  const parts = token.split('.')
-  if (parts.length < 2) return null
-  const decoded = decodeBase64Url(parts[1])
-  if (!decoded) return null
-  try {
-    return JSON.parse(decoded)
-  } catch {
-    return null
-  }
-}
-
-function isAccessTokenValid(token: string, leewaySeconds: number = 30): boolean {
-  const payload = decodeJwtPayload(token)
-  if (!payload?.exp) return false
-  const expiresAtMs = payload.exp * 1000
-  return Date.now() + leewaySeconds * 1000 < expiresAtMs
-}
-
-function getCookieValue(
-  cookies: Array<{ name: string; value: string }>,
-  patterns: RegExp[]
-): string | null {
-  for (const cookie of cookies) {
-    if (patterns.some((pattern) => pattern.test(cookie.name))) {
-      return cookie.value
-    }
-  }
-  return null
-}
-
-function getTokensFromAuthCookie(
-  value: string | null
-): { accessToken: string | null; refreshToken: string | null } {
-  if (!value) return { accessToken: null, refreshToken: null }
-  try {
-    const decoded = decodeURIComponent(value)
-    const parsed = JSON.parse(decoded)
-    return {
-      accessToken: parsed?.access_token ? String(parsed.access_token) : null,
-      refreshToken: parsed?.refresh_token ? String(parsed.refresh_token) : null,
-    }
-  } catch {
-    return { accessToken: null, refreshToken: null }
-  }
-}
-
-function getAuthTokens(req: NextRequest): { accessToken: string | null; refreshToken: string | null } {
-  const cookies = req.cookies.getAll()
-  const authCookieValue = getCookieValue(cookies, AUTH_TOKEN_COOKIE_PATTERNS)
-  const authCookieTokens = getTokensFromAuthCookie(authCookieValue)
-
-  const accessToken =
-    getCookieValue(cookies, ACCESS_TOKEN_COOKIE_PATTERNS) || authCookieTokens.accessToken
-  const refreshToken =
-    getCookieValue(cookies, REFRESH_TOKEN_COOKIE_PATTERNS) || authCookieTokens.refreshToken
-
-  return { accessToken, refreshToken }
-}
-
-function isRateLimitError(error: unknown): boolean {
-  const err = error as { status?: number; code?: string; message?: string } | null
-  if (!err) return false
-  return (
-    err.status === 429 ||
-    err.code === 'over_request_rate_limit' ||
-    (typeof err.message === 'string' && err.message.toLowerCase().includes('rate limit'))
-  )
-}
-
 /**
  * Check if a route is public (doesn't require authentication)
  */
@@ -238,29 +146,6 @@ export async function middleware(req: NextRequest) {
   // Create Supabase client for middleware
   // This uses the same cookie-based session management as the app
   const res = NextResponse.next();
-
-  const isApiRoute = pathname.startsWith('/api/')
-  const { accessToken, refreshToken } = getAuthTokens(req)
-
-  // If we have a valid access token, skip the auth API call to avoid rate limits.
-  if (accessToken && isAccessTokenValid(accessToken)) {
-    return res
-  }
-
-  // If we have no auth cookies at all, return early without hitting Supabase.
-  if (!accessToken && !refreshToken) {
-    if (isApiRoute) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/login';
-    if (pathname !== '/login') {
-      redirectUrl.searchParams.set('next', pathname);
-    }
-    return NextResponse.redirect(redirectUrl);
-  }
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -287,24 +172,6 @@ export async function middleware(req: NextRequest) {
 
   // If there's an error or no session, redirect to login
   if (error || !session) {
-    if (error && isRateLimitError(error)) {
-      if (isApiRoute) {
-        return NextResponse.json(
-          { error: 'Auth rate limit reached. Please retry shortly.' },
-          { status: 503, headers: { 'Retry-After': '10' } }
-        )
-      }
-
-      return NextResponse.json(
-        { error: 'Authentication is temporarily unavailable. Please retry.' },
-        { status: 503, headers: { 'Retry-After': '10' } }
-      )
-    }
-
-    if (isApiRoute) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = '/login';
     

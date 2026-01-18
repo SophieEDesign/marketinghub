@@ -164,9 +164,12 @@ export async function createImportMetadata(
           tableId,
           viewId,
           error:
-            `Field metadata is temporarily unavailable.\n\n` +
-            `Your data import completed, but field configuration could not be generated yet. ` +
-            `You can continue working with existing data while schema metadata syncs.`,
+            `Database Setup Required\n\n` +
+            `The table_fields table is missing. To fix this:\n\n` +
+            `1. Go to your Supabase Dashboard\n` +
+            `2. Navigate to SQL Editor\n` +
+            `3. Run the migration file: supabase/migrations/create_table_fields.sql\n\n` +
+            `This enables field metadata (including select options).`,
         }
       }
 
