@@ -25,15 +25,15 @@ function matchesRoute(pathname: string, route: string): boolean {
 }
 
 const ACCESS_TOKEN_COOKIE_PATTERNS = [
-  /^sb-access-token$/i,
-  /^sb-.*-access-token$/i,
+  /^sb-access-token(\.\d+)?$/i,
+  /^sb-.*-access-token(\.\d+)?$/i,
 ]
 const REFRESH_TOKEN_COOKIE_PATTERNS = [
-  /^sb-refresh-token$/i,
-  /^sb-.*-refresh-token$/i,
+  /^sb-refresh-token(\.\d+)?$/i,
+  /^sb-.*-refresh-token(\.\d+)?$/i,
 ]
 const AUTH_TOKEN_COOKIE_PATTERNS = [
-  /^sb-.*-auth-token$/i,
+  /^sb-.*-auth-token(\.\d+)?$/i,
 ]
 
 function decodeBase64Url(input: string): string | null {
@@ -77,20 +77,40 @@ function getCookieValue(
   return null
 }
 
-function getTokensFromAuthCookie(
-  value: string | null
-): { accessToken: string | null; refreshToken: string | null } {
-  if (!value) return { accessToken: null, refreshToken: null }
+function parseAuthCookiePayload(rawValue: string): { accessToken: string | null; refreshToken: string | null } | null {
   try {
-    const decoded = decodeURIComponent(value)
-    const parsed = JSON.parse(decoded)
+    const parsed = JSON.parse(rawValue)
     return {
       accessToken: parsed?.access_token ? String(parsed.access_token) : null,
       refreshToken: parsed?.refresh_token ? String(parsed.refresh_token) : null,
     }
   } catch {
-    return { accessToken: null, refreshToken: null }
+    return null
   }
+}
+
+function getTokensFromAuthCookie(
+  value: string | null
+): { accessToken: string | null; refreshToken: string | null } {
+  if (!value) return { accessToken: null, refreshToken: null }
+  let decoded = value
+  try {
+    decoded = decodeURIComponent(value)
+  } catch {
+    decoded = value
+  }
+
+  const direct = parseAuthCookiePayload(decoded)
+  if (direct) return direct
+
+  // Some environments store the auth cookie as base64/base64url JSON.
+  const base64Decoded = decodeBase64Url(decoded)
+  if (base64Decoded) {
+    const parsed = parseAuthCookiePayload(base64Decoded)
+    if (parsed) return parsed
+  }
+
+  return { accessToken: null, refreshToken: null }
 }
 
 function getAuthTokens(req: NextRequest): { accessToken: string | null; refreshToken: string | null } {
