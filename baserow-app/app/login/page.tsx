@@ -67,8 +67,8 @@ function LoginForm() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user) {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
           // Use centralized redirect function
           await performPostAuthRedirect(supabase, searchParams, {
             checkPasswordSetup: true
