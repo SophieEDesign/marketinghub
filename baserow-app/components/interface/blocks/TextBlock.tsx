@@ -113,20 +113,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     isConfigLoading,
   })
   
-  // Track if content_json exists and is valid (for setup state)
-  const hasContent = contentJson !== null && 
-                     contentJson !== undefined &&
-                     typeof contentJson === 'object' && 
-                     contentJson.type === 'doc' &&
-                     Array.isArray(contentJson.content) &&
-                     contentJson.content.length > 0
-
   // Internal editing state - tracks when user is actively editing text
   // This is separate from isEditing prop (which is page-level edit mode)
   const [isBlockEditing, setIsBlockEditing] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
-  const [toolbarPosition, setToolbarPosition] = useState<'top' | 'bottom'>('top')
+  const [hasSelection, setHasSelection] = useState(false)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -216,7 +208,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       attributes: {
         // Keep typography/layout on the wrapper element. ProseMirror should just fill the available space.
         class: 'focus:outline-none w-full h-full min-h-0',
-        'data-placeholder': isEditing ? 'Start typing…' : '',
         tabindex: isEditing ? '0' : '-1',
         style: config?.appearance?.text_color 
           ? `color: ${config.appearance.text_color};` 
@@ -268,6 +259,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       if (toolbarRef.current && toolbarRef.current.contains(relatedTarget)) {
         return
       }
+      setHasSelection(false)
       
       // Save on blur if content changed
       // CRITICAL: Use cached serialized content for comparison to avoid JSON.stringify in hot path
@@ -415,37 +407,24 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [editor, isConfigLoading, block.id])
 
-  // Calculate toolbar position
+  // Track selection state to show toolbar only when focused or selecting
   useEffect(() => {
-    if (!isEditing || readOnly || !containerRef.current) return
+    if (!editor) return
 
-    const checkPosition = () => {
-      if (!containerRef.current) return
-      
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const toolbarHeight = 40
-      const spaceAbove = containerRect.top
-      const spaceBelow = window.innerHeight - containerRect.bottom
-
-      if (spaceAbove < toolbarHeight + 20 && spaceBelow > toolbarHeight + 20) {
-        setToolbarPosition('bottom')
-      } else {
-        setToolbarPosition('top')
-      }
+    const updateSelectionState = () => {
+      const selection = editor.state.selection
+      setHasSelection(!selection.empty)
     }
 
-    // Check position immediately and on changes
-    // Use a small delay to ensure DOM is ready
-    const timeoutId = setTimeout(checkPosition, 50)
-    window.addEventListener('scroll', checkPosition, true)
-    window.addEventListener('resize', checkPosition)
+    updateSelectionState()
+    editor.on('selectionUpdate', updateSelectionState)
+    editor.on('transaction', updateSelectionState)
 
     return () => {
-      clearTimeout(timeoutId)
-      window.removeEventListener('scroll', checkPosition, true)
-      window.removeEventListener('resize', checkPosition)
+      editor.off('selectionUpdate', updateSelectionState)
+      editor.off('transaction', updateSelectionState)
     }
-  }, [isEditing, readOnly])
+  }, [editor])
 
   // Cleanup timeouts
   useEffect(() => {
@@ -494,14 +473,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     const editorElement = editor.view.dom as HTMLElement
     if (editorElement) {
       if (!readOnly) {
-        editorElement.setAttribute('data-placeholder', 'Start typing…')
         editorElement.setAttribute('tabindex', '0')
         editorElement.style.cursor = 'text'
         editorElement.style.pointerEvents = 'auto'
         editorElement.style.userSelect = 'text'
         editorElement.style.webkitUserSelect = 'text'
       } else {
-        editorElement.removeAttribute('data-placeholder')
         editorElement.setAttribute('tabindex', '-1')
         editorElement.style.cursor = 'default'
         editorElement.style.userSelect = 'text'
@@ -551,38 +528,13 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       return null
     }
 
-    // Toolbar is always visible when in edit mode
-    // Position it above or below the block based on available space
-    const toolbarOffset = toolbarPosition === 'top' 
-      ? "-translate-y-[calc(100%+8px)]" 
-      : "translate-y-[calc(100%+8px)]"
-
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[TextBlock Toolbar] Rendering:', { 
-        blockId: block.id, 
-        isEditing, 
-        readOnly, 
-        toolbarPosition,
-        hasEditor: !!editor 
-      })
-    }
-
     return (
       <div 
         ref={toolbarRef}
         data-toolbar="true"
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[9999] transition-all duration-200 opacity-100",
-          toolbarPosition === 'top' ? "top-0" : "bottom-0",
-          toolbarOffset
+          "flex flex-wrap items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-sm p-1 w-fit max-w-full"
         )}
-      style={{
-        marginTop: toolbarPosition === 'top' ? '-8px' : '0',
-        marginBottom: toolbarPosition === 'bottom' ? '-8px' : '0',
-        // Ensure toolbar is always visible
-        visibility: 'visible',
-        display: 'flex',
-      }}
         onMouseDown={(e) => {
           // Don't let the click bubble to the canvas (would select/drag the block),
           // but DO NOT preventDefault or Radix Select won't work reliably.
@@ -803,22 +755,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
-  // Setup state: Show when content_json is missing or empty
-  if (!hasContent && !isEditing) {
-    return (
-      <div 
-        className="h-full w-full flex items-center justify-center text-gray-400 text-sm p-4"
-        style={blockStyle}
-      >
-        <div className="text-center">
-          <p className="text-xs text-gray-400">Enter edit mode to add content</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Empty state hint: Show when empty and not editing (subtle hint)
-  const showEmptyHint = !hasContent && isEditing && !isBlockEditing
+  const showToolbar = isEditing && !readOnly && (isFocused || hasSelection)
 
   return (
     <div 
@@ -832,17 +769,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         isEditing && !isBlockEditing && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all",
         // Prevent dragging/resizing while editing
         isBlockEditing && "pointer-events-auto",
-        // Allow toolbar to overflow container
-        isEditing && "overflow-visible"
+        // Keep editor clipped to block bounds
+        "overflow-hidden"
       )}
       style={{
         ...blockStyle,
         // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
         // minHeight causes gaps when blocks collapse - it persists after collapse
         // Height must come from content and current expansion state only
-        // Ensure toolbar can overflow - critical for toolbar visibility
-        overflow: isEditing ? 'visible' : 'auto',
-        // Ensure relative positioning for absolute toolbar
+        // Ensure relative positioning for internal toolbar
         position: 'relative',
       }}
       // Prevent drag/resize events from propagating when editing
@@ -873,9 +808,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Only visible when editor is actually editable */}
-      {/* CRITICAL: Toolbar should only show when editor is editable, not just when isEditing is true */}
-      {editor && isEditing && !readOnly && <Toolbar />}
+      {/* Toolbar - Rendered inside the block, not floating */}
+      {editor && showToolbar && (
+        <div className="flex-shrink-0 mb-2">
+          <Toolbar />
+        </div>
+      )}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
@@ -888,14 +826,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor Content - Same source for both edit and view mode */}
       <div 
         className={cn(
-          "flex-1 w-full min-h-0 h-full",
-          !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
+          "flex-1 w-full min-h-0 overflow-hidden",
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",
           isEditing && !isBlockEditing && "cursor-pointer",
-          !isEditing && "cursor-default",
-          // Read-only mode: disable pointer events but keep editor alive
-          readOnly && "pointer-events-none"
+          !isEditing && "cursor-default"
         )}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode
@@ -921,7 +856,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           className={cn(
             // Make the editor fill the whole block height.
             // Typography rules live here; ProseMirror is styled to stretch via globals.css.
-            "text-block-editor prose prose-sm max-w-none w-full h-full min-h-0 flex flex-col",
+            "text-block-editor prose prose-sm max-w-none w-full h-full min-h-0 flex flex-col overflow-auto",
             "prose-headings:font-semibold",
             "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
             "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
@@ -941,12 +876,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         >
           {/* Use block.id as key to force EditorContent re-render when block changes */}
           <EditorContent key={block.id} editor={editor} />
-          {/* Empty state hint - only show when empty and not actively editing */}
-          {showEmptyHint && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-sm text-gray-400 italic">Click to add text…</p>
-            </div>
-          )}
         </div>
       </div>
     </div>

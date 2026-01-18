@@ -31,8 +31,9 @@ export default function MultiCalendarBlock({
     : []
 
   // Backward compatibility: normalize legacy/camelCase keys for older saved configs.
-  const sources = rawSources.map((s: any) => ({
+  const sources = rawSources.map((s: any, idx: number) => ({
     ...s,
+    id: s?.id ?? s?.source_id ?? s?.sourceId ?? `source_${idx + 1}`,
     table_id: s?.table_id ?? s?.tableId ?? s?.table ?? "",
     view_id: s?.view_id ?? s?.viewId,
     title_field: s?.title_field ?? s?.titleField ?? s?.title ?? "",

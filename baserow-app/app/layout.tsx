@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster"
 import CommandPaletteProvider from "@/components/command-palette/CommandPaletteProvider"
 import DynamicTitle from "@/components/layout/DynamicTitle"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
+import SchemaContractInitializer from "@/components/layout/SchemaContractInitializer"
 import SWRProvider from "@/components/providers/SWRProvider"
 import { getWorkspaceSettings } from "@/lib/branding"
 
@@ -74,6 +75,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <SWRProvider>
           <DiagnosticsInitializer />
+          <SchemaContractInitializer />
           <DynamicTitle />
           {children}
           <Toaster />

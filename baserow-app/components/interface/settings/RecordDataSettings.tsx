@@ -104,8 +104,9 @@ export default function RecordDataSettings({
   }
 
   const detailFields = config.detail_fields || []
-  const availableFields = fields.filter(
-    f => !detailFields.includes(f.name)
+  const selectableFields = fields.filter((f) => f.name !== 'id')
+  const availableFields = selectableFields.filter(
+    (f) => !detailFields.includes(f.name)
   )
 
   return (
@@ -196,7 +197,7 @@ export default function RecordDataSettings({
                 type="button"
                 onClick={() => {
                   // Select all fields
-                  const allFieldNames = fields.map(f => f.name)
+                  const allFieldNames = selectableFields.map((f) => f.name)
                   onUpdate({ detail_fields: allFieldNames })
                 }}
                 className="text-xs text-blue-600 hover:text-blue-700 underline"
@@ -221,12 +222,12 @@ export default function RecordDataSettings({
             from the page&apos;s visible fields (configured in Page Settings).
           </p>
           <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
-            {fields.length === 0 ? (
+            {selectableFields.length === 0 ? (
               <div className="text-sm text-gray-500 text-center py-2">
                 No fields available
               </div>
             ) : (
-              fields.map((field) => {
+              selectableFields.map((field) => {
                 const isVisible = detailFields.includes(field.name)
                 return (
                   <label
@@ -258,7 +259,7 @@ export default function RecordDataSettings({
             )}
           </div>
           <p className="text-xs text-gray-500">
-            {detailFields.length} of {fields.length} fields visible
+            {detailFields.length} of {selectableFields.length} fields visible
           </p>
         </div>
       )}

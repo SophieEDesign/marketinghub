@@ -12,6 +12,7 @@ interface SelectCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: string | null) => Promise<void>
   placeholder?: string
   choices?: string[]
@@ -19,6 +20,7 @@ interface SelectCellProps {
   fieldOptions?: FieldOptions
   fieldId?: string // Field ID for updating options
   tableId?: string // Table ID for updating options
+  canEditOptions?: boolean
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
 }
 
@@ -26,6 +28,7 @@ export default function SelectCell({
   value,
   fieldName,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = '—',
   choices = [],
@@ -33,13 +36,22 @@ export default function SelectCell({
   fieldOptions,
   fieldId,
   tableId,
+  canEditOptions = true,
   onFieldOptionsUpdate,
 }: SelectCellProps) {
   // If we don't have fieldId/tableId, fall back to basic select (for backwards compatibility)
+  const rowHeightStyle = rowHeight
+    ? {
+        height: `${rowHeight}px`,
+        minHeight: `${rowHeight}px`,
+        maxHeight: `${rowHeight}px`,
+      }
+    : { minHeight: '36px' }
+
   if (!fieldId || !tableId) {
     // Basic fallback - just show the value as a pill
     return (
-      <div className="w-full min-h-[36px] px-3 py-2 flex items-center gap-2 text-sm">
+      <div className="w-full h-full px-3 py-2 flex items-center gap-2 text-sm box-border" style={rowHeightStyle}>
         {value ? (
           (() => {
             const hexColor = fieldOptions
@@ -64,7 +76,7 @@ export default function SelectCell({
   }
 
   return (
-    <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
+    <div className="w-full h-full px-3 py-2 flex items-center box-border" style={rowHeightStyle}>
       <InlineSelectDropdown
         value={value}
         choices={choices}
@@ -74,7 +86,7 @@ export default function SelectCell({
         fieldId={fieldId}
         tableId={tableId}
         editable={editable}
-        canEditOptions={editable} // If they can edit the cell, they can edit options
+        canEditOptions={editable && canEditOptions} // Gate schema edits separately
         onValueChange={async (newValue) => {
           await onSave(newValue as string | null)
         }}

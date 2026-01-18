@@ -28,6 +28,18 @@ export interface UseGridDataReturn {
   deleteRow: (rowId: string) => Promise<void>
 }
 
+const isDev = process.env.NODE_ENV === 'development'
+const logWarn = (...args: any[]) => {
+  if (isDev) {
+    console.warn(...args)
+  }
+}
+const logError = (...args: any[]) => {
+  if (isDev) {
+    console.error(...args)
+  }
+}
+
 // CRITICAL: Reduced default limit from 10000 to 500 to prevent memory exhaustion and crashes
 // Large datasets should use pagination instead of loading everything at once
 const DEFAULT_LIMIT = 500
@@ -57,7 +69,7 @@ export function useGridData({
   const missingColumnsTableRef = useRef<string | null>(null)
 
   function noteMissingColumnFromError(err: any): string | null {
-    const msg = String(err?.message || err?.details || '').toLowerCase()
+    const msg = [err?.message, err?.details, err?.hint].filter(Boolean).join(' ').toLowerCase()
 
     // Common PostgREST patterns:
     // - Could not find the 'name' column of 'table_x' in the schema cache
@@ -65,7 +77,9 @@ export function useGridData({
     const m1 = msg.match(/could not find the '([^']+)' column/)
     if (m1?.[1]) return m1[1]
     const m2 = msg.match(/column\\s+\\"([^\\"]+)\\"\\s+does\\s+not\\s+exist/)
-    if (m2?.[1]) return m2[1]
+    if (m2?.[1]) return m2[1].split('.').pop() || m2[1]
+    const m3 = msg.match(/column\\s+([a-z0-9_\\.]+)\\s+does\\s+not\\s+exist/)
+    if (m3?.[1]) return m3[1].split('.').pop() || m3[1]
     return null
   }
 
@@ -146,7 +160,15 @@ export function useGridData({
           if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
           return String(x)
         }
-        if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+        const relationshipType = (field as any)?.options?.relationship_type
+        const maxSelections = Number((field as any)?.options?.max_selections || 0)
+        const isSingleLink = relationshipType === 'one-to-one' || maxSelections === 1
+
+        if (Array.isArray(v)) {
+          const normalized = v.map(toId).filter(Boolean)
+          return isSingleLink ? (normalized[0] ?? null) : normalized
+        }
+
         return toId(v)
       }
 
@@ -185,7 +207,7 @@ export function useGridData({
     
     // Prevent concurrent loads
     if (isLoadingRef.current) {
-      console.warn('[useGridData] Load already in progress, skipping duplicate request')
+      logWarn('[useGridData] Load already in progress, skipping duplicate request')
       return
     }
 
@@ -248,7 +270,7 @@ export function useGridData({
 
         const invalidFieldNames = physicalFieldNames.filter((n) => !toPostgrestColumn(n))
       if (invalidFieldNames.length > 0) {
-        console.warn(
+        logWarn(
           '[useGridData] Skipping invalid column names (would cause PostgREST 400):',
           invalidFieldNames
         )
@@ -286,15 +308,15 @@ export function useGridData({
         currentSorts.forEach((sort) => {
         const col = toPostgrestColumn(sort.field)
         if (!col) {
-          console.warn('[useGridData] Skipping sort on invalid column:', sort.field)
+          logWarn('[useGridData] Skipping sort on invalid column:', sort.field)
           return
         }
         if (physicalCols && !physicalCols.has(col)) {
-          console.warn('[useGridData] Skipping sort on missing physical column:', sort.field)
+          logWarn('[useGridData] Skipping sort on missing physical column:', sort.field)
           return
         }
         if (!physicalCols && learnedMissing.has(col)) {
-          console.warn('[useGridData] Skipping sort on learned-missing column:', sort.field)
+          logWarn('[useGridData] Skipping sort on learned-missing column:', sort.field)
           return
         }
         query = query.order(col, { ascending: sort.direction === 'asc' })
@@ -304,7 +326,7 @@ export function useGridData({
       query = query.limit(safeLimit)
       
       if (limit > MAX_SAFE_LIMIT) {
-        console.warn(`[useGridData] Limit ${limit} exceeds safe maximum ${MAX_SAFE_LIMIT}, capping to ${MAX_SAFE_LIMIT} to prevent crashes`)
+        logWarn(`[useGridData] Limit ${limit} exceeds safe maximum ${MAX_SAFE_LIMIT}, capping to ${MAX_SAFE_LIMIT} to prevent crashes`)
       }
 
         const { data, error: queryError } = await query
@@ -319,6 +341,14 @@ export function useGridData({
             if (attempt === 0) {
               return await runQuery(attempt + 1)
             }
+            // Fallback: if we still can't query due to missing columns, load rows without strict selects.
+            logWarn('[useGridData] Falling back to wildcard select after missing column error:', missing)
+            const fallback = await supabase.from(tableName).select('*').limit(safeLimit)
+            if (!fallback.error) {
+              setError(null)
+              setRows(asArray<GridRow>(fallback.data))
+              return null
+            }
           }
           throw queryError
         }
@@ -331,8 +361,8 @@ export function useGridData({
 
       await runQuery(0)
     } catch (err: any) {
-      console.error('Error loading grid data:', err)
-      setError(err.message || 'Failed to load data')
+      logError('Error loading grid data:', err)
+      setError('Unable to load data right now. Please try again.')
       setRows([])
     } finally {
       setLoading(false)
@@ -381,8 +411,8 @@ export function useGridData({
           if (msg.toLowerCase().includes('permission denied')) {
             throw new Error(
               `Permission denied updating table "${tableName}". ` +
-                `If this is a dynamic Core Data table, ensure it grants SELECT/INSERT/UPDATE/DELETE to the authenticated role ` +
-                `(see migration: supabase/migrations/grant_access_to_dynamic_data_tables.sql). Original error: ${msg}`
+                `If this is a dynamic Core Data table, ensure the authenticated role has SELECT/INSERT/UPDATE/DELETE permissions. ` +
+                (process.env.NODE_ENV === 'development' ? `Original error: ${msg}` : '')
             )
           }
 
@@ -406,7 +436,7 @@ export function useGridData({
           )
         )
       } catch (err: any) {
-        console.error('Error updating cell:', {
+        logError('Error updating cell:', {
           tableName,
           rowId,
           fieldName,
@@ -437,7 +467,7 @@ export function useGridData({
         setRows((prevRows) => [...prevRows, newRow])
         return newRow
       } catch (err: any) {
-        console.error('Error inserting row:', err)
+        logError('Error inserting row:', err)
         throw err
       }
     },
@@ -458,7 +488,7 @@ export function useGridData({
 
         setRows((prevRows) => prevRows.filter((row) => row.id !== rowId))
       } catch (err: any) {
-        console.error('Error deleting row:', err)
+        logError('Error deleting row:', err)
         throw err
       }
     },

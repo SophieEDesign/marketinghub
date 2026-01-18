@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { Plus, Edit2, Palette, X, Check } from 'lucide-react'
+import { Plus, Edit2, Palette, X, Check, GripVertical } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   resolveChoiceColor,
@@ -9,7 +9,15 @@ import {
   normalizeHexColor,
   getChoiceThemePalette,
 } from '@/lib/field-colors'
-import type { FieldOptions } from '@/types/fields'
+import type { FieldOptions, SelectOption } from '@/types/fields'
+import {
+  applySelectOptionsToFieldOptions,
+  getSelectOptions,
+  normalizeSelectFieldOptions,
+  sortSelectOptionsByLabel,
+  type SelectAlphabetizeMode,
+} from '@/lib/fields/select-options'
+import { getSchemaSafeMessage, logSchemaWarning } from '@/lib/errors/schema'
 
 interface InlineSelectDropdownProps {
   value: string | string[] | null
@@ -24,6 +32,9 @@ interface InlineSelectDropdownProps {
   onValueChange: (value: string | string[] | null) => Promise<void>
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
   placeholder?: string
+  displayVariant?: 'pills' | 'text'
+  allowClear?: boolean
+  clearLabel?: string
 }
 
 export default function InlineSelectDropdown({
@@ -39,6 +50,9 @@ export default function InlineSelectDropdown({
   onValueChange,
   onFieldOptionsUpdate,
   placeholder = 'Select...',
+  displayVariant = 'pills',
+  allowClear = false,
+  clearLabel = 'Clear selection',
 }: InlineSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -46,7 +60,11 @@ export default function InlineSelectDropdown({
   const [editingColor, setEditingColor] = useState<string | null>(null)
   const [newChoiceName, setNewChoiceName] = useState('')
   const [updatingOptions, setUpdatingOptions] = useState(false)
+  const [sortMode, setSortMode] = useState<SelectAlphabetizeMode>('manual')
+  const [localSelectOptions, setLocalSelectOptions] = useState<SelectOption[] | null>(null)
+  const [draggedOptionId, setDraggedOptionId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const normalizationRef = useRef<string | null>(null)
 
   const isMulti = fieldType === 'multi_select'
   const selectedValues = useMemo((): string[] => {
@@ -77,31 +95,71 @@ export default function InlineSelectDropdown({
     }
   }, [isOpen, editingChoice, editingColor])
 
+  const displayOptions = useMemo(() => {
+    if (sortMode === 'manual') return selectOptions
+    return sortSelectOptionsByLabel(selectOptions, sortMode === 'asc' ? 'asc' : 'desc')
+  }, [selectOptions, sortMode])
+
   // Filter choices based on search term
   const filteredChoices = useMemo(() => {
-    if (!searchTerm.trim()) return choices
+    if (!searchTerm.trim()) return displayOptions
     const term = searchTerm.toLowerCase()
-    return choices.filter(choice => choice.toLowerCase().includes(term))
-  }, [choices, searchTerm])
+    return displayOptions.filter(option => option.label.toLowerCase().includes(term))
+  }, [displayOptions, searchTerm])
 
   // Check if search term matches a new option to create
   const canCreateNewOption = useMemo(() => {
     if (!canEditOptions || !searchTerm.trim()) return false
     const term = searchTerm.trim()
-    return !choices.some(c => c.toLowerCase() === term.toLowerCase())
-  }, [canEditOptions, searchTerm, choices])
+    return !selectOptions.some(option => option.label.toLowerCase() === term.toLowerCase())
+  }, [canEditOptions, searchTerm, selectOptions])
 
   // Merge choiceColors into fieldOptions for proper resolution
   const mergedOptions: FieldOptions = useMemo(() => {
     return {
       ...fieldOptions,
+      choices: choices.length > 0 ? choices : fieldOptions?.choices,
       choiceColors: choiceColors || fieldOptions?.choiceColors,
     }
-  }, [choiceColors, fieldOptions])
+  }, [choiceColors, fieldOptions, choices])
+
+  const { options: normalizedFieldOptions, selectOptions: normalizedSelectOptions, changed: normalizationChanged } = useMemo(
+    () => normalizeSelectFieldOptions(fieldType, mergedOptions, mergedOptions),
+    [fieldType, mergedOptions]
+  )
+
+  useEffect(() => {
+    setLocalSelectOptions(normalizedSelectOptions)
+  }, [normalizedSelectOptions])
+
+  const selectOptions = localSelectOptions ?? normalizedSelectOptions
+
+  // Ensure missing sort_index/id metadata is persisted once.
+  useEffect(() => {
+    if (!normalizationChanged || !fieldId || !tableId) return
+    const payload = JSON.stringify(normalizedFieldOptions)
+    if (normalizationRef.current === payload) return
+    normalizationRef.current = payload
+    void (async () => {
+      try {
+        await fetch(`/api/tables/${tableId}/fields`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fieldId,
+            options: normalizedFieldOptions,
+          }),
+        })
+        onFieldOptionsUpdate?.()
+      } catch (error) {
+        console.warn('Failed to normalize select options:', error)
+      }
+    })()
+  }, [fieldId, tableId, normalizationChanged, normalizedFieldOptions, onFieldOptionsUpdate])
 
   // Get color for a choice
   const getChoiceColor = (choice: string, useSemantic: boolean = fieldType === 'single_select') => {
-    return resolveChoiceColor(choice, fieldType, mergedOptions, useSemantic)
+    return resolveChoiceColor(choice, fieldType, normalizedFieldOptions, useSemantic)
   }
 
   // Handle selecting a choice
@@ -117,48 +175,74 @@ export default function InlineSelectDropdown({
     }
   }
 
-  // Handle creating a new option
-  const handleCreateOption = async () => {
-    if (!canEditOptions || !searchTerm.trim()) return
+  const createSelectOptionId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID()
+    }
+    return `opt_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+  }
 
-    const newChoice = searchTerm.trim()
+  const persistSelectOptions = async (nextSelectOptions: SelectOption[]) => {
+    if (!fieldId || !tableId) return
+    const previousOptions = localSelectOptions
+    setLocalSelectOptions(nextSelectOptions)
     setUpdatingOptions(true)
-
     try {
-      // Update field options via API
+      const nextOptions = applySelectOptionsToFieldOptions(fieldType, normalizedFieldOptions, nextSelectOptions)
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fieldId,
-          options: {
-            ...fieldOptions,
-            choices: [...choices, newChoice],
-          },
+          options: nextOptions,
         }),
       })
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Failed to create option')
+        throw new Error(error.error || 'Failed to update options')
       }
 
-      // Select the newly created option
-      if (isMulti) {
-        await onValueChange([...selectedValues, newChoice])
-      } else {
-        await onValueChange(newChoice)
-        handleOpenChange(false)
-      }
-
-      setSearchTerm('')
       onFieldOptionsUpdate?.()
     } catch (error: any) {
-      console.error('Error creating option:', error)
-      alert(error.message || 'Failed to create option')
+      console.error('Error updating options:', error)
+      setLocalSelectOptions(previousOptions || normalizedSelectOptions)
+      logSchemaWarning('InlineSelectDropdown update options', error)
+      alert(getSchemaSafeMessage(error, 'Failed to update options'))
     } finally {
       setUpdatingOptions(false)
     }
+  }
+
+  // Handle creating a new option
+  const handleCreateOption = async () => {
+    if (!canEditOptions || !searchTerm.trim()) return
+
+    const newChoice = searchTerm.trim()
+    const newOption: SelectOption = {
+      id: createSelectOptionId(),
+      label: newChoice,
+      sort_index: selectOptions.length,
+      created_at: new Date().toISOString(),
+      color: resolveChoiceColor(newChoice, fieldType, normalizedFieldOptions, fieldType === 'single_select'),
+    }
+
+    const nextSelectOptions = [...selectOptions, newOption].map((opt, index) => ({
+      ...opt,
+      sort_index: index,
+    }))
+
+    await persistSelectOptions(nextSelectOptions)
+
+    // Select the newly created option
+    if (isMulti) {
+      await onValueChange([...selectedValues, newChoice])
+    } else {
+      await onValueChange(newChoice)
+      handleOpenChange(false)
+    }
+
+    setSearchTerm('')
   }
 
   // Handle renaming a choice
@@ -169,36 +253,14 @@ export default function InlineSelectDropdown({
       return
     }
 
-    setUpdatingOptions(true)
-
     try {
-      const newChoices = choices.map(c => c === oldChoice ? newName.trim() : c)
-      const newChoiceColors: Record<string, string> = { ...(fieldOptions?.choiceColors || {}) }
-      
-      // Preserve color when renaming
-      if (newChoiceColors[oldChoice]) {
-        newChoiceColors[newName.trim()] = newChoiceColors[oldChoice]
-        delete newChoiceColors[oldChoice]
-      }
+      const nextSelectOptions = selectOptions.map(option =>
+        option.label === oldChoice
+          ? { ...option, label: newName.trim() }
+          : option
+      )
 
-      // Update field options
-      const response = await fetch(`/api/tables/${tableId}/fields`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fieldId,
-          options: {
-            ...fieldOptions,
-            choices: newChoices,
-            choiceColors: newChoiceColors,
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to rename option')
-      }
+      await persistSelectOptions(nextSelectOptions)
 
       // Update selected values if the renamed choice was selected
       if (isMulti) {
@@ -210,12 +272,10 @@ export default function InlineSelectDropdown({
 
       setEditingChoice(null)
       setNewChoiceName('')
-      onFieldOptionsUpdate?.()
     } catch (error: any) {
       console.error('Error renaming option:', error)
-      alert(error.message || 'Failed to rename option')
-    } finally {
-      setUpdatingOptions(false)
+      logSchemaWarning('InlineSelectDropdown rename option', error)
+      alert(getSchemaSafeMessage(error, 'Failed to rename option'))
     }
   }
 
@@ -223,38 +283,20 @@ export default function InlineSelectDropdown({
   const handleChangeColor = async (choice: string, newColor: string) => {
     if (!canEditOptions) return
 
-    setUpdatingOptions(true)
-
     try {
-      const newChoiceColors = {
-        ...(fieldOptions?.choiceColors || {}),
-        [choice]: newColor,
-      }
+      const nextSelectOptions = selectOptions.map(option =>
+        option.label === choice
+          ? { ...option, color: newColor }
+          : option
+      )
 
-      const response = await fetch(`/api/tables/${tableId}/fields`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fieldId,
-          options: {
-            ...fieldOptions,
-            choiceColors: newChoiceColors,
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update color')
-      }
+      await persistSelectOptions(nextSelectOptions)
 
       setEditingColor(null)
-      onFieldOptionsUpdate?.()
     } catch (error: any) {
       console.error('Error updating color:', error)
-      alert(error.message || 'Failed to update color')
-    } finally {
-      setUpdatingOptions(false)
+      logSchemaWarning('InlineSelectDropdown update color', error)
+      alert(getSchemaSafeMessage(error, 'Failed to update color'))
     }
   }
 
@@ -263,30 +305,12 @@ export default function InlineSelectDropdown({
     if (!canEditOptions) return
     if (!confirm(`Delete option "${choiceToDelete}"? This will remove it from all records.`)) return
 
-    setUpdatingOptions(true)
-
     try {
-      const newChoices = choices.filter(c => c !== choiceToDelete)
-      const newChoiceColors = { ...(fieldOptions?.choiceColors || {}) }
-      delete newChoiceColors[choiceToDelete]
+      const nextSelectOptions = selectOptions
+        .filter(option => option.label !== choiceToDelete)
+        .map((option, index) => ({ ...option, sort_index: index }))
 
-      const response = await fetch(`/api/tables/${tableId}/fields`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fieldId,
-          options: {
-            ...fieldOptions,
-            choices: newChoices,
-            choiceColors: newChoiceColors,
-          },
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to delete option')
-      }
+      await persistSelectOptions(nextSelectOptions)
 
       // Remove from selected values if it was selected
       if (isMulti) {
@@ -295,14 +319,49 @@ export default function InlineSelectDropdown({
       } else if (selectedValues[0] === choiceToDelete) {
         await onValueChange(null)
       }
-
-      onFieldOptionsUpdate?.()
     } catch (error: any) {
       console.error('Error deleting option:', error)
-      alert(error.message || 'Failed to delete option')
-    } finally {
-      setUpdatingOptions(false)
+      logSchemaWarning('InlineSelectDropdown delete option', error)
+      alert(getSchemaSafeMessage(error, 'Failed to delete option'))
     }
+  }
+
+  const reorderSelectOptions = (fromId: string, toId: string) => {
+    const fromIndex = selectOptions.findIndex(option => option.id === fromId)
+    const toIndex = selectOptions.findIndex(option => option.id === toId)
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+      return selectOptions
+    }
+    const next = [...selectOptions]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    return next.map((option, index) => ({ ...option, sort_index: index }))
+  }
+
+  const handleDragStart = (optionId: string) => (event: React.DragEvent) => {
+    if (sortMode !== 'manual' || !canEditOptions) return
+    setDraggedOptionId(optionId)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', optionId)
+  }
+
+  const handleDragOver = (event: React.DragEvent) => {
+    if (sortMode !== 'manual' || !canEditOptions) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = (targetId: string) => async (event: React.DragEvent) => {
+    if (sortMode !== 'manual' || !canEditOptions) return
+    event.preventDefault()
+    const sourceId = draggedOptionId || event.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetId) {
+      setDraggedOptionId(null)
+      return
+    }
+    const nextOptions = reorderSelectOptions(sourceId, targetId)
+    setDraggedOptionId(null)
+    await persistSelectOptions(nextOptions)
   }
 
   if (!editable) {
@@ -310,6 +369,9 @@ export default function InlineSelectDropdown({
     return (
       <div className="flex flex-wrap gap-1.5">
         {selectedValues.length > 0 ? (
+          displayVariant === 'text' && !isMulti ? (
+            <span className="text-sm text-gray-900">{selectedValues[0]}</span>
+          ) : (
           selectedValues.map((val: string) => {
             const hexColor = getChoiceColor(val)
             const textColorClass = getTextColorForBackground(hexColor)
@@ -324,6 +386,7 @@ export default function InlineSelectDropdown({
               </span>
             )
           })
+          )
         ) : (
           <span className="text-gray-400 italic text-sm">{placeholder}</span>
         )}
@@ -337,7 +400,9 @@ export default function InlineSelectDropdown({
         {/* Dropdown trigger */}
         <button
           type="button"
-          className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
+          className={`cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-center ${
+            displayVariant === 'text' ? 'gap-2' : 'flex-wrap gap-1.5'
+          } text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2`}
           onMouseDown={(e) => {
             // Prevent row-level mouse handlers from ever seeing this interaction.
             // Some grids select rows on mousedown/click; we want the dropdown to be isolated.
@@ -349,20 +414,24 @@ export default function InlineSelectDropdown({
           }}
         >
           {selectedValues.length > 0 ? (
-            selectedValues.map((val: string) => {
-              const hexColor = getChoiceColor(val)
-              const textColorClass = getTextColorForBackground(hexColor)
-              const bgColor = normalizeHexColor(hexColor)
-              return (
-                <span
-                  key={val}
-                  className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-                  style={{ backgroundColor: bgColor }}
-                >
-                  {val}
-                </span>
-              )
-            })
+            displayVariant === 'text' && !isMulti ? (
+              <span className="text-sm text-gray-900">{selectedValues[0]}</span>
+            ) : (
+              selectedValues.map((val: string) => {
+                const hexColor = getChoiceColor(val)
+                const textColorClass = getTextColorForBackground(hexColor)
+                const bgColor = normalizeHexColor(hexColor)
+                return (
+                  <span
+                    key={val}
+                    className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    {val}
+                  </span>
+                )
+              })
+            )
           ) : (
             <span className="text-gray-400 italic text-sm">{placeholder}</span>
           )}
@@ -402,16 +471,59 @@ export default function InlineSelectDropdown({
               </div>
             )}
           </div>
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+            <span className="text-[11px] uppercase tracking-wide text-gray-500">Order</span>
+            <div className="flex items-center gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setSortMode('manual')}
+                className={`px-2 py-1 rounded ${sortMode === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('asc')}
+                className={`px-2 py-1 rounded ${sortMode === 'asc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                A-Z
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('desc')}
+                className={`px-2 py-1 rounded ${sortMode === 'desc' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Z-A
+              </button>
+            </div>
+          </div>
 
           {/* Options list */}
           <div className="overflow-y-auto flex-1">
+            {!isMulti && allowClear && selectedValues.length > 0 && (
+              <div className="px-3 py-2 border-b border-gray-100">
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void onValueChange(null)
+                    handleOpenChange(false)
+                  }}
+                  className="w-full text-left text-sm text-gray-600 hover:text-gray-900"
+                >
+                  {clearLabel}
+                </button>
+              </div>
+            )}
             {filteredChoices.length === 0 && !canCreateNewOption && (
               <div className="px-3 py-2 text-sm text-gray-500 text-center">
                 No options found
               </div>
             )}
 
-            {filteredChoices.map((choice) => {
+            {filteredChoices.map((option) => {
+              const choice = option.label
               const isSelected = selectedValues.includes(choice)
               const hexColor = getChoiceColor(choice)
               const textColorClass = getTextColorForBackground(hexColor)
@@ -421,10 +533,12 @@ export default function InlineSelectDropdown({
 
               return (
                 <div
-                  key={choice}
+                  key={option.id}
                   className={`px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
                     isSelected ? 'bg-blue-50' : ''
                   }`}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop(option.id)}
                 >
                   {isEditing ? (
                     // Edit mode for renaming
@@ -484,7 +598,7 @@ export default function InlineSelectDropdown({
                       <div className="flex flex-wrap gap-1">
                         {getChoiceThemePalette(
                           fieldType,
-                          mergedOptions,
+                          normalizedFieldOptions,
                           fieldType === 'single_select'
                         ).map((color) => (
                           <button
@@ -500,6 +614,21 @@ export default function InlineSelectDropdown({
                   ) : (
                     // Normal display
                     <div className="flex items-center gap-2">
+                      {canEditOptions && sortMode === 'manual' && (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
+                          draggable={!updatingOptions}
+                          onDragStart={handleDragStart(option.id)}
+                          onDragEnd={() => setDraggedOptionId(null)}
+                          className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing"
+                          title="Drag to reorder"
+                          aria-label="Drag to reorder"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         type="button"
                         onMouseDown={(e) => e.stopPropagation()}

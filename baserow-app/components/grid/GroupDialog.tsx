@@ -78,7 +78,7 @@ export default function GroupDialog({
               column_widths: {},
               column_order: [],
               column_wrap_text: {},
-              row_height: 'medium',
+              row_height: 'standard',
               frozen_columns: 0,
             },
           ])

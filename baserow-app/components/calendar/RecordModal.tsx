@@ -183,15 +183,15 @@ export default function RecordModal({
           <div className="space-y-4 py-4">
             {Array.isArray(tableFields) && tableFields
               .filter((field) => {
-                // Always exclude system fields
-                if (!field || field.name === 'id' || field.name === 'created_at' || field.name === 'updated_at') {
+                // Always exclude internal id
+                if (!field || field.name === 'id') {
                   return false
                 }
                 // If modalFields is specified and not empty, only show those fields
                 if (modalFields.length > 0) {
                   return modalFields.includes(field.name)
                 }
-                // Otherwise show all fields
+                // Otherwise show all fields (including system fields)
                 return true
               })
               .map((field) => {
@@ -206,6 +206,8 @@ export default function RecordModal({
                     required={field.required || false}
                     recordId={recordId || undefined}
                     tableName={supabaseTableName || undefined}
+                    selectOptionsEditable={false}
+                    suppressDerivedFieldErrors={true}
                   />
                 )
               })}

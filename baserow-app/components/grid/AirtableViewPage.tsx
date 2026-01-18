@@ -10,6 +10,8 @@ import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
+import { normalizeRowHeight, type RowHeightOption } from "@/lib/grid/row-height-utils"
+import { useSchemaContract } from "@/hooks/useSchemaContract"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -48,7 +50,7 @@ interface AirtableViewPageProps {
     column_widths?: Record<string, number>
     column_order?: string[]
     column_wrap_text?: Record<string, boolean>
-    row_height?: 'short' | 'medium' | 'tall'
+    row_height?: string
   } | null
 }
 
@@ -65,6 +67,7 @@ export default function AirtableViewPage({
   initialGridSettings,
 }: AirtableViewPageProps) {
   const router = useRouter()
+  const { schemaAvailable } = useSchemaContract()
   const gridActionsRef = useRef<AirtableGridActions | null>(null)
   const handleGridActionsReady = useCallback((actions: AirtableGridActions) => {
     gridActionsRef.current = actions
@@ -76,8 +79,11 @@ export default function AirtableViewPage({
   const [sorts, setSorts] = useState(initialViewSorts)
   const [userRole, setUserRole] = useState<"admin" | "editor">("editor")
   const [groupBy, setGroupBy] = useState<string | null>(initialGroupBy ?? null)
-  const [rowHeight, setRowHeight] = useState<"short" | "medium" | "tall">(
-    initialGridSettings?.row_height || (view.config as { row_height?: "short" | "medium" | "tall" })?.row_height || "medium"
+  const [rowHeight, setRowHeight] = useState<RowHeightOption>(() =>
+    normalizeRowHeight(
+      initialGridSettings?.row_height ||
+        (view.config as { row_height?: string })?.row_height
+    )
   )
   const [hiddenFields, setHiddenFields] = useState<string[]>(
     viewFields.filter(f => !f.visible).map(f => f.field_name)
@@ -181,11 +187,13 @@ export default function AirtableViewPage({
   }
 
   function handleAddField() {
+    if (!schemaAvailable) return
     setEditingField(null)
     setFieldBuilderOpen(true)
   }
 
   function handleEditField(fieldName: string) {
+    if (!schemaAvailable) return
     const field = tableFields.find((f) => f.name === fieldName)
     setEditingField(field || null)
     setFieldBuilderOpen(true)
@@ -294,7 +302,8 @@ export default function AirtableViewPage({
             router.refresh()
           }}
           onRowHeightChange={async (height) => {
-            setRowHeight(height)
+            const normalizedHeight = normalizeRowHeight(height)
+            setRowHeight(normalizedHeight)
             try {
               // Save row height to grid_view_settings using client-side supabase
               const { data: existing } = await supabase
@@ -307,7 +316,7 @@ export default function AirtableViewPage({
                 // Update existing settings
                 await supabase
                   .from('grid_view_settings')
-                  .update({ row_height: height })
+                  .update({ row_height: normalizedHeight })
                   .eq('view_id', viewId)
               } else {
                 // Create new settings
@@ -316,7 +325,7 @@ export default function AirtableViewPage({
                   .insert([
                     {
                       view_id: viewId,
-                      row_height: height,
+                      row_height: normalizedHeight,
                       column_widths: {},
                       column_order: [],
                       column_wrap_text: {},

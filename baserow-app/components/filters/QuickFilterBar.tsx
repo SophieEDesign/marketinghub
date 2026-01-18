@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Plus, RotateCcw, X } from "lucide-react"
 import type { TableField } from "@/types/fields"
+import { getSelectOptions } from "@/lib/fields/select-options"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { serializeFiltersForComparison } from "@/lib/interface/filters"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,12 @@ function getQuickableFields(tableFields: TableField[]): TableField[] {
 }
 
 function getChoiceOptions(field: TableField): Array<{ value: string; label: string }> {
+  if (field.type === "single_select" || field.type === "multi_select") {
+    return getSelectOptions(field.type, field.options).map((opt) => ({
+      value: opt.label,
+      label: opt.label,
+    }))
+  }
   const choices = (field.options as any)?.choices ?? (field as any)?.options ?? []
   if (!Array.isArray(choices)) return []
   return choices

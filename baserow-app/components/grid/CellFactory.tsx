@@ -15,6 +15,7 @@ import EmailCell from './cells/EmailCell'
 import JsonCell from './cells/JsonCell'
 import LookupCell from './cells/LookupCell'
 import LinkedRecordCell from './cells/LinkedRecordCell'
+import { getInlineEditState } from '@/lib/fields/display'
 
 interface CellFactoryProps {
   field: TableField
@@ -22,6 +23,8 @@ interface CellFactoryProps {
   rowId: string
   tableName: string
   editable?: boolean
+  canEditSchema?: boolean
+  contextReadOnly?: boolean
   wrapText?: boolean
   rowHeight?: number // Row height in pixels
   onSave: (value: any) => Promise<void>
@@ -34,15 +37,22 @@ export function CellFactory({
   rowId,
   tableName,
   editable = true,
+  canEditSchema = true,
+  contextReadOnly,
   wrapText = false,
   rowHeight,
   onSave,
   onFieldOptionsUpdate,
 }: CellFactoryProps): ReactNode {
+  const { canEdit } = getInlineEditState({
+    editable,
+    fieldType: field.type,
+    fieldOptions: field.options,
+  })
   const commonProps = {
     value,
     fieldName: field.name,
-    editable,
+    editable: canEdit,
     wrapText,
     rowHeight,
     onSave,
@@ -77,6 +87,7 @@ export function CellFactory({
           fieldOptions={field.options}
           fieldId={field.id}
           tableId={field.table_id}
+          canEditOptions={canEditSchema}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
         />
       )
@@ -90,6 +101,7 @@ export function CellFactory({
           fieldOptions={field.options}
           fieldId={field.id}
           tableId={field.table_id}
+          canEditOptions={canEditSchema}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
         />
       )
@@ -123,13 +135,15 @@ export function CellFactory({
           value={value}
           rowId={rowId}
           editable={editable}
+          rowHeight={rowHeight}
           onSave={onSave}
+          contextReadOnly={contextReadOnly}
         />
       )
 
     case 'formula':
       // These are read-only or need special handling
-      return <TextCell {...commonProps} editable={false} />
+      return <TextCell {...commonProps} />
 
     case 'lookup':
       return (
@@ -138,6 +152,7 @@ export function CellFactory({
           fieldName={field.name}
           field={field}
           rowId={rowId}
+          rowHeight={rowHeight}
         />
       )
 

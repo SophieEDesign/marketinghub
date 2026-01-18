@@ -40,6 +40,7 @@ import HideFieldsDialog from "./HideFieldsDialog"
 import ViewManagementDialog from "./ViewManagementDialog"
 import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
+import type { RowHeightOption } from "@/lib/grid/row-height-utils"
 
 interface ViewBuilderToolbarProps {
   viewId: string
@@ -64,13 +65,13 @@ interface ViewBuilderToolbarProps {
     direction: string
   }>
   groupBy?: string
-  rowHeight?: "short" | "medium" | "tall"
+  rowHeight?: RowHeightOption
   hiddenFields?: string[]
   userRole?: "admin" | "editor" | "viewer" | null
   onFiltersChange?: (filters: Array<{ id?: string; field_name: string; operator: FilterType; value?: string }>) => void
   onSortsChange?: (sorts: Array<{ id?: string; field_name: string; direction: string }>) => void
   onGroupChange?: (fieldName: string | null) => void
-  onRowHeightChange?: (height: "short" | "medium" | "tall") => void
+  onRowHeightChange?: (height: RowHeightOption) => void
   onHiddenFieldsChange?: (fields: string[]) => void
   onViewAction?: (action: "duplicate" | "rename" | "delete" | "setDefault") => void
   onDesign?: () => void
@@ -88,7 +89,7 @@ export default function ViewBuilderToolbar({
   filters,
   sorts,
   groupBy,
-  rowHeight = "medium",
+  rowHeight = "standard",
   hiddenFields = [],
   userRole = "editor",
   onFiltersChange,
@@ -166,9 +167,10 @@ export default function ViewBuilderToolbar({
   }
 
   const rowHeightOptions = [
-    { value: "short", label: "Short", icon: Minus },
-    { value: "medium", label: "Medium", icon: Maximize2 },
-    { value: "tall", label: "Tall", icon: Maximize2 },
+    { value: "compact", label: "Compact", icon: Minus },
+    { value: "standard", label: "Standard", icon: Maximize2 },
+    { value: "large", label: "Large", icon: Maximize2 },
+    { value: "extra_large", label: "Extra Large", icon: Maximize2 },
   ]
 
   return (
@@ -295,7 +297,7 @@ export default function ViewBuilderToolbar({
                     return (
                       <DropdownMenuItem
                         key={option.value}
-                        onClick={() => onRowHeightChange?.(option.value as "short" | "medium" | "tall")}
+                        onClick={() => onRowHeightChange?.(option.value as RowHeightOption)}
                         className={rowHeight === option.value ? "bg-blue-50" : ""}
                       >
                         <Icon className="h-4 w-4 mr-2" />

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { formatDateUK } from "@/lib/utils"
@@ -10,13 +10,9 @@ import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/L
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
+import { getInlineEditState, isFieldValueError } from "@/lib/fields/display"
+import { useSchemaContract } from "@/hooks/useSchemaContract"
 
-import {
-  resolveChoiceColor,
-  resolveFieldColor,
-  getTextColorForBackground,
-  normalizeHexColor,
-} from "@/lib/field-colors"
 
 interface InlineFieldEditorProps {
   field: TableField
@@ -28,6 +24,8 @@ interface InlineFieldEditorProps {
   onLinkedRecordClick: (tableId: string, recordId: string) => void
   onAddLinkedRecord: (field: TableField) => void
   isReadOnly?: boolean // Override read-only state (for field-level permissions)
+  selectOptionsEditable?: boolean // Allow editing select field options
+  suppressDerivedFieldErrors?: boolean // Suppress derived-field error UI
   showLabel?: boolean // Whether to render the field label (default: true)
   labelClassName?: string // Optional label classes
   tableId?: string // For attachment uploads
@@ -45,6 +43,8 @@ export default function InlineFieldEditor({
   onLinkedRecordClick,
   onAddLinkedRecord,
   isReadOnly: propIsReadOnly,
+  selectOptionsEditable = true,
+  suppressDerivedFieldErrors = false,
   showLabel: propShowLabel = true,
   labelClassName: propLabelClassName,
   tableId,
@@ -52,6 +52,7 @@ export default function InlineFieldEditor({
   tableName,
 }: InlineFieldEditorProps) {
   const { toast } = useToast()
+  const { schemaAvailable } = useSchemaContract()
   const [localValue, setLocalValue] = useState(value)
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null)
   const showLabel = propShowLabel
@@ -80,6 +81,47 @@ export default function InlineFieldEditor({
     }
   }, [isEditing])
 
+  const isErrorValue = isFieldValueError(value)
+  const safeValue = isErrorValue ? null : value
+
+  const suppressDerivedErrors = suppressDerivedFieldErrors && (field.type === "lookup" || field.type === "formula")
+
+  useEffect(() => {
+    if (isErrorValue && !suppressDerivedErrors) {
+      console.error(`Invalid value for field "${field.name}".`, value)
+    }
+  }, [isErrorValue, suppressDerivedErrors, value, field.name])
+
+  const selectDiagnostics = useMemo(() => {
+    if (field.type !== "single_select" && field.type !== "multi_select") {
+      return null
+    }
+    const choices = field.options?.choices || []
+    const isMulti = field.type === "multi_select"
+    const rawValues = isMulti
+      ? (Array.isArray(safeValue) ? safeValue : safeValue ? [safeValue] : [])
+      : (typeof safeValue === "string" ? [safeValue] : [])
+    const validValues = choices.length > 0
+      ? rawValues.filter((val) => choices.includes(val))
+      : rawValues
+    const hasInvalidValues = rawValues.length !== validValues.length
+    const normalizedSingleValue = !isMulti ? (validValues[0] ?? null) : null
+    return {
+      choices,
+      isMulti,
+      rawValues,
+      validValues,
+      hasInvalidValues,
+      normalizedSingleValue,
+    }
+  }, [field.type, field.options?.choices, safeValue])
+
+  useEffect(() => {
+    if (selectDiagnostics?.hasInvalidValues) {
+      console.warn(`Invalid select value for field "${field.name}".`, selectDiagnostics.rawValues)
+    }
+  }, [selectDiagnostics?.hasInvalidValues, selectDiagnostics?.rawValues, field.name])
+
   const handleChange = (newValue: any) => {
     setLocalValue(newValue)
   }
@@ -103,6 +145,7 @@ export default function InlineFieldEditor({
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     if (field.type === "lookup") {
       e.preventDefault()
+      if (suppressDerivedErrors) return
       toast({
         title: "Cannot edit derived field",
         description: "This field is derived and can't be edited.",
@@ -111,11 +154,15 @@ export default function InlineFieldEditor({
       return
     }
     // For linked fields, paste is handled by LookupFieldPicker
-  }, [field.type, toast])
+  }, [field.type, suppressDerivedErrors, toast])
 
-  const isVirtual = field.type === "formula" || field.type === "lookup"
-  // Use prop override first, then check field-level read-only, then virtual
-  const isReadOnly = propIsReadOnly !== undefined ? propIsReadOnly : (isVirtual || field.options?.read_only)
+  const schemaLocked = !schemaAvailable
+  const { isReadOnly, isVirtual } = getInlineEditState({
+    editable: true,
+    fieldType: field.type,
+    fieldOptions: field.options,
+    isReadOnlyOverride: propIsReadOnly || schemaLocked,
+  })
   
   // Determine if this is a lookup field (derived) vs linked field (editable)
   const isLookupField = field.type === "lookup"
@@ -215,7 +262,7 @@ export default function InlineFieldEditor({
             />
           ) : (
             <div className={readOnlyBoxClassName}>
-              {value !== null && value !== undefined ? String(value) : "—"}
+              {safeValue !== null && safeValue !== undefined ? String(safeValue) : "—"}
             </div>
           )}
         </div>
@@ -251,8 +298,10 @@ export default function InlineFieldEditor({
 
   // Select fields
   if (field.type === "single_select" || field.type === "multi_select") {
-    const choices = field.options?.choices || []
-    const isMulti = field.type === "multi_select"
+    const choices = selectDiagnostics?.choices || []
+    const isMulti = selectDiagnostics?.isMulti ?? field.type === "multi_select"
+    const validValues = selectDiagnostics?.validValues || []
+    const normalizedSingleValue = selectDiagnostics?.normalizedSingleValue ?? null
 
     return (
       <div className={containerClassName}>
@@ -267,7 +316,7 @@ export default function InlineFieldEditor({
           </label>
         )}
         <InlineSelectDropdown
-          value={isMulti ? (Array.isArray(value) ? value : value ? [value] : []) : value}
+          value={isMulti ? validValues : normalizedSingleValue}
           choices={choices}
           choiceColors={field.options?.choiceColors}
           fieldOptions={field.options}
@@ -275,7 +324,9 @@ export default function InlineFieldEditor({
           fieldId={field.id}
           tableId={field.table_id}
           editable={!isReadOnly}
-          canEditOptions={!isReadOnly} // If they can edit the field, they can edit options
+          canEditOptions={!isReadOnly && selectOptionsEditable} // If they can edit the field, they can edit options
+          displayVariant="pills"
+          allowClear={!isReadOnly}
           onValueChange={async (newValue) => {
             onChange(newValue)
           }}
@@ -288,9 +339,11 @@ export default function InlineFieldEditor({
   // Date fields
   if (field.type === "date") {
     // For input: use ISO format (YYYY-MM-DD) - HTML5 date input requires this
-    const dateValueForInput = value ? new Date(value).toISOString().split("T")[0] : ""
+    const parsedDate = safeValue ? new Date(safeValue) : null
+    const isValidDate = !!parsedDate && !isNaN(parsedDate.getTime())
+    const dateValueForInput = isValidDate ? parsedDate.toISOString().split("T")[0] : ""
     // For display: use UK format (DD/MM/YYYY)
-    const dateValueForDisplay = value ? formatDateUK(value, "—") : ""
+    const dateValueForDisplay = isValidDate ? formatDateUK(parsedDate, "—") : ""
 
     if (isEditing && !isReadOnly) {
       return (
@@ -402,10 +455,10 @@ export default function InlineFieldEditor({
         )}
         {isReadOnly ? (
           <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}>
-            {value ? (
+            {safeValue ? (
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: safeValue }}
               />
             ) : (
               <span className="italic">—</span>
@@ -416,10 +469,10 @@ export default function InlineFieldEditor({
             onClick={onEditStart}
             className={`${displayBoxClassName} ${showLabel ? "min-h-[48px]" : ""}`}
           >
-            {value ? (
+            {safeValue ? (
               <div 
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: value }}
+                dangerouslySetInnerHTML={{ __html: safeValue }}
               />
             ) : (
               <span className="text-gray-400">Click to add text...</span>
@@ -432,7 +485,7 @@ export default function InlineFieldEditor({
 
   // Attachment fields
   if (field.type === "attachment") {
-    const attachments: Attachment[] = Array.isArray(value) ? value : value ? [value] : []
+    const attachments: Attachment[] = Array.isArray(safeValue) ? safeValue : safeValue ? [safeValue] : []
     
     if (isEditing && !isReadOnly && tableId && recordId && tableName) {
       // Show attachment editor with upload capability
@@ -531,14 +584,14 @@ export default function InlineFieldEditor({
         )}
         {isReadOnly ? (
           <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : ""}`}>
-            {value ? (
+            {safeValue ? (
               <a
-                href={getFullUrl(value)}
+                href={getFullUrl(safeValue)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
               >
-                {formatUrl(value)}
+                {formatUrl(safeValue)}
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
               </a>
             ) : (
@@ -551,15 +604,15 @@ export default function InlineFieldEditor({
             className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center group" : "group"}`}
             title={value || undefined}
           >
-            {value ? (
+            {safeValue ? (
               <a
-                href={getFullUrl(value)}
+                href={getFullUrl(safeValue)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
               >
-                {formatUrl(value)}
+                {formatUrl(safeValue)}
                 <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
               </a>
             ) : (
@@ -605,14 +658,14 @@ export default function InlineFieldEditor({
         )}
         {isReadOnly ? (
           <div className={`${readOnlyBoxClassName} ${showLabel ? "min-h-[36px] flex items-center gap-1" : "flex items-center gap-1"}`}>
-            {value ? (
+            {safeValue ? (
               <>
                 <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
                 <a
-                  href={`mailto:${value}`}
+                  href={`mailto:${safeValue}`}
                   className="text-blue-600 hover:text-blue-800 underline"
                 >
-                  {value}
+                  {safeValue}
                 </a>
               </>
             ) : (
@@ -625,15 +678,15 @@ export default function InlineFieldEditor({
             className={`${displayBoxClassName} ${showLabel ? "min-h-[36px] flex items-center" : "flex items-center"}`}
             title={value || undefined}
           >
-            {value ? (
+            {safeValue ? (
               <>
                 <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
                 <a
-                  href={`mailto:${value}`}
+                  href={`mailto:${safeValue}`}
                   onClick={(e) => e.stopPropagation()}
                   className="text-blue-600 hover:text-blue-800 underline"
                 >
-                  {value}
+                  {safeValue}
                 </a>
               </>
             ) : (
@@ -682,7 +735,7 @@ export default function InlineFieldEditor({
       )}
       {isReadOnly ? (
         <div className={readOnlyBoxClassName}>
-          {value !== null && value !== undefined ? String(value) : "—"}
+          {safeValue !== null && safeValue !== undefined ? String(safeValue) : "—"}
           {field.type === "formula" && field.options?.formula && (
             <div className="text-xs text-gray-500 mt-1 font-mono">
               = {field.options.formula}

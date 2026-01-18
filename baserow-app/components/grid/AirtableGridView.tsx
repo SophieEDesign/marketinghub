@@ -30,10 +30,13 @@ import { asArray } from '@/lib/utils/asArray'
 import { useDataView } from '@/lib/dataView/useDataView'
 import type { Selection } from '@/lib/dataView/types'
 import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
+import { getRowHeightPixels, normalizeRowHeight, type RowHeightOption } from '@/lib/grid/row-height-utils'
 import { cn } from '@/lib/utils'
 import RecordModal from './RecordModal'
 import type { FilterType } from '@/types/database'
-import type { FilterConfig } from '@/lib/interface/filters'
+import { deriveDefaultValuesFromFilters, type FilterConfig } from '@/lib/interface/filters'
+import { useSchemaContract } from '@/hooks/useSchemaContract'
+import { useToast } from '@/components/ui/use-toast'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -52,7 +55,7 @@ interface AirtableGridViewProps {
     operator: FilterType
     value?: string
   }>
-  rowHeight?: 'short' | 'medium' | 'tall'
+  rowHeight?: RowHeightOption | string
   editable?: boolean
   fields?: TableField[]
   onAddField?: () => void
@@ -64,21 +67,11 @@ interface AirtableGridViewProps {
   onActionsReady?: (actions: AirtableGridActions) => void
 }
 
-const ROW_HEIGHT_SHORT = 32
-const ROW_HEIGHT_MEDIUM = 40
-const ROW_HEIGHT_TALL = 56
 const HEADER_HEIGHT = 40
 const COLUMN_MIN_WIDTH = 100
 const COLUMN_DEFAULT_WIDTH = 200
 const FROZEN_COLUMN_WIDTH = 50
 const OPEN_RECORD_COLUMN_WIDTH = 32
-
-// Map row height values: 'compact' -> 'short', 'comfortable' -> 'tall'
-const mapRowHeightToAirtable = (height: string): 'short' | 'medium' | 'tall' => {
-  if (height === 'compact') return 'short'
-  if (height === 'comfortable') return 'tall'
-  return 'medium'
-}
 
 export default function AirtableGridView({
   tableName,
@@ -86,7 +79,7 @@ export default function AirtableGridView({
   viewName = 'default',
   viewId,
   viewFilters = [],
-  rowHeight = 'medium',
+  rowHeight = 'standard',
   editable = true,
   fields = [],
   onAddField,
@@ -100,6 +93,8 @@ export default function AirtableGridView({
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
+  const { schemaAvailable, status: schemaStatus } = useSchemaContract()
+  const { toast } = useToast()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
   const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
 
@@ -132,12 +127,9 @@ export default function AirtableGridView({
     setModalRecord({ tableId: tableIdState, recordId: rowId, tableName })
   }, [tableIdState, tableName, disableRecordPanel])
   
-  // Map row height from props to internal format
-  // On mobile, cap row height to medium for better usability
-  const mappedRowHeight = mapRowHeightToAirtable(rowHeight)
-  const ROW_HEIGHT = isMobile
-    ? ROW_HEIGHT_MEDIUM // Cap at medium on mobile
-    : mappedRowHeight === 'short' ? ROW_HEIGHT_SHORT : mappedRowHeight === 'tall' ? ROW_HEIGHT_TALL : ROW_HEIGHT_MEDIUM
+  // Normalize row height from props to a single source of truth
+  const normalizedRowHeight = useMemo(() => normalizeRowHeight(rowHeight), [rowHeight])
+  const rowHeightPixels = useMemo(() => getRowHeightPixels(normalizedRowHeight), [normalizedRowHeight])
 
   // State
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
@@ -195,6 +187,8 @@ export default function AirtableGridView({
     sorts,
   })
 
+  const canInlineEdit = editable && schemaAvailable
+
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
   const safeRows = asArray<GridRow>(allRows)
@@ -244,7 +238,9 @@ export default function AirtableGridView({
   }, [safeRows, safeFields, searchQuery, visibleFieldNames])
 
   const createNewRow = useCallback(async (): Promise<GridRow | null> => {
-    const newRow = await insertRow({})
+    if (!schemaAvailable) return null
+    const defaultsFromFilters = deriveDefaultValuesFromFilters(standardizedFilters, safeFields)
+    const newRow = await insertRow(defaultsFromFilters)
 
     // Spreadsheet-style UX: jump to the newly created row and select the first visible field
     if (newRow && visibleFields.length > 0) {
@@ -260,7 +256,7 @@ export default function AirtableGridView({
     }
 
     return newRow
-  }, [insertRow, visibleFields])
+  }, [insertRow, visibleFields, standardizedFilters, safeFields, schemaAvailable])
 
   // Expose actions to parent (toolbar lives outside this component)
   useEffect(() => {
@@ -288,12 +284,20 @@ export default function AirtableGridView({
           .slice(0, 5)
           .map(e => `${e.fieldName}: ${e.error}`)
           .join('\n')
-        alert(`Some values could not be pasted:\n\n${errorMsg}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`)
+        toast({
+          variant: 'destructive',
+          title: 'Some values could not be pasted',
+          description: `${errorMsg}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`,
+        })
       }
     },
     onError: (error) => {
       console.error('Data view error:', error)
-      alert(`Error: ${error.message}`)
+      toast({
+        variant: 'destructive',
+        title: 'Data view error',
+        description: error.message || 'Something went wrong.',
+      })
     },
   })
 
@@ -523,7 +527,7 @@ export default function AirtableGridView({
               .insert([{
                 view_id: viewId,
                 ...settingsData,
-                row_height: 'medium',
+                row_height: 'standard',
                 frozen_columns: 0,
               }])
           }
@@ -682,7 +686,7 @@ export default function AirtableGridView({
   // Virtualization calculations
   const GROUP_HEADER_HEIGHT = 40
   const getItemHeight = (item: typeof renderItems[0]) => {
-    return item.type === 'group' ? GROUP_HEADER_HEIGHT : ROW_HEIGHT
+    return item.type === 'group' ? GROUP_HEADER_HEIGHT : rowHeightPixels
   }
   
   let currentHeight = 0
@@ -954,6 +958,11 @@ export default function AirtableGridView({
 
   return (
     <div ref={gridRef} className="flex flex-col h-full bg-gray-50 overflow-hidden w-full">
+      {schemaStatus?.available === false && (
+        <div className="px-3 py-2 border-b border-amber-200 bg-amber-50 text-amber-900 text-xs">
+          Schema editing is unavailable.
+        </div>
+      )}
       {/* Header */}
       <div
         ref={headerScrollRef}
@@ -1029,7 +1038,7 @@ export default function AirtableGridView({
                     onResizeStart={handleResizeStart}
                     onResize={handleResize}
                     onResizeEnd={handleResizeEnd}
-                    onEdit={onEditField}
+                    onEdit={schemaAvailable ? onEditField : undefined}
                     onToggleWrapText={handleToggleWrapText}
                     onSelect={(fieldId) => {
                       setSelectedColumnId(fieldId)
@@ -1052,8 +1061,9 @@ export default function AirtableGridView({
               style={{ width: FROZEN_COLUMN_WIDTH, height: HEADER_HEIGHT }}
             >
               <button
-                onClick={onAddField}
-                className="p-1.5 hover:bg-gray-100/50 rounded transition-colors text-gray-400 hover:text-gray-600"
+                onClick={schemaAvailable ? onAddField : undefined}
+                disabled={!schemaAvailable}
+                className="p-1.5 hover:bg-gray-100/50 rounded transition-colors text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Add column"
               >
                 <Plus className="h-4 w-4" />
@@ -1134,7 +1144,7 @@ export default function AirtableGridView({
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/30'
                   } ${isSelected ? 'bg-blue-50/50' : ''}`}
-                  style={{ height: ROW_HEIGHT }}
+                  style={{ height: rowHeightPixels }}
                   onClick={(e) => {
                     const target = e.target as HTMLElement
                     // Contract: single click selects the row ONLY (never opens a record).
@@ -1160,7 +1170,7 @@ export default function AirtableGridView({
                       stickyBgClass,
                       stickyHoverClass
                     )}
-                    style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: rowHeightPixels }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
@@ -1186,7 +1196,7 @@ export default function AirtableGridView({
                       stickyBgClass,
                       stickyHoverClass
                     )}
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, height: rowHeightPixels, left: OPEN_RECORD_COLUMN_WIDTH }}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRowSelect(row.id, rowIndex, e)
@@ -1216,7 +1226,7 @@ export default function AirtableGridView({
                     )}
                     style={{
                       width: FROZEN_COLUMN_WIDTH,
-                      height: ROW_HEIGHT,
+                      height: rowHeightPixels,
                       left: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH,
                     }}
                   >
@@ -1237,7 +1247,7 @@ export default function AirtableGridView({
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
                           isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
                         }`}
-                        style={{ width, height: ROW_HEIGHT, maxHeight: ROW_HEIGHT }}
+                        style={{ width, height: rowHeightPixels, maxHeight: rowHeightPixels }}
                         onClick={() => {
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
@@ -1253,9 +1263,10 @@ export default function AirtableGridView({
                             value={row[field.name]}
                             rowId={row.id}
                             tableName={tableName}
-                            editable={editable && !field.options?.read_only}
+                            editable={canInlineEdit && !field.options?.read_only}
+                            canEditSchema={schemaAvailable}
                             wrapText={wrapText}
-                            rowHeight={ROW_HEIGHT}
+                            rowHeight={rowHeightPixels}
                             onSave={(value) => handleCellSave(row.id, field.name, value)}
                             onFieldOptionsUpdate={onTableFieldsRefresh}
                           />
@@ -1331,6 +1342,7 @@ export default function AirtableGridView({
           tableId={modalRecord.tableId}
           recordId={modalRecord.recordId}
           tableName={modalRecord.tableName}
+          isReadOnly={!editable}
         />
       )}
     </div>

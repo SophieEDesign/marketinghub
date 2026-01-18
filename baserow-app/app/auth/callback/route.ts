@@ -5,7 +5,9 @@ import { authErrorToMessage, getRedirectUrl } from '@/lib/auth-utils'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = await getRedirectUrl(requestUrl.searchParams.get('next'), null)
+  const next = await getRedirectUrl(requestUrl.searchParams.get('next'), null, {
+    allowExplicitRedirect: false,
+  })
 
   if (code) {
     const supabase = await createClient()

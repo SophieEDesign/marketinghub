@@ -26,7 +26,9 @@ export default function SettingsAutomationsTab() {
         console.error('Error loading automations:', error)
         // If it's a 500 error, it might be a schema issue - set empty array
         if (error.code === 'PGRST116' || error.message?.includes('500')) {
-          console.warn('Automations table may have schema issues. Please run migration: fix_automations_trigger_fields.sql')
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Automations table may have schema issues.')
+          }
           setAutomations([])
         }
       } else {

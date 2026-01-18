@@ -253,7 +253,9 @@ export default function SettingsWorkspaceTab() {
             // Schema not present - cannot persist this setting
             setMessage({
               type: 'error',
-              text: 'Default page could not be saved: the workspace_settings table/column is missing. Please run the workspace settings migrations.'
+              text: process.env.NODE_ENV === 'development'
+                ? 'Default page could not be saved: workspace settings metadata is missing.'
+                : 'Default page could not be saved due to missing configuration metadata.'
             })
             saveHadErrorMessage = true
           } else {

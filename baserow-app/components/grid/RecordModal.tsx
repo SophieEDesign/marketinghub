@@ -22,6 +22,7 @@ interface RecordModalProps {
   recordId: string
   tableName: string
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  isReadOnly?: boolean
 }
 
 export default function RecordModal({
@@ -31,6 +32,7 @@ export default function RecordModal({
   recordId,
   tableName,
   modalFields,
+  isReadOnly = false,
 }: RecordModalProps) {
   const [record, setRecord] = useState<Record<string, any> | null>(null)
   const [fields, setFields] = useState<TableField[]>([])
@@ -95,6 +97,7 @@ export default function RecordModal({
   }
 
   async function handleFieldChange(fieldName: string, value: any) {
+    if (isReadOnly) return
     if (!record || !tableName) return
 
     try {
@@ -116,6 +119,7 @@ export default function RecordModal({
   }
 
   async function handleDeleteRecord() {
+    if (isReadOnly) return
     if (!tableName || !recordId) return
     if (userRole !== 'admin') {
       toast({
@@ -164,10 +168,10 @@ export default function RecordModal({
               {userRole === 'admin' && (
                 <button
                   onClick={handleDeleteRecord}
-                  disabled={deleting || loading}
+                  disabled={deleting || loading || isReadOnly}
                   className="p-2 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
                   aria-label="Delete record"
-                  title="Delete"
+                  title={isReadOnly ? "Read-only" : "Delete"}
                 >
                   <Trash2 className="h-4 w-4 text-red-600" />
                 </button>
@@ -195,7 +199,8 @@ export default function RecordModal({
               tableId={tableId}
               recordId={recordId}
               tableName={tableName}
-              isFieldEditable={() => true}
+              isFieldEditable={() => !isReadOnly}
+              selectOptionsEditable={false}
             />
           ) : (
             <div className="text-center py-8 text-gray-500">Record not found</div>

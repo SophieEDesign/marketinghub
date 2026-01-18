@@ -7,6 +7,7 @@ interface JsonCellProps {
   value: any
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave?: (value: any) => Promise<void>
   placeholder?: string
 }
@@ -15,6 +16,7 @@ export default function JsonCell({
   value,
   fieldName,
   editable = false,
+  rowHeight,
   onSave,
   placeholder = '—',
 }: JsonCellProps) {
@@ -43,11 +45,19 @@ export default function JsonCell({
   const preview = getPreview(displayValue)
   const isPlaceholder = value === null || value === undefined
 
+  const rowHeightStyle = rowHeight
+    ? {
+        height: `${rowHeight}px`,
+        minHeight: `${rowHeight}px`,
+        maxHeight: `${rowHeight}px`,
+      }
+    : { minHeight: '36px' }
+
   return (
-    <div className="w-full h-full px-2 flex items-center gap-1 text-sm">
+    <div className="w-full h-full px-2 flex items-center gap-1 text-sm overflow-hidden box-border" style={rowHeightStyle}>
       <FileJson className="h-3 w-3 text-gray-400 flex-shrink-0" />
       {expanded ? (
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-y-auto" style={rowHeight ? { maxHeight: `${Math.max(16, rowHeight - 8)}px` } : undefined}>
           <pre className="text-xs font-mono text-gray-700 whitespace-pre-wrap break-words">
             {formatJson(displayValue)}
           </pre>

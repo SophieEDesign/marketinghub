@@ -123,7 +123,9 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       if (error) {
         // Handle case where table_rows doesn't exist (PGRST205)
         if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
-          console.warn("table_rows table does not exist. Run migration to create it.")
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("table_rows table does not exist. Grid view rows are unavailable.")
+          }
           setRows([])
         } else {
           console.error("Error loading rows:", {
@@ -200,7 +202,9 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       const { error } = await supabase.from("table_rows").insert([newRow])
       if (error) {
         if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
-          console.warn("table_rows table does not exist. Run migration to create it.")
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("table_rows table does not exist. Grid view rows are unavailable.")
+          }
         } else {
           console.error("Error adding row:", error)
         }

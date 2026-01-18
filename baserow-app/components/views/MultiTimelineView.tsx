@@ -98,6 +98,11 @@ function isSelectField(field: TableField): field is TableField & { type: "single
   return field.type === "single_select" || field.type === "multi_select"
 }
 
+function resolveFieldByKey(fieldKey: string | undefined, tableFields: TableField[]): TableField | undefined {
+  if (!fieldKey) return undefined
+  return tableFields.find((f) => f.name === fieldKey || f.id === fieldKey)
+}
+
 export default function MultiTimelineView({
   blockId,
   pageId = null,
@@ -115,6 +120,9 @@ export default function MultiTimelineView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === "view"
   const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const allowOpenRecord = permissions.allowOpenRecord ?? true
+  const enableRecordOpen = appearance.enable_record_open ?? true
+  const canOpenRecord = allowOpenRecord && enableRecordOpen
   const blockShowAddRecord = appearance.show_add_record
   const showAddRecord = blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate && !isEditing
@@ -263,38 +271,43 @@ export default function MultiTimelineView({
 
       const sourceLabel = (s.label || "").trim() || table.name
       const sourceColor = pickSourceColor(idx)
+      const startFieldObj = resolveFieldByKey(s.start_date_field, tableFields)
+      const titleFieldObj = resolveFieldByKey(s.title_field, tableFields)
+      if (!startFieldObj || !titleFieldObj) return
+      const startFieldName = startFieldObj.name
+      const endFieldName = resolveFieldByKey(s.end_date_field, tableFields)?.name
+      const titleFieldName = titleFieldObj.name
+      const typeFieldName = resolveFieldByKey(s.type_field, tableFields)?.name
 
       rows.forEach((r) => {
         const row = r.data || {}
-        const startRaw = row[s.start_date_field]
+        const startRaw = row[startFieldName]
         if (!startRaw) return
         const start = new Date(startRaw)
         if (isNaN(start.getTime())) return
 
-        const endRaw = s.end_date_field ? row[s.end_date_field] : null
+        const endRaw = endFieldName ? row[endFieldName] : null
         const end = endRaw ? new Date(endRaw) : start
         const finalEnd = isNaN(end.getTime()) ? start : end
 
-        const title = row[s.title_field] ? String(row[s.title_field]) : "Untitled"
+        const title = row[titleFieldName] ? String(row[titleFieldName]) : "Untitled"
         if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return
 
-        const typeLabel = s.type_field && row[s.type_field] ? String(row[s.type_field]) : undefined
+        const typeLabel = typeFieldName && row[typeFieldName] ? String(row[typeFieldName]) : undefined
 
         let eventColor = sourceColor
         if (s.color_field) {
-          const colorFieldObj = tableFields.find(
-            (f): f is TableField & { type: "single_select" | "multi_select" } =>
-              (f.name === s.color_field || f.id === s.color_field) && isSelectField(f)
-          )
-          if (colorFieldObj) {
-            const rawValue = row[colorFieldObj.name]
+          const colorFieldObj = resolveFieldByKey(s.color_field, tableFields)
+          const selectColorField = colorFieldObj && isSelectField(colorFieldObj) ? colorFieldObj : undefined
+          if (selectColorField) {
+            const rawValue = row[selectColorField.name]
             if (rawValue) {
               eventColor = normalizeHexColor(
                 resolveChoiceColor(
                   String(rawValue).trim(),
-                  colorFieldObj.type,
-                  colorFieldObj.options,
-                  colorFieldObj.type === "single_select"
+                  selectColorField.type,
+                  selectColorField.options,
+                  selectColorField.type === "single_select"
                 )
               )
             }
@@ -374,13 +387,16 @@ export default function MultiTimelineView({
       setJustDraggedEventId(dragging.eventId)
       justDraggedAtRef.current = Date.now()
       if (!event || !update?.start) return
-      if (!event.mapping?.start_date_field) return
+      const tableFields = fieldsBySource[event.sourceId] || []
+      const startFieldName = resolveFieldByKey(event.mapping?.start_date_field, tableFields)?.name
+      const endFieldName = resolveFieldByKey(event.mapping?.end_date_field, tableFields)?.name
+      if (!startFieldName) return
 
       const updates: Record<string, any> = {
-        [event.mapping.start_date_field]: safeDateOnly(update.start),
+        [startFieldName]: safeDateOnly(update.start),
       }
-      if (event.mapping.end_date_field && update.end) {
-        updates[event.mapping.end_date_field] = safeDateOnly(update.end)
+      if (endFieldName && update.end) {
+        updates[endFieldName] = safeDateOnly(update.end)
       }
 
       try {
@@ -423,8 +439,11 @@ export default function MultiTimelineView({
 
     const defaultsFromFilters = deriveDefaultValuesFromFilters(effectiveFilters, tableFields)
     const newData: Record<string, any> = { ...defaultsFromFilters }
-    if (mapping.start_date_field) newData[mapping.start_date_field] = safeDateOnly(createDate)
-    if (mapping.end_date_field) newData[mapping.end_date_field] = newData[mapping.end_date_field] || safeDateOnly(createDate)
+    const startFieldName = resolveFieldByKey(mapping.start_date_field, tableFields)?.name
+    const endFieldName = resolveFieldByKey(mapping.end_date_field, tableFields)?.name
+    if (!startFieldName) return
+    newData[startFieldName] = safeDateOnly(createDate)
+    if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(createDate)
 
     try {
       const { error } = await supabase.from(table.supabaseTable).insert([newData])
@@ -602,11 +621,8 @@ export default function MultiTimelineView({
                     if (!inRange) return null
 
                     const tableFields = fieldsBySource[ev.sourceId] || []
-                    const hasStartDate = tableFields.some(
-                      (f) =>
-                        (f.name === ev.mapping.start_date_field || f.id === ev.mapping.start_date_field) &&
-                        f.type === "date"
-                    )
+                    const startFieldObj = resolveFieldByKey(ev.mapping.start_date_field, tableFields)
+                    const hasStartDate = startFieldObj?.type === "date"
                     const canDrag = hasStartDate && !isViewOnly && !isEditing
                     const label = ev.typeLabel ? `${ev.title} · ${ev.typeLabel}` : ev.title
 
@@ -622,11 +638,12 @@ export default function MultiTimelineView({
                         onClick={() => {
                           // Avoid opening the record when the user just dragged.
                           if (justDraggedEventId === ev.id && Date.now() - justDraggedAtRef.current < 250) return
+                          if (!canOpenRecord) return
                           if (onRecordClick) {
                             onRecordClick(ev.rowId, ev.tableId)
                             return
                           }
-                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields)
+                          openRecord(ev.tableId, ev.rowId, ev.supabaseTableName, (blockConfig as any)?.modal_fields, isViewOnly)
                         }}
                         onMouseDown={(e) => {
                           if (!canDrag) return

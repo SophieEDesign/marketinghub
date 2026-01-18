@@ -11,17 +11,18 @@ interface RecordPanelState {
   isPinned: boolean
   isFullscreen: boolean
   modalFields?: string[] // Fields to show in modal (if empty, show all)
+  isReadOnly?: boolean
   history: Array<{ tableId: string; recordId: string; tableName: string }> // For breadcrumb navigation
 }
 
 interface RecordPanelContextType {
   state: RecordPanelState
-  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[]) => void
+  openRecord: (tableId: string, recordId: string, tableName: string, modalFields?: string[], isReadOnly?: boolean) => void
   closeRecord: () => void
   setWidth: (width: number) => void
   togglePin: () => void
   toggleFullscreen: () => void
-  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string) => void
+  navigateToLinkedRecord: (tableId: string, recordId: string, tableName: string, isReadOnly?: boolean) => void
   goBack: () => void
 }
 
@@ -43,7 +44,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     history: [],
   })
 
-  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[]) => {
+  const openRecord = useCallback((tableId: string, recordId: string, tableName: string, modalFields?: string[], isReadOnly?: boolean) => {
     setState((prev) => ({
       ...prev,
       isOpen: true,
@@ -51,6 +52,7 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
       recordId,
       tableName,
       modalFields,
+      isReadOnly: isReadOnly ?? (prev.isOpen ? prev.isReadOnly ?? false : false),
       history: prev.isOpen && prev.tableId === tableId && prev.recordId === recordId
         ? prev.history // Don't add to history if same record
         : [...prev.history, { tableId, recordId, tableName }],
@@ -87,12 +89,13 @@ export function RecordPanelProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
-  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string) => {
+  const navigateToLinkedRecord = useCallback((tableId: string, recordId: string, tableName: string, isReadOnly?: boolean) => {
     setState((prev) => ({
       ...prev,
       tableId,
       recordId,
       tableName,
+      isReadOnly: isReadOnly ?? prev.isReadOnly ?? false,
       history: [...prev.history, { tableId, recordId, tableName }],
     }))
   }, [])

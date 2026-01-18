@@ -1091,14 +1091,10 @@ export default function CSVImportModal({
       // Check if the error is about missing table_fields table
       if (errorMessage.includes('table_fields table does not exist') || 
           errorMessage.includes('MISSING_TABLE')) {
-        setError(
-          `Database Setup Required\n\n` +
-          `The table_fields table is missing. To fix this:\n\n` +
-          `1. Go to your Supabase Dashboard\n` +
-          `2. Navigate to SQL Editor\n` +
-          `3. Run the migration file: supabase/migrations/create_table_fields.sql\n\n` +
-          `This migration creates the required table for field management.`
-        )
+        const devDetails = process.env.NODE_ENV === 'development'
+          ? 'Schema metadata is unavailable. Field creation during import is disabled.'
+          : 'Schema metadata is unavailable. CSV import cannot create fields.'
+        setError(devDetails)
       } else {
         setError(`Failed to import CSV: ${errorMessage}`)
       }

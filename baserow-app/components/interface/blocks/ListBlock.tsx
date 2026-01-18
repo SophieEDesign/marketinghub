@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -229,6 +229,10 @@ export default function ListBlock({
   const isViewOnly = permissions.mode === "view"
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const canCreateRecord = !isViewOnly && allowInlineCreate
+  const canEdit = !isViewOnly
+  const allowOpenRecord = permissions.allowOpenRecord ?? true
+  const enableRecordOpen = appearance.enable_record_open ?? true
+  const canOpenRecord = allowOpenRecord && enableRecordOpen
 
   const titleFieldObj = useMemo(() => {
     if (!titleField) return null
@@ -424,6 +428,8 @@ export default function ListBlock({
         onRecordClick={onRecordClick}
         showAddRecord={showAddRecord}
         canCreateRecord={canCreateRecord}
+        canEdit={canEdit}
+        canOpenRecord={canOpenRecord}
         titleField={titleField}
         subtitleFields={subtitleFields}
         imageField={imageField}

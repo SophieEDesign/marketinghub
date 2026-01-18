@@ -52,13 +52,14 @@ export default function ListDataSettings({
     setSelectedTableId(config.table_id || "")
   }, [config.table_id])
 
-  // Get available fields for selection
-  const textFields = fields.filter(f => f.type === 'text' || f.type === 'long_text')
-  const allFields = fields
-  const selectFields = fields.filter(f => f.type === 'single_select' || f.type === 'multi_select')
-  const attachmentFields = fields.filter(f => f.type === 'attachment')
-  const dateFields = fields.filter(f => f.type === 'date')
-  const numberFields = fields.filter(f => f.type === 'number' || f.type === 'percent' || f.type === 'currency')
+  // Get available fields for selection (allow system fields; only hide internal id)
+  const selectableFields = fields.filter((f) => f.name !== 'id')
+  const textFields = selectableFields.filter((f) => f.type === 'text' || f.type === 'long_text')
+  const allFields = selectableFields
+  const selectFields = selectableFields.filter((f) => f.type === 'single_select' || f.type === 'multi_select')
+  const attachmentFields = selectableFields.filter((f) => f.type === 'attachment')
+  const dateFields = selectableFields.filter((f) => f.type === 'date')
+  const numberFields = selectableFields.filter((f) => f.type === 'number' || f.type === 'percent' || f.type === 'currency')
 
   const handleTableChange = async (tableId: string) => {
     setSelectedTableId(tableId)
@@ -143,7 +144,7 @@ export default function ListDataSettings({
   }
 
   // Get groupable fields (not formula, not lookup)
-  const groupableFields = fields.filter(
+  const groupableFields = selectableFields.filter(
     (f) => f.type !== "formula" && f.type !== "lookup"
   )
 

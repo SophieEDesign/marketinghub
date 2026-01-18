@@ -18,6 +18,7 @@ interface RecordHeaderProps {
   saving: boolean
   hasChanges: boolean
   loading: boolean
+  isReadOnly?: boolean
 }
 
 export default function RecordHeader({
@@ -33,6 +34,7 @@ export default function RecordHeader({
   saving,
   hasChanges,
   loading,
+  isReadOnly = false,
 }: RecordHeaderProps) {
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameValue, setNameValue] = useState("")
@@ -64,6 +66,10 @@ export default function RecordHeader({
   }, [isEditingName])
 
   const handleNameSave = () => {
+    if (isReadOnly) {
+      setIsEditingName(false)
+      return
+    }
     if (primaryNameField) {
       onFieldChange(primaryNameField.name, nameValue)
     }
@@ -107,7 +113,7 @@ export default function RecordHeader({
     <div className="border-b border-gray-200 bg-white">
       {/* Primary Name */}
       <div className="px-6 py-4">
-        {isEditingName && primaryNameField ? (
+        {isEditingName && primaryNameField && !isReadOnly ? (
           <div className="flex items-center gap-2">
             <input
               ref={nameInputRef}
@@ -129,12 +135,14 @@ export default function RecordHeader({
         ) : (
           <h1
             className={`text-2xl font-semibold text-gray-900 flex-1 min-w-0 truncate ${
-              primaryNameField ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors" : ""
+              primaryNameField && !isReadOnly
+                ? "cursor-text hover:bg-gray-50 -mx-2 px-2 py-1 rounded-md transition-colors"
+                : ""
             }`}
             onClick={() => {
-              if (primaryNameField) setIsEditingName(true)
+              if (primaryNameField && !isReadOnly) setIsEditingName(true)
             }}
-            title={primaryNameField ? "Click to edit" : undefined}
+            title={primaryNameField && !isReadOnly ? "Click to edit" : undefined}
           >
             {recordName || "Untitled"}
           </h1>
@@ -179,8 +187,9 @@ export default function RecordHeader({
         <div className="flex items-center gap-1">
           <button
             onClick={onDuplicate}
-            className="p-2 hover:bg-gray-200 rounded transition-colors"
-            title="Duplicate record"
+            className="p-2 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+            title={isReadOnly ? "Read-only" : "Duplicate record"}
+            disabled={isReadOnly}
           >
             <Copy className="h-4 w-4 text-gray-600" />
           </button>
@@ -193,8 +202,9 @@ export default function RecordHeader({
           </button>
           <button
             onClick={onDelete}
-            className="p-2 hover:bg-red-100 rounded transition-colors"
-            title="Delete record"
+            className="p-2 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+            title={isReadOnly ? "Read-only" : "Delete record"}
+            disabled={isReadOnly}
           >
             <Trash2 className="h-4 w-4 text-red-600" />
           </button>

@@ -1,5 +1,15 @@
 import { createServerSupabaseClient } from './supabase'
 
+type RowHeightSetting =
+  | 'compact'
+  | 'standard'
+  | 'large'
+  | 'extra_large'
+  | 'short'
+  | 'medium'
+  | 'tall'
+  | 'comfortable'
+
 export interface GridViewSettings {
   id: string
   view_id: string
@@ -7,7 +17,7 @@ export interface GridViewSettings {
   column_widths: Record<string, number>
   column_order: string[]
   column_wrap_text: Record<string, boolean>
-  row_height: 'short' | 'medium' | 'tall'
+  row_height: RowHeightSetting
   frozen_columns: number
   created_at: string
   updated_at: string
@@ -120,7 +130,7 @@ export async function updateColumnWrapText(
  */
 export async function updateRowHeight(
   viewId: string,
-  height: 'short' | 'medium' | 'tall'
+  height: RowHeightSetting
 ): Promise<void> {
   await saveGridViewSettings(viewId, { row_height: height })
 }

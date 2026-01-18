@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTable } from '@/lib/crud/tables'
 import { validateFieldName, validateFieldOptions, canChangeType, sanitizeFieldName } from '@/lib/fields/validation'
+import { normalizeSelectFieldOptions } from '@/lib/fields/select-options'
 import {
   generateAddColumnSQL,
   generateRenameColumnSQL,
@@ -36,7 +37,9 @@ export async function GET(
     // If table doesn't exist, return empty array (graceful degradation)
     if (isTableNotFoundError(error)) {
       const { tableId } = await params
-      console.warn(`table_fields table may not exist for table ${tableId}, returning empty fields array`)
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`table_fields table may not exist for table ${tableId}, returning empty fields array`)
+      }
       const response = NextResponse.json({ fields: [] })
       response.headers.set('Cache-Control', 'no-store')
       return response
@@ -126,6 +129,12 @@ export async function POST(
     }, -1)
     const order_index = maxOrderIndex + 1
 
+    // Normalize select options (sort_index, ids, colors)
+    const normalizedOptions =
+      type === 'single_select' || type === 'multi_select'
+        ? normalizeSelectFieldOptions(type as FieldType, options || {}, options || {}).options
+        : options || {}
+
     // Start transaction-like operation
     // 1. Create metadata record (table_fields table must exist)
     const { data: fieldData, error: fieldError } = await supabase
@@ -141,7 +150,7 @@ export async function POST(
           required: required || false,
           // Preserve valid falsy defaults like 0/false
           default_value: default_value ?? null,
-          options: options || {},
+          options: normalizedOptions,
         },
       ])
       .select()
@@ -150,11 +159,13 @@ export async function POST(
     if (fieldError) {
       // If table_fields doesn't exist, provide helpful error
       if (isTableNotFoundError(fieldError)) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('table_fields table does not exist. Schema editing is unavailable.', fieldError)
+        }
         return NextResponse.json(
           { 
-            error: 'table_fields table does not exist. Please run the migration create_table_fields.sql in Supabase.',
-            code: 'MISSING_TABLE',
-            details: 'The table_fields table is required for field management. Run the migration file: supabase/migrations/create_table_fields.sql'
+            error: 'Schema metadata is unavailable. Field editing is disabled.',
+            code: 'SCHEMA_METADATA_MISSING'
           },
           { status: 500 }
         )
@@ -429,7 +440,10 @@ export async function PATCH(
           { status: 400 }
         )
       }
-      updates.options = options
+      updates.options =
+        (type || existingField.type) === 'single_select' || (type || existingField.type) === 'multi_select'
+          ? normalizeSelectFieldOptions((type || existingField.type) as FieldType, options, existingField.options).options
+          : options
     }
 
     // Handle group_name update

@@ -48,7 +48,11 @@ export default function MultiSourceDataSettings({
   onUpdate,
 }: MultiSourceDataSettingsProps) {
   const sources = useMemo<MultiSource[]>(() => {
-    return Array.isArray((config as any).sources) ? ((config as any).sources as MultiSource[]) : []
+    const raw = Array.isArray((config as any).sources) ? ((config as any).sources as MultiSource[]) : []
+    return raw.map((s, idx) => ({
+      ...s,
+      id: s.id ?? (s as any).source_id ?? (s as any).sourceId ?? `source_${idx + 1}`,
+    }))
   }, [config])
 
   const [sourceFields, setSourceFields] = useState<Record<string, TableField[]>>({})

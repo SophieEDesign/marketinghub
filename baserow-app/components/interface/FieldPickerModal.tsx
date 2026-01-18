@@ -181,13 +181,23 @@ export default function FieldPickerModal({
     return tokens
   }, [normalizeToken])
 
+  const selectableFields = useMemo(() => {
+    return fields.filter((f) => f.name !== "id")
+  }, [fields])
+
+  useEffect(() => {
+    if (!open) return
+    const allowed = new Set(selectableFields.map((f) => f.name))
+    setLocalSelectedFields((prev) => prev.filter((name) => allowed.has(name)))
+  }, [open, selectableFields])
+
   // Filter + sort fields for list
   const filteredFields = useMemo(() => {
     const searchLower = fieldSearch.trim().toLowerCase()
 
     const base = searchLower
-      ? fields.filter((f) => f.name.toLowerCase().includes(searchLower))
-      : fields
+      ? selectableFields.filter((f) => f.name.toLowerCase().includes(searchLower))
+      : selectableFields
 
     const sorted = [...base]
     sorted.sort((a, b) => {
@@ -201,7 +211,7 @@ export default function FieldPickerModal({
       return 0
     })
     return sorted
-  }, [fields, fieldSearch, fieldSort])
+  }, [selectableFields, fieldSearch, fieldSort])
 
   const handleFieldToggle = (fieldName: string, checked: boolean) => {
     if (checked) {
@@ -212,7 +222,7 @@ export default function FieldPickerModal({
   }
 
   const handleSelectAll = () => {
-    setLocalSelectedFields(fields.map((f) => f.name))
+    setLocalSelectedFields(selectableFields.map((f) => f.name))
   }
 
   const handleSelectNone = () => {
@@ -221,7 +231,7 @@ export default function FieldPickerModal({
 
   const handleInvertSelection = () => {
     const selected = new Set(localSelectedFields)
-    setLocalSelectedFields(fields.filter((f) => !selected.has(f.name)).map((f) => f.name))
+    setLocalSelectedFields(selectableFields.filter((f) => !selected.has(f.name)).map((f) => f.name))
   }
 
   const applyPaste = (mode: "add" | "replace") => {
@@ -232,7 +242,7 @@ export default function FieldPickerModal({
     }
 
     const fieldNameByNorm = new Map<string, string>()
-    for (const f of fields) {
+    for (const f of selectableFields) {
       fieldNameByNorm.set(normalizeToken(f.name), f.name)
     }
 
@@ -268,8 +278,8 @@ export default function FieldPickerModal({
 
   // Get visible fields for preview (in order they appear in fields array)
   const visibleFieldsForPreview = useMemo(() => {
-    return fields.filter((f) => localSelectedFields.includes(f.name))
-  }, [fields, localSelectedFields])
+    return selectableFields.filter((f) => localSelectedFields.includes(f.name))
+  }, [selectableFields, localSelectedFields])
 
   // Get preview fields for record list (first 3 visible fields)
   const previewFields = useMemo(() => {
@@ -534,7 +544,7 @@ export default function FieldPickerModal({
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-4 border-t mt-4">
           <div className="text-sm text-gray-500">
-            {localSelectedFields.length} of {fields.length} fields selected
+            {localSelectedFields.length} of {selectableFields.length} fields selected
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

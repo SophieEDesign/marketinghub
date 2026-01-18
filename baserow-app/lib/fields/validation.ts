@@ -74,7 +74,10 @@ export function validateFieldOptions(
   switch (fieldType) {
     case 'single_select':
     case 'multi_select':
-      if (!options.choices || options.choices.length === 0) {
+      if (
+        (!options.choices || options.choices.length === 0) &&
+        (!options.select_options || options.select_options.length === 0)
+      ) {
         return { valid: false, error: 'Select fields must have at least one choice' }
       }
       break
