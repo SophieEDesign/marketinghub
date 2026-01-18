@@ -73,36 +73,3 @@ export async function ensureTableFieldsTable(): Promise<void> {
     }
   }
 }
-table_columns', {
-    table_name: tableName
-  })
-
-  if (error) {
-    // Fallback: Try direct query if RPC doesn't exist
-    // For now, return empty and let the system work with metadata only
-    console.warn('Could not fetch actual columns:', error)
-    return []
-  }
-
-  return data || []
-}
-
-/**
- * Create table_fields table if it doesn't exist
- * This should be run as a migration, but we'll provide a helper
- */
-export async function ensureTableFieldsTable(): Promise<void> {
-  const supabase = await createClient()
-  
-  // Try to query the table - if it fails, it doesn't exist
-  const { error } = await supabase
-    .from('table_fields')
-    .select('id')
-    .limit(1)
-
-  if (error && error.code === '42P01') {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('table_fields table does not exist. Schema editing is unavailable until metadata tables are present.')
-    }
-  }
-}
