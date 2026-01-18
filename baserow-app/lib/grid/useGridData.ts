@@ -68,6 +68,92 @@ export function useGridData({
     if (m2?.[1]) return m2[1]
     return null
   }
+
+  function formatPostgrestError(err: any): string {
+    if (!err) return 'Unknown error'
+    const parts = [
+      err?.code ? `code=${err.code}` : null,
+      err?.message ? `message=${err.message}` : null,
+      err?.details ? `details=${err.details}` : null,
+      err?.hint ? `hint=${err.hint}` : null,
+    ].filter(Boolean)
+    return parts.length > 0 ? parts.join(' | ') : String(err)
+  }
+
+  function normalizeUpdateValue(fieldName: string, value: any): any {
+    // Avoid sending `undefined` (it becomes `{}` and can cause PostgREST 400s).
+    let v: any = value === undefined ? null : value
+    // JSON.stringify turns NaN/Infinity into null; do it explicitly for clarity.
+    if (typeof v === 'number' && (!Number.isFinite(v) || Number.isNaN(v))) v = null
+
+    const safeFields = asArray<TableField>(fields)
+    const field = safeFields.find((f) => f && typeof f === 'object' && (f as any).name === fieldName)
+    const type = (field as any)?.type as TableField['type'] | undefined
+
+    if (!type) return v
+
+    switch (type) {
+      case 'number':
+      case 'percent':
+      case 'currency': {
+        if (v === '') return null
+        if (typeof v === 'string') {
+          const trimmed = v.trim()
+          if (!trimmed) return null
+          const n = Number(trimmed)
+          return Number.isFinite(n) ? n : null
+        }
+        return v
+      }
+
+      case 'checkbox': {
+        if (typeof v === 'string') {
+          const t = v.trim().toLowerCase()
+          if (t === 'true') return true
+          if (t === 'false') return false
+        }
+        return !!v
+      }
+
+      case 'multi_select': {
+        if (v == null) return []
+        if (Array.isArray(v)) return v.filter((x) => x !== null && x !== undefined && x !== '').map(String)
+        if (typeof v === 'string') {
+          const trimmed = v.trim()
+          if (!trimmed) return []
+          return trimmed
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        }
+        return v
+      }
+
+      case 'single_select': {
+        if (v == null) return null
+        return String(v)
+      }
+
+      case 'date': {
+        if (v === '') return null
+        return v
+      }
+
+      case 'link_to_table': {
+        const toId = (x: any): string | null => {
+          if (x == null || x === '') return null
+          if (typeof x === 'string') return x
+          if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
+          return String(x)
+        }
+        if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+        return toId(v)
+      }
+
+      default:
+        return v
+    }
+  }
   
   // Store filters and sorts in refs to avoid dependency issues
   // Only update when content actually changes (via stringified comparison)
@@ -114,8 +200,10 @@ export function useGridData({
         missingColumnsRef.current = new Set()
       }
 
-      // Load physical columns (once per tableName) so we can avoid PostgREST 400s.
-      if (physicalColumnsTableRef.current !== tableName) {
+      const refreshPhysicalColumns = async (force = false) => {
+        if (!force && physicalColumnsTableRef.current === tableName && physicalColumnsRef.current !== null) {
+          return
+        }
         physicalColumnsTableRef.current = tableName
         physicalColumnsRef.current = null
         try {
@@ -132,6 +220,9 @@ export function useGridData({
           physicalColumnsRef.current = null
         }
       }
+
+      // Load physical columns (once per tableName) so we can avoid PostgREST 400s.
+      await refreshPhysicalColumns()
 
       const runQuery = async (attempt: number): Promise<any> => {
         // Use refs to get current filters/sorts without causing dependency issues
@@ -221,9 +312,13 @@ export function useGridData({
         if (queryError) {
           // If we hit a PostgREST 400 due to schema drift, learn the missing column and retry once.
           const missing = noteMissingColumnFromError(queryError)
-          if (missing && attempt === 0) {
+          if (missing) {
             missingColumnsRef.current.add(missing)
-            return await runQuery(attempt + 1)
+            // Revalidate physical columns after schema changes (rename/delete/type change).
+            await refreshPhysicalColumns(true)
+            if (attempt === 0) {
+              return await runQuery(attempt + 1)
+            }
           }
           throw queryError
         }
@@ -264,9 +359,19 @@ export function useGridData({
           )
         }
 
+        const physicalCols = physicalColumnsRef.current
+        if (physicalCols && !physicalCols.has(safeColumn)) {
+          throw new Error(
+            `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
+              `This usually means your table schema is out of sync with field metadata, or PostgREST schema cache hasn't refreshed yet.`
+          )
+        }
+
+        const normalizedValue = normalizeUpdateValue(fieldName, value)
+
         const { error: updateError } = await supabase
           .from(tableName)
-          .update({ [safeColumn]: value })
+          .update({ [safeColumn]: normalizedValue })
           .eq('id', rowId)
 
         if (updateError) {
@@ -280,17 +385,34 @@ export function useGridData({
                 `(see migration: supabase/migrations/grant_access_to_dynamic_data_tables.sql). Original error: ${msg}`
             )
           }
-          throw updateError
+
+          // If PostgREST complains about schema cache / missing columns, surface a clearer error.
+          const missing = noteMissingColumnFromError(updateError)
+          if (missing) {
+            throw new Error(
+              `Failed to update "${safeColumn}" on "${tableName}" because PostgREST reports a missing column "${missing}". ` +
+                `If this column was recently created/renamed, wait a moment and reload; otherwise ensure the physical table matches the field definition. ` +
+                `Original error: ${formatPostgrestError(updateError)}`
+            )
+          }
+
+          throw new Error(`Failed to update "${safeColumn}" on "${tableName}": ${formatPostgrestError(updateError)}`)
         }
 
         // Optimistically update local state
         setRows((prevRows) =>
           prevRows.map((row) =>
-            row.id === rowId ? { ...row, [fieldName]: value } : row
+            row.id === rowId ? { ...row, [fieldName]: normalizedValue } : row
           )
         )
       } catch (err: any) {
-        console.error('Error updating cell:', err)
+        console.error('Error updating cell:', {
+          tableName,
+          rowId,
+          fieldName,
+          value,
+          error: err,
+        })
         // Reload on error to sync with server
         await loadData()
         throw err

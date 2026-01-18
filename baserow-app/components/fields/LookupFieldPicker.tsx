@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { X, Plus, Search, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -69,6 +69,7 @@ export default function LookupFieldPicker({
   const [loading, setLoading] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const loadedSelectedIdsRef = useRef<string>("")
 
   // Determine if multi-select
   const isMultiSelect = 
@@ -83,6 +84,7 @@ export default function LookupFieldPicker({
     : value 
       ? (typeof value === 'string' && value.includes(',') ? value.split(',').filter(Boolean) : [value])
       : []
+  const selectedIdsKey = useMemo(() => selectedIds.slice().sort().join("|"), [selectedIds])
 
   // Get lookup table ID
   const lookupTableId = config?.lookupTableId || 
@@ -110,6 +112,10 @@ export default function LookupFieldPicker({
     } else {
       setTableName(null)
     }
+  }, [lookupTableId])
+
+  useEffect(() => {
+    loadedSelectedIdsRef.current = ""
   }, [lookupTableId])
 
   const isMirroredLinkedField =
@@ -147,6 +153,21 @@ export default function LookupFieldPicker({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, selectedIds.length, lookupTableId])
+
+  const hasMissingSelected = useMemo(() => {
+    if (selectedIds.length === 0) return false
+    const optionIds = new Set(options.map((opt) => opt.id))
+    return selectedIds.some((id) => !optionIds.has(id))
+  }, [options, selectedIds])
+
+  useEffect(() => {
+    if (!lookupTableId || selectedIds.length === 0) return
+    if (!hasMissingSelected) return
+    if (loadedSelectedIdsRef.current === selectedIdsKey) return
+    loadedSelectedIdsRef.current = selectedIdsKey
+    loadSelectedRecords()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupTableId, selectedIdsKey, selectedIds.length, hasMissingSelected])
 
   async function loadOptions(query: string = "") {
     if (!lookupTableId) return

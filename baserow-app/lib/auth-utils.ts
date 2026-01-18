@@ -128,14 +128,17 @@ export async function getRedirectUrl(
       !trimmed.startsWith('//') &&
       !trimmed.toLowerCase().startsWith('/\\') // extra hardening for odd encodings
 
+    // Strip query/hash for route checks (but keep them for the final redirect)
+    const pathOnly = trimmed.split(/[?#]/)[0]
+
     const blockedPrefixes = ['/login', '/auth', '/settings']
-    const isBlocked = blockedPrefixes.some((p) => trimmed === p || trimmed.startsWith(p + '/'))
+    const isBlocked = blockedPrefixes.some((p) => pathOnly === p || pathOnly.startsWith(p + '/'))
 
     if (
       isInternal &&
       !isBlocked &&
-      trimmed !== '/' &&
-      trimmed !== '/login'
+      pathOnly !== '/' &&
+      pathOnly !== '/login'
     ) {
       return trimmed
     }
@@ -343,7 +346,17 @@ export async function performPostAuthRedirect(
     )
     
     // Use window.location for full page reload to ensure cookies are sent
-    const safeNext = next && next !== '/login' ? next : '/'
+    let safeNext = next && next !== '/login' ? next : '/'
+    // Defense-in-depth: never redirect to settings/auth after login; let `/` resolve the landing page.
+    const safePathOnly = safeNext.split(/[?#]/)[0]
+    if (
+      safePathOnly === '/settings' ||
+      safePathOnly.startsWith('/settings/') ||
+      safePathOnly === '/auth' ||
+      safePathOnly.startsWith('/auth/')
+    ) {
+      safeNext = '/'
+    }
     window.location.href = safeNext
   } catch (error: any) {
     const errorMsg = error.message || 'Failed to redirect after authentication'

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import React from "react"
@@ -36,6 +36,7 @@ import { getRowHeightPixels } from "@/lib/grid/row-height-utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { createClient } from "@/lib/supabase/client"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { generateAddColumnSQL } from "@/lib/fields/sqlGenerator"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -97,6 +98,27 @@ function extractCurlyFieldRefs(formula: string): string[] {
     // ignore
   }
   return refs
+}
+
+function extractMissingColumnFromError(err: any): string | null {
+  const msg = String(err?.message || err?.details || err?.hint || '').trim()
+  if (!msg) return null
+
+  // Postgres:
+  // - column "theme" does not exist
+  // - column table_x.theme does not exist
+  // - column table_x."Theme" does not exist
+  const m1 = msg.match(/column\s+["]?([a-zA-Z0-9_]+)["]?\s+does\s+not\s+exist/i)
+  if (m1?.[1]) return m1[1]
+  const m2 = msg.match(/column\s+[a-zA-Z0-9_]+\.(?:"([^"]+)"|([a-zA-Z0-9_]+))\s+does\s+not\s+exist/i)
+  if (m2?.[1] || m2?.[2]) return m2[1] || m2[2]
+
+  // PostgREST:
+  // - Could not find the 'name' column of 'table_x' in the schema cache
+  const m3 = msg.match(/Could not find the '([^']+)' column/i)
+  if (m3?.[1]) return m3[1]
+
+  return null
 }
 
 // Draggable column header component with resize
@@ -266,6 +288,10 @@ export default function GridView({
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
   const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+
+  // Prevent runaway "create table" loops on repeated errors.
+  // (E.g. when the error is actually a missing column, not a missing table.)
+  const createTableAttemptedRef = useRef<Set<string>>(new Set())
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -811,11 +837,71 @@ export default function GridView({
         // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
         // IMPORTANT: only treat as "missing column" for 42703 (missing table is 42P01 and must be handled separately).
         if ((error as any)?.code === '42703') {
+          const missingColumn = extractMissingColumnFromError(error)
           console.warn('[GridView] Column missing for view; retrying with "*" select.', {
             message: (error as any)?.message,
             code: (error as any)?.code,
+            missingColumn,
           })
-          const retry = await supabase.from(supabaseTableName).select('*').limit(ITEMS_PER_PAGE)
+
+          const isMissingMatch = (fieldName?: string | null) => {
+            if (!missingColumn || !fieldName) return false
+            const normalized = String(fieldName).toLowerCase()
+            const missingNormalized = String(missingColumn).toLowerCase()
+            return normalized === missingNormalized
+          }
+
+          const filteredRetryFilters = missingColumn
+            ? safeFilters.filter((f) => !isMissingMatch(toPostgrestColumn(f.field)))
+            : safeFilters
+          const filteredRetryViewFilters = missingColumn
+            ? safeViewFilters.filter((f) => !isMissingMatch(toPostgrestColumn(f.field_name)))
+            : safeViewFilters
+          const filteredRetrySorts = missingColumn
+            ? safeViewSorts.filter((s) => !isMissingMatch(toPostgrestColumn(s.field_name)))
+            : safeViewSorts
+
+          let retryQuery = supabase.from(supabaseTableName).select('*')
+
+          if (filteredRetryFilters.length > 0) {
+            const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
+            retryQuery = applyFiltersToQuery(retryQuery, filteredRetryFilters, normalizedFields)
+          } else if (filteredRetryViewFilters.length > 0) {
+            const legacyFilters: FilterConfig[] = filteredRetryViewFilters.map(f => ({
+              field: f.field_name,
+              operator: f.operator as FilterConfig['operator'],
+              value: f.value,
+            }))
+            const normalizedFields = safeTableFields.map(f => ({ name: f.name, type: f.type }))
+            retryQuery = applyFiltersToQuery(retryQuery, legacyFilters, normalizedFields)
+          }
+
+          const retryNeedsClientSideSort =
+            filteredRetrySorts.length > 0 &&
+            shouldUseClientSideSorting(
+              filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+              safeTableFields
+            )
+
+          if (filteredRetrySorts.length > 0 && !retryNeedsClientSideSort) {
+            for (let i = 0; i < filteredRetrySorts.length; i++) {
+              const sort = filteredRetrySorts[i]
+              const orderColumn = toPostgrestColumn(sort.field_name)
+              if (!orderColumn) {
+                console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
+                continue
+              }
+              retryQuery = retryQuery.order(orderColumn, {
+                ascending: sort.direction === "asc",
+              })
+            }
+          } else if (filteredRetrySorts.length === 0) {
+            retryQuery = retryQuery.order("id", { ascending: false })
+          }
+
+          retryQuery = retryQuery.limit(retryNeedsClientSideSort ? ITEMS_PER_PAGE * 2 : ITEMS_PER_PAGE)
+
+          const retry = await retryQuery
           if (!retry.error) {
             let dataArray = asArray<Record<string, any>>(retry.data)
             setIsMissingPhysicalTable(false)
@@ -823,10 +909,44 @@ export default function GridView({
             setTableWarning(
               'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
             )
+            if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
+              dataArray = sortRowsByFieldType(
+                dataArray,
+                filteredRetrySorts.map(s => ({ field_name: s.field_name, direction: s.direction as 'asc' | 'desc' })),
+                safeTableFields
+              ).slice(0, ITEMS_PER_PAGE)
+            }
             setRows(dataArray)
             setLoading(false)
             return
           }
+
+          // Retry also failed: treat as schema mismatch (do NOT try to create the table).
+          let sqlHint = ''
+          if (missingColumn) {
+            const field = safeTableFields.find(
+              (f) => f && typeof f === 'object' && typeof f.name === 'string' && f.name === missingColumn
+            )
+            // Only generate SQL for physical fields (formula/lookup are virtual).
+            if (field && field.type !== 'formula' && field.type !== 'lookup') {
+              try {
+                const sql = generateAddColumnSQL(supabaseTableName, missingColumn, field.type as any, field.options as any)
+                sqlHint = `\n\nRun this SQL in Supabase to add the missing column:\n${sql}`
+              } catch {
+                // ignore (we'll show generic message)
+              }
+            }
+          }
+          setIsMissingPhysicalTable(false)
+          setTableWarning(null)
+          setTableError(
+            `This table is missing a column required by the view${missingColumn ? `: "${missingColumn}"` : ''}.` +
+              `\n\nThis is a schema mismatch (error code 42703), not a missing table.` +
+              sqlHint
+          )
+          setRows([])
+          setLoading(false)
+          return
         }
         console.error("Error loading rows:", {
           code: (error as any)?.code,
@@ -837,13 +957,15 @@ export default function GridView({
         })
         // Check if table doesn't exist - check multiple error patterns
         const errorMessage = (error as any)?.message || ''
-        const isTableNotFound = 
-          error.code === "42P01" || 
-          error.code === "PGRST116" ||
-          errorMessage.includes("does not exist") || 
-          errorMessage.includes("relation") ||
-          errorMessage.includes("schema cache") ||
-          errorMessage.includes("Could not find the table")
+        // IMPORTANT: be strict here. "column ... does not exist" is NOT a missing table.
+        const isTableNotFound =
+          error.code === "42P01" ||
+          error.code === "PGRST205" ||
+          (typeof errorMessage === 'string' && (
+            errorMessage.includes("Could not find the table") ||
+            errorMessage.includes("schema cache") ||
+            /relation\s+.+\s+does not exist/i.test(errorMessage)
+          ))
         
         if (isTableNotFound) {
           setIsMissingPhysicalTable(true)
@@ -852,6 +974,15 @@ export default function GridView({
           
           // Try to create the table automatically
           try {
+            // Only try once per tableName to avoid infinite loops / resource exhaustion.
+            if (createTableAttemptedRef.current.has(supabaseTableName)) {
+              setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically.`)
+              setRows([])
+              setLoading(false)
+              return
+            }
+            createTableAttemptedRef.current.add(supabaseTableName)
+
             const createResponse = await fetch('/api/tables/create-table', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -936,9 +1067,18 @@ export default function GridView({
     if (!rowId || !supabaseTableName) return
 
     try {
+      const safeColumn = toPostgrestColumn(fieldName)
+      if (!safeColumn) {
+        throw new Error(
+          `This field cannot be updated because its column name is not a safe identifier: "${fieldName}". ` +
+            `Rename the field to a simple snake_case name (letters/numbers/_), or ensure your backend supports quoted column updates.`
+        )
+      }
+
       const { error } = await supabase
         .from(supabaseTableName)
-        .update({ [fieldName]: value })
+        // Avoid sending undefined (turns into an empty JSON body and can cause PostgREST 400s)
+        .update({ [safeColumn]: value === undefined ? null : value })
         .eq("id", rowId)
 
       if (error) {
