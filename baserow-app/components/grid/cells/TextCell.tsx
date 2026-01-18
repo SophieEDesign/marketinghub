@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 
 interface TextCellProps {
-  value: string | null
+  // CellFactory passes `any` at runtime; be defensive here.
+  value: unknown
   fieldName: string
   editable?: boolean
   wrapText?: boolean // If true, allow max 2 lines; if false, single line with ellipsis
@@ -22,12 +23,23 @@ export default function TextCell({
   placeholder = '—',
 }: TextCellProps) {
   const [editing, setEditing] = useState(false)
-  const [editValue, setEditValue] = useState(value || '')
+  const toDisplayString = (v: unknown): string => {
+    if (v === null || v === undefined) return ''
+    if (typeof v === 'string') return v
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+    try {
+      return JSON.stringify(v)
+    } catch {
+      return String(v)
+    }
+  }
+
+  const [editValue, setEditValue] = useState(toDisplayString(value))
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    setEditValue(value || '')
+    setEditValue(toDisplayString(value))
   }, [value])
 
   useEffect(() => {
@@ -82,8 +94,11 @@ export default function TextCell({
     )
   }
 
-  const displayValue = value || placeholder
-  const isPlaceholder = !value
+  // IMPORTANT: don't treat 0/false as empty (previously: `value || placeholder`)
+  const rawText = toDisplayString(value)
+  const isEmpty = rawText.trim().length === 0
+  const displayValue = isEmpty ? placeholder : rawText
+  const isPlaceholder = isEmpty
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
   const cellStyle: React.CSSProperties = {
@@ -99,7 +114,7 @@ export default function TextCell({
         wrapText ? 'items-start' : 'items-center'
       }`}
       style={cellStyle}
-      title={value || undefined}
+      title={!isEmpty ? rawText : undefined}
     >
       <span 
         className={`${wrapText ? 'line-clamp-2' : 'truncate'} ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'} w-full`}
