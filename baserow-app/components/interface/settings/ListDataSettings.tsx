@@ -42,7 +42,10 @@ export default function ListDataSettings({
   const metaFields = config.list_meta_fields || []
   const groupBy = config.group_by || ""
   const blockFilters = Array.isArray(config.filters) ? config.filters : []
-  const choiceGroupsDefaultCollapsed = (config as any)?.list_choice_groups_default_collapsed ?? true
+  const choiceGroupsDefaultCollapsed =
+    (config as any)?.list_groups_default_collapsed ??
+    (config as any)?.list_choice_groups_default_collapsed ??
+    true
 
   // Keep the local table select in sync when config.table_id is hydrated/changed upstream.
   useEffect(() => {
@@ -478,34 +481,34 @@ export default function ListDataSettings({
         </div>
       )}
 
-      {/* Choice Group Load Behavior */}
-      {config.table_id && fields.length > 0 && groupBy && groupBy !== "__none__" && (() => {
-        const groupField = fields.find(f => f.name === groupBy || f.id === groupBy)
-        const isChoice = groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')
-        if (!isChoice) return null
-        return (
-          <div className="space-y-2">
-            <Label>Choice options on load</Label>
-            <Select
-              value={choiceGroupsDefaultCollapsed ? "closed" : "open"}
-              onValueChange={(value) => {
-                onUpdate({ list_choice_groups_default_collapsed: value === "closed" } as any)
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="closed">Closed (collapsed)</SelectItem>
-                <SelectItem value="open">Open (expanded)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              When grouping by a choice field, control whether all choice groups start expanded or collapsed.
-            </p>
-          </div>
-        )
-      })()}
+      {/* Group Load Behavior */}
+      {config.table_id && fields.length > 0 && groupBy && groupBy !== "__none__" && (
+        <div className="space-y-2">
+          <Label>Groups on load</Label>
+          <Select
+            value={choiceGroupsDefaultCollapsed ? "closed" : "open"}
+            onValueChange={(value) => {
+              const closed = value === "closed"
+              // Prefer the new key, but also write the legacy key for backward compatibility.
+              onUpdate({
+                list_groups_default_collapsed: closed,
+                list_choice_groups_default_collapsed: closed,
+              } as any)
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="closed">Closed (collapsed)</SelectItem>
+              <SelectItem value="open">Open (expanded)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Control whether grouped sections start expanded or collapsed when the list loads.
+          </p>
+        </div>
+      )}
 
       {/* Filters (Optional) */}
       {config.table_id && fields.length > 0 && (

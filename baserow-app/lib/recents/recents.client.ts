@@ -46,7 +46,8 @@ export async function getRecentItemsClient(
     return []
   }
 
-  return response.json()
+  const json = await response.json()
+  return Array.isArray(json) ? json : (json?.items || [])
 }
 
 /**
@@ -116,7 +117,8 @@ export async function getFavoritesClient(
     return []
   }
 
-  return response.json()
+  const json = await response.json()
+  return Array.isArray(json) ? json : (json?.items || [])
 }
 
 /**

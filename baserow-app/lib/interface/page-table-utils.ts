@@ -10,6 +10,11 @@ import { createClient } from '@/lib/supabase/client'
 import type { InterfacePage } from './page-types-only'
 import { VIEWS_ENABLED } from '@/lib/featureFlags'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuidLike(value: string | null | undefined): value is string {
+  return typeof value === 'string' && UUID_RE.test(value)
+}
+
 /**
  * Extract tableId from a page
  * Priority:
@@ -23,16 +28,37 @@ export async function getPageTableId(page: InterfacePage): Promise<string | null
   // First check base_table - if it's a UUID, it's a table ID
   if (page.base_table) {
     // Check if it looks like a UUID (36 chars with dashes)
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(page.base_table)) {
+    if (isUuidLike(page.base_table)) {
       return page.base_table
     }
-    // Otherwise it might be a table name, but we need the ID
-    // For now, treat UUID-like strings as IDs
+    // Otherwise it might be a table name (or supabase_table) - resolve to ID.
+    try {
+      const supabase = createClient()
+      const byName = await supabase
+        .from('tables')
+        .select('id')
+        .eq('name', page.base_table)
+        .maybeSingle()
+      if (!byName.error && byName.data?.id) {
+        return byName.data.id
+      }
+
+      const bySupabaseTable = await supabase
+        .from('tables')
+        .select('id')
+        .eq('supabase_table', page.base_table)
+        .maybeSingle()
+      if (!bySupabaseTable.error && bySupabaseTable.data?.id) {
+        return bySupabaseTable.data.id
+      }
+    } catch (error) {
+      console.warn('Error resolving base_table to table ID:', error)
+    }
   }
 
   // Check form_config_id - if it's a UUID, it's a table ID
   if (page.form_config_id) {
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(page.form_config_id)) {
+    if (isUuidLike(page.form_config_id)) {
       return page.form_config_id
     }
   }
@@ -72,14 +98,14 @@ export function getPageTableIdSync(
 ): string | null {
   // Check base_table
   if (page.base_table) {
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(page.base_table)) {
+    if (isUuidLike(page.base_table)) {
       return page.base_table
     }
   }
 
   // Check form_config_id
   if (page.form_config_id) {
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(page.form_config_id)) {
+    if (isUuidLike(page.form_config_id)) {
       return page.form_config_id
     }
   }

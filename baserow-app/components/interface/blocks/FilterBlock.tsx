@@ -209,6 +209,18 @@ export default function FilterBlock({
     return configs
   }, [filterTree])
 
+  // Stable signature to ensure we only emit when payload meaningfully changes.
+  // This avoids Provider/Consumer update loops if arrays/objects are re-created with identical values.
+  const emitSignature = useMemo(() => {
+    const blockTitle = config?.title || block.id
+    return JSON.stringify({
+      blockId: block.id,
+      filterConfigs,
+      targetBlocks,
+      blockTitle,
+    })
+  }, [block.id, filterConfigs, targetBlocks, config?.title])
+
   // Emit filter state to context whenever filters change
   useEffect(() => {
     if (block.id) {
@@ -221,7 +233,7 @@ export default function FilterBlock({
         removeFilterBlock(block.id)
       }
     }
-  }, [block.id, filterConfigs, targetBlocks, config?.title, updateFilterBlock, removeFilterBlock])
+  }, [emitSignature, block.id, updateFilterBlock, removeFilterBlock])
 
   // Persist filter tree to config when it changes (debounced)
   useEffect(() => {
@@ -361,65 +373,35 @@ export default function FilterBlock({
       {/* Header with title and Filtered button */}
       <div className={`flex items-center justify-between px-4 pt-4 ${isEditing ? "mb-2" : "mb-4"}`}>
         <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-        {!isEmpty && !isEditing && (
+        {!isAtDefaults && (hasDefaults || !isEmpty) && (
           <Button
-            onClick={() => isEditing && setIsModalOpen(true)}
-            variant="default"
+            onClick={handleReset}
+            variant="ghost"
             size="sm"
-            className="h-7 px-3 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-            disabled={!isEditing}
+            className="h-7 px-2 text-xs text-gray-600 hover:text-gray-900"
+            title="Reset filters"
           >
-            <Filter className="h-3 w-3 mr-1.5" />
-            Filtered
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Reset
           </Button>
         )}
       </div>
 
-      {/* Builder mode: show Airtable-like inline filter rows */}
-      {isEditing ? (
-        <div className="px-4 pb-4">
-          <FilterBuilder
-            filterTree={filterTree}
-            tableFields={availableFields}
-            onChange={setFilterTree}
-            variant="airtable"
-          />
-          <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
-            <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
-            <span>These filters refine results in connected elements.</span>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* View mode: show summary (compact, non-interactive) */}
-          {!isEmpty ? (
-            <div className="px-4 pb-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Filter className="h-4 w-4 text-gray-600" />
-                <span className="text-sm text-gray-700">Filter results</span>
-                <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-700 rounded-md px-1.5 py-0.5">
-                  {conditionCount} condition{conditionCount !== 1 ? 's' : ''}
-                </Badge>
-                <span className="text-xs text-gray-400 ml-auto">Default view</span>
-              </div>
+      {/* All modes: show Airtable-like inline filter rows (view mode changes are session-only) */}
+      <div className="px-4 pb-4">
+        <FilterBuilder
+          filterTree={filterTree}
+          tableFields={availableFields}
+          onChange={setFilterTree}
+          variant="airtable"
+        />
 
-              {/* Info Message */}
-              <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
-                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
-                <span>These filters refine results in connected elements.</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-sm py-8 px-4">
-              <div className="text-center">
-                <Filter className="h-6 w-6 mx-auto mb-2 text-gray-300" />
-                <p className="mb-1 text-sm">No filters applied</p>
-                <p className="text-xs text-gray-500">Add a condition to control connected elements</p>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+        {/* Info Message */}
+        <div className="flex items-start gap-2 text-xs text-gray-600 mt-4 pt-3 border-t border-gray-200">
+          <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-gray-500" />
+          <span>These filters refine results in connected elements.</span>
+        </div>
+      </div>
 
       {/* Connection Status - only show in edit mode */}
       {isEditing && connectedBlocks.length > 0 && (

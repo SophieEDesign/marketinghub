@@ -153,6 +153,7 @@ export default function AirtableGridView({
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set())
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
+  const layoutDirtyRef = useRef(false)
   
   // Track wrap text settings per column (from grid_view_settings)
   const [columnWrapTextSettings, setColumnWrapTextSettings] = useState<Record<string, boolean>>({})
@@ -486,6 +487,7 @@ export default function AirtableGridView({
   // Save column widths, order, and wrap text to database and localStorage
   useEffect(() => {
     if (Object.keys(columnWidths).length === 0 || columnOrder.length === 0) return
+    if (!layoutDirtyRef.current) return
 
     // Save to localStorage as backup
     const storageKey = `grid_${tableName}_${viewName}`
@@ -528,9 +530,13 @@ export default function AirtableGridView({
         } catch (error) {
           console.error('Error saving grid view settings:', error)
           // Non-critical, continue
+        } finally {
+          layoutDirtyRef.current = false
         }
       }
       saveToDatabase()
+    } else {
+      layoutDirtyRef.current = false
     }
   }, [columnWidths, columnOrder, columnWrapText, tableName, viewName, viewId])
 
@@ -717,30 +723,37 @@ export default function AirtableGridView({
     )
   }, [columnOrder, columnWidths, onAddField])
 
+  const markLayoutDirty = useCallback(() => {
+    layoutDirtyRef.current = true
+  }, [])
+
   // Handle wrap text toggle
   const handleToggleWrapText = useCallback((fieldName: string) => {
+    markLayoutDirty()
     setColumnWrapText((prev) => ({
       ...prev,
       [fieldName]: !prev[fieldName],
     }))
-  }, [])
+  }, [markLayoutDirty])
 
   // Handle column resize
   // Disable resize on mobile (can enable long-press later if needed)
   const handleResizeStart = useCallback((fieldName: string) => {
     if (isMobile) return // Disable resize on mobile
+    markLayoutDirty()
     setResizingColumn(fieldName)
-  }, [isMobile])
+  }, [isMobile, markLayoutDirty])
 
   const handleResize = useCallback(
     (fieldName: string, width: number) => {
       if (isMobile) return // Disable resize on mobile
+      markLayoutDirty()
       setColumnWidths((prev) => ({
         ...prev,
         [fieldName]: Math.max(COLUMN_MIN_WIDTH, Math.min(width, 1000)), // Max width 1000px
       }))
     },
-    [isMobile]
+    [isMobile, markLayoutDirty]
   )
 
   const handleResizeEnd = useCallback(() => {
@@ -753,6 +766,7 @@ export default function AirtableGridView({
     const { active, over } = event
 
     if (over && active.id !== over.id) {
+      markLayoutDirty()
       setColumnOrder((items) => {
         const oldIndex = items.indexOf(active.id as string)
         const newIndex = items.indexOf(over.id as string)
@@ -1135,13 +1149,8 @@ export default function AirtableGridView({
                     setSelectedCell(null)
                   }}
                   onDoubleClick={(e) => {
-                    const target = e.target as HTMLElement
-                    // Optional: double-click row background opens record.
-                    if (target.closest('[data-grid-open="true"]')) return
-                    if (target.closest('[data-grid-cell="true"]')) return
-                    if (target.closest('.cell-editor')) return
-                    if (target.closest('input[type="checkbox"]')) return
-                    handleOpenRecord(row.id)
+                    // Never open records on row double-click (chevron-only).
+                    e.stopPropagation()
                   }}
                 >
                   {/* Record open chevron - FIRST column */}

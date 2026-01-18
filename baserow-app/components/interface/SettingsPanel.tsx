@@ -66,6 +66,11 @@ interface SettingsPanelProps {
   pageTableId?: string | null // Table ID from the page (for field blocks on record_view pages)
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuidLike(value: string | null | undefined): value is string {
+  return typeof value === 'string' && UUID_RE.test(value)
+}
+
 export default function SettingsPanel({
   block,
   isOpen,
@@ -206,17 +211,52 @@ export default function SettingsPanel({
 
     // Load views if table is selected
     if (config.table_id) {
+      // Robustness: table_id may be a legacy table name; resolve it to an actual UUID id.
+      let effectiveTableId: string | null = config.table_id
+      if (!isUuidLike(effectiveTableId)) {
+        const byName = await supabase
+          .from("tables")
+          .select("id")
+          .eq("name", effectiveTableId)
+          .maybeSingle()
+        if (!byName.error && byName.data?.id) {
+          effectiveTableId = byName.data.id
+        } else {
+          const bySupabaseTable = await supabase
+            .from("tables")
+            .select("id")
+            .eq("supabase_table", effectiveTableId)
+            .maybeSingle()
+          if (!bySupabaseTable.error && bySupabaseTable.data?.id) {
+            effectiveTableId = bySupabaseTable.data.id
+          } else {
+            effectiveTableId = null
+          }
+        }
+
+        // Update local config once so selects + dependent lookups work.
+        if (effectiveTableId && effectiveTableId !== config.table_id) {
+          setConfig((prev) => ({ ...(prev || {}), table_id: effectiveTableId as any }))
+        }
+      }
+
+      if (!effectiveTableId) {
+        setViews([])
+        setFields([])
+        return
+      }
+
       const { data: viewsData } = await supabase
         .from("views")
         .select("*")
-        .eq("table_id", config.table_id)
+        .eq("table_id", effectiveTableId)
       setViews((viewsData || []) as View[])
 
       // Load fields
       const { data: fieldsData } = await supabase
         .from("table_fields")
         .select("*")
-        .eq("table_id", config.table_id)
+        .eq("table_id", effectiveTableId)
         .order("position")
       setFields((fieldsData || []) as TableField[])
     } else {
@@ -265,6 +305,33 @@ export default function SettingsPanel({
 
     // Normalize legacy multi-source config keys before validation + save.
     safeConfig = normalizeConfigForValidation(block.type, safeConfig)
+
+    // Robustness: If table_id is a legacy table name, resolve it to a UUID before validating/saving.
+    // This prevents configs that "look valid" (truthy string) but break downstream queries that expect UUID ids.
+    if (safeConfig.table_id && !isUuidLike(safeConfig.table_id)) {
+      try {
+        const supabase = createClient()
+        const byName = await supabase
+          .from("tables")
+          .select("id")
+          .eq("name", safeConfig.table_id)
+          .maybeSingle()
+        if (!byName.error && byName.data?.id) {
+          safeConfig = { ...safeConfig, table_id: byName.data.id }
+        } else {
+          const bySupabaseTable = await supabase
+            .from("tables")
+            .select("id")
+            .eq("supabase_table", safeConfig.table_id)
+            .maybeSingle()
+          if (!bySupabaseTable.error && bySupabaseTable.data?.id) {
+            safeConfig = { ...safeConfig, table_id: bySupabaseTable.data.id }
+          }
+        }
+      } catch (e) {
+        // Non-fatal: validation will still catch missing/invalid ids if resolution failed.
+      }
+    }
     
     // Validate config before saving
     const { validateBlockConfig } = await import("@/lib/interface/block-config-types")

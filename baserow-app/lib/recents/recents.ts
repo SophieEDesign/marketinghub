@@ -106,17 +106,46 @@ export async function getRecentItems(
               .single()
             if (table) enrichedItem.name = table.name
             break
-          case 'page':
           case 'interface':
+          case 'page':
+            // New system: interface pages live in interface_pages (do NOT filter out archived/historic pages)
+            // Legacy fallback: some historic pages may still exist as rows in views.
+            {
+              const { data: interfacePage } = await supabase
+                .from('interface_pages')
+                .select('name')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (interfacePage?.name) {
+                enrichedItem.name = interfacePage.name
+                break
+              }
+
+              const { data: legacyView } = await supabase
+                .from('views')
+                .select('name, table_id')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (legacyView) {
+                enrichedItem.name = legacyView.name
+                enrichedItem.table_id = legacyView.table_id || undefined
+              }
+            }
+            break
           case 'view':
-            const { data: view } = await supabase
-              .from('views')
-              .select('name, table_id')
-              .eq('id', item.entity_id)
-              .single()
-            if (view) {
-              enrichedItem.name = view.name
-              enrichedItem.table_id = view.table_id || undefined
+            {
+              const { data: view } = await supabase
+                .from('views')
+                .select('name, table_id')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (view) {
+                enrichedItem.name = view.name
+                enrichedItem.table_id = view.table_id || undefined
+              }
             }
             break
         }
@@ -281,17 +310,46 @@ export async function getFavorites(
               .single()
             if (table) enrichedItem.name = table.name
             break
-          case 'page':
           case 'interface':
+          case 'page':
+            // New system: interface pages live in interface_pages (do NOT filter out archived/historic pages)
+            // Legacy fallback: some historic pages may still exist as rows in views.
+            {
+              const { data: interfacePage } = await supabase
+                .from('interface_pages')
+                .select('name')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (interfacePage?.name) {
+                enrichedItem.name = interfacePage.name
+                break
+              }
+
+              const { data: legacyView } = await supabase
+                .from('views')
+                .select('name, table_id')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (legacyView) {
+                enrichedItem.name = legacyView.name
+                enrichedItem.table_id = legacyView.table_id || undefined
+              }
+            }
+            break
           case 'view':
-            const { data: view } = await supabase
-              .from('views')
-              .select('name, table_id')
-              .eq('id', item.entity_id)
-              .single()
-            if (view) {
-              enrichedItem.name = view.name
-              enrichedItem.table_id = view.table_id || undefined
+            {
+              const { data: view } = await supabase
+                .from('views')
+                .select('name, table_id')
+                .eq('id', item.entity_id)
+                .maybeSingle()
+
+              if (view) {
+                enrichedItem.name = view.name
+                enrichedItem.table_id = view.table_id || undefined
+              }
             }
             break
         }

@@ -21,6 +21,11 @@ import CreateRecordModal from "@/components/records/CreateRecordModal"
 import { useToast } from "@/components/ui/use-toast"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuidLike(value: string | null | undefined): value is string {
+  return typeof value === "string" && UUID_RE.test(value)
+}
+
 interface ListBlockProps {
   block: PageBlock
   isEditing?: boolean
@@ -42,7 +47,7 @@ export default function ListBlock({
 }: ListBlockProps) {
   const { toast } = useToast()
   const { config } = block
-  const tableId = config?.table_id || pageTableId || config?.base_table || null
+  const tableId = config?.table_id || pageTableId || (config as any)?.base_table || null
   // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
   const viewId = VIEWS_ENABLED ? config?.view_id : null
   const blockBaseFilters = Array.isArray(config?.filters) ? config.filters : []
@@ -67,18 +72,30 @@ export default function ListBlock({
   const [creating, setCreating] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [table, setTable] = useState<{ supabase_table: string; name?: string | null } | null>(null)
+  const [table, setTable] = useState<{ id: string; supabase_table: string; name?: string | null } | null>(null)
   const [tableFields, setTableFields] = useState<TableField[]>([])
   
   // Get groupBy from block config (not view config)
   const groupBy = config?.group_by
   
-  // Choice-group default collapse behavior (List view specific)
+  // List group default collapse behavior (List view specific)
   // Default: collapsed/closed unless explicitly set to false.
-  const defaultChoiceGroupsCollapsed = config?.list_choice_groups_default_collapsed ?? true
+  // Back-compat: `list_choice_groups_default_collapsed` (older key name).
+  const defaultChoiceGroupsCollapsed =
+    (config as any)?.list_groups_default_collapsed ??
+    (config as any)?.list_choice_groups_default_collapsed ??
+    true
+
+  // For hooks/queries, ensure we only pass a real UUID table id.
+  const effectiveTableIdForHooks = useMemo(() => {
+    if (!tableId) return null
+    if (isUuidLike(tableId)) return tableId
+    // If tableId is a name, we will resolve it during load and then re-render with `table.id`.
+    return table?.id || null
+  }, [tableId, table?.id])
 
   // Use cached metadata hook
-  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
+  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, effectiveTableIdForHooks)
 
   const safeTableFields = asArray<TableField>(tableFields)
 
@@ -128,20 +145,49 @@ export default function ListBlock({
       try {
         const supabase = createClient()
 
-        const tableRes = await supabase
-          .from("tables")
-          .select("supabase_table, name")
-          .eq("id", tableId)
-          .maybeSingle()
+        // Resolve tableId which may be:
+        // - a UUID (tables.id)
+        // - a legacy table name (tables.name)
+        // - a supabase table name (tables.supabase_table)
+        let resolvedTable: { id: string; supabase_table: string; name?: string | null } | null = null
 
-        if (tableRes.data) {
-          setTable(tableRes.data)
+        if (isUuidLike(tableId)) {
+          const byId = await supabase
+            .from("tables")
+            .select("id, supabase_table, name")
+            .eq("id", tableId)
+            .maybeSingle()
+          if (byId.data) resolvedTable = byId.data as any
+        } else {
+          const byName = await supabase
+            .from("tables")
+            .select("id, supabase_table, name")
+            .eq("name", tableId)
+            .maybeSingle()
+          if (byName.data) {
+            resolvedTable = byName.data as any
+          } else {
+            const bySupabaseTable = await supabase
+              .from("tables")
+              .select("id, supabase_table, name")
+              .eq("supabase_table", tableId)
+              .maybeSingle()
+            if (bySupabaseTable.data) resolvedTable = bySupabaseTable.data as any
+          }
         }
+
+        if (!resolvedTable?.id) {
+          setTable(null)
+          setTableFields([])
+          return
+        }
+
+        setTable(resolvedTable)
 
         const tableFieldsRes = await supabase
           .from("table_fields")
           .select("*")
-          .eq("table_id", tableId)
+          .eq("table_id", resolvedTable.id)
           .order("position", { ascending: true })
 
         const normalizedFields = asArray<TableField>(tableFieldsRes.data)
@@ -278,10 +324,25 @@ export default function ListBlock({
         direction: s.direction as 'asc' | 'desc',
       }))
 
-  if (isLoading || !table) {
+  if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400 text-sm">
         Loading...
+      </div>
+    )
+  }
+
+  if (!table) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+        <div className="text-center">
+          <p className="mb-2">
+            {isEditing ? "This block requires a valid table connection." : "Table not found"}
+          </p>
+          {isEditing && (
+            <p className="text-xs text-gray-400">Select a table in block settings.</p>
+          )}
+        </div>
       </div>
     )
   }
@@ -351,7 +412,7 @@ export default function ListBlock({
       )}
 
       <ListView
-        tableId={tableId}
+        tableId={table.id}
         viewId={viewId || undefined}
         supabaseTableName={table.supabase_table}
         tableFields={safeTableFields}
