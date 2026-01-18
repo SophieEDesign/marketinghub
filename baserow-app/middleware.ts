@@ -36,12 +36,6 @@ const AUTH_TOKEN_COOKIE_PATTERNS = [
   /^sb-.*-auth-token$/i,
 ]
 
-function stripChunkSuffix(name: string): { base: string; index: number | null } {
-  const match = name.match(/^(.*)\.(\d+)$/)
-  if (!match) return { base: name, index: null }
-  return { base: match[1], index: Number(match[2]) }
-}
-
 function decodeBase64Url(input: string): string | null {
   try {
     const base64 = input.replace(/-/g, '+').replace(/_/g, '/')
@@ -83,77 +77,31 @@ function getCookieValue(
   return null
 }
 
-function getCookieValueWithChunks(
-  cookies: Array<{ name: string; value: string }>,
-  patterns: RegExp[]
-): string | null {
-  // Fast path: exact cookie present
-  const direct = getCookieValue(cookies, patterns)
-  if (direct) return direct
-
-  // Chunked cookies: <name>.0, <name>.1, ...
-  const chunksByBase = new Map<string, Array<{ index: number; value: string }>>()
-  for (const cookie of cookies) {
-    const { base, index } = stripChunkSuffix(cookie.name)
-    if (index === null) continue
-    if (!patterns.some((pattern) => pattern.test(base))) continue
-    const arr = chunksByBase.get(base) || []
-    arr.push({ index, value: cookie.value })
-    chunksByBase.set(base, arr)
-  }
-
-  // If multiple bases match, use the first deterministically.
-  const first = [...chunksByBase.entries()].sort(([a], [b]) => a.localeCompare(b))[0]
-  if (!first) return null
-
-  const [, chunks] = first
-  chunks.sort((a, b) => a.index - b.index)
-  return chunks.map((c) => c.value).join('')
-}
-
 function getTokensFromAuthCookie(
   value: string | null
 ): { accessToken: string | null; refreshToken: string | null } {
   if (!value) return { accessToken: null, refreshToken: null }
   try {
-    let decoded = value
-    try {
-      decoded = decodeURIComponent(value)
-    } catch {
-      decoded = value
-    }
+    const decoded = decodeURIComponent(value)
     const parsed = JSON.parse(decoded)
     return {
       accessToken: parsed?.access_token ? String(parsed.access_token) : null,
       refreshToken: parsed?.refresh_token ? String(parsed.refresh_token) : null,
     }
   } catch {
-    // Some environments store the auth cookie as base64/base64url JSON.
-    const base64Decoded = decodeBase64Url(value)
-    if (base64Decoded) {
-      try {
-        const parsed = JSON.parse(base64Decoded)
-        return {
-          accessToken: parsed?.access_token ? String(parsed.access_token) : null,
-          refreshToken: parsed?.refresh_token ? String(parsed.refresh_token) : null,
-        }
-      } catch {
-        // fallthrough
-      }
-    }
     return { accessToken: null, refreshToken: null }
   }
 }
 
 function getAuthTokens(req: NextRequest): { accessToken: string | null; refreshToken: string | null } {
   const cookies = req.cookies.getAll()
-  const authCookieValue = getCookieValueWithChunks(cookies, AUTH_TOKEN_COOKIE_PATTERNS)
+  const authCookieValue = getCookieValue(cookies, AUTH_TOKEN_COOKIE_PATTERNS)
   const authCookieTokens = getTokensFromAuthCookie(authCookieValue)
 
   const accessToken =
-    getCookieValueWithChunks(cookies, ACCESS_TOKEN_COOKIE_PATTERNS) || authCookieTokens.accessToken
+    getCookieValue(cookies, ACCESS_TOKEN_COOKIE_PATTERNS) || authCookieTokens.accessToken
   const refreshToken =
-    getCookieValueWithChunks(cookies, REFRESH_TOKEN_COOKIE_PATTERNS) || authCookieTokens.refreshToken
+    getCookieValue(cookies, REFRESH_TOKEN_COOKIE_PATTERNS) || authCookieTokens.refreshToken
 
   return { accessToken, refreshToken }
 }
@@ -322,10 +270,10 @@ export async function middleware(req: NextRequest) {
           return req.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: any) {
-          res.cookies.set(name, value, { ...(options || {}), path: options?.path ?? '/' });
+          res.cookies.set(name, value, options);
         },
         remove(name: string, options: any) {
-          res.cookies.set(name, '', { ...(options || {}), path: options?.path ?? '/', maxAge: -1 });
+          res.cookies.set(name, '', { ...options, maxAge: -1 });
         },
       },
     }
