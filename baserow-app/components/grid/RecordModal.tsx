@@ -42,9 +42,6 @@ export default function RecordModal({
 
   useEffect(() => {
     if (isOpen && recordId && tableName) {
-      // Avoid flashing stale data while the next record loads.
-      setRecord(null)
-      setLoading(true)
       loadRecord()
       loadFields()
     } else {

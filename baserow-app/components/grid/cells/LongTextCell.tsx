@@ -81,17 +81,14 @@ export default function LongTextCell({
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
   const cellStyle: React.CSSProperties = {
-    minHeight: rowHeight ? `${rowHeight}px` : 'auto',
+    height: rowHeight ? `${rowHeight}px` : 'auto',
     maxHeight: rowHeight ? `${rowHeight}px` : 'none',
   }
-  const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex ${
-        wrapText ? 'items-start' : 'items-center'
-      }`}
+      className="w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex items-center"
       style={cellStyle}
       title={plainText || undefined}
     >
@@ -99,8 +96,8 @@ export default function LongTextCell({
         <div 
           className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
           style={{ 
-            lineHeight: '1.25',
-            maxHeight: wrapText ? contentMaxHeight : 'none',
+            lineHeight: rowHeight ? `${Math.max(16, rowHeight - 8)}px` : '1.5',
+            maxHeight: wrapText && rowHeight ? `${rowHeight - 8}px` : rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none',
           }}
           dangerouslySetInnerHTML={{ __html: value }}
         />

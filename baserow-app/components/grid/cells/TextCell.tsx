@@ -87,25 +87,22 @@ export default function TextCell({
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
   const cellStyle: React.CSSProperties = {
-    minHeight: rowHeight ? `${rowHeight}px` : 'auto',
+    height: rowHeight ? `${rowHeight}px` : 'auto',
     maxHeight: rowHeight ? `${rowHeight}px` : 'none',
   }
-  const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className={`w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex overflow-hidden ${
-        wrapText ? 'items-start' : 'items-center'
-      }`}
+      className="w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex items-center overflow-hidden"
       style={cellStyle}
       title={value || undefined}
     >
       <span 
         className={`${wrapText ? 'line-clamp-2' : 'truncate'} ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'} w-full`}
         style={{ 
-          lineHeight: '1.25',
-          maxHeight: wrapText ? contentMaxHeight : 'none',
+          lineHeight: rowHeight ? `${Math.max(16, rowHeight - 8)}px` : '1.5',
+          maxHeight: wrapText && rowHeight ? `${rowHeight - 8}px` : 'none',
         }}
       >
         {displayValue}

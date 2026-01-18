@@ -61,12 +61,6 @@ export default function LinkedRecordCell({
     }
   }, [linkedTableId])
 
-  const relationshipType = field.options?.relationship_type || "one-to-many"
-  const isMulti =
-    relationshipType === "one-to-many" ||
-    relationshipType === "many-to-many" ||
-    (typeof field.options?.max_selections === "number" && field.options.max_selections > 1)
-
   const normalizedIds = useMemo(() => {
     if (value == null) return null
     const arr = Array.isArray(value) ? value : [value]
@@ -79,9 +73,9 @@ export default function LinkedRecordCell({
       })
       .filter(Boolean)
     if (ids.length === 0) return null
-    // Keep an array for multi relationships, otherwise a single id.
-    return isMulti ? ids : ids[0]
-  }, [isMulti, value])
+    // If the underlying value is an array, keep an array; otherwise keep a single id.
+    return Array.isArray(value) ? ids : ids[0]
+  }, [value])
 
   const isMirrored = !!field.options?.read_only
   const isDisabled = !editable || isMirrored
@@ -89,7 +83,7 @@ export default function LinkedRecordCell({
   const lookupConfig: LookupFieldConfig | undefined = linkedTableId
     ? {
         lookupTableId: linkedTableId,
-        relationshipType,
+        relationshipType: field.options?.relationship_type || "one-to-many",
         maxSelections: field.options?.max_selections,
         required: field.required,
         allowCreate: field.options?.allow_create,
