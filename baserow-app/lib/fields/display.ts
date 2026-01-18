@@ -31,7 +31,7 @@ export function getInlineEditState({
   isVirtual,
   isReadOnlyOverride,
 }: InlineEditStateInput) {
-  const resolvedVirtual = isVirtual ?? (fieldType === "formula" || fieldType === "lookup")
+  const resolvedVirtual = isVirtual ?? fieldType === "formula" || fieldType === "lookup"
   const readOnlyByField = !!fieldOptions?.read_only || !!fieldOptions?.system
   const isReadOnly = isReadOnlyOverride !== undefined
     ? isReadOnlyOverride

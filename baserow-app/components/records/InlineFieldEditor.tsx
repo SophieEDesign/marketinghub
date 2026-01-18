@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Link2, Plus, X, Calculator, Link as LinkIcon, Paperclip, ExternalLink, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { formatDateObjectUK } from "@/lib/utils"
+import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
@@ -343,7 +343,7 @@ export default function InlineFieldEditor({
     const isValidDate = !!parsedDate && !isNaN(parsedDate.getTime())
     const dateValueForInput = isValidDate ? parsedDate.toISOString().split("T")[0] : ""
     // For display: use UK format (DD/MM/YYYY)
-    const dateValueForDisplay = isValidDate ? formatDateObjectUK(parsedDate, "—") : ""
+    const dateValueForDisplay = isValidDate ? formatDateUK(parsedDate, "—") : ""
 
     if (isEditing && !isReadOnly) {
       return (

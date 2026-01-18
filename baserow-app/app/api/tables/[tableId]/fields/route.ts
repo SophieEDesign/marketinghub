@@ -132,7 +132,7 @@ export async function POST(
     // Normalize select options (sort_index, ids, colors)
     const normalizedOptions =
       type === 'single_select' || type === 'multi_select'
-        ? normalizeSelectFieldOptions(type, options || {}, options || {}).options
+        ? normalizeSelectFieldOptions(type as FieldType, options || {}, options || {}).options
         : options || {}
 
     // Start transaction-like operation
@@ -440,10 +440,9 @@ export async function PATCH(
           { status: 400 }
         )
       }
-      const selectType = type || existingField.type
       updates.options =
-        selectType === 'single_select' || selectType === 'multi_select'
-          ? normalizeSelectFieldOptions(selectType, options, existingField.options).options
+        (type || existingField.type) === 'single_select' || (type || existingField.type) === 'multi_select'
+          ? normalizeSelectFieldOptions((type || existingField.type) as FieldType, options, existingField.options).options
           : options
     }
 
