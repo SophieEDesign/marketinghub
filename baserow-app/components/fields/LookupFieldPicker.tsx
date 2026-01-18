@@ -72,6 +72,12 @@ export default function LookupFieldPicker({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadedSelectedIdsRef = useRef<string>("")
+  const isLikelyRecordId = useCallback((raw: string) => {
+    const value = String(raw ?? '').trim()
+    if (!value) return false
+    if (/^\d+$/.test(value)) return true
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  }, [])
 
   // Determine if multi-select
   const isMultiSelect = 
@@ -347,13 +353,34 @@ export default function LookupFieldPicker({
         ...effectiveSecondaryLabelFields,
       ].filter(Boolean)
 
-      const { data: records } = await supabase
-        .from(table.supabase_table)
-        .select(fieldsToSelect.join(', '))
-        .in('id', selectedIds)
+      const idCandidates = selectedIds.filter((id) => isLikelyRecordId(id))
+      const labelCandidates = selectedIds.filter((id) => !isLikelyRecordId(id))
 
-      if (records) {
-        const transformed: RecordOption[] = records.map((record: any) => ({
+      const records: any[] = []
+      if (idCandidates.length > 0) {
+        const { data: idRecords } = await supabase
+          .from(table.supabase_table)
+          .select(fieldsToSelect.join(', '))
+          .in('id', idCandidates)
+        if (idRecords) records.push(...idRecords)
+      }
+
+      if (
+        labelCandidates.length > 0 &&
+        effectivePrimaryLabelField &&
+        effectivePrimaryLabelField !== 'id'
+      ) {
+        const { data: labelRecords } = await supabase
+          .from(table.supabase_table)
+          .select(fieldsToSelect.join(', '))
+          .in(effectivePrimaryLabelField, labelCandidates)
+        if (labelRecords) records.push(...labelRecords)
+      }
+
+      if (records.length > 0) {
+        const byId = new Map(records.map((record: any) => [record.id, record]))
+        const deduped = Array.from(byId.values())
+        const transformed: RecordOption[] = deduped.map((record: any) => ({
           id: record.id,
           primaryLabel: record[effectivePrimaryLabelField] 
             ? String(record[effectivePrimaryLabelField])

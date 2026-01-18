@@ -10,6 +10,16 @@ import type { TableField, LinkedField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import { toPostgrestColumn } from '@/lib/supabase/postgrest'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const INT_RE = /^\d+$/
+
+function isLikelyRecordId(raw: unknown): boolean {
+  const value = String(raw ?? '').trim()
+  if (!value) return false
+  if (INT_RE.test(value)) return true
+  return UUID_RE.test(value)
+}
+
 /**
  * Resolve a linked field value to display labels
  * 
@@ -106,16 +116,17 @@ export async function resolveLinkedFieldDisplay(
 
   // Resolve IDs to display values
   const ids = Array.isArray(value) ? value : [value]
-  const validIds = ids.filter(id => id && typeof id === 'string')
+  const idCandidates = ids.filter((id) => id && typeof id === 'string' && isLikelyRecordId(id))
+  const passthrough = ids.filter((id) => !isLikelyRecordId(id)).map(String)
 
-  if (validIds.length === 0) {
-    return ''
+  if (idCandidates.length === 0) {
+    return passthrough.join(', ')
   }
 
   const { data: records, error: recordsError } = await supabase
     .from(targetTable.supabase_table)
     .select(`id, ${displayFieldName}`)
-    .in('id', validIds)
+    .in('id', idCandidates)
 
   if (recordsError || !records || !Array.isArray(records)) {
     console.warn(`[resolveLinkedFieldDisplay] Error fetching records:`, recordsError)
@@ -127,7 +138,12 @@ export async function resolveLinkedFieldDisplay(
     records.map((r: any) => [r.id, r[displayFieldName!] || ''])
   )
 
-  const labels = validIds.map(id => displayMap.get(id) || id)
+  const labels = ids.map((id) => {
+    if (isLikelyRecordId(id)) {
+      return displayMap.get(id) || String(id)
+    }
+    return String(id)
+  })
   return labels.join(', ')
 }
 

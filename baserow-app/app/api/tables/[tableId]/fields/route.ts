@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getTable } from '@/lib/crud/tables'
 import { validateFieldName, validateFieldOptions, canChangeType, sanitizeFieldName } from '@/lib/fields/validation'
 import { normalizeSelectFieldOptions } from '@/lib/fields/select-options'
@@ -17,6 +18,21 @@ import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
   return SYSTEM_FIELD_NAMES.has(String(name || '').toLowerCase())
+}
+
+async function getWriteClient() {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+
+  try {
+    const adminClient = createAdminClient()
+    return { supabase: adminClient, user }
+  } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Using auth client for field writes (service role unavailable).', error)
+    }
+    return { supabase: authClient, user }
+  }
 }
 
 // GET: Get all fields for a table
@@ -55,7 +71,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ tableId: string }> }
 ) {
-  const supabase = await createClient()
+  const { supabase, user } = await getWriteClient()
 
   try {
     const { tableId } = await params
@@ -151,6 +167,7 @@ export async function POST(
           // Preserve valid falsy defaults like 0/false
           default_value: default_value ?? null,
           options: normalizedOptions,
+          ...(user?.id ? { created_by: user.id, updated_by: user.id } : {}),
         },
       ])
       .select()
@@ -266,7 +283,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ tableId: string }> }
 ) {
-  const supabase = await createClient()
+  const { supabase, user } = await getWriteClient()
 
   try {
     const { tableId } = await params
@@ -507,6 +524,7 @@ export async function PATCH(
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
+        ...(user?.id ? { updated_by: user.id } : {}),
       })
       .eq('id', fieldId)
       .select()
@@ -536,7 +554,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ tableId: string }> }
 ) {
-  const supabase = await createClient()
+  const { supabase } = await getWriteClient()
 
   try {
     const { tableId } = await params

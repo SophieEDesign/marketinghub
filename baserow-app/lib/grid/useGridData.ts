@@ -164,6 +164,31 @@ export function useGridData({
         const maxSelections = Number((field as any)?.options?.max_selections || 0)
         const isSingleLink = relationshipType === 'one-to-one' || maxSelections === 1
 
+        if (typeof v === 'string') {
+          const trimmed = v.trim()
+          if (!trimmed) return null
+          if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+              const parsed = JSON.parse(trimmed)
+              if (Array.isArray(parsed)) {
+                const normalized = parsed.map(toId).filter(Boolean)
+                return isSingleLink ? (normalized[0] ?? null) : normalized
+              }
+            } catch {
+              // Fall through to best-effort parsing below.
+            }
+          }
+          if (trimmed.includes(',')) {
+            const normalized = trimmed
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map(toId)
+              .filter(Boolean)
+            return isSingleLink ? (normalized[0] ?? null) : normalized
+          }
+        }
+
         if (Array.isArray(v)) {
           const normalized = v.map(toId).filter(Boolean)
           return isSingleLink ? (normalized[0] ?? null) : normalized
