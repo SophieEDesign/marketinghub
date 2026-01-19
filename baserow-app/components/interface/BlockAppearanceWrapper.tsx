@@ -22,14 +22,22 @@ export default function BlockAppearanceWrapper({
     : null
 
   // Get title from appearance or config
-  const rawTitle = appearance?.title || block.config?.title || ""
-  // Compatibility: historically text blocks used a default title of "Text Block" which
-  // produces an unwanted header in view mode. Treat that specific default as "no title"
-  // unless the user explicitly set an appearance title.
-  const title =
-    block.type === 'text' && !appearance?.title && rawTitle === 'Text Block'
-      ? ''
-      : rawTitle
+  const appearanceTitle = appearance?.title || ""
+  const legacyConfigTitle = block.config?.title || ""
+  const rawTitle = appearanceTitle || legacyConfigTitle
+  // Compatibility:
+  // - Text blocks historically used a default "Text Block" title, which should not render as a header.
+  // - Field blocks often store the field name in config.title (legacy / wizard behavior), but the field
+  //   label should not become a block header unless the user explicitly sets a Title.
+  const title = (() => {
+    if (block.type === 'text' && !appearanceTitle && legacyConfigTitle === 'Text Block') {
+      return ''
+    }
+    if (block.type === 'field' && !appearanceTitle) {
+      return ''
+    }
+    return rawTitle
+  })()
   const showTitle = appearance?.showTitle !== false && !!title
 
   // Only apply appearance styling if any appearance settings exist

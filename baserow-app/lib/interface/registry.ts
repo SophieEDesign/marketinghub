@@ -216,7 +216,9 @@ export const BLOCK_REGISTRY: Record<BlockType, BlockDefinition> = {
     minWidth: 2,
     minHeight: 2,
     defaultConfig: {
-      title: 'Field',
+      // Field blocks show the field label/value; they shouldn't render a generic header by default.
+      // If users want a header, they can set appearance.title explicitly.
+      title: '',
       field_id: '',
     },
   },

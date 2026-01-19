@@ -70,11 +70,13 @@ export default function FilterBuilder({
       children: [],
     }
 
-    // Simple mode: no groups; flatten everything into a single AND group.
+    // Simple mode: no nested groups; flatten everything into a single group.
+    // If OR is allowed, preserve the incoming top-level operator (AND/OR).
     if (!allowGroups) {
       const conditions = flattenFilterTree(base)
-      return (conditionsToFilterTree(conditions, "AND") || {
-        operator: "AND" as GroupOperator,
+      const op: GroupOperator = allowOr ? base.operator : "AND"
+      return (conditionsToFilterTree(conditions, op) || {
+        operator: op,
         children: [],
       }) as FilterGroup
     }

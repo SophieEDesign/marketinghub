@@ -600,7 +600,6 @@ export default function PageCreationWizard({
                         w: 8, // Full right column width
                         h: 2, // Default height for field blocks
                         config: {
-                          title: field.name,
                           table_id: tableId.trim(),
                           field_id: field.id,
                           field_name: field.name,

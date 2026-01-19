@@ -602,27 +602,31 @@ export default function SettingsPanel({
 
     // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
     const normalizedBlockType = ((block?.type as string | undefined) === 'table' ? 'grid' : block?.type) as BlockType | undefined
+    const commonAppearanceProps = {
+      ...commonProps,
+      blockType: normalizedBlockType,
+    }
 
     switch (normalizedBlockType) {
       case "kpi":
         return (
           <>
             <KPIAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "chart":
         return (
           <>
             <ChartAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "text":
         return (
           <>
             <TextAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "action":
@@ -632,63 +636,63 @@ export default function SettingsPanel({
               {...commonProps} 
               onConfigUpdate={updateConfig}
             />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "link_preview":
         return (
           <>
             <LinkPreviewAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "form":
         return (
           <>
             <FormAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "image":
         return (
           <>
             <ImageAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "divider":
         return (
           <>
             <DividerAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "grid":
         return (
           <>
             <GridAppearanceSettings {...commonProps} fields={fields} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "field":
         return (
           <>
             <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "number":
         return (
           <>
             <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "button":
         return (
           <>
             <ButtonAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       case "list":
@@ -702,11 +706,11 @@ export default function SettingsPanel({
         return (
           <>
             <GridAppearanceSettings {...commonProps} fields={fields} />
-            <CommonAppearanceSettings {...commonProps} />
+            <CommonAppearanceSettings {...commonAppearanceProps} />
           </>
         )
       default:
-        return <CommonAppearanceSettings {...commonProps} />
+        return <CommonAppearanceSettings {...commonAppearanceProps} />
     }
   }
 }

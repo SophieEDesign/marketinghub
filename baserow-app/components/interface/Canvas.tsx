@@ -1384,13 +1384,21 @@ export default function Canvas({
             {isEditing && (
               <>
                 {/* Drag Handle - Only visible on hover, hidden when block is editing (via CSS) */}
-                <div className="absolute top-2 left-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity drag-handle">
-                  <div
-                    className="cursor-grab active:cursor-grabbing p-1.5 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
-                    title="Drag to reorder"
+                <div
+                  className={`absolute top-2 left-2 z-20 drag-handle transition-opacity ${
+                    selectedBlockId === block.id ? "opacity-100" : "opacity-30 group-hover:opacity-100"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="cursor-grab active:cursor-grabbing p-2 bg-white/95 backdrop-blur border border-gray-300 rounded-md shadow-sm hover:bg-white hover:border-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 touch-none"
+                    title="Drag to move"
+                    aria-label="Drag to move"
                     onMouseDown={(e) => {
                       // Prevent dragging if TextBlock is editing
-                      const blockContent = e.currentTarget.closest('.react-grid-item')?.querySelector('[data-block-editing="true"]')
+                      const blockContent = e.currentTarget
+                        .closest(".react-grid-item")
+                        ?.querySelector('[data-block-editing="true"]')
                       if (blockContent) {
                         e.preventDefault()
                         e.stopPropagation()
@@ -1398,10 +1406,16 @@ export default function Canvas({
                       }
                     }}
                   >
-                    <svg className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 12h16M4 16h16" />
+                    {/* 6-dot grip icon (reads as "drag handle" vs menu) */}
+                    <svg className="h-4 w-4 text-gray-700" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <circle cx="7" cy="6" r="1.2" />
+                      <circle cx="13" cy="6" r="1.2" />
+                      <circle cx="7" cy="10" r="1.2" />
+                      <circle cx="13" cy="10" r="1.2" />
+                      <circle cx="7" cy="14" r="1.2" />
+                      <circle cx="13" cy="14" r="1.2" />
                     </svg>
-                  </div>
+                  </button>
                 </div>
 
                 {/* Block Toolbar - Only visible on hover */}
@@ -1465,7 +1479,7 @@ export default function Canvas({
 
             {/* Lock Indicator - Only show in edit mode */}
             {isEditing && block.config?.locked && (
-              <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-xs text-yellow-800">
+              <div className="absolute top-10 left-2 z-10 flex items-center gap-1 px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-xs text-yellow-800">
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>

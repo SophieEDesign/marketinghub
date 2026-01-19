@@ -10,19 +10,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { BlockConfig } from "@/lib/interface/types"
+import type { BlockConfig, BlockType } from "@/lib/interface/types"
 import { cn } from "@/lib/utils"
 
 interface CommonAppearanceSettingsProps {
   config: BlockConfig
   onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
+  blockType?: BlockType
 }
 
 export default function CommonAppearanceSettings({
   config,
   onUpdate,
+  blockType,
 }: CommonAppearanceSettingsProps) {
   const appearance = config.appearance || {}
+  const titleInputValue =
+    appearance.title !== undefined
+      ? appearance.title
+      : blockType === "field"
+        ? ""
+        : (config.title || "")
 
   return (
     <div className="space-y-6">
@@ -181,7 +189,7 @@ export default function CommonAppearanceSettings({
           <Label>Title</Label>
           <Input
             type="text"
-            value={appearance.title || config.title || ""}
+            value={titleInputValue}
             onChange={(e) => onUpdate({ title: e.target.value })}
             placeholder="Block title"
           />
