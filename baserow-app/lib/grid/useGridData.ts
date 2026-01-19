@@ -12,6 +12,8 @@ export interface GridRow {
 
 export interface UseGridDataOptions {
   tableName: string
+  /** Optional: enables server-side schema self-heal for this table */
+  tableId?: string
   fields?: TableField[]
   filters?: FilterConfig[]
   sorts?: Array<{ field: string; direction: 'asc' | 'desc' }>
@@ -37,6 +39,7 @@ const MAX_SAFE_LIMIT = 2000 // Hard cap to prevent crashes
 
 export function useGridData({
   tableName,
+  tableId,
   fields = [],
   filters = [],
   sorts = [],
@@ -268,6 +271,31 @@ export function useGridData({
       // Load physical columns (once per tableName) so we can avoid PostgREST 400s.
       await refreshPhysicalColumns()
 
+      const maybeSyncSchema = async () => {
+        if (!tableId) return false
+        try {
+          const res = await fetch(`/api/tables/${tableId}/sync-schema`, { method: 'POST' })
+          if (!res.ok) return false
+          return true
+        } catch {
+          return false
+        }
+      }
+
+      const isTableMissingError = (err: any): boolean => {
+        // Supabase/PostgREST often uses 404 or codes like 42P01 for missing relations.
+        const status = (err as any)?.status
+        const code = String((err as any)?.code || '')
+        const msg = String((err as any)?.message || '').toLowerCase()
+        return (
+          status === 404 ||
+          code === '42P01' ||
+          msg.includes('does not exist') ||
+          msg.includes('could not find the table') ||
+          msg.includes('table not found')
+        )
+      }
+
       const runQuery = async (attempt: number): Promise<any> => {
         // Use refs to get current filters/sorts without causing dependency issues
         const currentFilters = filtersRef.current
@@ -354,6 +382,15 @@ export function useGridData({
         const { data, error: queryError } = await query
 
         if (queryError) {
+          // Self-heal: if the physical table is missing (common when metadata exists but
+          // table creation failed), attempt a server-side schema sync once.
+          if (attempt === 0 && isTableMissingError(queryError)) {
+            const synced = await maybeSyncSchema()
+            if (synced) {
+              await refreshPhysicalColumns(true)
+              return await runQuery(attempt + 1)
+            }
+          }
           // If we hit a PostgREST 400 due to schema drift, learn the missing column and retry once.
           const missing = noteMissingColumnFromError(queryError)
           if (missing) {
@@ -384,7 +421,7 @@ export function useGridData({
     }
     // CRITICAL: Only depend on stringified versions to prevent infinite loops
     // Refs ensure we always use latest values without causing re-renders
-  }, [tableName, filtersString, sortsString, safeLimit])
+  }, [tableName, tableId, filtersString, sortsString, safeLimit])
 
   useEffect(() => {
     loadData()
@@ -405,10 +442,25 @@ export function useGridData({
 
         const physicalCols = physicalColumnsRef.current
         if (physicalCols && !physicalCols.has(safeColumn)) {
-          throw new Error(
-            `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
-              `This usually means your table schema is out of sync with field metadata, or PostgREST schema cache hasn't refreshed yet.`
-          )
+          // Self-heal: try to sync schema and refresh physical columns once.
+          if (tableId) {
+            try {
+              const res = await fetch(`/api/tables/${tableId}/sync-schema`, { method: 'POST' })
+              if (res.ok) {
+                await refreshPhysicalColumns(true)
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          const refreshedCols = physicalColumnsRef.current
+          if (refreshedCols && !refreshedCols.has(safeColumn)) {
+            throw new Error(
+              `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
+                `This usually means your table schema is out of sync with field metadata, or PostgREST schema cache hasn't refreshed yet.`
+            )
+          }
         }
 
         const normalizedValue = normalizeUpdateValue(fieldName, value)
@@ -488,7 +540,7 @@ export function useGridData({
         throw err
       }
     },
-    [tableName, loadData]
+    [tableName, tableId, loadData]
   )
 
   const insertRow = useCallback(

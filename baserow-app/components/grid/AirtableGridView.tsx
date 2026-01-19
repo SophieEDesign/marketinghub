@@ -195,6 +195,7 @@ export default function AirtableGridView({
 
   const { rows: allRows, loading, error, updateCell, refresh, insertRow } = useGridData({
     tableName,
+    tableId: tableIdState || tableId,
     fields,
     filters: standardizedFilters,
     sorts,

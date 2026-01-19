@@ -1,5 +1,21 @@
 import type { FieldType, FieldOptions } from '@/types/fields'
 
+function quoteIdent(ident: string): string {
+  // Double-quote an identifier and escape embedded quotes.
+  return `"${String(ident ?? '').replace(/"/g, '""')}"`
+}
+
+function quoteMaybeQualifiedName(name: string): string {
+  // Support schema-qualified names like `public.table_x`.
+  // If more than one dot exists, treat the whole string as a single identifier.
+  const raw = String(name ?? '')
+  const parts = raw.split('.')
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    return `${quoteIdent(parts[0])}.${quoteIdent(parts[1])}`
+  }
+  return quoteIdent(raw)
+}
+
 /**
  * Map Airtable field type to PostgreSQL type
  */
@@ -62,10 +78,7 @@ export function generateAddColumnSQL(
   }
 
   const pgType = mapFieldTypeToPostgres(fieldType, options)
-  const sanitizedTableName = tableName.replace(/"/g, '""')
-  const sanitizedColumnName = columnName.replace(/"/g, '""')
-
-  return `ALTER TABLE "${sanitizedTableName}" ADD COLUMN "${sanitizedColumnName}" ${pgType};`
+  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ADD COLUMN ${quoteIdent(columnName)} ${pgType};`
 }
 
 /**
@@ -76,11 +89,7 @@ export function generateRenameColumnSQL(
   oldColumnName: string,
   newColumnName: string
 ): string {
-  const sanitizedTableName = tableName.replace(/"/g, '""')
-  const sanitizedOldName = oldColumnName.replace(/"/g, '""')
-  const sanitizedNewName = newColumnName.replace(/"/g, '""')
-
-  return `ALTER TABLE "${sanitizedTableName}" RENAME COLUMN "${sanitizedOldName}" TO "${sanitizedNewName}";`
+  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} RENAME COLUMN ${quoteIdent(oldColumnName)} TO ${quoteIdent(newColumnName)};`
 }
 
 /**
@@ -97,8 +106,7 @@ export function generateChangeColumnTypeSQL(
     throw new Error('Cannot change to virtual field type')
   }
 
-  const sanitizedTableName = tableName.replace(/"/g, '""')
-  const sanitizedColumnName = columnName.replace(/"/g, '""')
+  const sanitizedColumnName = String(columnName ?? '').replace(/"/g, '""')
   const newPgType = mapFieldTypeToPostgres(newType, options)
 
   // Use USING clause for safe type conversion
@@ -118,7 +126,7 @@ export function generateChangeColumnTypeSQL(
     usingClause = ' USING CAST("' + sanitizedColumnName + '" AS text)'
   }
 
-  return `ALTER TABLE "${sanitizedTableName}" ALTER COLUMN "${sanitizedColumnName}" TYPE ${newPgType}${usingClause};`
+  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} ALTER COLUMN ${quoteIdent(columnName)} TYPE ${newPgType}${usingClause};`
 }
 
 /**
@@ -128,10 +136,7 @@ export function generateDropColumnSQL(
   tableName: string,
   columnName: string
 ): string {
-  const sanitizedTableName = tableName.replace(/"/g, '""')
-  const sanitizedColumnName = columnName.replace(/"/g, '""')
-
-  return `ALTER TABLE "${sanitizedTableName}" DROP COLUMN IF EXISTS "${sanitizedColumnName}";`
+  return `ALTER TABLE ${quoteMaybeQualifiedName(tableName)} DROP COLUMN IF EXISTS ${quoteIdent(columnName)};`
 }
 
 /**
