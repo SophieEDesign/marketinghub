@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -12,6 +12,8 @@ import {
 import { Button } from '@/components/ui/button'
 import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
+import { useToast } from '@/components/ui/use-toast'
+import { useUserRole } from '@/lib/hooks/useUserRole'
 
 export interface RecordModalProps {
   open: boolean
@@ -22,6 +24,7 @@ export interface RecordModalProps {
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   initialData?: Record<string, any> // Initial data for creating new records
   onSave?: () => void
+  onDeleted?: () => void | Promise<void>
 }
 
 export default function RecordModal({
@@ -33,11 +36,15 @@ export default function RecordModal({
   modalFields = [],
   initialData,
   onSave,
+  onDeleted,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const { toast } = useToast()
+  const { role: userRole } = useUserRole()
 
   const loadTableInfo = useCallback(async () => {
     if (!tableId) return
@@ -156,6 +163,47 @@ export default function RecordModal({
     }
   }
 
+  async function handleDelete() {
+    if (!recordId) return
+    if (!supabaseTableName) return
+
+    if (userRole !== 'admin') {
+      toast({
+        variant: 'destructive',
+        title: 'Not allowed',
+        description: 'Only admins can delete records here.',
+      })
+      return
+    }
+
+    if (!confirm('Are you sure you want to delete this record? This action cannot be undone.')) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from(supabaseTableName).delete().eq('id', recordId)
+      if (error) throw error
+
+      toast({
+        title: 'Record deleted',
+        description: 'The record has been deleted.',
+      })
+      await onDeleted?.()
+      onClose()
+    } catch (error: any) {
+      console.error('Error deleting record:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Failed to delete record',
+        description: error?.message || 'Please try again',
+      })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   function handleFieldChange(fieldName: string, value: any) {
     setFormData((prev) => ({ ...prev, [fieldName]: value }))
   }
@@ -217,7 +265,19 @@ export default function RecordModal({
         )}
 
         <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={onClose}>
+          {recordId && userRole === 'admin' && (
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting || saving || loading}
+              className="mr-auto"
+              title="Delete this record"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose} disabled={deleting}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving || loading}>

@@ -1513,6 +1513,10 @@ export default function AirtableGridView({
         <RecordModal
           isOpen={!!modalRecord}
           onClose={() => setModalRecord(null)}
+          onDeleted={async () => {
+            // Refresh data so the deleted record disappears.
+            await refresh()
+          }}
           tableId={modalRecord.tableId}
           recordId={modalRecord.recordId}
           tableName={modalRecord.tableName}

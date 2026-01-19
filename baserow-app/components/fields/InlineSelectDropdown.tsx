@@ -112,7 +112,12 @@ export default function InlineSelectDropdown({
         : [...selectedValues, choice]
       await onValueChange(newValues)
     } else {
-      await onValueChange(choice)
+      // For single select, allow "toggle off" by clicking the currently-selected option.
+      if (selectedValues[0] === choice) {
+        await onValueChange(null)
+      } else {
+        await onValueChange(choice)
+      }
       handleOpenChange(false)
     }
   }
@@ -503,18 +508,23 @@ export default function InlineSelectDropdown({
                       <button
                         type="button"
                         onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation()
-                          handleSelectChoice(choice)
+                          await handleSelectChoice(choice)
                         }}
                         className="flex items-center gap-2 flex-1 text-left"
                       >
                         <input
                           type={isMulti ? 'checkbox' : 'radio'}
                           checked={isSelected}
-                          onChange={() => {}}
                           onMouseDown={(e) => e.stopPropagation()}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            // Make the checkbox/radio itself interactive.
+                            // We stop propagation so we don't also trigger the parent button click.
+                            e.stopPropagation()
+                            void handleSelectChoice(choice)
+                          }}
+                          onChange={() => {}} // handled via onClick above
                           className="w-4 h-4"
                         />
                         <span

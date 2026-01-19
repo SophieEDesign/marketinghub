@@ -18,6 +18,7 @@ import { Trash2 } from "lucide-react"
 interface RecordModalProps {
   isOpen: boolean
   onClose: () => void
+  onDeleted?: () => void | Promise<void>
   tableId: string
   recordId: string
   tableName: string
@@ -27,6 +28,7 @@ interface RecordModalProps {
 export default function RecordModal({
   isOpen,
   onClose,
+  onDeleted,
   tableId,
   recordId,
   tableName,
@@ -195,6 +197,7 @@ export default function RecordModal({
         title: "Record deleted",
         description: "The record has been deleted.",
       })
+      await onDeleted?.()
       onClose()
     } catch (error: any) {
       console.error("Error deleting record:", error)
@@ -243,16 +246,32 @@ export default function RecordModal({
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : record ? (
-            <RecordFields
-              fields={fields}
-              formData={record}
-              onFieldChange={handleFieldChange}
-              fieldGroups={{}}
-              tableId={tableId}
-              recordId={recordId}
-              tableName={tableName}
-              isFieldEditable={() => true}
-            />
+            <>
+              <RecordFields
+                fields={fields}
+                formData={record}
+                onFieldChange={handleFieldChange}
+                fieldGroups={{}}
+                tableId={tableId}
+                recordId={recordId}
+                tableName={tableName}
+                isFieldEditable={() => true}
+              />
+
+              {/* Footer actions */}
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteRecord}
+                  disabled={deleting || loading || userRole !== 'admin'}
+                  className="inline-flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={userRole !== 'admin' ? 'Only admins can delete records' : 'Delete this record'}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete record
+                </button>
+              </div>
+            </>
           ) : (
             <div className="text-center py-8 text-gray-500">Record not found</div>
           )}

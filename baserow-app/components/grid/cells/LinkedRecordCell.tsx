@@ -211,7 +211,12 @@ export default function LinkedRecordCell({
         value={normalizedIds as any}
         onChange={async (newValue) => {
           if (isDisabled) return
-          await onSave(newValue)
+          try {
+            await onSave(newValue)
+          } catch (e: any) {
+            console.error("[LinkedRecordCell] Error saving linked record value:", e)
+            alert(e?.message || "Failed to save. Please check your permissions and try again.")
+          }
         }}
         config={lookupConfig}
         disabled={isDisabled}

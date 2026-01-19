@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { format } from "date-fns"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
@@ -96,6 +96,42 @@ function resolveFieldNameFromFields(fields: TableField[], raw: string | undefine
   return match?.name || trimmed
 }
 
+function isFilterCompatible(filter: FilterConfig, tableFields: TableField[]) {
+  const fieldName = (filter as any)?.field_name || (filter as any)?.field
+  if (!fieldName) return false
+  return tableFields.some((f) => f.name === fieldName || f.id === fieldName)
+}
+
+function buildSourcesKey(list: MultiSource[]) {
+  // Avoid JSON.stringify: configs can contain non-JSON values and throw at render-time.
+  return (Array.isArray(list) ? list : [])
+    .map((s) =>
+      [
+        s?.id ?? "",
+        s?.enabled === false ? "0" : "1",
+        s?.table_id ?? "",
+        s?.view_id ?? "",
+        s?.title_field ?? "",
+        s?.start_date_field ?? "",
+        s?.end_date_field ?? "",
+        s?.color_field ?? "",
+        s?.type_field ?? "",
+      ]
+        .map((x) => String(x ?? ""))
+        .join("~")
+    )
+    .join("|")
+}
+
+function areStringArraysEqual(a: string[], b: string[]) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 export default function MultiCalendarView({
   blockId,
   pageId = null,
@@ -118,11 +154,23 @@ export default function MultiCalendarView({
   const showAddRecord = blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate && !isEditing
 
-  const enabledSourceIdsDefault = useMemo(() => {
-    return sources.filter((s) => s.enabled !== false).map((s) => s.id)
+  // IMPORTANT: `sources` can be reconstructed each render upstream. If we unconditionally
+  // sync derived defaults into state, we can trigger a render loop (React #185).
+  const enabledSourceIdsDefaultKey = useMemo(() => {
+    return (Array.isArray(sources) ? sources : [])
+      .map((s) => `${s?.id}:${s?.enabled === false ? 0 : 1}`)
+      .join("|")
   }, [sources])
+
+  const enabledSourceIdsDefault = useMemo(() => {
+    return (Array.isArray(sources) ? sources : []).filter((s) => s.enabled !== false).map((s) => s.id)
+  }, [enabledSourceIdsDefaultKey])
+
   const [enabledSourceIds, setEnabledSourceIds] = useState<string[]>(enabledSourceIdsDefault)
-  useEffect(() => setEnabledSourceIds(enabledSourceIdsDefault), [enabledSourceIdsDefault])
+
+  useEffect(() => {
+    setEnabledSourceIds((prev) => (areStringArraysEqual(prev, enabledSourceIdsDefault) ? prev : enabledSourceIdsDefault))
+  }, [enabledSourceIdsDefaultKey, enabledSourceIdsDefault])
 
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -154,13 +202,20 @@ export default function MultiCalendarView({
     return sources.filter((s) => enabledSet.has(s.id) && s.table_id)
   }, [sources, enabledSourceIds])
 
-  function isFilterCompatible(filter: FilterConfig, tableFields: TableField[]) {
-    const fieldName = (filter as any)?.field_name || (filter as any)?.field
-    if (!fieldName) return false
-    return tableFields.some((f) => f.name === fieldName || f.id === fieldName)
-  }
+  const sourcesKey = useMemo(() => buildSourcesKey(sources), [sources])
+  const filtersKey = useMemo(() => {
+    try {
+      return JSON.stringify(filters || [])
+    } catch {
+      // Fall back to a lossy but safe signature.
+      return (Array.isArray(filters) ? filters : [])
+        .map((f: any) => [f?.field ?? "", f?.field_name ?? "", f?.operator ?? "", String(f?.value ?? ""), String(f?.value2 ?? "")]
+          .join("~"))
+        .join("|")
+    }
+  }, [filters])
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
@@ -254,13 +309,12 @@ export default function MultiCalendarView({
       setLoading(false)
       loadingRef.current = false
     }
-  }
+  }, [filtersKey, quickFiltersBySource, sourcesKey, supabase])
 
   // Reload whenever sources change (and on first mount). Quick filters are applied via dedicated reload button (keeps it predictable).
   useEffect(() => {
     loadAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(sources), JSON.stringify(filters)])
+  }, [loadAll, sourcesKey, filtersKey])
 
   const events = useMemo<EventInput[]>(() => {
     const enabledSet = new Set(enabledSourceIds)
@@ -368,7 +422,7 @@ export default function MultiCalendarView({
     isEditing,
   ])
 
-  async function handleEventDrop(info: EventDropArg) {
+  const handleEventDrop = useCallback(async (info: EventDropArg) => {
     const ext = info.event.extendedProps as any
     const mapping = ext?.mapping as MultiSource | undefined
     const tableId = ext?.tableId as string | undefined
@@ -425,7 +479,37 @@ export default function MultiCalendarView({
       info.revert()
       await loadAll()
     }
-  }
+  }, [fieldsBySource, rowsBySource, supabase, loadAll])
+
+  // FullCalendar: keep option prop references stable to avoid internal update loops.
+  const calendarPlugins = useMemo(() => [dayGridPlugin, interactionPlugin], [])
+
+  const onCalendarEventClick = useCallback(
+    (info: any) => {
+      const ext = info.event.extendedProps as any
+      const recordId = String(ext?.rowId || "")
+      const tableId = String(ext?.tableId || "")
+      const tableName = String(ext?.supabaseTableName || "")
+      if (!recordId || !tableId || !tableName) return
+      if (onRecordClick) {
+        onRecordClick(recordId, tableId)
+        return
+      }
+      openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields)
+    },
+    [blockConfig, onRecordClick, openRecord]
+  )
+
+  const onCalendarDateClick = useCallback(
+    (arg: any) => {
+      if (!canCreateRecord) return
+      // Force explicit table selection (no implicit default).
+      setCreateSourceId("")
+      setCreateDate(arg.date)
+      setCreateOpen(true)
+    },
+    [canCreateRecord]
+  )
 
   async function handleCreate() {
     const sid = createSourceId
@@ -601,31 +685,14 @@ export default function MultiCalendarView({
 
       <div className="flex-1 min-h-0">
         <FullCalendar
-          plugins={[dayGridPlugin, interactionPlugin]}
+          plugins={calendarPlugins}
           initialView="dayGridMonth"
           height="100%"
           events={events}
           editable={!isViewOnly && !isEditing}
           eventDrop={handleEventDrop}
-          eventClick={(info) => {
-            const ext = info.event.extendedProps as any
-            const recordId = String(ext?.rowId || "")
-            const tableId = String(ext?.tableId || "")
-            const tableName = String(ext?.supabaseTableName || "")
-            if (!recordId || !tableId || !tableName) return
-            if (onRecordClick) {
-              onRecordClick(recordId, tableId)
-              return
-            }
-            openRecord(tableId, recordId, tableName, (blockConfig as any)?.modal_fields)
-          }}
-          dateClick={(arg) => {
-            if (!canCreateRecord) return
-            // Force explicit table selection (no implicit default).
-            setCreateSourceId("")
-            setCreateDate(arg.date)
-            setCreateOpen(true)
-          }}
+          eventClick={onCalendarEventClick}
+          dateClick={onCalendarDateClick}
         />
       </div>
 

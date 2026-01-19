@@ -84,7 +84,12 @@ export default function MultiSelectCell({
         editable={editable}
         canEditOptions={editable} // If they can edit the cell, they can edit options
         onValueChange={async (newValue) => {
-          await onSave((newValue as string[]) || [])
+          try {
+            await onSave((newValue as string[]) || [])
+          } catch (e: any) {
+            console.error("[MultiSelectCell] Error saving value:", e)
+            alert(e?.message || "Failed to save. Please check your permissions and try again.")
+          }
         }}
         onFieldOptionsUpdate={onFieldOptionsUpdate}
         placeholder={placeholder}

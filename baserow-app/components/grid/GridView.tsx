@@ -1407,6 +1407,65 @@ export default function GridView({
         throw new Error(`Cannot update "${fieldName}" because it is a ${fieldMeta.type} field.`)
       }
 
+      // Normalize values to match the physical column type expectations.
+      // This prevents common inline-edit crashes (especially for linked record fields).
+      const normalizeUpdateValue = (field: TableField, raw: any): any => {
+        // Avoid sending `undefined` (PostgREST can treat it as an empty body).
+        let v: any = raw === undefined ? null : raw
+        if (typeof v === 'number' && (!Number.isFinite(v) || Number.isNaN(v))) v = null
+
+        if (field.type !== 'link_to_table') return v
+
+        const maybeParseJsonArrayString = (s: string): any[] | null => {
+          const trimmed = s.trim()
+          if (!(trimmed.startsWith('[') && trimmed.endsWith(']'))) return null
+          try {
+            const parsed = JSON.parse(trimmed)
+            return Array.isArray(parsed) ? parsed : null
+          } catch {
+            return null
+          }
+        }
+
+        const toId = (x: any): string | null => {
+          if (x == null || x === '') return null
+          if (typeof x === 'string') {
+            // Some UI paths accidentally stringify arrays for link fields, e.g. `["uuid"]`.
+            const parsedArr = maybeParseJsonArrayString(x)
+            if (parsedArr) {
+              const first = parsedArr[0]
+              if (first == null || first === '') return null
+              return String(first)
+            }
+            return x
+          }
+          if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
+          return String(x)
+        }
+
+        const relationshipType = (field.options as any)?.relationship_type as
+          | 'one-to-one'
+          | 'one-to-many'
+          | 'many-to-many'
+          | undefined
+        const maxSelections = (field.options as any)?.max_selections as number | undefined
+        const isMulti =
+          relationshipType === 'one-to-many' ||
+          relationshipType === 'many-to-many' ||
+          (typeof maxSelections === 'number' && maxSelections > 1)
+
+        if (isMulti) {
+          if (v == null) return null
+          if (Array.isArray(v)) return v.map(toId).filter(Boolean)
+          const id = toId(v)
+          return id ? [id] : null
+        }
+
+        // Single-link: always normalize to a single UUID (or null).
+        if (Array.isArray(v)) return toId(v[0])
+        return toId(v)
+      }
+
       const safeColumn = toPostgrestColumn(fieldName)
       if (!safeColumn) {
         throw new Error(
@@ -1415,11 +1474,26 @@ export default function GridView({
         )
       }
 
-      const { error } = await supabase
-        .from(supabaseTableName)
-        // Avoid sending undefined (turns into an empty JSON body and can cause PostgREST 400s)
-        .update({ [safeColumn]: value === undefined ? null : value })
-        .eq("id", rowId)
+      let finalSavedValue: any = normalizeUpdateValue(fieldMeta, value)
+
+      const doUpdate = async (val: any) => {
+        return await supabase.from(supabaseTableName).update({ [safeColumn]: val }).eq("id", rowId)
+      }
+
+      let { error } = await doUpdate(finalSavedValue)
+
+      // Compatibility rescue: if Postgres reports uuid cast errors for arrays, retry with scalar for single selections.
+      if (
+        error?.code === '22P02' &&
+        Array.isArray(finalSavedValue) &&
+        String((error as any)?.message || '').toLowerCase().includes('invalid input syntax for type uuid')
+      ) {
+        if (finalSavedValue.length <= 1) {
+          finalSavedValue = finalSavedValue[0] ?? null
+          const retry = await doUpdate(finalSavedValue)
+          error = retry.error
+        }
+      }
 
       if (error) {
         console.error("Error saving cell:", error)
@@ -1432,7 +1506,7 @@ export default function GridView({
       // Update local state immediately for better UX
       setRows((prevRows) =>
         prevRows.map((row) =>
-          row.id === rowId ? { ...row, [fieldName]: value } : row
+          row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
         )
       )
     } catch (error) {
@@ -1498,25 +1572,32 @@ export default function GridView({
   // Allow editing in live view if not view-only (even when not in edit mode)
   const canEdit = !isViewOnly
 
-  function handleRowClick(rowId: string) {
+  function openRecordUI(rowId: string) {
     // Don't open record if not allowed or disabled
     if (!allowOpenRecord || !enableRecordOpen) return
+    if (!rowId) return
 
-    // If onRecordClick callback provided, use it (for blocks)
+    // CRITICAL: If this grid is configured to open records in a modal,
+    // the dedicated chevron (and optional double-click) must open the modal
+    // even when `onRecordClick` is provided (e.g. by GridBlock).
+    if (recordOpenStyle === 'modal') {
+      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName })
+      return
+    }
+
+    // Otherwise, if an integration callback is provided, use it.
     if (onRecordClick) {
       onRecordClick(rowId)
-    } else if (recordOpenStyle === 'modal') {
-      // Open in modal if configured
-      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName })
-    } else {
-      // Otherwise, use RecordPanel context (for views)
-      openRecord(tableId, rowId, supabaseTableName, modalFields)
+      return
     }
+
+    // Default: use RecordPanel context (for views)
+    openRecord(tableId, rowId, supabaseTableName, modalFields)
   }
 
   function handleOpenRecordClick(e: React.MouseEvent, rowId: string) {
     e.stopPropagation() // Prevent row click
-    handleRowClick(rowId)
+    openRecordUI(rowId)
   }
 
   function handleRowSelect(rowId: string) {
@@ -1528,7 +1609,7 @@ export default function GridView({
     // Optional secondary behaviour: double-click row background opens record.
     // Cell contents should stopPropagation on double click to prevent accidental opens.
     if (!allowOpenRecord || !enableRecordOpen) return
-    handleRowClick(rowId)
+    openRecordUI(rowId)
   }
 
   // Apply client-side search
@@ -2307,6 +2388,10 @@ export default function GridView({
         <RecordModal
           isOpen={!!modalRecord}
           onClose={() => setModalRecord(null)}
+          onDeleted={() => {
+            // Refresh the grid after deletion so the removed row disappears.
+            void loadRows()
+          }}
           tableId={modalRecord.tableId}
           recordId={modalRecord.recordId}
           tableName={modalRecord.tableName}
