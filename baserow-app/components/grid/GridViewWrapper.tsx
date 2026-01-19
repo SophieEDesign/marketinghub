@@ -515,11 +515,12 @@ export default function GridViewWrapper({
   }, [standardizedFilters, filters])
 
   // Determine toolbar visibility based on appearance settings
-  // Default: show toolbar in edit mode, respect appearance settings in view mode
-  const showToolbar = appearance.show_toolbar !== false && (isEditing || appearance.show_toolbar === true)
-  const showSearch = appearance.show_search !== false && showToolbar
-  const showFilter = appearance.show_filter !== false && showToolbar
-  const showSort = appearance.show_sort !== false && showToolbar
+  // Default: undefined => shown (matches Settings UI)
+  // Editing mode: always show the toolbar so it can be configured/used.
+  const showToolbar = isEditing ? true : appearance.show_toolbar !== false
+  const showSearch = showToolbar && (isEditing ? true : appearance.show_search !== false)
+  const showFilter = showToolbar && (isEditing ? true : appearance.show_filter !== false)
+  const showSort = showToolbar && (isEditing ? true : appearance.show_sort !== false)
 
   return (
     <div className="w-full h-full flex flex-col">

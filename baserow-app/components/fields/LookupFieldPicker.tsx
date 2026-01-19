@@ -43,6 +43,8 @@ export interface LookupFieldPickerProps {
   onRecordClick?: (tableId: string, recordId: string) => void
   onCreateRecord?: (tableId: string) => Promise<string | null> // Returns new record ID
   isLookupField?: boolean // True for derived lookup fields, false for editable linked fields
+  /** Compact inline rendering (e.g. grid rows). */
+  compact?: boolean
 }
 
 interface RecordOption {
@@ -62,6 +64,7 @@ export default function LookupFieldPicker({
   onRecordClick,
   onCreateRecord,
   isLookupField = false,
+  compact = false,
 }: LookupFieldPickerProps) {
   const [open, setOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -439,16 +442,18 @@ export default function LookupFieldPicker({
   // For lookup fields (read-only), render as informational pills without popover
   if (isLookupField || disabled) {
     return (
-      <div className="space-y-2" ref={containerRef}>
-        {isMirroredLinkedField && (
+      <div className={cn(compact ? "space-y-0" : "space-y-2")} ref={containerRef}>
+        {isMirroredLinkedField && !compact && (
           <div className="text-xs text-gray-500">
             Linked from {tableName || 'linked table'}
           </div>
         )}
         <div
           className={cn(
-            "min-h-[40px] w-full rounded-md border border-gray-200/50 bg-gray-50/50 px-3 py-2.5 text-sm",
-            "flex flex-wrap items-center gap-2",
+            compact
+              ? "min-h-[32px] w-full rounded-md border border-gray-200/50 bg-gray-50/50 px-2 py-1.5 text-sm"
+              : "min-h-[40px] w-full rounded-md border border-gray-200/50 bg-gray-50/50 px-3 py-2.5 text-sm",
+            compact ? "flex flex-nowrap items-center gap-2 overflow-hidden" : "flex flex-wrap items-center gap-2",
             isLookupField && "cursor-default"
           )}
         >
@@ -484,13 +489,17 @@ export default function LookupFieldPicker({
 
   // For linked fields (editable), render with popover
   return (
-    <div className="space-y-2" ref={containerRef}>
+    <div className={cn(compact ? "space-y-0" : "space-y-2")} ref={containerRef}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div
             className={cn(
-              "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm",
-              "flex flex-wrap items-center gap-2 transition-colors",
+              compact
+                ? "min-h-[32px] w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm"
+                : "min-h-[40px] w-full rounded-md border border-gray-200 bg-white px-3 py-2.5 text-sm",
+              compact
+                ? "flex flex-nowrap items-center gap-2 transition-colors overflow-hidden"
+                : "flex flex-wrap items-center gap-2 transition-colors",
               !disabled && "cursor-pointer hover:border-blue-300 hover:bg-blue-50/30",
               "focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-400/20 focus-within:ring-offset-1",
               disabled && "opacity-50 cursor-not-allowed bg-gray-50"

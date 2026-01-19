@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS public.grid_view_settings (
   column_widths jsonb DEFAULT '{}'::jsonb,
   column_order jsonb DEFAULT '[]'::jsonb,
   column_wrap_text jsonb DEFAULT '{}'::jsonb,
+  row_heights jsonb DEFAULT '{}'::jsonb,
   row_height text DEFAULT 'medium'::text CHECK (row_height = ANY (ARRAY['short'::text, 'medium'::text, 'tall'::text])),
   frozen_columns integer DEFAULT 0 CHECK (frozen_columns >= 0),
   created_at timestamp with time zone DEFAULT now(),

@@ -110,6 +110,21 @@ export default function TimelineView({
   const allowInlineCreate = permissions.allowInlineCreate ?? true
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
 
+  // In live mode, parent props (especially `filters`) can be recreated each render.
+  // If we depend on array/object identity in effects, we'll refetch repeatedly and
+  // toggle `loading`, causing visible flashing.
+  const filtersKey = JSON.stringify(Array.isArray(filters) ? filters : [])
+  const tableFieldsKey = JSON.stringify(
+    (Array.isArray(tableFields) ? tableFields : []).map((f) => ({
+      id: (f as any)?.id,
+      name: (f as any)?.name,
+      type: (f as any)?.type,
+    }))
+  )
+
+  // Prevent stale/overlapping loads from causing UI flicker.
+  const loadSeqRef = useRef(0)
+
   useEffect(() => {
     loadTableInfo()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,7 +135,7 @@ export default function TimelineView({
       loadRows()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, filters])
+  }, [supabaseTableName, tableId, filtersKey, tableFieldsKey])
 
   async function loadTableInfo() {
     const { data } = await supabase
@@ -135,7 +150,8 @@ export default function TimelineView({
 
   async function loadRows() {
     if (!supabaseTableName) return
-    
+
+    const seq = ++loadSeqRef.current
     setLoading(true)
     try {
       // Build query with filters
@@ -144,13 +160,19 @@ export default function TimelineView({
         .select("*")
 
       // Apply filters using shared filter system
-      const normalizedFields = tableFields.map(f => ({ name: f.name || f.id, type: f.type }))
-      query = applyFiltersToQuery(query, filters, normalizedFields)
+      const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f) => ({
+        name: f.name || f.id,
+        type: f.type,
+      }))
+      query = applyFiltersToQuery(query, Array.isArray(filters) ? filters : [], normalizedFields)
 
       // Apply ordering
       query = query.order("created_at", { ascending: false })
 
       const { data, error } = await query
+
+      // If a newer load has started, ignore this result.
+      if (seq !== loadSeqRef.current) return
 
       if (error) {
         if (!isAbortError(error)) {
@@ -171,10 +193,17 @@ export default function TimelineView({
     } catch (error) {
       if (!isAbortError(error)) {
         console.error("Error loading rows:", error)
-        setRows([])
+        // If a newer load has started, ignore this error.
+        if (seq === loadSeqRef.current) {
+          setRows([])
+        }
+      }
+    } finally {
+      // Only clear loading for the latest request.
+      if (seq === loadSeqRef.current) {
+        setLoading(false)
       }
     }
-    setLoading(false)
   }
 
   // Filter rows by search query
@@ -424,10 +453,9 @@ export default function TimelineView({
     
     if (!groupFieldName) return null
     
-    const field = tableFields.find(f => 
-      (f.name === groupFieldName || f.id === groupFieldName) &&
-      (f.type === 'single_select' || f.type === 'multi_select')
-    )
+    // Timeline grouping is supported for many field types (not just select fields).
+    // For select fields, we preserve choice-order sorting when choices are available.
+    const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
     
     return field || null
   }, [groupByFieldProp, blockConfig, tableFields])
@@ -600,10 +628,24 @@ export default function TimelineView({
           const groupFieldValue = row.data[groupFieldName]
           
           if (groupFieldValue) {
-            // For multi_select, use the first value; for single_select, use the value directly
-            groupValue = resolvedGroupByField.type === 'multi_select' && Array.isArray(groupFieldValue)
-              ? String(groupFieldValue[0] || '')
-              : String(groupFieldValue || '')
+            // Normalize common value shapes to a stable string label.
+            // - arrays: take first value (e.g. multi_select, link_to_table)
+            // - Dates: stringify (ISO or existing string)
+            // - objects: JSON stringify fallback (rare)
+            if (Array.isArray(groupFieldValue)) {
+              groupValue = groupFieldValue.length > 0 ? String(groupFieldValue[0] ?? '') : ''
+            } else if (groupFieldValue instanceof Date) {
+              groupValue = isNaN(groupFieldValue.getTime()) ? '' : groupFieldValue.toISOString()
+            } else if (typeof groupFieldValue === 'object') {
+              try {
+                groupValue = JSON.stringify(groupFieldValue)
+              } catch {
+                groupValue = String(groupFieldValue)
+              }
+            } else {
+              groupValue = String(groupFieldValue)
+            }
+            if (groupValue !== null) groupValue = groupValue.trim()
           }
         }
 
@@ -702,8 +744,11 @@ export default function TimelineView({
       groups[groupKey].push(event)
     })
 
-    // Sort groups by field options order if available
-    if (resolvedGroupByField.options?.choices) {
+    // Sort groups by field options order if available (single/multi select)
+    if (
+      (resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select') &&
+      resolvedGroupByField.options?.choices
+    ) {
       const sortedGroups: Record<string, TimelineEvent[]> = {}
       const choices = resolvedGroupByField.options.choices
       
@@ -724,7 +769,17 @@ export default function TimelineView({
       return sortedGroups
     }
 
-    return groups
+    // Default: alphabetical group order, with Unassigned last.
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const aIsUnassigned = a === 'Unassigned'
+      const bIsUnassigned = b === 'Unassigned'
+      if (aIsUnassigned && !bIsUnassigned) return 1
+      if (!aIsUnassigned && bIsUnassigned) return -1
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    })
+    const sortedGroups: Record<string, TimelineEvent[]> = {}
+    for (const k of sortedKeys) sortedGroups[k] = groups[k]
+    return sortedGroups
   }, [visibleEvents, resolvedGroupByField])
 
   // Calculate row size spacing

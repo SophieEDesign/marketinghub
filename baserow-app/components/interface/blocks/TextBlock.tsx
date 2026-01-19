@@ -18,19 +18,10 @@ import {
   List,
   ListOrdered,
   Link as LinkIcon,
-  RemoveFormatting,
   CheckSquare,
   Code,
-  ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 
 interface TextBlockProps {
@@ -125,8 +116,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // This is separate from isEditing prop (which is page-level edit mode)
   const [isBlockEditing, setIsBlockEditing] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [hasSelection, setHasSelection] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
-  const [toolbarPosition, setToolbarPosition] = useState<'top' | 'bottom'>('top')
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -223,6 +214,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           : '',
       },
       handleKeyDown: (view, event) => {
+        // While editing a text block, editor keyboard input must not leak to the grid/page.
+        // This disables InterfaceBuilder/Canvas shortcuts while the editor is focused.
+        if (!readOnly) {
+          event.stopPropagation()
+        }
         if ((event.metaKey || event.ctrlKey) && event.key === 'b') {
           event.preventDefault()
           editor?.chain().focus().toggleBold().run()
@@ -307,6 +303,26 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       }, 1000)
     },
   })
+
+  // Track selection state so we can show toolbar on text selection (not just focus)
+  useEffect(() => {
+    if (!editor) return
+
+    const update = () => {
+      setHasSelection(!editor.state.selection.empty)
+    }
+
+    update()
+    editor.on('selectionUpdate', update)
+    editor.on('focus', update)
+    editor.on('blur', update)
+
+    return () => {
+      editor.off('selectionUpdate', update)
+      editor.off('focus', update)
+      editor.off('blur', update)
+    }
+  }, [editor])
 
   /**
    * Save content to database
@@ -415,38 +431,6 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     }
   }, [editor, isConfigLoading, block.id])
 
-  // Calculate toolbar position
-  useEffect(() => {
-    if (!isEditing || readOnly || !containerRef.current) return
-
-    const checkPosition = () => {
-      if (!containerRef.current) return
-      
-      const containerRect = containerRef.current.getBoundingClientRect()
-      const toolbarHeight = 40
-      const spaceAbove = containerRect.top
-      const spaceBelow = window.innerHeight - containerRect.bottom
-
-      if (spaceAbove < toolbarHeight + 20 && spaceBelow > toolbarHeight + 20) {
-        setToolbarPosition('bottom')
-      } else {
-        setToolbarPosition('top')
-      }
-    }
-
-    // Check position immediately and on changes
-    // Use a small delay to ensure DOM is ready
-    const timeoutId = setTimeout(checkPosition, 50)
-    window.addEventListener('scroll', checkPosition, true)
-    window.addEventListener('resize', checkPosition)
-
-    return () => {
-      clearTimeout(timeoutId)
-      window.removeEventListener('scroll', checkPosition, true)
-      window.removeEventListener('resize', checkPosition)
-    }
-  }, [isEditing, readOnly])
-
   // Cleanup timeouts
   useEffect(() => {
     return () => {
@@ -551,18 +535,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       return null
     }
 
-    // Toolbar is always visible when in edit mode
-    // Position it above or below the block based on available space
-    const toolbarOffset = toolbarPosition === 'top' 
-      ? "-translate-y-[calc(100%+8px)]" 
-      : "translate-y-[calc(100%+8px)]"
-
     if (process.env.NODE_ENV === 'development') {
       console.log('[TextBlock Toolbar] Rendering:', { 
         blockId: block.id, 
         isEditing, 
         readOnly, 
-        toolbarPosition,
         hasEditor: !!editor 
       })
     }
@@ -572,20 +549,12 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         ref={toolbarRef}
         data-toolbar="true"
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 flex items-center gap-1 bg-white border border-gray-200 rounded-lg shadow-lg p-1 z-[9999] transition-all duration-200 opacity-100",
-          toolbarPosition === 'top' ? "top-0" : "bottom-0",
-          toolbarOffset
+          "flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur border border-gray-200 rounded-lg shadow-sm p-1",
+          "flex-shrink-0"
         )}
-      style={{
-        marginTop: toolbarPosition === 'top' ? '-8px' : '0',
-        marginBottom: toolbarPosition === 'bottom' ? '-8px' : '0',
-        // Ensure toolbar is always visible
-        visibility: 'visible',
-        display: 'flex',
-      }}
         onMouseDown={(e) => {
           // Don't let the click bubble to the canvas (would select/drag the block),
-          // but DO NOT preventDefault or Radix Select won't work reliably.
+          // but DO NOT preventDefault or focus handling can get weird.
           e.stopPropagation()
         }}
         onMouseEnter={() => {
@@ -603,48 +572,59 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
       >
-        {/* Text Type Dropdown */}
-        <Select
-          value={
-            editor.isActive('heading', { level: 1 }) ? 'h1' :
-            editor.isActive('heading', { level: 2 }) ? 'h2' :
-            editor.isActive('heading', { level: 3 }) ? 'h3' :
-            'paragraph'
-          }
-          onValueChange={(value) => {
-            if (value === 'paragraph') {
-              editor.chain().focus().setParagraph().run()
-            } else if (value === 'h1') {
-              editor.chain().focus().setHeading({ level: 1 }).run()
-            } else if (value === 'h2') {
-              editor.chain().focus().setHeading({ level: 2 }).run()
-            } else if (value === 'h3') {
-              editor.chain().focus().setHeading({ level: 3 }).run()
-            }
+        {/* Text type (no global/portaled dropdown; stays owned by the block) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().setParagraph().run()
           }}
+          className={cn("h-8 px-2", !editor.isActive('heading') && "bg-gray-100")}
+          title="Paragraph"
         >
-          <SelectTrigger 
-            className="h-8 px-3 min-w-[100px] text-sm font-medium border-0 shadow-none hover:bg-gray-100 focus:ring-0 bg-transparent"
-            onMouseDown={(e) => {
-              e.stopPropagation()
-            }}
-          >
-            <SelectValue className="flex items-center gap-1">
-              <span>
-                {editor.isActive('heading', { level: 1 }) ? 'Heading 1' :
-                 editor.isActive('heading', { level: 2 }) ? 'Heading 2' :
-                 editor.isActive('heading', { level: 3 }) ? 'Heading 3' :
-                 'Paragraph'}
-              </span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="z-[10000]">
-            <SelectItem value="paragraph">Paragraph</SelectItem>
-            <SelectItem value="h1">Heading 1</SelectItem>
-            <SelectItem value="h2">Heading 2</SelectItem>
-            <SelectItem value="h3">Heading 3</SelectItem>
-          </SelectContent>
-        </Select>
+          <span className="text-xs font-semibold">P</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().setHeading({ level: 1 }).run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 1 }) && "bg-gray-100")}
+          title="Heading 1"
+        >
+          <Heading1 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().setHeading({ level: 2 }).run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 2 }) && "bg-gray-100")}
+          title="Heading 2"
+        >
+          <Heading2 className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            editor.chain().focus().setHeading({ level: 3 }).run()
+          }}
+          className={cn("h-8 w-8 p-0", editor.isActive('heading', { level: 3 }) && "bg-gray-100")}
+          title="Heading 3"
+        >
+          <Heading3 className="h-4 w-4" />
+        </Button>
 
         <div className="w-px h-6 bg-gray-300 mx-1" />
 
@@ -803,47 +783,33 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     )
   }
 
-  // Setup state: Show when content_json is missing or empty
+  // View mode: do not show any placeholder/setup UI. Empty text blocks render as empty.
   if (!hasContent && !isEditing) {
-    return (
-      <div 
-        className="h-full w-full flex items-center justify-center text-gray-400 text-sm p-4"
-        style={blockStyle}
-      >
-        <div className="text-center">
-          <p className="text-xs text-gray-400">Enter edit mode to add content</p>
-        </div>
-      </div>
-    )
+    return <div className="h-full w-full" style={blockStyle} />
   }
 
   // Empty state hint: Show when empty and not editing (subtle hint)
   const showEmptyHint = !hasContent && isEditing && !isBlockEditing
+  const showToolbar = isEditing && !readOnly && (isFocused || isBlockEditing || hasSelection)
 
   return (
     <div 
       ref={containerRef}
       data-block-editing={isBlockEditing ? "true" : "false"}
       className={cn(
-        "h-full w-full flex flex-col relative",
+        "h-full w-full flex flex-col relative overflow-hidden",
         // Visual editing state: blue ring when actively editing
         isBlockEditing && "ring-2 ring-blue-500 ring-offset-2 rounded-lg",
         // Subtle hover state when not editing
         isEditing && !isBlockEditing && "hover:ring-1 hover:ring-gray-300 rounded-lg transition-all",
         // Prevent dragging/resizing while editing
         isBlockEditing && "pointer-events-auto",
-        // Allow toolbar to overflow container
-        isEditing && "overflow-visible"
       )}
       style={{
         ...blockStyle,
         // CRITICAL: Do NOT set minHeight - height must be DERIVED from content
         // minHeight causes gaps when blocks collapse - it persists after collapse
         // Height must come from content and current expansion state only
-        // Ensure toolbar can overflow - critical for toolbar visibility
-        overflow: isEditing ? 'visible' : 'auto',
-        // Ensure relative positioning for absolute toolbar
-        position: 'relative',
       }}
       // Prevent drag/resize events from propagating when editing
       onMouseDown={(e) => {
@@ -873,9 +839,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           }
         }}
     >
-      {/* Toolbar - Only visible when editor is actually editable */}
-      {/* CRITICAL: Toolbar should only show when editor is editable, not just when isEditing is true */}
-      {editor && isEditing && !readOnly && <Toolbar />}
+      {/* Toolbar (owned by this block; no global floating UI) */}
+      {showToolbar && <Toolbar />}
       
       {/* Save status indicator */}
       {isEditing && saveStatus !== "idle" && (
@@ -888,7 +853,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor Content - Same source for both edit and view mode */}
       <div 
         className={cn(
-          "flex-1 w-full min-h-0 h-full",
+          "flex-1 w-full min-h-0 h-full overflow-auto",
           !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",

@@ -921,26 +921,41 @@ export default function GridDataSettings({
                 })}
               >
                 <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Select a select field" />
+                  <SelectValue placeholder="Select a field" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None (no grouping)</SelectItem>
                   {fields
-                    .filter(field => field.type === 'single_select' || field.type === 'multi_select')
+                    .filter((field) => {
+                      // Timeline can group on most "simple" field types.
+                      // Exclude id + unsupported/too-noisy types.
+                      if (!field || typeof field !== 'object') return false
+                      if (!field.name || field.name === 'id') return false
+                      const t = String((field as any).type || '')
+                      return (
+                        t === 'text' ||
+                        t === 'long_text' ||
+                        t === 'number' ||
+                        t === 'percent' ||
+                        t === 'currency' ||
+                        t === 'date' ||
+                        t === 'single_select' ||
+                        t === 'multi_select' ||
+                        t === 'checkbox' ||
+                        t === 'url' ||
+                        t === 'email' ||
+                        t === 'link_to_table'
+                      )
+                    })
                     .map((field) => (
                       <SelectItem key={field.id} value={field.name}>
-                        {getFieldDisplayName(field)}
+                        {getFieldDisplayName(field)} ({field.type})
                       </SelectItem>
                     ))}
                 </SelectContent>
               </Select>
-              {fields.filter(f => f.type === 'single_select' || f.type === 'multi_select').length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  No select fields found. Add a single-select or multi-select field to enable grouping.
-                </p>
-              )}
               <p className="text-xs text-gray-500 mt-1">
-                Group timeline events by a select field. Each group appears as a separate lane.
+                Group timeline events by a field value. Each group appears as a separate lane.
               </p>
             </div>
           </div>

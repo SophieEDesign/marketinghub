@@ -226,15 +226,43 @@ export function resolveChoiceColor(
   fieldOptions?: FieldOptions,
   useSemanticColors: boolean = true
 ): string {
+  const normalizedChoice = String(choice || '').trim()
+
+  // 0. Canonical option model: selectOptions (preferred)
+  // Records typically store the option *label* (string), but some older data might store IDs.
+  // If we have explicit colors on options, use them as the highest-precedence source.
+  const selectOptions = Array.isArray(fieldOptions?.selectOptions) ? fieldOptions?.selectOptions : undefined
+  if (selectOptions && normalizedChoice) {
+    const match = selectOptions.find((opt) => {
+      const label = String(opt?.label ?? '').trim()
+      const id = String(opt?.id ?? '').trim()
+      if (!label && !id) return false
+      const c = normalizedChoice.toLowerCase()
+      return (label && label.toLowerCase() === c) || (id && id.toLowerCase() === c)
+    })
+
+    const rawColor = String(match?.color ?? '').trim()
+    if (rawColor) {
+      // Only accept hex-like colors here; downstream code expects hex for alpha suffixing.
+      // If it's not hex, ignore and fall through to other sources.
+      const hexLike = rawColor.startsWith('#')
+        ? rawColor.slice(1)
+        : rawColor
+      if (/^[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/.test(hexLike)) {
+        return rawColor.startsWith('#') ? rawColor : `#${rawColor}`
+      }
+    }
+  }
+
   // 1. Check option-level override (highest precedence)
-  if (fieldOptions?.choiceColors?.[choice]) {
-    return fieldOptions.choiceColors[choice]
+  if (normalizedChoice && fieldOptions?.choiceColors?.[normalizedChoice]) {
+    return fieldOptions.choiceColors[normalizedChoice]
   }
 
   // Try case-insensitive match for option-level override
   if (fieldOptions?.choiceColors) {
     const matchingKey = Object.keys(fieldOptions.choiceColors).find(
-      key => key.toLowerCase() === choice.toLowerCase()
+      key => key.toLowerCase() === normalizedChoice.toLowerCase()
     )
     if (matchingKey) {
       return fieldOptions.choiceColors[matchingKey]
@@ -248,7 +276,7 @@ export function resolveChoiceColor(
 
   // 3. Global field-type default
   const palette = getChoiceThemePalette(fieldType, fieldOptions, useSemanticColors)
-  return getColorFromString(choice, palette)
+  return getColorFromString(normalizedChoice || choice, palette)
 }
 
 /**

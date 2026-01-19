@@ -1476,9 +1476,8 @@ export default function Canvas({
             {/* Block Content */}
             {/* CRITICAL: No min-height - height must be DERIVED from content */}
             {/* min-h-0 allows flex children to shrink below content size */}
-            {/* TextBlock toolbar is positioned outside the block bounds; allow overflow in edit mode so it's visible */}
             <div 
-              className={`h-full w-full min-h-0 ${isEditing && block.type === 'text' ? 'overflow-visible' : 'overflow-hidden'} rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
+              className={`h-full w-full min-h-0 overflow-hidden rounded-lg ${block.config?.locked ? 'pointer-events-none opacity-75' : ''}`}
               data-block-id={block.id}
               style={{
                 // CRITICAL: Do NOT set minHeight - height must be DERIVED from content

@@ -8,6 +8,7 @@ interface DateCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: string | null) => Promise<void>
   placeholder?: string
 }
@@ -16,6 +17,7 @@ export default function DateCell({
   value,
   fieldName,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = '—',
 }: DateCellProps) {
@@ -96,6 +98,8 @@ export default function DateCell({
     return formatDateUK(val, placeholder)
   }
 
+  const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
+
   if (editing && editable) {
     return (
       <input
@@ -105,7 +109,8 @@ export default function DateCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
+        className="w-full h-full px-3 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
+        style={containerStyle}
         disabled={saving}
       />
     )
@@ -114,7 +119,8 @@ export default function DateCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors"
+      className="w-full h-full px-3 flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden"
+      style={containerStyle}
     >
       <span className="truncate">
         {value ? formatDisplayValue(value) : <span className="text-gray-400 italic">{placeholder}</span>}

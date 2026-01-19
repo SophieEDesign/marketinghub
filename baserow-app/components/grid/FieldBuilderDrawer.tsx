@@ -7,6 +7,7 @@ import { FIELD_TYPES } from "@/types/fields"
 import { resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { createClient } from "@/lib/supabase/client"
 
 interface FieldBuilderDrawerProps {
   isOpen: boolean
@@ -34,6 +35,12 @@ export default function FieldBuilderDrawer({
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [tables, setTables] = useState<Array<{ id: string; name: string }>>([])
+  const [loadingTables, setLoadingTables] = useState(false)
+  const [lookupTableFields, setLookupTableFields] = useState<
+    Array<{ id: string; name: string; type: string }>
+  >([])
+  const [loadingLookupFields, setLoadingLookupFields] = useState(false)
 
   const isEdit = !!field
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
@@ -57,6 +64,67 @@ export default function FieldBuilderDrawer({
     setWarning(null)
     setShowDeleteConfirm(false)
   }, [field, isOpen])
+
+  // Load tables for link_to_table and lookup fields.
+  useEffect(() => {
+    if (!isOpen) return
+    if (type !== "link_to_table" && type !== "lookup") return
+    loadTables()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, type])
+
+  // Load fields for lookup table selection.
+  useEffect(() => {
+    if (!isOpen) return
+    if (type !== "lookup" || !options.lookup_table_id) {
+      setLookupTableFields([])
+      return
+    }
+    loadLookupTableFields(options.lookup_table_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, type, options.lookup_table_id])
+
+  async function loadTables() {
+    setLoadingTables(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("tables")
+        .select("id, name")
+        .order("name", { ascending: true })
+
+      if (!error && data) {
+        setTables(data)
+      }
+    } catch (e) {
+      console.error("Error loading tables:", e)
+    } finally {
+      setLoadingTables(false)
+    }
+  }
+
+  async function loadLookupTableFields(lookupTableId: string) {
+    setLoadingLookupFields(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from("table_fields")
+        .select("id, name, type")
+        .eq("table_id", lookupTableId)
+        .order("position", { ascending: true })
+
+      if (!error && data) {
+        setLookupTableFields(data)
+      } else {
+        setLookupTableFields([])
+      }
+    } catch (e) {
+      console.error("Error loading lookup table fields:", e)
+      setLookupTableFields([])
+    } finally {
+      setLoadingLookupFields(false)
+    }
+  }
 
   async function handleSave() {
     if (!name.trim()) {
@@ -246,17 +314,31 @@ export default function FieldBuilderDrawer({
         return (
           <div className="space-y-2">
             <label className="block text-sm font-medium">Linked Table</label>
-            <input
-              type="text"
+            <select
               value={options.linked_table_id || ""}
               onChange={(e) =>
-                setOptions({ ...options, linked_table_id: e.target.value })
+                setOptions({
+                  ...options,
+                  linked_table_id: e.target.value || undefined,
+                })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="Table ID"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+              disabled={loadingTables}
+            >
+              <option value="" disabled>
+                {loadingTables ? "Loading tables..." : "Select a table"}
+              </option>
+              {tables
+                .filter((t) => t.id !== tableId) // Don’t allow linking to self
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </select>
             <p className="text-xs text-gray-500">
-              Enter the ID of the table to pull records from
+              Select the table to link records from. Each row can contain one or
+              more records from that table.
             </p>
           </div>
         )
@@ -276,25 +358,55 @@ export default function FieldBuilderDrawer({
         return (
           <div className="space-y-2">
             <label className="block text-sm font-medium">Lookup Table</label>
-            <input
-              type="text"
+            <select
               value={options.lookup_table_id || ""}
               onChange={(e) =>
-                setOptions({ ...options, lookup_table_id: e.target.value })
+                setOptions({
+                  ...options,
+                  lookup_table_id: e.target.value || undefined,
+                  // Reset field when table changes
+                  lookup_field_id: undefined,
+                })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mb-2"
-              placeholder="Table ID"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white mb-2"
+              disabled={loadingTables}
+            >
+              <option value="" disabled>
+                {loadingTables ? "Loading tables..." : "Select a table"}
+              </option>
+              {tables
+                .filter((t) => t.id !== tableId)
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </select>
             <label className="block text-sm font-medium">Lookup Field</label>
-            <input
-              type="text"
+            <select
               value={options.lookup_field_id || ""}
               onChange={(e) =>
-                setOptions({ ...options, lookup_field_id: e.target.value })
+                setOptions({
+                  ...options,
+                  lookup_field_id: e.target.value || undefined,
+                })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              placeholder="Field ID"
-            />
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+              disabled={!options.lookup_table_id || loadingLookupFields}
+            >
+              <option value="" disabled>
+                {!options.lookup_table_id
+                  ? "Select a table first"
+                  : loadingLookupFields
+                    ? "Loading fields..."
+                    : "Select a field"}
+              </option>
+              {lookupTableFields.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.type})
+                </option>
+              ))}
+            </select>
           </div>
         )
 

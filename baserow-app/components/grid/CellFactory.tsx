@@ -123,6 +123,7 @@ export function CellFactory({
           value={value}
           rowId={rowId}
           editable={editable}
+          rowHeight={rowHeight}
           onSave={onSave}
         />
       )
@@ -138,6 +139,7 @@ export function CellFactory({
           fieldName={field.name}
           field={field}
           rowId={rowId}
+          rowHeight={rowHeight}
         />
       )
 

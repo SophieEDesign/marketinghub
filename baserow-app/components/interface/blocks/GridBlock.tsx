@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -690,7 +690,6 @@ export default function GridBlock({
             modalFields={(config as any).modal_fields}
             appearance={{
               ...appearance,
-              show_toolbar: false, // Hide horizontal toolbar for blocks
               color_field: appearance.color_field,
               image_field: appearance.image_field,
               fit_image_size: appearance.fit_image_size,

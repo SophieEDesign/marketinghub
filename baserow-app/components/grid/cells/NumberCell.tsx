@@ -6,6 +6,7 @@ interface NumberCellProps {
   value: number | null
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: number | null) => Promise<void>
   placeholder?: string
   precision?: number
@@ -15,6 +16,7 @@ export default function NumberCell({
   value,
   fieldName,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = '—',
   precision,
@@ -73,6 +75,8 @@ export default function NumberCell({
     return val.toString()
   }
 
+  const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
+
   if (editing && editable) {
     return (
       <input
@@ -83,7 +87,8 @@ export default function NumberCell({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full min-h-[36px] px-3 py-2 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md text-right"
+        className="w-full h-full px-3 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md text-right"
+        style={containerStyle}
         disabled={saving}
       />
     )
@@ -92,7 +97,8 @@ export default function NumberCell({
   return (
     <div
       onClick={() => editable && setEditing(true)}
-      className="w-full min-h-[36px] px-3 py-2 flex items-center justify-end text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors"
+      className="w-full h-full px-3 flex items-center justify-end text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden"
+      style={containerStyle}
     >
       <span className="truncate text-right">
         {value !== null && value !== undefined ? formatDisplayValue(value) : <span className="text-gray-400 italic">{placeholder}</span>}

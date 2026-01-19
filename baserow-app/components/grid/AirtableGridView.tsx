@@ -159,6 +159,9 @@ export default function AirtableGridView({
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
   const layoutDirtyRef = useRef(false)
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
+  const MIN_ROW_HEIGHT_PX = ROW_HEIGHT_SHORT
+  const rowHeightsRef = useRef<Record<string, number>>({})
   
   // Track wrap text settings per column (from grid_view_settings)
   const [columnWrapTextSettings, setColumnWrapTextSettings] = useState<Record<string, boolean>>({})
@@ -168,6 +171,14 @@ export default function AirtableGridView({
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const bodyScrollRef = useRef<HTMLDivElement>(null)
   const frozenColumnRef = useRef<HTMLDivElement>(null)
+  const rowResizeActiveRef = useRef(false)
+  const rowResizeRowIdRef = useRef<string | null>(null)
+  const rowResizeStartYRef = useRef(0)
+  const rowResizeStartHeightRef = useRef(0)
+
+  useEffect(() => {
+    rowHeightsRef.current = rowHeights
+  }, [rowHeights])
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -329,11 +340,22 @@ export default function AirtableGridView({
     async function loadGridViewSettings() {
       try {
         const supabase = createClient()
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('grid_view_settings')
-          .select('column_widths, column_order, column_wrap_text')
+          .select('column_widths, column_order, column_wrap_text, row_heights')
           .eq('view_id', viewId)
           .maybeSingle()
+
+        // Backward compatibility: older schemas won't have row_heights yet.
+        if (error && ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('row_heights'))) {
+          const retry = await supabase
+            .from('grid_view_settings')
+            .select('column_widths, column_order, column_wrap_text')
+            .eq('view_id', viewId)
+            .maybeSingle()
+          data = retry.data as any
+          error = retry.error as any
+        }
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error loading grid view settings:', error)
@@ -386,6 +408,15 @@ export default function AirtableGridView({
             setColumnWrapText(data.column_wrap_text as Record<string, boolean>)
             setColumnWrapTextSettings(data.column_wrap_text as Record<string, boolean>)
           }
+          if (data.row_heights && typeof data.row_heights === 'object') {
+            const sanitized: Record<string, number> = {}
+            for (const [k, v] of Object.entries(data.row_heights as any)) {
+              if (typeof k !== 'string' || k.trim().length === 0) continue
+              if (typeof v !== 'number' || !Number.isFinite(v)) continue
+              sanitized[k] = Math.max(MIN_ROW_HEIGHT_PX, Math.round(v))
+            }
+            setRowHeights(sanitized)
+          }
         } else {
           // Fallback to localStorage
           loadFromLocalStorage()
@@ -412,6 +443,7 @@ export default function AirtableGridView({
       const savedWidths = localStorage.getItem(`${storageKey}_widths`)
       const savedOrder = localStorage.getItem(`${storageKey}_order`)
       const savedWrapText = localStorage.getItem(`${storageKey}_wrapText`)
+      const savedRowHeights = localStorage.getItem(`${storageKey}_rowHeights`)
 
       if (savedWidths) {
         try {
@@ -485,6 +517,21 @@ export default function AirtableGridView({
           // Fallback to defaults
         }
       }
+
+      if (savedRowHeights) {
+        try {
+          const parsed = JSON.parse(savedRowHeights) as Record<string, number>
+          const sanitized: Record<string, number> = {}
+          for (const [k, v] of Object.entries(parsed || {})) {
+            if (typeof k !== 'string' || k.trim().length === 0) continue
+            if (typeof v !== 'number' || !Number.isFinite(v)) continue
+            sanitized[k] = Math.max(MIN_ROW_HEIGHT_PX, Math.round(v))
+          }
+          setRowHeights(sanitized)
+        } catch {
+          // ignore
+        }
+      }
     }
 
     loadGridViewSettings()
@@ -545,6 +592,112 @@ export default function AirtableGridView({
       layoutDirtyRef.current = false
     }
   }, [columnWidths, columnOrder, columnWrapText, tableName, viewName, viewId])
+
+  const persistRowHeights = useCallback(async (next: Record<string, number>) => {
+    // Always persist to localStorage as backup
+    const storageKey = `grid_${tableName}_${viewName}`
+    try {
+      localStorage.setItem(`${storageKey}_rowHeights`, JSON.stringify(next))
+    } catch {
+      // ignore
+    }
+
+    if (!viewId) return
+    try {
+      const supabase = createClient()
+      const { data: existing } = await supabase
+        .from('grid_view_settings')
+        .select('id')
+        .eq('view_id', viewId)
+        .maybeSingle()
+
+      if (existing) {
+        const res = await supabase
+          .from('grid_view_settings')
+          .update({ row_heights: next })
+          .eq('view_id', viewId)
+        // Backward compatibility: older schemas won't have row_heights yet.
+        if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
+          return
+        }
+      } else {
+        const res = await supabase
+          .from('grid_view_settings')
+          .insert([{
+            view_id: viewId,
+            column_widths: columnWidths,
+            column_order: columnOrder,
+            column_wrap_text: columnWrapText,
+            row_height: 'medium',
+            frozen_columns: 0,
+            row_heights: next,
+          }])
+        if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
+          // Can't persist row heights in DB yet; localStorage still works.
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error saving row heights:', error)
+    }
+  }, [columnOrder, columnWidths, columnWrapText, tableName, viewId, viewName])
+
+  const getEffectiveRowHeight = useCallback((rowId: string | null | undefined) => {
+    if (!rowId) return ROW_HEIGHT
+    const override = rowHeights[rowId]
+    if (typeof override === 'number' && Number.isFinite(override) && override > 0) {
+      return Math.max(MIN_ROW_HEIGHT_PX, Math.round(override))
+    }
+    return ROW_HEIGHT
+  }, [ROW_HEIGHT, rowHeights])
+
+  const startRowResize = useCallback((rowId: string, startHeight: number, startClientY: number) => {
+    if (isMobile) return
+    if (!rowId) return
+    rowResizeActiveRef.current = true
+    rowResizeRowIdRef.current = rowId
+    rowResizeStartYRef.current = startClientY
+    rowResizeStartHeightRef.current = startHeight
+
+    const prevCursor = document.body.style.cursor
+    const prevUserSelect = document.body.style.userSelect
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+
+    const handleMove = (e: MouseEvent) => {
+      if (!rowResizeActiveRef.current || rowResizeRowIdRef.current !== rowId) return
+      const diff = e.clientY - rowResizeStartYRef.current
+      const nextH = Math.max(MIN_ROW_HEIGHT_PX, Math.round(rowResizeStartHeightRef.current + diff))
+      setRowHeights((prev) => ({ ...prev, [rowId]: nextH }))
+    }
+
+    const handleUp = async () => {
+      rowResizeActiveRef.current = false
+      rowResizeRowIdRef.current = null
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevUserSelect
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleUp)
+
+      // Persist once at the end (avoid spamming writes while dragging)
+      const latest = rowHeightsRef.current || {}
+      const current = latest[rowId]
+      const height = typeof current === 'number' ? current : startHeight
+      const final = { ...latest, [rowId]: Math.max(MIN_ROW_HEIGHT_PX, Math.round(height)) }
+      await persistRowHeights(final)
+    }
+
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleUp)
+  }, [isMobile, persistRowHeights])
+
+  const resetRowHeight = useCallback(async (rowId: string) => {
+    if (!rowId) return
+    const next = { ...rowHeights }
+    delete next[rowId]
+    setRowHeights(next)
+    await persistRowHeights(next)
+  }, [persistRowHeights, rowHeights])
 
   // Update container height
   useEffect(() => {
@@ -674,7 +827,8 @@ export default function AirtableGridView({
   // Virtualization calculations
   const GROUP_HEADER_HEIGHT = 40
   const getItemHeight = (item: (typeof renderItems)[number]) => {
-    return item.type === 'group' ? GROUP_HEADER_HEIGHT : ROW_HEIGHT
+    if (item.type === 'group') return GROUP_HEADER_HEIGHT
+    return getEffectiveRowHeight(item.data?.id)
   }
   
   let currentHeight = 0
@@ -1114,6 +1268,7 @@ export default function AirtableGridView({
               const isEven = actualIndex % 2 === 0
               const isSelected = selectedRowIds.has(row.id)
               const rowIndex = filteredRows.findIndex((r: any) => r.id === row.id)
+              const effectiveRowHeight = getEffectiveRowHeight(row.id)
               const stickyBgClass = isSelected
                 ? 'bg-blue-50'
                 : isEven
@@ -1128,12 +1283,12 @@ export default function AirtableGridView({
               return (
                 <div
                   key={item.groupPathKey ? `${row.id}::${item.groupPathKey}` : row.id}
-                  className={`group flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
+                  className={`group flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors relative ${
                     'cursor-default'
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/30'
                   } ${isSelected ? 'bg-blue-50/50' : ''}`}
-                  style={{ height: ROW_HEIGHT }}
+                  style={{ height: effectiveRowHeight }}
                   data-group-level={item.level || 0}
                   onClick={(e) => {
                     const target = e.target as HTMLElement
@@ -1153,6 +1308,31 @@ export default function AirtableGridView({
                     e.stopPropagation()
                   }}
                 >
+                  {/* Row resize handle (between rows) */}
+                  {!isMobile && (
+                    <div
+                      className="absolute left-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{
+                        bottom: '-3px',
+                        height: '6px',
+                        cursor: 'row-resize',
+                        pointerEvents: 'auto',
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        startRowResize(row.id, effectiveRowHeight, e.clientY)
+                      }}
+                      onDoubleClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        resetRowHeight(row.id)
+                      }}
+                      title="Drag to resize row (double-click to reset)"
+                    >
+                      <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-blue-500/60" />
+                    </div>
+                  )}
                   {/* Record open chevron - FIRST column */}
                   <div
                     className={cn(
@@ -1160,7 +1340,7 @@ export default function AirtableGridView({
                       stickyBgClass,
                       stickyHoverClass
                     )}
-                    style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: ROW_HEIGHT }}
+                    style={{ width: OPEN_RECORD_COLUMN_WIDTH, height: effectiveRowHeight }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
@@ -1186,7 +1366,7 @@ export default function AirtableGridView({
                       stickyBgClass,
                       stickyHoverClass
                     )}
-                    style={{ width: FROZEN_COLUMN_WIDTH, height: ROW_HEIGHT, left: OPEN_RECORD_COLUMN_WIDTH }}
+                    style={{ width: FROZEN_COLUMN_WIDTH, height: effectiveRowHeight, left: OPEN_RECORD_COLUMN_WIDTH }}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleRowSelect(row.id, rowIndex, e)
@@ -1216,7 +1396,7 @@ export default function AirtableGridView({
                     )}
                     style={{
                       width: FROZEN_COLUMN_WIDTH,
-                      height: ROW_HEIGHT,
+                      height: effectiveRowHeight,
                       left: OPEN_RECORD_COLUMN_WIDTH + FROZEN_COLUMN_WIDTH,
                     }}
                   >
@@ -1237,7 +1417,7 @@ export default function AirtableGridView({
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
                           isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
                         }`}
-                        style={{ width, height: ROW_HEIGHT, maxHeight: ROW_HEIGHT }}
+                        style={{ width, height: effectiveRowHeight, maxHeight: effectiveRowHeight }}
                         onClick={() => {
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
@@ -1255,7 +1435,7 @@ export default function AirtableGridView({
                             tableName={tableName}
                             editable={editable && !field.options?.read_only}
                             wrapText={wrapText}
-                            rowHeight={ROW_HEIGHT}
+                            rowHeight={effectiveRowHeight}
                             onSave={(value) => handleCellSave(row.id, field.name, value)}
                             onFieldOptionsUpdate={onTableFieldsRefresh}
                           />

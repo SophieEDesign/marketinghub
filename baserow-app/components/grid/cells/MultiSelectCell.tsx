@@ -13,6 +13,7 @@ interface MultiSelectCellProps {
   value: string[] | null
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: string[]) => Promise<void>
   placeholder?: string
   choices?: string[]
@@ -27,6 +28,7 @@ export default function MultiSelectCell({
   value,
   fieldName,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = '—',
   choices = [],
@@ -36,12 +38,13 @@ export default function MultiSelectCell({
   tableId,
   onFieldOptionsUpdate,
 }: MultiSelectCellProps) {
+  const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
   if (!fieldId || !tableId) {
     // Basic fallback - just show the values as pills
     const displayValues = sortLabelsByManualOrder(value || [], "multi_select", fieldOptions)
     return (
-      <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm">
+      <div className="w-full h-full px-3 flex items-center flex-wrap gap-1.5 text-sm overflow-hidden" style={containerStyle}>
         {displayValues.length > 0 ? (
           displayValues.map((val) => {
             const hexColor = fieldOptions
@@ -67,7 +70,7 @@ export default function MultiSelectCell({
   }
 
   return (
-    <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
+    <div className="w-full h-full px-3 flex items-center overflow-hidden" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
         // Ensure the picker dropdown uses canonical manual order by default.

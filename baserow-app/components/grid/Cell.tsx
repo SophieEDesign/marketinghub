@@ -247,7 +247,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
   if (editing) {
     if (inputType === "checkbox") {
       return (
-        <div className="flex items-center justify-center h-8">
+        <div className="flex items-center justify-center h-full">
           <input
             type="checkbox"
             checked={!!editValue}
@@ -269,7 +269,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={handleSave}
           onKeyDown={handleKeyDown}
-          className="w-full h-20 px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+          className="w-full h-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
           placeholder="Enter text..."
         />
       )
@@ -288,7 +288,7 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
         }}
         onBlur={handleSave}
         onKeyDown={handleKeyDown}
-        className="w-full h-8 px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-full h-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
         placeholder="Enter value..."
         disabled={saving}
       />

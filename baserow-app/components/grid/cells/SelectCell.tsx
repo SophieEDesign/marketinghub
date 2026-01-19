@@ -13,6 +13,7 @@ interface SelectCellProps {
   value: string | null
   fieldName: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: string | null) => Promise<void>
   placeholder?: string
   choices?: string[]
@@ -27,6 +28,7 @@ export default function SelectCell({
   value,
   fieldName,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = '—',
   choices = [],
@@ -36,11 +38,12 @@ export default function SelectCell({
   tableId,
   onFieldOptionsUpdate,
 }: SelectCellProps) {
+  const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
   // If we don't have fieldId/tableId, fall back to basic select (for backwards compatibility)
   if (!fieldId || !tableId) {
     // Basic fallback - just show the value as a pill
     return (
-      <div className="w-full min-h-[36px] px-3 py-2 flex items-center gap-2 text-sm">
+      <div className="w-full h-full px-3 flex items-center gap-2 text-sm overflow-hidden" style={containerStyle}>
         {value ? (
           (() => {
             const hexColor = fieldOptions
@@ -65,7 +68,7 @@ export default function SelectCell({
   }
 
   return (
-    <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
+    <div className="w-full h-full px-3 flex items-center overflow-hidden" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
         // Ensure the picker dropdown uses canonical manual order by default.

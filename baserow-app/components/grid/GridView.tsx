@@ -91,6 +91,26 @@ interface GridViewProps {
 
 const ITEMS_PER_PAGE = 100
 
+function shallowEqualRecordNumber(a: Record<string, number>, b: Record<string, number>): boolean {
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false
+    if (a[k] !== b[k]) return false
+  }
+  return true
+}
+
+function arrayShallowEqual(a: string[], b: string[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 function extractCurlyFieldRefs(formula: string): string[] {
   if (!formula || typeof formula !== 'string') return []
   const refs: string[] = []
@@ -292,6 +312,9 @@ export default function GridView({
   const [columnOrder, setColumnOrder] = useState<string[]>([])
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
   const [resizingColumn, setResizingColumn] = useState<string | null>(null)
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
+  const [hoverResizeRowId, setHoverResizeRowId] = useState<string | null>(null)
+  const [resizeLineTop, setResizeLineTop] = useState<number | null>(null)
   const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
 
@@ -312,6 +335,22 @@ export default function GridView({
 
   const COLUMN_DEFAULT_WIDTH = 200
   const COLUMN_MIN_WIDTH = 100
+  const MIN_ROW_HEIGHT_PX = 32
+  const RESIZE_HITBOX_PX = 4
+
+  const rowHeightsStorageKey = useMemo(() => {
+    // Per-view when available; otherwise per table instance (still not global).
+    if (viewId && String(viewId).trim().length > 0) return `mh:gridRowHeights:view:${viewId}`
+    const t = tableId || 'unknown-table'
+    const n = supabaseTableName || 'unknown-name'
+    return `mh:gridRowHeights:table:${t}:${n}`
+  }, [supabaseTableName, tableId, viewId])
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isResizingRowRef = useRef(false)
+  const resizingRowIdRef = useRef<string | null>(null)
+  const resizeStartYRef = useRef(0)
+  const resizeStartHeightRef = useRef(0)
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -406,6 +445,15 @@ export default function GridView({
   // Calculate row height in pixels from string setting
   const rowHeightPixels = useMemo(() => getRowHeightPixels(rowHeight), [rowHeight])
 
+  const getEffectiveRowHeight = useCallback((rowId: string | null | undefined) => {
+    if (!rowId) return rowHeightPixels
+    const override = rowHeights[rowId]
+    if (typeof override === 'number' && Number.isFinite(override) && override > 0) {
+      return Math.max(MIN_ROW_HEIGHT_PX, Math.round(override))
+    }
+    return rowHeightPixels
+  }, [rowHeights, rowHeightPixels])
+
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     console.log('GridView input types', {
@@ -419,17 +467,79 @@ export default function GridView({
   }
 
   // Load column order and widths from grid_view_settings
+  // NOTE: upstream props can be recreated each render (new array identities).
+  // Use a stable "content key" to avoid an update loop (React error #185).
+  const columnSettingsKey = useMemo(() => {
+    // IMPORTANT: Make this key order-insensitive.
+    // Some upstream queries can return the same rows in different orders; if we bake that order into
+    // a key used by a setState effect, we can create an infinite render loop (React #185).
+    const visible = Array.isArray(safeViewFields)
+      ? safeViewFields
+          .filter((f) => f && typeof f === 'object' && f.visible === true && typeof f.field_name === 'string')
+          .map((f) => String(f.field_name))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+      : []
+
+    const fieldsMinimal = Array.isArray(safeTableFields)
+      ? safeTableFields
+          .map((f: any) => ({
+            id: f?.id ?? null,
+            name: f?.name ?? null,
+            order_index: f?.order_index ?? f?.position ?? null,
+          }))
+          .sort((a, b) => {
+            const ak = String(a.id ?? a.name ?? '')
+            const bk = String(b.id ?? b.name ?? '')
+            return ak.localeCompare(bk)
+          })
+      : []
+
+    return JSON.stringify({ viewId, visible, fieldsMinimal })
+  }, [viewId, safeViewFields, safeTableFields])
+
   useEffect(() => {
-    if (!viewId || safeTableFields.length === 0) return
+    if (safeTableFields.length === 0) return
+
+    // Local fallback when viewId is not set (e.g. block-backed tables without views enabled).
+    if (!viewId) {
+      try {
+        const raw = localStorage.getItem(rowHeightsStorageKey)
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, number>
+          const sanitized: Record<string, number> = {}
+          for (const [k, v] of Object.entries(parsed || {})) {
+            if (typeof k !== 'string' || k.trim().length === 0) continue
+            if (typeof v !== 'number' || !Number.isFinite(v)) continue
+            sanitized[k] = Math.max(MIN_ROW_HEIGHT_PX, Math.round(v))
+          }
+          setRowHeights(sanitized)
+        }
+      } catch {
+        // ignore
+      }
+      return
+    }
 
     async function loadColumnSettings() {
       try {
         const supabase = createClient()
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('grid_view_settings')
-          .select('column_order, column_widths')
+          .select('column_order, column_widths, row_heights')
           .eq('view_id', viewId)
           .maybeSingle()
+
+        // Backward compatibility: older schemas won't have row_heights yet.
+        if (error && ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('row_heights'))) {
+          const retry = await supabase
+            .from('grid_view_settings')
+            .select('column_order, column_widths')
+            .eq('view_id', viewId)
+            .maybeSingle()
+          data = retry.data as any
+          error = retry.error as any
+        }
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error loading column settings:', error)
@@ -445,7 +555,24 @@ export default function GridView({
               sanitizedWidths[key] = value
             }
           }
-          setColumnWidths(sanitizedWidths)
+          setColumnWidths((prev) => (shallowEqualRecordNumber(prev, sanitizedWidths) ? prev : sanitizedWidths))
+        }
+
+        // Load row heights - CRITICAL: Sanitize persisted state
+        if (data?.row_heights && typeof data.row_heights === 'object' && data.row_heights !== null) {
+          const sanitizedHeights: Record<string, number> = {}
+          for (const [key, value] of Object.entries(data.row_heights as any)) {
+            if (typeof key !== 'string' || key.trim().length === 0) continue
+            if (typeof value !== 'number' || !Number.isFinite(value)) continue
+            // Clamp to minimum; leave upper bound unconstrained (Airtable-like).
+            sanitizedHeights[key] = Math.max(MIN_ROW_HEIGHT_PX, Math.round(value))
+          }
+          setRowHeights((prev) => (shallowEqualRecordNumber(prev, sanitizedHeights) ? prev : sanitizedHeights))
+          try {
+            localStorage.setItem(rowHeightsStorageKey, JSON.stringify(sanitizedHeights))
+          } catch {
+            // ignore
+          }
         }
 
         // Load column order - CRITICAL: Validate against current fields
@@ -469,7 +596,8 @@ export default function GridView({
             // All fields in order are valid - use it
             // Add any missing fields to the end
             const missingFields = allFieldNames.filter(name => !validOrder.includes(name))
-            setColumnOrder([...validOrder, ...missingFields])
+            const nextOrder = [...validOrder, ...missingFields]
+            setColumnOrder((prev) => (arrayShallowEqual(prev, nextOrder) ? prev : nextOrder))
           } else {
             // Some fields in order are stale - rebuild from current fields
             initializeColumnOrder()
@@ -486,7 +614,7 @@ export default function GridView({
     function initializeColumnOrder() {
       // CRITICAL: Defensive initialization - filter out invalid fields
       if (!Array.isArray(safeViewFields) || safeViewFields.length === 0) {
-        setColumnOrder([])
+        setColumnOrder((prev) => (prev.length === 0 ? prev : []))
         return
       }
       
@@ -518,11 +646,20 @@ export default function GridView({
         .map((f) => f.field_name)
         .filter((name): name is string => typeof name === 'string' && name.length > 0)
       
-      setColumnOrder(visibleFieldNames)
+      setColumnOrder((prev) => (arrayShallowEqual(prev, visibleFieldNames) ? prev : visibleFieldNames))
     }
 
     loadColumnSettings()
-  }, [viewId, safeViewFields, safeTableFields])
+  }, [viewId, columnSettingsKey, rowHeightsStorageKey])
+
+  // Persist row heights locally as a safety net (and as primary store when viewId is absent).
+  useEffect(() => {
+    try {
+      localStorage.setItem(rowHeightsStorageKey, JSON.stringify(rowHeights))
+    } catch {
+      // ignore
+    }
+  }, [rowHeights, rowHeightsStorageKey])
 
   // Save column order and widths to grid_view_settings
   useEffect(() => {
@@ -540,23 +677,27 @@ export default function GridView({
         const settingsData = {
           column_order: columnOrder,
           column_widths: columnWidths,
+          row_heights: rowHeights,
         }
 
-        if (existing) {
-          await supabase
-            .from('grid_view_settings')
-            .update(settingsData)
-            .eq('view_id', viewId)
-        } else {
-          await supabase
-            .from('grid_view_settings')
-            .insert([{
-              view_id: viewId,
-              ...settingsData,
-              column_wrap_text: {},
-              row_height: 'medium',
-              frozen_columns: 0,
-            }])
+        const tryUpdateOrInsert = async (payload: any) => {
+          if (existing) {
+            return await supabase.from('grid_view_settings').update(payload).eq('view_id', viewId)
+          }
+          return await supabase.from('grid_view_settings').insert([{
+            view_id: viewId,
+            ...payload,
+            column_wrap_text: {},
+            row_height: 'medium',
+            frozen_columns: 0,
+          }])
+        }
+
+        const res = await tryUpdateOrInsert(settingsData)
+        // Backward compatibility: older schemas won't have row_heights yet.
+        if (res?.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
+          const { row_heights, ...withoutRowHeights } = settingsData as any
+          await tryUpdateOrInsert(withoutRowHeights)
         }
       } catch (error) {
         console.error('Error saving column settings:', error)
@@ -566,7 +707,89 @@ export default function GridView({
     // Debounce saves to avoid too many database calls
     const timeoutId = setTimeout(saveColumnSettings, 500)
     return () => clearTimeout(timeoutId)
-  }, [columnOrder, columnWidths, viewId])
+  }, [columnOrder, columnWidths, rowHeights, viewId])
+
+  const startRowResize = useCallback((rowId: string, startHeight: number, startClientY: number) => {
+    if (isMobile) return
+    if (!rowId) return
+
+    isResizingRowRef.current = true
+    resizingRowIdRef.current = rowId
+    resizeStartYRef.current = startClientY
+    resizeStartHeightRef.current = startHeight
+
+    const prevCursor = document.body.style.cursor
+    const prevUserSelect = document.body.style.userSelect
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRowRef.current || resizingRowIdRef.current !== rowId) return
+      const diff = e.clientY - resizeStartYRef.current
+      const next = Math.max(MIN_ROW_HEIGHT_PX, Math.round(resizeStartHeightRef.current + diff))
+      setRowHeights((prev) => ({ ...prev, [rowId]: next }))
+    }
+
+    const handleMouseUp = () => {
+      isResizingRowRef.current = false
+      resizingRowIdRef.current = null
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevUserSelect
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [isMobile])
+
+  const resetRowHeight = useCallback((rowId: string) => {
+    if (!rowId) return
+    setRowHeights((prev) => {
+      if (!Object.prototype.hasOwnProperty.call(prev, rowId)) return prev
+      const next = { ...prev }
+      delete next[rowId]
+      return next
+    })
+  }, [])
+
+  const handleRowResizeHover = useCallback((e: React.MouseEvent) => {
+    if (isMobile) return
+    if (isResizingRowRef.current) return
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const target = e.target as HTMLElement | null
+    const tr = target?.closest?.('tr[data-rowid="true"]') as HTMLTableRowElement | null
+    if (!tr) {
+      if (hoverResizeRowId) setHoverResizeRowId(null)
+      if (resizeLineTop != null) setResizeLineTop(null)
+      return
+    }
+
+    const rowId = tr.getAttribute('data-row-key') || ''
+    if (!rowId) return
+
+    const rowRect = tr.getBoundingClientRect()
+    const distToBottom = Math.abs(e.clientY - rowRect.bottom)
+    if (distToBottom > RESIZE_HITBOX_PX) {
+      if (hoverResizeRowId) setHoverResizeRowId(null)
+      if (resizeLineTop != null) setResizeLineTop(null)
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const topWithinScroll = (rowRect.bottom - containerRect.top) + container.scrollTop
+
+    if (hoverResizeRowId !== rowId) setHoverResizeRowId(rowId)
+    if (resizeLineTop !== topWithinScroll) setResizeLineTop(topWithinScroll)
+  }, [hoverResizeRowId, isMobile, resizeLineTop])
+
+  const handleRowResizeMouseLeave = useCallback(() => {
+    if (isResizingRowRef.current) return
+    setHoverResizeRowId(null)
+    setResizeLineTop(null)
+  }, [])
 
   // Handle column resize
   const handleResizeStart = useCallback((fieldName: string) => {
@@ -671,6 +894,17 @@ export default function GridView({
     return JSON.stringify(minimal)
   }, [safeTableFields])
 
+  // Prevent request storms (e.g. repeated mount/unmount in dev/StrictMode).
+  // - Only allow one in-flight load at a time.
+  // - If a load is requested while in-flight, queue exactly one more.
+  // - After failures, apply a short exponential backoff to avoid hammering Supabase.
+  const loadingRowsRef = useRef(false)
+  const pendingLoadRowsRef = useRef(false)
+  const loadBackoffRef = useRef<{ nextAllowedAt: number; delayMs: number }>({
+    nextAllowedAt: 0,
+    delayMs: 0,
+  })
+
   // Handle column reorder
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
@@ -690,12 +924,35 @@ export default function GridView({
   }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey])
 
   async function loadRows() {
+    // De-dupe in-flight loads (prevents hundreds of parallel requests).
+    if (loadingRowsRef.current) {
+      pendingLoadRowsRef.current = true
+      return
+    }
+    const now = Date.now()
+    if (loadBackoffRef.current.nextAllowedAt > now) {
+      // Respect backoff window.
+      return
+    }
+
     if (!supabaseTableName) {
       setLoading(false)
       return
     }
 
+    loadingRowsRef.current = true
+    pendingLoadRowsRef.current = false
     setLoading(true)
+
+    const bumpLoadBackoff = () => {
+      const prev = loadBackoffRef.current.delayMs || 0
+      const next = Math.min(prev > 0 ? prev * 2 : 500, 10_000)
+      loadBackoffRef.current = {
+        delayMs: next,
+        nextAllowedAt: Date.now() + next,
+      }
+    }
+
     try {
       // Build a minimal select list: visible fields + any fields referenced by filters/sorts/grouping/appearance,
       // plus underlying dependencies needed to compute formula fields client-side.
@@ -862,6 +1119,7 @@ export default function GridView({
         if (isAbortError(error)) {
           return
         }
+        bumpLoadBackoff()
 
         // If a view references a column that no longer exists in the physical table,
         // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
@@ -943,6 +1201,8 @@ export default function GridView({
             setTableWarning(
               'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
             )
+            // Successful recovery: clear backoff.
+            loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
             if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
               dataArray = sortRowsByFieldType(
                 dataArray,
@@ -956,6 +1216,7 @@ export default function GridView({
           }
 
           // Retry also failed: treat as schema mismatch (do NOT try to create the table).
+          bumpLoadBackoff()
           let sqlHint = ''
           if (missingColumn) {
             const field = safeTableFields.find(
@@ -1002,6 +1263,7 @@ export default function GridView({
           ))
         
         if (isTableNotFound) {
+          bumpLoadBackoff()
           setIsMissingPhysicalTable(true)
           setTableWarning(null)
           setTableError(`The table "${supabaseTableName}" does not exist. Attempting to create it...`)
@@ -1031,6 +1293,8 @@ export default function GridView({
                 setIsMissingPhysicalTable(false)
                 setTableError(null)
                 setTableWarning(null)
+                // Clear backoff since we are explicitly retrying after a successful create.
+                loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
                 loadRows()
               }, 1000)
               return
@@ -1051,6 +1315,9 @@ export default function GridView({
         }
         setRows([])
       } else {
+        // Success: clear backoff.
+        loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
+
         // CRITICAL: Normalize data to array - API might return single record or null
         let dataArray = asArray<Record<string, any>>(data)
         
@@ -1082,6 +1349,7 @@ export default function GridView({
       }
     } catch (error) {
       if (isAbortError(error)) return
+      bumpLoadBackoff()
       console.error("Error loading rows:", error)
       const msg =
         (error as any)?.message ||
@@ -1093,6 +1361,16 @@ export default function GridView({
       setRows([])
     } finally {
       setLoading(false)
+      loadingRowsRef.current = false
+
+      // If we queued another load while in-flight, run it once.
+      if (pendingLoadRowsRef.current) {
+        pendingLoadRowsRef.current = false
+        // Schedule next tick to avoid deep recursion and to allow React to flush state.
+        setTimeout(() => {
+          void loadRows()
+        }, 0)
+      }
     }
   }
 
@@ -1102,6 +1380,25 @@ export default function GridView({
     if (!rowId || !supabaseTableName) return
 
     try {
+      // Prevent 400 spam when the view references a field that no longer exists physically.
+      const fieldMeta = safeTableFields.find(
+        (f) =>
+          f &&
+          typeof f === 'object' &&
+          (f.name === fieldName ||
+            f.id === fieldName ||
+            (typeof f.name === 'string' && f.name.toLowerCase() === String(fieldName).toLowerCase()))
+      )
+      if (!fieldMeta) {
+        throw new Error(
+          `Cannot update "${fieldName}" because it does not exist in the underlying table schema. ` +
+            `Refresh the view fields or re-add/rename the column in Supabase.`
+        )
+      }
+      if (fieldMeta.type === 'formula' || fieldMeta.type === 'lookup') {
+        throw new Error(`Cannot update "${fieldName}" because it is a ${fieldMeta.type} field.`)
+      }
+
       const safeColumn = toPostgrestColumn(fieldName)
       if (!safeColumn) {
         throw new Error(
@@ -1523,8 +1820,41 @@ export default function GridView({
 
       {/* Grid Table - Takes remaining space and scrolls */}
       <div className="flex-1 min-h-0 border border-gray-200 rounded-lg overflow-hidden bg-white flex flex-col relative">
-        <div className="flex-1 overflow-auto" style={{ paddingBottom: isEditing ? '20px' : '0' }}>
-          <table className="w-full border-collapse">
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-auto relative"
+          style={{ paddingBottom: isEditing ? '20px' : '0' }}
+          onMouseMove={handleRowResizeHover}
+          onMouseLeave={handleRowResizeMouseLeave}
+        >
+          {/* Row resize overlay (between rows) */}
+          {hoverResizeRowId && resizeLineTop != null && !isMobile && (
+            <div
+              className="absolute left-0 right-0 z-30"
+              style={{
+                top: `${resizeLineTop - 3}px`,
+                height: '6px',
+                cursor: 'row-resize',
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const rowId = hoverResizeRowId
+                const startHeight = getEffectiveRowHeight(rowId)
+                startRowResize(rowId, startHeight, e.clientY)
+              }}
+              onDoubleClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                resetRowHeight(hoverResizeRowId)
+              }}
+              title="Drag to resize row (double-click to reset)"
+            >
+              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-blue-500/70" />
+            </div>
+          )}
+          {/* Allow the table to grow wider than the container so horizontal scroll appears */}
+          <table className="min-w-full w-max border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {/* Row action column header (for record opening) */}
@@ -1655,6 +1985,7 @@ export default function GridView({
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
                   const canOpenRecord = enableRecordOpen && allowOpenRecord
                   const thisRowId = row?.id ? String(row.id) : null
+                  const thisRowHeight = getEffectiveRowHeight(thisRowId)
 
                   return (
                     <tr
@@ -1662,7 +1993,9 @@ export default function GridView({
                       className={`border-b border-gray-100 transition-colors ${
                         thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                       } cursor-default`}
-                      style={{ ...borderColor, height: `${rowHeightPixels}px` }}
+                      style={{ ...borderColor, height: `${thisRowHeight}px` }}
+                      data-rowid="true"
+                      data-row-key={thisRowId || ''}
                       onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
                       onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                     >
@@ -1745,7 +2078,7 @@ export default function GridView({
                                       tableName={supabaseTableName}
                                       editable={canEdit && !isVirtual && rowId !== null}
                                       wrapText={wrapText}
-                                      rowHeight={rowHeightPixels}
+                                      rowHeight={thisRowHeight}
                                       onSave={async (value) => {
                                         if (!isVirtual && rowId) {
                                           await handleCellSave(rowId, field.field_name, value)
@@ -1762,7 +2095,7 @@ export default function GridView({
                                       isVirtual={isVirtual}
                                       editable={canEdit && !isVirtual && rowId !== null}
                                       wrapText={wrapText}
-                                      rowHeight={rowHeightPixels}
+                                      rowHeight={thisRowHeight}
                                       onSave={async (value) => {
                                         if (!isVirtual && rowId) {
                                           await handleCellSave(rowId, field.field_name, value)
@@ -1786,6 +2119,7 @@ export default function GridView({
                   const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
                   const canOpenRecord = enableRecordOpen && allowOpenRecord
                   const thisRowId = row?.id ? String(row.id) : null
+                  const thisRowHeight = getEffectiveRowHeight(thisRowId)
                   
                   return (
                   <tr
@@ -1793,7 +2127,9 @@ export default function GridView({
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}
-                    style={{ ...borderColor, height: `${rowHeightPixels}px` }}
+                    style={{ ...borderColor, height: `${thisRowHeight}px` }}
+                    data-rowid="true"
+                    data-row-key={thisRowId || ''}
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
                     onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                   >
@@ -1878,7 +2214,7 @@ export default function GridView({
                                     tableName={supabaseTableName}
                                     editable={canEdit && !isVirtual && rowId !== null}
                                     wrapText={wrapText}
-                                    rowHeight={rowHeightPixels}
+                                    rowHeight={thisRowHeight}
                                     onSave={async (value) => {
                                       if (!isVirtual && rowId) {
                                         await handleCellSave(rowId, field.field_name, value)
@@ -1895,7 +2231,7 @@ export default function GridView({
                                     isVirtual={isVirtual}
                                     editable={canEdit && !isVirtual && rowId !== null}
                                     wrapText={wrapText}
-                                    rowHeight={rowHeightPixels}
+                                    rowHeight={thisRowHeight}
                                     onSave={async (value) => {
                                       if (!isVirtual && rowId) {
                                         await handleCellSave(rowId, field.field_name, value)

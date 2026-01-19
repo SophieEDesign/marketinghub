@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
+import { getPrimaryFieldName } from "@/lib/fields/primary"
+import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 
 type LinkedValue =
   | string
@@ -16,6 +18,7 @@ interface LinkedRecordCellProps {
   value: LinkedValue | null | undefined
   rowId: string
   editable?: boolean
+  rowHeight?: number
   onSave: (value: any) => Promise<void>
   placeholder?: string
 }
@@ -25,6 +28,7 @@ export default function LinkedRecordCell({
   value,
   rowId,
   editable = true,
+  rowHeight,
   onSave,
   placeholder = "—",
 }: LinkedRecordCellProps) {
@@ -111,16 +115,97 @@ export default function LinkedRecordCell({
     window.location.href = `/tables/${tableId}/records/${recordId}`
   }
 
+  const handleCreateLinkedRecord = async (tableId: string): Promise<string | null> => {
+    if (!tableId) return null
+    try {
+      const supabase = createClient()
+
+      // Load table metadata to find the physical table name.
+      const { data: table, error: tableError } = await supabase
+        .from("tables")
+        .select("supabase_table, primary_field_name")
+        .eq("id", tableId)
+        .maybeSingle()
+
+      if (tableError || !table?.supabase_table) {
+        console.error("[LinkedRecordCell] Failed to load linked table metadata:", tableError)
+        return null
+      }
+
+      // Best-effort: try to prefill a primary text-like field so the record isn't "blank".
+      // If we can't safely determine a physical column name, fall back to inserting an empty row.
+      const payload: Record<string, any> = {}
+      const { data: linkedFields } = await supabase
+        .from("table_fields")
+        .select("name, type, position, order_index, options")
+        .eq("table_id", tableId)
+        .order("position", { ascending: true })
+
+      const configuredPrimary =
+        typeof (table as any)?.primary_field_name === "string" &&
+        String((table as any).primary_field_name).trim().length > 0 &&
+        String((table as any).primary_field_name).trim() !== "id"
+          ? String((table as any).primary_field_name).trim()
+          : null
+
+      const candidatePrimaryName = configuredPrimary || getPrimaryFieldName(linkedFields as any)
+      if (candidatePrimaryName) {
+        const safePrimaryCol = toPostgrestColumn(candidatePrimaryName)
+        const primaryField = Array.isArray(linkedFields)
+          ? linkedFields.find((f: any) => f?.name === candidatePrimaryName)
+          : null
+
+        const isTextLike =
+          primaryField && ["text", "long_text", "email", "url"].includes(String(primaryField.type))
+
+        if (safePrimaryCol && safePrimaryCol !== "id" && isTextLike) {
+          payload[safePrimaryCol] = "New record"
+        }
+      }
+
+      // Try insert with payload first, then fall back to empty row if needed.
+      const attemptInsert = async (data: Record<string, any>) => {
+        return await supabase.from(table.supabase_table).insert([data]).select().single()
+      }
+
+      let inserted = await attemptInsert(payload)
+      if (inserted.error && Object.keys(payload).length > 0) {
+        inserted = await attemptInsert({})
+      }
+
+      if (inserted.error) {
+        console.error("[LinkedRecordCell] Failed to create linked record:", inserted.error)
+        alert("Failed to create linked record. Please check required fields and permissions.")
+        return null
+      }
+
+      const createdId = (inserted.data as any)?.id || (inserted.data as any)?.record_id
+      return createdId ? String(createdId) : null
+    } catch (e) {
+      console.error("[LinkedRecordCell] Failed to create linked record:", e)
+      alert("Failed to create linked record. Please try again.")
+      return null
+    }
+  }
+
   if (!linkedTableId || !lookupConfig) {
     return (
-      <div className="w-full min-h-[36px] px-3 py-2 flex items-center text-sm text-gray-400 italic">
+      <div
+        className="w-full h-full px-3 flex items-center text-sm text-gray-400 italic overflow-hidden"
+        style={rowHeight ? { height: `${rowHeight}px` } : undefined}
+      >
         {placeholder}
       </div>
     )
   }
 
   return (
-    <div className="w-full min-h-[36px] px-2 py-1.5" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+    <div
+      className="w-full h-full px-2 flex items-center overflow-hidden"
+      style={rowHeight ? { height: `${rowHeight}px` } : undefined}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+    >
       <LookupFieldPicker
         field={field}
         value={normalizedIds as any}
@@ -132,7 +217,9 @@ export default function LinkedRecordCell({
         disabled={isDisabled}
         placeholder={isDisabled ? placeholder : `Add ${field.name}...`}
         onRecordClick={handleLinkedRecordClick}
+        onCreateRecord={lookupConfig.allowCreate && !isDisabled ? handleCreateLinkedRecord : undefined}
         isLookupField={false}
+        compact={true}
       />
     </div>
   )

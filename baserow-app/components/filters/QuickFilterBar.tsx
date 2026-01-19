@@ -320,15 +320,15 @@ export default function QuickFilterBar({
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded-full border border-dashed bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
-              aria-label="Add filter"
+              aria-label="Add Filter"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add
+              Add Filter
             </button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-64 p-2">
             <div className="text-xs font-medium text-gray-700 px-2 py-1">
-              Add filter
+              Add Filter
             </div>
             <div className="max-h-56 overflow-auto">
               {addableFields.map((f) => (
