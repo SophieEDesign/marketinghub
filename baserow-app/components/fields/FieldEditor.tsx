@@ -337,6 +337,38 @@ export default function FieldEditor({
   // Determine if this is a lookup field (derived) vs linked field (editable)
   const isLookupField = field.type === "lookup"
 
+  // Linked records and lookup fields use the same picker component.
+  // IMPORTANT: hooks must be called unconditionally (Rules of Hooks),
+  // so compute config outside conditional render branches.
+  const linkedTableId =
+    field.type === "link_to_table"
+      ? field.options?.linked_table_id
+      : field.type === "lookup"
+        ? field.options?.lookup_table_id
+        : undefined
+
+  const lookupConfig: LookupFieldConfig | undefined = useMemo(() => {
+    if (!linkedTableId) return undefined
+    if (field.type !== "link_to_table" && field.type !== "lookup") return undefined
+    return {
+      lookupTableId: linkedTableId,
+      relationshipType:
+        field.options?.relationship_type ||
+        (field.type === "link_to_table" ? "one-to-many" : "one-to-one"),
+      maxSelections: field.options?.max_selections,
+      required: field.required || required,
+      allowCreate: field.options?.allow_create,
+    }
+  }, [
+    linkedTableId,
+    field.type,
+    field.required,
+    required,
+    field.options?.relationship_type,
+    field.options?.max_selections,
+    field.options?.allow_create,
+  ])
+
   // Handle paste - block for lookup fields
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     if (field.type === "lookup") {
@@ -369,32 +401,6 @@ export default function FieldEditor({
 
   // Linked records and lookup fields - use LookupFieldPicker
   if (field.type === "link_to_table" || field.type === "lookup") {
-    const linkedTableId = field.type === "link_to_table" 
-      ? field.options?.linked_table_id 
-      : field.options?.lookup_table_id
-
-    // Build lookup config from field options
-    const lookupConfig: LookupFieldConfig | undefined = useMemo(() => {
-      if (!linkedTableId) return undefined
-      return {
-        lookupTableId: linkedTableId,
-        relationshipType:
-          field.options?.relationship_type ||
-          (field.type === "link_to_table" ? "one-to-many" : "one-to-one"),
-        maxSelections: field.options?.max_selections,
-        required: field.required || required,
-        allowCreate: field.options?.allow_create,
-      }
-    }, [
-      linkedTableId,
-      field.type,
-      field.required,
-      required,
-      field.options?.relationship_type,
-      field.options?.max_selections,
-      field.options?.allow_create,
-    ])
-
     // LOOKUP FIELDS (derived, read-only) - Show as informational pills
     if (isLookupField) {
       return (

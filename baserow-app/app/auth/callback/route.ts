@@ -15,45 +15,41 @@ export async function GET(request: NextRequest) {
     
     if (!error && sessionData?.user) {
       // Successfully confirmed email and created session
-      // Create or update profile with role from user metadata (if invited)
+      // Ensure a profile row exists for this user.
+      // CRITICAL: Do NOT overwrite an existing profile role on login.
+      // Overwriting would allow accidental (or malicious) role changes via user metadata.
       const userMetadata = sessionData.user.user_metadata || {}
-      const role = (userMetadata.role || 'member') as 'admin' | 'member' // Default to member if no role specified
-      
-      // Create or update profile - ensure role is always set
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: sessionData.user.id,
-          role: role,
-        }, {
-          onConflict: 'user_id',
-        })
+      const requestedRole = (userMetadata.role === 'admin' ? 'admin' : 'member') as 'admin' | 'member'
 
-      // If profile creation failed, log but don't block auth flow
-      if (profileError) {
-        // Only log in development to avoid exposing errors in production
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error creating/updating profile:', profileError)
-        }
-        
-        // Try to create profile with default role if upsert failed
-        // This handles cases where the profile doesn't exist yet
-        if (!profileError.message?.includes('duplicate') && 
-            !profileError.message?.includes('already exists')) {
+      try {
+        const { data: existingProfile, error: existingProfileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('user_id', sessionData.user.id)
+          .maybeSingle()
+
+        // If profile exists, never overwrite role here.
+        if (!existingProfileError && existingProfile?.role) {
+          // noop
+        } else {
+          // Create profile with safest default. If the user was provisioned via a trusted invite flow
+          // that sets role metadata, we can use it ONLY for initial creation.
           const { error: insertError } = await supabase
             .from('profiles')
             .insert({
               user_id: sessionData.user.id,
-              role: 'member',
+              role: requestedRole,
             })
-            .select()
-            .maybeSingle()
-          
+
           if (insertError && process.env.NODE_ENV === 'development') {
-            console.error('Error creating profile with default role:', insertError)
+            console.error('Error creating profile:', insertError)
           }
         }
-        // Don't fail the auth flow if profile creation fails - user can still proceed
+      } catch (e) {
+        // Don't block auth flow if profile syncing fails.
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error ensuring profile exists:', e)
+        }
       }
 
       // Check if this is an invited user who needs to set up a password

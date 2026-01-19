@@ -80,17 +80,22 @@ export default function NonGridViewWrapper({
     try {
       const { error } = await supabase
         .from(tableInfo.supabase_table)
-        .insert([{}])
+        .insert([{ created_at: new Date().toISOString() }])
 
       if (error) {
         console.error("Error creating record:", error)
-        alert("Failed to create record")
+        const message = (error as any)?.message || 'Unknown error'
+        const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
+        alert(`Failed to create record${code}: ${message}`)
       } else {
         router.refresh()
       }
     } catch (error) {
       console.error("Error creating record:", error)
-      alert("Failed to create record")
+      const e = error as any
+      const message = e?.message || 'Unknown error'
+      const code = e?.code ? ` (code: ${e.code})` : ''
+      alert(`Failed to create record${code}: ${message}`)
     }
   }
 

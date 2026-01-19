@@ -552,9 +552,17 @@ export function useGridData({
   const insertRow = useCallback(
     async (data: Record<string, any>): Promise<GridRow | null> => {
       try {
+        // Some Supabase/PostgREST setups reject INSERT payloads with no columns (e.g. `{}`),
+        // even if the table has defaults/triggers. Ensure at least one safe column is present.
+        // `created_at` is part of our standardized audit fields across dynamic tables.
+        const payload =
+          data && Object.keys(data).length > 0
+            ? data
+            : { created_at: new Date().toISOString() }
+
         const { data: newRow, error: insertError } = await supabase
           .from(tableName)
-          .insert([data])
+          .insert([payload])
           .select()
           .single()
 

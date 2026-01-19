@@ -784,6 +784,10 @@ export default function CalendarView({
         supabaseTableName,
         updates,
       })
+      const e = error as any
+      const message = e?.message || "Unknown error"
+      const code = e?.code ? ` (code: ${e.code})` : ""
+      alert(`Failed to save change${code}: ${message}`)
       info.revert()
       await loadRows()
     }
@@ -1580,7 +1584,9 @@ export default function CalendarView({
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}
-            const dateValue = createRecordDate.toISOString().split('T')[0] // Format as YYYY-MM-DD
+            // IMPORTANT: Use local date formatting (not UTC via toISOString),
+            // otherwise the day can shift for users outside UTC.
+            const dateValue = format(createRecordDate, 'yyyy-MM-dd')
             
             // Use resolved date field or view config fields
             if (resolvedDateFieldId) {

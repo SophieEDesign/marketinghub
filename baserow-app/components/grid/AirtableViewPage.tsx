@@ -257,7 +257,9 @@ export default function AirtableViewPage({
       }
 
       // Fallback: insert directly (e.g. grid not mounted yet)
-      const { error } = await supabase.from(table.supabase_table).insert([{}])
+      const { error } = await supabase
+        .from(table.supabase_table)
+        .insert([{ created_at: new Date().toISOString() }])
       if (error) throw error
     } catch (error) {
       const e = error as any
