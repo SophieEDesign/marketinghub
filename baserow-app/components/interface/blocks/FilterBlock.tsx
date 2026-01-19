@@ -17,6 +17,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
+import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree, FilterGroup, FilterCondition } from "@/lib/filters/canonical-model"
 import {
   normalizeFilterTree,
@@ -231,21 +232,53 @@ export default function FilterBlock({
 
   // Stable signature to ensure we only emit when payload meaningfully changes.
   // This avoids Provider/Consumer update loops if arrays/objects are re-created with identical values.
+  const emittedFilters = useMemo<FilterConfig[]>(() => {
+    const normalized = normalizeFilterTree(filterTree)
+    if (!normalized) return []
+
+    const conditions = flattenFilterTree(normalized)
+
+    return conditions.map((c) => {
+      // Normalize date_range into legacy split fields (value/value2) for compatibility.
+      if (
+        c.operator === "date_range" &&
+        c.value &&
+        typeof c.value === "object" &&
+        "start" in (c.value as any) &&
+        "end" in (c.value as any)
+      ) {
+        const v = c.value as any
+        return {
+          field: c.field_id,
+          operator: c.operator as FilterConfig["operator"],
+          value: v.start ?? null,
+          value2: v.end ?? null,
+        }
+      }
+
+      return {
+        field: c.field_id,
+        operator: c.operator as FilterConfig["operator"],
+        value: c.value ?? null,
+      }
+    })
+  }, [filterTree])
+
   const emitSignature = useMemo(() => {
     const blockTitle = config?.title || block.id
     return JSON.stringify({
       blockId: block.id,
-      filterTree,
+      filters: emittedFilters,
       targetBlocks: effectiveTargetBlocks,
       blockTitle,
     })
-  }, [block.id, filterTree, effectiveTargetBlocks, config?.title])
+  }, [block.id, emittedFilters, effectiveTargetBlocks, config?.title])
 
   // Emit filter state to context whenever filters change
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
-      updateFilterBlock(block.id, filterTree, effectiveTargetBlocks, blockTitle)
+      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle)
     }
     
     return () => {

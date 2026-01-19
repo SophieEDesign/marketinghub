@@ -1285,83 +1285,11 @@ export default function CalendarView({
     }
   }
 
-  if (loading) {
-    return <div className="p-4">Loading...</div>
-  }
-
-  // Handle missing tableId gracefully - show setup state
-  if (!resolvedTableId || resolvedTableId.trim() === '') {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-        <div className="text-sm mb-2 text-center font-medium">
-          Calendar view requires a table connection.
-        </div>
-        <div className="text-xs text-gray-400 text-center">
-          This page isn&apos;t connected to a table. Please configure it in Settings.
-        </div>
-      </div>
-    )
-  }
-
-  // Handle missing or invalid date field - show setup state
-  // Use resolvedDateFieldId instead of dateFieldId prop to check all sources
-  if (!resolvedDateFieldId || !isValidDateField) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-        <div className="text-sm mb-2 text-center font-medium">
-          Calendar view requires a date field.
-        </div>
-        <div className="text-xs text-gray-400 text-center">
-          {!resolvedDateFieldId 
-            ? "Please select a date field in Page Settings or block settings."
-            : `The selected field "${resolvedDateFieldId}" is not a date field. Please select a date field in Page Settings.`
-          }
-        </div>
-      </div>
-    )
-  }
-
-  // Empty state for search
-  if (searchQuery && filteredRows.length === 0 && rows.length > 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500">
-        <div className="text-sm mb-2">No records match your search</div>
-        <button
-          onClick={() => {
-            const params = new URLSearchParams(window.location.search)
-            params.delete("q")
-            window.history.replaceState({}, "", `?${params.toString()}`)
-            window.location.reload()
-          }}
-          className="text-xs text-blue-600 hover:text-blue-700 underline"
-        >
-          Clear search
-        </button>
-      </div>
-    )
-  }
-
-  // Empty state for no data
-  if (!loading && rows.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-        <div className="text-sm mb-2 text-center font-medium">
-          No records found
-        </div>
-        <div className="text-xs text-gray-400 text-center">
-          {filters.length > 0 
-            ? "Try adjusting your filters to see more records."
-            : "Add records to this table to see them in the calendar."
-          }
-        </div>
-      </div>
-    )
-  }
-
-  // Get events for rendering
+  // Get events for rendering (non-hook; safe to compute before early returns)
   const calendarEvents = getEvents()
 
   // FullCalendar: keep option prop references stable to avoid internal update loops.
+  // IMPORTANT: Hooks must be declared before any early returns.
   const calendarPlugins = useMemo(() => [dayGridPlugin, interactionPlugin], [])
   const calendarHeaderToolbar = useMemo(
     () => ({
@@ -1494,6 +1422,79 @@ export default function CalendarView({
     },
     [canCreateRecord]
   )
+
+  if (loading) {
+    return <div className="p-4">Loading...</div>
+  }
+
+  // Handle missing tableId gracefully - show setup state
+  if (!resolvedTableId || resolvedTableId.trim() === '') {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center font-medium">
+          Calendar view requires a table connection.
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          This page isn&apos;t connected to a table. Please configure it in Settings.
+        </div>
+      </div>
+    )
+  }
+
+  // Handle missing or invalid date field - show setup state
+  // Use resolvedDateFieldId instead of dateFieldId prop to check all sources
+  if (!resolvedDateFieldId || !isValidDateField) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center font-medium">
+          Calendar view requires a date field.
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          {!resolvedDateFieldId 
+            ? "Please select a date field in Page Settings or block settings."
+            : `The selected field "${resolvedDateFieldId}" is not a date field. Please select a date field in Page Settings.`
+          }
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state for search
+  if (searchQuery && filteredRows.length === 0 && rows.length > 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500">
+        <div className="text-sm mb-2">No records match your search</div>
+        <button
+          onClick={() => {
+            const params = new URLSearchParams(window.location.search)
+            params.delete("q")
+            window.history.replaceState({}, "", `?${params.toString()}`)
+            window.location.reload()
+          }}
+          className="text-xs text-blue-600 hover:text-blue-700 underline"
+        >
+          Clear search
+        </button>
+      </div>
+    )
+  }
+
+  // Empty state for no data
+  if (!loading && rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+        <div className="text-sm mb-2 text-center font-medium">
+          No records found
+        </div>
+        <div className="text-xs text-gray-400 text-center">
+          {filters.length > 0 
+            ? "Try adjusting your filters to see more records."
+            : "Add records to this table to see them in the calendar."
+          }
+        </div>
+      </div>
+    )
+  }
 
   // Empty state: rows exist but no events generated (likely missing/invalid date values)
   // CRITICAL: This check must happen AFTER rows are loaded and events are generated
