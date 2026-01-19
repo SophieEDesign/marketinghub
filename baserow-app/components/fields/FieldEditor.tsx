@@ -374,13 +374,26 @@ export default function FieldEditor({
       : field.options?.lookup_table_id
 
     // Build lookup config from field options
-    const lookupConfig: LookupFieldConfig | undefined = linkedTableId ? {
-      lookupTableId: linkedTableId,
-      relationshipType: field.options?.relationship_type || (field.type === "link_to_table" ? 'one-to-many' : 'one-to-one'),
-      maxSelections: field.options?.max_selections,
-      required: field.required || required,
-      allowCreate: field.options?.allow_create,
-    } : undefined
+    const lookupConfig: LookupFieldConfig | undefined = useMemo(() => {
+      if (!linkedTableId) return undefined
+      return {
+        lookupTableId: linkedTableId,
+        relationshipType:
+          field.options?.relationship_type ||
+          (field.type === "link_to_table" ? "one-to-many" : "one-to-one"),
+        maxSelections: field.options?.max_selections,
+        required: field.required || required,
+        allowCreate: field.options?.allow_create,
+      }
+    }, [
+      linkedTableId,
+      field.type,
+      field.required,
+      required,
+      field.options?.relationship_type,
+      field.options?.max_selections,
+      field.options?.allow_create,
+    ])
 
     // LOOKUP FIELDS (derived, read-only) - Show as informational pills
     if (isLookupField) {
@@ -498,8 +511,11 @@ export default function FieldEditor({
 
   // Select fields
   if (field.type === "single_select" || field.type === "multi_select") {
-    const choices = getManualChoiceLabels(field.type, field.options)
-    const isMulti = field.type === "multi_select"
+    // Capture the narrowed type so TS keeps it inside closures.
+    const selectFieldType: "single_select" | "multi_select" = field.type
+
+    const choices = getManualChoiceLabels(selectFieldType, field.options)
+    const isMulti = selectFieldType === "multi_select"
     const selectedValuesRaw = isMulti
       ? (Array.isArray(value) ? value : value ? [value] : [])
       : value
@@ -507,10 +523,7 @@ export default function FieldEditor({
         : []
     // IMPORTANT: pills must always follow manual order (sort_index),
     // and must never be affected by any per-picker alphabetise UI.
-    const selectedValues = sortLabelsByManualOrder(selectedValuesRaw, field.type, field.options)
-
-    // Capture the narrowed type so TS keeps it inside closures.
-    const selectFieldType: "single_select" | "multi_select" = field.type
+    const selectedValues = sortLabelsByManualOrder(selectedValuesRaw, selectFieldType, field.options)
     const useSemanticColors = selectFieldType === "single_select"
     const getChoiceColor = (choice: string): string =>
       resolveChoiceColor(choice, selectFieldType, field.options, useSemanticColors)
@@ -604,7 +617,7 @@ export default function FieldEditor({
                         const toggled = isSelected
                           ? selectedValuesRaw.filter((v) => v !== choice)
                           : [...selectedValuesRaw, choice]
-                        onChange(sortLabelsByManualOrder(toggled, field.type, field.options))
+                        onChange(sortLabelsByManualOrder(toggled, selectFieldType, field.options))
                       }}
                       className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 text-left"
                     >

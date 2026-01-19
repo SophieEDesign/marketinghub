@@ -10,6 +10,11 @@ import type { TableField, LinkedField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import { toPostgrestColumn } from '@/lib/supabase/postgrest'
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v)
+}
+
 /**
  * Resolve a linked field value to display labels
  * 
@@ -112,10 +117,20 @@ export async function resolveLinkedFieldDisplay(
     return ''
   }
 
+  // Defensive: some legacy data stores display labels instead of UUID ids.
+  // Never issue `.in('id', ['Sophie Edgerley'])` against a UUID column (PostgREST 400).
+  const uuidIds = validIds.filter(isUuid)
+  const legacyValues = validIds.filter((v) => !isUuid(v))
+
+  if (uuidIds.length === 0) {
+    // Nothing we can safely resolve; fall back to joining original values.
+    return legacyValues.join(', ')
+  }
+
   const { data: records, error: recordsError } = await supabase
     .from(targetTable.supabase_table)
     .select(`id, ${displayFieldName}`)
-    .in('id', validIds)
+    .in('id', uuidIds)
 
   if (recordsError || !records || !Array.isArray(records)) {
     console.warn(`[resolveLinkedFieldDisplay] Error fetching records:`, recordsError)
@@ -127,7 +142,9 @@ export async function resolveLinkedFieldDisplay(
     records.map((r: any) => [r.id, r[displayFieldName!] || ''])
   )
 
-  const labels = validIds.map(id => displayMap.get(id) || id)
+  const labels = uuidIds.map(id => displayMap.get(id) || id)
+  // Append any legacy (non-UUID) values we couldn't resolve.
+  if (legacyValues.length > 0) labels.push(...legacyValues)
   return labels.join(', ')
 }
 

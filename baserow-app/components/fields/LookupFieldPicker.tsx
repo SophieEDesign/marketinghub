@@ -10,6 +10,119 @@ import { cn } from "@/lib/utils"
 import { getPrimaryFieldName } from "@/lib/fields/primary"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuid(v: unknown): v is string {
+  return typeof v === "string" && UUID_RE.test(v)
+}
+
+type TableInfo = {
+  supabase_table: string
+  name?: string | null
+  primary_field_name?: string | null
+}
+type LookupFieldMeta = { id?: string; name: string; type: string }
+
+// Module-level caches to avoid repeated metadata queries across many pickers.
+const tableInfoCache = new Map<string, TableInfo>()
+const fieldsCache = new Map<string, LookupFieldMeta[]>()
+const physicalColsCache = new Map<string, Set<string>>()
+// Cache resolved record options per "context" (table + requested label fields).
+const recordOptionCache = new Map<string, Map<string, RecordOption>>()
+
+function buildContextKey(lookupTableId: string, primary?: string, secondary?: string[]) {
+  const s = (secondary || []).filter(Boolean).slice(0, 2).join("|")
+  return `${lookupTableId}::p=${primary || ""}::s=${s}`
+}
+
+async function getTableInfoCached(lookupTableId: string): Promise<TableInfo | null> {
+  const cached = tableInfoCache.get(lookupTableId)
+  if (cached) return cached
+  const supabase = createClient()
+  const { data: table, error } = await supabase
+    .from("tables")
+    .select("supabase_table, name, primary_field_name")
+    .eq("id", lookupTableId)
+    .single()
+  if (error || !table) return null
+  tableInfoCache.set(lookupTableId, table as TableInfo)
+  return table as TableInfo
+}
+
+async function getFieldsCached(lookupTableId: string): Promise<LookupFieldMeta[]> {
+  const cached = fieldsCache.get(lookupTableId)
+  if (cached) return cached
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from("table_fields")
+    .select("id, name, type")
+    .eq("table_id", lookupTableId)
+    .order("position", { ascending: true })
+  if (error || !Array.isArray(data)) return []
+  const fields = data as LookupFieldMeta[]
+  fieldsCache.set(lookupTableId, fields)
+  return fields
+}
+
+async function getPhysicalColsCached(supabaseTableName: string): Promise<Set<string>> {
+  const cached = physicalColsCache.get(supabaseTableName)
+  if (cached) return cached
+  const supabase = createClient()
+  const { data: physicalCols, error } = await supabase.rpc("get_table_columns", {
+    table_name: supabaseTableName,
+  })
+  if (error || !Array.isArray(physicalCols)) return new Set()
+  const cols = new Set(
+    physicalCols.map((c: any) => String(c?.column_name ?? "")).filter(Boolean)
+  )
+  physicalColsCache.set(supabaseTableName, cols)
+  return cols
+}
+
+function resolveEffectiveLabelFields(args: {
+  table: TableInfo
+  lookupFields: LookupFieldMeta[]
+  physicalCols: Set<string> | null
+  requestedPrimaryLabelField?: string
+  requestedSecondaryLabelFields?: string[]
+}): { primary: string; secondary: string[] } {
+  const {
+    table,
+    lookupFields,
+    physicalCols,
+    requestedPrimaryLabelField,
+    requestedSecondaryLabelFields,
+  } = args
+
+  const hasPhysical = !!physicalCols && physicalCols.size > 0
+  const hasField = (name: string) => lookupFields.some((f) => f.name === name)
+  const isPhysical = (name: string) => !hasPhysical || physicalCols!.has(name)
+
+  const configuredPrimary =
+    typeof (table as any)?.primary_field_name === "string" &&
+    String((table as any).primary_field_name).trim().length > 0
+      ? String((table as any).primary_field_name).trim()
+      : null
+
+  const candidatePrimary =
+    requestedPrimaryLabelField && hasField(requestedPrimaryLabelField)
+      ? requestedPrimaryLabelField
+      : configuredPrimary && configuredPrimary !== "id" && hasField(configuredPrimary)
+        ? configuredPrimary
+        : getPrimaryFieldName(lookupFields as any) || "id"
+
+  const safePrimary = toPostgrestColumn(candidatePrimary)
+  const primary =
+    candidatePrimary !== "id" && (!safePrimary || !isPhysical(candidatePrimary)) ? "id" : candidatePrimary
+
+  const secondary = (requestedSecondaryLabelFields || [])
+    .filter((fieldName) => fieldName && fieldName !== primary)
+    .filter((fieldName) => hasField(fieldName))
+    .filter((fieldName) => toPostgrestColumn(fieldName) && isPhysical(fieldName))
+    .slice(0, 2)
+
+  return { primary, secondary }
+}
+
 export interface LookupFieldConfig {
   // Optional: field to use as primary label (defaults to the table's primary field)
   primaryLabelField?: string
@@ -73,6 +186,8 @@ export default function LookupFieldPicker({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadedSelectedIdsRef = useRef<string>("")
+  const loadOptionsSeqRef = useRef(0)
+  const loadSelectedSeqRef = useRef(0)
 
   // Determine if multi-select
   const isMultiSelect = 
@@ -89,6 +204,23 @@ export default function LookupFieldPicker({
       : []
   const selectedIdsKey = useMemo(() => selectedIds.slice().sort().join("|"), [selectedIds])
 
+  // Some older/legacy data stores display labels instead of UUID record IDs.
+  // Supabase/PostgREST cannot handle `in.(Sophie Edgerley)` without quoting, and `id` is a uuid column.
+  // Treat non-UUID selected values as "legacy pills" and avoid querying by `id` for them.
+  const { uuidSelectedIds, legacySelectedValues } = useMemo(() => {
+    const uuids: string[] = []
+    const legacy: string[] = []
+    for (const raw of selectedIds) {
+      const s = String(raw ?? '').trim()
+      if (!s) continue
+      if (isUuid(s)) uuids.push(s)
+      else legacy.push(s)
+    }
+    // de-dupe while preserving order
+    const uniq = (arr: string[]) => Array.from(new Set(arr))
+    return { uuidSelectedIds: uniq(uuids), legacySelectedValues: uniq(legacy) }
+  }, [selectedIds])
+
   // Get lookup table ID
   const lookupTableId = config?.lookupTableId || 
     (field.type === 'link_to_table' ? field.options?.linked_table_id : field.options?.lookup_table_id) ||
@@ -97,29 +229,54 @@ export default function LookupFieldPicker({
   // Requested label fields (may be undefined); effective fields are resolved per-table after loading fields.
   const requestedPrimaryLabelField = config?.primaryLabelField
   const requestedSecondaryLabelFields = config?.secondaryLabelFields || []
+  const contextKey = useMemo(
+    () => (lookupTableId ? buildContextKey(lookupTableId, requestedPrimaryLabelField, requestedSecondaryLabelFields) : ""),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lookupTableId, requestedPrimaryLabelField, (requestedSecondaryLabelFields || []).join("|")]
+  )
 
   // Get table name for display
   const [tableName, setTableName] = useState<string | null>(null)
   
   useEffect(() => {
-    if (lookupTableId) {
-      const supabase = createClient()
-      supabase
-        .from("tables")
-        .select("name")
-        .eq("id", lookupTableId)
-        .single()
-        .then(({ data }) => {
-          if (data) setTableName(data.name)
-        })
-    } else {
+    let cancelled = false
+    if (!lookupTableId) {
       setTableName(null)
+      return
+    }
+    getTableInfoCached(lookupTableId).then((t) => {
+      if (cancelled) return
+      setTableName(t?.name ?? null)
+    })
+    return () => {
+      cancelled = true
     }
   }, [lookupTableId])
 
   useEffect(() => {
     loadedSelectedIdsRef.current = ""
   }, [lookupTableId])
+
+  // If we've already cached selected record labels (from another picker instance),
+  // seed local options immediately to avoid any extra round-trip.
+  useEffect(() => {
+    if (!contextKey) return
+    if (uuidSelectedIds.length === 0) return
+    const cacheForContext = recordOptionCache.get(contextKey)
+    if (!cacheForContext) return
+
+    const cached = uuidSelectedIds
+      .map((id) => cacheForContext.get(id))
+      .filter(Boolean) as RecordOption[]
+
+    if (cached.length === 0) return
+
+    setOptions((prev) => {
+      const existingIds = new Set(prev.map((o) => o.id))
+      const add = cached.filter((o) => !existingIds.has(o.id))
+      return add.length > 0 ? [...prev, ...add] : prev
+    })
+  }, [contextKey, uuidSelectedIds.join("|")])
 
   const isMirroredLinkedField =
     field.type === 'link_to_table' &&
@@ -130,12 +287,214 @@ export default function LookupFieldPicker({
   const handleNavigateToRecord = useCallback(
     (e: React.MouseEvent, recordId: string) => {
       e.stopPropagation()
+      // Only navigate when the selected value is a real record UUID.
+      if (!isUuid(recordId)) return
       if (onRecordClick && lookupTableId) {
         onRecordClick(lookupTableId, recordId)
       }
     },
     [onRecordClick, lookupTableId]
   )
+
+  const loadOptions = useCallback(
+    async (query: string = "") => {
+      if (!lookupTableId) return
+
+      const seq = ++loadOptionsSeqRef.current
+      setLoading(true)
+      try {
+        const table = await getTableInfoCached(lookupTableId)
+        if (seq !== loadOptionsSeqRef.current) return
+        if (!table) {
+          setOptions([])
+          return
+        }
+
+        const lookupFields = await getFieldsCached(lookupTableId)
+        if (seq !== loadOptionsSeqRef.current) return
+
+        const physicalCols = await getPhysicalColsCached(table.supabase_table)
+        if (seq !== loadOptionsSeqRef.current) return
+
+        const { primary: effectivePrimaryLabelField, secondary: effectiveSecondaryLabelFields } =
+          resolveEffectiveLabelFields({
+            table,
+            lookupFields,
+            physicalCols,
+            requestedPrimaryLabelField,
+            requestedSecondaryLabelFields,
+          })
+
+        const fieldsToSelect = ["id", effectivePrimaryLabelField, ...effectiveSecondaryLabelFields].filter(Boolean)
+
+        const supabase = createClient()
+        let queryBuilder = supabase
+          .from(table.supabase_table)
+          .select(fieldsToSelect.join(", "))
+          .limit(50)
+
+        if (query.trim()) {
+          const primaryField = lookupFields.find((f: any) => f.name === effectivePrimaryLabelField)
+          if (primaryField) {
+            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
+          }
+        }
+
+        const { data: records, error } = await queryBuilder
+        if (seq !== loadOptionsSeqRef.current) return
+
+        if (error) {
+          console.error("Error loading records:", error)
+          setOptions([])
+          return
+        }
+
+        const transformedOptions: RecordOption[] = (records || []).map((record: any) => {
+          const primaryLabel = record[effectivePrimaryLabelField] ? String(record[effectivePrimaryLabelField]) : "Untitled"
+          const secondaryLabels = effectiveSecondaryLabelFields
+            .map((fieldName) => record[fieldName])
+            .filter(Boolean)
+            .map(String)
+
+          return {
+            id: record.id,
+            primaryLabel,
+            secondaryLabels: secondaryLabels.length > 0 ? secondaryLabels : undefined,
+            data: record,
+          }
+        })
+
+        // Warm the per-context cache for selected rendering in other pickers.
+        if (contextKey) {
+          const existing = recordOptionCache.get(contextKey) || new Map<string, RecordOption>()
+          for (const opt of transformedOptions) existing.set(opt.id, opt)
+          recordOptionCache.set(contextKey, existing)
+        }
+
+        setOptions(transformedOptions)
+      } catch (error) {
+        console.error("Error in loadOptions:", error)
+        setOptions([])
+      } finally {
+        if (seq === loadOptionsSeqRef.current) setLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lookupTableId, contextKey, requestedPrimaryLabelField, (requestedSecondaryLabelFields || []).join("|")]
+  )
+
+  const loadSelectedRecords = useCallback(async () => {
+    if (!lookupTableId || selectedIds.length === 0) return
+
+    const seq = ++loadSelectedSeqRef.current
+    setLoading(true)
+    try {
+      const table = await getTableInfoCached(lookupTableId)
+      if (seq !== loadSelectedSeqRef.current) return
+      if (!table) return
+
+      const lookupFields = await getFieldsCached(lookupTableId)
+      if (seq !== loadSelectedSeqRef.current) return
+
+      // For selected records we also validate physical columns to avoid PostgREST 400s.
+      const physicalCols = await getPhysicalColsCached(table.supabase_table)
+      if (seq !== loadSelectedSeqRef.current) return
+
+      const { primary: effectivePrimaryLabelField, secondary: effectiveSecondaryLabelFields } =
+        resolveEffectiveLabelFields({
+          table,
+          lookupFields,
+          physicalCols,
+          requestedPrimaryLabelField,
+          requestedSecondaryLabelFields,
+        })
+
+      // Always include "legacy" selected values as pills so the UI can render them without
+      // making invalid PostgREST queries (e.g. `id=in.(Sophie Edgerley)`).
+      if (legacySelectedValues.length > 0) {
+        const legacyOptions: RecordOption[] = legacySelectedValues.map((v) => ({
+          id: v,
+          primaryLabel: v,
+          secondaryLabels: undefined,
+          data: { id: v, [effectivePrimaryLabelField]: v },
+        }))
+        setOptions((prev) => {
+          const existingIds = new Set(prev.map((o) => o.id))
+          const add = legacyOptions.filter((o) => !existingIds.has(o.id))
+          return add.length > 0 ? [...prev, ...add] : prev
+        })
+      }
+
+      if (uuidSelectedIds.length === 0) return
+
+      const fieldsToSelect = ["id", effectivePrimaryLabelField, ...effectiveSecondaryLabelFields].filter(Boolean)
+
+      const cacheForContext = contextKey ? recordOptionCache.get(contextKey) : undefined
+      const missingIds = cacheForContext
+        ? uuidSelectedIds.filter((id) => !cacheForContext.has(id))
+        : uuidSelectedIds
+
+      // If everything is cached, just merge into local options and return.
+      if (cacheForContext && missingIds.length === 0) {
+        const cachedOptions = uuidSelectedIds
+          .map((id) => cacheForContext.get(id))
+          .filter(Boolean) as RecordOption[]
+        setOptions((prev) => {
+          const existingIds = new Set(prev.map((o) => o.id))
+          const add = cachedOptions.filter((o) => !existingIds.has(o.id))
+          return add.length > 0 ? [...prev, ...add] : prev
+        })
+        return
+      }
+
+      const supabase = createClient()
+      const { data: records, error } = await supabase
+        .from(table.supabase_table)
+        .select(fieldsToSelect.join(", "))
+        .in("id", missingIds)
+
+      if (seq !== loadSelectedSeqRef.current) return
+      if (error) {
+        console.error("Error loading selected records:", error)
+        return
+      }
+
+      const transformed: RecordOption[] = (records || []).map((record: any) => ({
+        id: record.id,
+        primaryLabel: record[effectivePrimaryLabelField] ? String(record[effectivePrimaryLabelField]) : "Untitled",
+        secondaryLabels: effectiveSecondaryLabelFields
+          .map((fieldName) => record[fieldName])
+          .filter(Boolean)
+          .map(String),
+        data: record,
+      }))
+
+      if (contextKey) {
+        const existing = recordOptionCache.get(contextKey) || new Map<string, RecordOption>()
+        for (const opt of transformed) existing.set(opt.id, opt)
+        recordOptionCache.set(contextKey, existing)
+      }
+
+      setOptions((prev) => {
+        const existingIds = new Set(prev.map((o) => o.id))
+        const newOptions = transformed.filter((o) => !existingIds.has(o.id))
+        return newOptions.length > 0 ? [...prev, ...newOptions] : prev
+      })
+    } catch (error) {
+      console.error("Error loading selected records:", error)
+    } finally {
+      if (seq === loadSelectedSeqRef.current) setLoading(false)
+    }
+  }, [
+    lookupTableId,
+    selectedIds.length,
+    uuidSelectedIds.join("|"),
+    legacySelectedValues.join("|"),
+    contextKey,
+    requestedPrimaryLabelField,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (requestedSecondaryLabelFields || []).join("|"),
+  ])
 
   // Load options when search query changes
   useEffect(() => {
@@ -146,16 +505,7 @@ export default function LookupFieldPicker({
 
       return () => clearTimeout(timeoutId)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, searchQuery, lookupTableId])
-
-  // Load selected records on mount/open
-  useEffect(() => {
-    if (open && selectedIds.length > 0 && lookupTableId) {
-      loadSelectedRecords()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selectedIds.length, lookupTableId])
+  }, [open, searchQuery, lookupTableId, loadOptions])
 
   const hasMissingSelected = useMemo(() => {
     if (selectedIds.length === 0) return false
@@ -169,209 +519,7 @@ export default function LookupFieldPicker({
     if (loadedSelectedIdsRef.current === selectedIdsKey) return
     loadedSelectedIdsRef.current = selectedIdsKey
     loadSelectedRecords()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupTableId, selectedIdsKey, selectedIds.length, hasMissingSelected])
-
-  async function loadOptions(query: string = "") {
-    if (!lookupTableId) return
-
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      
-      // Get table info
-      const { data: table, error: tableError } = await supabase
-        .from("tables")
-        .select("supabase_table, name, primary_field_name")
-        .eq("id", lookupTableId)
-        .single()
-
-      if (tableError || !table) {
-        console.error("Table not found:", tableError)
-        setOptions([])
-        return
-      }
-
-      // Get fields for the lookup table
-      const { data: lookupFields, error: fieldsError } = await supabase
-        .from("table_fields")
-        .select("*")
-        .eq("table_id", lookupTableId)
-        .order("position", { ascending: true })
-
-      if (fieldsError) {
-        console.error("Error loading fields:", fieldsError)
-        setOptions([])
-        return
-      }
-
-      // Also fetch physical columns, because table_fields metadata can drift from the real table schema.
-      // If we select a non-existent column, PostgREST returns 400 and the picker breaks.
-      const { data: physicalCols, error: colsError } = await supabase.rpc('get_table_columns', {
-        table_name: table.supabase_table,
-      })
-      const physicalColSet = new Set(
-        Array.isArray(physicalCols)
-          ? physicalCols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean)
-          : []
-      )
-      const hasPhysical = physicalColSet.size > 0 && !colsError
-
-      const tableConfiguredPrimary =
-        typeof (table as any)?.primary_field_name === "string" &&
-        String((table as any).primary_field_name).trim().length > 0
-          ? String((table as any).primary_field_name).trim()
-          : null
-
-      const candidatePrimary =
-        (requestedPrimaryLabelField && lookupFields?.some((f: any) => f.name === requestedPrimaryLabelField))
-          ? requestedPrimaryLabelField
-          : (tableConfiguredPrimary && lookupFields?.some((f: any) => f.name === tableConfiguredPrimary))
-            ? tableConfiguredPrimary
-            : (getPrimaryFieldName(lookupFields as any) || 'id')
-
-      const effectivePrimaryLabelField =
-        candidatePrimary !== 'id' && (!toPostgrestColumn(candidatePrimary) || (hasPhysical && !physicalColSet.has(candidatePrimary)))
-          ? 'id'
-          : candidatePrimary
-
-      const effectiveSecondaryLabelFields = (requestedSecondaryLabelFields || [])
-        .filter((fieldName) => fieldName && fieldName !== effectivePrimaryLabelField)
-        .filter((fieldName) => lookupFields?.some((f: any) => f.name === fieldName))
-        .slice(0, 2)
-
-      // Build select query - include primary label field and secondary fields
-      const fieldsToSelect = [
-        'id',
-        effectivePrimaryLabelField,
-        ...effectiveSecondaryLabelFields, // Max 2 secondary fields
-      ].filter(Boolean)
-
-      // Query records
-      let queryBuilder = supabase
-        .from(table.supabase_table)
-        .select(fieldsToSelect.join(', '))
-        .limit(50)
-
-      // Apply search filter if query provided
-      if (query.trim()) {
-        // Search in primary label field
-        const primaryField = lookupFields.find((f: any) => f.name === effectivePrimaryLabelField)
-        if (primaryField) {
-          if (primaryField.type === 'text' || primaryField.type === 'long_text') {
-            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
-          } else {
-            // For other types, use contains
-            queryBuilder = queryBuilder.ilike(effectivePrimaryLabelField, `%${query}%`)
-          }
-        }
-      }
-
-      const { data: records, error } = await queryBuilder
-
-      if (error) {
-        console.error("Error loading records:", error)
-        setOptions([])
-        return
-      }
-
-      // Transform records to options
-      const transformedOptions: RecordOption[] = (records || []).map((record: any) => {
-        const primaryLabel = record[effectivePrimaryLabelField] 
-          ? String(record[effectivePrimaryLabelField])
-          : "Untitled"
-        
-        const secondaryLabels = effectiveSecondaryLabelFields
-          .map(fieldName => record[fieldName])
-          .filter(Boolean)
-          .map(String)
-
-        return {
-          id: record.id,
-          primaryLabel,
-          secondaryLabels: secondaryLabels.length > 0 ? secondaryLabels : undefined,
-          data: record,
-        }
-      })
-
-      setOptions(transformedOptions)
-    } catch (error) {
-      console.error("Error in loadOptions:", error)
-      setOptions([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadSelectedRecords() {
-    if (!lookupTableId || selectedIds.length === 0) return
-
-    setLoading(true)
-    try {
-      const supabase = createClient()
-      
-      const { data: table } = await supabase
-        .from("tables")
-        .select("supabase_table")
-        .eq("id", lookupTableId)
-        .single()
-
-      if (!table) return
-
-      // Load fields so we can resolve the effective primary/secondary label fields.
-      const { data: lookupFields } = await supabase
-        .from("table_fields")
-        .select("*")
-        .eq("table_id", lookupTableId)
-        .order("position", { ascending: true })
-
-      const effectivePrimaryLabelField =
-        (requestedPrimaryLabelField && lookupFields?.some((f: any) => f.name === requestedPrimaryLabelField))
-          ? requestedPrimaryLabelField
-          : (getPrimaryFieldName(lookupFields as any) || 'id')
-
-      const effectiveSecondaryLabelFields = (requestedSecondaryLabelFields || [])
-        .filter((fieldName) => fieldName && fieldName !== effectivePrimaryLabelField)
-        .filter((fieldName) => lookupFields?.some((f: any) => f.name === fieldName))
-        .slice(0, 2)
-
-      const fieldsToSelect = [
-        'id',
-        effectivePrimaryLabelField,
-        ...effectiveSecondaryLabelFields,
-      ].filter(Boolean)
-
-      const { data: records } = await supabase
-        .from(table.supabase_table)
-        .select(fieldsToSelect.join(', '))
-        .in('id', selectedIds)
-
-      if (records) {
-        const transformed: RecordOption[] = records.map((record: any) => ({
-          id: record.id,
-          primaryLabel: record[effectivePrimaryLabelField] 
-            ? String(record[effectivePrimaryLabelField])
-            : "Untitled",
-          secondaryLabels: effectiveSecondaryLabelFields
-            .map(fieldName => record[fieldName])
-            .filter(Boolean)
-            .map(String),
-          data: record,
-        }))
-
-        // Merge with existing options, avoiding duplicates
-        setOptions(prev => {
-          const existingIds = new Set(prev.map(o => o.id))
-          const newOptions = transformed.filter(o => !existingIds.has(o.id))
-          return [...prev, ...newOptions]
-        })
-      }
-    } catch (error) {
-      console.error("Error loading selected records:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [lookupTableId, selectedIdsKey, selectedIds.length, hasMissingSelected, loadSelectedRecords])
 
   function handleSelect(option: RecordOption) {
     if (disabled) return
@@ -432,12 +580,14 @@ export default function LookupFieldPicker({
 
 
   // Get selected options
-  const selectedOptions = options.filter(opt => selectedIds.includes(opt.id))
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIdsKey])
+  const selectedOptions = useMemo(() => options.filter((opt) => selectedIdSet.has(opt.id)), [options, selectedIdSet])
 
   // Filter out selected options from dropdown (unless multi-select and showing all)
-  const availableOptions = isMultiSelect 
-    ? options 
-    : options.filter(opt => !selectedIds.includes(opt.id))
+  const availableOptions = useMemo(
+    () => (isMultiSelect ? options : options.filter((opt) => !selectedIdSet.has(opt.id))),
+    [isMultiSelect, options, selectedIdSet]
+  )
 
   // For lookup fields (read-only), render as informational pills without popover
   if (isLookupField || disabled) {
