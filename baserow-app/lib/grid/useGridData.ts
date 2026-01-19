@@ -59,6 +59,31 @@ export function useGridData({
   const missingColumnsRef = useRef<Set<string>>(new Set())
   const missingColumnsTableRef = useRef<string | null>(null)
 
+  const refreshPhysicalColumns = useCallback(
+    async (force = false) => {
+      if (!tableName) return
+      if (!force && physicalColumnsTableRef.current === tableName && physicalColumnsRef.current !== null) {
+        return
+      }
+      physicalColumnsTableRef.current = tableName
+      physicalColumnsRef.current = null
+      try {
+        const { data: cols, error: colsError } = await supabase.rpc('get_table_columns', {
+          table_name: tableName,
+        })
+        if (!colsError && Array.isArray(cols)) {
+          physicalColumnsRef.current = new Set(
+            cols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean)
+          )
+        }
+      } catch {
+        // Non-fatal: if RPC isn't available, we fall back to best-effort behaviour.
+        physicalColumnsRef.current = null
+      }
+    },
+    [tableName]
+  )
+
   function noteMissingColumnFromError(err: any): string | null {
     const msg = String(err?.message || err?.details || '').toLowerCase()
 
@@ -247,27 +272,6 @@ export function useGridData({
         missingColumnsRef.current = new Set()
       }
 
-      const refreshPhysicalColumns = async (force = false) => {
-        if (!force && physicalColumnsTableRef.current === tableName && physicalColumnsRef.current !== null) {
-          return
-        }
-        physicalColumnsTableRef.current = tableName
-        physicalColumnsRef.current = null
-        try {
-          const { data: cols, error: colsError } = await supabase.rpc('get_table_columns', {
-            table_name: tableName,
-          })
-          if (!colsError && Array.isArray(cols)) {
-            physicalColumnsRef.current = new Set(
-              cols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean)
-            )
-          }
-        } catch {
-          // Non-fatal: if RPC isn't available, we fall back to best-effort behaviour.
-          physicalColumnsRef.current = null
-        }
-      }
-
       // Load physical columns (once per tableName) so we can avoid PostgREST 400s.
       await refreshPhysicalColumns()
 
@@ -421,7 +425,7 @@ export function useGridData({
     }
     // CRITICAL: Only depend on stringified versions to prevent infinite loops
     // Refs ensure we always use latest values without causing re-renders
-  }, [tableName, tableId, filtersString, sortsString, safeLimit])
+  }, [tableName, tableId, filtersString, refreshPhysicalColumns, safeLimit, sortsString])
 
   useEffect(() => {
     loadData()

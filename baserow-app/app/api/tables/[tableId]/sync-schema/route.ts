@@ -68,7 +68,11 @@ export async function POST(
   }
 
   // Ensure audit fields/trigger exist (best-effort; not all envs have the function).
-  await supabase.rpc('ensure_audit_fields_for_table', { p_schema: 'public', p_table: tableName }).catch(() => {})
+  try {
+    await supabase.rpc('ensure_audit_fields_for_table', { p_schema: 'public', p_table: tableName })
+  } catch {
+    // best-effort only
+  }
 
   // 2) Load field metadata.
   const fields = await getTableFields(tableId)
@@ -104,9 +108,11 @@ export async function POST(
   }
 
   // 5) Best-effort: ask PostgREST to reload schema cache so new tables/columns are queryable immediately.
-  await supabase
-    .rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-    .catch(() => {})
+  try {
+    await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
+  } catch {
+    // best-effort only
+  }
 
   return NextResponse.json({
     success: true,

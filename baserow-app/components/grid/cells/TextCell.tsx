@@ -64,7 +64,7 @@ export default function TextCell({
   }
 
   const handleCancel = () => {
-    setEditValue(value || '')
+    setEditValue(toDisplayString(value))
     setEditing(false)
   }
 

@@ -243,7 +243,7 @@ export default function ListView({
       const next = [...ancestors, node]
       map.set(String(node.pathKey), next)
       const children = Array.isArray(node.children) ? node.children : []
-      children.forEach((c) => walk(c, next))
+      children.forEach((c: any) => walk(c, next))
     }
     const roots = Array.isArray(groupModel.rootGroups) ? groupModel.rootGroups : []
     roots.forEach((g) => walk(g, []))
