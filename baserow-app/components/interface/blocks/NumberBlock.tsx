@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { PageBlock } from "@/lib/interface/types"
 import type { TableField } from "@/types/fields"
+import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 
 interface NumberBlockProps {
   block: PageBlock
@@ -83,14 +84,14 @@ export default function NumberBlock({ block, isEditing = false, pageTableId = nu
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data } = await supabase
-        .from(tableName)
-        .select(field.name)
-        .eq("id", recordId)
-        .maybeSingle()
+      // Fetch row with `*` to avoid PostgREST 400s when `field.name` isn't a physical column.
+      const { data } = await supabase.from(tableName).select("*").eq("id", recordId).maybeSingle()
 
       if (data) {
-        const value = (data as Record<string, any>)[field.name]
+        const row = data as Record<string, any>
+        const alias = resolveSystemFieldAlias(field.name)
+        const raw = row[field.name] ?? (alias ? row[alias] : undefined)
+        const value = raw
         setFieldValue(typeof value === 'number' ? value : (value ? parseFloat(String(value)) : null))
       }
     } catch (error) {

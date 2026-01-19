@@ -84,6 +84,8 @@ export default function GridBlock({
   // Calendar-only: date range filter state (lifted here so we can render controls in a unified header panel)
   const [calendarDateFrom, setCalendarDateFrom] = useState<Date | undefined>(undefined)
   const [calendarDateTo, setCalendarDateTo] = useState<Date | undefined>(undefined)
+  // Bump to force views to refetch after record creation.
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const viewFiltersWithUserOverrides = useMemo(() => {
     return mergeViewDefaultFiltersWithUserQuickFilters(viewDefaultFilters, userQuickFilters)
@@ -401,6 +403,9 @@ export default function GridBlock({
         const createdId = (data as any)?.id || (data as any)?.record_id
         if (!createdId) return
 
+        // Force the currently rendered view to refetch so the new record appears immediately.
+        setRefreshKey((k) => k + 1)
+
         // Contract: creating a record must NOT auto-open it.
         // User can open via the dedicated chevron (or optional double-click) in the grid.
       } catch (error) {
@@ -505,6 +510,7 @@ export default function GridBlock({
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            reloadKey={refreshKey}
             dateFrom={calendarDateFrom}
             dateTo={calendarDateTo}
             onDateFromChange={setCalendarDateFrom}
@@ -562,6 +568,7 @@ export default function GridBlock({
             fitImageSize={appearance.fit_image_size}
             blockConfig={config}
             onRecordClick={onRecordClick}
+            reloadKey={refreshKey}
           />
         )
       }
@@ -607,6 +614,7 @@ export default function GridBlock({
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
             onRecordClick={onRecordClick}
+            reloadKey={refreshKey}
             // Card field configuration
             titleField={config.timeline_title_field || config.card_title_field}
             cardField1={config.timeline_field_1 || config.card_field_1}
@@ -648,6 +656,7 @@ export default function GridBlock({
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
+            reloadKey={refreshKey}
           />
         )
       }
@@ -701,6 +710,7 @@ export default function GridBlock({
             isEditing={isEditing}
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
+            reloadKey={refreshKey}
             appearance={{
               ...appearance,
               color_field: appearance.color_field,

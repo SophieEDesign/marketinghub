@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
@@ -15,7 +15,7 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { format } from "date-fns"
 import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
@@ -40,6 +40,8 @@ interface CalendarViewProps {
   colorField?: string // Field name to use for event colors (single-select field)
   imageField?: string // Field name to use for event images
   fitImageSize?: boolean // Whether to fit image to container size
+  /** Bump to force a refetch (e.g. after external record creation). */
+  reloadKey?: number
   /** Optional external control of date range filter UI/state (used by Calendar block unified header) */
   dateFrom?: Date
   dateTo?: Date
@@ -62,6 +64,7 @@ export default function CalendarView({
   colorField,
   imageField,
   fitImageSize = false,
+  reloadKey,
   dateFrom: controlledDateFrom,
   dateTo: controlledDateTo,
   onDateFromChange,
@@ -92,7 +95,6 @@ export default function CalendarView({
   const calendarDebugEnabled = isDebugEnabled('CALENDAR')
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [loadedTableFields, setLoadedTableFields] = useState<TableField[]>(tableFields || [])
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -382,7 +384,7 @@ export default function CalendarView({
     
     // Only reload if filters (including date range), searchQuery, or loadedTableFields actually changed
     const currentFiltersKey = filtersKey
-    const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}`
+    const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}|${reloadKey ?? 0}`
     
     // CRITICAL: Load rows if key changed OR if we have no rows yet (initial load)
     // This ensures rows are always loaded when prerequisites are met
@@ -401,7 +403,7 @@ export default function CalendarView({
     }
     // Use loadedTableFieldsKey to track actual content changes, not just length
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedTableId, supabaseTableName, filtersKey, searchQuery, loadedTableFieldsKey])
+  }, [resolvedTableId, supabaseTableName, filtersKey, searchQuery, loadedTableFieldsKey, reloadKey])
 
   async function resolveTableId() {
     // CRITICAL: tableId prop MUST come from block config (not page fallback)
@@ -1359,6 +1361,140 @@ export default function CalendarView({
   // Get events for rendering
   const calendarEvents = getEvents()
 
+  // FullCalendar: keep option prop references stable to avoid internal update loops.
+  const calendarPlugins = useMemo(() => [dayGridPlugin, interactionPlugin], [])
+  const calendarHeaderToolbar = useMemo(
+    () => ({
+      left: "prev,next today",
+      center: "title",
+      right: "dayGridMonth,dayGridWeek",
+    }),
+    []
+  )
+  const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
+
+  const calendarEventClassNames = useCallback(
+    (arg: any) => [
+      "hover:opacity-80 transition-opacity rounded-md",
+      allowOpenRecord ? "cursor-pointer" : "",
+      selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
+    ],
+    [allowOpenRecord, selectedEventId]
+  )
+
+  const calendarEventContent = useCallback((eventInfo: any) => {
+    const image = eventInfo.event.extendedProps?.image
+    const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
+    const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
+    const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
+    const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
+    const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
+    const tooltip = String(eventInfo.event.title || "")
+
+    return (
+      <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
+        {image && (
+          <div
+            className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${
+              fitImageSize ? "object-contain" : "object-cover"
+            }`}
+          >
+            <img
+              src={image}
+              alt=""
+              className={`w-full h-full ${fitImageSize ? "object-contain" : "object-cover"}`}
+              onError={(e) => {
+                ;(e.target as HTMLImageElement).style.display = "none"
+              }}
+            />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
+            <div className="truncate text-xs font-medium">
+              {titleField ? (
+                <TimelineFieldValue
+                  field={titleField}
+                  value={titleValue ?? eventInfo.event.title}
+                  compact={true}
+                />
+              ) : (
+                String(eventInfo.event.title || "Untitled")
+              )}
+            </div>
+            {cardFields.slice(0, 2).map((f: any, idx: number) => (
+              <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
+                {f?.field ? (
+                  <TimelineFieldValue field={f.field as TableField} value={f.value} compact={true} />
+                ) : (
+                  String(f?.value || "")
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }, [])
+
+  const onCalendarEventClick = useCallback(
+    (info: any) => {
+      // Contract: single click opens the record (if permitted) and selects event.
+      const recordId = info.event.id
+      const recordIdString = recordId ? String(recordId) : ""
+      setSelectedEventId(recordIdString || null)
+
+      // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
+      // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
+      const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_CALENDAR") === "1"
+      if (debugEnabled || process.env.NODE_ENV === "development") {
+        console.log("[Calendar] Event clicked", {
+          recordId,
+          eventId: info.event.id,
+          eventTitle: info.event.title,
+          hasOnRecordClick: !!onRecordClick,
+          allowOpenRecord,
+          willUseModal: allowOpenRecord && !onRecordClick,
+          willCallCallback: allowOpenRecord && !!onRecordClick,
+          debugEnabled,
+        })
+      }
+
+      debugCalendar("CALENDAR", "Event clicked", {
+        recordId,
+        event: info.event,
+        hasOnRecordClick: !!onRecordClick,
+        allowOpenRecord,
+        willUseModal: allowOpenRecord && !onRecordClick,
+      })
+
+      if (!recordId) {
+        console.warn("[Calendar] Event clicked but no recordId found", { event: info.event })
+        return
+      }
+
+      if (!allowOpenRecord) return
+
+      if (onRecordClick) {
+        onRecordClick(recordIdString)
+        return
+      }
+      setSelectedRecordId(recordIdString)
+    },
+    [allowOpenRecord, onRecordClick]
+  )
+
+  const onCalendarDateClick = useCallback(
+    (info: any) => {
+      if (!canCreateRecord) return
+      // Date clicked - open modal to create new record with pre-filled date
+      // info.dateStr is already in YYYY-MM-DD format
+      const clickedDate = new Date(info.dateStr + "T00:00:00") // Ensure it's treated as local date
+      setCreateRecordDate(clickedDate)
+    },
+    [canCreateRecord]
+  )
+
   // Empty state: rows exist but no events generated (likely missing/invalid date values)
   // CRITICAL: This check must happen AFTER rows are loaded and events are generated
   if (!loading && rows.length > 0 && calendarEvents.length === 0) {
@@ -1418,139 +1554,29 @@ export default function CalendarView({
       
       <div className="p-6 bg-white">
         <FullCalendar
-          plugins={[dayGridPlugin, interactionPlugin]}
+          plugins={calendarPlugins}
           events={calendarEvents}
-          key={`calendar-${resolvedTableId}-${resolvedDateFieldId}`}
           editable={!isViewOnly}
           eventDrop={handleEventDrop}
-          headerToolbar={{
-            left: "prev,next today",
-            center: "title",
-            right: viewMode === 'month' ? "dayGridWeek,dayGridMonth" : "dayGridMonth,dayGridWeek",
-          }}
-          initialView={viewMode === 'month' ? "dayGridMonth" : "dayGridWeek"}
+          headerToolbar={calendarHeaderToolbar}
+          // Uncontrolled: changing `initialView` after mount can trigger repeated remount/update cycles.
+          initialView="dayGridMonth"
           height="auto"
           aspectRatio={1.35}
           dayMaxEvents={3}
           moreLinkClick="popover"
           eventDisplay="block"
-          eventClassNames={(arg) => [
-            "hover:opacity-80 transition-opacity rounded-md",
-            allowOpenRecord ? "cursor-pointer" : "",
-            selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
-          ]}
+          eventClassNames={calendarEventClassNames}
           dayCellClassNames="hover:bg-gray-50 transition-colors"
           dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
           eventTextColor="#1f2937"
           eventBorderColor="transparent"
           eventBackgroundColor="#f3f4f6"
-          dayHeaderFormat={{ weekday: 'short' }}
+          dayHeaderFormat={calendarDayHeaderFormat}
           firstDay={1}
-          eventContent={(eventInfo) => {
-            const recordId = String(eventInfo.event.id || "")
-            const image = eventInfo.event.extendedProps?.image
-            const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
-            const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
-            const cardFields = Array.isArray(cardFieldsRaw) ? cardFieldsRaw : []
-            const titleField = eventInfo.event.extendedProps?.titleField as TableField | null | undefined
-            const titleValue = (eventInfo.event.extendedProps as any)?.titleValue
-            const tooltip = String(eventInfo.event.title || "")
-            
-            return (
-              <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
-                {image && (
-                  <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
-                    <img
-                      src={image}
-                      alt=""
-                      className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none'
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-col gap-0.5 min-w-0 leading-tight">
-                    <div className="truncate text-xs font-medium">
-                      {titleField ? (
-                        <TimelineFieldValue field={titleField} value={titleValue ?? eventInfo.event.title} compact={true} />
-                      ) : (
-                        String(eventInfo.event.title || "Untitled")
-                      )}
-                    </div>
-                    {cardFields.slice(0, 2).map((f: any, idx: number) => (
-                      <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
-                        {f?.field ? (
-                          <TimelineFieldValue field={f.field as TableField} value={f.value} compact={true} />
-                        ) : (
-                          String(f?.value || "")
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
-          }}
-          viewDidMount={(view) => {
-            // Update view mode when user changes view
-            if (view.view.type === 'dayGridMonth') {
-              setViewMode('month')
-            } else if (view.view.type === 'dayGridWeek') {
-              setViewMode('week')
-            }
-          }}
-          eventClick={(info) => {
-            // Contract: single click opens the record (if permitted) and selects event.
-            const recordId = info.event.id
-            const recordIdString = recordId ? String(recordId) : ""
-            setSelectedEventId(recordIdString || null)
-            
-            // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
-            // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
-            const debugEnabled = typeof window !== 'undefined' && localStorage.getItem("DEBUG_CALENDAR") === "1"
-            if (debugEnabled || process.env.NODE_ENV === 'development') {
-              console.log('[Calendar] Event clicked', {
-                recordId,
-                eventId: info.event.id,
-                eventTitle: info.event.title,
-                hasOnRecordClick: !!onRecordClick,
-                allowOpenRecord,
-                willUseModal: allowOpenRecord && !onRecordClick,
-                willCallCallback: allowOpenRecord && !!onRecordClick,
-                debugEnabled,
-              })
-            }
-            
-            debugCalendar('CALENDAR', 'Event clicked', {
-              recordId,
-              event: info.event,
-              hasOnRecordClick: !!onRecordClick,
-              allowOpenRecord,
-              willUseModal: allowOpenRecord && !onRecordClick
-            })
-            
-            if (!recordId) {
-              console.warn('[Calendar] Event clicked but no recordId found', { event: info.event })
-              return
-            }
-
-            if (!allowOpenRecord) return
-
-            if (onRecordClick) {
-              onRecordClick(recordIdString)
-              return
-            }
-            setSelectedRecordId(recordIdString)
-          }}
-          dateClick={(info) => {
-            if (!canCreateRecord) return
-            // Date clicked - open modal to create new record with pre-filled date
-            // info.dateStr is already in YYYY-MM-DD format
-            const clickedDate = new Date(info.dateStr + 'T00:00:00') // Ensure it's treated as local date
-            setCreateRecordDate(clickedDate)
-          }}
+          eventContent={calendarEventContent}
+          eventClick={onCalendarEventClick}
+          dateClick={onCalendarDateClick}
         />
       </div>
 
@@ -1584,6 +1610,12 @@ export default function CalendarView({
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}
+            // Also apply Airtable-style defaults from active filters (when they imply a single-value selection).
+            // NOTE: combinedFilters includes date range UI filters, but deriveDefaultValuesFromFilters() intentionally ignores them.
+            const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFilters, loadedTableFields)
+            if (Object.keys(defaultsFromFilters).length > 0) {
+              Object.assign(initial, defaultsFromFilters)
+            }
             // IMPORTANT: Use local date formatting (not UTC via toISOString),
             // otherwise the day can shift for users outside UTC.
             const dateValue = format(createRecordDate, 'yyyy-MM-dd')

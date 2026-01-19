@@ -72,6 +72,8 @@ interface GridViewWrapperProps {
   }
   permissions?: BlockPermissions // Block-level permissions
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
+  /** Bump to force GridView to refetch rows (e.g. after external record creation). */
+  reloadKey?: number
 }
 
 export default function GridViewWrapper({
@@ -90,6 +92,7 @@ export default function GridViewWrapper({
   appearance = {},
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
+  reloadKey,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -573,6 +576,7 @@ export default function GridViewWrapper({
           recordOpenStyle={appearance.record_open_style || 'side_panel'}
           modalFields={modalFields}
           onTableFieldsRefresh={loadFields}
+          reloadKey={reloadKey}
         />
       </div>
       <FieldBuilderDrawer

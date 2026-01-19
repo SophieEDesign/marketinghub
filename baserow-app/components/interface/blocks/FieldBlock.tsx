@@ -9,6 +9,7 @@ import { Paperclip } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
 import InlineFieldEditor from "@/components/records/InlineFieldEditor"
+import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 
 interface FieldBlockProps {
   block: PageBlock
@@ -189,16 +190,21 @@ export default function FieldBlock({
     setLoading(true)
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from(tableName)
-        .select(field.name)
-        .eq("id", recordId)
-        .single()
+      // IMPORTANT:
+      // - Some "system" fields can exist in `table_fields` but not as physical columns
+      //   on the dynamic data table. Selecting a missing column causes a PostgREST 400.
+      // - Fetch the single row with `*` and then read the desired key (or alias) locally.
+      const { data, error } = await supabase.from(tableName).select("*").eq("id", recordId).single()
 
       if (error) throw error
       if (data) {
-        // Type assertion needed because Supabase returns dynamic field names
-        setFieldValue((data as Record<string, any>)[field.name])
+        const row = data as Record<string, any>
+        const alias = resolveSystemFieldAlias(field.name)
+        const value =
+          row[field.name] ??
+          (alias ? row[alias] : undefined) ??
+          null
+        setFieldValue(value)
       }
     } catch (error) {
       console.error("Error loading field value:", error)
@@ -274,6 +280,17 @@ export default function FieldBlock({
   async function handleCommit(newValue: any) {
     if (!recordId || !tableName || !field) {
       setIsEditingValue(false)
+      return
+    }
+
+    // Guard: system/virtual fields are read-only in record blocks.
+    if (field.options?.system || field.type === "formula" || field.type === "lookup") {
+      setIsEditingValue(false)
+      toast({
+        variant: "destructive",
+        title: "Read-only field",
+        description: "This field cannot be edited here.",
+      })
       return
     }
 

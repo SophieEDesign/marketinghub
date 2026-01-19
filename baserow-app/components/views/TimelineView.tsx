@@ -43,6 +43,8 @@ interface TimelineViewProps {
   // Appearance settings
   wrapTitle?: boolean // Whether to wrap title text
   rowSize?: 'compact' | 'medium' | 'comfortable' // Row size setting
+  /** Bump to force a refetch (e.g. after external record creation). */
+  reloadKey?: number
 }
 
 type ZoomLevel = "day" | "week" | "month" | "quarter" | "year"
@@ -81,6 +83,7 @@ export default function TimelineView({
   groupByField: groupByFieldProp,
   wrapTitle: wrapTitleProp,
   rowSize = 'medium',
+  reloadKey,
 }: TimelineViewProps) {
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -135,7 +138,7 @@ export default function TimelineView({
       loadRows()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, filtersKey, tableFieldsKey])
+  }, [supabaseTableName, tableId, filtersKey, tableFieldsKey, reloadKey])
 
   async function loadTableInfo() {
     const { data } = await supabase

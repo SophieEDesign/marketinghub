@@ -27,6 +27,8 @@ interface KanbanViewProps {
   fitImageSize?: boolean // Whether to fit image to container size
   blockConfig?: Record<string, any> // Block config for modal_fields
   onRecordClick?: (recordId: string) => void
+  /** Bump to force a refetch (e.g. after external record creation). */
+  reloadKey?: number
 }
 
 export default function KanbanView({ 
@@ -42,6 +44,7 @@ export default function KanbanView({
   fitImageSize = false,
   blockConfig = {},
   onRecordClick,
+  reloadKey,
 }: KanbanViewProps) {
   // All hooks must be at the top level, before any conditional returns
   const { openRecord } = useRecordPanel()
@@ -142,7 +145,7 @@ export default function KanbanView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId])
+  }, [tableId, reloadKey])
 
   async function loadRows() {
     if (!tableId) {

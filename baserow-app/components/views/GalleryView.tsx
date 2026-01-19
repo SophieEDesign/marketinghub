@@ -20,6 +20,8 @@ interface GalleryViewProps {
   tableFields?: any[]
   filters?: FilterConfig[]
   onRecordClick?: (recordId: string) => void
+  /** Bump to force a refetch (e.g. after external record creation). */
+  reloadKey?: number
   // Visual card fields
   colorField?: string
   imageField?: string
@@ -36,6 +38,7 @@ export default function GalleryView({
   tableFields = [],
   filters = [],
   onRecordClick,
+  reloadKey,
   colorField,
   imageField,
   fitImageSize = false,
@@ -131,7 +134,7 @@ export default function GalleryView({
 
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, tableId, JSON.stringify(filters)])
+  }, [supabaseTableName, tableId, JSON.stringify(filters), reloadKey])
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])
 

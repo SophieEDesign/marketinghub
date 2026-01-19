@@ -30,6 +30,8 @@ export interface FilterConfig {
     | 'date_range'
     | 'date_today'
     | 'date_next_days'
+    | 'has'
+    | 'does_not_have'
   value: any
   // For date_range operator
   value2?: any
@@ -250,10 +252,21 @@ function valuesLooselyEqual(a: any, b: any): boolean {
  * Airtable-style: derive default field values from the *active* filters.
  *
  * Safety rules:
- * - Only supports simple equality-ish operators (currently: 'equal')
- * - Only scalar values, or single-item arrays
+ * - Only supports simple equality-ish operators ('equal' and 'contains' when it implies a single value)
+ * - Only scalar values, or single-item arrays (single value)
  * - Skips virtual/read-only computed fields (formula/lookup) when tableFields are provided
  * - If multiple eligible filters target the same field with conflicting values, that field is skipped
+ *
+ * Matches the “filtered view new record defaults” expectation:
+ * - single_select: set the selected value
+ * - multi_select: add the filtered value (union if multiple filters apply)
+ * - link_to_table: set the relationship (best-effort; depends on filter value shape)
+ *
+ * Explicitly does NOT apply:
+ * - range filters (>, <, date_range, etc.)
+ * - relative date filters (date_today, date_next_days)
+ * - “is empty / is not empty”
+ * - formula/lookup based fields
  */
 export function deriveDefaultValuesFromFilters(
   activeFilters: FilterConfig[] = [],
@@ -262,62 +275,90 @@ export function deriveDefaultValuesFromFilters(
   const safeFilters = Array.isArray(activeFilters) ? activeFilters : []
   const safeFields = Array.isArray(tableFields) ? tableFields : []
 
-  const fieldByName = new Map<string, TableField>()
+  const fieldByNameOrId = new Map<string, TableField>()
   for (const f of safeFields) {
-    if (f?.name) fieldByName.set(f.name, f)
+    if (f?.name) fieldByNameOrId.set(f.name, f)
+    if (f?.id) fieldByNameOrId.set(f.id, f)
   }
 
   const defaults: Record<string, any> = {}
   const conflicted = new Set<string>()
 
+  const normalizeSingleValue = (raw: any): any | undefined => {
+    let v = raw
+    if (Array.isArray(v)) {
+      if (v.length !== 1) return undefined
+      v = v[0]
+    }
+    if (v === undefined || v === null) return undefined
+    if (typeof v === 'string' && v.trim() === '') return undefined
+    return v
+  }
+
+  const isEligibleOperator = (op: FilterConfig['operator']): boolean => {
+    // "contains" here is only considered when it effectively represents a single value selection
+    // (e.g. some UIs use "contains" semantics for select-like fields).
+    // "has" is used for linked record fields (link_to_table) in the canonical filter model.
+    return op === 'equal' || op === 'contains' || op === 'has'
+  }
+
   for (const f of safeFilters) {
     if (!f || typeof f.field !== 'string' || f.field.trim() === '') continue
-    if (f.operator !== 'equal') continue
+    if (!isEligibleOperator(f.operator)) continue
 
     const fieldName = f.field
     if (conflicted.has(fieldName)) continue
 
-    const field = fieldByName.get(fieldName)
+    const field = fieldByNameOrId.get(fieldName)
     if (field?.type === 'formula' || field?.type === 'lookup') continue
 
-    let value: any = f.value
-    if (Array.isArray(value)) {
-      if (value.length !== 1) continue
-      value = value[0]
-    }
-
+    const value = normalizeSingleValue(f.value)
     if (value === undefined) continue
-    if (typeof value === 'string' && value.trim() === '') continue
 
-    // Minimal type-aware shaping for fields that store arrays.
-    if (field?.type === 'multi_select') {
-      value = [String(value)]
+    // Only apply defaults for field types where a filter implies an obvious default selection.
+    // Avoid applying for free-text/number/date filters which often shouldn't prefill a new record.
+    const fieldType = field?.type
+    const isEligibleFieldType =
+      fieldType === 'single_select' || fieldType === 'multi_select' || fieldType === 'link_to_table'
+    if (!isEligibleFieldType) continue
+
+    // multi_select: union values (Airtable-like "add the filtered value")
+    if (fieldType === 'multi_select') {
+      const nextVal = String(value)
+      const existing = defaults[fieldName]
+      const existingArr = Array.isArray(existing) ? existing.map(String) : []
+      if (!existingArr.includes(nextVal)) {
+        defaults[fieldName] = [...existingArr, nextVal]
+      }
+      continue
     }
 
-    // Checkbox: accept 'true'/'false' strings (common from querystring/UI)
-    if (field?.type === 'checkbox' && typeof value === 'string') {
-      if (value === 'true') value = true
-      if (value === 'false') value = false
+    // link_to_table: best-effort assignment.
+    // Values are stored as record IDs (UUID) (single: string; sometimes multi: string[]).
+    if (fieldType === 'link_to_table') {
+      const nextVal = String(value)
+      if (Object.prototype.hasOwnProperty.call(defaults, fieldName)) {
+        if (!valuesLooselyEqual(defaults[fieldName], nextVal)) {
+          delete defaults[fieldName]
+          conflicted.add(fieldName)
+        }
+        continue
+      }
+      defaults[fieldName] = nextVal
+      continue
     }
 
-    // Numeric-ish fields: accept number-like strings.
-    if (
-      (field?.type === 'number' || field?.type === 'percent' || field?.type === 'currency') &&
-      typeof value === 'string'
-    ) {
-      const n = Number(value)
-      if (Number.isFinite(n)) value = n
-    }
-
+    // single_select: direct assignment (string labels)
+    const nextVal = String(value)
     if (Object.prototype.hasOwnProperty.call(defaults, fieldName)) {
-      if (!valuesLooselyEqual(defaults[fieldName], value)) {
+      if (!valuesLooselyEqual(defaults[fieldName], nextVal)) {
         delete defaults[fieldName]
         conflicted.add(fieldName)
       }
       continue
     }
 
-    defaults[fieldName] = value
+    defaults[fieldName] = nextVal
   }
 
   return defaults

@@ -87,6 +87,8 @@ interface GridViewProps {
   recordOpenStyle?: 'side_panel' | 'modal' // How to open records (default: 'side_panel')
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
+  /** Bump to force a refetch (e.g. after external record creation). */
+  reloadKey?: number
 }
 
 const ITEMS_PER_PAGE = 100
@@ -297,6 +299,7 @@ export default function GridView({
   recordOpenStyle = 'side_panel',
   modalFields,
   onTableFieldsRefresh,
+  reloadKey,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -921,7 +924,7 @@ export default function GridView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey])
+  }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey, reloadKey])
 
   async function loadRows() {
     // De-dupe in-flight loads (prevents hundreds of parallel requests).
@@ -1444,7 +1447,16 @@ export default function GridView({
         newRow[field.field_name] = null
       })
 
-      const defaultsFromFilters = deriveDefaultValuesFromFilters(safeFilters, safeTableFields)
+      // Apply Airtable-like defaults from the *effective* active filters.
+      // Prefer standardized `filters`; fall back to legacy `viewFilters` when needed.
+      const legacyFilters: FilterConfig[] = safeViewFilters.map(f => ({
+        field: f.field_name,
+        operator: f.operator as FilterConfig['operator'],
+        value: f.value,
+      }))
+      const effectiveFiltersForDefaults = safeFilters.length > 0 ? safeFilters : legacyFilters
+
+      const defaultsFromFilters = deriveDefaultValuesFromFilters(effectiveFiltersForDefaults, safeTableFields)
       if (Object.keys(defaultsFromFilters).length > 0) {
         Object.assign(newRow, defaultsFromFilters)
       }
