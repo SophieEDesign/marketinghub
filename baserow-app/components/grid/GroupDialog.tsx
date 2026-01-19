@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface GroupDialogProps {
   isOpen: boolean
@@ -39,6 +40,7 @@ export default function GroupDialog({
   onGroupChange,
 }: GroupDialogProps) {
   const [selectedField, setSelectedField] = useState<string>(groupBy || "")
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
 
   useEffect(() => {
     setSelectedField(groupBy || "")
@@ -51,6 +53,10 @@ export default function GroupDialog({
 
   async function handleSave() {
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so grouping can't be saved.")
+        return
+      }
       // Update grid view settings instead of views.config
       const groupByValue = selectedField === "__none__" ? null : selectedField
       
@@ -58,7 +64,7 @@ export default function GroupDialog({
       const { data: existing } = await supabase
         .from("grid_view_settings")
         .select("id")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .single()
 
       if (existing) {
@@ -66,14 +72,14 @@ export default function GroupDialog({
         await supabase
           .from("grid_view_settings")
           .update({ group_by_field: groupByValue })
-          .eq("view_id", viewId)
+          .eq("view_id", viewUuid)
       } else {
         // Create new settings
         await supabase
           .from("grid_view_settings")
           .insert([
             {
-              view_id: viewId,
+              view_id: viewUuid,
               group_by_field: groupByValue,
               column_widths: {},
               column_order: [],

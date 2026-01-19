@@ -97,6 +97,11 @@ export default function NewAutomationClient() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Backwards-compatible trigger payload:
+    // DB schema still requires `trigger` (jsonb NOT NULL), while app uses `trigger_type`/`trigger_config`.
+    const triggerType = (automation.trigger_type || "row_created") as any
+    const triggerConfig = { ...(automation.trigger_config || {}), table_id: tableId }
+
     const { data, error } = await supabase
       .from("automations")
       .insert([
@@ -104,8 +109,9 @@ export default function NewAutomationClient() {
           table_id: tableId,
           name: automation.name,
           description: automation.description,
-          trigger_type: automation.trigger_type,
-          trigger_config: automation.trigger_config || {},
+          trigger: { type: triggerType, config: triggerConfig },
+          trigger_type: triggerType,
+          trigger_config: triggerConfig,
           actions: automation.actions || [],
           conditions: automation.conditions || [],
           enabled: automation.enabled ?? true,

@@ -524,8 +524,9 @@ export default function MultiCalendarView({
                   variant="outline"
                   className="bg-white"
                   onClick={() => {
-                    const firstEnabled = enabledSourceIds[0] || sources[0]?.id || ""
-                    setCreateSourceId(firstEnabled)
+                    // Force the user to choose a source/table when multiple tables are present.
+                    // (Do not preselect the first enabled source.)
+                    setCreateSourceId("")
                     setCreateDate(new Date())
                     setCreateOpen(true)
                   }}
@@ -620,8 +621,8 @@ export default function MultiCalendarView({
           }}
           dateClick={(arg) => {
             if (!canCreateRecord) return
-            const firstEnabled = enabledSourceIds[0] || sources[0]?.id || ""
-            setCreateSourceId(firstEnabled)
+            // Force explicit table selection (no implicit default).
+            setCreateSourceId("")
             setCreateDate(arg.date)
             setCreateOpen(true)
           }}
@@ -636,10 +637,10 @@ export default function MultiCalendarView({
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Source</Label>
+              <Label>Table</Label>
               <Select value={createSourceId || "__none__"} onValueChange={(v) => setCreateSourceId(v === "__none__" ? "" : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
+                  <SelectValue placeholder="Select table" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Select…</SelectItem>

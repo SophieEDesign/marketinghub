@@ -12,9 +12,53 @@ import type { FilterTree, FilterGroup, FilterCondition } from './canonical-model
 import { normalizeFilterTree } from './canonical-model'
 import type { TableField } from '@/types/fields'
 
+type RelativeDateValue = {
+  type: 'relative_date'
+  base: 'today'
+  amount: number
+  unit: 'DAY' | 'MONTH'
+  direction: 'before' | 'after'
+}
+
+function isRelativeDateValue(value: unknown): value is RelativeDateValue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as any).type === 'relative_date' &&
+    (value as any).base === 'today'
+  )
+}
+
+function resolveRelativeDateToDateOnlyLocal(value: RelativeDateValue): string {
+  const amount = Number(value.amount)
+  const unit = String(value.unit).toUpperCase()
+  const direction = value.direction === 'before' ? -1 : 1
+  const delta = Number.isFinite(amount) ? Math.trunc(amount) * direction : 0
+
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
+
+  const y = base.getFullYear()
+  const m = base.getMonth()
+  const d = base.getDate()
+
+  let result: Date
+  if (unit === 'MONTH') {
+    result = new Date(y, m + delta, d, 0, 0, 0, 0)
+  } else {
+    // Default to days
+    result = new Date(y, m, d + delta, 0, 0, 0, 0)
+  }
+
+  return toDateOnlyLocal(result)
+}
+
 function resolveDateOnlyDynamicValue(value: unknown): unknown {
   if (value === '__TODAY__') {
     return toDateOnlyLocal(new Date())
+  }
+  if (isRelativeDateValue(value)) {
+    return resolveRelativeDateToDateOnlyLocal(value)
   }
   return value
 }

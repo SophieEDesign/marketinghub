@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select"
 import type { TableField } from "@/types/fields"
 import type { FilterOperator } from "@/lib/filters/canonical-model"
+import type { RelativeDateValue, RelativeDateUnit, RelativeDateDirection } from "@/lib/filters/canonical-model"
 import {
   resolveChoiceColor,
   normalizeHexColor,
@@ -20,8 +21,8 @@ import { getManualChoiceLabels } from "@/lib/fields/select-options"
 interface FilterValueInputProps {
   field: TableField | null
   operator: FilterOperator
-  value: string | number | boolean | string[] | null | undefined
-  onChange: (value: string | number | boolean | string[] | null) => void
+  value: any
+  onChange: (value: any) => void
   placeholder?: string
   size?: "sm" | "md"
   className?: string
@@ -50,6 +51,18 @@ export default function FilterValueInput({
 }: FilterValueInputProps) {
   const controlHeight = size === "sm" ? "h-8" : "h-9"
   const textSize = size === "sm" ? "text-xs" : "text-sm"
+
+  const isRelativeDateValue = (v: any): v is RelativeDateValue => {
+    return (
+      typeof v === "object" &&
+      v !== null &&
+      v.type === "relative_date" &&
+      (v.base === "today") &&
+      (v.direction === "before" || v.direction === "after") &&
+      (v.unit === "DAY" || v.unit === "MONTH") &&
+      typeof v.amount === "number"
+    )
+  }
 
   // Operators that don't require a value
   const noValueOperators: FilterOperator[] = ['is_empty', 'is_not_empty']
@@ -205,7 +218,18 @@ export default function FilterValueInput({
     // Single-date operators: allow dynamic "Today" without hardcoding a date
     if (singleDateOperators.includes(operator)) {
       const isToday = value === '__TODAY__'
-      const mode = isToday ? 'today' : 'specific'
+      const isRelative = isRelativeDateValue(value)
+      const mode = isToday ? 'today' : isRelative ? 'relative' : 'specific'
+
+      const relativeValue: RelativeDateValue = isRelative
+        ? value
+        : {
+            type: 'relative_date',
+            base: 'today',
+            amount: 7,
+            unit: 'DAY',
+            direction: 'before',
+          }
 
       return (
         <div className="flex gap-2 items-center">
@@ -214,9 +238,11 @@ export default function FilterValueInput({
             onValueChange={(val) => {
               if (val === 'today') {
                 onChange('__TODAY__')
+              } else if (val === 'relative') {
+                onChange(relativeValue)
               } else {
                 // Switch back to specific date; keep current date if it exists, otherwise clear.
-                onChange(isToday ? '' : (value as any) ?? '')
+                onChange(isToday || isRelative ? '' : (value as any) ?? '')
               }
             }}
           >
@@ -226,17 +252,85 @@ export default function FilterValueInput({
             <SelectContent>
               <SelectItem value="specific">Specific</SelectItem>
               <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="relative">Relative</SelectItem>
             </SelectContent>
           </Select>
 
-          <Input
-            type="date"
-            value={isToday ? '' : (value as string || "")}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="Select date"
-            className={`${controlHeight} ${textSize} flex-1 ${className}`}
-            disabled={isToday}
-          />
+          {mode === 'specific' && (
+            <Input
+              type="date"
+              value={value as string || ""}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="Select date"
+              className={`${controlHeight} ${textSize} flex-1 ${className}`}
+            />
+          )}
+
+          {mode === 'today' && (
+            <Input
+              type="date"
+              value={''}
+              onChange={() => {}}
+              placeholder="Today"
+              className={`${controlHeight} ${textSize} flex-1 ${className}`}
+              disabled
+            />
+          )}
+
+          {mode === 'relative' && (
+            <div className="flex gap-2 items-center flex-1">
+              <Select
+                value={relativeValue.direction}
+                onValueChange={(val) => {
+                  onChange({
+                    ...relativeValue,
+                    direction: val as RelativeDateDirection,
+                  } satisfies RelativeDateValue)
+                }}
+              >
+                <SelectTrigger className={`${controlHeight} w-28 ${textSize}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="before">Before</SelectItem>
+                  <SelectItem value="after">After</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Input
+                type="number"
+                min="0"
+                value={Number.isFinite(relativeValue.amount) ? relativeValue.amount : 0}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const amt = raw === '' ? 0 : Math.max(0, parseInt(raw, 10) || 0)
+                  onChange({ ...relativeValue, amount: amt } satisfies RelativeDateValue)
+                }}
+                placeholder="0"
+                className={`${controlHeight} ${textSize} w-20 ${className}`}
+              />
+
+              <Select
+                value={relativeValue.unit}
+                onValueChange={(val) => {
+                  onChange({
+                    ...relativeValue,
+                    unit: val as RelativeDateUnit,
+                  } satisfies RelativeDateValue)
+                }}
+              >
+                <SelectTrigger className={`${controlHeight} w-28 ${textSize}`}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DAY">Days</SelectItem>
+                  <SelectItem value="MONTH">Months</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <span className="text-xs text-gray-500 whitespace-nowrap">today</span>
+            </div>
+          )}
         </div>
       )
     }

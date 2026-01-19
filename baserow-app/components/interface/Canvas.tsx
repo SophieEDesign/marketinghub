@@ -78,20 +78,9 @@ export default function Canvas({
   
   // CRITICAL: Fetch aggregate data at page level (inside FilterStateProvider)
   // This eliminates duplicate requests - SWR handles deduplication automatically
-  // Collect page-level filters from all filter blocks
-  const pageFilters = useMemo(() => {
-    const filters: FilterConfig[] = []
-    blocks.forEach(block => {
-      if (block.type === 'filter') {
-        const blockFilters = getFiltersForBlock(block.id)
-        filters.push(...blockFilters)
-      }
-    })
-    return filters
-  }, [blocks, getFiltersForBlock])
-  
-  // Fetch all aggregates for KPI blocks
-  const aggregateData = usePageAggregates(blocks, pageFilters)
+  // Fetch all aggregates for KPI blocks using per-block page filters.
+  // This ensures a Filter block only affects the KPI blocks it targets.
+  const aggregateData = usePageAggregates(blocks, (blockId) => getFiltersForBlock(blockId))
   
   // Identify top two field blocks (by y position) for inline editing without Edit button
   // Only consider field blocks in the right column (x >= 4) for record view pages

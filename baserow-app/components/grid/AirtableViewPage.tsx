@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import ViewBuilderToolbar from "./ViewBuilderToolbar"
 import AirtableGridView, { type AirtableGridActions } from "./AirtableGridView"
@@ -10,6 +10,7 @@ import DesignSidebar from "@/components/layout/DesignSidebar"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import type { ViewType, FilterType } from "@/types/database"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface AirtableViewPageProps {
   tableId: string
@@ -69,6 +70,8 @@ export default function AirtableViewPage({
   const handleGridActionsReady = useCallback((actions: AirtableGridActions) => {
     gridActionsRef.current = actions
   }, [])
+
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
 
   const [viewFields, setViewFields] = useState(initialViewFields)
   const [tableFields, setTableFields] = useState<TableField[]>(initialTableFields)
@@ -305,11 +308,12 @@ export default function AirtableViewPage({
           onRowHeightChange={async (height) => {
             setRowHeight(height)
             try {
+              if (!viewUuid) return
               // Save row height to grid_view_settings using client-side supabase
               const { data: existing } = await supabase
                 .from('grid_view_settings')
                 .select('id')
-                .eq('view_id', viewId)
+                .eq('view_id', viewUuid)
                 .maybeSingle()
 
               if (existing) {
@@ -317,14 +321,14 @@ export default function AirtableViewPage({
                 await supabase
                   .from('grid_view_settings')
                   .update({ row_height: height })
-                  .eq('view_id', viewId)
+                  .eq('view_id', viewUuid)
               } else {
                 // Create new settings
                 await supabase
                   .from('grid_view_settings')
                   .insert([
                     {
-                      view_id: viewId,
+                      view_id: viewUuid,
                       row_height: height,
                       column_widths: {},
                       column_order: [],

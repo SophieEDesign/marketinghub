@@ -1202,6 +1202,7 @@ export default function InterfaceBuilder({
           onMoveToTop={handleMoveBlockToTop}
           onMoveToBottom={handleMoveBlockToBottom}
           pageTableId={pageTableId}
+          allBlocks={blocks}
           onLock={handleLockBlock}
         />
       )}

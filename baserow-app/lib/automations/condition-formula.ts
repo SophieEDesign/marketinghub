@@ -3,7 +3,7 @@
  * and vice versa for automation conditions
  */
 
-import type { FilterTree, FilterGroup, FilterCondition, FilterOperator } from '@/lib/filters/canonical-model'
+import type { FilterTree, FilterGroup, FilterCondition, FilterOperator, RelativeDateValue } from '@/lib/filters/canonical-model'
 import type { TableField } from '@/types/fields'
 import { normalizeFilterTree } from '@/lib/filters/canonical-model'
 
@@ -113,6 +113,13 @@ function formatCondition(
     case 'date_today':
       // A date value can include time, so treat "today" as [TODAY(), TODAY()+1 day)
       return `(${fieldRef} >= TODAY()) AND (${fieldRef} < DATEADD(TODAY(), 1, "DAY"))`
+
+    case 'date_next_days': {
+      const n = typeof condition.value === 'number' ? Math.floor(condition.value) : parseInt(String(condition.value ?? ''), 10)
+      const safe = Number.isFinite(n) && n >= 0 ? n : 0
+      // Inclusive of today and the next N days => end exclusive is start of day (today + N + 1)
+      return `(${fieldRef} >= TODAY()) AND (${fieldRef} < DATEADD(TODAY(), ${safe + 1}, "DAY"))`
+    }
     
     default:
       return `${fieldRef} = ${formatValue(condition.value, field)}`
@@ -138,6 +145,14 @@ function formatValue(value: any, field: TableField | undefined): string {
     return 'TODAY()'
   }
 
+  // Relative dates (Airtable-style)
+  if (isRelativeDateValue(value)) {
+    const amt = Number.isFinite(value.amount) ? Math.trunc(value.amount) : 0
+    const sign = value.direction === 'before' ? -1 : 1
+    const unit = String(value.unit).toUpperCase() === 'MONTH' ? 'MONTH' : 'DAY'
+    return `DATEADD(TODAY(), ${sign * amt}, "${unit}")`
+  }
+
   // Boolean values
   if (typeof value === 'boolean') {
     return value ? 'TRUE' : 'FALSE'
@@ -150,6 +165,18 @@ function formatValue(value: any, field: TableField | undefined): string {
 
   // String values - always quote
   return `"${escapeString(String(value))}"`
+}
+
+function isRelativeDateValue(value: any): value is RelativeDateValue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    value.type === 'relative_date' &&
+    value.base === 'today' &&
+    (value.direction === 'before' || value.direction === 'after') &&
+    (value.unit === 'DAY' || value.unit === 'MONTH') &&
+    typeof value.amount === 'number'
+  )
 }
 
 function escapeString(str: string): string {
@@ -247,6 +274,17 @@ function formatConditionSummary(
 function formatValueSummary(value: any, field: TableField | undefined): string {
   if (value === null || value === undefined) {
     return 'empty'
+  }
+
+  if (value === '__TODAY__') {
+    return 'today'
+  }
+
+  if (isRelativeDateValue(value)) {
+    const amt = Number.isFinite(value.amount) ? Math.trunc(value.amount) : 0
+    const unitLower = (String(value.unit).toUpperCase() === 'MONTH' ? 'month' : 'day') + (amt === 1 ? '' : 's')
+    const dir = value.direction === 'before' ? 'before' : 'after'
+    return `${amt} ${unitLower} ${dir} today`
   }
 
   if (typeof value === 'boolean') {

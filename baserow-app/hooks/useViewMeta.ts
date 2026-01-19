@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { ViewField, ViewFilter, ViewSort } from "@/types/database"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 export interface ViewMetadata {
   fields: ViewField[]
@@ -44,8 +45,11 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
       return
     }
 
-    // Skip if no viewId or tableId
-    if (!viewId || !tableId) {
+    const viewUuid = normalizeUuid(viewId)
+    const tableUuid = normalizeUuid(tableId)
+
+    // Skip if no (valid) viewId or tableId
+    if (!viewUuid || !tableUuid) {
       if (metadataRef.current) {
         // Keep existing metadata if viewId/tableId cleared
         return
@@ -56,12 +60,12 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
     }
 
     // Skip if already loading the same view
-    if (loadingRef.current && viewIdRef.current === viewId && tableIdRef.current === tableId) {
+    if (loadingRef.current && viewIdRef.current === viewUuid && tableIdRef.current === tableUuid) {
       return
     }
 
     // Check cache first
-    const cacheKey = `${tableId}:${viewId}`
+    const cacheKey = `${tableUuid}:${viewUuid}`
     const cached = metadataCache.get(cacheKey)
     
     if (cached?.data && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -70,8 +74,8 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
       setMetadata(cached.data)
       setLoading(false)
       setError(null)
-      viewIdRef.current = viewId
-      tableIdRef.current = tableId
+      viewIdRef.current = viewUuid
+      tableIdRef.current = tableUuid
       return
     }
 
@@ -104,8 +108,8 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
 
     // Load metadata (SERIALIZED - no parallel requests)
     loadingRef.current = true
-    viewIdRef.current = viewId
-    tableIdRef.current = tableId
+    viewIdRef.current = viewUuid
+    tableIdRef.current = tableUuid
     setLoading(true)
     setError(null)
 
@@ -117,7 +121,7 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
       const { data: fields, error: fieldsError } = await supabase
         .from("view_fields")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("position", { ascending: true })
 
       if (fieldsError && fieldsError.code !== 'PGRST116' && fieldsError.code !== '42P01') {
@@ -128,7 +132,7 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
       const { data: filters, error: filtersError } = await supabase
         .from("view_filters")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
 
       if (filtersError && filtersError.code !== 'PGRST116' && filtersError.code !== '42P01') {
         console.warn("Error loading view filters:", filtersError)
@@ -138,7 +142,7 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
       const { data: sorts, error: sortsError } = await supabase
         .from("view_sorts")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
 
       if (sortsError) {
         // Handle different error cases
@@ -149,7 +153,7 @@ export function useViewMeta(viewId: string | null | undefined, tableId: string |
           const { data: sortsWithoutOrder } = await supabase
             .from("view_sorts")
             .select("*")
-            .eq("view_id", viewId)
+            .eq("view_id", viewUuid)
           
           if (sortsWithoutOrder) {
             return {

@@ -25,6 +25,7 @@ interface FilterBlockSettingsProps {
   tables: Table[]
   fields: TableField[]
   allBlocks?: Array<{ id: string; type: string; config?: BlockConfig }> // All blocks on the page
+  pageTableId?: string | null // Table ID from page context (for blocks that rely on page fallback)
   onUpdate: (updates: Partial<BlockConfig>) => void
   onTableChange: (tableId: string) => Promise<void>
 }
@@ -59,6 +60,7 @@ export default function FilterBlockSettings({
   tables,
   fields,
   allBlocks = [],
+  pageTableId = null,
   onUpdate,
   onTableChange,
 }: FilterBlockSettingsProps) {
@@ -99,10 +101,21 @@ export default function FilterBlockSettings({
     setDefaultFilters(config?.filters || [])
   }, [config?.filters])
 
-  // Get data blocks that can be filtered
-  const filterableBlocks = allBlocks.filter(b => 
-    ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
-  )
+  const allDataBlocks = useMemo(() => {
+    return allBlocks.filter((b) =>
+      ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
+    )
+  }, [allBlocks])
+
+  // Only blocks on the SAME table are "compatible" for a filter control
+  const filterableBlocks = useMemo(() => {
+    // If table isn't selected yet, show all data blocks (so user understands what's on page)
+    if (!tableId) return allDataBlocks
+    return allDataBlocks.filter((b) => {
+      const blockTableId = b.config?.table_id || pageTableId
+      return !!blockTableId && blockTableId === tableId
+    })
+  }, [allDataBlocks, tableId, pageTableId])
   
   // Get currently connected blocks
   const connectedBlocks = useMemo(() => {
@@ -270,7 +283,13 @@ export default function FilterBlockSettings({
             </div>
           )}
           
-          {filterableBlocks.length === 0 && (
+          {filterableBlocks.length === 0 && allDataBlocks.length > 0 && (
+            <div className="border rounded-lg p-3 bg-gray-50 text-sm text-gray-500 text-center">
+              No compatible elements found for this table. Only blocks using the same table can be connected.
+            </div>
+          )}
+          
+          {allDataBlocks.length === 0 && (
             <div className="border rounded-lg p-3 bg-gray-50 text-sm text-gray-500 text-center">
               No filterable elements found on this page. Add grid, chart, or KPI blocks to connect.
             </div>

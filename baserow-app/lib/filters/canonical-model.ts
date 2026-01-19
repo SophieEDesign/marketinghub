@@ -39,6 +39,35 @@ export type FilterOperator =
 export type GroupOperator = 'AND' | 'OR'
 
 /**
+ * Date values used by filters.
+ *
+ * Notes:
+ * - Date-only strings are represented as 'YYYY-MM-DD'
+ * - Relative date values are anchored to "today" (local), similar to Airtable
+ */
+export type DateRangeValue = { start?: string; end?: string }
+
+export type RelativeDateUnit = 'DAY' | 'MONTH'
+export type RelativeDateDirection = 'before' | 'after'
+
+export type RelativeDateValue = {
+  type: 'relative_date'
+  base: 'today'
+  amount: number
+  unit: RelativeDateUnit
+  direction: RelativeDateDirection
+}
+
+export type FilterValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | null
+  | DateRangeValue
+  | RelativeDateValue
+
+/**
  * FilterCondition: A single filter condition
  * 
  * - field_id: The field to filter on (can be field name or ID)
@@ -48,7 +77,7 @@ export type GroupOperator = 'AND' | 'OR'
 export interface FilterCondition {
   field_id: string
   operator: FilterOperator
-  value?: string | number | boolean | string[] | null
+  value?: FilterValue
 }
 
 /**

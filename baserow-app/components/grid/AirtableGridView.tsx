@@ -36,6 +36,7 @@ import type { FilterType } from '@/types/database'
 import type { FilterConfig } from '@/lib/interface/filters'
 import { buildGroupTree, flattenGroupTree } from '@/lib/grouping/groupTree'
 import type { GroupRule } from '@/lib/grouping/types'
+import { normalizeUuid } from '@/lib/utils/ids'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -107,6 +108,10 @@ export default function AirtableGridView({
   const isTablet = useIsTablet()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
   const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
+
+  // `viewId` can be a composite like "<uuid>:<index>" in some contexts.
+  // Only use a strict UUID when querying `grid_view_settings`.
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
 
   // Load tableId from tableName if not provided
   useEffect(() => {
@@ -335,7 +340,7 @@ export default function AirtableGridView({
 
   // Load grid view settings from database (column widths, order, wrap text)
   useEffect(() => {
-    if (!viewId || safeFields.length === 0) return
+    if (!viewUuid || safeFields.length === 0) return
 
     async function loadGridViewSettings() {
       try {
@@ -343,7 +348,7 @@ export default function AirtableGridView({
         let { data, error } = await supabase
           .from('grid_view_settings')
           .select('column_widths, column_order, column_wrap_text, row_heights')
-          .eq('view_id', viewId)
+          .eq('view_id', viewUuid)
           .maybeSingle()
 
         // Backward compatibility: older schemas won't have row_heights yet.
@@ -351,7 +356,7 @@ export default function AirtableGridView({
           const retry = await supabase
             .from('grid_view_settings')
             .select('column_widths, column_order, column_wrap_text')
-            .eq('view_id', viewId)
+            .eq('view_id', viewUuid)
             .maybeSingle()
           data = retry.data as any
           error = retry.error as any
@@ -535,7 +540,7 @@ export default function AirtableGridView({
     }
 
     loadGridViewSettings()
-  }, [safeFields, tableName, viewName, viewId])
+  }, [safeFields, tableName, viewName, viewUuid])
 
   // Save column widths, order, and wrap text to database and localStorage
   useEffect(() => {
@@ -549,14 +554,14 @@ export default function AirtableGridView({
     localStorage.setItem(`${storageKey}_wrapText`, JSON.stringify(columnWrapText))
 
     // Save to database if viewId is available
-    if (viewId) {
+    if (viewUuid) {
       async function saveToDatabase() {
         try {
           const supabase = createClient()
           const { data: existing } = await supabase
             .from('grid_view_settings')
             .select('id')
-            .eq('view_id', viewId)
+            .eq('view_id', viewUuid)
             .maybeSingle()
 
           const settingsData = {
@@ -569,12 +574,12 @@ export default function AirtableGridView({
             await supabase
               .from('grid_view_settings')
               .update(settingsData)
-              .eq('view_id', viewId)
+              .eq('view_id', viewUuid)
           } else {
             await supabase
               .from('grid_view_settings')
               .insert([{
-                view_id: viewId,
+                view_id: viewUuid,
                 ...settingsData,
                 row_height: 'medium',
                 frozen_columns: 0,
@@ -591,7 +596,7 @@ export default function AirtableGridView({
     } else {
       layoutDirtyRef.current = false
     }
-  }, [columnWidths, columnOrder, columnWrapText, tableName, viewName, viewId])
+  }, [columnWidths, columnOrder, columnWrapText, tableName, viewName, viewUuid])
 
   const persistRowHeights = useCallback(async (next: Record<string, number>) => {
     // Always persist to localStorage as backup
@@ -602,20 +607,20 @@ export default function AirtableGridView({
       // ignore
     }
 
-    if (!viewId) return
+    if (!viewUuid) return
     try {
       const supabase = createClient()
       const { data: existing } = await supabase
         .from('grid_view_settings')
         .select('id')
-        .eq('view_id', viewId)
+        .eq('view_id', viewUuid)
         .maybeSingle()
 
       if (existing) {
         const res = await supabase
           .from('grid_view_settings')
           .update({ row_heights: next })
-          .eq('view_id', viewId)
+          .eq('view_id', viewUuid)
         // Backward compatibility: older schemas won't have row_heights yet.
         if (res.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
           return
@@ -624,7 +629,7 @@ export default function AirtableGridView({
         const res = await supabase
           .from('grid_view_settings')
           .insert([{
-            view_id: viewId,
+            view_id: viewUuid,
             column_widths: columnWidths,
             column_order: columnOrder,
             column_wrap_text: columnWrapText,
@@ -640,7 +645,7 @@ export default function AirtableGridView({
     } catch (error) {
       console.error('Error saving row heights:', error)
     }
-  }, [columnOrder, columnWidths, columnWrapText, tableName, viewId, viewName])
+  }, [columnOrder, columnWidths, columnWrapText, tableName, viewUuid, viewName])
 
   const getEffectiveRowHeight = useCallback((rowId: string | null | undefined) => {
     if (!rowId) return ROW_HEIGHT

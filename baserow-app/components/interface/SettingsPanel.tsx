@@ -64,6 +64,7 @@ interface SettingsPanelProps {
   onMoveToBottom?: (blockId: string) => void
   onLock?: (blockId: string, locked: boolean) => void
   pageTableId?: string | null // Table ID from the page (for field blocks on record_view pages)
+  allBlocks?: PageBlock[] // All blocks on the page (for Filter block settings)
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -80,6 +81,7 @@ export default function SettingsPanel({
   onMoveToBottom,
   onLock,
   pageTableId = null,
+  allBlocks = [],
 }: SettingsPanelProps) {
   const { toast } = useToast()
   const [tables, setTables] = useState<Table[]>([])
@@ -565,7 +567,7 @@ export default function SettingsPanel({
       case "image":
         return <ImageDataSettings {...commonProps} />
       case "filter":
-        return <FilterBlockSettings {...commonProps} allBlocks={[]} />
+        return <FilterBlockSettings {...commonProps} allBlocks={allBlocks} pageTableId={pageTableId} />
       case "field":
         return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
       case "number":

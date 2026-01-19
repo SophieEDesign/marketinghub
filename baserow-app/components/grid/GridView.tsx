@@ -40,6 +40,7 @@ import { generateAddColumnSQL } from "@/lib/fields/sqlGenerator"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -349,6 +350,10 @@ export default function GridView({
     return `mh:gridRowHeights:table:${t}:${n}`
   }, [supabaseTableName, tableId, viewId])
 
+  // IMPORTANT: `viewId` can sometimes be a composite like "<uuid>:<index>".
+  // Only use a real UUID for DB queries; otherwise fall back to localStorage-only behaviour.
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
+
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isResizingRowRef = useRef(false)
   const resizingRowIdRef = useRef<string | null>(null)
@@ -505,7 +510,7 @@ export default function GridView({
     if (safeTableFields.length === 0) return
 
     // Local fallback when viewId is not set (e.g. block-backed tables without views enabled).
-    if (!viewId) {
+    if (!viewUuid) {
       try {
         const raw = localStorage.getItem(rowHeightsStorageKey)
         if (raw) {
@@ -530,7 +535,7 @@ export default function GridView({
         let { data, error } = await supabase
           .from('grid_view_settings')
           .select('column_order, column_widths, row_heights')
-          .eq('view_id', viewId)
+          .eq('view_id', viewUuid)
           .maybeSingle()
 
         // Backward compatibility: older schemas won't have row_heights yet.
@@ -538,7 +543,7 @@ export default function GridView({
           const retry = await supabase
             .from('grid_view_settings')
             .select('column_order, column_widths')
-            .eq('view_id', viewId)
+            .eq('view_id', viewUuid)
             .maybeSingle()
           data = retry.data as any
           error = retry.error as any
@@ -653,7 +658,7 @@ export default function GridView({
     }
 
     loadColumnSettings()
-  }, [viewId, columnSettingsKey, rowHeightsStorageKey])
+  }, [viewUuid, columnSettingsKey, rowHeightsStorageKey])
 
   // Persist row heights locally as a safety net (and as primary store when viewId is absent).
   useEffect(() => {
@@ -666,7 +671,7 @@ export default function GridView({
 
   // Save column order and widths to grid_view_settings
   useEffect(() => {
-    if (!viewId || columnOrder.length === 0) return
+    if (!viewUuid || columnOrder.length === 0) return
 
     async function saveColumnSettings() {
       try {
@@ -674,7 +679,7 @@ export default function GridView({
         const { data: existing } = await supabase
           .from('grid_view_settings')
           .select('id')
-          .eq('view_id', viewId)
+          .eq('view_id', viewUuid)
           .maybeSingle()
 
         const settingsData = {
@@ -685,10 +690,10 @@ export default function GridView({
 
         const tryUpdateOrInsert = async (payload: any) => {
           if (existing) {
-            return await supabase.from('grid_view_settings').update(payload).eq('view_id', viewId)
+            return await supabase.from('grid_view_settings').update(payload).eq('view_id', viewUuid)
           }
           return await supabase.from('grid_view_settings').insert([{
-            view_id: viewId,
+            view_id: viewUuid,
             ...payload,
             column_wrap_text: {},
             row_height: 'medium',
@@ -710,7 +715,7 @@ export default function GridView({
     // Debounce saves to avoid too many database calls
     const timeoutId = setTimeout(saveColumnSettings, 500)
     return () => clearTimeout(timeoutId)
-  }, [columnOrder, columnWidths, rowHeights, viewId])
+  }, [columnOrder, columnWidths, rowHeights, viewUuid])
 
   const startRowResize = useCallback((rowId: string, startHeight: number, startClientY: number) => {
     if (isMobile) return

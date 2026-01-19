@@ -23,9 +23,11 @@ export interface AggregateDataMap {
 /**
  * Extract aggregate requests from blocks
  */
+type PageFiltersResolver = FilterConfig[] | ((blockId: string) => FilterConfig[])
+
 function extractAggregateRequests(
   blocks: PageBlock[],
-  pageFilters: FilterConfig[]
+  pageFilters: PageFiltersResolver
 ): Map<string, AggregateRequest> {
   const requests = new Map<string, AggregateRequest>()
   
@@ -39,7 +41,8 @@ function extractAggregateRequests(
     const aggregate = config.kpi_aggregate || 'count'
     const fieldName = config.kpi_field
     const blockFilters = config.filters || []
-    const allFilters = mergeFilters(blockFilters, pageFilters, [])
+    const resolvedPageFilters = typeof pageFilters === 'function' ? pageFilters(block.id) : pageFilters
+    const allFilters = mergeFilters(blockFilters, resolvedPageFilters, [])
     
     const comparison = config.comparison ? {
       dateFieldName: config.comparison.date_field,
@@ -92,7 +95,7 @@ async function batchAggregateFetcher(requests: AggregateRequest[]): Promise<any[
  */
 export function usePageAggregates(
   blocks: PageBlock[],
-  pageFilters: FilterConfig[] = []
+  pageFilters: PageFiltersResolver = []
 ): AggregateDataMap {
   // Extract all aggregate requests from KPI blocks
   const requests = useMemo(

@@ -111,6 +111,16 @@ export default function FilterBlock({
   // Load table fields if table_id is configured
   const tableId = config?.table_id || pageTableId
 
+  const isFilterableDataBlock = useCallback((b: PageBlock) => {
+    return ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
+  }, [])
+
+  const isSameTable = useCallback((b: PageBlock) => {
+    if (!tableId) return false
+    const blockTableId = b.config?.table_id || pageTableId
+    return !!blockTableId && blockTableId === tableId
+  }, [tableId, pageTableId])
+
   // Sync filter tree when config changes externally
   useEffect(() => {
     const configFilterTree = config?.filter_tree
@@ -155,16 +165,31 @@ export default function FilterBlock({
   // Get connected blocks
   const connectedBlocks = useMemo(() => {
     if (targetBlocks === 'all') {
-      return allBlocks.filter(b => 
-        b.id !== block.id && 
-        ['grid', 'chart', 'kpi', 'kanban', 'calendar', 'timeline', 'list'].includes(b.type)
+      // "All compatible" means: all data blocks on the SAME table.
+      return allBlocks.filter((b) =>
+        b.id !== block.id &&
+        isFilterableDataBlock(b) &&
+        isSameTable(b)
       )
     }
     if (Array.isArray(targetBlocks)) {
-      return allBlocks.filter(b => targetBlocks.includes(b.id))
+      // Defensive: even for explicit selections, do not connect cross-table.
+      return allBlocks.filter((b) =>
+        targetBlocks.includes(b.id) &&
+        b.id !== block.id &&
+        isFilterableDataBlock(b) &&
+        isSameTable(b)
+      )
     }
     return []
-  }, [targetBlocks, allBlocks, block.id])
+  }, [targetBlocks, allBlocks, block.id, isFilterableDataBlock, isSameTable])
+
+  // Emit targets as an explicit list so we never "accidentally" affect other tables.
+  const effectiveTargetBlocks = useMemo<string[] | 'all'>(() => {
+    if (!tableId) return []
+    // If user picked explicit blocks, connectedBlocks is already filtered safely.
+    return connectedBlocks.map((b) => b.id)
+  }, [connectedBlocks, tableId])
 
   // Get fields common to all connected blocks
   const availableFields = useMemo(() => {
@@ -211,16 +236,16 @@ export default function FilterBlock({
     return JSON.stringify({
       blockId: block.id,
       filterTree,
-      targetBlocks,
+      targetBlocks: effectiveTargetBlocks,
       blockTitle,
     })
-  }, [block.id, filterTree, targetBlocks, config?.title])
+  }, [block.id, filterTree, effectiveTargetBlocks, config?.title])
 
   // Emit filter state to context whenever filters change
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
-      updateFilterBlock(block.id, filterTree, targetBlocks, blockTitle)
+      updateFilterBlock(block.id, filterTree, effectiveTargetBlocks, blockTitle)
     }
     
     return () => {

@@ -9,6 +9,7 @@ import FieldBuilderDrawer from "./FieldBuilderDrawer"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
 import { asArray } from "@/lib/utils/asArray"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface Filter {
   id?: string
@@ -122,6 +123,10 @@ export default function GridViewWrapper({
   const [fields, setFields] = useState<TableField[]>(safeInitialTableFields)
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
+
+  // `viewId` can sometimes be a composite like "<uuid>:<index>".
+  // Only use a strict UUID for DB writes/reads.
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   
   // CRITICAL: Use block-level appearance settings for row height and wrapping
   // Block settings take precedence over view-level settings
@@ -171,11 +176,16 @@ export default function GridViewWrapper({
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
+      if (!viewUuid) {
+        console.warn("GridViewWrapper: viewId is not a valid UUID; cannot persist filter.")
+        setFilters((prev) => [...prev, { ...filter, id: `local:${Date.now()}` }])
+        return
+      }
       const { data, error } = await supabase
         .from("view_filters")
         .insert([
           {
-            view_id: viewId,
+            view_id: viewUuid,
             field_name: filter.field_name,
             operator: filter.operator,
             value: filter.value,
@@ -234,11 +244,15 @@ export default function GridViewWrapper({
 
   async function handleSortCreate(sort: Omit<Sort, "id">) {
     try {
+      if (!viewUuid) {
+        console.warn("GridViewWrapper: viewId is not a valid UUID; cannot persist sort.")
+        return
+      }
       // Check if view exists first (for SQL-view backed pages)
       const { data: viewExists } = await supabase
         .from("views")
         .select("id")
-        .eq("id", viewId)
+        .eq("id", viewUuid)
         .maybeSingle()
 
       if (!viewExists) {
@@ -250,7 +264,7 @@ export default function GridViewWrapper({
       const { data: existingSorts, error: fetchError } = await supabase
         .from("view_sorts")
         .select("order_index")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: false })
         .limit(1)
 
@@ -260,13 +274,13 @@ export default function GridViewWrapper({
           const { data: sortsWithoutOrder } = await supabase
             .from("view_sorts")
             .select("*")
-            .eq("view_id", viewId)
+            .eq("view_id", viewUuid)
           
           const nextOrderIndex = sortsWithoutOrder ? sortsWithoutOrder.length : 0
           
           // Try to insert with order_index first, fallback without if column doesn't exist
           const insertData: any = {
-            view_id: viewId,
+            view_id: viewUuid,
             field_name: sort.field_name,
             direction: sort.direction,
           }
@@ -301,7 +315,7 @@ export default function GridViewWrapper({
         .from("view_sorts")
         .insert([
           {
-            view_id: viewId,
+            view_id: viewUuid,
             field_name: sort.field_name,
             direction: sort.direction,
             order_index: nextOrderIndex,
@@ -358,12 +372,17 @@ export default function GridViewWrapper({
 
   async function handleGroupByChange(fieldName: string | null) {
     try {
+      if (!viewUuid) {
+        console.warn("GridViewWrapper: viewId is not a valid UUID; cannot persist grouping.")
+        setGroupBy(fieldName || undefined)
+        return
+      }
       // Update grid view settings instead of views.config
       // Handle case where table doesn't exist (404)
       const { data: existing, error: fetchError } = await supabase
         .from("grid_view_settings")
         .select("id")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .maybeSingle()
 
       if (fetchError) {
@@ -382,7 +401,7 @@ export default function GridViewWrapper({
         const { error } = await supabase
           .from("grid_view_settings")
           .update({ group_by_field: fieldName })
-          .eq("view_id", viewId)
+          .eq("view_id", viewUuid)
 
         if (error) {
           if (error.code === 'PGRST205' || error.code === '42P01') {
@@ -398,7 +417,7 @@ export default function GridViewWrapper({
           .from("grid_view_settings")
           .insert([
             {
-              view_id: viewId,
+              view_id: viewUuid,
               group_by_field: fieldName,
               column_widths: {},
               column_order: [],

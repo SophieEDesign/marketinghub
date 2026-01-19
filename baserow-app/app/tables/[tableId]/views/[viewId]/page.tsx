@@ -10,6 +10,7 @@ import { getTable } from "@/lib/crud/tables"
 import { getView } from "@/lib/crud/views"
 import { Button } from "@/components/ui/button"
 import type { View } from "@/types/database"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 export default async function ViewPage({
   params,
@@ -38,8 +39,12 @@ export default async function ViewPage({
   }
   try {
     const supabase = await createClient()
+
+    // Be defensive: in some contexts IDs may arrive as "<uuid>:<index>".
+    const tableId = normalizeUuid(params.tableId) || params.tableId
+    const viewId = normalizeUuid(params.viewId) || params.viewId
     
-    const table = await getTable(params.tableId).catch(() => null)
+    const table = await getTable(tableId).catch(() => null)
     if (!table) {
       return (
         <WorkspaceShellWrapper title="Table not found">
@@ -48,7 +53,7 @@ export default async function ViewPage({
       )
     }
 
-    const view = await getView(params.viewId).catch(() => null)
+    const view = await getView(viewId).catch(() => null)
     if (!view) {
       return (
         <WorkspaceShellWrapper title="View not found">
@@ -62,7 +67,7 @@ export default async function ViewPage({
       return (
         <WorkspaceShellWrapper title={view.name}>
           <div className="w-full h-full -m-6">
-            <InterfacePage viewId={params.viewId} />
+            <InterfacePage viewId={viewId} />
           </div>
         </WorkspaceShellWrapper>
       )
@@ -74,25 +79,25 @@ export default async function ViewPage({
       supabase
         .from("view_fields")
         .select("field_name, visible, position")
-        .eq("view_id", params.viewId)
+        .eq("view_id", viewId)
         .order("position", { ascending: true }),
       supabase
         .from("view_filters")
         .select("id, field_name, operator, value")
-        .eq("view_id", params.viewId),
+        .eq("view_id", viewId),
       supabase
         .from("view_sorts")
         .select("id, field_name, direction")
-        .eq("view_id", params.viewId),
+        .eq("view_id", viewId),
       supabase
         .from("grid_view_settings")
         .select("group_by_field")
-        .eq("view_id", params.viewId)
+        .eq("view_id", viewId)
         .maybeSingle(),
       supabase
         .from("table_fields")
         .select("*")
-        .eq("table_id", params.tableId)
+        .eq("table_id", tableId)
         .order("position", { ascending: true }),
     ])
 
@@ -114,8 +119,8 @@ export default async function ViewPage({
       <WorkspaceShellWrapper title={view.name}>
         {view.type === "grid" ? (
           <AirtableViewPage
-            tableId={params.tableId}
-            viewId={params.viewId}
+            tableId={tableId}
+            viewId={viewId}
             table={table}
             view={view}
             initialViewFields={viewFields}
@@ -129,8 +134,8 @@ export default async function ViewPage({
           <NonGridViewWrapper
             viewType={view.type as "form" | "kanban" | "calendar" | "timeline"}
             viewName={view.name}
-            tableId={params.tableId}
-            viewId={params.viewId}
+            tableId={tableId}
+            viewId={viewId}
             fieldIds={Array.isArray(viewFields) ? viewFields.map((f) => f.field_name).filter(Boolean) : []}
             groupingFieldId={kanbanGroupField}
             dateFieldId={

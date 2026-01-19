@@ -58,10 +58,22 @@ export default function EditAutomationClient({ automationId }: EditAutomationCli
   async function handleSave(updates: Partial<Automation>) {
     const supabase = createClient()
 
+    // Keep legacy `trigger` JSONB in sync for backwards compatibility.
+    // The DB schema still requires `trigger` and older migrations may read it.
+    const triggerType = (updates.trigger_type || automation?.trigger_type || "row_created") as any
+    const triggerConfig = {
+      ...(automation?.trigger_config || {}),
+      ...(updates.trigger_config || {}),
+      table_id: automation?.table_id,
+    }
+
     const { error } = await supabase
       .from("automations")
       .update({
         ...updates,
+        trigger: { type: triggerType, config: triggerConfig },
+        trigger_type: triggerType,
+        trigger_config: triggerConfig,
         updated_at: new Date().toISOString(),
       })
       .eq("id", automationId)
