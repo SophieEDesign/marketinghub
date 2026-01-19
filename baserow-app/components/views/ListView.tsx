@@ -12,6 +12,7 @@ import type { FilterType } from "@/types/database"
 import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
+import RecordModal from "@/components/calendar/RecordModal"
 import GroupDialog from "../grid/GroupDialog"
 import FilterDialog from "../grid/FilterDialog"
 import { CellFactory } from "../grid/CellFactory"
@@ -88,6 +89,10 @@ export default function ListView({
   const [filterDialogOpen, setFilterDialogOpen] = useState(false)
   const [currentGroupBy, setCurrentGroupBy] = useState<string | undefined>(groupBy)
   const [currentFilters, setCurrentFilters] = useState<FilterConfig[]>(filters)
+
+  // Create flow: open modal first; only insert on Save inside modal.
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createInitialData, setCreateInitialData] = useState<Record<string, any> | null>(null)
 
   // Load table name for record panel
   useEffect(() => {
@@ -450,7 +455,6 @@ export default function ListView({
     if (effectiveGroupRules.length === 0) return
 
     try {
-      const supabase = createClient()
       const newData: Record<string, any> = {}
 
       const defaultsFromFilters = deriveDefaultValuesFromFilters(filters, tableFields)
@@ -486,27 +490,33 @@ export default function ListView({
           }
         }
       }
-
-      const { data, error } = await supabase
-        .from(supabaseTableName)
-        .insert([newData])
-        .select()
-        .single()
-      if (error) throw error
-
-      const createdId = (data as any)?.id || (data as any)?.record_id
-      if (!createdId) return
-
-      await loadRows()
-
-      // Contract: creating a record must NOT auto-open it.
-      // User can open via the dedicated chevron (or optional double-click).
-      setSelectedRecordId(String(createdId))
+      // Do NOT insert yet — open the modal with pre-filled data.
+      setCreateInitialData(newData)
+      setCreateModalOpen(true)
     } catch (error) {
       console.error('Failed to create record:', error)
       alert('Failed to create record. Please try again.')
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters, handleOpenRecord])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters])
+
+  const createRecordModal = (
+    <RecordModal
+      open={createModalOpen}
+      onClose={() => {
+        setCreateModalOpen(false)
+        setCreateInitialData(null)
+      }}
+      tableId={tableId}
+      recordId={null}
+      tableFields={Array.isArray(tableFields) ? tableFields : []}
+      initialData={createInitialData || undefined}
+      onSave={async () => {
+        await loadRows()
+        setCreateModalOpen(false)
+        setCreateInitialData(null)
+      }}
+    />
+  )
 
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
@@ -831,6 +841,8 @@ export default function ListView({
             </div>
           </div>
         )}
+
+        {createRecordModal}
       </div>
     )
   }
@@ -917,6 +929,8 @@ export default function ListView({
             </div>
           </div>
         )}
+
+        {createRecordModal}
       </div>
     )
   }
@@ -994,6 +1008,8 @@ export default function ListView({
           </div>
         </div>
       )}
+
+      {createRecordModal}
     </div>
   )
 }

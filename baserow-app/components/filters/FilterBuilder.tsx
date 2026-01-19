@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Plus, X, ChevronDown, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,7 +13,12 @@ import {
 import { Label } from "@/components/ui/label"
 import type { TableField } from "@/types/fields"
 import type { FilterTree, FilterGroup, FilterCondition, GroupOperator } from "@/lib/filters/canonical-model"
-import { normalizeFilterTree, isEmptyFilterTree } from "@/lib/filters/canonical-model"
+import {
+  normalizeFilterTree,
+  isEmptyFilterTree,
+  flattenFilterTree,
+  conditionsToFilterTree,
+} from "@/lib/filters/canonical-model"
 import { getOperatorsForFieldType, getDefaultOperatorForFieldType } from "@/lib/filters/field-operators"
 import FilterValueInput from "./FilterValueInput"
 
@@ -23,6 +28,16 @@ interface FilterBuilderProps {
   onChange: (filterTree: FilterTree) => void
   className?: string
   variant?: "default" | "airtable"
+  /**
+   * When false, the UI will not allow creating nested groups (all conditions are ANDed).
+   * Any incoming grouped tree will be flattened to conditions combined with AND.
+   */
+  allowGroups?: boolean
+  /**
+   * When false, the UI will not allow selecting OR as a group operator.
+   * Any incoming OR operators will be coerced to AND.
+   */
+  allowOr?: boolean
 }
 
 /**
@@ -42,15 +57,41 @@ export default function FilterBuilder({
   onChange,
   className = "",
   variant = "default",
+  allowGroups = true,
+  allowOr = true,
 }: FilterBuilderProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [draggedItem, setDraggedItem] = useState<{ type: 'condition' | 'group'; path: number[] } | null>(null)
 
-  // Normalize filter tree to always be a group
-  const normalizedTree = normalizeFilterTree(filterTree) || {
-    operator: 'AND' as GroupOperator,
-    children: [],
-  }
+  // Normalize filter tree to always be a group, then apply capability constraints.
+  const normalizedTree = useMemo<FilterGroup>(() => {
+    const base = normalizeFilterTree(filterTree) || {
+      operator: "AND" as GroupOperator,
+      children: [],
+    }
+
+    // Simple mode: no groups; flatten everything into a single AND group.
+    if (!allowGroups) {
+      const conditions = flattenFilterTree(base)
+      return (conditionsToFilterTree(conditions, "AND") || {
+        operator: "AND" as GroupOperator,
+        children: [],
+      }) as FilterGroup
+    }
+
+    // AND-only mode: keep grouping, but disallow OR operators.
+    if (!allowOr) {
+      const coerceToAnd = (g: FilterGroup): FilterGroup => ({
+        operator: "AND",
+        children: g.children.map((child) =>
+          "field_id" in child ? child : coerceToAnd(child)
+        ),
+      })
+      return coerceToAnd(base)
+    }
+
+    return base
+  }, [filterTree, allowGroups, allowOr])
 
   const toggleGroupCollapse = useCallback((path: number[]) => {
     const key = path.join(',')
@@ -84,14 +125,15 @@ export default function FilterBuilder({
 
   // Add a new group
   const addGroup = useCallback((path: number[], operator: GroupOperator = 'AND') => {
+    if (!allowGroups) return
     const newGroup: FilterGroup = {
-      operator,
+      operator: allowOr ? operator : 'AND',
       children: [],
     }
 
     const newTree = addGroupToPath(normalizedTree, path, newGroup)
     onChange(newTree)
-  }, [normalizedTree, onChange])
+  }, [allowGroups, allowOr, normalizedTree, onChange])
 
   // Remove an item (condition or group)
   const removeItem = useCallback((path: number[]) => {
@@ -107,9 +149,10 @@ export default function FilterBuilder({
 
   // Update a group's operator
   const updateGroupOperator = useCallback((path: number[], operator: GroupOperator) => {
-    const newTree = updateGroupOperatorInPath(normalizedTree, path, operator)
+    const nextOperator = allowOr ? operator : 'AND'
+    const newTree = updateGroupOperatorInPath(normalizedTree, path, nextOperator)
     onChange(newTree)
-  }, [normalizedTree, onChange])
+  }, [allowOr, normalizedTree, onChange])
 
   // Duplicate a condition or group
   const duplicateItem = useCallback((path: number[]) => {
@@ -344,15 +387,17 @@ export default function FilterBuilder({
               <Plus className="h-3.5 w-3.5 mr-1.5" />
               Add condition
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => addGroup(path, "AND")}
-              className="h-8 px-2 text-xs"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add group
-            </Button>
+            {allowGroups && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => addGroup(path, "AND")}
+                className="h-8 px-2 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                Add group
+              </Button>
+            )}
           </div>
         </div>
       )
@@ -387,18 +432,24 @@ export default function FilterBuilder({
               <span className={`text-sm font-semibold ${variant === "airtable" ? "text-gray-900" : "text-blue-900"}`}>
                 {isEmpty ? 'Empty Group' : `Group (${group.children.length} condition${group.children.length !== 1 ? 's' : ''})`}
               </span>
-              <Select
-                value={group.operator}
-                onValueChange={(value) => updateGroupOperator(path, value as GroupOperator)}
-              >
-                <SelectTrigger className={`h-7 w-20 text-xs ${variant === "airtable" ? "border-gray-300" : "border-blue-300"}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AND">AND</SelectItem>
-                  <SelectItem value="OR">OR</SelectItem>
-                </SelectContent>
-              </Select>
+              {allowOr ? (
+                <Select
+                  value={group.operator}
+                  onValueChange={(value) => updateGroupOperator(path, value as GroupOperator)}
+                >
+                  <SelectTrigger className={`h-7 w-20 text-xs ${variant === "airtable" ? "border-gray-300" : "border-blue-300"}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AND">AND</SelectItem>
+                    <SelectItem value="OR">OR</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className={`text-xs font-semibold px-2 py-1 rounded border ${variant === "airtable" ? "border-gray-300 text-gray-700 bg-white" : "border-blue-300 text-blue-800 bg-white"}`}>
+                  AND
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -452,22 +503,24 @@ export default function FilterBuilder({
                   <Plus className="h-4 w-4 mr-2" />
                   Add Condition
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addGroup(path, 'AND')}
-                  className={`flex-1 ${variant === "airtable" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "border-blue-300 text-blue-700 hover:bg-blue-100"}`}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Group
-                </Button>
+                {allowGroups && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addGroup(path, 'AND')}
+                    className={`flex-1 ${variant === "airtable" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "border-blue-300 text-blue-700 hover:bg-blue-100"}`}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Group
+                  </Button>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
     )
-  }, [isGroupCollapsed, toggleGroupCollapse, updateGroupOperator, removeItem, duplicateItem, addCondition, addGroup, renderCondition, variant])
+  }, [isGroupCollapsed, toggleGroupCollapse, updateGroupOperator, removeItem, duplicateItem, addCondition, addGroup, renderCondition, variant, allowGroups, allowOr])
 
   // Helper functions to manipulate filter tree
   function addConditionToPath(tree: FilterGroup, path: number[], condition: FilterCondition): FilterGroup {
@@ -614,7 +667,9 @@ export default function FilterBuilder({
       {isEmpty ? (
         <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
           <p className="text-sm mb-1">No filters applied</p>
-          <p className="text-xs">Add a condition or group to filter records</p>
+          <p className="text-xs">
+            {allowGroups ? "Add a condition or group to filter records" : "Add a condition to filter records"}
+          </p>
         </div>
       ) : (
         renderGroup(normalizedTree, [], true)
@@ -631,15 +686,17 @@ export default function FilterBuilder({
             <Plus className="h-4 w-4 mr-2" />
             Add Condition
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => addGroup([], 'AND')}
-            className="flex-1"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Group
-          </Button>
+          {allowGroups && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => addGroup([], 'AND')}
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Group
+            </Button>
+          )}
         </div>
       )}
     </div>

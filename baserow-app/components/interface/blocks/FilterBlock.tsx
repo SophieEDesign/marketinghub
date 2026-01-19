@@ -5,7 +5,7 @@
  * First-class control element that drives connected elements
  * 
  * Features:
- * - Full filter system support (AND/OR groups, nested groups)
+ * - Block-safe filters (AND-only conditions; no groups/OR)
  * - Explicit connection model (shows which elements are connected)
  * - Field awareness (only shows fields common to all connected elements)
  * - Reset & defaults support
@@ -19,7 +19,12 @@ import type { PageBlock } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree, FilterGroup, FilterCondition } from "@/lib/filters/canonical-model"
-import { normalizeFilterTree, isEmptyFilterTree, conditionsToFilterTree } from "@/lib/filters/canonical-model"
+import {
+  normalizeFilterTree,
+  isEmptyFilterTree,
+  conditionsToFilterTree,
+  flattenFilterTree,
+} from "@/lib/filters/canonical-model"
 import { filterConfigsToFilterTree, filterTreeToDbFormat } from "@/lib/filters/converters"
 import { Filter, RotateCcw, Settings, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -60,11 +65,18 @@ export default function FilterBlock({
   const allowedFields = config?.allowed_fields || []
   const defaultFilters = config?.default_filters || null // Default filter tree
   
+  // NOTE: The block filter system currently applies filters as a flat AND list.
+  // Groups/OR are not supported for blocks, so we flatten any incoming tree to AND-only.
+  const toSimpleAndTree = useCallback((tree: FilterTree): FilterTree => {
+    const conditions = flattenFilterTree(tree)
+    return conditionsToFilterTree(conditions, "AND")
+  }, [])
+
   // Current filter state (stored as FilterTree)
   const [filterTree, setFilterTree] = useState<FilterTree>(() => {
     // Initialize from config.filters (legacy BlockFilter[]) or config.filter_tree (new FilterTree)
     if (config?.filter_tree) {
-      return config.filter_tree as FilterTree
+      return toSimpleAndTree(config.filter_tree as FilterTree)
     }
     if (config?.filters && Array.isArray(config.filters) && config.filters.length > 0) {
       // Convert legacy BlockFilter[] to FilterTree
@@ -73,11 +85,11 @@ export default function FilterBlock({
         operator: f.operator,
         value: f.value,
       }))
-      return filterConfigsToFilterTree(filterConfigs, 'AND')
+      return toSimpleAndTree(filterConfigsToFilterTree(filterConfigs, 'AND'))
     }
     // Use defaults if available
     if (defaultFilters) {
-      return defaultFilters as FilterTree
+      return toSimpleAndTree(defaultFilters as FilterTree)
     }
     return null
   })
@@ -94,18 +106,20 @@ export default function FilterBlock({
 
   // Sync filter tree when config changes externally
   useEffect(() => {
-    const configFilterTree = config?.filter_tree 
-      ? (config.filter_tree as FilterTree)
+    const configFilterTree = config?.filter_tree
+      ? toSimpleAndTree(config.filter_tree as FilterTree)
       : (config?.filters && Array.isArray(config.filters) && config.filters.length > 0
-          ? filterConfigsToFilterTree(
-              config.filters.map((f: any) => ({
-                field: f.field,
-                operator: f.operator,
-                value: f.value,
-              })),
-              'AND'
+          ? toSimpleAndTree(
+              filterConfigsToFilterTree(
+                config.filters.map((f: any) => ({
+                  field: f.field,
+                  operator: f.operator,
+                  value: f.value,
+                })),
+                'AND'
+              )
             )
-          : (defaultFilters ? (defaultFilters as FilterTree) : null))
+          : (defaultFilters ? toSimpleAndTree(defaultFilters as FilterTree) : null))
     
     const configStr = JSON.stringify(configFilterTree)
     
@@ -123,7 +137,7 @@ export default function FilterBlock({
       }
       return prev
     })
-  }, [config?.filter_tree, config?.filters, defaultFilters])
+  }, [config?.filter_tree, config?.filters, defaultFilters, toSimpleAndTree])
 
   useEffect(() => {
     if (tableId) {
@@ -282,11 +296,11 @@ export default function FilterBlock({
   // Reset to defaults
   const handleReset = useCallback(() => {
     if (defaultFilters) {
-      setFilterTree(defaultFilters as FilterTree)
+      setFilterTree(toSimpleAndTree(defaultFilters as FilterTree))
     } else {
       setFilterTree(null)
     }
-  }, [defaultFilters])
+  }, [defaultFilters, toSimpleAndTree])
 
   // Apply appearance settings
   const appearance = config.appearance || {}
@@ -394,6 +408,8 @@ export default function FilterBlock({
           tableFields={availableFields}
           onChange={setFilterTree}
           variant="airtable"
+          allowGroups={false}
+          allowOr={false}
         />
 
         {/* Info Message */}
@@ -446,6 +462,8 @@ export default function FilterBlock({
                 filterTree={filterTree}
                 tableFields={availableFields}
                 onChange={setFilterTree}
+                allowGroups={false}
+                allowOr={false}
               />
 
               {/* Actions */}

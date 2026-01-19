@@ -30,6 +30,7 @@ import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateR
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import RecordModal from "@/components/calendar/RecordModal"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import {
   applyFiltersToQuery,
@@ -87,6 +88,14 @@ function isSelectField(field: TableField): field is TableField & { type: "single
   return field.type === "single_select" || field.type === "multi_select"
 }
 
+function resolveFieldNameFromFields(fields: TableField[], raw: string | undefined | null): string | null {
+  if (!raw || typeof raw !== "string") return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const match = (Array.isArray(fields) ? fields : []).find((f) => f && (f.name === trimmed || f.id === trimmed))
+  return match?.name || trimmed
+}
+
 export default function MultiCalendarView({
   blockId,
   pageId = null,
@@ -132,6 +141,11 @@ export default function MultiCalendarView({
   const [createOpen, setCreateOpen] = useState(false)
   const [createSourceId, setCreateSourceId] = useState<string>("")
   const [createDate, setCreateDate] = useState<Date>(new Date())
+  const [createDraft, setCreateDraft] = useState<{
+    sourceId: string
+    tableId: string
+    initialData: Record<string, any>
+  } | null>(null)
 
   const loadingRef = useRef(false)
 
@@ -264,16 +278,18 @@ export default function MultiCalendarView({
       const sourceLabel = (s.label || "").trim() || table.name
       const sourceColor = pickSourceColor(idx)
 
-      const startField = s.start_date_field
-      const endField = s.end_date_field
-      const titleField = s.title_field
+      // IMPORTANT: Supabase row keys are field NAMES (columns), but config can store IDs.
+      const startFieldName = resolveFieldNameFromFields(tableFields, s.start_date_field)
+      const endFieldName = resolveFieldNameFromFields(tableFields, s.end_date_field || null)
+      const titleFieldName = resolveFieldNameFromFields(tableFields, s.title_field)
 
-      const isStartEditable = tableFields.some((f) => (f.name === startField || f.id === startField) && f.type === "date")
+      const isStartEditable =
+        !!startFieldName && tableFields.some((f) => f && f.name === startFieldName && f.type === "date")
 
       rows.forEach((r) => {
         const row = r.data || {}
-        const startRaw = row[startField]
-        const endRaw = endField ? row[endField] : null
+        const startRaw = startFieldName ? row[startFieldName] : null
+        const endRaw = endFieldName ? row[endFieldName] : null
         if (!startRaw) return
 
         const start = new Date(startRaw)
@@ -282,7 +298,7 @@ export default function MultiCalendarView({
         const end = endRaw ? new Date(endRaw) : start
         const finalEnd = isNaN(end.getTime()) ? start : end
 
-        const title = row[titleField] ? String(row[titleField]) : "Untitled"
+        const title = titleFieldName && row[titleFieldName] ? String(row[titleFieldName]) : "Untitled"
         if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return
 
         // Date range filter (UI-level)
@@ -291,9 +307,12 @@ export default function MultiCalendarView({
 
         let eventColor = sourceColor
         if (s.color_field) {
+          const resolvedColorFieldName = resolveFieldNameFromFields(tableFields, s.color_field)
           const colorFieldObj = tableFields.find(
             (f): f is TableField & { type: "single_select" | "multi_select" } =>
-              (f.name === s.color_field || f.id === s.color_field) && isSelectField(f)
+              Boolean(resolvedColorFieldName) &&
+              (f.name === resolvedColorFieldName || f.id === resolvedColorFieldName) &&
+              isSelectField(f)
           )
           if (colorFieldObj) {
             const rawValue = row[colorFieldObj.name]
@@ -363,8 +382,9 @@ export default function MultiCalendarView({
     }
 
     const tableFields = fieldsBySource[mapping.id] || []
-    const startFieldName = mapping.start_date_field
-    const hasStart = tableFields.some((f) => (f.name === startFieldName || f.id === startFieldName) && f.type === "date")
+    const startFieldName = resolveFieldNameFromFields(tableFields, mapping.start_date_field)
+    const endFieldName = resolveFieldNameFromFields(tableFields, mapping.end_date_field || null)
+    const hasStart = !!startFieldName && tableFields.some((f) => f && f.name === startFieldName && f.type === "date")
     if (!hasStart) {
       info.revert()
       return
@@ -373,18 +393,18 @@ export default function MultiCalendarView({
     // Shift end date by the same delta, if an end field exists.
     const currentRow = (rowsBySource[mapping.id] || []).find((r) => r.id === rowId)
     const currentRowData = currentRow?.data || ext?.rowData || {}
-    const oldFromRaw = currentRowData?.[startFieldName]
+    const oldFromRaw = startFieldName ? currentRowData?.[startFieldName] : null
     const oldFromDate = oldFromRaw && !isNaN(new Date(oldFromRaw).getTime()) ? new Date(oldFromRaw) : info.oldEvent?.start || null
 
-    const updates: Record<string, any> = { [startFieldName]: safeDateOnly(newStart) }
+    const updates: Record<string, any> = startFieldName ? { [startFieldName]: safeDateOnly(newStart) } : {}
 
-    if (mapping.end_date_field && currentRowData?.[mapping.end_date_field] && oldFromDate && !isNaN(oldFromDate.getTime())) {
-      const oldToRaw = currentRowData[mapping.end_date_field]
+    if (endFieldName && currentRowData?.[endFieldName] && oldFromDate && !isNaN(oldFromDate.getTime())) {
+      const oldToRaw = currentRowData[endFieldName]
       const oldToDate = new Date(oldToRaw)
       if (!isNaN(oldToDate.getTime())) {
         const deltaMs = newStart.getTime() - oldFromDate.getTime()
         const newToDate = new Date(oldToDate.getTime() + deltaMs)
-        updates[mapping.end_date_field] = safeDateOnly(newToDate)
+        updates[endFieldName] = safeDateOnly(newToDate)
       }
     }
 
@@ -415,8 +435,8 @@ export default function MultiCalendarView({
     const tableFields = fieldsBySource[sid] || []
     if (!table?.supabaseTable) return
 
-    const startField = mapping.start_date_field
-    const endField = mapping.end_date_field
+    const startFieldName = resolveFieldNameFromFields(tableFields, mapping.start_date_field)
+    const endFieldName = resolveFieldNameFromFields(tableFields, mapping.end_date_field || null)
 
     const viewDefaults = viewDefaultFiltersBySource[sid] || []
     const userQuick = quickFiltersBySource[sid] || []
@@ -430,18 +450,16 @@ export default function MultiCalendarView({
       ...defaultsFromFilters,
     }
     // Ensure date fields are set so record appears in view
-    if (startField) newData[startField] = safeDateOnly(createDate)
-    if (endField) newData[endField] = newData[endField] || safeDateOnly(createDate)
+    if (startFieldName) newData[startFieldName] = safeDateOnly(createDate)
+    if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(createDate)
 
-    try {
-      const { error } = await supabase.from(table.supabaseTable).insert([newData])
-      if (error) throw error
-      setCreateOpen(false)
-      await loadAll()
-    } catch (e) {
-      console.error("MultiCalendar: Failed to create record", e)
-      alert("Failed to create record. Please try again.")
-    }
+    // Do NOT insert yet — open the record modal with pre-filled data.
+    setCreateOpen(false)
+    setCreateDraft({
+      sourceId: sid,
+      tableId: mapping.table_id,
+      initialData: newData,
+    })
   }
 
   const legendItems = useMemo(() => {
@@ -651,11 +669,27 @@ export default function MultiCalendarView({
               Cancel
             </Button>
             <Button onClick={handleCreate} disabled={!createSourceId}>
-              Create
+              Continue
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {createDraft && (
+        <RecordModal
+          open={true}
+          onClose={() => setCreateDraft(null)}
+          tableId={createDraft.tableId}
+          recordId={null}
+          tableFields={fieldsBySource[createDraft.sourceId] || []}
+          modalFields={Array.isArray((blockConfig as any)?.modal_fields) ? (blockConfig as any).modal_fields : []}
+          initialData={createDraft.initialData}
+          onSave={async () => {
+            setCreateDraft(null)
+            await loadAll()
+          }}
+        />
+      )}
     </div>
   )
 }

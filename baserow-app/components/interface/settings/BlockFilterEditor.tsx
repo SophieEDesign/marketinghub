@@ -7,7 +7,6 @@ import type { BlockFilter } from "@/lib/interface/types"
 import type { TableField } from "@/types/database"
 import FilterBuilder from "@/components/filters/FilterBuilder"
 import type { FilterTree } from "@/lib/filters/canonical-model"
-import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import { conditionsToFilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
 
@@ -93,6 +92,8 @@ export default function BlockFilterEditor({
           filterTree={filterTree}
           tableFields={tableFields}
           onChange={handleFilterTreeChange}
+          allowGroups={false}
+          allowOr={false}
         />
       </div>
 

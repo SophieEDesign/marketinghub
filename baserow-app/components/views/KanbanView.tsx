@@ -50,6 +50,36 @@ export default function KanbanView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
+  // IMPORTANT: config may provide field IDs, but row data keys are field NAMES (supabase columns).
+  const groupingFieldName = useMemo(() => {
+    const raw = typeof groupingFieldId === "string" ? groupingFieldId.trim() : ""
+    if (!raw) return ""
+    const match = (Array.isArray(tableFields) ? tableFields : []).find(
+      (f: any) => f && (f.name === raw || f.id === raw)
+    )
+    return (match?.name as string) || raw
+  }, [groupingFieldId, tableFields])
+
+  const colorFieldName = useMemo(() => {
+    if (!colorField || typeof colorField !== "string") return null
+    const raw = colorField.trim()
+    if (!raw) return null
+    const match = (Array.isArray(tableFields) ? tableFields : []).find(
+      (f: any) => f && (f.name === raw || f.id === raw)
+    )
+    return (match?.name as string) || raw
+  }, [colorField, tableFields])
+
+  const imageFieldName = useMemo(() => {
+    if (!imageField || typeof imageField !== "string") return null
+    const raw = imageField.trim()
+    if (!raw) return null
+    const match = (Array.isArray(tableFields) ? tableFields : []).find(
+      (f: any) => f && (f.name === raw || f.id === raw)
+    )
+    return (match?.name as string) || raw
+  }, [imageField, tableFields])
+
   // Filter rows by search query
   const filteredRows = useMemo(() => {
     if (!searchQuery || !tableFields.length) return rows
@@ -70,14 +100,14 @@ export default function KanbanView({
 
   // Helper to get color from color field
   const getCardColor = useCallback((row: TableRow): string | null => {
-    if (!colorField) return null
+    if (!colorFieldName) return null
     
-    const colorFieldObj = tableFields.find(f => f.name === colorField || f.id === colorField)
+    const colorFieldObj = tableFields.find((f: any) => f?.name === colorFieldName || f?.id === colorFieldName)
     if (!colorFieldObj || (colorFieldObj.type !== 'single_select' && colorFieldObj.type !== 'multi_select')) {
       return null
     }
     
-    const colorValue = row.data[colorField]
+    const colorValue = row.data[colorFieldName]
     if (!colorValue || !(colorFieldObj.type === 'single_select' || colorFieldObj.type === 'multi_select')) return null
     
     const normalizedValue = String(colorValue).trim()
@@ -89,13 +119,13 @@ export default function KanbanView({
         colorFieldObj.type === 'single_select'
       )
     )
-  }, [colorField, tableFields])
+  }, [colorFieldName, tableFields])
 
   // Helper to get image from image field
   const getCardImage = useCallback((row: TableRow): string | null => {
-    if (!imageField) return null
+    if (!imageFieldName) return null
     
-    const imageValue = row.data[imageField]
+    const imageValue = row.data[imageFieldName]
     if (!imageValue) return null
     
     // Handle attachment field (array of URLs) or URL field (single URL)
@@ -107,7 +137,7 @@ export default function KanbanView({
     }
     
     return null
-  }, [imageField])
+  }, [imageFieldName])
 
   useEffect(() => {
     loadRows()
@@ -218,10 +248,13 @@ export default function KanbanView({
       if (Object.keys(defaultsFromFilters).length > 0) {
         Object.assign(newData, defaultsFromFilters)
       }
+      if (!groupingFieldName) {
+        throw new Error("Grouping field is not configured.")
+      }
       if (groupName && groupName !== "Uncategorized") {
-        newData[groupingFieldId] = groupName
+        newData[groupingFieldName] = groupName
       } else {
-        newData[groupingFieldId] = null
+        newData[groupingFieldName] = null
       }
 
       const { data, error } = await supabase
@@ -243,12 +276,12 @@ export default function KanbanView({
       console.error("Error creating record:", error)
       alert("Failed to create record")
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldId, handleOpenRecord])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, groupingFieldName, handleOpenRecord])
 
   function groupRowsByField() {
     const groups: Record<string, TableRow[]> = {}
     filteredRows.forEach((row) => {
-      const groupValue = row.data[groupingFieldId] || "Uncategorized"
+      const groupValue = (groupingFieldName ? row.data[groupingFieldName] : null) || "Uncategorized"
       if (!groups[groupValue]) {
         groups[groupValue] = []
       }

@@ -548,7 +548,7 @@ export default function FilterBlockSettings({
             <ul className="list-disc list-inside space-y-1 text-blue-700">
               <li>Filter controls are shared controls that drive connected elements</li>
               <li>Filters apply in addition to each element&apos;s own filters (never replace them)</li>
-              <li>Full filter system: supports AND/OR groups and nested groups</li>
+              <li>Filters are AND-only conditions (no groups/OR)</li>
               <li>Changes apply instantly - no Save required</li>
               <li>Only fields common to all connected elements are shown</li>
             </ul>

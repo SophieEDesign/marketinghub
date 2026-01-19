@@ -326,6 +326,14 @@ export default function GridBlock({
     const canCreate = !isViewOnly && allowInlineCreate
     const disabled = !showAddRecord || !canCreate || isLoading || !table || !tableId
 
+    const resolveFieldName = (fieldIdOrName: unknown): string | null => {
+      if (!fieldIdOrName || typeof fieldIdOrName !== "string") return null
+      const raw = fieldIdOrName.trim()
+      if (!raw) return null
+      const match = safeTableFields.find((f) => f && (f.id === raw || f.name === raw))
+      return match?.name || raw
+    }
+
     const handler = async () => {
       if (disabled || !table || !tableId) return
       try {
@@ -339,37 +347,42 @@ export default function GridBlock({
 
         // Ensure newly created records show up for date-based views by pre-filling the date field if we can.
         if (viewType === 'calendar') {
-          const dateField =
+          const rawDateField =
             (config as any).start_date_field ||
             (config as any).from_date_field ||
             (config as any).calendar_date_field ||
             (config as any).calendar_start_field ||
             (config as any).date_field
-          if (typeof dateField === 'string' && dateField.trim() !== '') {
-            newData[dateField] = todayDate
+          const dateFieldName = resolveFieldName(rawDateField)
+          if (dateFieldName) {
+            // IMPORTANT: Supabase table columns are field *names*, not field IDs.
+            newData[dateFieldName] = todayDate
           }
         }
 
         if (viewType === 'timeline') {
-          const fromField =
+          const rawFromField =
             (config as any).date_from ||
             (config as any).from_date_field ||
             (config as any).start_date_field ||
             (config as any).timeline_date_field ||
             (config as any).date_field
-          const toField =
+          const rawToField =
             (config as any).date_to ||
             (config as any).to_date_field ||
             (config as any).end_date_field
 
-          if (typeof fromField === 'string' && fromField.trim() !== '') {
-            newData[fromField] = todayDate
-          } else if (typeof toField === 'string' && toField.trim() !== '') {
-            newData[toField] = todayDate
+          const fromFieldName = resolveFieldName(rawFromField)
+          const toFieldName = resolveFieldName(rawToField)
+
+          if (fromFieldName) {
+            newData[fromFieldName] = todayDate
+          } else if (toFieldName) {
+            newData[toFieldName] = todayDate
           }
-          if (typeof toField === 'string' && toField.trim() !== '') {
+          if (toFieldName) {
             // Default end date to same as start for single-day events.
-            newData[toField] = newData[toField] || todayDate
+            newData[toFieldName] = newData[toFieldName] || todayDate
           }
         }
 
@@ -377,7 +390,7 @@ export default function GridBlock({
           Object.assign(newData, defaultsFromFilters)
         }
 
-                const { data, error } = await supabase
+        const { data, error } = await supabase
           .from(table.supabase_table)
           .insert([newData])
           .select()

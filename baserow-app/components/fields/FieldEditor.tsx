@@ -13,6 +13,15 @@ import {
 } from "@/lib/field-colors"
 import { getManualChoiceLabels, sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { useToast } from "@/components/ui/use-toast"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import AttachmentPreview, { type Attachment } from "@/components/attachments/AttachmentPreview"
@@ -544,7 +553,21 @@ export default function FieldEditor({
       )
     }
 
-    // Editable select - use dropdown for single, multi-select with checkboxes
+    const renderChoicePill = (choice: string) => {
+      const hexColor = getChoiceColor(choice)
+      const textColorClass = getTextColorForBackground(hexColor)
+      const bgColor = normalizeHexColor(hexColor)
+      return (
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
+          style={{ backgroundColor: bgColor }}
+        >
+          {choice}
+        </span>
+      )
+    }
+
+    // Editable select - dropdowns (single + multi)
     return (
       <div className="space-y-2.5">
         {showLabel && (
@@ -553,82 +576,77 @@ export default function FieldEditor({
             {required && <span className="text-red-500">*</span>}
           </label>
         )}
-        {isMulti ? (
-          // Multi-select: show color pills that can be toggled
-          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
-            {choices.length === 0 ? (
-              <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
-            ) : (
-              choices.map((choice: string) => {
-                const isSelected = selectedValuesRaw.includes(choice)
-                const hexColor = getChoiceColor(choice)
-                const textColorClass = getTextColorForBackground(hexColor)
-                const bgColor = normalizeHexColor(hexColor)
-                
-                return (
-                  <button
-                    key={choice}
-                    type="button"
-                    onClick={() => {
-                      const newValues = isSelected
-                        ? selectedValuesRaw.filter((v) => v !== choice)
-                        : [...selectedValuesRaw, choice]
-                      onChange(newValues)
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
-                      isSelected 
-                        ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                    style={isSelected ? { backgroundColor: bgColor } : {}}
-                  >
-                    {choice}
-                  </button>
-                )
-              })
-            )}
-          </div>
-        ) : (
-          // Single select: show color pills that can be clicked
-          <div className={`flex flex-wrap gap-2 ${inputClassName}`}>
-            {choices.length === 0 ? (
-              <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
-            ) : (
-              <>
-                {choices.map((choice: string) => {
+        {choices.length === 0 ? (
+          <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
+        ) : isMulti ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={`w-full min-h-[40px] px-3.5 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 flex flex-wrap items-center gap-1.5 text-left ${inputClassName}`}
+              >
+                {selectedValues.length > 0 ? (
+                  selectedValues.map((v) => <span key={v}>{renderChoicePill(v)}</span>)
+                ) : (
+                  <span className="text-gray-400 italic">Select…</span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[var(--radix-popper-anchor-width)] p-2">
+              <div className="max-h-64 overflow-auto space-y-1">
+                {choices.map((choice) => {
                   const isSelected = selectedValuesRaw.includes(choice)
-                  const hexColor = getChoiceColor(choice)
-                  const textColorClass = getTextColorForBackground(hexColor)
-                  const bgColor = normalizeHexColor(hexColor)
-                  
                   return (
                     <button
                       key={choice}
                       type="button"
-                      onClick={() => onChange(choice)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
-                        isSelected 
-                          ? `${textColorClass} ring-2 ring-offset-1 ring-gray-400` 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                      style={isSelected ? { backgroundColor: bgColor } : {}}
+                      onClick={() => {
+                        const toggled = isSelected
+                          ? selectedValuesRaw.filter((v) => v !== choice)
+                          : [...selectedValuesRaw, choice]
+                        onChange(sortLabelsByManualOrder(toggled, field.type, field.options))
+                      }}
+                      className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50 text-left"
                     >
-                      {choice}
+                      <Checkbox checked={isSelected} onCheckedChange={() => {}} />
+                      {renderChoicePill(choice)}
                     </button>
                   )
                 })}
-                {value && (
-                  <button
-                    type="button"
-                    onClick={() => onChange(null)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-300"
-                  >
-                    Clear
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+              </div>
+
+              <div className="pt-2 mt-2 border-t flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {selectedValues.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onChange([])}
+                  className="text-xs text-gray-600 hover:text-gray-900 hover:underline"
+                  disabled={selectedValuesRaw.length === 0}
+                >
+                  Clear
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Select
+            value={typeof value === "string" ? value : Array.isArray(value) ? value[0] : undefined}
+            onValueChange={(v) => onChange(v === "__CLEAR__" ? null : v)}
+          >
+            <SelectTrigger className={inputClassName}>
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__CLEAR__">Clear</SelectItem>
+              {choices.map((choice) => (
+                <SelectItem key={choice} value={choice}>
+                  {choice}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </div>
     )
