@@ -859,8 +859,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           isBlockEditing && "cursor-text",
           isEditing && !isBlockEditing && "cursor-pointer",
           !isEditing && "cursor-default",
-          // Read-only mode: disable pointer events but keep editor alive
-          readOnly && "pointer-events-none"
+          // Read-only mode: keep pointer events enabled so users can select/copy text.
+          // Editability is enforced via editor.setEditable(false).
+          readOnly && "select-text"
         )}
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode

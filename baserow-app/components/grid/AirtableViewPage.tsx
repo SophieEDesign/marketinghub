@@ -260,8 +260,15 @@ export default function AirtableViewPage({
       const { error } = await supabase.from(table.supabase_table).insert([{}])
       if (error) throw error
     } catch (error) {
-      console.error("Error creating record:", error)
-      alert("Failed to create record")
+      const e = error as any
+      console.error("Error creating record:", e)
+      const message =
+        e?.message ||
+        e?.error_description ||
+        (typeof e === "string" ? e : "") ||
+        "Unknown error"
+      const code = e?.code ? ` (code: ${e.code})` : ""
+      alert(`Failed to create record${code}: ${message}`)
     }
   }
 

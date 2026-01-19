@@ -26,32 +26,33 @@ export async function getUserRole(): Promise<UserRole | null> {
     .eq('user_id', user.id)
     .maybeSingle()
   
-  if (!profileError && profile) {
+  if (!profileError && profile?.role) {
     return profile.role as UserRole
   }
   
   // Fallback to user_roles table (legacy support)
-  if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
+  // We fall back not only when the profiles table is missing, but also when the row is missing
+  // (maybeSingle can return { data: null, error: null } for "no rows").
+  try {
     const { data: legacyRole, error: legacyError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .maybeSingle()
     
-    if (!legacyError && legacyRole) {
+    if (!legacyError && legacyRole?.role) {
       // Map legacy roles: admin/editor -> admin, viewer -> member
-      return legacyRole.role === 'admin' || legacyRole.role === 'editor' ? 'admin' : 'member'
+      return legacyRole.role === 'admin' || legacyRole.role === 'editor'
+        ? 'admin'
+        : 'member'
     }
+  } catch {
+    // Ignore missing legacy table / other failures and default safely below
   }
   
   // If no profile exists, default to member for security
   // Admin role must be explicitly assigned through user management
   // This prevents privilege escalation attacks
-  if (profileError?.code === 'PGRST116' || profileError?.message?.includes('relation') || profileError?.message?.includes('does not exist')) {
-    // Profiles table doesn't exist yet - default to member
-    return 'member'
-  }
-  
   // If profile table exists but user has no profile, default to member
   // Admin role must be explicitly assigned
   return 'member'

@@ -35,6 +35,7 @@ interface RecordReviewLeftColumnProps {
   tableId: string | null // From page.settings.tableId
   selectedRecordId: string | null
   onRecordSelect: (recordId: string) => void
+  deletedRecordId?: string | null
   showAddRecord?: boolean
   pageConfig?: any
   leftPanelSettings?: {
@@ -67,6 +68,7 @@ export default function RecordReviewLeftColumn({
   tableId,
   selectedRecordId,
   onRecordSelect,
+  deletedRecordId = null,
   showAddRecord = false,
   pageConfig,
   leftPanelSettings,
@@ -83,6 +85,12 @@ export default function RecordReviewLeftColumn({
   const [tableName, setTableName] = useState<string | null>(null)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   
+  // If a record was deleted elsewhere (e.g. right canvas action), remove it from this list immediately.
+  useEffect(() => {
+    if (!deletedRecordId) return
+    setRecords((prev) => prev.filter((r) => String(r?.id) !== String(deletedRecordId)))
+  }, [deletedRecordId])
+
   // Get settings based on page type
   const isRecordView = pageType === 'record_view'
   const isRecordReview = pageType === 'record_review'

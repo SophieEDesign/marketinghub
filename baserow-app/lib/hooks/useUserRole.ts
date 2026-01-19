@@ -42,11 +42,9 @@ export function useUserRole() {
         }
 
         // Fallback to user_roles table (legacy support)
-        if (
-          profileError?.code === 'PGRST116' ||
-          profileError?.message?.includes('relation') ||
-          profileError?.message?.includes('does not exist')
-        ) {
+        // Note: `maybeSingle()` can return { data: null, error: null } when no rows match,
+        // so we also fall back when the profile row doesn't exist.
+        try {
           const { data: legacyRole, error: legacyError } = await supabase
             .from('user_roles')
             .select('role')
@@ -55,14 +53,17 @@ export function useUserRole() {
 
           if (!legacyError && legacyRole?.role) {
             // Map legacy roles: admin/editor -> admin, viewer -> member
-            if (!cancelled)
+            if (!cancelled) {
               setRole(
                 legacyRole.role === 'admin' || legacyRole.role === 'editor'
                   ? 'admin'
                   : 'member'
               )
+            }
             return
           }
+        } catch {
+          // Ignore missing legacy table / other failures and default safely below
         }
 
         if (!cancelled) setRole('member')

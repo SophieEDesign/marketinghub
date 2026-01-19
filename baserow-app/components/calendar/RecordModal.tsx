@@ -126,7 +126,9 @@ export default function RecordModal({
 
         if (error) {
           console.error('Error saving record:', error)
-          alert('Failed to save record. Please try again.')
+          const message = (error as any)?.message || 'Unknown error'
+          const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
+          alert(`Failed to save record${code}: ${message}`)
           return
         }
       } else {
@@ -137,7 +139,9 @@ export default function RecordModal({
 
         if (error) {
           console.error('Error creating record:', error)
-          alert('Failed to create record. Please try again.')
+          const message = (error as any)?.message || 'Unknown error'
+          const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
+          alert(`Failed to create record${code}: ${message}`)
           return
         }
       }

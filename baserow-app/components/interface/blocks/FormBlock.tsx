@@ -167,7 +167,9 @@ export default function FormBlock({ block, isEditing = false, onSubmit, pageTabl
     } catch (error: any) {
       console.error("Form submission error:", error)
       setSubmitStatus('error')
-      setErrorMessage(error.message || "Failed to submit form. Please try again.")
+      const message = error?.message || "Failed to submit form. Please try again."
+      const code = error?.code ? ` (code: ${error.code})` : ""
+      setErrorMessage(`${message}${code}`)
       setTimeout(() => setSubmitStatus('idle'), 5000)
     } finally {
       setLoading(false)
