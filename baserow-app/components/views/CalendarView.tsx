@@ -16,7 +16,7 @@ import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
-import { format } from "date-fns"
+import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
 import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
@@ -49,6 +49,18 @@ interface CalendarViewProps {
   onDateToChange?: (date?: Date) => void
   /** If false, CalendarView will not render the date range controls (caller can render them elsewhere). */
   showDateRangeControls?: boolean
+}
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function parseDateValueToLocalDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+  const s = String(value).trim()
+  if (!s) return null
+  // IMPORTANT: treat YYYY-MM-DD as a local date (not UTC) to avoid day-shifts.
+  const d = DATE_ONLY_RE.test(s) ? new Date(`${s}T00:00:00`) : new Date(s)
+  return isNaN(d.getTime()) ? null : d
 }
 
 export default function CalendarView({ 
@@ -138,8 +150,8 @@ export default function CalendarView({
     }
 
     if (field?.type === 'date') {
-      const d = raw instanceof Date ? raw : new Date(String(raw))
-      if (!isNaN(d.getTime())) {
+      const d = parseDateValueToLocalDate(raw)
+      if (d) {
         // DD/MM/YYYY
         return format(d, 'dd/MM/yyyy')
       }
@@ -329,9 +341,9 @@ export default function CalendarView({
   // Memoize filters to prevent unnecessary re-renders
   // Include date range filters in the key
   const filtersKey = useMemo(() => {
-    const dateRangeKey = (dateFrom && !isNaN(dateFrom.getTime())) || (dateTo && !isNaN(dateTo.getTime())) 
-      ? `${dateFrom && !isNaN(dateFrom.getTime()) ? dateFrom.toISOString() : ''}|${dateTo && !isNaN(dateTo.getTime()) ? dateTo.toISOString() : ''}` 
-      : ''
+    const fromKey = dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, 'yyyy-MM-dd') : ''
+    const toKey = dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, 'yyyy-MM-dd') : ''
+    const dateRangeKey = fromKey || toKey ? `${fromKey}|${toKey}` : ''
     return JSON.stringify(filters || []) + dateRangeKey
   }, [filters, dateFrom, dateTo])
   
@@ -344,8 +356,10 @@ export default function CalendarView({
       allFilters.push({
         field: resolvedDateFieldId,
         operator: 'date_range',
-        value: dateFrom && !isNaN(dateFrom.getTime()) ? dateFrom.toISOString().split('T')[0] : undefined,
-        value2: dateTo && !isNaN(dateTo.getTime()) ? dateTo.toISOString().split('T')[0] : undefined,
+        // IMPORTANT: use local date formatting (not UTC via toISOString),
+        // otherwise the day can shift for users outside UTC.
+        value: dateFrom && !isNaN(dateFrom.getTime()) ? format(dateFrom, 'yyyy-MM-dd') : undefined,
+        value2: dateTo && !isNaN(dateTo.getTime()) ? format(dateTo, 'yyyy-MM-dd') : undefined,
       })
     }
     
@@ -737,21 +751,19 @@ export default function CalendarView({
     const currentRowData = currentRow?.data || (info.event.extendedProps as any)?.rowData
 
     const oldFromRaw = currentRowData?.[fromFieldName]
-    const oldFromDate =
-      oldFromRaw && !isNaN(new Date(oldFromRaw).getTime())
-        ? new Date(oldFromRaw)
-        : info.oldEvent?.start || null
+    const oldFromDate = parseDateValueToLocalDate(oldFromRaw) || info.oldEvent?.start || null
 
-    const newFromValue = format(newStart, "yyyy-MM-dd")
+    const newFromDay = startOfDay(newStart)
+    const newFromValue = format(newFromDay, "yyyy-MM-dd")
 
     // Update end field (if configured) by shifting it by the same delta as the start date.
     const updates: Record<string, any> = { [fromFieldName]: newFromValue }
     if (toFieldName && currentRowData?.[toFieldName] && oldFromDate && !isNaN(oldFromDate.getTime())) {
       const oldToRaw = currentRowData[toFieldName]
-      const oldToDate = new Date(oldToRaw)
-      if (!isNaN(oldToDate.getTime())) {
-        const deltaMs = newStart.getTime() - oldFromDate.getTime()
-        const newToDate = new Date(oldToDate.getTime() + deltaMs)
+      const oldToDate = parseDateValueToLocalDate(oldToRaw)
+      if (oldToDate) {
+        const deltaDays = differenceInCalendarDays(newFromDay, startOfDay(oldFromDate))
+        const newToDate = addDays(startOfDay(oldToDate), deltaDays)
         updates[toFieldName] = format(newToDate, "yyyy-MM-dd")
       }
     }
@@ -1043,38 +1055,18 @@ export default function CalendarView({
           }
           
           // Parse date values
-          // Use date_from as default start date, fallback to date_to if date_from is not available
-          let parsedStartDate: Date
-          let parsedEndDate: Date | null = null
-          
-          try {
-            // Start date: prefer date_from, fallback to date_to if date_from is not available
-            const startDateValue = fromDateValue || toDateValue
-            if (startDateValue) {
-              parsedStartDate = startDateValue instanceof Date ? startDateValue : new Date(startDateValue)
-              if (isNaN(parsedStartDate.getTime())) {
-                parsedStartDate = new Date()
-              }
-            } else {
-              parsedStartDate = new Date()
-            }
-            
-            // End date: use date_to if available (for range), otherwise use start date (single day event)
-            if (toDateValue) {
-              parsedEndDate = toDateValue instanceof Date ? toDateValue : new Date(toDateValue)
-              if (isNaN(parsedEndDate.getTime())) {
-                parsedEndDate = parsedStartDate
-              }
-            } else if (fromDateValue && !toDateValue) {
-              // Only date_from available, use it for both start and end (single day event)
-              parsedEndDate = parsedStartDate
-            } else {
-              // No end date, use start date for both
-              parsedEndDate = parsedStartDate
-            }
-          } catch {
-            parsedStartDate = new Date()
-            parsedEndDate = new Date()
+          // Use date_from as default start date, fallback to date_to if date_from is not available.
+          // IMPORTANT: FullCalendar treats `end` as EXCLUSIVE for all-day events.
+          // Our `date_to` is stored as an inclusive end date, so we must add +1 day.
+          const parsedStart = parseDateValueToLocalDate(fromDateValue || toDateValue) || new Date()
+          const parsedStartDay = startOfDay(parsedStart)
+
+          let parsedEndExclusive: Date | undefined = undefined
+          if (toDateValue) {
+            const parsedEnd = parseDateValueToLocalDate(toDateValue) || parsedStartDay
+            const parsedEndDay = startOfDay(parsedEnd)
+            const inclusiveEndDay = parsedEndDay < parsedStartDay ? parsedStartDay : parsedEndDay
+            parsedEndExclusive = addDays(inclusiveEndDay, 1)
           }
           
           // Use visible fields (fieldIds) to determine title - prefer first text field
@@ -1179,8 +1171,9 @@ export default function CalendarView({
           return {
             id: row.id,
             title: title || "Untitled",
-            start: parsedStartDate,
-            end: parsedEndDate || undefined,
+            allDay: true,
+            start: parsedStartDay,
+            end: parsedEndExclusive,
             backgroundColor: eventColor,
             borderColor: eventColor,
             textColor: eventColor ? (() => {
@@ -1285,8 +1278,57 @@ export default function CalendarView({
     }
   }
 
-  // Get events for rendering (non-hook; safe to compute before early returns)
-  const calendarEvents = getEvents()
+  // FullCalendar can get into internal update loops if `events` changes identity on
+  // unrelated parent re-renders (especially when event objects contain new Date instances).
+  // Memoize to only regenerate when the underlying data/config that affects events changes.
+  const blockConfigEventKey = useMemo(() => {
+    const bc: any = blockConfig || {}
+    return JSON.stringify({
+      date_from: bc?.date_from ?? null,
+      date_to: bc?.date_to ?? null,
+      from_date_field: bc?.from_date_field ?? null,
+      to_date_field: bc?.to_date_field ?? null,
+      start_date_field: bc?.start_date_field ?? null,
+      end_date_field: bc?.end_date_field ?? null,
+      calendar_start_field: bc?.calendar_start_field ?? null,
+      calendar_end_field: bc?.calendar_end_field ?? null,
+      calendar_date_field: bc?.calendar_date_field ?? null,
+      date_field: bc?.date_field ?? null,
+    })
+  }, [blockConfig])
+
+  const viewConfigEventKey = useMemo(() => {
+    return JSON.stringify({
+      calendar_date_field: viewConfig?.calendar_date_field ?? null,
+      calendar_start_field: viewConfig?.calendar_start_field ?? null,
+      calendar_end_field: viewConfig?.calendar_end_field ?? null,
+      calendar_color_field: viewConfig?.calendar_color_field ?? null,
+    })
+  }, [
+    viewConfig?.calendar_date_field,
+    viewConfig?.calendar_start_field,
+    viewConfig?.calendar_end_field,
+    viewConfig?.calendar_color_field,
+  ])
+
+  // Get events for rendering (hook; declared before early returns)
+  const calendarEvents = useMemo(() => getEvents(), [
+    // Data that affects which rows become events
+    filteredRows,
+    rows,
+    searchQuery,
+    filtersKey,
+    // Field/config that affects mapping
+    resolvedDateFieldId,
+    isValidDateField,
+    loadedTableFieldsKey,
+    fieldIds,
+    colorField,
+    imageField,
+    fitImageSize,
+    blockConfigEventKey,
+    viewConfigEventKey,
+  ])
 
   // FullCalendar: keep option prop references stable to avoid internal update loops.
   // IMPORTANT: Hooks must be declared before any early returns.
@@ -1592,6 +1634,12 @@ export default function CalendarView({
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
           onSave={() => {
             // Reload rows after save
+            if (resolvedTableId && supabaseTableName) {
+              loadRows()
+            }
+          }}
+          onDeleted={() => {
+            // Reload rows after delete
             if (resolvedTableId && supabaseTableName) {
               loadRows()
             }

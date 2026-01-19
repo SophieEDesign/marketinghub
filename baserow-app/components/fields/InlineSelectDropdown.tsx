@@ -112,7 +112,12 @@ export default function InlineSelectDropdown({
         : [...selectedValues, choice]
       await onValueChange(newValues)
     } else {
-      await onValueChange(choice)
+      // For single select, allow "toggle off" by clicking the currently-selected option.
+      if (selectedValues[0] === choice) {
+        await onValueChange(null)
+      } else {
+        await onValueChange(choice)
+      }
       handleOpenChange(false)
     }
   }
@@ -503,9 +508,9 @@ export default function InlineSelectDropdown({
                       <button
                         type="button"
                         onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation()
-                          handleSelectChoice(choice)
+                          await handleSelectChoice(choice)
                         }}
                         className="flex items-center gap-2 flex-1 text-left"
                       >

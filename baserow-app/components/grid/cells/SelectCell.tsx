@@ -82,7 +82,12 @@ export default function SelectCell({
         editable={editable}
         canEditOptions={editable} // If they can edit the cell, they can edit options
         onValueChange={async (newValue) => {
-          await onSave(newValue as string | null)
+          try {
+            await onSave(newValue as string | null)
+          } catch (e: any) {
+            console.error("[SelectCell] Error saving value:", e)
+            alert(e?.message || "Failed to save. Please check your permissions and try again.")
+          }
         }}
         onFieldOptionsUpdate={onFieldOptionsUpdate}
         placeholder={placeholder}

@@ -96,6 +96,15 @@ function resolveFieldNameFromFields(fields: TableField[], raw: string | undefine
   return match?.name || trimmed
 }
 
+function areStringArraysEqual(a: string[], b: string[]) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 export default function MultiCalendarView({
   blockId,
   pageId = null,
@@ -118,11 +127,23 @@ export default function MultiCalendarView({
   const showAddRecord = blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate && !isEditing
 
-  const enabledSourceIdsDefault = useMemo(() => {
-    return sources.filter((s) => s.enabled !== false).map((s) => s.id)
+  // IMPORTANT: `sources` can be reconstructed each render upstream. If we unconditionally
+  // sync derived defaults into state, we can trigger a render loop (React #185).
+  const enabledSourceIdsDefaultKey = useMemo(() => {
+    return (Array.isArray(sources) ? sources : [])
+      .map((s) => `${s?.id}:${s?.enabled === false ? 0 : 1}`)
+      .join("|")
   }, [sources])
+
+  const enabledSourceIdsDefault = useMemo(() => {
+    return (Array.isArray(sources) ? sources : []).filter((s) => s.enabled !== false).map((s) => s.id)
+  }, [enabledSourceIdsDefaultKey])
+
   const [enabledSourceIds, setEnabledSourceIds] = useState<string[]>(enabledSourceIdsDefault)
-  useEffect(() => setEnabledSourceIds(enabledSourceIdsDefault), [enabledSourceIdsDefault])
+
+  useEffect(() => {
+    setEnabledSourceIds((prev) => (areStringArraysEqual(prev, enabledSourceIdsDefault) ? prev : enabledSourceIdsDefault))
+  }, [enabledSourceIdsDefaultKey, enabledSourceIdsDefault])
 
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
