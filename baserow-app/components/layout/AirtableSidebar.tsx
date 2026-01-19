@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -65,6 +65,7 @@ export default function AirtableSidebar({
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
   const isMobile = useIsMobile()
+  const previousPathnameRef = useRef<string | null>(null)
   
   // Load initial state - use default on server, sync from localStorage on client after mount
   // This prevents hydration mismatches
@@ -100,21 +101,22 @@ export default function AirtableSidebar({
   const isSettings = pathname.includes("/settings")
   const isTablePage = pathname.includes("/tables/")
   
-  // Close sidebar on mobile when navigating
+  // Close sidebar on mobile when navigating.
+  // Note: `popstate` only fires for back/forward, not Next.js Link navigations.
   useEffect(() => {
-    if (isMobile && isOpen && onClose) {
-      // Close on navigation
-      const handleRouteChange = () => {
+    // Skip first render so we don't immediately close on initial load.
+    if (previousPathnameRef.current === null) {
+      previousPathnameRef.current = pathname
+      return
+    }
+
+    if (previousPathnameRef.current !== pathname) {
+      previousPathnameRef.current = pathname
+      if (isMobile && isOpen && onClose) {
         onClose()
       }
-      
-      window.addEventListener('popstate', handleRouteChange)
-      
-      return () => {
-        window.removeEventListener('popstate', handleRouteChange)
-      }
     }
-  }, [isMobile, isOpen, onClose])
+  }, [pathname, isMobile, isOpen, onClose])
 
   // Save expand/collapse state to localStorage when it changes (only after mount)
   useEffect(() => {
@@ -273,8 +275,8 @@ export default function AirtableSidebar({
           </div>
         )}
 
-        {/* Core Data Section - Collapsed by default */}
-        {tables.length > 0 && (
+        {/* Core Data Section - Admin only */}
+        {isAdmin && tables.length > 0 && (
           <div className="py-2 border-t border-black/10">
             <div className="px-3 mb-1">
               <button

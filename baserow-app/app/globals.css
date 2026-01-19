@@ -73,8 +73,9 @@
 
 /* Text block: make the editor fill the available block height so it doesn't look like a small inner box */
 .text-block-editor .ProseMirror {
-  height: 100%;
-  min-height: 100%;
+  /* Let content determine height (prevents "giant editor surface" + caret glitches on click). */
+  height: auto;
+  min-height: 0;
   /* The block container already provides padding via appearance settings. Avoid double-padding. */
   padding: 0;
 }

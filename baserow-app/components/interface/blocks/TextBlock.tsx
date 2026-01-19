@@ -817,27 +817,37 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           e.stopPropagation()
         }
       }}
-        onClick={(e) => {
-          // Only enter edit mode when page is in edit mode
-          if (isEditing && !readOnly && editor) {
-            const target = e.target as HTMLElement
-            // Don't focus if clicking buttons or toolbar
-            if (
-              !target.closest('button') &&
-              !target.closest('[role="button"]') &&
-              !target.closest('.drag-handle') &&
-              !target.closest('.react-resizable-handle') &&
-              !target.closest('[data-toolbar]')
-            ) {
-              e.stopPropagation()
-              setIsBlockEditing(true)
+      onClick={(e) => {
+        // Only enter edit mode when page is in edit mode.
+        // CRITICAL: Do NOT force focus('end') when clicking inside ProseMirror,
+        // otherwise the caret jumps and feels "glitchy". Let TipTap handle caret placement.
+        if (isEditing && !readOnly && editor) {
+          const target = e.target as HTMLElement
+          const clickedInsideEditor =
+            !!target.closest('.ProseMirror') || !!target.closest('[contenteditable="true"]')
+
+          // Don't focus if clicking buttons, drag/resize handles, or the toolbar.
+          if (
+            !target.closest('button') &&
+            !target.closest('[role="button"]') &&
+            !target.closest('.drag-handle') &&
+            !target.closest('.react-resizable-handle') &&
+            !target.closest('[data-toolbar]')
+          ) {
+            // Prevent canvas selection/drag when user is interacting with the block.
+            e.stopPropagation()
+            setIsBlockEditing(true)
+
+            // Only force focus to the end when clicking empty space *outside* ProseMirror.
+            if (!clickedInsideEditor) {
               // Small delay to ensure DOM is ready
               setTimeout(() => {
                 editor.commands.focus('end')
               }, 10)
             }
           }
-        }}
+        }
+      }}
     >
       {/* Toolbar (owned by this block; no global floating UI) */}
       {showToolbar && <Toolbar />}
@@ -866,17 +876,29 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         onClick={(e) => {
           // Only enter edit mode when page is in edit mode
           if (isEditing && !readOnly && !isBlockEditing && editor) {
+            const target = e.target as HTMLElement
+            // If the user clicked inside the editor content, don't override caret placement.
+            if (target.closest('.ProseMirror') || target.closest('[contenteditable="true"]')) {
+              return
+            }
             e.stopPropagation()
             setIsBlockEditing(true)
             editor.commands.focus('end')
           }
         }}
         onMouseDown={(e) => {
-          // Prevent drag/resize when clicking to edit
-          if (isBlockEditing) {
-            e.stopPropagation()
-          }
+          // Prevent drag/resize when clicking to edit.
+          // CRITICAL: Don't force focus('end') on mouse down inside ProseMirror, it breaks caret placement.
+          if (isBlockEditing) e.stopPropagation()
+
           if (isEditing && !readOnly && editor && !editor.isFocused) {
+            const target = e.target as HTMLElement
+            const clickedInsideEditor =
+              !!target.closest('.ProseMirror') || !!target.closest('[contenteditable="true"]')
+
+            // Let ProseMirror handle its own mouse-down selection/caret.
+            if (clickedInsideEditor) return
+
             e.stopPropagation()
             setIsBlockEditing(true)
             editor.commands.focus('end')
