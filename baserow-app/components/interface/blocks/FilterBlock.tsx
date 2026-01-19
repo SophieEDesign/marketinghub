@@ -274,19 +274,24 @@ export default function FilterBlock({
     })
   }, [block.id, emittedFilters, effectiveTargetBlocks, config?.title])
 
-  // Emit filter state to context whenever filters change
+  // Emit filter state to context whenever filters change.
+  // IMPORTANT: Do not remove the filter block on every update (effect cleanup runs on dependency changes),
+  // otherwise we can create remove/add loops that trigger "maximum update depth exceeded" in React.
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
       updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle)
     }
-    
+  }, [emitSignature, block.id, updateFilterBlock])
+
+  // Cleanup only on unmount / blockId change.
+  useEffect(() => {
     return () => {
       if (block.id) {
         removeFilterBlock(block.id)
       }
     }
-  }, [emitSignature, block.id, updateFilterBlock, removeFilterBlock])
+  }, [block.id, removeFilterBlock])
 
   // Persist filter tree to config when it changes (debounced)
   useEffect(() => {
