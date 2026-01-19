@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { format } from "date-fns"
@@ -11,6 +11,7 @@ import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig 
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import { isAbortError } from "@/lib/api/error-handling"
 import TimelineFieldValue from "./TimelineFieldValue"
 import {
   resolveChoiceColor,
@@ -152,8 +153,10 @@ export default function TimelineView({
       const { data, error } = await query
 
       if (error) {
-        console.error("Error loading rows:", error)
-        setRows([])
+        if (!isAbortError(error)) {
+          console.error("Error loading rows:", error)
+          setRows([])
+        }
       } else {
         // Convert to TableRow format
         const tableRows: TableRow[] = (data || []).map((row: any) => ({
@@ -166,8 +169,10 @@ export default function TimelineView({
         setRows(tableRows)
       }
     } catch (error) {
-      console.error("Error loading rows:", error)
-      setRows([])
+      if (!isAbortError(error)) {
+        console.error("Error loading rows:", error)
+        setRows([])
+      }
     }
     setLoading(false)
   }

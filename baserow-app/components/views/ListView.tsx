@@ -18,6 +18,7 @@ import { CellFactory } from "../grid/CellFactory"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
+import { isAbortError } from "@/lib/api/error-handling"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -193,12 +194,14 @@ export default function ListView({
       const { data, error } = await query
 
       if (error) {
+        if (isAbortError(error)) return
         console.error("Error loading rows:", error)
         setRows([])
       } else {
         setRows(data || [])
       }
     } catch (error) {
+      if (isAbortError(error)) return
       console.error("Error loading rows:", error)
       setRows([])
     } finally {

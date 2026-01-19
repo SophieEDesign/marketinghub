@@ -4,6 +4,7 @@ import type { TableField } from '@/types/fields'
 import { asArray } from '@/lib/utils/asArray'
 import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
 import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
+import { isAbortError } from '@/lib/api/error-handling'
 
 export interface GridRow {
   id: string
@@ -416,6 +417,7 @@ export function useGridData({
 
       await runQuery(0)
     } catch (err: any) {
+      if (isAbortError(err)) return
       console.error('Error loading grid data:', err)
       setError(err.message || 'Failed to load data')
       setRows([])

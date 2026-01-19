@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import type { TableRow, ViewFilter, ViewSort } from "@/types/database"
 import { useViewMeta } from "@/hooks/useViewMeta"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface GridViewProps {
   tableId: string
@@ -121,6 +122,7 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
       const { data, error } = await query
 
       if (error) {
+        if (isAbortError(error)) return
         // Handle case where table_rows doesn't exist (PGRST205)
         if (error.code === 'PGRST205' || error.message?.includes('table_rows')) {
           console.warn("table_rows table does not exist. Run migration to create it.")
@@ -154,6 +156,7 @@ export default function GridView({ tableId, viewId, fieldIds }: GridViewProps) {
         }
       }
     } catch (error) {
+      if (isAbortError(error)) return
       console.error("Error loading rows:", error)
       // CRITICAL: Do NOT retry automatically on network failure
       // Keep existing rows if available

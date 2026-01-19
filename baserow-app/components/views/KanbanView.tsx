@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
@@ -12,6 +12,7 @@ import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "../grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface KanbanViewProps {
   tableId: string
@@ -152,8 +153,10 @@ export default function KanbanView({
         .order("created_at", { ascending: false })
 
       if (error) {
-        console.error("Error loading rows:", error)
-        setRows([])
+        if (!isAbortError(error)) {
+          console.error("Error loading rows:", error)
+          setRows([])
+        }
       } else {
         // Convert flat rows to TableRow format for compatibility
         const tableRows = (data || []).map((row: any) => ({
@@ -166,8 +169,10 @@ export default function KanbanView({
         setRows(tableRows)
       }
     } catch (error) {
-      console.error("Error loading kanban rows:", error)
-      setRows([])
+      if (!isAbortError(error)) {
+        console.error("Error loading kanban rows:", error)
+        setRows([])
+      }
     }
     setLoading(false)
   }

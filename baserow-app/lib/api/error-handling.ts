@@ -9,6 +9,19 @@ export interface ApiError {
 }
 
 /**
+ * Check if an error is caused by a request being aborted (navigation/unmount).
+ * This is not a real failure and should generally be ignored.
+ */
+export function isAbortError(error: any): boolean {
+  if (!error) return false
+  const name = (error as any)?.name
+  if (name === 'AbortError') return true
+
+  const message = String((error as any)?.message || (error as any)?.details || '')
+  return message.includes('AbortError') || message.includes('signal is aborted')
+}
+
+/**
  * Check if an error indicates a table/relation doesn't exist
  */
 export function isTableNotFoundError(error: ApiError): boolean {

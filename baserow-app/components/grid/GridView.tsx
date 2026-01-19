@@ -39,6 +39,7 @@ import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { generateAddColumnSQL } from "@/lib/fields/sqlGenerator"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -297,6 +298,9 @@ export default function GridView({
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
   const createTableAttemptedRef = useRef<Set<string>>(new Set())
+  // If we detect a schema mismatch (e.g. view references a missing column), force future loads to use `select('*')`
+  // to avoid repeated failing "minimal select" attempts on every re-render.
+  const forceStarSelectRef = useRef<Set<string>>(new Set())
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -652,6 +656,21 @@ export default function GridView({
       .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
   }, [safeViewFields, safeTableFields, columnOrder])
 
+  // In live mode, upstream props can be recreated each render (new array identities),
+  // which would repeatedly re-trigger `loadRows()` even when content is unchanged.
+  // Use stable "content keys" so we only refetch when the actual data changes.
+  const filtersKey = useMemo(() => JSON.stringify(safeFilters ?? []), [safeFilters])
+  const viewFiltersKey = useMemo(() => JSON.stringify(safeViewFilters ?? []), [safeViewFilters])
+  const viewSortsKey = useMemo(() => JSON.stringify(safeViewSorts ?? []), [safeViewSorts])
+  const tableFieldsKey = useMemo(() => {
+    const minimal = (safeTableFields ?? []).map((f) => ({
+      id: (f as any)?.id,
+      name: (f as any)?.name,
+      type: (f as any)?.type,
+    }))
+    return JSON.stringify(minimal)
+  }, [safeTableFields])
+
   // Handle column reorder
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
@@ -668,7 +687,7 @@ export default function GridView({
   useEffect(() => {
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supabaseTableName, filters, viewFilters, viewSorts, tableFields])
+  }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey])
 
   async function loadRows() {
     if (!supabaseTableName) {
@@ -761,8 +780,9 @@ export default function GridView({
       // fall back to "*" to avoid rendering empty cells due to under-fetching.
       const isOnlyIdSelected = baseColumnNames.size === 1 && baseColumnNames.has('id')
       const shouldFallbackToStar = isOnlyIdSelected && requiredNames.size > 0
+      const forceStarSelect = forceStarSelectRef.current.has(supabaseTableName)
 
-      const selectClause = shouldFallbackToStar
+      const selectClause = (shouldFallbackToStar || forceStarSelect)
         ? '*'
         : Array.from(baseColumnNames)
             .filter((n) => typeof n === 'string' && n.trim().length > 0)
@@ -770,7 +790,7 @@ export default function GridView({
             .join(',')
 
       // PostgREST expects unquoted identifiers in `select=...`; validate and strip anything unsafe.
-      const safeSelectClause = shouldFallbackToStar
+      const safeSelectClause = (shouldFallbackToStar || forceStarSelect)
         ? '*'
         : buildSelectClause(selectClause.split(','), { includeId: true, fallback: '*' })
 
@@ -838,6 +858,11 @@ export default function GridView({
       const { data, error } = await query
 
       if (error) {
+        // If the request was aborted (navigation/unmount), ignore it.
+        if (isAbortError(error)) {
+          return
+        }
+
         // If a view references a column that no longer exists in the physical table,
         // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
         // IMPORTANT: only treat as "missing column" for 42703 (missing table is 42P01 and must be handled separately).
@@ -848,6 +873,10 @@ export default function GridView({
             code: (error as any)?.code,
             missingColumn,
           })
+
+          // From this point on, avoid repeating the failing "minimal select" for this table.
+          // This prevents endless 400s in live mode when parent props cause re-renders.
+          forceStarSelectRef.current.add(supabaseTableName)
 
           const isMissingMatch = (fieldName?: string | null) => {
             if (!missingColumn || !fieldName) return false
@@ -1052,6 +1081,7 @@ export default function GridView({
         setRows(computedRows)
       }
     } catch (error) {
+      if (isAbortError(error)) return
       console.error("Error loading rows:", error)
       const msg =
         (error as any)?.message ||

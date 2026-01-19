@@ -50,6 +50,7 @@ import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from
 import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { isAbortError } from "@/lib/api/error-handling"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
@@ -202,6 +203,7 @@ export default function AirtableKanbanView({
       const { data, error } = await query
 
       if (error) {
+        if (isAbortError(error)) return
         console.error("Error loading rows:", error)
         setRows([])
       } else {
@@ -219,6 +221,7 @@ export default function AirtableKanbanView({
         setRows(rowsData)
       }
     } catch (error) {
+      if (isAbortError(error)) return
       console.error("Error loading rows:", error)
       setRows([])
     } finally {

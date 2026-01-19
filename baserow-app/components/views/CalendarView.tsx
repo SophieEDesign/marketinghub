@@ -25,6 +25,7 @@ import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWa
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import TimelineFieldValue from "@/components/views/TimelineFieldValue"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface CalendarViewProps {
   tableId: string
@@ -550,6 +551,7 @@ export default function CalendarView({
       const { data, error } = await query
 
       if (error) {
+        if (isAbortError(error)) return
         console.error('Calendar: Error loading rows:', error, {
           tableId: resolvedTableId,
           supabaseTableName,
@@ -577,6 +579,7 @@ export default function CalendarView({
         })
       }
     } catch (error) {
+      if (isAbortError(error)) return
       console.error('Calendar: Exception loading rows:', error)
       setRows([])
     } finally {
