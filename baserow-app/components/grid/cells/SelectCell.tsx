@@ -7,6 +7,7 @@ import {
   resolveChoiceColor,
 } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
+import { getManualChoiceLabels } from "@/lib/fields/select-options"
 
 interface SelectCellProps {
   value: string | null
@@ -67,7 +68,9 @@ export default function SelectCell({
     <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
       <InlineSelectDropdown
         value={value}
-        choices={choices}
+        // Ensure the picker dropdown uses canonical manual order by default.
+        // Alphabetise (if enabled) is a per-picker visual transform only.
+        choices={getManualChoiceLabels("single_select", fieldOptions) || choices}
         choiceColors={choiceColors}
         fieldOptions={fieldOptions}
         fieldType="single_select"

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon, ChevronRight, X } from "lucide-react"
+import { CalendarIcon, X } from "lucide-react"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
@@ -103,6 +103,7 @@ export default function CalendarView({
   const permissions = (blockConfig as any)?.permissions || {}
   const isViewOnly = permissions.mode === 'view'
   const allowInlineCreate = permissions.allowInlineCreate ?? true
+  const allowOpenRecord = permissions.allowOpenRecord ?? true
   const canCreateRecord = showAddRecord && !isViewOnly && allowInlineCreate
   
   // View config state - calendar settings from view config
@@ -1428,6 +1429,7 @@ export default function CalendarView({
           eventDisplay="block"
           eventClassNames={(arg) => [
             "hover:opacity-80 transition-opacity rounded-md",
+            allowOpenRecord ? "cursor-pointer" : "",
             selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
           ]}
           dayCellClassNames="hover:bg-gray-50 transition-colors"
@@ -1449,21 +1451,6 @@ export default function CalendarView({
             
             return (
               <div className="flex items-center gap-1.5 h-full min-w-0" title={tooltip}>
-                {/* Open record control (explicit) */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (!recordId) return
-                    if (onRecordClick) onRecordClick(recordId)
-                    else setSelectedRecordId(recordId)
-                  }}
-                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                  title="Open record"
-                  aria-label="Open record"
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
                 {image && (
                   <div className={`flex-shrink-0 w-4 h-4 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
                     <img
@@ -1508,9 +1495,10 @@ export default function CalendarView({
             }
           }}
           eventClick={(info) => {
-            // Contract: single click selects event only (never opens record).
+            // Contract: single click opens the record (if permitted) and selects event.
             const recordId = info.event.id
-            setSelectedEventId(recordId ? String(recordId) : null)
+            const recordIdString = recordId ? String(recordId) : ""
+            setSelectedEventId(recordIdString || null)
             
             // DEBUG_CALENDAR: Always log event clicks in development (prove click wiring works)
             // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
@@ -1521,8 +1509,9 @@ export default function CalendarView({
                 eventId: info.event.id,
                 eventTitle: info.event.title,
                 hasOnRecordClick: !!onRecordClick,
-                willUseModal: !onRecordClick,
-                willCallCallback: !!onRecordClick,
+                allowOpenRecord,
+                willUseModal: allowOpenRecord && !onRecordClick,
+                willCallCallback: allowOpenRecord && !!onRecordClick,
                 debugEnabled,
               })
             }
@@ -1531,35 +1520,22 @@ export default function CalendarView({
               recordId,
               event: info.event,
               hasOnRecordClick: !!onRecordClick,
-              willUseModal: !onRecordClick
+              allowOpenRecord,
+              willUseModal: allowOpenRecord && !onRecordClick
             })
             
             if (!recordId) {
               console.warn('[Calendar] Event clicked but no recordId found', { event: info.event })
+              return
             }
-          }}
-          eventDidMount={(info) => {
-            // Optional: double-click event opens record.
-            const el = info.el as any
-            const recordId = String(info.event.id || "")
-            const onDblClick = (e: MouseEvent) => {
-              // Ignore if user double-clicks an inner control (e.g., open chevron)
-              const target = e.target as HTMLElement | null
-              if (target?.closest('button')) return
-              if (!recordId) return
-              if (onRecordClick) onRecordClick(recordId)
-              else setSelectedRecordId(recordId)
+
+            if (!allowOpenRecord) return
+
+            if (onRecordClick) {
+              onRecordClick(recordIdString)
+              return
             }
-            el.__calendarDblClickHandler = onDblClick
-            info.el.addEventListener("dblclick", onDblClick)
-          }}
-          eventWillUnmount={(info) => {
-            const el = info.el as any
-            const handler = el.__calendarDblClickHandler as ((e: MouseEvent) => void) | undefined
-            if (handler) {
-              info.el.removeEventListener("dblclick", handler)
-              delete el.__calendarDblClickHandler
-            }
+            setSelectedRecordId(recordIdString)
           }}
           dateClick={(info) => {
             if (!canCreateRecord) return

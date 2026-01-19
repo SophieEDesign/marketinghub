@@ -251,9 +251,16 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, auth
 AS $$
+DECLARE
+  allow_delete boolean :=
+    lower(coalesce(current_setting('app.allow_system_field_delete', true), 'off'))
+      IN ('on', 'true', '1', 'yes');
 BEGIN
   IF OLD.name IN ('created_at', 'created_by', 'updated_at', 'updated_by') THEN
     IF TG_OP = 'DELETE' THEN
+      IF allow_delete THEN
+        RETURN OLD;
+      END IF;
       RAISE EXCEPTION 'System field "%" cannot be deleted.', OLD.name;
     END IF;
 

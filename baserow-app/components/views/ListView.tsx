@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -16,6 +16,8 @@ import GroupDialog from "../grid/GroupDialog"
 import FilterDialog from "../grid/FilterDialog"
 import { CellFactory } from "../grid/CellFactory"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
+import type { GroupRule } from "@/lib/grouping/types"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -27,6 +29,8 @@ interface ListViewProps {
   filters?: FilterConfig[]
   sorts?: Array<{ field_name: string; direction: 'asc' | 'desc' }>
   groupBy?: string
+  /** Nested grouping rules (preferred). If omitted, falls back to `groupBy`. */
+  groupByRules?: GroupRule[]
   /** When grouping, should groups start collapsed? Default: true (closed). */
   defaultChoiceGroupsCollapsed?: boolean
   searchQuery?: string
@@ -55,6 +59,7 @@ export default function ListView({
   filters = [],
   sorts = [],
   groupBy,
+  groupByRules,
   defaultChoiceGroupsCollapsed = true,
   searchQuery = "",
   onRecordClick,
@@ -209,31 +214,41 @@ export default function ListView({
     return filterRowsBySearch(rows, tableFields, searchQuery, fieldIds)
   }, [rows, tableFields, searchQuery])
 
-  // Group rows if groupBy is set
-  const groupedRows = useMemo(() => {
-    if (!currentGroupBy) return { ungrouped: filteredRows }
+  const effectiveGroupRules = useMemo<GroupRule[]>(() => {
+    const safe = Array.isArray(groupByRules) ? groupByRules.filter(Boolean) : []
+    if (safe.length > 0) return safe
+    if (currentGroupBy && typeof currentGroupBy === 'string' && currentGroupBy.trim()) {
+      return [{ type: 'field', field: currentGroupBy.trim() }]
+    }
+    return []
+  }, [currentGroupBy, groupByRules])
 
-    const groupField = tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy)
-    if (!groupField) return { ungrouped: filteredRows }
-
-    const groups: Record<string, Record<string, any>[]> = {}
-
-    filteredRows.forEach((row) => {
-      const groupValue = row[currentGroupBy] || '(Empty)'
-      const groupKey = String(groupValue)
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
-      }
-      groups[groupKey].push(row)
+  const groupModel = useMemo(() => {
+    if (effectiveGroupRules.length === 0) return null
+    return buildGroupTree(filteredRows, tableFields, effectiveGroupRules, {
+      emptyLabel: '(Empty)',
+      emptyLast: true,
     })
+  }, [effectiveGroupRules, filteredRows, tableFields])
 
-    return groups
-  }, [filteredRows, currentGroupBy, tableFields])
+  const flattenedGroups = useMemo(() => {
+    if (!groupModel || groupModel.rootGroups.length === 0) return null
+    return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
+  }, [collapsedGroups, groupModel])
 
-  const groupFieldForCurrentGroupBy = useMemo(() => {
-    if (!currentGroupBy) return null
-    return tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy) || null
-  }, [currentGroupBy, tableFields])
+  const groupPathMap = useMemo(() => {
+    const map = new Map<string, any[]>()
+    if (!groupModel) return map
+    const walk = (node: any, ancestors: any[]) => {
+      const next = [...ancestors, node]
+      map.set(String(node.pathKey), next)
+      const children = Array.isArray(node.children) ? node.children : []
+      children.forEach((c) => walk(c, next))
+    }
+    const roots = Array.isArray(groupModel.rootGroups) ? groupModel.rootGroups : []
+    roots.forEach((g) => walk(g, []))
+    return map
+  }, [groupModel])
 
   // When grouping, allow "start collapsed" behavior (default: collapsed).
   // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
@@ -248,7 +263,7 @@ export default function ListView({
     }
 
     // No grouping: always open (nothing to collapse)
-    if (!currentGroupBy) {
+    if (effectiveGroupRules.length === 0) {
       didInitChoiceGroupCollapseRef.current = false
       return
     }
@@ -262,12 +277,11 @@ export default function ListView({
 
     // Setting is "closed": collapse all groups once, when we have keys.
     if (didInitChoiceGroupCollapseRef.current) return
-    if ('ungrouped' in groupedRows) return
-    const keys = Object.keys(groupedRows)
-    if (keys.length === 0) return
-    setCollapsedGroups(new Set(keys))
+    const top = groupModel?.rootGroups || []
+    if (top.length === 0) return
+    setCollapsedGroups(new Set(top.map((n) => n.pathKey)))
     didInitChoiceGroupCollapseRef.current = true
-  }, [currentGroupBy, defaultChoiceGroupsCollapsed, groupedRows])
+  }, [currentGroupBy, defaultChoiceGroupsCollapsed, effectiveGroupRules.length, groupModel?.rootGroups])
 
   // Handle group change
   const handleGroupChange = useCallback(async (fieldName: string | null) => {
@@ -430,7 +444,7 @@ export default function ListView({
   const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
     if (!showAddRecord || !canCreateRecord) return
     if (!supabaseTableName || !tableId) return
-    if (!currentGroupBy) return
+    if (effectiveGroupRules.length === 0) return
 
     try {
       const supabase = createClient()
@@ -441,8 +455,34 @@ export default function ListView({
         Object.assign(newData, defaultsFromFilters)
       }
 
-      // Group key "(Empty)" means null/empty for the group field.
-      newData[currentGroupBy] = groupKey === '(Empty)' ? null : groupKey
+      const chain = groupPathMap.get(groupKey as any) || []
+      for (const node of chain as any[]) {
+        const rule = (node as any).rule as GroupRule
+        if (rule.type === 'field') {
+          // For "(Empty)" groups, store null so the record lands in the empty bucket.
+          if ((node as any).key === '(Empty)') {
+            newData[rule.field] = null
+          } else {
+            // Checkbox buckets use keys "true"/"false"
+            const field = tableFields.find((f) => f.name === rule.field || f.id === rule.field)
+            if (field?.type === 'checkbox') {
+              newData[rule.field] = String((node as any).key) === 'true'
+            } else {
+              newData[rule.field] = (node as any).key
+            }
+          }
+        } else if (rule.type === 'date') {
+          if ((node as any).key === '(Empty)') {
+            newData[rule.field] = null
+          } else if (rule.granularity === 'year') {
+            const y = String((node as any).key)
+            newData[rule.field] = /^\d{4}$/.test(y) ? `${y}-01-01` : null
+          } else {
+            const ym = String((node as any).key)
+            newData[rule.field] = /^\d{4}-\d{2}$/.test(ym) ? `${ym}-01` : null
+          }
+        }
+      }
 
       const { data, error } = await supabase
         .from(supabaseTableName)
@@ -463,7 +503,7 @@ export default function ListView({
       console.error('Failed to create record:', error)
       alert('Failed to create record. Please try again.')
     }
-  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, currentGroupBy, handleOpenRecord])
+  }, [showAddRecord, canCreateRecord, supabaseTableName, tableId, effectiveGroupRules.length, groupPathMap, tableFields, filters, handleOpenRecord])
 
   // Render a list item
   const renderListItem = useCallback((row: Record<string, any>) => {
@@ -630,11 +670,8 @@ export default function ListView({
     )
   }
 
-  // Render grouped or ungrouped
-  if (currentGroupBy && Object.keys(groupedRows).length > 0 && 'ungrouped' in groupedRows === false) {
-    const groupField = tableFields.find(f => f.name === currentGroupBy || f.id === currentGroupBy)
-    const groupValue = currentGroupBy
-
+  // Render grouped (nested) or ungrouped
+  if (flattenedGroups && flattenedGroups.length > 0) {
     return (
       <div className="h-full flex flex-col">
         {/* Toolbar */}
@@ -666,80 +703,86 @@ export default function ListView({
 
         {/* Grouped Content */}
         <div className="flex-1 overflow-y-auto">
-          {Object.entries(groupedRows).map(([groupKey, groupRows]) => {
-            const isCollapsed = collapsedGroups.has(groupKey)
-            const groupDisplayValue = groupKey === '(Empty)' ? '(Empty)' : String(groupKey)
-            
-            // Get group color if it's a select field
-            let groupColor: string | null = null
-            if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
-              groupColor = getPillColor(groupField, groupKey)
+          {flattenedGroups.map((it) => {
+            if (it.type === 'group') {
+              const node = it.node
+              const isCollapsed = collapsedGroups.has(node.pathKey)
+              const ruleLabel =
+                node.rule.type === 'date'
+                  ? node.rule.granularity === 'year'
+                    ? 'Year'
+                    : 'Month'
+                  : node.rule.field
+
+              // Group color (only for select-type field group nodes)
+              let groupColor: string | null = null
+              if (node.rule.type === 'field') {
+                const groupField = tableFields.find((f) => f.name === node.rule.field || f.id === node.rule.field)
+                if (groupField && (groupField.type === 'single_select' || groupField.type === 'multi_select')) {
+                  groupColor = getPillColor(groupField, node.key)
+                }
+              }
+
+              return (
+                <div key={node.pathKey} className="border-b border-gray-200 last:border-b-0">
+                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors">
+                    <button
+                      onClick={() => {
+                        setCollapsedGroups((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(node.pathKey)) next.delete(node.pathKey)
+                          else next.add(node.pathKey)
+                          return next
+                        })
+                      }}
+                      className="flex items-center gap-2 text-left flex-1"
+                      style={{ paddingLeft: 8 + (it.level || 0) * 16 }}
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      )}
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: groupColor ? `${groupColor}20` : undefined,
+                          color: groupColor || undefined,
+                          border: groupColor ? `1px solid ${groupColor}40` : undefined,
+                        }}
+                      >
+                        {ruleLabel}: {node.label}
+                      </span>
+                      <span className="text-sm text-gray-500 ml-2">{node.size}</span>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        handleAddRecordToGroup(node.pathKey)
+                      }}
+                      className="h-7 text-xs"
+                      disabled={!showAddRecord || !canCreateRecord}
+                      title={
+                        !showAddRecord
+                          ? 'Enable "Show Add record button" in block settings to add records'
+                          : !canCreateRecord
+                            ? 'Adding records is disabled for this block'
+                            : 'Add a new record to this group'
+                      }
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add content
+                    </Button>
+                  </div>
+                </div>
+              )
             }
 
-            return (
-              <div key={groupKey} className="border-b border-gray-200 last:border-b-0">
-                {/* Group Header */}
-                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <button
-                    onClick={() => {
-                      setCollapsedGroups((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(groupKey)) {
-                          next.delete(groupKey)
-                        } else {
-                          next.add(groupKey)
-                        }
-                        return next
-                      })
-                    }}
-                    className="flex items-center gap-2 text-left flex-1"
-                  >
-                    {isCollapsed ? (
-                      <ChevronRight className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    )}
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-sm font-medium"
-                      style={{
-                        backgroundColor: groupColor ? `${groupColor}20` : undefined,
-                        color: groupColor || undefined,
-                        border: groupColor ? `1px solid ${groupColor}40` : undefined,
-                      }}
-                    >
-                      {groupDisplayValue}
-                    </span>
-                    <span className="text-sm text-gray-500 ml-2">{groupRows.length}</span>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      handleAddRecordToGroup(groupKey)
-                    }}
-                    className="h-7 text-xs"
-                    disabled={!showAddRecord || !canCreateRecord}
-                    title={
-                      !showAddRecord
-                        ? 'Enable "Show Add record button" in block settings to add records'
-                        : !canCreateRecord
-                          ? 'Adding records is disabled for this block'
-                          : 'Add a new record to this group'
-                    }
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Add content
-                  </Button>
-                </div>
-
-                {/* Group Items - Card View (Lists â‰  Tables) */}
-                {!isCollapsed && (
-                  <div className="bg-white">
-                    {groupRows.map((row) => renderListItem(row))}
-                  </div>
-                )}
-              </div>
-            )
+            // Item row (card)
+            const row = it.item as any
+            const key = `${String(row?.id ?? Math.random())}::${it.groupPathKey}`
+            return <div key={key}>{renderListItem(row)}</div>
           })}
         </div>
 
@@ -790,7 +833,7 @@ export default function ListView({
   }
 
   // Render ungrouped list
-  const rowsToRender = currentGroupBy ? (groupedRows as { ungrouped: Record<string, any>[] }).ungrouped || [] : filteredRows
+  const rowsToRender = filteredRows
 
   if (rowsToRender.length === 0) {
     return (

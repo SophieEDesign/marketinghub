@@ -23,6 +23,15 @@ export type FieldType =
  */
 export type ChoiceColorTheme = 'vibrant' | 'pastel' | 'blues'
 
+export interface SelectOption {
+  id: string
+  label: string
+  color?: string
+  /** Authoritative manual order. UI order = sort_index ASC */
+  sort_index: number
+  created_at?: string
+}
+
 export interface TableField {
   id: string
   table_id: string
@@ -48,6 +57,13 @@ export interface FieldOptions {
   choices?: string[]
   choiceColors?: Record<string, string> // Map of choice value to hex color (option-level override)
   choiceColorTheme?: ChoiceColorTheme // Palette used when no option-level override exists
+  /**
+   * Canonical option model for single/multi select.
+   * This is the single source of truth for ordering via `sort_index`.
+   *
+   * NOTE: record values are still stored as labels (strings) for backwards compatibility.
+   */
+  selectOptions?: SelectOption[]
   
   // Field-level color override (applies to entire field when no option-level override exists)
   fieldColor?: string // Hex color for the field (applies to linked records, lookups, or as fallback for selects)

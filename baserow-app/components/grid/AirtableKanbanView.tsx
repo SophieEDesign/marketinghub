@@ -49,6 +49,7 @@ import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/f
 import { resolveChoiceColor, normalizeHexColor, getTextColorForBackground } from "@/lib/field-colors"
 import { CellFactory } from "./CellFactory"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { getManualChoiceLabels } from "@/lib/fields/select-options"
 
 // PostgREST expects unquoted identifiers in select/order clauses; see `lib/supabase/postgrest`.
 
@@ -118,7 +119,10 @@ export default function AirtableKanbanView({
   )
 
   const loadColumns = useCallback((field: TableField) => {
-    const choices = field.options?.choices || []
+    const choices =
+      field.type === "single_select" || field.type === "multi_select"
+        ? getManualChoiceLabels(field.type, field.options)
+        : []
     const columnList: KanbanColumn[] = choices.map((choice, index) => ({
       id: choice,
       name: choice,

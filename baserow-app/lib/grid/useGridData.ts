@@ -140,9 +140,30 @@ export function useGridData({
       }
 
       case 'link_to_table': {
+        const maybeParseJsonArrayString = (s: string): any[] | null => {
+          const trimmed = s.trim()
+          if (!(trimmed.startsWith('[') && trimmed.endsWith(']'))) return null
+          try {
+            const parsed = JSON.parse(trimmed)
+            return Array.isArray(parsed) ? parsed : null
+          } catch {
+            return null
+          }
+        }
+
         const toId = (x: any): string | null => {
           if (x == null || x === '') return null
-          if (typeof x === 'string') return x
+          if (typeof x === 'string') {
+            // Some UI paths accidentally stringify arrays for link fields, e.g. `["uuid"]`.
+            // Coerce that back into a single uuid to avoid Postgres 22P02.
+            const parsedArr = maybeParseJsonArrayString(x)
+            if (parsedArr) {
+              const first = parsedArr[0]
+              if (first == null || first === '') return null
+              return String(first)
+            }
+            return x
+          }
           if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
           return String(x)
         }

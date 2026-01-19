@@ -15,6 +15,7 @@ import {
   resolveChoiceColor,
   normalizeHexColor,
 } from "@/lib/field-colors"
+import { getManualChoiceLabels } from "@/lib/fields/select-options"
 
 interface FilterValueInputProps {
   field: TableField | null
@@ -76,7 +77,7 @@ export default function FilterValueInput({
 
   // Select fields: Show dropdown with options and colors
   if (field.type === 'single_select' || field.type === 'multi_select') {
-    const choices = field.options?.choices || []
+    const choices = getManualChoiceLabels(field.type, field.options)
     
     if (choices.length === 0) {
       return (

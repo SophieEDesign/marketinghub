@@ -11,6 +11,7 @@ import {
   getTextColorForBackground,
   normalizeHexColor,
 } from "@/lib/field-colors"
+import { getManualChoiceLabels, sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { useToast } from "@/components/ui/use-toast"
 import LookupFieldPicker, { type LookupFieldConfig } from "@/components/fields/LookupFieldPicker"
 import RichTextEditor from "@/components/fields/RichTextEditor"
@@ -488,13 +489,16 @@ export default function FieldEditor({
 
   // Select fields
   if (field.type === "single_select" || field.type === "multi_select") {
-    const choices = field.options?.choices || []
+    const choices = getManualChoiceLabels(field.type, field.options)
     const isMulti = field.type === "multi_select"
-    const selectedValues = isMulti
+    const selectedValuesRaw = isMulti
       ? (Array.isArray(value) ? value : value ? [value] : [])
       : value
         ? [value]
         : []
+    // IMPORTANT: pills must always follow manual order (sort_index),
+    // and must never be affected by any per-picker alphabetise UI.
+    const selectedValues = sortLabelsByManualOrder(selectedValuesRaw, field.type, field.options)
 
     // Capture the narrowed type so TS keeps it inside closures.
     const selectFieldType: "single_select" | "multi_select" = field.type
@@ -556,7 +560,7 @@ export default function FieldEditor({
               <div className="text-sm text-gray-500 italic px-2 py-1">No options configured</div>
             ) : (
               choices.map((choice: string) => {
-                const isSelected = selectedValues.includes(choice)
+                const isSelected = selectedValuesRaw.includes(choice)
                 const hexColor = getChoiceColor(choice)
                 const textColorClass = getTextColorForBackground(hexColor)
                 const bgColor = normalizeHexColor(hexColor)
@@ -567,8 +571,8 @@ export default function FieldEditor({
                     type="button"
                     onClick={() => {
                       const newValues = isSelected
-                        ? selectedValues.filter((v) => v !== choice)
-                        : [...selectedValues, choice]
+                        ? selectedValuesRaw.filter((v) => v !== choice)
+                        : [...selectedValuesRaw, choice]
                       onChange(newValues)
                     }}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap shadow-sm transition-all ${
@@ -592,7 +596,7 @@ export default function FieldEditor({
             ) : (
               <>
                 {choices.map((choice: string) => {
-                  const isSelected = selectedValues.includes(choice)
+                  const isSelected = selectedValuesRaw.includes(choice)
                   const hexColor = getChoiceColor(choice)
                   const textColorClass = getTextColorForBackground(hexColor)
                   const bgColor = normalizeHexColor(hexColor)

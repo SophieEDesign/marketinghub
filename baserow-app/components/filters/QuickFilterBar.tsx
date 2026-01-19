@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { getManualChoiceLabels } from "@/lib/fields/select-options"
 
 type QuickableFieldType = "single_select" | "multi_select"
 
@@ -42,19 +43,9 @@ function getQuickableFields(tableFields: TableField[]): TableField[] {
 }
 
 function getChoiceOptions(field: TableField): Array<{ value: string; label: string }> {
-  const choices = (field.options as any)?.choices ?? (field as any)?.options ?? []
-  if (!Array.isArray(choices)) return []
-  return choices
-    .map((c: any) => {
-      if (typeof c === "string") return { value: c, label: c }
-      if (c && typeof c === "object") {
-        const v = String(c.value ?? c.label ?? "")
-        const l = String(c.label ?? c.value ?? v)
-        return v ? { value: v, label: l } : null
-      }
-      return null
-    })
-    .filter(Boolean) as Array<{ value: string; label: string }>
+  if (field.type !== "single_select" && field.type !== "multi_select") return []
+  // Quick filters must always use manual (canonical) option order, never alphabetise.
+  return getManualChoiceLabels(field.type, field.options).map((c) => ({ value: c, label: c }))
 }
 
 function operatorLabel(fieldType: QuickableFieldType, op: QuickFilterOperator): string {

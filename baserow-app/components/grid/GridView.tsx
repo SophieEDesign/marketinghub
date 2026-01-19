@@ -37,6 +37,8 @@ import { useIsMobile } from "@/hooks/useResponsive"
 import { createClient } from "@/lib/supabase/client"
 import { buildSelectClause, toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { generateAddColumnSQL } from "@/lib/fields/sqlGenerator"
+import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
+import type { GroupRule } from "@/lib/grouping/types"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -66,6 +68,8 @@ interface GridViewProps {
   }>
   searchTerm?: string
   groupBy?: string
+  /** Nested grouping rules (preferred). If omitted, falls back to `groupBy`. */
+  groupByRules?: GroupRule[]
   tableFields?: TableField[]
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
@@ -255,6 +259,7 @@ export default function GridView({
   viewSorts = [],
   searchTerm = "",
   groupBy,
+  groupByRules,
   tableFields = [],
   onAddField,
   onEditField,
@@ -1209,42 +1214,25 @@ export default function GridView({
     })
   }, [safeRows, searchTerm, visibleFields])
 
-  // Group rows if groupBy is set
-  // CRITICAL: Normalize filteredRows before grouping, optional-safe field access
-  const groupedRows = useMemo(() => {
-    if (!groupBy || typeof groupBy !== 'string') return null
+  const effectiveGroupRules = useMemo<GroupRule[]>(() => {
+    const safe = Array.isArray(groupByRules) ? groupByRules.filter(Boolean) : []
+    if (safe.length > 0) return safe
+    if (groupBy && typeof groupBy === 'string' && groupBy.trim()) return [{ type: 'field', field: groupBy.trim() }]
+    return []
+  }, [groupBy, groupByRules])
 
-    if (!Array.isArray(filteredRows)) return null
-
-    const groups: Record<string, Record<string, any>[]> = {}
-
-    // filteredRows is already normalized, but guard for safety
-    filteredRows.forEach((row) => {
-      if (!row || typeof row !== 'object') return // Skip null/undefined/invalid rows
-      
-      // CRITICAL: Optional-safe access to groupBy field
-      const groupValue = row[groupBy] ?? "Uncategorized"
-      const groupKey = String(groupValue)
-      
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
-      }
-      groups[groupKey].push(row)
+  const groupModel = useMemo(() => {
+    if (effectiveGroupRules.length === 0) return null
+    return buildGroupTree(asArray<Record<string, any>>(filteredRows), safeTableFields, effectiveGroupRules, {
+      emptyLabel: '(Empty)',
+      emptyLast: true,
     })
+  }, [effectiveGroupRules, filteredRows, safeTableFields])
 
-    // Sort group keys
-    const sortedGroupKeys = Object.keys(groups).sort()
-
-    return sortedGroupKeys.map((key) => {
-      const groupRows = asArray(groups[key])
-      const firstRow = groupRows[0] && typeof groupRows[0] === 'object' ? groupRows[0] as Record<string, any> : null
-      return {
-        key,
-        value: firstRow && groupBy ? firstRow[groupBy] : "Uncategorized",
-        rows: groupRows, // Ensure rows is always an array
-      }
-    })
-  }, [filteredRows, groupBy])
+  const flattenedGroups = useMemo(() => {
+    if (!groupModel || groupModel.rootGroups.length === 0) return null
+    return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
+  }, [collapsedGroups, groupModel])
 
   function toggleGroup(groupKey: string) {
     setCollapsedGroups((prev) => {
@@ -1588,16 +1576,19 @@ export default function GridView({
                     {searchTerm ? "No rows match your search" : "No rows found"}
                   </td>
                 </tr>
-              ) : groupBy && groupedRows && Array.isArray(groupedRows) ? (
-                // Render grouped rows
-                // CRITICAL: groupedRows is already verified as array, but use type annotation for safety
-                (groupedRows as Array<{ key: string; value: any; rows: Record<string, any>[] }>).map((group) => {
-                  const isCollapsed = collapsedGroups.has(group.key)
-                  const groupRows = asArray<Record<string, any>>(group.rows)
-                  return (
-                    <React.Fragment key={group.key}>
-                      {/* Group header */}
-                      <tr className="bg-gray-50 border-b border-gray-200">
+              ) : flattenedGroups ? (
+                flattenedGroups.map((it) => {
+                  if (it.type === 'group') {
+                    const node = it.node
+                    const isCollapsed = collapsedGroups.has(node.pathKey)
+                    const ruleLabel =
+                      node.rule.type === 'date'
+                        ? node.rule.granularity === 'year'
+                          ? 'Year'
+                          : 'Month'
+                        : node.rule.field
+                    return (
+                      <tr key={`group-${node.pathKey}`} className="bg-gray-50 border-b border-gray-200">
                         <td
                           colSpan={
                             safeVisibleFields.length +
@@ -1607,8 +1598,9 @@ export default function GridView({
                           className="px-4 py-2"
                         >
                           <button
-                            onClick={() => toggleGroup(group.key)}
+                            onClick={() => toggleGroup(node.pathKey)}
                             className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 w-full text-left"
+                            style={{ paddingLeft: 8 + (it.level || 0) * 16 }}
                           >
                             {isCollapsed ? (
                               <ChevronRight className="h-4 w-4" />
@@ -1616,147 +1608,143 @@ export default function GridView({
                               <ChevronDown className="h-4 w-4" />
                             )}
                             <span className="font-semibold">
-                              {groupBy}: {String(group.value ?? "Uncategorized")}
+                              {ruleLabel}: {node.label}
                             </span>
                             <span className="text-gray-500 ml-2">
-                              ({groupRows.length} {groupRows.length === 1 ? "row" : "rows"})
+                              ({node.size} {node.size === 1 ? "row" : "rows"})
                             </span>
                           </button>
                         </td>
                       </tr>
-                      {/* Group rows */}
-                      {!isCollapsed &&
-                        groupRows.map((row) => {
-                          const rowColor = getRowColor ? getRowColor(row) : null
-                          const rowImage = getRowImage ? getRowImage(row) : null
-                          const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
-                          const canOpenRecord = enableRecordOpen && allowOpenRecord
-                          const thisRowId = row?.id ? String(row.id) : null
-                          
-                          return (
-                          <tr
-                            key={row?.id || `row-${Math.random()}`}
-                            className={`border-b border-gray-100 transition-colors ${
-                              thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
-                            } cursor-default`}
-                            style={{ ...borderColor, height: `${rowHeightPixels}px` }}
-                            onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
-                            onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
-                          >
-                            {/* Row open control */}
-                            {canOpenRecord && (
-                              <td
-                                className="px-2 py-1 w-8"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={(e) => row?.id && handleOpenRecordClick(e, row.id)}
-                                  className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
-                                  title="Open record"
-                                  aria-label="Open record"
-                                >
-                                  <ChevronRight className="h-4 w-4" />
-                                </button>
-                              </td>
-                            )}
-                            {/* Image cell if image field is configured */}
-                            {rowImage && (
-                              <td
-                                className="px-2 py-1 w-12"
-                                onClick={(e) => e.stopPropagation()}
-                                onDoubleClick={(e) => e.stopPropagation()}
-                              >
-                                <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
-                                  <img
-                                    src={rowImage}
-                                    alt=""
-                                    className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).style.display = 'none'
-                                    }}
-                                  />
-                                </div>
-                              </td>
-                            )}
-                            {safeVisibleFields.length > 0
-                              ? safeVisibleFields
-                                  .filter((field): field is NonNullable<typeof field> => {
-                                    // CRITICAL: Filter out null/undefined and ensure field_name exists
-                                    return field !== null && 
-                                           field !== undefined && 
-                                           typeof field === 'object' &&
-                                           !!field.field_name && 
-                                           typeof field.field_name === 'string'
-                                  })
-                                  .map((field) => {
-                                    // CRITICAL: Defensive access to tableField, columnWidth, and row.id
-                                    const tableField = Array.isArray(safeTableFields) 
-                                      ? safeTableFields.find(f => 
-                                          f && 
-                                          typeof f === 'object' && 
-                                          (f.name === field.field_name || f.id === field.field_name)
-                                        )
-                                      : undefined
-                                    
-                                    const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
-                                    const columnWidth = typeof columnWidths === 'object' && columnWidths !== null
-                                      ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
-                                      : COLUMN_DEFAULT_WIDTH
-                                    
-                                    // CRITICAL: Ensure row.id exists before using it
-                                    const rowId = row && typeof row === 'object' && row.id ? row.id : null
-                                    
-                                    const canUseCellFactory = !!tableField && rowId !== null
+                    )
+                  }
 
-                                    return (
-                                      <td
-                                        key={field.field_name}
-                                        className="px-0 py-0"
-                                        style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        onDoubleClick={(e) => e.stopPropagation()}
-                                      >
-                                        {canUseCellFactory ? (
-                                          <CellFactory
-                                            field={tableField!}
-                                            value={row && typeof row === 'object' ? row[field.field_name] : undefined}
-                                            rowId={String(rowId)}
-                                            tableName={supabaseTableName}
-                                            editable={canEdit && !isVirtual && rowId !== null}
-                                            wrapText={wrapText}
-                                            rowHeight={rowHeightPixels}
-                                            onSave={async (value) => {
-                                              if (!isVirtual && rowId) {
-                                                await handleCellSave(rowId, field.field_name, value)
-                                              }
-                                            }}
-                                            onFieldOptionsUpdate={onTableFieldsRefresh}
-                                          />
-                                        ) : (
-                                          <Cell
-                                            value={row && typeof row === 'object' ? row[field.field_name] : undefined}
-                                            fieldName={field.field_name}
-                                            fieldType={tableField?.type}
-                                            fieldOptions={tableField?.options}
-                                            isVirtual={isVirtual}
-                                            editable={canEdit && !isVirtual && rowId !== null}
-                                            wrapText={wrapText}
-                                            rowHeight={rowHeightPixels}
-                                            onSave={async (value) => {
-                                              if (!isVirtual && rowId) {
-                                                await handleCellSave(rowId, field.field_name, value)
-                                              }
-                                            }}
-                                          />
-                                        )}
-                                      </td>
-                                    )
-                                  })
-                              : null}
-                          </tr>
-                          )
-                        })}
-                    </React.Fragment>
+                  const row = it.item
+                  const rowColor = getRowColor ? getRowColor(row) : null
+                  const rowImage = getRowImage ? getRowImage(row) : null
+                  const borderColor = rowColor ? { borderLeftColor: rowColor, borderLeftWidth: '4px' } : {}
+                  const canOpenRecord = enableRecordOpen && allowOpenRecord
+                  const thisRowId = row?.id ? String(row.id) : null
+
+                  return (
+                    <tr
+                      key={thisRowId ? `${thisRowId}::${it.groupPathKey}` : `row-${Math.random()}`}
+                      className={`border-b border-gray-100 transition-colors ${
+                        thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
+                      } cursor-default`}
+                      style={{ ...borderColor, height: `${rowHeightPixels}px` }}
+                      onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
+                      onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
+                    >
+                      {/* Row open control */}
+                      {canOpenRecord && (
+                        <td className="px-2 py-1 w-8">
+                          <button
+                            type="button"
+                            onClick={(e) => row?.id && handleOpenRecordClick(e, row.id)}
+                            className="w-full h-full flex items-center justify-center text-gray-400 hover:text-blue-600 transition-colors rounded"
+                            title="Open record"
+                            aria-label="Open record"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
+                      {/* Image cell if image field is configured */}
+                      {rowImage && (
+                        <td
+                          className="px-2 py-1 w-12"
+                          onClick={(e) => e.stopPropagation()}
+                          onDoubleClick={(e) => e.stopPropagation()}
+                        >
+                          <div className={`w-8 h-8 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
+                            <img
+                              src={rowImage}
+                              alt=""
+                              className={`w-full h-full ${fitImageSize ? 'object-contain' : 'object-cover'}`}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        </td>
+                      )}
+                      {safeVisibleFields.length > 0
+                        ? safeVisibleFields
+                            .filter((field): field is NonNullable<typeof field> => {
+                              return (
+                                field !== null &&
+                                field !== undefined &&
+                                typeof field === 'object' &&
+                                !!field.field_name &&
+                                typeof field.field_name === 'string'
+                              )
+                            })
+                            .map((field) => {
+                              const tableField = Array.isArray(safeTableFields)
+                                ? safeTableFields.find(
+                                    (f) =>
+                                      f &&
+                                      typeof f === 'object' &&
+                                      (f.name === field.field_name || f.id === field.field_name)
+                                  )
+                                : undefined
+
+                              const isVirtual = tableField?.type === 'formula' || tableField?.type === 'lookup'
+                              const columnWidth =
+                                typeof columnWidths === 'object' && columnWidths !== null
+                                  ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
+                                  : COLUMN_DEFAULT_WIDTH
+
+                              const rowId = row && typeof row === 'object' && row.id ? row.id : null
+                              const canUseCellFactory = !!tableField && rowId !== null
+
+                              return (
+                                <td
+                                  key={field.field_name}
+                                  className="px-0 py-0"
+                                  style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                >
+                                  {canUseCellFactory ? (
+                                    <CellFactory
+                                      field={tableField!}
+                                      value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                      rowId={String(rowId)}
+                                      tableName={supabaseTableName}
+                                      editable={canEdit && !isVirtual && rowId !== null}
+                                      wrapText={wrapText}
+                                      rowHeight={rowHeightPixels}
+                                      onSave={async (value) => {
+                                        if (!isVirtual && rowId) {
+                                          await handleCellSave(rowId, field.field_name, value)
+                                        }
+                                      }}
+                                      onFieldOptionsUpdate={onTableFieldsRefresh}
+                                    />
+                                  ) : (
+                                    <Cell
+                                      value={row && typeof row === 'object' ? row[field.field_name] : undefined}
+                                      fieldName={field.field_name}
+                                      fieldType={tableField?.type}
+                                      fieldOptions={tableField?.options}
+                                      isVirtual={isVirtual}
+                                      editable={canEdit && !isVirtual && rowId !== null}
+                                      wrapText={wrapText}
+                                      rowHeight={rowHeightPixels}
+                                      onSave={async (value) => {
+                                        if (!isVirtual && rowId) {
+                                          await handleCellSave(rowId, field.field_name, value)
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                </td>
+                              )
+                            })
+                        : null}
+                    </tr>
                   )
                 })
               ) : (

@@ -34,6 +34,8 @@ import { cn } from '@/lib/utils'
 import RecordModal from './RecordModal'
 import type { FilterType } from '@/types/database'
 import type { FilterConfig } from '@/lib/interface/filters'
+import { buildGroupTree, flattenGroupTree } from '@/lib/grouping/groupTree'
+import type { GroupRule } from '@/lib/grouping/types'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -58,6 +60,8 @@ interface AirtableGridViewProps {
   onAddField?: () => void
   onEditField?: (fieldName: string) => void
   groupBy?: string
+  /** Nested grouping rules (preferred). If omitted, falls back to `groupBy`. */
+  groupByRules?: GroupRule[]
   userRole?: "admin" | "editor" | "viewer" | null
   disableRecordPanel?: boolean // If true, clicking rows won't open record panel
   onTableFieldsRefresh?: () => void // Refresh field metadata after option updates
@@ -92,6 +96,7 @@ export default function AirtableGridView({
   onAddField,
   onEditField,
   groupBy,
+  groupByRules,
   userRole = "editor",
   disableRecordPanel = false,
   onTableFieldsRefresh,
@@ -570,42 +575,26 @@ export default function AirtableGridView({
     }
   }, [])
 
-  // Group rows if groupBy is set
-  // CRITICAL: Normalize filteredRows before grouping
-  const groupedRows = useMemo(() => {
-    if (!groupBy) return null
+  const effectiveGroupRules = useMemo<GroupRule[]>(() => {
+    const safe = Array.isArray(groupByRules) ? groupByRules.filter(Boolean) : []
+    if (safe.length > 0) return safe
+    if (groupBy && typeof groupBy === 'string' && groupBy.trim()) return [{ type: 'field', field: groupBy.trim() }]
+    return []
+  }, [groupBy, groupByRules])
 
-    const safeFilteredRows = asArray<GridRow>(filteredRows)
-    const groups: Record<string, GridRow[]> = {}
-
-    safeFilteredRows.forEach((row) => {
-      if (!row) return // Skip null/undefined rows
-      const groupValue = row[groupBy] ?? "Uncategorized"
-      const groupKey = String(groupValue)
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
-      }
-      groups[groupKey].push(row)
+  const groupModel = useMemo(() => {
+    if (effectiveGroupRules.length === 0) return null
+    return buildGroupTree(asArray<GridRow>(filteredRows), safeFields, effectiveGroupRules, {
+      emptyLabel: '(Empty)',
+      emptyLast: true,
     })
+  }, [effectiveGroupRules, filteredRows, safeFields])
 
-    // Sort group keys
-    const sortedGroupKeys = Object.keys(groups).sort()
-
-    return sortedGroupKeys.map((key) => ({
-      key,
-      value: groups[key][0]?.[groupBy],
-      rows: groups[key], // Already an array
-    }))
-  }, [filteredRows, groupBy])
-
-  function toggleGroup(groupKey: string) {
+  function toggleGroup(pathKey: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev)
-      if (next.has(groupKey)) {
-        next.delete(groupKey)
-      } else {
-        next.add(groupKey)
-      }
+      if (next.has(pathKey)) next.delete(pathKey)
+      else next.add(pathKey)
       return next
     })
   }
@@ -664,24 +653,26 @@ export default function AirtableGridView({
 
   // Build render items (groups + rows or just rows)
   const renderItems = useMemo(() => {
-    if (groupBy && groupedRows) {
-      const items: Array<{ type: 'group' | 'row'; data: any; groupKey?: string }> = []
-      groupedRows.forEach((group) => {
-        items.push({ type: 'group', data: group, groupKey: group.key })
-        if (!collapsedGroups.has(group.key)) {
-          group.rows.forEach((row: any) => {
-            items.push({ type: 'row', data: row })
-          })
+    if (groupModel && groupModel.rootGroups.length > 0) {
+      const flat = flattenGroupTree<GridRow>(groupModel.rootGroups, collapsedGroups)
+      return flat.map((it) => {
+        if (it.type === 'group') {
+          return { type: 'group' as const, node: it.node, level: it.level }
+        }
+        return {
+          type: 'row' as const,
+          data: it.item,
+          level: it.level,
+          groupPathKey: it.groupPathKey,
         }
       })
-      return items
     }
-    return filteredRows.map((row) => ({ type: 'row' as const, data: row }))
-  }, [groupBy, groupedRows, collapsedGroups, filteredRows])
+    return asArray<GridRow>(filteredRows).map((row) => ({ type: 'row' as const, data: row, level: 0, groupPathKey: '' }))
+  }, [collapsedGroups, filteredRows, groupModel])
 
   // Virtualization calculations
   const GROUP_HEADER_HEIGHT = 40
-  const getItemHeight = (item: typeof renderItems[0]) => {
+  const getItemHeight = (item: (typeof renderItems)[number]) => {
     return item.type === 'group' ? GROUP_HEADER_HEIGHT : ROW_HEIGHT
   }
   
@@ -1083,17 +1074,24 @@ export default function AirtableGridView({
           <div style={{ height: offsetTop }} />
           {visibleItems.map((item, idx) => {
             if (item.type === 'group') {
-              const group = item.data
-              const isCollapsed = collapsedGroups.has(item.groupKey!)
+              const node = item.node
+              const isCollapsed = collapsedGroups.has(node.pathKey)
+              const ruleLabel =
+                node.rule.type === 'date'
+                  ? node.rule.granularity === 'year'
+                    ? 'Year'
+                    : 'Month'
+                  : node.rule.field
               return (
                 <div
-                  key={`group-${item.groupKey}`}
-                  className="flex border-b border-gray-100 bg-gray-50/50 sticky top-0 z-20"
+                  key={`group-${node.pathKey}`}
+                  className="flex border-b border-gray-100 bg-gray-50/50"
                   style={{ height: GROUP_HEADER_HEIGHT }}
                 >
                   <div
                     className="flex items-center px-4 flex-1 cursor-pointer hover:bg-gray-100/50 transition-colors"
-                    onClick={() => toggleGroup(item.groupKey!)}
+                    style={{ paddingLeft: 16 + (item.level || 0) * 16 }}
+                    onClick={() => toggleGroup(node.pathKey)}
                   >
                     {isCollapsed ? (
                       <ChevronRight className="h-4 w-4 mr-2 text-gray-400" />
@@ -1101,10 +1099,10 @@ export default function AirtableGridView({
                       <ChevronDown className="h-4 w-4 mr-2 text-gray-400" />
                     )}
                     <span className="font-medium text-sm text-gray-700">
-                      {groupBy}: {String(group.value ?? "Uncategorized")}
+                      {ruleLabel}: {node.label}
                     </span>
                     <span className="text-gray-500 ml-2 text-sm">
-                      ({group.rows.length} {group.rows.length === 1 ? "row" : "rows"})
+                      ({node.size} {node.size === 1 ? "row" : "rows"})
                     </span>
                   </div>
                 </div>
@@ -1128,13 +1126,14 @@ export default function AirtableGridView({
               
               return (
                 <div
-                  key={row.id}
+                  key={item.groupPathKey ? `${row.id}::${item.groupPathKey}` : row.id}
                   className={`group flex border-b border-gray-100/50 hover:bg-gray-50/30 transition-colors ${
                     'cursor-default'
                   } ${
                     isEven ? 'bg-white' : 'bg-gray-50/30'
                   } ${isSelected ? 'bg-blue-50/50' : ''}`}
                   style={{ height: ROW_HEIGHT }}
+                  data-group-level={item.level || 0}
                   onClick={(e) => {
                     const target = e.target as HTMLElement
                     // Contract: single click selects the row ONLY (never opens a record).

@@ -7,6 +7,7 @@ import {
   resolveChoiceColor,
 } from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
+import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
 
 interface MultiSelectCellProps {
   value: string[] | null
@@ -38,7 +39,7 @@ export default function MultiSelectCell({
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
   if (!fieldId || !tableId) {
     // Basic fallback - just show the values as pills
-    const displayValues = value || []
+    const displayValues = sortLabelsByManualOrder(value || [], "multi_select", fieldOptions)
     return (
       <div className="w-full min-h-[36px] px-3 py-2 flex items-center flex-wrap gap-1.5 text-sm">
         {displayValues.length > 0 ? (
@@ -69,7 +70,9 @@ export default function MultiSelectCell({
     <div className="w-full min-h-[36px] px-3 py-2 flex items-center">
       <InlineSelectDropdown
         value={value}
-        choices={choices}
+        // Ensure the picker dropdown uses canonical manual order by default.
+        // Alphabetise (if enabled) is a per-picker visual transform only.
+        choices={sortLabelsByManualOrder(choices, "multi_select", fieldOptions)}
         choiceColors={choiceColors}
         fieldOptions={fieldOptions}
         fieldType="multi_select"
