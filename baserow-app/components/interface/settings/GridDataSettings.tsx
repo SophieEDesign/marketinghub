@@ -670,8 +670,8 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Grouping (optional) - Only for Table view */}
-      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
+      {/* Grouping (optional) - Table + Gallery */}
+      {(currentViewType === 'grid' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>Group by (optional)</Label>
@@ -699,7 +699,7 @@ export default function GridDataSettings({
             </SelectContent>
           </Select>
           <p className="text-xs text-gray-500">
-            Group rows into collapsible sections by the selected field.
+            Group {currentViewType === 'gallery' ? 'cards' : 'rows'} into collapsible sections by the selected field.
           </p>
         </div>
       )}

@@ -46,6 +46,13 @@ interface TextBlockProps {
 export default function TextBlock({ block, isEditing = false, onUpdate }: TextBlockProps) {
   const { config } = block
   
+  // Prevent toolbar interactions from stealing focus/selection from TipTap.
+  // Without this, clicks can clear the selection before commands run, making the toolbar feel "broken".
+  const handleToolbarMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
   // CRITICAL: Determine if viewer mode is forced (check URL or parent context)
   // Viewer mode should always force read-only, regardless of isEditing prop
   // FIX: Use state + useEffect to prevent hydration mismatch
@@ -85,6 +92,15 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
   // CRITICAL: Read content ONLY from config.content_json
   // No fallbacks, no other sources
   const contentJson = config?.content_json
+
+  // Backward compatibility: older text blocks may still store HTML/text in legacy keys.
+  // We only use this to initialize/render when `content_json` is missing.
+  // All edits still persist to `content_json`.
+  const legacyContent =
+    (typeof (config as any)?.content === 'string' && (config as any).content) ||
+    (typeof (config as any)?.text_content === 'string' && (config as any).text_content) ||
+    (typeof (config as any)?.text === 'string' && (config as any).text) ||
+    ""
   
   // Track if config is still loading
   // CRITICAL: Config is loading ONLY if config itself is undefined (not yet loaded)
@@ -104,13 +120,16 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
     isConfigLoading,
   })
   
-  // Track if content_json exists and is valid (for setup state)
-  const hasContent = contentJson !== null && 
-                     contentJson !== undefined &&
-                     typeof contentJson === 'object' && 
-                     contentJson.type === 'doc' &&
-                     Array.isArray(contentJson.content) &&
-                     contentJson.content.length > 0
+  // Track if this block has content (for setup/empty state).
+  // Prefer content_json, but treat legacy content as "has content" for compatibility.
+  const hasContent =
+    (contentJson !== null &&
+      contentJson !== undefined &&
+      typeof contentJson === 'object' &&
+      contentJson.type === 'doc' &&
+      Array.isArray(contentJson.content) &&
+      contentJson.content.length > 0) ||
+    (typeof legacyContent === 'string' && legacyContent.trim().length > 0)
 
   // Internal editing state - tracks when user is actively editing text
   // This is separate from isEditing prop (which is page-level edit mode)
@@ -145,6 +164,11 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       if (cachedConfigContentStrRef.current !== newStr) {
         cachedConfigContentStrRef.current = newStr
       }
+    } else if (legacyContent && legacyContent.trim().length > 0) {
+      // IMPORTANT: If we only have legacy HTML/text, don't cache an "empty doc" string here.
+      // We want the initial `lastSavedContentRef` to come from the editor's parsed JSON so that
+      // focus/blur doesn't trigger an unwanted auto-save.
+      cachedConfigContentStrRef.current = ""
     } else {
       // Empty content
       const emptyContent = { type: 'doc', content: [] }
@@ -153,16 +177,21 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         cachedConfigContentStrRef.current = emptyStr
       }
     }
-  }, [config?.content_json])
+  }, [config?.content_json, legacyContent])
 
   /**
    * Get initial content for editor
-   * ONLY uses config.content_json - no fallbacks
+   * Prefer config.content_json, but support legacy HTML/text for backward compatibility.
    */
   const getInitialContent = useCallback(() => {
     // If content_json exists and is valid TipTap JSON, use it
     if (contentJson && typeof contentJson === 'object' && contentJson.type === 'doc') {
       return contentJson
+    }
+
+    // Legacy HTML/text content fallback (TipTap can parse HTML strings)
+    if (legacyContent && typeof legacyContent === 'string') {
+      return legacyContent
     }
     
     // Empty state - no content_json or invalid format
@@ -170,7 +199,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       type: 'doc',
       content: []
     }
-  }, [contentJson])
+  }, [contentJson, legacyContent])
 
   /**
    * TipTap Editor Instance
@@ -554,8 +583,8 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         )}
         onMouseDown={(e) => {
           // Don't let the click bubble to the canvas (would select/drag the block),
-          // but DO NOT preventDefault or focus handling can get weird.
-          e.stopPropagation()
+          // and keep editor selection from being cleared.
+          handleToolbarMouseDown(e)
         }}
         onMouseEnter={() => {
           // Ensure editor stays focused when hovering toolbar
@@ -574,8 +603,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       >
         {/* Text type (no global/portaled dropdown; stays owned by the block) */}
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -587,8 +618,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <span className="text-xs font-semibold">P</span>
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -600,8 +633,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <Heading1 className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -613,8 +648,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <Heading2 className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -630,8 +667,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
         {/* List Formatting */}
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -643,8 +682,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <List className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -656,8 +697,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <ListOrdered className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -675,8 +718,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
 
         {/* Text Styling */}
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -688,8 +733,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <Bold className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -701,8 +748,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <Italic className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -714,8 +763,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           <Strikethrough className="h-4 w-4" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -740,8 +791,10 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
         
         {/* Link */}
         <Button
+          type="button"
           variant="ghost"
           size="sm"
+          onMouseDown={handleToolbarMouseDown}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -909,7 +962,9 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
           className={cn(
             // Make the editor fill the whole block height.
             // Typography rules live here; ProseMirror is styled to stretch via globals.css.
-            "text-block-editor prose prose-sm max-w-none w-full h-full min-h-0 flex flex-col",
+            // IMPORTANT: Tailwind typography sizes are `prose-sm`, `prose-lg`, `prose-xl` etc.
+            // There is no `prose-base`; base size is just `prose`.
+            "text-block-editor prose max-w-none w-full h-full min-h-0 flex flex-col",
             "prose-headings:font-semibold",
             "prose-p:my-2 prose-p:first:mt-0 prose-p:last:mb-0",
             "prose-ul:my-2 prose-ul:first:mt-0 prose-ul:last:mb-0",
@@ -922,7 +977,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
             textAlign === 'right' && "text-right",
             textAlign === 'justify' && "text-justify",
             textSize === 'sm' && "prose-sm",
-            textSize === 'md' && "prose-base",
+            // md is default base size (no extra class)
             textSize === 'lg' && "prose-lg",
             textSize === 'xl' && "prose-xl",
           )}

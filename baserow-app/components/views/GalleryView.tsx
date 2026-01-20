@@ -9,9 +9,11 @@ import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
-import { ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "../grid/CellFactory"
+import { buildGroupTree } from "@/lib/grouping/groupTree"
+import type { GroupedNode } from "@/lib/grouping/types"
 
 interface GalleryViewProps {
   tableId: string
@@ -52,6 +54,7 @@ export default function GalleryView({
   const [loading, setLoading] = useState(true)
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
 
   // Resolve supabase table name
   useEffect(() => {
@@ -145,6 +148,26 @@ export default function GalleryView({
 
   const safeFieldIds = useMemo(() => (Array.isArray(fieldIds) ? fieldIds : []), [fieldIds])
 
+  const effectiveGroupByField = useMemo(() => {
+    const raw =
+      (blockConfig as any)?.gallery_group_by ||
+      (blockConfig as any)?.group_by_field ||
+      (blockConfig as any)?.group_by
+    if (typeof raw !== "string") return null
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+
+    const tf = (Array.isArray(tableFields) ? tableFields : []).find(
+      (f: any) => f?.name === trimmed || f?.id === trimmed
+    )
+    return (tf?.name as string | undefined) || trimmed
+  }, [blockConfig, tableFields])
+
+  // Reset collapsed groups when grouping field changes
+  useEffect(() => {
+    setCollapsedGroups(new Set())
+  }, [effectiveGroupByField])
+
   // Pick a title field for cards (simple heuristic, configurable later)
   const titleField = useMemo(() => {
     const configured =
@@ -226,6 +249,32 @@ export default function GalleryView({
     return rows.filter((r) => ids.has(r.id))
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
+  type GalleryGroupItem = Record<string, any> & { __row: TableRow; __rowId: string }
+
+  const groupedRows = useMemo((): GroupedNode<GalleryGroupItem>[] | null => {
+    if (!effectiveGroupByField) return null
+    const safeFields = (Array.isArray(tableFields) ? tableFields : []).filter(Boolean) as TableField[]
+    const items: GalleryGroupItem[] = filteredRows.map((r) => ({
+      ...(r.data || {}),
+      __row: r,
+      __rowId: String(r.id),
+    }))
+    const { rootGroups } = buildGroupTree(items, safeFields, [{ type: "field", field: effectiveGroupByField }], {
+      emptyLabel: "(Empty)",
+      emptyLast: true,
+    })
+    return rootGroups
+  }, [effectiveGroupByField, filteredRows, tableFields])
+
+  const toggleGroupCollapsed = useCallback((pathKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(pathKey)) next.delete(pathKey)
+      else next.add(pathKey)
+      return next
+    })
+  }, [])
+
   const handleOpenRecord = useCallback((recordId: string) => {
     if (onRecordClick) {
       onRecordClick(recordId)
@@ -252,6 +301,132 @@ export default function GalleryView({
       )
     )
   }, [supabaseTableName])
+
+  const renderCard = useCallback(
+    (row: TableRow, reactKey: string) => {
+      const cardColor = getCardColor(row)
+      const cardImage = getCardImage(row)
+      const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: "4px" } : {}
+      const titleFieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
+        (f: any) => f?.name === titleField || f?.id === titleField
+      ) as TableField | undefined
+      const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
+
+      return (
+        <Card
+          key={reactKey}
+          className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden cursor-default ${
+            selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
+          }`}
+          style={borderColor}
+          onClick={() => setSelectedCardId(String(row.id))}
+          onDoubleClick={() => handleOpenRecord(String(row.id))}
+        >
+          {cardImage && (
+            <div className={`w-full ${fitImageSize ? "h-auto" : "h-40"} bg-gray-100`}>
+              <img
+                src={cardImage}
+                alt=""
+                className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-40 object-cover"}`}
+                onError={(e) => {
+                  ;(e.target as HTMLImageElement).style.display = "none"
+                }}
+              />
+            </div>
+          )}
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div
+                className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2"
+                onDoubleClick={(e) => e.stopPropagation()}
+              >
+                {titleFieldObj ? (
+                  <CellFactory
+                    field={titleFieldObj}
+                    value={titleValue}
+                    rowId={String(row.id)}
+                    tableName={supabaseTableName || ""}
+                    editable={
+                      !titleFieldObj.options?.read_only &&
+                      titleFieldObj.type !== "formula" &&
+                      titleFieldObj.type !== "lookup" &&
+                      !!supabaseTableName
+                    }
+                    wrapText={true}
+                    rowHeight={32}
+                    onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
+                  />
+                ) : (
+                  <span>
+                    {titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== ""
+                      ? String(titleValue)
+                      : "Untitled"}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenRecord(String(row.id))
+                }}
+                className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
+                title="Open record"
+                aria-label="Open record"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {secondaryFields.map((fieldName) => {
+                const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
+                  (f: any) => f.name === fieldName || f.id === fieldName
+                ) as TableField | undefined
+                const label = fieldObj?.name || fieldName
+                const fieldValue = row.data?.[fieldObj?.name || fieldName]
+                const isVirtual = fieldObj?.type === "formula" || fieldObj?.type === "lookup"
+                return (
+                  <div key={fieldName} className="text-xs text-gray-700">
+                    <span className="text-gray-500 font-medium">{label}:</span>{" "}
+                    <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
+                      {fieldObj ? (
+                        <CellFactory
+                          field={fieldObj}
+                          value={fieldValue}
+                          rowId={String(row.id)}
+                          tableName={supabaseTableName || ""}
+                          editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
+                          wrapText={true}
+                          rowHeight={28}
+                          onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
+                        />
+                      ) : (
+                        <span>
+                          {fieldValue === null || fieldValue === undefined || fieldValue === "" ? "—" : String(fieldValue)}
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )
+    },
+    [
+      fitImageSize,
+      getCardColor,
+      getCardImage,
+      handleCellSave,
+      handleOpenRecord,
+      secondaryFields,
+      selectedCardId,
+      supabaseTableName,
+      tableFields,
+      titleField,
+    ]
+  )
 
   if (loading) {
     return (
@@ -296,105 +471,45 @@ export default function GalleryView({
 
   return (
     <div className="w-full h-full overflow-auto bg-gray-50">
-      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {filteredRows.map((row) => {
-          const cardColor = getCardColor(row)
-          const cardImage = getCardImage(row)
-          const borderColor = cardColor ? { borderLeftColor: cardColor, borderLeftWidth: "4px" } : {}
-          const titleFieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
-            (f: any) => f?.name === titleField || f?.id === titleField
-          ) as TableField | undefined
-          const titleValue = titleFieldObj ? row.data?.[titleFieldObj.name] : row.data?.[titleField]
-
-          return (
-            <Card
-              key={row.id}
-              className={`hover:shadow-md transition-shadow bg-white border-gray-200 rounded-lg overflow-hidden cursor-default ${
-                selectedCardId === String(row.id) ? "ring-1 ring-blue-400/40 bg-blue-50/30" : ""
-              }`}
-              style={borderColor}
-              onClick={() => setSelectedCardId(String(row.id))}
-              onDoubleClick={() => handleOpenRecord(String(row.id))}
-            >
-              {cardImage && (
-                <div className={`w-full ${fitImageSize ? "h-auto" : "h-40"} bg-gray-100`}>
-                  <img
-                    src={cardImage}
-                    alt=""
-                    className={`w-full ${fitImageSize ? "h-auto object-contain" : "h-40 object-cover"}`}
-                    onError={(e) => {
-                      ;(e.target as HTMLImageElement).style.display = "none"
-                    }}
-                  />
-                </div>
-              )}
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1 text-sm font-semibold text-gray-900 line-clamp-2" onDoubleClick={(e) => e.stopPropagation()}>
-                    {titleFieldObj ? (
-                      <CellFactory
-                        field={titleFieldObj}
-                        value={titleValue}
-                        rowId={String(row.id)}
-                        tableName={supabaseTableName || ""}
-                        editable={!titleFieldObj.options?.read_only && titleFieldObj.type !== "formula" && titleFieldObj.type !== "lookup" && !!supabaseTableName}
-                        wrapText={true}
-                        rowHeight={32}
-                        onSave={(value) => handleCellSave(String(row.id), titleFieldObj.name, value)}
-                      />
-                    ) : (
-                      <span>{titleValue !== undefined && titleValue !== null && String(titleValue).trim() !== "" ? String(titleValue) : "Untitled"}</span>
-                    )}
+      {Array.isArray(groupedRows) && groupedRows.length > 0 ? (
+        <div className="p-6 space-y-6">
+          {groupedRows.map((group) => {
+            const isCollapsed = collapsedGroups.has(group.pathKey)
+            const items = Array.isArray(group.items) ? group.items : []
+            return (
+              <div key={group.pathKey} className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => toggleGroupCollapsed(group.pathKey)}
+                  className="w-full flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-left hover:bg-gray-50"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-gray-900 truncate">
+                      {group.label}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {group.size} {group.size === 1 ? "record" : "records"}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleOpenRecord(String(row.id))
-                    }}
-                    className="w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors flex-shrink-0"
-                    title="Open record"
-                    aria-label="Open record"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {secondaryFields.map((fieldName) => {
-                    const fieldObj = (Array.isArray(tableFields) ? tableFields : []).find(
-                      (f: any) => f.name === fieldName || f.id === fieldName
-                    ) as TableField | undefined
-                    const label = fieldObj?.name || fieldName
-                    const fieldValue = row.data?.[fieldObj?.name || fieldName]
-                    const isVirtual = fieldObj?.type === "formula" || fieldObj?.type === "lookup"
-                    return (
-                      <div key={fieldName} className="text-xs text-gray-700">
-                        <span className="text-gray-500 font-medium">{label}:</span>{" "}
-                        <span className="text-gray-900" onDoubleClick={(e) => e.stopPropagation()}>
-                          {fieldObj ? (
-                            <CellFactory
-                              field={fieldObj}
-                              value={fieldValue}
-                              rowId={String(row.id)}
-                              tableName={supabaseTableName || ""}
-                              editable={!fieldObj.options?.read_only && !isVirtual && !!supabaseTableName}
-                              wrapText={true}
-                              rowHeight={28}
-                              onSave={(value) => handleCellSave(String(row.id), fieldObj.name, value)}
-                            />
-                          ) : (
-                            <span>{fieldValue === null || fieldValue === undefined || fieldValue === "" ? "—" : String(fieldValue)}</span>
-                          )}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                  <ChevronDown
+                    className={`h-4 w-4 text-gray-500 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                  />
+                </button>
+
+                {!isCollapsed && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {items.map((item) => renderCard(item.__row, `${group.pathKey}:${item.__rowId}`))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredRows.map((row) => renderCard(row, String(row.id)))}
+        </div>
+      )}
     </div>
   )
 }

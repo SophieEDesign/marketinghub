@@ -324,6 +324,12 @@ export default function GridBlock({
   const showAddRecord =
     blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
 
+  // Toolbar visibility (matches GridViewWrapper behavior)
+  // In editing mode, always show so the builder can work with it.
+  const showToolbar = isEditing ? true : appearance.show_toolbar !== false
+  // For non-grid views, the only "toolbar" we currently render is QuickFilterBar (filters).
+  const showQuickFilters = showToolbar && (isEditing ? true : appearance.show_filter !== false)
+
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}
     const isViewOnly = permissions.mode === 'view'
@@ -781,12 +787,14 @@ export default function GridBlock({
         return (
           <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <QuickFilterBar
-                storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
-                tableFields={safeTableFields}
-                viewDefaultFilters={viewDefaultFilters}
-                onChange={setUserQuickFilters}
-              />
+              {showQuickFilters && (
+                <QuickFilterBar
+                  storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
+                  tableFields={safeTableFields}
+                  viewDefaultFilters={viewDefaultFilters}
+                  onChange={setUserQuickFilters}
+                />
+              )}
 
               {showAddRecord && (
                 <Button
@@ -836,7 +844,7 @@ export default function GridBlock({
       )}
 
       {/* Airtable-style quick filters (session-only; never saved to the view) */}
-      {!isEditing && viewType !== "calendar" && (
+      {showQuickFilters && viewType !== "calendar" && (
         <QuickFilterBar
           storageKey={`mh:quickFilters:${pageId || "page"}:${block.id}`}
           tableFields={safeTableFields}

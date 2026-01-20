@@ -29,6 +29,7 @@ export default function RecordPanel() {
   const [fieldGroups, setFieldGroups] = useState<Record<string, string[]>>({}) // fieldName -> groupName
   const resizeRef = useRef<HTMLDivElement>(null)
   const isResizingRef = useRef(false)
+  const resizeCleanupRef = useRef<null | (() => void)>(null)
 
   useEffect(() => {
     if (state.isOpen && state.tableId && state.recordId) {
@@ -68,30 +69,17 @@ export default function RecordPanel() {
   }, [state.isOpen, state.isPinned, closeRecord])
 
   // Resize handler
+  // Important: we attach mousemove/mouseup listeners *on mousedown*.
+  // Using a ref alone won't trigger this effect, and can leave the page "stuck"
+  // with cursor/userSelect styles until refresh.
   useEffect(() => {
-    if (!state.isOpen || state.isFullscreen) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingRef.current || !resizeRef.current) return
-      const newWidth = window.innerWidth - e.clientX
-      setWidth(newWidth)
-    }
-
-    const handleMouseUp = () => {
+    return () => {
+      // Cleanup on unmount / route change
+      resizeCleanupRef.current?.()
+      resizeCleanupRef.current = null
       isResizingRef.current = false
-      document.body.style.cursor = ""
-      document.body.style.userSelect = ""
     }
-
-    if (isResizingRef.current) {
-      document.addEventListener("mousemove", handleMouseMove)
-      document.addEventListener("mouseup", handleMouseUp)
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove)
-        document.removeEventListener("mouseup", handleMouseUp)
-      }
-    }
-  }, [state.isOpen, state.isFullscreen, setWidth])
+  }, [])
 
   async function loadRecord() {
     if (!state.tableId || !state.recordId || !state.tableName) return
@@ -347,9 +335,34 @@ export default function RecordPanel() {
             className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors z-10"
             onMouseDown={(e) => {
               e.preventDefault()
+              // If a previous resize got "stuck", clean it up first.
+              resizeCleanupRef.current?.()
+
               isResizingRef.current = true
+              const prevCursor = document.body.style.cursor
+              const prevUserSelect = document.body.style.userSelect
               document.body.style.cursor = "col-resize"
               document.body.style.userSelect = "none"
+
+              const handleMouseMove = (ev: MouseEvent) => {
+                if (!isResizingRef.current) return
+                const raw = window.innerWidth - ev.clientX
+                const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, raw))
+                setWidth(clamped)
+              }
+
+              const handleMouseUp = () => {
+                isResizingRef.current = false
+                document.body.style.cursor = prevCursor
+                document.body.style.userSelect = prevUserSelect
+                document.removeEventListener("mousemove", handleMouseMove)
+                document.removeEventListener("mouseup", handleMouseUp)
+                resizeCleanupRef.current = null
+              }
+
+              resizeCleanupRef.current = handleMouseUp
+              document.addEventListener("mousemove", handleMouseMove)
+              document.addEventListener("mouseup", handleMouseUp)
             }}
           />
         )}
