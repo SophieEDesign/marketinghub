@@ -6,54 +6,20 @@ import type { PageBlock, BlockConfig, BlockType } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 
-// Import block-specific settings components
-import KPIDataSettings from "./settings/KPIDataSettings"
-import KPIAppearanceSettings from "./settings/KPIAppearanceSettings"
-import ChartDataSettings from "./settings/ChartDataSettings"
-import ChartAppearanceSettings from "./settings/ChartAppearanceSettings"
-import TextDataSettings from "./settings/TextDataSettings"
-import TextAppearanceSettings from "./settings/TextAppearanceSettings"
-import ActionDataSettings from "./settings/ActionDataSettings"
-import ActionAppearanceSettings from "./settings/ActionAppearanceSettings"
-import LinkPreviewDataSettings from "./settings/LinkPreviewDataSettings"
-import LinkPreviewAppearanceSettings from "./settings/LinkPreviewAppearanceSettings"
-import GridDataSettings from "./settings/GridDataSettings"
-import GridAppearanceSettings from "./settings/GridAppearanceSettings"
-import ListDataSettings from "./settings/ListDataSettings"
-import MultiSourceDataSettings from "./settings/MultiSourceDataSettings"
-import FormDataSettings from "./settings/FormDataSettings"
-import FormAppearanceSettings from "./settings/FormAppearanceSettings"
-import RecordDataSettings from "./settings/RecordDataSettings"
 import {
   guardAgainstConfigOverwrite,
   validateShallowMerge,
   markUserInteraction,
 } from "@/lib/interface/editor-safety"
-import ImageDataSettings from "./settings/ImageDataSettings"
-import ImageAppearanceSettings from "./settings/ImageAppearanceSettings"
-import DividerAppearanceSettings from "./settings/DividerAppearanceSettings"
-import FilterBlockSettings from "./settings/FilterBlockSettings"
-import FieldDataSettings from "./settings/FieldDataSettings"
-import FieldAppearanceSettings from "./settings/FieldAppearanceSettings"
-import ButtonDataSettings from "./settings/ButtonDataSettings"
-import ButtonAppearanceSettings from "./settings/ButtonAppearanceSettings"
 import AdvancedSettings from "./settings/AdvancedSettings"
-import CommonAppearanceSettings from "./settings/CommonAppearanceSettings"
 import { BLOCK_REGISTRY } from "@/lib/interface/registry"
+import {
+  renderBlockAppearanceSettings,
+  renderBlockDataSettings,
+} from "./settings/blockSettingsRegistry"
 
 interface SettingsPanelProps {
   block: PageBlock | null
@@ -524,195 +490,56 @@ export default function SettingsPanel({
   )
 
   function renderDataSettings() {
-    const commonProps = {
+    const onTableChange = async (tableId: string) => {
+      updateConfig({ table_id: tableId })
+      if (tableId) {
+        const supabase = createClient()
+        const [viewsRes, fieldsRes] = await Promise.all([
+          supabase.from("views").select("*").eq("table_id", tableId),
+          supabase.from("table_fields").select("*").eq("table_id", tableId).order("position"),
+        ])
+        setViews((viewsRes.data || []) as View[])
+        setFields((fieldsRes.data || []) as TableField[])
+      }
+    }
+
+    // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
+    const normalizedBlockType = ((block?.type as string | undefined) === "table"
+      ? "grid"
+      : block?.type) as BlockType | undefined
+
+    const rendered = renderBlockDataSettings(normalizedBlockType, {
       config,
       tables,
       views,
       fields,
       onUpdate: updateConfig,
-      onTableChange: async (tableId: string) => {
-        updateConfig({ table_id: tableId })
-        if (tableId) {
-          const supabase = createClient()
-          const [viewsRes, fieldsRes] = await Promise.all([
-            supabase.from("views").select("*").eq("table_id", tableId),
-            supabase.from("table_fields").select("*").eq("table_id", tableId).order("position"),
-          ])
-          setViews((viewsRes.data || []) as View[])
-          setFields((fieldsRes.data || []) as TableField[])
-        }
-      },
-    }
+      onTableChange,
+      pageTableId,
+      allBlocks,
+    })
 
-    // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
-    const normalizedBlockType = ((block?.type as string | undefined) === 'table' ? 'grid' : block?.type) as BlockType | undefined
+    if (rendered) return rendered
 
-    switch (normalizedBlockType) {
-      case "kpi":
-        return <KPIDataSettings {...commonProps} />
-      case "chart":
-        return <ChartDataSettings {...commonProps} />
-      case "text":
-        return <TextDataSettings {...commonProps} />
-      case "action":
-        return <ActionDataSettings {...commonProps} />
-      case "link_preview":
-        return <LinkPreviewDataSettings {...commonProps} />
-      case "grid":
-        return <GridDataSettings {...commonProps} />
-      case "form":
-        return <FormDataSettings {...commonProps} />
-      case "record":
-        return <RecordDataSettings {...commonProps} />
-      case "image":
-        return <ImageDataSettings {...commonProps} />
-      case "filter":
-        return <FilterBlockSettings {...commonProps} allBlocks={allBlocks} pageTableId={pageTableId} />
-      case "field":
-        return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
-      case "number":
-        return <FieldDataSettings {...commonProps} pageTableId={pageTableId} />
-      case "button":
-        return <ButtonDataSettings {...commonProps} />
-      case "list":
-        // List blocks have their own settings for field configuration
-        return <ListDataSettings {...commonProps} />
-      case "multi_calendar":
-      case "multi_timeline":
-        return <MultiSourceDataSettings {...commonProps} />
-      case "calendar":
-      case "kanban":
-      case "timeline":
-      case "gallery":
-        // Calendar, Kanban, and Timeline blocks use the same settings as Grid blocks
-        // They're grid blocks with different view_type values
-        return <GridDataSettings {...commonProps} />
-      default:
-        return (
-          <div className="text-sm text-gray-500">
-            No data settings available for this block type.
-          </div>
-        )
-    }
+    return (
+      <div className="text-sm text-gray-500">
+        No data settings available for this block type.
+      </div>
+    )
   }
 
   function renderAppearanceSettings() {
-    const commonProps = {
-      config,
-      onUpdate: updateAppearance,
-    }
-
     // Backward compatibility: normalize 'table' type to 'grid' (not in BlockType union but may exist in legacy data)
-    const normalizedBlockType = ((block?.type as string | undefined) === 'table' ? 'grid' : block?.type) as BlockType | undefined
-    const commonAppearanceProps = {
-      ...commonProps,
-      blockType: normalizedBlockType,
-    }
+    const normalizedBlockType = ((block?.type as string | undefined) === "table"
+      ? "grid"
+      : block?.type) as BlockType | undefined
 
-    switch (normalizedBlockType) {
-      case "kpi":
-        return (
-          <>
-            <KPIAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "chart":
-        return (
-          <>
-            <ChartAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "text":
-        return (
-          <>
-            <TextAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "action":
-        return (
-          <>
-            <ActionAppearanceSettings 
-              {...commonProps} 
-              onConfigUpdate={updateConfig}
-            />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "link_preview":
-        return (
-          <>
-            <LinkPreviewAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "form":
-        return (
-          <>
-            <FormAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "image":
-        return (
-          <>
-            <ImageAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "divider":
-        return (
-          <>
-            <DividerAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "grid":
-        return (
-          <>
-            <GridAppearanceSettings {...commonProps} fields={fields} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "field":
-        return (
-          <>
-            <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "number":
-        return (
-          <>
-            <FieldAppearanceSettings {...commonProps} onUpdate={updateConfig} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "button":
-        return (
-          <>
-            <ButtonAppearanceSettings {...commonProps} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      case "list":
-      case "calendar":
-      case "multi_calendar":
-      case "kanban":
-      case "timeline":
-      case "multi_timeline":
-      case "gallery":
-        // List, Calendar, Kanban, and Timeline blocks use the same appearance settings as Grid blocks
-        return (
-          <>
-            <GridAppearanceSettings {...commonProps} fields={fields} />
-            <CommonAppearanceSettings {...commonAppearanceProps} />
-          </>
-        )
-      default:
-        return <CommonAppearanceSettings {...commonAppearanceProps} />
-    }
+    return renderBlockAppearanceSettings(normalizedBlockType, {
+      blockType: normalizedBlockType,
+      config,
+      fields,
+      onUpdateAppearance: updateAppearance,
+      onUpdateConfig: updateConfig,
+    })
   }
 }
