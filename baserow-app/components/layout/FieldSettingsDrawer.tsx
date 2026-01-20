@@ -507,11 +507,10 @@ export default function FieldSettingsDrawer({
       }
 
       // Step 3: Delete the original field (it's been backed up to duplicate)
-      const deleteResponse = await fetch(`/api/tables/${tableId}/fields`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldId: field.id }),
-      })
+      const deleteResponse = await fetch(
+        `/api/tables/${tableId}/fields?fieldId=${encodeURIComponent(field.id)}`,
+        { method: 'DELETE' }
+      )
 
       if (!deleteResponse.ok) {
         const errorData = await deleteResponse.json()

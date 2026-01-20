@@ -18,6 +18,11 @@ function isSystemFieldName(name: string) {
   return SYSTEM_FIELD_NAMES.has(String(name || '').toLowerCase())
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && UUID_RE.test(v)
+}
+
 // GET: Get all fields for a table
 export async function GET(
   request: NextRequest,
@@ -126,6 +131,9 @@ export async function POST(
     }, -1)
     const order_index = maxOrderIndex + 1
 
+    // Normalize options early (we may mutate for bidirectional links).
+    const normalizedOptions: FieldOptions = (options || {}) as FieldOptions
+
     // Start transaction-like operation
     // 1. Create metadata record (table_fields table must exist)
     const { data: fieldData, error: fieldError } = await supabase
@@ -141,7 +149,7 @@ export async function POST(
           required: required || false,
           // Preserve valid falsy defaults like 0/false
           default_value: default_value ?? null,
-          options: options || {},
+          options: normalizedOptions,
         },
       ])
       .select()
@@ -188,7 +196,7 @@ export async function POST(
           }
         }
         
-        const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, options)
+        const sql = generateAddColumnSQL(table.supabase_table, finalSanitizedName, type as FieldType, normalizedOptions)
         
         const { error: sqlError } = await supabase.rpc('execute_sql_safe', {
           sql_text: sql
@@ -222,7 +230,221 @@ export async function POST(
       }
     }
 
-    // 3. Update all views to include this field
+    // 3. If creating a link field, optionally create the reciprocal field in the target table.
+    // Baserow-style link fields are bidirectional: both sides are created and reference each other.
+    // This project stores links as UUID/UUID[] columns, so we mirror the schema and link metadata via `linked_field_id`.
+    let reciprocalField: TableField | null = null
+    let reciprocalColumnName: string | null = null
+    let reciprocalTable: { id: string; name?: string | null; supabase_table: string } | null = null
+
+    const shouldCreateReciprocal =
+      (type as FieldType) === 'link_to_table' &&
+      typeof normalizedOptions?.linked_table_id === 'string' &&
+      normalizedOptions.linked_table_id.trim().length > 0 &&
+      // Only auto-create when the caller didn't explicitly point at a reciprocal field.
+      !normalizedOptions?.linked_field_id
+
+    if (shouldCreateReciprocal) {
+      const targetTableId = String(normalizedOptions.linked_table_id)
+
+      // Prevent self-linking at the API level too.
+      if (targetTableId === tableId) {
+        // Rollback: best-effort cleanup of created metadata + column.
+        try {
+          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+        return NextResponse.json(
+          { error: 'Cannot create a link field that targets the same table.' },
+          { status: 400 }
+        )
+      }
+
+      // Load target table and its fields for uniqueness checks.
+      const targetTable = await getTable(targetTableId)
+      if (!targetTable) {
+        // Rollback the source field.
+        try {
+          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+        return NextResponse.json(
+          { error: 'Linked table not found' },
+          { status: 404 }
+        )
+      }
+      reciprocalTable = targetTable as any
+
+      const targetExistingFields = await getTableFields(targetTableId)
+      const targetExistingNames = targetExistingFields.map((f) => f.name.toLowerCase())
+
+      // Default reciprocal label: the *source* table name (human-friendly), falling back to the created field label.
+      const sourceTableLabel = String((table as any)?.name || '').trim()
+      const reciprocalLabelRaw = sourceTableLabel || rawLabel || 'Linked records'
+
+      // Sanitize + ensure uniqueness in the target table.
+      let desiredReciprocalName = sanitizeFieldName(reciprocalLabelRaw)
+      const { RESERVED_WORDS } = await import('@/types/fields')
+      if (RESERVED_WORDS.includes(desiredReciprocalName.toLowerCase())) {
+        desiredReciprocalName = `${desiredReciprocalName}_field`
+      }
+
+      // If there's a conflict, append a suffix. We re-use validateFieldName for consistent rules.
+      let attempt = 0
+      let reciprocalSanitizedName = desiredReciprocalName
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const nv = validateFieldName(reciprocalSanitizedName, targetExistingNames)
+        if (nv.valid && !isSystemFieldName(reciprocalSanitizedName)) break
+        attempt += 1
+        reciprocalSanitizedName = `${desiredReciprocalName}_${attempt}`
+        // guard: don't loop forever
+        if (attempt > 50) {
+          // Rollback the source field.
+          try {
+            const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+            await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          } catch {
+            // ignore
+          }
+          await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+          return NextResponse.json(
+            { error: 'Failed to generate a unique reciprocal field name in the linked table.' },
+            { status: 500 }
+          )
+        }
+      }
+
+      // Create reciprocal metadata in the target table.
+      const reciprocalPosition = targetExistingFields.length
+      const targetMaxOrderIndex = targetExistingFields.reduce((max, f) => {
+        const oi = f.order_index ?? f.position ?? 0
+        return Math.max(max, oi)
+      }, -1)
+      const reciprocalOrderIndex = targetMaxOrderIndex + 1
+
+      const reciprocalOptions: FieldOptions = {
+        ...(normalizedOptions || {}),
+        linked_table_id: tableId,
+        linked_field_id: fieldData.id, // point back to the source field
+      }
+
+      const { data: reciprocalFieldData, error: reciprocalFieldError } = await supabase
+        .from('table_fields')
+        .insert([
+          {
+            table_id: targetTableId,
+            name: reciprocalSanitizedName,
+            label: reciprocalLabelRaw,
+            type: 'link_to_table',
+            position: reciprocalPosition,
+            order_index: reciprocalOrderIndex,
+            required: false,
+            default_value: null,
+            options: reciprocalOptions,
+          },
+        ])
+        .select()
+        .single()
+
+      if (reciprocalFieldError || !reciprocalFieldData) {
+        // Rollback the source field.
+        try {
+          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+        const errorResponse = createErrorResponse(reciprocalFieldError, 'Failed to create reciprocal linked field', 500)
+        return NextResponse.json(errorResponse, { status: 500 })
+      }
+
+      reciprocalField = reciprocalFieldData as TableField
+      reciprocalColumnName = reciprocalSanitizedName
+
+      // Add reciprocal SQL column to the target physical table.
+      try {
+        const reciprocalSql = generateAddColumnSQL(
+          (targetTable as any).supabase_table,
+          reciprocalSanitizedName,
+          'link_to_table',
+          reciprocalOptions
+        )
+        const { error: reciprocalSqlError } = await supabase.rpc('execute_sql_safe', { sql_text: reciprocalSql })
+        if (reciprocalSqlError) {
+          // Rollback both sides best-effort.
+          await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
+          try {
+            const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+            await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+          } catch {
+            // ignore
+          }
+          await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+          const errorResponse = createErrorResponse(reciprocalSqlError, 'Failed to create reciprocal column', 500)
+          return NextResponse.json(errorResponse, { status: 500 })
+        }
+      } catch (e: any) {
+        // Rollback both sides best-effort.
+        await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
+        try {
+          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+        const errorResponse = createErrorResponse(e, 'Failed to create reciprocal column', 500)
+        return NextResponse.json(errorResponse, { status: 500 })
+      }
+
+      // Finally, update the *source* field to point to the reciprocal.
+      const updatedSourceOptions: FieldOptions = {
+        ...(normalizedOptions || {}),
+        linked_field_id: reciprocalFieldData.id,
+      }
+
+      const { error: updateSourceLinkError } = await supabase
+        .from('table_fields')
+        .update({ options: updatedSourceOptions, updated_at: new Date().toISOString() })
+        .eq('id', fieldData.id)
+
+      if (updateSourceLinkError) {
+        // Rollback best-effort: remove reciprocal + source metadata + columns.
+        try {
+          const dropRecSql = generateDropColumnSQL((targetTable as any).supabase_table, reciprocalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropRecSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
+        try {
+          const dropSql = generateDropColumnSQL(table.supabase_table, finalSanitizedName)
+          await supabase.rpc('execute_sql_safe', { sql_text: dropSql })
+        } catch {
+          // ignore
+        }
+        await supabase.from('table_fields').delete().eq('id', fieldData.id)
+
+        const errorResponse = createErrorResponse(updateSourceLinkError, 'Failed to finalize link field relationship', 500)
+        return NextResponse.json(errorResponse, { status: 500 })
+      }
+    }
+
+    // 4. Update all views to include this field (and reciprocal if created)
     const { data: views } = await supabase
       .from('views')
       .select('id')
@@ -239,11 +461,33 @@ export async function POST(
       await supabase.from('view_fields').insert(viewFields)
     }
 
+    if (reciprocalField && reciprocalColumnName && reciprocalTable) {
+      const { data: targetViews } = await supabase
+        .from('views')
+        .select('id')
+        .eq('table_id', reciprocalTable.id)
+
+      if (targetViews && targetViews.length > 0) {
+        const reciprocalViewFields = targetViews.map((view: { id: string }) => ({
+          view_id: view.id,
+          field_name: reciprocalColumnName!,
+          visible: true,
+          position: (reciprocalField as any).position ?? 0,
+        }))
+
+        await supabase.from('view_fields').insert(reciprocalViewFields)
+      }
+    }
+
     // TODO (Future Enhancement): Invalidate view metadata cache when fields change
     // import { clearViewMetaCache } from '@/hooks/useViewMeta'
     // clearViewMetaCache(undefined, params.tableId) // Clear all views for this table
 
-    return NextResponse.json({ field: fieldData })
+    // Return the created field; include reciprocal info when applicable for UI follow-up.
+    return NextResponse.json({
+      field: fieldData,
+      reciprocal_field: reciprocalField,
+    })
   } catch (error: any) {
     const errorResponse = createErrorResponse(error, 'Failed to create field', 500)
     return NextResponse.json(errorResponse, { status: 500 })
@@ -526,7 +770,18 @@ export async function DELETE(
   try {
     const { tableId } = await params
     const { searchParams } = new URL(request.url)
-    const fieldId = searchParams.get('fieldId')
+    // Prefer query param for REST-y semantics, but accept JSON body for backward compatibility.
+    let fieldId = searchParams.get('fieldId')
+    if (!fieldId) {
+      try {
+        const body = await request.json()
+        if (body && typeof body.fieldId === 'string') {
+          fieldId = body.fieldId
+        }
+      } catch {
+        // ignore (no JSON body)
+      }
+    }
 
     if (!fieldId) {
       return NextResponse.json(
@@ -560,7 +815,6 @@ export async function DELETE(
     const { data: linkedFields } = await supabase
       .from('table_fields')
       .select('id, name, options')
-      .eq('table_id', tableId)
       .or('type.eq.link_to_table,type.eq.lookup')
 
     const isReferenced = linkedFields?.some((f: any) => {
@@ -582,6 +836,43 @@ export async function DELETE(
         { error: 'Table not found' },
         { status: 404 }
       )
+    }
+
+    // If deleting a bidirectional link field, also delete its reciprocal field (Baserow-style behavior).
+    // We do this before deleting the current field so we can still read its options.
+    if (field.type === 'link_to_table') {
+      const linkedFieldId = (field.options as any)?.linked_field_id
+      const linkedTableId = (field.options as any)?.linked_table_id
+
+      if (isUuid(linkedFieldId) && typeof linkedTableId === 'string' && linkedTableId.trim().length > 0) {
+        const { data: reciprocal, error: reciprocalFetchError } = await supabase
+          .from('table_fields')
+          .select('*')
+          .eq('id', linkedFieldId)
+          .maybeSingle()
+
+        if (!reciprocalFetchError && reciprocal && reciprocal.type === 'link_to_table') {
+          // Best-effort: delete reciprocal SQL column + metadata.
+          const reciprocalTable = await getTable(reciprocal.table_id)
+          if (reciprocalTable) {
+            // Drop column if physical
+            if (reciprocal.type !== 'formula' && reciprocal.type !== 'lookup') {
+              try {
+                const sql = generateDropColumnSQL((reciprocalTable as any).supabase_table, reciprocal.name)
+                await supabase.rpc('execute_sql_safe', { sql_text: sql })
+              } catch {
+                // ignore
+              }
+            }
+
+            // Delete reciprocal from view_fields
+            await supabase.from('view_fields').delete().eq('field_name', reciprocal.name)
+
+            // Delete reciprocal metadata
+            await supabase.from('table_fields').delete().eq('id', reciprocal.id)
+          }
+        }
+      }
     }
 
     // Delete SQL column if not virtual

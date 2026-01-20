@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "predeploy-check": "tsx scripts/predeploy-check.ts",
+    "repair-linked-fields": "tsx scripts/repair-linked-fields.ts",
     "prebuild": "npm run predeploy-check"
   },
   "dependencies": {

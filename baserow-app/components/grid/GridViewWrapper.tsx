@@ -153,22 +153,58 @@ export default function GridViewWrapper({
   const prevInitialSortsRef = useRef<string>('')
   const prevInitialGroupByRef = useRef<string>('')
   
-  // Sync filters and sorts when initial props change (e.g., from block config)
-  useEffect(() => {
-    const filtersKey = JSON.stringify(safeInitialFilters)
-    if (prevInitialFiltersRef.current !== filtersKey) {
-      prevInitialFiltersRef.current = filtersKey
-      setFilters(safeInitialFilters)
-    }
+  // Order-insensitive keys: upstream arrays can reorder between renders.
+  // If we treat order changes as "new config", we can trigger state churn and downstream fetch loops.
+  const initialFiltersKey = useMemo(() => {
+    const canonical = (safeInitialFilters ?? [])
+      .map((f: any) => ({
+        field_name: typeof f?.field_name === 'string' ? f.field_name : '',
+        operator: typeof f?.operator === 'string' ? f.operator : '',
+        value:
+          f?.value == null
+            ? ''
+            : Array.isArray(f.value)
+              ? f.value.map((v: any) => String(v)).sort().join('|')
+              : String(f.value),
+      }))
+      .filter((f) => f.field_name || f.operator || f.value)
+      .sort((a, b) => {
+        const ak = `${a.field_name}\u0000${a.operator}\u0000${a.value}`
+        const bk = `${b.field_name}\u0000${b.operator}\u0000${b.value}`
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
   }, [safeInitialFilters])
 
+  const initialSortsKey = useMemo(() => {
+    const canonical = (safeInitialSorts ?? [])
+      .map((s: any) => ({
+        field_name: typeof s?.field_name === 'string' ? s.field_name : '',
+        direction: typeof s?.direction === 'string' ? s.direction : '',
+      }))
+      .filter((s) => s.field_name || s.direction)
+      .sort((a, b) => {
+        const ak = `${a.field_name}\u0000${a.direction}`
+        const bk = `${b.field_name}\u0000${b.direction}`
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
+  }, [safeInitialSorts])
+  
+  // Sync filters and sorts when initial props change (e.g., from block config)
   useEffect(() => {
-    const sortsKey = JSON.stringify(safeInitialSorts)
-    if (prevInitialSortsRef.current !== sortsKey) {
-      prevInitialSortsRef.current = sortsKey
+    if (prevInitialFiltersRef.current !== initialFiltersKey) {
+      prevInitialFiltersRef.current = initialFiltersKey
+      setFilters(safeInitialFilters)
+    }
+  }, [initialFiltersKey, safeInitialFilters])
+
+  useEffect(() => {
+    if (prevInitialSortsRef.current !== initialSortsKey) {
+      prevInitialSortsRef.current = initialSortsKey
       setSorts(safeInitialSorts)
     }
-  }, [safeInitialSorts])
+  }, [initialSortsKey, safeInitialSorts])
 
   useEffect(() => {
     const groupKey = initialGroupBy || ''
@@ -542,13 +578,13 @@ export default function GridViewWrapper({
     return [...blockLevelFilters, ...userCreatedFilters]
   }, [standardizedFilters, filters])
 
-  // Determine toolbar visibility based on appearance settings
+  // Determine toolbar visibility based on appearance settings.
+  // Keep edit mode WYSIWYG (match live view).
   // Default: undefined => shown (matches Settings UI)
-  // Editing mode: always show the toolbar so it can be configured/used.
-  const showToolbar = isEditing ? true : appearance.show_toolbar !== false
-  const showSearch = showToolbar && (isEditing ? true : appearance.show_search !== false)
-  const showFilter = showToolbar && (isEditing ? true : appearance.show_filter !== false)
-  const showSort = showToolbar && (isEditing ? true : appearance.show_sort !== false)
+  const showToolbar = appearance.show_toolbar !== false
+  const showSearch = showToolbar && appearance.show_search !== false
+  const showFilter = showToolbar && appearance.show_filter !== false
+  const showSort = showToolbar && appearance.show_sort !== false
 
   return (
     <div className="w-full h-full flex flex-col">

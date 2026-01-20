@@ -324,11 +324,10 @@ export default function GridBlock({
   const showAddRecord =
     blockShowAddRecord === true || (blockShowAddRecord == null && pageShowAddRecord)
 
-  // Toolbar visibility (matches GridViewWrapper behavior)
-  // In editing mode, always show so the builder can work with it.
-  const showToolbar = isEditing ? true : appearance.show_toolbar !== false
+  // Toolbar visibility: keep edit mode WYSIWYG (match live view).
+  const showToolbar = appearance.show_toolbar !== false
   // For non-grid views, the only "toolbar" we currently render is QuickFilterBar (filters).
-  const showQuickFilters = showToolbar && (isEditing ? true : appearance.show_filter !== false)
+  const showQuickFilters = showToolbar && appearance.show_filter !== false
 
   const { canCreateRecord, isAddRecordDisabled, handleAddRecord } = (() => {
     const permissions = config.permissions || {}

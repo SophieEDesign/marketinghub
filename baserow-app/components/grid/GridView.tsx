@@ -331,6 +331,45 @@ export default function GridView({
   // If we detect a schema mismatch (e.g. view references a missing column), force future loads to use `select('*')`
   // to avoid repeated failing "minimal select" attempts on every re-render.
   const forceStarSelectRef = useRef<Set<string>>(new Set())
+  // Some environments created tables with `record_id` instead of `id`.
+  // Track the actual row identifier column per physical table to avoid hard-coding `id` everywhere.
+  const rowIdColumnByTableRef = useRef<Map<string, string>>(new Map())
+
+  const getRowIdColumn = useCallback(() => {
+    const key = String(supabaseTableName || '').trim()
+    if (!key) return 'id'
+    return rowIdColumnByTableRef.current.get(key) || 'id'
+  }, [supabaseTableName])
+
+  const normalizeRowsWithId = useCallback(
+    (data: Record<string, any>[]) => {
+      const rowIdColumn = getRowIdColumn()
+      if (!Array.isArray(data) || data.length === 0) return data
+
+      // Detect id column from returned data (most reliable).
+      const sample = data[0] || {}
+      const detected =
+        typeof sample === 'object' && sample
+          ? ('id' in sample ? 'id' : 'record_id' in sample ? 'record_id' : rowIdColumn)
+          : rowIdColumn
+
+      const key = String(supabaseTableName || '').trim()
+      if (key) rowIdColumnByTableRef.current.set(key, detected)
+
+      // Ensure callers can rely on `row.id` for UI identity.
+      if (detected !== 'id') {
+        return data.map((r) => {
+          if (r && typeof r === 'object' && r.id == null && (r as any)[detected] != null) {
+            return { ...r, id: (r as any)[detected] }
+          }
+          return r
+        })
+      }
+
+      return data
+    },
+    [getRowIdColumn, supabaseTableName]
+  )
 
   // Sensors for drag and drop
   const sensors = useSensors(
@@ -893,16 +932,84 @@ export default function GridView({
   // In live mode, upstream props can be recreated each render (new array identities),
   // which would repeatedly re-trigger `loadRows()` even when content is unchanged.
   // Use stable "content keys" so we only refetch when the actual data changes.
-  const filtersKey = useMemo(() => JSON.stringify(safeFilters ?? []), [safeFilters])
-  const viewFiltersKey = useMemo(() => JSON.stringify(safeViewFilters ?? []), [safeViewFilters])
-  const viewSortsKey = useMemo(() => JSON.stringify(safeViewSorts ?? []), [safeViewSorts])
+  // IMPORTANT: These keys must be order-insensitive; upstream arrays can legitimately reorder between renders
+  // (e.g. due to different DB ordering, Map iteration order, or "same data different order" queries).
+  // If we bake order into the key, we can create a fetch → setState → rerender → key changes → fetch loop (React #185).
+  const filtersKey = useMemo(() => {
+    const canonical = (safeFilters ?? [])
+      .map((f: any) => {
+        const field = typeof f?.field === "string" ? f.field : ""
+        const operator = typeof f?.operator === "string" ? f.operator : ""
+        const valueRaw = (f as any)?.value
+        const value =
+          valueRaw == null
+            ? ""
+            : Array.isArray(valueRaw)
+              ? valueRaw.map((v) => String(v)).sort().join("|")
+              : String(valueRaw)
+        return { field, operator, value }
+      })
+      .filter((f) => f.field || f.operator || f.value)
+      .sort((a, b) => {
+        const ak = `${a.field}\u0000${a.operator}\u0000${a.value}`
+        const bk = `${b.field}\u0000${b.operator}\u0000${b.value}`
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
+  }, [safeFilters])
+
+  const viewFiltersKey = useMemo(() => {
+    const canonical = (safeViewFilters ?? [])
+      .map((f: any) => {
+        const field_name = typeof f?.field_name === "string" ? f.field_name : ""
+        const operator = typeof f?.operator === "string" ? f.operator : ""
+        const valueRaw = (f as any)?.value
+        const value =
+          valueRaw == null
+            ? ""
+            : Array.isArray(valueRaw)
+              ? valueRaw.map((v) => String(v)).sort().join("|")
+              : String(valueRaw)
+        return { field_name, operator, value }
+      })
+      .filter((f) => f.field_name || f.operator || f.value)
+      .sort((a, b) => {
+        const ak = `${a.field_name}\u0000${a.operator}\u0000${a.value}`
+        const bk = `${b.field_name}\u0000${b.operator}\u0000${b.value}`
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
+  }, [safeViewFilters])
+
+  const viewSortsKey = useMemo(() => {
+    const canonical = (safeViewSorts ?? [])
+      .map((s: any) => {
+        const field_name = typeof s?.field_name === "string" ? s.field_name : ""
+        const direction = typeof s?.direction === "string" ? s.direction : ""
+        return { field_name, direction }
+      })
+      .filter((s) => s.field_name || s.direction)
+      .sort((a, b) => {
+        const ak = `${a.field_name}\u0000${a.direction}`
+        const bk = `${b.field_name}\u0000${b.direction}`
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
+  }, [safeViewSorts])
+
   const tableFieldsKey = useMemo(() => {
-    const minimal = (safeTableFields ?? []).map((f) => ({
-      id: (f as any)?.id,
-      name: (f as any)?.name,
-      type: (f as any)?.type,
-    }))
-    return JSON.stringify(minimal)
+    const canonical = (safeTableFields ?? [])
+      .map((f: any) => ({
+        id: f?.id ?? null,
+        name: f?.name ?? null,
+        type: f?.type ?? null,
+      }))
+      .sort((a, b) => {
+        const ak = String(a.id ?? a.name ?? "")
+        const bk = String(b.id ?? b.name ?? "")
+        return ak.localeCompare(bk)
+      })
+    return JSON.stringify(canonical)
   }, [safeTableFields])
 
   // Prevent request storms (e.g. repeated mount/unmount in dev/StrictMode).
@@ -1041,8 +1148,8 @@ export default function GridView({
       // Closure: formulas referenced by needed formulas
       Array.from(neededFormulaNames).forEach(expandFormula)
 
-      // Always fetch id
-      baseColumnNames.add('id')
+      // Always fetch the row identifier column (usually `id`, sometimes `record_id`).
+      baseColumnNames.add(getRowIdColumn())
 
       // Safety fallback: if we know we need specific fields but can't map them to metadata yet,
       // fall back to "*" to avoid rendering empty cells due to under-fetching.
@@ -1060,7 +1167,7 @@ export default function GridView({
       // PostgREST expects unquoted identifiers in `select=...`; validate and strip anything unsafe.
       const safeSelectClause = (shouldFallbackToStar || forceStarSelect)
         ? '*'
-        : buildSelectClause(selectClause.split(','), { includeId: true, fallback: '*' })
+        : buildSelectClause(selectClause.split(','), { includeId: getRowIdColumn(), fallback: '*' })
 
       let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
 
@@ -1115,8 +1222,9 @@ export default function GridView({
           }
         }
       } else if (safeViewSorts.length === 0) {
-        // Default sort by id descending
-        query = query.order("id", { ascending: false })
+        // Default sort by row identifier descending (fallback to created_at if needed).
+        const rowIdColumn = getRowIdColumn()
+        query = query.order(rowIdColumn, { ascending: false })
       }
       // If needsClientSideSort is true, we'll sort after fetching (don't apply DB sorting)
 
@@ -1152,6 +1260,17 @@ export default function GridView({
           // From this point on, avoid repeating the failing "minimal select" for this table.
           // This prevents endless 400s in live mode when parent props cause re-renders.
           forceStarSelectRef.current.add(supabaseTableName)
+
+          // If the missing column is our row identifier, switch to the alternate id column and retry.
+          // This keeps legacy tables (record_id pk) working.
+          const currentRowIdColumn = getRowIdColumn()
+          if (missingColumn && String(missingColumn).toLowerCase() === String(currentRowIdColumn).toLowerCase()) {
+            const key = String(supabaseTableName || '').trim()
+            if (key) {
+              const next = currentRowIdColumn === 'id' ? 'record_id' : 'id'
+              rowIdColumnByTableRef.current.set(key, next)
+            }
+          }
 
           const isMissingMatch = (fieldName?: string | null) => {
             if (!missingColumn || !fieldName) return false
@@ -1205,14 +1324,15 @@ export default function GridView({
               })
             }
           } else if (filteredRetrySorts.length === 0) {
-            retryQuery = retryQuery.order("id", { ascending: false })
+            const rowIdColumn = getRowIdColumn()
+            retryQuery = retryQuery.order(rowIdColumn, { ascending: false })
           }
 
           retryQuery = retryQuery.limit(retryNeedsClientSideSort ? ITEMS_PER_PAGE * 2 : ITEMS_PER_PAGE)
 
           const retry = await retryQuery
           if (!retry.error) {
-            let dataArray = asArray<Record<string, any>>(retry.data)
+            let dataArray = normalizeRowsWithId(asArray<Record<string, any>>(retry.data))
             setIsMissingPhysicalTable(false)
             setTableError(null)
             setTableWarning(
@@ -1336,7 +1456,7 @@ export default function GridView({
         loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
 
         // CRITICAL: Normalize data to array - API might return single record or null
-        let dataArray = asArray<Record<string, any>>(data)
+        let dataArray = normalizeRowsWithId(asArray<Record<string, any>>(data))
         
         // Compute only formula fields that are actually needed by the view (visible/sort/filter/grouping/appearance),
         // plus any formula-to-formula dependencies (computed via the closure above).
@@ -1347,6 +1467,8 @@ export default function GridView({
           formulaFieldsToCompute.length > 0
             ? dataArray.map((row) => computeFormulaFields(row, formulaFieldsToCompute, safeTableFields))
             : dataArray
+
+        computedRows = normalizeRowsWithId(computedRows)
         
         // Apply client-side sorting if needed (for single_select by order, multi_select by first value)
         if (needsClientSideSort && safeViewSorts.length > 0) {
@@ -1486,7 +1608,8 @@ export default function GridView({
       let finalSavedValue: any = normalizeUpdateValue(fieldMeta, value)
 
       const doUpdate = async (val: any) => {
-        return await supabase.from(supabaseTableName).update({ [safeColumn]: val }).eq("id", rowId)
+        const rowIdColumn = getRowIdColumn()
+        return await supabase.from(supabaseTableName).update({ [safeColumn]: val }).eq(rowIdColumn, rowId)
       }
 
       let { error } = await doUpdate(finalSavedValue)
