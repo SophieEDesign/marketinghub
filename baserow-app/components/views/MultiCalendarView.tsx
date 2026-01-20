@@ -122,7 +122,6 @@ function buildSourcesKey(list: MultiSource[]) {
     )
     .join("|")
 }
-
 function areStringArraysEqual(a: string[], b: string[]) {
   if (a === b) return true
   if (a.length !== b.length) return false
