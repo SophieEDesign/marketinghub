@@ -263,16 +263,16 @@ export default function InterfaceBuilder({
   const saveLayout = useCallback(
     async (layout: LayoutItem[], hasUserInteraction = false) => {
       // Only save in edit mode - view mode must never mutate layout
-      if (!effectiveIsEditing) return
+      if (!effectiveIsEditing) return false
 
       // Pre-deployment guard: Prevent saves during mount
       if (guardAgainstMountSave(componentIdRef.current, 'saveLayout')) {
-        return
+        return false
       }
 
       // Pre-deployment guard: Prevent saves without user interaction
       if (guardAgainstAutoSave('saveLayout', hasUserInteraction || layoutModifiedByUserRef.current)) {
-        return
+        return false
       }
 
       // CRITICAL: Never save layout unless user actually modified it
@@ -281,7 +281,7 @@ export default function InterfaceBuilder({
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save blocked: no user modification")
         }
-        return
+        return false
       }
 
       // Diff check: Skip save if layout hasn't changed
@@ -294,7 +294,7 @@ export default function InterfaceBuilder({
         if (process.env.NODE_ENV === 'development') {
           console.debug("[Layout] Save skipped: no diff (layout unchanged)")
         }
-        return
+        return false
       }
 
       // PHASE 1 - Layout write verification: Log before save (client)
@@ -359,6 +359,7 @@ export default function InterfaceBuilder({
           
           // Show success feedback briefly, then reset to idle
           setTimeout(() => setSaveStatus("idle"), 2000)
+          return true
         } else {
           const error = await response.text()
           throw new Error(error || "Failed to save layout")
@@ -372,6 +373,7 @@ export default function InterfaceBuilder({
           description: error.message || "Please try again",
         })
         setTimeout(() => setSaveStatus("idle"), 3000)
+        return false
       }
     },
     [page.id, effectiveIsEditing, toast]
@@ -483,7 +485,12 @@ export default function InterfaceBuilder({
         // This ensures layout is saved even if layoutModifiedByUserRef was reset
         // Also mark as modified to ensure save goes through
         layoutModifiedByUserRef.current = true
-        await saveLayout(layoutToSave, true)
+        const ok = await saveLayout(layoutToSave, true)
+        if (!ok) {
+          // `saveLayout` already toasts on error.
+          setSaveStatus("error")
+          return
+        }
         
         if (process.env.NODE_ENV === 'development') {
           console.log('[Layout] Layout saved successfully')
@@ -492,8 +499,8 @@ export default function InterfaceBuilder({
         setSaveStatus("saved")
         toast({
           variant: "default",
-          title: "Saved",
-          description: "All changes have been saved",
+          title: exitAfterSave ? "Finished editing" : "Saved",
+          description: exitAfterSave ? "All changes have been saved." : "All changes have been saved",
         })
         
         // Reset status after 2 seconds (only if not exiting)
@@ -503,11 +510,6 @@ export default function InterfaceBuilder({
       } catch (error) {
         console.error("Failed to save layout:", error)
         setSaveStatus("error")
-        toast({
-          variant: "destructive",
-          title: "Failed to save",
-          description: error instanceof Error ? error.message : "Please try again",
-        })
         // Don't exit if save failed
         return
       } finally {
@@ -568,13 +570,13 @@ export default function InterfaceBuilder({
         }
         
         layoutModifiedByUserRef.current = true
-        saveLayout(layoutToSave, true).catch((error: any) => {
-          console.error("Failed to auto-save layout on exit:", error)
-          toast({
-            variant: "destructive",
-            title: "Failed to save layout",
-            description: error instanceof Error ? error.message : "Please try again",
-          })
+        void saveLayout(layoutToSave, true).then((ok) => {
+          if (ok) {
+            toast({
+              title: "Finished editing",
+              description: "All changes have been saved.",
+            })
+          }
         })
       } else if (process.env.NODE_ENV === 'development') {
         console.log('[InterfaceBuilder] No layout to auto-save on exit (grid ref is empty)')

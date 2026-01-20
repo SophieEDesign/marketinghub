@@ -161,10 +161,14 @@ export default function AirtableViewPage({
 
   async function loadViewFields() {
     try {
+      if (!viewUuid) {
+        console.warn("AirtableViewPage: viewId is not a valid UUID; cannot load view fields.")
+        return
+      }
       const { data } = await supabase
         .from("view_fields")
         .select("field_name, visible, position")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("position", { ascending: true })
 
       if (data) {
@@ -224,6 +228,10 @@ export default function AirtableViewPage({
 
   async function handleReorderFields(fieldNames: string[]) {
     try {
+      if (!viewUuid) {
+        console.warn("AirtableViewPage: viewId is not a valid UUID; cannot persist field order.")
+        return
+      }
       // Update view_fields positions
       const updates = fieldNames.map((fieldName, index) => ({
         field_name: fieldName,
@@ -235,7 +243,7 @@ export default function AirtableViewPage({
           supabase
             .from("view_fields")
             .update({ position: update.position })
-            .eq("view_id", viewId)
+            .eq("view_id", viewUuid)
             .eq("field_name", update.field_name)
         )
       )

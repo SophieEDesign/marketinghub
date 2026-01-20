@@ -21,6 +21,7 @@ import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
 import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 // PostgREST expects unquoted identifiers in order clauses; see `lib/supabase/postgrest`.
 
@@ -79,6 +80,7 @@ export default function ListView({
 }: ListViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   const [rows, setRows] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
@@ -353,7 +355,7 @@ export default function ListView({
     }
     
     // Otherwise, try to save to view config if viewId exists
-    if (!viewId) {
+    if (!viewUuid) {
       return
     }
 
@@ -365,7 +367,7 @@ export default function ListView({
       const { data: viewData } = await supabase
         .from("views")
         .select("config")
-        .eq("id", viewId)
+        .eq("id", viewUuid)
         .single()
 
       if (viewData) {
@@ -375,12 +377,12 @@ export default function ListView({
         await supabase
           .from("views")
           .update({ config })
-          .eq("id", viewId)
+          .eq("id", viewUuid)
       }
     } catch (error) {
       console.error("Error saving group setting:", error)
     }
-  }, [viewId, onGroupByChange])
+  }, [viewUuid, onGroupByChange])
 
   // Handle filters change
   const handleFiltersChange = useCallback((newFilters: Array<{ id?: string; field_name: string; operator: any; value?: string }>) => {

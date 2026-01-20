@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface ViewManagementDialogProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ export default function ViewManagementDialog({
   onAction,
 }: ViewManagementDialogProps) {
   const router = useRouter()
+  const viewUuid = normalizeUuid(viewId)
   const [action, setAction] = useState<"rename" | "duplicate" | "delete" | null>(initialAction || null)
   const [newName, setNewName] = useState(viewName)
 
@@ -60,10 +62,14 @@ export default function ViewManagementDialog({
     }
 
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so it can't be renamed.")
+        return
+      }
       await supabase
         .from("views")
         .update({ name: newName.trim() })
-        .eq("id", viewId)
+        .eq("id", viewUuid)
 
       onAction?.("rename")
       router.refresh()
@@ -81,11 +87,15 @@ export default function ViewManagementDialog({
     }
 
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so it can't be duplicated.")
+        return
+      }
       // Get current view data
       const { data: currentView } = await supabase
         .from("views")
         .select("*")
-        .eq("id", viewId)
+        .eq("id", viewUuid)
         .single()
 
       if (!currentView) {
@@ -95,9 +105,9 @@ export default function ViewManagementDialog({
 
       // Get view fields, filters, sorts
       const [fieldsRes, filtersRes, sortsRes] = await Promise.all([
-        supabase.from("view_fields").select("*").eq("view_id", viewId),
-        supabase.from("view_filters").select("*").eq("view_id", viewId),
-        supabase.from("view_sorts").select("*").eq("view_id", viewId),
+        supabase.from("view_fields").select("*").eq("view_id", viewUuid),
+        supabase.from("view_filters").select("*").eq("view_id", viewUuid),
+        supabase.from("view_sorts").select("*").eq("view_id", viewUuid),
       ])
 
       // Create new view
@@ -166,7 +176,11 @@ export default function ViewManagementDialog({
 
   async function handleDelete() {
     try {
-      const { error } = await supabase.from("views").delete().eq("id", viewId)
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so it can't be deleted.")
+        return
+      }
+      const { error } = await supabase.from("views").delete().eq("id", viewUuid)
       
       if (error) throw error
       

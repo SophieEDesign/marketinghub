@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { validateFieldOptions } from "@/lib/fields/validation"
-import type { FieldType, TableField, FieldOptions, ChoiceColorTheme } from "@/types/fields"
+import type { FieldType, TableField, FieldOptions, ChoiceColorTheme, SelectOption } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import { CHOICE_COLOR_THEME_LABELS, isChoiceColorTheme, resolveChoiceColor } from "@/lib/field-colors"
 import FormulaEditor from "@/components/fields/FormulaEditor"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 
 interface FieldBuilderModalProps {
   isOpen: boolean
@@ -48,6 +49,69 @@ export default function FieldBuilderModal({
   const fieldTypeInfo = FIELD_TYPES.find(t => t.type === type)
   const isVirtual = fieldTypeInfo?.isVirtual || false
 
+  function safeId(): string {
+    // Browser + modern runtimes
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return (crypto as any).randomUUID()
+    }
+    // Fallback: not cryptographically strong, but stable enough for option ids
+    return `opt_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`
+  }
+
+  function nowIso(): string {
+    try {
+      return new Date().toISOString()
+    } catch {
+      return ''
+    }
+  }
+
+  function syncSelectOptionsPayload(
+    base: FieldOptions,
+    input: SelectOption[],
+    { dropEmpty }: { dropEmpty: boolean }
+  ): FieldOptions {
+    const mapped = (Array.isArray(input) ? input : [])
+      .map((o) => ({
+        id: String(o?.id || '').trim() || safeId(),
+        // Preserve in-progress typing (don't trim until save)
+        label: typeof o?.label === 'string' ? o.label : String(o?.label ?? ''),
+        color: (() => {
+          if (typeof o?.color === 'string' && o.color) return o.color
+          const label = typeof o?.label === 'string' ? o.label : String(o?.label ?? '')
+          const m = (base?.choiceColors || {}) as Record<string, string>
+          const direct = typeof m[label] === 'string' ? m[label] : undefined
+          const trimmed = typeof m[label.trim()] === 'string' ? m[label.trim()] : undefined
+          return direct || trimmed
+        })(),
+        sort_index:
+          typeof o?.sort_index === 'number' && Number.isFinite(o.sort_index) ? Math.trunc(o.sort_index) : 0,
+        created_at: typeof o?.created_at === 'string' && o.created_at ? o.created_at : nowIso(),
+      }))
+      .sort((a, b) => a.sort_index - b.sort_index)
+      .map((o, idx) => ({ ...o, sort_index: idx }))
+
+    const kept = dropEmpty ? mapped.filter((o) => String(o.label).trim().length > 0) : mapped
+    const reindexed = kept.map((o, idx) => ({ ...o, sort_index: idx }))
+
+    const choices = reindexed.map((o) => o.label)
+    const choiceColors: Record<string, string> = {}
+    for (const o of reindexed) {
+      const key = String(o.label).trim()
+      if (!key) continue
+      if (o.color) choiceColors[key] = o.color
+    }
+
+    const next: FieldOptions = {
+      ...base,
+      selectOptions: reindexed,
+      // Keep legacy keys in sync so older UI paths remain stable.
+      choices,
+      choiceColors: Object.keys(choiceColors).length > 0 ? choiceColors : undefined,
+    }
+    return next
+  }
+
   useEffect(() => {
     if (field) {
       setName(getFieldDisplayName(field))
@@ -64,6 +128,17 @@ export default function FieldBuilderModal({
     }
     setError(null)
   }, [field, isOpen])
+
+  // When editing select fields, ensure we always have a normalized selectOptions model in state.
+  useEffect(() => {
+    if (!isOpen) return
+    if (type !== 'single_select' && type !== 'multi_select') return
+    const { didRepair, repairedFieldOptions } = normalizeSelectOptionsForUi(type, options)
+    if (didRepair && repairedFieldOptions) {
+      setOptions(repairedFieldOptions)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, type])
 
   // Load tables for lookup and link_to_table fields
   useEffect(() => {
@@ -128,7 +203,27 @@ export default function FieldBuilderModal({
     }
 
     // Validate field options based on type
-    const validation = validateFieldOptions(type, options)
+    // Canonicalize select field options (ordering + colors) so the 3-dots editor
+    // matches the Design-side editor behavior.
+    const optionsForSave: FieldOptions = (() => {
+      let opts: FieldOptions = { ...options }
+      if (type === 'single_select' || type === 'multi_select') {
+        const normalized = normalizeSelectOptionsForUi(type, opts)
+        opts = normalized.repairedFieldOptions || opts
+        const { selectOptions } = normalizeSelectOptionsForUi(type, opts)
+        const ordered = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
+        const trimmed = ordered.map((o) => ({ ...o, label: String(o.label ?? '').trim() }))
+        opts = syncSelectOptionsPayload(opts, trimmed, { dropEmpty: true })
+      }
+      // Filter out empty legacy choices (defensive)
+      if (Array.isArray(opts.choices)) {
+        opts.choices = opts.choices.filter((c) => String(c).trim().length > 0)
+        if (opts.choices.length === 0) delete opts.choices
+      }
+      return opts
+    })()
+
+    const validation = validateFieldOptions(type, optionsForSave)
     if (!validation.valid) {
       setError(validation.error || "Invalid field configuration")
       return
@@ -147,14 +242,14 @@ export default function FieldBuilderModal({
             type,
             required,
             default_value: defaultValue,
-            options,
+            options: optionsForSave,
           }
         : {
             label: name.trim(),
             type,
             required,
             default_value: defaultValue,
-            options,
+            options: optionsForSave,
           }
 
       const response = await fetch(url, {
@@ -221,85 +316,182 @@ export default function FieldBuilderModal({
               </p>
             </div>
             <div className="space-y-2">
-              {(options.choices || [""]).map((choice, index) => {
-                // Use centralized color system for default
-                const choiceColor = options.choiceColors?.[choice] || resolveChoiceColor(
-                  choice,
-                  type as 'single_select' | 'multi_select',
-                  options,
-                  type === 'single_select'
+              {(() => {
+                const { selectOptions } = normalizeSelectOptionsForUi(type as any, options)
+                const ordered = (
+                  selectOptions.length > 0
+                    ? selectOptions
+                    : [{ id: safeId(), label: '', sort_index: 0, created_at: nowIso() }]
                 )
+                  .slice()
+                  .sort((a, b) => a.sort_index - b.sort_index)
+
+                const applyReindexed = (next: SelectOption[]) => {
+                  const reindexed = next.map((o, idx) => ({ ...o, sort_index: idx }))
+                  setOptions((prev) => syncSelectOptionsPayload(prev, reindexed, { dropEmpty: false }))
+                }
+
+                const sortByLabel = (dir: 1 | -1) => {
+                  const sorted = ordered
+                    .filter((o) => String(o.label || '').trim().length > 0)
+                    .slice()
+                    .sort((a, b) =>
+                      dir * String(a.label).localeCompare(String(b.label), undefined, { sensitivity: 'base' })
+                    )
+                  applyReindexed(sorted)
+                }
+
+                const move = (from: number, to: number) => {
+                  if (from === to) return
+                  if (from < 0 || to < 0) return
+                  if (from >= ordered.length || to >= ordered.length) return
+                  const next = ordered.slice()
+                  const [item] = next.splice(from, 1)
+                  next.splice(to, 0, item)
+                  applyReindexed(next)
+                }
+
                 return (
-                  <div key={index} className="flex gap-2 items-center">
-                    <Input
-                      type="text"
-                      value={choice}
-                      onChange={(e) => {
-                        const newChoices = [...(options.choices || [])]
-                        const oldChoice = newChoices[index]
-                        newChoices[index] = e.target.value
-                        // Preserve color when renaming choice
-                        const newChoiceColors = { ...(options.choiceColors || {}) }
-                        if (oldChoice && oldChoice !== e.target.value) {
-                          if (newChoiceColors[oldChoice]) {
-                            newChoiceColors[e.target.value] = newChoiceColors[oldChoice]
-                            delete newChoiceColors[oldChoice]
-                          }
-                        }
-                        setOptions({ 
-                          ...options, 
-                          choices: newChoices,
-                          choiceColors: newChoiceColors
-                        })
-                      }}
-                      placeholder="Option name"
-                      className="flex-1"
-                    />
-                    <input
-                      type="color"
-                      value={choiceColor}
-                      onChange={(e) => {
-                        const newChoiceColors = { ...(options.choiceColors || {}) }
-                        if (choice) {
-                          newChoiceColors[choice] = e.target.value
-                        }
-                        setOptions({ ...options, choiceColors: newChoiceColors })
-                      }}
-                      className="h-10 w-10 rounded border border-gray-300 cursor-pointer"
-                      title="Choose color for this option"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newChoices = (options.choices || []).filter((_, i) => i !== index)
-                        const newChoiceColors = { ...(options.choiceColors || {}) }
-                        // Remove color for deleted choice
-                        if (choice) {
-                          delete newChoiceColors[choice]
-                        }
-                        setOptions({ 
-                          ...options, 
-                          choices: newChoices,
-                          choiceColors: newChoiceColors
-                        })
-                      }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-gray-500">Drag to reorder, or sort alphabetically.</p>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => sortByLabel(1)}
+                          disabled={ordered.filter((o) => String(o.label || '').trim().length > 0).length < 2}
+                          className="h-8"
+                          title="Sort A to Z (updates manual order)"
+                        >
+                          Sort A→Z
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => sortByLabel(-1)}
+                          disabled={ordered.filter((o) => String(o.label || '').trim().length > 0).length < 2}
+                          className="h-8"
+                          title="Sort Z to A (updates manual order)"
+                        >
+                          Sort Z→A
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {ordered.map((opt, index) => {
+                        const label = String(opt.label || '')
+                        const defaultColor = resolveChoiceColor(
+                          label,
+                          type as 'single_select' | 'multi_select',
+                          options,
+                          type === 'single_select'
+                        )
+                        const colorValue = opt.color || options.choiceColors?.[label] || defaultColor
+
+                        return (
+                          <div
+                            key={opt.id || `${index}`}
+                            className="flex gap-2 items-center rounded-md border border-gray-200 bg-white px-2 py-2"
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              const fromStr = e.dataTransfer.getData('text/plain')
+                              const from = Number.parseInt(fromStr, 10)
+                              if (Number.isFinite(from)) move(from, index)
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 select-none px-1"
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', String(index))
+                                e.dataTransfer.effectAllowed = 'move'
+                              }}
+                              aria-label="Drag to reorder"
+                              title="Drag to reorder"
+                            >
+                              ⋮⋮
+                            </button>
+
+                            <Input
+                              type="text"
+                              value={label}
+                              onChange={(e) => {
+                                const next = ordered.slice()
+                                const preservedColor =
+                                  next[index]?.color ||
+                                  options.choiceColors?.[label] ||
+                                  options.choiceColors?.[label.trim()] ||
+                                  undefined
+                                next[index] = {
+                                  ...next[index],
+                                  label: e.target.value,
+                                  color: preservedColor,
+                                  created_at: next[index]?.created_at || nowIso(),
+                                }
+                                applyReindexed(next)
+                              }}
+                              placeholder="Option name"
+                              className="flex-1"
+                            />
+
+                            <input
+                              type="color"
+                              value={colorValue}
+                              onChange={(e) => {
+                                const next = ordered.slice()
+                                next[index] = {
+                                  ...next[index],
+                                  color: e.target.value,
+                                  created_at: next[index]?.created_at || nowIso(),
+                                }
+                                applyReindexed(next)
+                              }}
+                              className="h-10 w-10 rounded border border-gray-300 cursor-pointer"
+                              title="Choose color for this option"
+                            />
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const next = ordered.filter((_, i) => i !== index)
+                                applyReindexed(next)
+                              }}
+                              className="h-10 w-10 p-0"
+                              title="Delete"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
                 )
-              })}
+              })()}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setOptions({
-                    ...options,
-                    choices: [...(options.choices || []), ""],
+                  const { selectOptions } = normalizeSelectOptionsForUi(type as any, options)
+                  const next = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
+                  next.push({
+                    id: safeId(),
+                    label: '',
+                    sort_index: next.length,
+                    created_at: nowIso(),
                   })
+                  setOptions((prev) => syncSelectOptionsPayload(prev, next, { dropEmpty: false }))
                 }}
               >
                 + Add choice

@@ -41,8 +41,17 @@ export default async function ViewPage({
     const supabase = await createClient()
 
     // Be defensive: in some contexts IDs may arrive as "<uuid>:<index>".
-    const tableId = normalizeUuid(params.tableId) || params.tableId
-    const viewId = normalizeUuid(params.viewId) || params.viewId
+    // Supabase expects strict UUID strings for uuid-typed columns, so reject invalid IDs early.
+    const tableId = normalizeUuid(params.tableId)
+    const viewId = normalizeUuid(params.viewId)
+
+    if (!tableId || !viewId) {
+      return (
+        <WorkspaceShellWrapper title="Invalid view">
+          <div>Invalid view.</div>
+        </WorkspaceShellWrapper>
+      )
+    }
     
     const table = await getTable(tableId).catch(() => null)
     if (!table) {

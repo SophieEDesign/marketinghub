@@ -33,7 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import FilterDialog from "./FilterDialog"
+import UnifiedFilterDialog from "@/components/filters/UnifiedFilterDialog"
 import SortDialog from "./SortDialog"
 import GroupDialog from "./GroupDialog"
 import HideFieldsDialog from "./HideFieldsDialog"
@@ -374,7 +374,7 @@ export default function ViewBuilderToolbar({
       {/* Dialogs */}
       {canEdit && (
         <>
-          <FilterDialog
+          <UnifiedFilterDialog
             isOpen={filterDialogOpen}
             onClose={() => setFilterDialogOpen(false)}
             viewId={viewId}

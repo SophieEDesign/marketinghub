@@ -21,13 +21,15 @@ import { flattenFilterTree } from "@/lib/filters/canonical-model"
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
 import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
-import type { TableField } from "@/types/fields"
+import type { LinkedField, TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
 import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWarn } from '@/lib/interface/debug-flags'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import TimelineFieldValue from "@/components/views/TimelineFieldValue"
 import { isAbortError } from "@/lib/api/error-handling"
+import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface CalendarViewProps {
   tableId: string
@@ -87,6 +89,7 @@ export default function CalendarView({
   onDateToChange,
   showDateRangeControls = true,
 }: CalendarViewProps) {
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array (defensive check for any edge cases)
   const fieldIds = useMemo(() => {
     if (!fieldIdsProp) return []
@@ -116,6 +119,31 @@ export default function CalendarView({
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [createRecordDate, setCreateRecordDate] = useState<Date | null>(null) // Date for creating new record
+  const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+  const prevCalendarEventsSignatureRef = useRef<string>("")
+  const prevCalendarEventsRef = useRef<EventInput[]>([])
+
+  const areLinkedValueMapsEqual = useCallback(
+    (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
+      if (a === b) return true
+      const aKeys = Object.keys(a)
+      const bKeys = Object.keys(b)
+      if (aKeys.length !== bKeys.length) return false
+      for (const k of aKeys) {
+        if (!(k in b)) return false
+        const aInner = a[k] || {}
+        const bInner = b[k] || {}
+        const aInnerKeys = Object.keys(aInner)
+        const bInnerKeys = Object.keys(bInner)
+        if (aInnerKeys.length !== bInnerKeys.length) return false
+        for (const ik of aInnerKeys) {
+          if (aInner[ik] !== bInner[ik]) return false
+        }
+      }
+      return true
+    },
+    []
+  )
 
   // Respect block permissions + per-block add-record toggle.
   const showAddRecord = (blockConfig as any)?.appearance?.show_add_record === true
@@ -150,7 +178,7 @@ export default function CalendarView({
     }
 
     if (field?.type === 'checkbox') {
-      return raw ? '✓' : null
+      return raw ? '?' : null
     }
 
     if (field?.type === 'date') {
@@ -217,20 +245,20 @@ export default function CalendarView({
 
   // Load view config when viewId changes
   useEffect(() => {
-    if (viewId) {
+    if (viewUuid) {
       loadViewConfig()
     }
-  }, [viewId])
+  }, [viewUuid])
 
   async function loadViewConfig() {
-    if (!viewId) return
+    if (!viewUuid) return
     
     try {
       const supabase = createClient()
       const { data: view } = await supabase
         .from('views')
         .select('config, table_id')
-        .eq('id', viewId)
+        .eq('id', viewUuid)
         .single()
 
       if (view?.config) {
@@ -467,13 +495,13 @@ export default function CalendarView({
     }
 
     // If no tableId but we have viewId, fetch the view's table_id (fallback for legacy pages)
-    if (!tableId && viewId) {
+    if (!tableId && viewUuid) {
       try {
         const supabase = createClient()
         const { data: view, error } = await supabase
           .from("views")
           .select("table_id")
-          .eq("id", viewId)
+          .eq("id", viewUuid)
           .single()
 
         if (error) {
@@ -668,6 +696,69 @@ export default function CalendarView({
     // Map back to TableRow format
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, loadedTableFields, searchQuery, fieldIds])
+
+  // Resolve display labels for any link_to_table fields shown on calendar cards.
+  useEffect(() => {
+    let cancelled = false
+
+    const collectIds = (raw: any): string[] => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.flatMap(collectIds)
+      if (typeof raw === "object") {
+        if (raw && "id" in raw) return [String((raw as any).id)]
+        return []
+      }
+      const s = String(raw).trim()
+      return s ? [s] : []
+    }
+
+    async function load() {
+      const idsToResolve = new Map<string, { field: LinkedField; ids: Set<string> }>()
+
+      const resolveFieldObj = (raw: string) => {
+        const trimmed = String(raw || "").trim()
+        if (!trimmed) return null
+        return loadedTableFields.find((f) => f.name === trimmed || f.id === trimmed) || null
+      }
+
+      // Calendar cards are driven by `fieldIds` (fields to show in cards/table).
+      for (const fid of Array.isArray(fieldIds) ? fieldIds : []) {
+        const f = resolveFieldObj(fid)
+        if (!f || f.type !== "link_to_table") continue
+        if (!idsToResolve.has(f.name)) idsToResolve.set(f.name, { field: f as LinkedField, ids: new Set<string>() })
+      }
+
+      if (idsToResolve.size === 0) {
+        setLinkedValueLabelMaps((prev) => (Object.keys(prev).length === 0 ? prev : {}))
+        return
+      }
+
+      for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
+        const data = (row as any)?.data || {}
+        for (const { field, ids } of idsToResolve.values()) {
+          for (const id of collectIds(data[field.name])) ids.add(id)
+        }
+      }
+
+      const next: Record<string, Record<string, string>> = {}
+      for (const { field, ids } of idsToResolve.values()) {
+        if (ids.size === 0) continue
+        const map = await resolveLinkedFieldDisplayMap(field, Array.from(ids))
+        const obj = Object.fromEntries(map.entries())
+        next[field.name] = obj
+        next[(field as any).id] = obj
+      }
+
+      if (!cancelled) {
+        setLinkedValueLabelMaps((prev) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [filteredRows, loadedTableFields, fieldIds, areLinkedValueMapsEqual])
 
 
   // Find date field in loadedTableFields to validate it exists and is a date type
@@ -1354,10 +1445,9 @@ export default function CalendarView({
   ])
 
   // Get events for rendering (hook; declared before early returns)
-  const calendarEvents = useMemo(() => getEvents(), [
+  const computedCalendarEvents = useMemo(() => getEvents(), [
     // Data that affects which rows become events
     filteredRows,
-    rows,
     searchQuery,
     filtersKey,
     // Field/config that affects mapping
@@ -1371,6 +1461,36 @@ export default function CalendarView({
     blockConfigEventKey,
     viewConfigEventKey,
   ])
+
+  // Make `events` prop stable across unrelated re-renders to avoid FullCalendar internal update loops.
+  // We intentionally derive a lightweight signature from stable primitives.
+  const calendarEvents = useMemo(() => {
+    const signature = (Array.isArray(computedCalendarEvents) ? computedCalendarEvents : [])
+      .map((e: any) => {
+        const startMs =
+          e?.start instanceof Date ? e.start.getTime() : typeof e?.start === "number" ? e.start : String(e?.start || "")
+        const endMs =
+          e?.end instanceof Date ? e.end.getTime() : typeof e?.end === "number" ? e.end : String(e?.end || "")
+        const bg = String(e?.backgroundColor || "")
+        const title = String(e?.title || "")
+        const id = String(e?.id || "")
+        const image = String(e?.extendedProps?.image || "")
+        const cards = Array.isArray(e?.extendedProps?.cardFields)
+          ? e.extendedProps.cardFields
+              .map((cf: any) => `${String(cf?.field?.id || cf?.field?.name || "")}=${String(cf?.value ?? "")}`)
+              .join(",")
+          : ""
+        return `${id}|${title}|${startMs}|${endMs}|${bg}|${image}|${cards}`
+      })
+      .join("~")
+
+    if (prevCalendarEventsSignatureRef.current === signature) {
+      return prevCalendarEventsRef.current
+    }
+    prevCalendarEventsSignatureRef.current = signature
+    prevCalendarEventsRef.current = computedCalendarEvents
+    return computedCalendarEvents
+  }, [computedCalendarEvents])
 
   // FullCalendar: keep option prop references stable to avoid internal update loops.
   // IMPORTANT: Hooks must be declared before any early returns.
@@ -1428,6 +1548,7 @@ export default function CalendarView({
                 <TimelineFieldValue
                   field={titleField}
                   value={titleValue ?? eventInfo.event.title}
+                  valueLabelMap={linkedValueLabelMaps[titleField.name] || linkedValueLabelMaps[titleField.id]}
                   compact={true}
                 />
               ) : (
@@ -1437,7 +1558,12 @@ export default function CalendarView({
             {cardFields.slice(0, 2).map((f: any, idx: number) => (
               <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
                 {f?.field ? (
-                  <TimelineFieldValue field={f.field as TableField} value={f.value} compact={true} />
+                  <TimelineFieldValue
+                    field={f.field as TableField}
+                    value={f.value}
+                    valueLabelMap={linkedValueLabelMaps[f.field.name] || linkedValueLabelMaps[f.field.id]}
+                    compact={true}
+                  />
                 ) : (
                   String(f?.value || "")
                 )}
@@ -1447,7 +1573,7 @@ export default function CalendarView({
         </div>
       </div>
     )
-  }, [])
+  }, [linkedValueLabelMaps])
 
   const onCalendarEventClick = useCallback(
     (info: any) => {

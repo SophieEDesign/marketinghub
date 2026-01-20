@@ -42,6 +42,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
 import { cn } from "@/lib/utils"
+import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
 
 interface FieldPickerModalProps {
   open: boolean
@@ -510,9 +511,19 @@ export default function FieldPickerModal({
                             <div className="mt-1 text-sm text-gray-900">
                               {value !== null && value !== undefined ? (
                                 field.type === "single_select" && typeof value === "string" ? (
-                                  <Badge variant="outline" className="text-xs">
-                                    {value}
-                                  </Badge>
+                                  <ChoicePill
+                                    label={value}
+                                    fieldType="single_select"
+                                    fieldOptions={field.options}
+                                    useSemanticColors={true}
+                                  />
+                                ) : field.type === "multi_select" && Array.isArray(value) ? (
+                                  <ChoicePillList
+                                    labels={value.map((v) => String(v))}
+                                    fieldType="multi_select"
+                                    fieldOptions={field.options}
+                                    max={3}
+                                  />
                                 ) : (
                                   String(value)
                                 )

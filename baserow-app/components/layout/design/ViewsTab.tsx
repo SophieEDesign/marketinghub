@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface ViewsTabProps {
   tableId: string
@@ -59,11 +60,16 @@ const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
     }
 
     try {
+      const viewUuid = normalizeUuid(viewId)
+      if (!viewUuid) {
+        alert("Invalid view ID.")
+        return
+      }
       const supabase = createClient()
       const { error } = await supabase
         .from("views")
         .delete()
-        .eq("id", viewId)
+        .eq("id", viewUuid)
 
       if (error) throw error
 

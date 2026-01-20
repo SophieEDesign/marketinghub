@@ -5,18 +5,20 @@ import { format } from "date-fns"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
+import { Plus, ChevronLeft, ZoomIn, ZoomOut } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
-import type { TableField } from "@/types/fields"
+import type { LinkedField, TableField } from "@/types/fields"
 import { isAbortError } from "@/lib/api/error-handling"
 import TimelineFieldValue from "./TimelineFieldValue"
 import {
   resolveChoiceColor,
   normalizeHexColor,
 } from "@/lib/field-colors"
+import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface TimelineViewProps {
   tableId: string
@@ -85,6 +87,7 @@ export default function TimelineView({
   rowSize = 'medium',
   reloadKey,
 }: TimelineViewProps) {
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
   const { openRecord } = useRecordPanel()
@@ -94,11 +97,37 @@ export default function TimelineView({
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("month")
   const [scrollPosition, setScrollPosition] = useState(0)
   const timelineRef = useRef<HTMLDivElement>(null)
+  const [linkedValueLabelMaps, setLinkedValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+
+  const areLinkedValueMapsEqual = useCallback(
+    (a: Record<string, Record<string, string>>, b: Record<string, Record<string, string>>): boolean => {
+      if (a === b) return true
+      const aKeys = Object.keys(a)
+      const bKeys = Object.keys(b)
+      if (aKeys.length !== bKeys.length) return false
+      for (const k of aKeys) {
+        if (!(k in b)) return false
+        const aInner = a[k] || {}
+        const bInner = b[k] || {}
+        const aInnerKeys = Object.keys(aInner)
+        const bInnerKeys = Object.keys(bInner)
+        if (aInnerKeys.length !== bInnerKeys.length) return false
+        for (const ik of aInnerKeys) {
+          if (aInner[ik] !== bInner[ik]) return false
+        }
+      }
+      return true
+    },
+    []
+  )
 
   // Drag and resize state
   const [draggingEvent, setDraggingEvent] = useState<string | null>(null)
   const [resizingEvent, setResizingEvent] = useState<{ id: string; edge: 'start' | 'end' } | null>(null)
   const [dragStartPos, setDragStartPos] = useState<{ x: number; startDate: Date; endDate: Date } | null>(null)
+  // We only start a drag after the pointer moves a small threshold.
+  // This fixes "can't click to open record" because mousedown no longer forces dragging state.
+  const [pendingDrag, setPendingDrag] = useState<{ id: string; x: number; startDate: Date; endDate: Date } | null>(null)
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, { start?: Date; end?: Date }>>({})
   // Avoid opening a record due to the synthetic click fired after drag/resize.
   const justInteractedEventIdRef = useRef<string | null>(null)
@@ -224,26 +253,84 @@ export default function TimelineView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
+  // Resolve display labels for any link_to_table fields used in cards/grouping.
+  useEffect(() => {
+    let cancelled = false
+
+    const collectIds = (raw: any): string[] => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.flatMap(collectIds)
+      if (typeof raw === "object") {
+        if (raw && "id" in raw) return [String((raw as any).id)]
+        return []
+      }
+      const s = String(raw).trim()
+      return s ? [s] : []
+    }
+
+    async function load() {
+      const fields = Array.isArray(tableFields) ? tableFields : []
+
+      const wanted = new Map<string, LinkedField>()
+      const addIfLinked = (f: TableField | null | undefined) => {
+        if (!f) return
+        if (f.type !== "link_to_table") return
+        wanted.set(f.name, f as LinkedField)
+      }
+
+      addIfLinked(resolvedCardFields?.titleField || null)
+      for (const f of (resolvedCardFields?.cardFields || [])) addIfLinked(f)
+      addIfLinked(resolvedGroupByField as any)
+
+      if (wanted.size === 0) {
+        setLinkedValueLabelMaps((prev) => (Object.keys(prev).length === 0 ? prev : {}))
+        return
+      }
+
+      const next: Record<string, Record<string, string>> = {}
+      for (const f of wanted.values()) {
+        const ids = new Set<string>()
+        for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
+          for (const id of collectIds((row as any)?.data?.[f.name])) ids.add(id)
+        }
+        if (ids.size === 0) continue
+        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        const obj = Object.fromEntries(map.entries())
+        next[f.name] = obj
+        next[(f as any).id] = obj
+      }
+
+      if (!cancelled) {
+        setLinkedValueLabelMaps((prev) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [filteredRows, resolvedCardFields, resolvedGroupByField, tableFieldsKey, areLinkedValueMapsEqual])
+
   // Load view config for timeline settings (color field, etc.)
   const [viewConfig, setViewConfig] = useState<{
     timeline_color_field?: string | null
   } | null>(null)
 
   useEffect(() => {
-    if (viewId) {
+    if (viewUuid) {
       loadViewConfig()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewId])
+  }, [viewUuid])
 
   async function loadViewConfig() {
-    if (!viewId) return
+    if (!viewUuid) return
     
     try {
       const { data: view } = await supabase
         .from('views')
         .select('config')
-        .eq('id', viewId)
+        .eq('id', viewUuid)
         .single()
 
       if (view?.config) {
@@ -636,17 +723,31 @@ export default function TimelineView({
             // - Dates: stringify (ISO or existing string)
             // - objects: JSON stringify fallback (rare)
             if (Array.isArray(groupFieldValue)) {
-              groupValue = groupFieldValue.length > 0 ? String(groupFieldValue[0] ?? '') : ''
+              const first = groupFieldValue.length > 0 ? groupFieldValue[0] : null
+              const id = first && typeof first === "object" && "id" in (first as any) ? String((first as any).id) : String(first ?? "")
+              groupValue =
+                resolvedGroupByField.type === "link_to_table" && id.trim()
+                  ? linkedValueLabelMaps[groupFieldName]?.[id.trim()] ?? id
+                  : id
             } else if (groupFieldValue instanceof Date) {
               groupValue = isNaN(groupFieldValue.getTime()) ? '' : groupFieldValue.toISOString()
             } else if (typeof groupFieldValue === 'object') {
-              try {
-                groupValue = JSON.stringify(groupFieldValue)
-              } catch {
-                groupValue = String(groupFieldValue)
+              if (resolvedGroupByField.type === "link_to_table" && groupFieldValue && "id" in (groupFieldValue as any)) {
+                const id = String((groupFieldValue as any).id ?? "").trim()
+                groupValue = id ? (linkedValueLabelMaps[groupFieldName]?.[id] ?? id) : ""
+              } else {
+                try {
+                  groupValue = JSON.stringify(groupFieldValue)
+                } catch {
+                  groupValue = String(groupFieldValue)
+                }
               }
             } else {
-              groupValue = String(groupFieldValue)
+              const id = String(groupFieldValue)
+              groupValue =
+                resolvedGroupByField.type === "link_to_table" && id.trim()
+                  ? linkedValueLabelMaps[groupFieldName]?.[id.trim()] ?? id
+                  : id
             }
             if (groupValue !== null) groupValue = groupValue.trim()
           }
@@ -923,16 +1024,19 @@ export default function TimelineView({
   // Handle drag start
   const handleDragStart = useCallback(
     (event: TimelineEvent, e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      setDraggingEvent(event.id)
-      setDragStartPos({
+      if (isViewOnly) return
+
+      // Do NOT immediately enter dragging state. That breaks click-to-open.
+      // Instead, mark this as a pending drag, and promote to a real drag only
+      // after the pointer moves beyond a small threshold.
+      setPendingDrag({
+        id: event.id,
         x: e.clientX,
         startDate: new Date(event.start),
         endDate: new Date(event.end),
       })
     },
-    []
+    [isViewOnly]
   )
 
   // Handle resize start
@@ -953,8 +1057,8 @@ export default function TimelineView({
 
   // Handle mouse move for dragging/resizing
   useEffect(() => {
-    if (!draggingEvent && !resizingEvent) return
-    if (!dragStartPos) return
+    if (!pendingDrag && !draggingEvent && !resizingEvent) return
+    if ((draggingEvent || resizingEvent) && !dragStartPos) return
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!timelineRef.current) return
@@ -963,6 +1067,23 @@ export default function TimelineView({
       const relativeX = e.clientX - timelineRect.left
       const timelineWidth = timelineRef.current.clientWidth
       const rangeMs = timelineRange.end.getTime() - timelineRange.start.getTime()
+
+      // Promote pending drag to real drag only after moving a threshold.
+      if (pendingDrag && !draggingEvent && !resizingEvent) {
+        const dx = e.clientX - pendingDrag.x
+        const DRAG_THRESHOLD_PX = 4
+        if (Math.abs(dx) >= DRAG_THRESHOLD_PX) {
+          setDraggingEvent(pendingDrag.id)
+          setDragStartPos({
+            x: pendingDrag.x,
+            startDate: pendingDrag.startDate,
+            endDate: pendingDrag.endDate,
+          })
+          setPendingDrag(null)
+        } else {
+          return
+        }
+      }
       
       if (draggingEvent) {
         // Calculate the offset from the drag start
@@ -1004,6 +1125,12 @@ export default function TimelineView({
     }
 
     const handleMouseUp = async () => {
+      // If we never crossed the threshold, treat as a normal click.
+      if (pendingDrag && !draggingEvent && !resizingEvent) {
+        setPendingDrag(null)
+        return
+      }
+
       if (draggingEvent && dragStartPos) {
         const event = events.find((e) => e.id === draggingEvent)
         if (event) {
@@ -1051,7 +1178,7 @@ export default function TimelineView({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [draggingEvent, resizingEvent, dragStartPos, timelineRange, events, handleEventUpdate])
+  }, [pendingDrag, draggingEvent, resizingEvent, dragStartPos, timelineRange, events, handleEventUpdate])
 
   const handlePrevious = () => {
     const newDate = new Date(currentDate)
@@ -1264,7 +1391,7 @@ export default function TimelineView({
                               className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
                                 event.color ? `border-l-4` : ""
                               } ${isDragging || isResizing ? 'opacity-75' : ''} ${
-                                draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
+                                draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
                               } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
                               style={{
                                 borderLeftColor: event.color,
@@ -1272,32 +1399,8 @@ export default function TimelineView({
                               }}
                               onMouseDown={(e) => handleDragStart(event, e)}
                               onClick={(e) => handleEventSelect(event, e)}
-                              onDoubleClick={(e) => {
-                                // Optional: double-click background opens record.
-                                const target = e.target as HTMLElement
-                                if (target.closest('[data-timeline-open="true"]')) return
-                                if (target.closest('[data-timeline-field="true"]')) return
-                                if (target.closest('[data-timeline-resize="true"]')) return
-                                handleOpenEventRecord(event.rowId)
-                              }}
                             >
                               <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
-                                {/* Record open control (explicit) */}
-                                <div className="absolute top-1 right-1">
-                                  <button
-                                    type="button"
-                                    data-timeline-open="true"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleOpenEventRecord(event.rowId)
-                                    }}
-                                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                                    title="Open record"
-                                    aria-label="Open record"
-                                  >
-                                    <ChevronRight className="h-4 w-4" />
-                                  </button>
-                                </div>
                                 {/* Image if configured */}
                                 {event.image && (
                                   <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
@@ -1328,7 +1431,7 @@ export default function TimelineView({
 
                                 {/* Card fields */}
                                 {resolvedCardFields.cardFields.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-0.5" data-timeline-field="true" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex flex-wrap gap-1 mt-0.5">
                                     {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
                                       const value = event.rowData[field.name]
                                       return (
@@ -1336,6 +1439,7 @@ export default function TimelineView({
                                           key={field.id}
                                           field={field}
                                           value={value}
+                                          valueLabelMap={linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]}
                                           compact={true}
                                         />
                                       )
@@ -1380,7 +1484,7 @@ export default function TimelineView({
                       className={`${rowSizeSpacing.cardHeight} shadow-sm hover:shadow-md transition-shadow ${
                         event.color ? `border-l-4` : ""
                       } ${isDragging || isResizing ? 'opacity-75' : ''} ${
-                        draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-move'
+                        draggingEvent || resizingEvent ? 'cursor-grabbing' : 'cursor-pointer'
                       } ${selectedEventId === event.rowId ? 'ring-1 ring-blue-400/40' : ''}`}
                       style={{
                         borderLeftColor: event.color,
@@ -1388,33 +1492,8 @@ export default function TimelineView({
                       }}
                       onMouseDown={(e) => handleDragStart(event, e)}
                       onClick={(e) => handleEventSelect(event, e)}
-                      onDoubleClick={(e) => {
-                        // Optional: double-click background opens record.
-                        const target = e.target as HTMLElement
-                        if (target.closest('[data-timeline-open="true"]')) return
-                        if (target.closest('[data-timeline-field="true"]')) return
-                        if (target.closest('[data-timeline-resize="true"]')) return
-                        handleOpenEventRecord(event.rowId)
-                      }}
                     >
                       <CardContent className={`${rowSizeSpacing.cardPadding} h-full flex flex-col relative gap-1`}>
-                        {/* Record open control (explicit) */}
-                        <div className="absolute top-1 right-1">
-                          <button
-                            type="button"
-                            data-timeline-open="true"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleOpenEventRecord(event.rowId)
-                            }}
-                            className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-                            title="Open record"
-                            aria-label="Open record"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </div>
-
                         {/* Image if configured */}
                         {event.image && (
                           <div className={`flex-shrink-0 w-6 h-6 rounded overflow-hidden bg-gray-100 ${fitImageSize ? 'object-contain' : 'object-cover'}`}>
@@ -1445,7 +1524,7 @@ export default function TimelineView({
 
                         {/* Card fields */}
                         {resolvedCardFields.cardFields.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-0.5" data-timeline-field="true" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
                             {resolvedCardFields.cardFields.slice(0, 3).map((field) => {
                               const value = event.rowData[field.name]
                               return (
@@ -1453,6 +1532,7 @@ export default function TimelineView({
                                   key={field.id}
                                   field={field}
                                   value={value}
+                                  valueLabelMap={linkedValueLabelMaps[field.name] || linkedValueLabelMaps[field.id]}
                                   compact={true}
                                 />
                               )

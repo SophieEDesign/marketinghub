@@ -1,12 +1,17 @@
 import { createClient } from '../supabase/server'
 import type { ViewBlock } from '@/types/database'
+import { normalizeUuid } from '@/lib/utils/ids'
 
 export async function getViewBlocks(viewId: string) {
+  const viewUuid = normalizeUuid(viewId)
+  if (!viewUuid) {
+    throw new Error(`Invalid viewId (expected UUID): ${String(viewId)}`)
+  }
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('view_blocks')
     .select('*')
-    .eq('view_id', viewId)
+    .eq('view_id', viewUuid)
     .order('order_index', { ascending: true })
   
   if (error) throw error

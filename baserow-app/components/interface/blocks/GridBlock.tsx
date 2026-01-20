@@ -25,6 +25,7 @@ import { Plus } from "lucide-react"
 import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface GridBlockProps {
   block: PageBlock
@@ -57,6 +58,7 @@ export default function GridBlock({
   const tableId = config?.table_id || legacyTableId || pageTableId || config?.base_table || null
   // RULE: Views are currently not used; ignore view_id unless explicitly enabled.
   const viewId = VIEWS_ENABLED ? config?.view_id : null
+  const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   const viewType: ViewType = config?.view_type || 'grid'
   
   // DEBUG_LIST: Log tableId resolution
@@ -106,7 +108,7 @@ export default function GridBlock({
   const [groupBy, setGroupBy] = useState<string | undefined>(undefined)
   
   // Use cached metadata hook (serialized, no parallel requests)
-  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewId, tableId)
+  const { metadata: viewMeta, loading: metaLoading } = useViewMeta(viewUuid, tableId)
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
@@ -211,11 +213,11 @@ export default function GridBlock({
 
         // Load view config if viewId provided (separate from metadata)
         // RULE: Views are disabled by default; only load when explicitly enabled.
-        if (VIEWS_ENABLED && viewId) {
+        if (VIEWS_ENABLED && viewUuid) {
           const viewRes = await supabase
             .from("views")
             .select("config")
-            .eq("id", viewId)
+            .eq("id", viewUuid)
             .maybeSingle()
 
           if (viewRes.data?.config) {
@@ -234,7 +236,7 @@ export default function GridBlock({
     }
 
     loadTableData()
-  }, [tableId, viewId]) // Dependencies are tableId/viewId values, not config reference
+  }, [tableId, viewUuid]) // Dependencies are tableId/viewId values, not config reference
 
   // Combine loading states
   const isLoading = loading || metaLoading
@@ -508,7 +510,7 @@ export default function GridBlock({
         return (
           <CalendarView
             tableId={tableId}
-            viewId={viewId || ''}
+            viewId={viewUuid || ''}
             dateFieldId={dateFieldId}
             fieldIds={fieldIds}
             tableFields={tableFields}
@@ -567,7 +569,7 @@ export default function GridBlock({
         return (
           <KanbanView
             tableId={tableId}
-            viewId={viewId || ''}
+            viewId={viewUuid || ''}
             groupingFieldId={groupByFieldId}
             fieldIds={fieldIds}
             searchQuery=""
@@ -610,7 +612,7 @@ export default function GridBlock({
         return (
           <TimelineView
             tableId={tableId!}
-            viewId={viewId || ''}
+            viewId={viewUuid || ''}
             dateFieldId={dateFieldId}
             startDateFieldId={dateFromFieldFromConfig}
             endDateFieldId={dateToFieldFromConfig}
@@ -655,7 +657,7 @@ export default function GridBlock({
         return (
           <GalleryView
             tableId={tableId}
-            viewId={viewId || undefined}
+            viewId={viewUuid || undefined}
             fieldIds={fieldIds}
             searchQuery=""
             tableFields={tableFields}
@@ -709,7 +711,7 @@ export default function GridBlock({
         return (
           <GridViewWrapper
             tableId={tableId!}
-            viewId={viewId || ''}
+            viewId={viewUuid || ''}
             supabaseTableName={table.supabase_table}
             viewFields={visibleFields}
             initialFilters={activeFilters}

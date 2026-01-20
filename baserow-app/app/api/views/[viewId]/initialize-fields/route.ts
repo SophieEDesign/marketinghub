@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { normalizeUuid } from '@/lib/utils/ids'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
 function isSystemFieldName(name: string) {
@@ -15,15 +16,22 @@ export async function POST(
   { params }: { params: Promise<{ viewId: string }> }
 ) {
   const { viewId } = await params
+  const viewUuid = normalizeUuid(viewId)
   try {
+    if (!viewUuid) {
+      return NextResponse.json(
+        { error: 'Invalid viewId (expected UUID)', error_code: 'INVALID_VIEW_ID', viewId },
+        { status: 400 }
+      )
+    }
     const supabase = await createClient()
-    console.log('🔥 initialize-fields CALLED', { viewId })
+    console.log('🔥 initialize-fields CALLED', { viewId, viewUuid })
 
     // 1. Get the view to find its table_id
     const { data: view, error: viewError } = await supabase
       .from('views')
       .select('table_id')
-      .eq('id', viewId)
+      .eq('id', viewUuid)
       .single()
 
     if (viewError || !view) {
@@ -59,7 +67,7 @@ export async function POST(
     const { data: existingViewFields, error: existingError } = await supabase
       .from('view_fields')
       .select('field_name')
-      .eq('view_id', viewId)
+      .eq('view_id', viewUuid)
 
     if (existingError && existingError.code !== 'PGRST116') {
       // PGRST116 is "no rows returned", which is fine
@@ -77,7 +85,7 @@ export async function POST(
     const fieldsToAdd = tableFields
       .filter((field) => !existingFieldNames.has(field.name))
       .map((field, index) => ({
-        view_id: viewId,
+        view_id: viewUuid,
         field_name: field.name,
         // System fields should exist for sorting/filtering but stay hidden by default.
         visible: !isSystemFieldName(field.name),
@@ -177,6 +185,7 @@ export async function POST(
       
       console.error('🔥 initialize-fields INSERT ERROR:', {
         viewId,
+        viewUuid,
         tableId: view.table_id,
         fieldsToAddCount: fieldsToAdd.length,
         errorCode: insertError.code,
@@ -193,6 +202,7 @@ export async function POST(
           error_code: isRLSViolation ? 'RLS_ERROR' : isTableNotFound ? 'TABLE_NOT_FOUND' : 'INSERT_ERROR', 
           details: errorMessage,
           viewId,
+          viewUuid,
           tableId: view.table_id,
         },
         { status: 500 }
@@ -208,6 +218,7 @@ export async function POST(
   } catch (error: any) {
     console.error('🔥 initialize-fields ERROR:', {
       viewId,
+      viewUuid,
       error: error.message,
       errorCode: error.code,
       errorStack: error.stack,

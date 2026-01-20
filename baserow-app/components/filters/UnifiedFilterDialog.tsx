@@ -15,6 +15,7 @@ import type { ViewFilterGroup, ViewFilter, FilterConditionType, FilterType } fro
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbFiltersToFilterTree, filterTreeToDbFormat } from "@/lib/filters/converters"
 import FilterBuilder from "./FilterBuilder"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface UnifiedFilterDialogProps {
   isOpen: boolean
@@ -46,6 +47,7 @@ export default function UnifiedFilterDialog({
   filters,
   onFiltersChange,
 }: UnifiedFilterDialogProps) {
+  const viewUuid = normalizeUuid(viewId)
   const [filterTree, setFilterTree] = useState<FilterTree>(null)
   const [loading, setLoading] = useState(false)
 
@@ -59,12 +61,15 @@ export default function UnifiedFilterDialog({
   async function loadFilters() {
     try {
       setLoading(true)
+      if (!viewUuid) {
+        throw new Error("Invalid viewId (expected UUID).")
+      }
       
       // Load filter groups
       const { data: groups, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
       if (groupsError) throw groupsError
@@ -73,7 +78,7 @@ export default function UnifiedFilterDialog({
       const { data: allFilters, error: filtersError } = await supabase
         .from("view_filters")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
       if (filtersError) throw filtersError
@@ -93,13 +98,17 @@ export default function UnifiedFilterDialog({
   async function handleSave() {
     try {
       setLoading(true)
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so filters can't be saved.")
+        return
+      }
 
       // Delete existing filter groups and filters
-      await supabase.from("view_filters").delete().eq("view_id", viewId)
-      await supabase.from("view_filter_groups").delete().eq("view_id", viewId)
+      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
+      await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
 
       // Convert filter tree to database format
-      const { groups, filters: dbFilters } = filterTreeToDbFormat(filterTree, viewId)
+      const { groups, filters: dbFilters } = filterTreeToDbFormat(filterTree, viewUuid)
 
       // Insert filter groups first
       let insertedGroupIds: string[] = []
@@ -142,7 +151,7 @@ export default function UnifiedFilterDialog({
       const { data: insertedFilters } = await supabase
         .from("view_filters")
         .select("id, field_name, operator, value")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
       
       const flattenedFilters = (insertedFilters || []).map((f) => ({

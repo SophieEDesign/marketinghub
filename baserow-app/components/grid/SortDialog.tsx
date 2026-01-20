@@ -20,6 +20,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface SortDialogProps {
   isOpen: boolean
@@ -42,6 +43,7 @@ export default function SortDialog({
   sorts,
   onSortsChange,
 }: SortDialogProps) {
+  const viewUuid = normalizeUuid(viewId)
   const [localSorts, setLocalSorts] = useState(sorts)
 
   useEffect(() => {
@@ -78,15 +80,19 @@ export default function SortDialog({
 
   async function handleSave() {
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so sorts can't be saved.")
+        return
+      }
       // Delete existing sorts
-      await supabase.from("view_sorts").delete().eq("view_id", viewId)
+      await supabase.from("view_sorts").delete().eq("view_id", viewUuid)
 
       // Insert new sorts with order_index
       if (localSorts.length > 0) {
         const sortsToInsert = localSorts
           .filter(s => s.field_name)
           .map((sort, index) => ({
-            view_id: viewId,
+            view_id: viewUuid,
             field_name: sort.field_name,
             direction: sort.direction,
             order_index: index,

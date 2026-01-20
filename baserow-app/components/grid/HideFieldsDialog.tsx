@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface HideFieldsDialogProps {
   isOpen: boolean
@@ -46,6 +47,7 @@ export default function HideFieldsDialog({
   hiddenFields,
   onHiddenFieldsChange,
 }: HideFieldsDialogProps) {
+  const viewUuid = normalizeUuid(viewId)
   const [localHiddenFields, setLocalHiddenFields] = useState<string[]>(hiddenFields)
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<"position" | "name_asc" | "name_desc" | "type_asc">("position")
@@ -154,6 +156,10 @@ export default function HideFieldsDialog({
 
   async function handleSave() {
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so visibility can't be saved.")
+        return
+      }
       // Update view_fields visibility
       const updates = viewFields.map((vf) => ({
         field_name: vf.field_name,
@@ -165,7 +171,7 @@ export default function HideFieldsDialog({
           supabase
             .from("view_fields")
             .update({ visible: update.visible })
-            .eq("view_id", viewId)
+            .eq("view_id", viewUuid)
             .eq("field_name", update.field_name)
         )
       )

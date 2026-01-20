@@ -4,12 +4,14 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import BlockRenderer from "@/components/blocks/BlockRenderer"
 import type { ViewBlock } from "@/types/database"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface InterfacePageProps {
   viewId: string
 }
 
 export default function InterfacePage({ viewId }: InterfacePageProps) {
+  const viewUuid = normalizeUuid(viewId)
   const [blocks, setBlocks] = useState<ViewBlock[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -20,10 +22,16 @@ export default function InterfacePage({ viewId }: InterfacePageProps) {
 
   async function loadBlocks() {
     setLoading(true)
+    if (!viewUuid) {
+      console.warn("InterfacePage: viewId is not a valid UUID; cannot load blocks.")
+      setBlocks([])
+      setLoading(false)
+      return
+    }
     const { data, error } = await supabase
       .from("view_blocks")
       .select("*")
-      .eq("view_id", viewId)
+      .eq("view_id", viewUuid)
       .order("order_index", { ascending: true })
 
     if (error) {

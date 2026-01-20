@@ -27,6 +27,7 @@ import {
   resolveChoiceColor,
   normalizeHexColor,
 } from "@/lib/field-colors"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 interface FilterDialogProps {
   isOpen: boolean
@@ -63,6 +64,7 @@ export default function FilterDialog({
   filters,
   onFiltersChange,
 }: FilterDialogProps) {
+  const viewUuid = normalizeUuid(viewId)
   const [filterGroups, setFilterGroups] = useState<LocalFilterGroup[]>([])
   const [ungroupedFilters, setUngroupedFilters] = useState<LocalFilter[]>([])
 
@@ -75,11 +77,14 @@ export default function FilterDialog({
 
   async function loadFilterGroups() {
     try {
+      if (!viewUuid) {
+        throw new Error("Invalid viewId (expected UUID).")
+      }
       // Load filter groups
       const { data: groups, error: groupsError } = await supabase
         .from("view_filter_groups")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
       if (groupsError) throw groupsError
@@ -88,7 +93,7 @@ export default function FilterDialog({
       const { data: allFilters, error: filtersError } = await supabase
         .from("view_filters")
         .select("*")
-        .eq("view_id", viewId)
+        .eq("view_id", viewUuid)
         .order("order_index", { ascending: true })
 
       if (filtersError) throw filtersError
@@ -275,15 +280,19 @@ export default function FilterDialog({
 
   async function handleSave() {
     try {
+      if (!viewUuid) {
+        alert("This view is not linked to a valid view ID, so filters can't be saved.")
+        return
+      }
       // Delete existing filter groups and filters
-      await supabase.from("view_filters").delete().eq("view_id", viewId)
-      await supabase.from("view_filter_groups").delete().eq("view_id", viewId)
+      await supabase.from("view_filters").delete().eq("view_id", viewUuid)
+      await supabase.from("view_filter_groups").delete().eq("view_id", viewUuid)
 
       // Insert filter groups first
       const groupsToInsert = filterGroups
         .filter((group) => group.filters.length > 0)
         .map((group, index) => ({
-          view_id: viewId,
+          view_id: viewUuid,
           condition_type: group.condition_type,
           order_index: index,
         }))
@@ -308,7 +317,7 @@ export default function FilterDialog({
           group.filters.forEach((filter, filterIndex) => {
             if (filter.field_name && filter.operator) {
               filtersToInsert.push({
-                view_id: viewId,
+                view_id: viewUuid,
                 field_name: filter.field_name,
                 operator: filter.operator,
                 value: filter.value || null,
@@ -324,7 +333,7 @@ export default function FilterDialog({
       ungroupedFilters.forEach((filter, index) => {
         if (filter.field_name && filter.operator) {
           filtersToInsert.push({
-            view_id: viewId,
+            view_id: viewUuid,
             field_name: filter.field_name,
             operator: filter.operator,
             value: filter.value || null,

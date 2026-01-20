@@ -1,13 +1,9 @@
 "use client"
 
 import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
-import {
-  getTextColorForBackground,
-  normalizeHexColor,
-  resolveChoiceColor,
-} from "@/lib/field-colors"
 import type { FieldOptions } from "@/types/fields"
 import { getManualChoiceLabels } from "@/lib/fields/select-options"
+import { ChoicePill } from "@/components/fields/ChoicePill"
 
 interface SelectCellProps {
   value: string | null
@@ -45,21 +41,12 @@ export default function SelectCell({
     return (
       <div className="w-full h-full px-3 flex items-center gap-2 text-sm overflow-hidden" style={containerStyle}>
         {value ? (
-          (() => {
-            const hexColor = fieldOptions
-              ? resolveChoiceColor(value, "single_select", fieldOptions, true)
-              : "#BFDBFE"
-            const textColorClass = getTextColorForBackground(hexColor)
-            const bgColor = normalizeHexColor(hexColor)
-            return (
-              <span
-                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-                style={{ backgroundColor: bgColor }}
-              >
-                {value}
-              </span>
-            )
-          })()
+          <ChoicePill
+            label={value}
+            fieldType="single_select"
+            fieldOptions={fieldOptions}
+            useSemanticColors={true}
+          />
         ) : (
           <span className="text-gray-400 italic text-sm">{placeholder}</span>
         )}

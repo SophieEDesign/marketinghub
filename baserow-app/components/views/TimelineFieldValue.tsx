@@ -1,17 +1,14 @@
 "use client"
 
-import { useMemo } from "react"
-import {
-  resolveChoiceColor,
-  getTextColorForBackground,
-  normalizeHexColor,
-} from "@/lib/field-colors"
 import type { TableField } from "@/types/fields"
+import { ChoicePill, ChoicePillList } from "@/components/fields/ChoicePill"
 
 interface TimelineFieldValueProps {
   field: TableField
   value: any
   compact?: boolean // For compact card display
+  /** Optional map for resolving link_to_table UUIDs -> display labels */
+  valueLabelMap?: Record<string, string>
 }
 
 /**
@@ -25,6 +22,7 @@ export default function TimelineFieldValue({
   field,
   value,
   compact = false,
+  valueLabelMap,
 }: TimelineFieldValueProps) {
   // Handle null/undefined/empty values
   if (value === null || value === undefined || value === "") {
@@ -34,25 +32,14 @@ export default function TimelineFieldValue({
   // Single select - render as colored pill
   if (field.type === "single_select") {
     const normalizedValue = String(value).trim()
-    const hexColor = resolveChoiceColor(
-      normalizedValue,
-      "single_select",
-      field.options,
-      true // Use semantic colors
-    )
-    const textColorClass = getTextColorForBackground(hexColor)
-    const bgColor = normalizeHexColor(hexColor)
-
     return (
-      <span
-        className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-        style={{
-          backgroundColor: bgColor,
-          boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-        }}
-      >
-        {normalizedValue}
-      </span>
+      <ChoicePill
+        label={normalizedValue}
+        fieldType="single_select"
+        fieldOptions={field.options}
+        useSemanticColors={true}
+        density={compact ? "compact" : "default"}
+      />
     )
   }
 
@@ -64,32 +51,13 @@ export default function TimelineFieldValue({
     }
 
     return (
-      <div className="flex flex-wrap gap-1">
-        {values.map((val: string, idx: number) => {
-          const normalizedValue = String(val).trim()
-          const hexColor = resolveChoiceColor(
-            normalizedValue,
-            "multi_select",
-            field.options,
-            false // Use muted colors for multi-select
-          )
-          const textColorClass = getTextColorForBackground(hexColor)
-          const bgColor = normalizeHexColor(hexColor)
-
-          return (
-            <span
-              key={idx}
-              className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-              style={{
-                backgroundColor: bgColor,
-                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
-              }}
-            >
-              {normalizedValue}
-            </span>
-          )
-        })}
-      </div>
+      <ChoicePillList
+        labels={values.map((v) => String(v).trim()).filter(Boolean)}
+        fieldType="multi_select"
+        fieldOptions={field.options}
+        max={compact ? 1 : 3}
+        density={compact ? "compact" : "default"}
+      />
     )
   }
 
@@ -103,7 +71,12 @@ export default function TimelineFieldValue({
     return (
       <div className="flex flex-wrap gap-1">
         {linkedRecords.slice(0, compact ? 1 : 3).map((record: any, idx: number) => {
-          const label = typeof record === "string" ? record : record?.label || record?.id || "Linked"
+          const id = typeof record === "string" ? record : record?.id
+          const fallbackLabel = typeof record === "string" ? record : record?.label || record?.id || "Linked"
+          const label =
+            typeof id === "string" && id.trim() && valueLabelMap?.[id.trim()]
+              ? valueLabelMap[id.trim()]
+              : fallbackLabel
           return (
             <span
               key={idx}

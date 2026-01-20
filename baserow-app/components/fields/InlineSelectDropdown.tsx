@@ -5,11 +5,12 @@ import { Plus, Edit2, Palette, X, Check } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   resolveChoiceColor,
-  getTextColorForBackground,
   normalizeHexColor,
   getChoiceThemePalette,
 } from '@/lib/field-colors'
-import type { FieldOptions } from '@/types/fields'
+import type { FieldOptions, SelectOption } from '@/types/fields'
+import { ChoicePill } from '@/components/fields/ChoicePill'
+import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 
 interface InlineSelectDropdownProps {
   value: string | string[] | null
@@ -99,6 +100,48 @@ export default function InlineSelectDropdown({
     }
   }, [choiceColors, fieldOptions])
 
+  const safeId = () =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? (crypto as any).randomUUID()
+      : `opt_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`
+
+  const nowIso = () => {
+    try {
+      return new Date().toISOString()
+    } catch {
+      return ''
+    }
+  }
+
+  const buildSelectOptionsPayload = (base: FieldOptions, input: SelectOption[]): FieldOptions => {
+    const withColors = (Array.isArray(input) ? input : []).map((o, idx) => {
+      const label = String(o?.label ?? '').trim()
+      const color = o?.color || (base.choiceColors ? (base.choiceColors as any)[label] : undefined)
+      return {
+        ...o,
+        id: String(o?.id || '').trim() || safeId(),
+        label,
+        color,
+        sort_index: idx,
+        created_at: typeof o?.created_at === 'string' && o.created_at ? o.created_at : nowIso(),
+      }
+    })
+
+    const choices = withColors.map((o) => o.label)
+    const choiceColorsOut: Record<string, string> = {}
+    for (const o of withColors) {
+      if (o.color) choiceColorsOut[o.label] = o.color
+    }
+
+    return {
+      ...base,
+      selectOptions: withColors,
+      // Keep legacy keys in sync so older UI paths remain stable.
+      choices,
+      choiceColors: Object.keys(choiceColorsOut).length > 0 ? choiceColorsOut : undefined,
+    }
+  }
+
   // Get color for a choice
   const getChoiceColor = (choice: string, useSemantic: boolean = fieldType === 'single_select') => {
     return resolveChoiceColor(choice, fieldType, mergedOptions, useSemantic)
@@ -130,6 +173,16 @@ export default function InlineSelectDropdown({
     setUpdatingOptions(true)
 
     try {
+      const base =
+        normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
+      const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const nextSelectOptions = [
+        ...selectOptions,
+        { id: safeId(), label: newChoice, sort_index: selectOptions.length, created_at: nowIso() },
+      ].sort((a, b) => a.sort_index - b.sort_index)
+
+      const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
+
       // Update field options via API
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: 'PATCH',
@@ -137,8 +190,7 @@ export default function InlineSelectDropdown({
         body: JSON.stringify({
           fieldId,
           options: {
-            ...fieldOptions,
-            choices: [...choices, newChoice],
+            ...nextOptions,
           },
         }),
       })
@@ -177,14 +229,14 @@ export default function InlineSelectDropdown({
     setUpdatingOptions(true)
 
     try {
-      const newChoices = choices.map(c => c === oldChoice ? newName.trim() : c)
-      const newChoiceColors: Record<string, string> = { ...(fieldOptions?.choiceColors || {}) }
-      
-      // Preserve color when renaming
-      if (newChoiceColors[oldChoice]) {
-        newChoiceColors[newName.trim()] = newChoiceColors[oldChoice]
-        delete newChoiceColors[oldChoice]
-      }
+      const trimmed = newName.trim()
+      const base =
+        normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
+      const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const nextSelectOptions = selectOptions.map((o) =>
+        o.label === oldChoice ? { ...o, label: trimmed } : o
+      )
+      const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
       // Update field options
       const response = await fetch(`/api/tables/${tableId}/fields`, {
@@ -193,9 +245,7 @@ export default function InlineSelectDropdown({
         body: JSON.stringify({
           fieldId,
           options: {
-            ...fieldOptions,
-            choices: newChoices,
-            choiceColors: newChoiceColors,
+            ...nextOptions,
           },
         }),
       })
@@ -231,10 +281,13 @@ export default function InlineSelectDropdown({
     setUpdatingOptions(true)
 
     try {
-      const newChoiceColors = {
-        ...(fieldOptions?.choiceColors || {}),
-        [choice]: newColor,
-      }
+      const base =
+        normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
+      const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const nextSelectOptions = selectOptions.map((o) =>
+        o.label === choice ? { ...o, color: newColor } : o
+      )
+      const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: 'PATCH',
@@ -242,8 +295,7 @@ export default function InlineSelectDropdown({
         body: JSON.stringify({
           fieldId,
           options: {
-            ...fieldOptions,
-            choiceColors: newChoiceColors,
+            ...nextOptions,
           },
         }),
       })
@@ -271,9 +323,11 @@ export default function InlineSelectDropdown({
     setUpdatingOptions(true)
 
     try {
-      const newChoices = choices.filter(c => c !== choiceToDelete)
-      const newChoiceColors = { ...(fieldOptions?.choiceColors || {}) }
-      delete newChoiceColors[choiceToDelete]
+      const base =
+        normalizeSelectOptionsForUi(fieldType, mergedOptions).repairedFieldOptions || mergedOptions
+      const { selectOptions } = normalizeSelectOptionsForUi(fieldType, base)
+      const nextSelectOptions = selectOptions.filter((o) => o.label !== choiceToDelete)
+      const nextOptions = buildSelectOptionsPayload(base, nextSelectOptions)
 
       const response = await fetch(`/api/tables/${tableId}/fields`, {
         method: 'PATCH',
@@ -281,9 +335,7 @@ export default function InlineSelectDropdown({
         body: JSON.stringify({
           fieldId,
           options: {
-            ...fieldOptions,
-            choices: newChoices,
-            choiceColors: newChoiceColors,
+            ...nextOptions,
           },
         }),
       })
@@ -316,17 +368,8 @@ export default function InlineSelectDropdown({
       <div className="flex flex-wrap gap-1.5">
         {selectedValues.length > 0 ? (
           selectedValues.map((val: string) => {
-            const hexColor = getChoiceColor(val)
-            const textColorClass = getTextColorForBackground(hexColor)
-            const bgColor = normalizeHexColor(hexColor)
             return (
-              <span
-                key={val}
-                className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-                style={{ backgroundColor: bgColor }}
-              >
-                {val}
-              </span>
+              <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} />
             )
           })
         ) : (
@@ -355,17 +398,8 @@ export default function InlineSelectDropdown({
         >
           {selectedValues.length > 0 ? (
             selectedValues.map((val: string) => {
-              const hexColor = getChoiceColor(val)
-              const textColorClass = getTextColorForBackground(hexColor)
-              const bgColor = normalizeHexColor(hexColor)
               return (
-                <span
-                  key={val}
-                  className={`px-2 py-0.5 rounded-md text-xs font-medium whitespace-nowrap ${textColorClass}`}
-                  style={{ backgroundColor: bgColor }}
-                >
-                  {val}
-                </span>
+                <ChoicePill key={val} label={val} fieldType={fieldType} fieldOptions={mergedOptions} />
               )
             })
           ) : (
@@ -527,12 +561,7 @@ export default function InlineSelectDropdown({
                           onChange={() => {}} // handled via onClick above
                           className="w-4 h-4"
                         />
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-medium ${textColorClass}`}
-                          style={{ backgroundColor: bgColor }}
-                        >
-                          {choice}
-                        </span>
+                        <ChoicePill label={choice} fieldType={fieldType} fieldOptions={mergedOptions} />
                       </button>
                       {canEditOptions && (
                         <div className="flex items-center gap-1">

@@ -144,7 +144,19 @@ function extractCurlyFieldRefs(formula: string): string[] {
 }
 
 function extractMissingColumnFromError(err: any): string | null {
-  const msg = String(err?.message || err?.details || err?.hint || '').trim()
+  const candidates = [
+    err?.message,
+    err?.details,
+    err?.hint,
+    err?.error?.message,
+    err?.error_description,
+    err?.cause?.message,
+  ]
+    .filter(Boolean)
+    .map((x) => String(x).trim())
+    .filter((x) => x.length > 0)
+
+  const msg = candidates.join("\n").trim()
   if (!msg) return null
 
   // Postgres:
@@ -1275,10 +1287,21 @@ export default function GridView({
         bumpLoadBackoff()
 
         // If a view references a column that no longer exists in the physical table,
-        // Postgres returns 42703 (undefined_column). Recover by retrying with "*".
-        // IMPORTANT: only treat as "missing column" for 42703 (missing table is 42P01 and must be handled separately).
-        if ((error as any)?.code === '42703') {
-          const missingColumn = extractMissingColumnFromError(error)
+        // Postgres returns 42703 (undefined_column). PostgREST can also surface this as a 400
+        // with a schema-cache message. Recover by retrying with `select('*')` and removing
+        // any filters/sorts that reference non-physical columns.
+        //
+        // IMPORTANT: missing physical table is 42P01 and must be handled separately.
+        const missingColumn = extractMissingColumnFromError(error)
+        const errorMsg = String((error as any)?.message || (error as any)?.details || '').trim()
+        const isMissingColumnLike =
+          (error as any)?.code === '42703' ||
+          (!!missingColumn &&
+            (/(does\s+not\s+exist)/i.test(errorMsg) ||
+              /(Could not find the ')/i.test(errorMsg) ||
+              /(schema cache)/i.test(errorMsg)))
+
+        if (isMissingColumnLike) {
           console.warn('[GridView] Column missing for view; retrying with "*" select.', {
             message: (error as any)?.message,
             code: (error as any)?.code,
@@ -1307,15 +1330,57 @@ export default function GridView({
             return normalized === missingNormalized
           }
 
-          const filteredRetryFilters = missingColumn
-            ? safeFilters.filter((f) => !isMissingMatch(toPostgrestColumn(f.field)))
-            : safeFilters
-          const filteredRetryViewFilters = missingColumn
-            ? safeViewFilters.filter((f) => !isMissingMatch(toPostgrestColumn(f.field_name)))
-            : safeViewFilters
-          const filteredRetrySorts = missingColumn
-            ? safeViewSorts.filter((s) => !isMissingMatch(toPostgrestColumn(s.field_name)))
-            : safeViewSorts
+          // If we couldn't extract the exact missing column, probe the physical schema by fetching 1 row.
+          // This lets us safely drop sorts/filters that reference non-existent columns.
+          let physicalColumnsLower: Set<string> | null = null
+          if (!missingColumn) {
+            try {
+              const probe = await supabase.from(supabaseTableName).select('*').limit(1)
+              const sample = Array.isArray(probe.data) ? probe.data[0] : probe.data
+              if (sample && typeof sample === 'object') {
+                physicalColumnsLower = new Set(Object.keys(sample).map((k) => String(k).toLowerCase()))
+              }
+            } catch {
+              // ignore: we'll fall back to dropping only invalid identifiers below
+            }
+          }
+
+          const isPhysical = (maybeCol: string | null): boolean => {
+            if (!maybeCol) return false
+            if (!physicalColumnsLower) return true
+            return physicalColumnsLower.has(String(maybeCol).toLowerCase())
+          }
+
+          const filteredRetryFilters =
+            missingColumn || physicalColumnsLower
+              ? safeFilters.filter((f) => {
+                  const col = toPostgrestColumn(f.field)
+                  if (missingColumn && isMissingMatch(col)) return false
+                  // If we know physical columns, drop filters on non-physical cols to avoid 400 loops.
+                  if (physicalColumnsLower && col && !isPhysical(col)) return false
+                  return true
+                })
+              : safeFilters
+
+          const filteredRetryViewFilters =
+            missingColumn || physicalColumnsLower
+              ? safeViewFilters.filter((f) => {
+                  const col = toPostgrestColumn(f.field_name)
+                  if (missingColumn && isMissingMatch(col)) return false
+                  if (physicalColumnsLower && col && !isPhysical(col)) return false
+                  return true
+                })
+              : safeViewFilters
+
+          const filteredRetrySorts =
+            missingColumn || physicalColumnsLower
+              ? safeViewSorts.filter((s) => {
+                  const col = toPostgrestColumn(s.field_name)
+                  if (missingColumn && isMissingMatch(col)) return false
+                  if (physicalColumnsLower && col && !isPhysical(col)) return false
+                  return true
+                })
+              : safeViewSorts
 
           let retryQuery = supabase.from(supabaseTableName).select('*')
 

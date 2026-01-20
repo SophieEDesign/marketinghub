@@ -1071,10 +1071,6 @@ function InterfacePageClientInternal({
 
   const handleDoneEditingInterface = () => {
     exitBlockEdit()
-    toast({
-      title: "Finished editing",
-      description: "Refreshing to show saved changes.",
-    })
     // Refresh server components + re-fetch blocks to ensure view mode reflects persisted state.
     router.refresh()
     if (page) loadBlocks(true)
