@@ -26,6 +26,7 @@ import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import {
   applyFiltersToQuery,
   deriveDefaultValuesFromFilters,
@@ -69,6 +70,7 @@ interface MultiTimelineViewProps {
   pageId?: string | null
   sources: MultiSource[]
   filters?: FilterConfig[]
+  filterTree?: FilterTree | null
   blockConfig?: Record<string, any>
   isEditing?: boolean
   onRecordClick?: (recordId: string, tableId?: string) => void

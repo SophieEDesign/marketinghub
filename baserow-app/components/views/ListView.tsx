@@ -9,13 +9,12 @@ import { formatDateUK } from "@/lib/utils"
 import type { TableField } from "@/types/fields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterType } from "@/types/database"
-import { ChevronDown, ChevronRight, Filter, Group, Plus } from "lucide-react"
+import { ChevronDown, ChevronRight, Filter, Group, MapPin, MoreHorizontal, Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/useResponsive"
 import { Button } from "@/components/ui/button"
 import RecordModal from "@/components/calendar/RecordModal"
 import GroupDialog from "../grid/GroupDialog"
 import FilterDialog from "../grid/FilterDialog"
-import { CellFactory } from "../grid/CellFactory"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
@@ -122,21 +121,6 @@ export default function ListView({
       openRecord(tableId, recordId, effectiveTableName)
     }
   }, [onRecordClick, openRecord, supabaseTableName, tableId, tableName])
-
-  const handleCellSave = useCallback(async (rowId: string, fieldName: string, value: any) => {
-    if (!rowId || !supabaseTableName) return
-    const supabase = createClient()
-    const { error } = await supabase
-      .from(supabaseTableName)
-      .update({ [fieldName]: value })
-      .eq("id", rowId)
-    if (error) throw error
-
-    // Update local state for snappy UX
-    setRows((prev) =>
-      prev.map((r) => (String(r?.id) === String(rowId) ? { ...(r || {}), [fieldName]: value } : r))
-    )
-  }, [supabaseTableName])
 
   // Update currentGroupBy when groupBy prop changes
   useEffect(() => {
@@ -346,47 +330,27 @@ export default function ListView({
     }
   }, [onFiltersChange])
 
-  // Get visible fields for table display (title, subtitle, pill, meta fields)
-  const visibleFieldsForTable = useMemo(() => {
-    const fields: TableField[] = []
-    
-    if (titleField) {
-      const field = tableFields.find(f => f.name === titleField || f.id === titleField)
-      if (field) fields.push(field)
-    }
-    
-    subtitleFields.forEach(fieldName => {
-      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      if (field) fields.push(field)
-    })
-    
-    pillFields.forEach(fieldName => {
-      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      if (field) fields.push(field)
-    })
-    
-    metaFields.forEach(fieldName => {
-      const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      if (field) fields.push(field)
-    })
-    
-    return fields
-  }, [tableFields, titleField, subtitleFields, pillFields, metaFields])
-
   // Helper to get image from image field
-  const getImageUrl = useCallback((row: Record<string, any>): string | null => {
-    if (!imageField) return null
+  const getRowValue = useCallback(
+    (row: Record<string, any>, fieldNameOrId?: string | null) => {
+      if (!fieldNameOrId) return null
+      const f = tableFields.find((tf) => tf.name === fieldNameOrId || tf.id === fieldNameOrId)
+      const key = f?.name || fieldNameOrId
+      return row?.[key] ?? null
+    },
+    [tableFields]
+  )
 
-    const imageValue = row[imageField]
+  const getImageUrlFromValue = useCallback((imageValue: any): string | null => {
     if (!imageValue) return null
 
-    // Handle attachment field (array of URLs) or URL field (single URL)
+    // Handle attachment field (array of URLs/objects) or URL field (single URL)
     if (Array.isArray(imageValue) && imageValue.length > 0) {
       const firstItem = imageValue[0]
       if (typeof firstItem === 'string') {
         return firstItem
       }
-      if (typeof firstItem === 'object' && firstItem.url) {
+      if (typeof firstItem === 'object' && firstItem?.url) {
         return firstItem.url
       }
     }
@@ -395,12 +359,12 @@ export default function ListView({
     }
 
     return null
-  }, [imageField])
+  }, [])
 
   // Helper to format field value for display
   const formatFieldValue = useCallback((field: TableField, value: any): string => {
     if (value === null || value === undefined || value === '') {
-      return 'â€”'
+      return '—'
     }
 
     switch (field.type) {
@@ -422,7 +386,7 @@ export default function ListView({
         if (Array.isArray(value)) {
           return `${value.length} file${value.length !== 1 ? 's' : ''}`
         }
-        return 'â€”'
+        return '—'
       default:
         return String(value)
     }
@@ -443,10 +407,6 @@ export default function ListView({
         field.type === 'single_select'
       )
     )
-  }, [])
-
-  const isVirtualField = useCallback((field?: TableField | null) => {
-    return field?.type === 'formula' || field?.type === 'lookup'
   }, [])
 
   const handleAddRecordToGroup = useCallback(async (groupKey: string) => {
@@ -524,38 +484,48 @@ export default function ListView({
 
     // Get title field
     const titleFieldObj = tableFields.find(f => f.name === titleField || f.id === titleField)
-    const titleValue = titleFieldObj && titleField ? row[titleField] : null
+    const titleRaw = titleFieldObj ? row?.[titleFieldObj.name] : null
+    const titleText = titleFieldObj ? formatFieldValue(titleFieldObj, titleRaw) : 'Untitled'
 
     // Get image
-    const imageUrl = getImageUrl(row)
+    const imageRaw = imageField ? getRowValue(row, imageField) : null
+    const imageUrl = imageField ? getImageUrlFromValue(imageRaw) : null
+
+    // Subtitle mapping (to match card style)
+    const descriptionKey = subtitleFields?.[0]
+    const locationKey = subtitleFields?.[1]
+    const extraSubtitleKeys = (subtitleFields || []).slice(2, 3)
+
+    const descriptionField = descriptionKey ? tableFields.find((f) => f.name === descriptionKey || f.id === descriptionKey) : null
+    const locationField = locationKey ? tableFields.find((f) => f.name === locationKey || f.id === locationKey) : null
+    const descriptionText = descriptionField ? formatFieldValue(descriptionField, row?.[descriptionField.name]) : ''
+    const locationText = locationField ? formatFieldValue(locationField, row?.[locationField.name]) : ''
+
+    const extraSubtitle = extraSubtitleKeys
+      .map((k) => {
+        const f = tableFields.find((tf) => tf.name === k || tf.id === k)
+        if (!f) return null
+        const t = formatFieldValue(f, row?.[f.name])
+        if (!t || t === '—') return null
+        return { key: k, label: f.name, text: t }
+      })
+      .filter(Boolean) as Array<{ key: string; label: string; text: string }>
 
     return (
       <div
         key={recordId}
         onClick={() => setSelectedRecordId(String(recordId))}
         onDoubleClick={() => handleOpenRecord(String(recordId))}
-        className={`group border-b border-gray-200 transition-colors touch-manipulation cursor-default ${
-          selectedRecordId === String(recordId) ? "bg-blue-50/60" : "hover:bg-gray-50 active:bg-gray-100"
+        className={`group touch-manipulation cursor-default rounded-xl border bg-white shadow-sm transition-all ${
+          selectedRecordId === String(recordId)
+            ? "border-blue-200 ring-2 ring-blue-100"
+            : "border-gray-200 hover:border-gray-300 hover:shadow-md active:shadow-sm"
         }`}
       >
-        <div className={`flex items-start gap-3 ${isMobile ? 'p-3' : 'p-4'}`}>
-          {/* Row open control */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleOpenRecord(String(recordId))
-            }}
-            className="mt-0.5 flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50/60 transition-colors"
-            title="Open record"
-            aria-label="Open record"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-
-          {/* Image */}
-          {imageUrl && (
-            <div className={`flex-shrink-0 rounded-md overflow-hidden bg-gray-100 ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}`}>
+        <div className={`flex items-start gap-4 ${isMobile ? 'p-3' : 'p-4'}`}>
+          {/* Thumbnail (always reserved, matches card style) */}
+          <div className={`flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 ${isMobile ? 'w-14 h-14' : 'w-20 h-20'}`}>
+            {imageUrl ? (
               <img
                 src={imageUrl}
                 alt=""
@@ -564,97 +534,108 @@ export default function ListView({
                   e.currentTarget.style.display = 'none'
                 }}
               />
-            </div>
-          )}
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200" />
+            )}
+          </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            {/* Title */}
-            <div
-              className={`font-medium text-gray-900 mb-1 ${isMobile ? 'text-sm' : 'text-base'} break-words`}
-              onDoubleClick={(e) => e.stopPropagation()}
-            >
-              {titleFieldObj ? (
-                <CellFactory
-                  field={titleFieldObj}
-                  value={titleValue}
-                  rowId={String(recordId)}
-                  tableName={supabaseTableName}
-                  editable={!titleFieldObj.options?.read_only && !isVirtualField(titleFieldObj)}
-                  wrapText={true}
-                  rowHeight={isMobile ? 32 : 40}
-                  onSave={(value) => handleCellSave(String(recordId), titleFieldObj.name, value)}
-                />
-              ) : (
-                <span className="text-gray-700">Untitled</span>
-              )}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className={`font-semibold text-gray-900 ${isMobile ? 'text-sm' : 'text-base'} leading-snug line-clamp-2`}>
+                  {titleText && titleText !== '—' ? titleText : 'Untitled'}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenRecord(String(recordId))
+                }}
+                className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                title="Open"
+                aria-label="Open"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Subtitles */}
-            {subtitleFields.slice(0, 3).length > 0 && (
-              <div className={`text-gray-700 space-y-1 mb-2 ${isMobile ? 'text-xs' : 'text-sm'}`}>
-                {subtitleFields.slice(0, 3).map((fieldName) => {
-                  const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-                  if (!field) return null
-                  return (
-                    <div key={fieldName} className="min-w-0" onDoubleClick={(e) => e.stopPropagation()}>
-                      <CellFactory
-                        field={field}
-                        value={row[field.name]}
-                        rowId={String(recordId)}
-                        tableName={supabaseTableName}
-                        editable={!field.options?.read_only && !isVirtualField(field)}
-                        wrapText={true}
-                        rowHeight={isMobile ? 32 : 40}
-                        onSave={(value) => handleCellSave(String(recordId), field.name, value)}
-                      />
-                    </div>
-                  )
+            {/* Description */}
+            {descriptionText && descriptionText !== '—' && (
+              <div className={`mt-1 text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'} leading-snug line-clamp-2`}>
+                {descriptionText}
+              </div>
+            )}
+
+            {/* Location */}
+            {locationText && locationText !== '—' && (
+              <div className={`mt-2 flex items-center gap-1.5 text-gray-500 ${isMobile ? 'text-xs' : 'text-sm'} min-w-0`}>
+                <MapPin className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                <span className="truncate">{locationText}</span>
+              </div>
+            )}
+
+            {/* Extra subtitle (optional) */}
+            {extraSubtitle.length > 0 && (
+              <div className="mt-1 space-y-1">
+                {extraSubtitle.map((s) => (
+                  <div key={s.key} className={`text-gray-500 ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>
+                    {s.text}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tags (pills) */}
+            {pillFields.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {pillFields.flatMap((fieldNameOrId) => {
+                  const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
+                  if (!field) return []
+                  const raw = row?.[field.name]
+                  if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) return []
+
+                  const values = field.type === 'multi_select' ? (Array.isArray(raw) ? raw : []) : [raw]
+                  return values
+                    .filter((v) => v != null && String(v).trim() !== '')
+                    .map((v) => {
+                      const label = String(v).trim()
+                      const color = getPillColor(field, label)
+                      const bg = color ? `${color}1A` : '#F3F4F6'
+                      const border = color ? `${color}33` : '#E5E7EB'
+                      const text = color || '#374151'
+                      return (
+                        <span
+                          key={`${field.name}:${label}`}
+                          className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border"
+                          style={{ backgroundColor: bg, borderColor: border, color: text }}
+                        >
+                          {label}
+                        </span>
+                      )
+                    })
                 })}
               </div>
             )}
 
-            {/* Pills + meta */}
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              {pillFields.map((fieldName) => {
-                const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-                if (!field) return null
-                return (
-                  <div key={`pill-${fieldName}`} onDoubleClick={(e) => e.stopPropagation()}>
-                    <CellFactory
-                      field={field}
-                      value={row[field.name]}
-                      rowId={String(recordId)}
-                      tableName={supabaseTableName}
-                      editable={!field.options?.read_only && !isVirtualField(field)}
-                      wrapText={false}
-                      rowHeight={isMobile ? 32 : 40}
-                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
-                    />
-                  </div>
-                )
-              })}
-
-              {metaFields.map((fieldName) => {
-                const field = tableFields.find(f => f.name === fieldName || f.id === fieldName)
-                if (!field) return null
-                return (
-                  <div key={`meta-${fieldName}`} className="flex items-center gap-1" onDoubleClick={(e) => e.stopPropagation()}>
-                    <span className={`text-gray-500 ${isMobile ? 'text-[10px]' : 'text-xs'}`}>{field.name}:</span>
-                    <CellFactory
-                      field={field}
-                      value={row[field.name]}
-                      rowId={String(recordId)}
-                      tableName={supabaseTableName}
-                      editable={!field.options?.read_only && !isVirtualField(field)}
-                      wrapText={false}
-                      rowHeight={isMobile ? 32 : 40}
-                      onSave={(value) => handleCellSave(String(recordId), field.name, value)}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+            {/* Metadata (optional) */}
+            {metaFields.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                {metaFields.map((fieldNameOrId) => {
+                  const field = tableFields.find((f) => f.name === fieldNameOrId || f.id === fieldNameOrId)
+                  if (!field) return null
+                  const text = formatFieldValue(field, row?.[field.name])
+                  if (!text || text === '—') return null
+                  return (
+                    <span key={`meta:${field.name}`} className="truncate">
+                      <span className="text-gray-400">{field.name}:</span> {text}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -666,13 +647,13 @@ export default function ListView({
     imageField,
     pillFields,
     metaFields,
-    getImageUrl,
+    getRowValue,
+    getImageUrlFromValue,
     handleOpenRecord,
-    handleCellSave,
-    isVirtualField,
     isMobile,
     selectedRecordId,
-    supabaseTableName,
+    formatFieldValue,
+    getPillColor,
   ])
 
   if (loading) {
@@ -795,7 +776,11 @@ export default function ListView({
             // Item row (card)
             const row = it.item as any
             const key = `${String(row?.id ?? Math.random())}::${it.groupPathKey}`
-            return <div key={key}>{renderListItem(row)}</div>
+            return (
+              <div key={key} className="px-4 py-3">
+                {renderListItem(row)}
+              </div>
+            )
           })}
         </div>
 
@@ -964,7 +949,9 @@ export default function ListView({
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {rowsToRender.map((row) => renderListItem(row))}
+        <div className="p-3 space-y-3">
+          {rowsToRender.map((row) => renderListItem(row))}
+        </div>
       </div>
       {/* Dialogs */}
       {viewId ? (

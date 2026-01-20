@@ -32,6 +32,7 @@ import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import {
   applyFiltersToQuery,
   deriveDefaultValuesFromFilters,
@@ -59,6 +60,7 @@ interface MultiCalendarViewProps {
   pageId?: string | null
   sources: MultiSource[]
   filters?: FilterConfig[]
+  filterTree?: FilterTree | null
   blockConfig?: Record<string, any>
   isEditing?: boolean
   onRecordClick?: (recordId: string, tableId?: string) => void
