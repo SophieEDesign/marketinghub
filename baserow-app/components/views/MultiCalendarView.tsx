@@ -391,8 +391,10 @@ export default function MultiCalendarView({
           title,
           start,
           end: finalEnd || undefined,
-          backgroundColor: eventColor,
+          // Unified "card" styling: neutral background + subtle coloured border for source/type.
+          backgroundColor: "#ffffff",
           borderColor: eventColor,
+          textColor: "#111827",
           editable: isStartEditable && !isViewOnly && !isEditing,
           startEditable: isStartEditable && !isViewOnly && !isEditing,
           extendedProps: {

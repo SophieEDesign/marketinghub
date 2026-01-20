@@ -616,11 +616,13 @@ export default function MultiTimelineView({
                     return (
                       <div
                         key={ev.id}
-                        className="absolute top-3 h-10 rounded-md px-2 flex items-center text-xs text-white shadow cursor-pointer select-none"
+                        className="absolute top-3 h-10 rounded-md px-2 flex items-center text-xs shadow cursor-pointer select-none border bg-white text-gray-900 hover:bg-gray-50 transition-colors"
                         style={{
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
-                          backgroundColor: ev.color,
+                          borderColor: "#e5e7eb",
+                          borderLeftColor: ev.color,
+                          borderLeftWidth: 4,
                         }}
                         onClick={() => {
                           // Avoid opening the record when the user just dragged.
