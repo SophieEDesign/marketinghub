@@ -1488,7 +1488,6 @@ export default function GridView({
           error.code === "PGRST205" ||
           (typeof errorMessage === 'string' && (
             errorMessage.includes("Could not find the table") ||
-            errorMessage.includes("schema cache") ||
             /relation\s+.+\s+does not exist/i.test(errorMessage)
           ))
         

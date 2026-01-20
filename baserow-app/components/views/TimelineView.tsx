@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { format } from "date-fns"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
@@ -19,6 +19,8 @@ import {
 } from "@/lib/field-colors"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { sanitizeFieldName } from "@/lib/fields/validation"
+import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 
 interface TimelineViewProps {
   tableId: string
@@ -87,6 +89,7 @@ export default function TimelineView({
   rowSize = 'medium',
   reloadKey,
 }: TimelineViewProps) {
+  const supabase = useMemo(() => createClient(), [])
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
   // Ensure fieldIds is always an array
   const fieldIds = Array.isArray(fieldIdsProp) ? fieldIdsProp : []
@@ -135,6 +138,11 @@ export default function TimelineView({
 
   // Get table name for opening records
   const [supabaseTableName, setSupabaseTableName] = useState<string>("")
+  // Cache physical columns to bridge drift between metadata names and actual columns.
+  // This is critical when older tables were created with quoted identifiers (e.g. "Content Name")
+  // but metadata uses snake_case internal names (e.g. content_name).
+  const physicalColumnsRef = useRef<Set<string> | null>(null)
+  const physicalColumnsTableRef = useRef<string | null>(null)
 
   const showAddRecord = (blockConfig as any)?.appearance?.show_add_record === true
   const permissions = (blockConfig as any)?.permissions || {}
@@ -180,21 +188,94 @@ export default function TimelineView({
     }
   }
 
+  async function ensurePhysicalColumns(force = false): Promise<Set<string> | null> {
+    if (!supabaseTableName) return null
+    if (!force && physicalColumnsTableRef.current === supabaseTableName && physicalColumnsRef.current) {
+      return physicalColumnsRef.current
+    }
+
+    physicalColumnsTableRef.current = supabaseTableName
+    physicalColumnsRef.current = null
+    try {
+      const { data: cols, error } = await supabase.rpc("get_table_columns", {
+        table_name: supabaseTableName,
+      })
+      if (error) {
+        // Non-fatal: we can still proceed using best-effort keys from returned rows.
+        return null
+      }
+      if (Array.isArray(cols)) {
+        const set = new Set<string>(
+          cols
+            .map((c: any) => String(c?.column_name ?? "").trim())
+            .filter(Boolean)
+        )
+        // Include audit fields which are commonly referenced by filters/sorts.
+        set.add("created_at")
+        set.add("updated_at")
+        set.add("created_by")
+        set.add("updated_by")
+        set.add("id")
+        physicalColumnsRef.current = set
+        return set
+      }
+    } catch {
+      // ignore
+    }
+    return null
+  }
+
   async function loadRows() {
     if (!supabaseTableName) return
 
     const seq = ++loadSeqRef.current
     setLoading(true)
     try {
+      const physicalCols = await ensurePhysicalColumns()
+      const sanitizedToPhysical = new Map<string, string>()
+      if (physicalCols) {
+        for (const col of physicalCols) {
+          sanitizedToPhysical.set(sanitizeFieldName(col), col)
+        }
+      }
+
+      const resolvePhysicalColumnForField = (field: TableField): string => {
+        const candidates: Array<string | null | undefined> = [
+          field.name,
+          resolveSystemFieldAlias(field.name),
+          typeof field.label === "string" ? field.label.trim() : null,
+          typeof field.label === "string" ? sanitizeFieldName(field.label) : null,
+          sanitizeFieldName(field.name),
+        ]
+
+        for (const c of candidates) {
+          const key = typeof c === "string" ? c.trim() : ""
+          if (!key) continue
+          if (physicalCols?.has(key)) return key
+        }
+
+        // Last resort: if physical columns exist, match by sanitized form.
+        if (physicalCols) {
+          const viaSan = sanitizedToPhysical.get(sanitizeFieldName(field.name))
+          if (viaSan) return viaSan
+        }
+
+        return field.name
+      }
+
       // Build query with filters
       let query = supabase
         .from(supabaseTableName)
         .select("*")
 
-      // Apply filters using shared filter system
+      // Apply filters using shared filter system.
+      // IMPORTANT: Keep `name` as the metadata field name to match how filters are stored.
+      // (We separately normalize row data so rendering works even if physical columns drift.)
       const normalizedFields = (Array.isArray(tableFields) ? tableFields : []).map((f) => ({
         name: f.name || f.id,
         type: f.type,
+        id: (f as any)?.id,
+        options: (f as any)?.options,
       }))
       query = applyFiltersToQuery(query, Array.isArray(filters) ? filters : [], normalizedFields)
 
@@ -216,7 +297,24 @@ export default function TimelineView({
         const tableRows: TableRow[] = (data || []).map((row: any) => ({
           id: row.id,
           table_id: tableId,
-          data: row,
+          // Normalize row data so `row.data[field.name]` works even if the physical column
+          // is not the same as the field metadata name (e.g. quoted identifiers / legacy drift).
+          data: (() => {
+            const out: Record<string, any> = { ...row }
+            const fieldsArr = Array.isArray(tableFields) ? tableFields : []
+            for (const f of fieldsArr) {
+              const physical = resolvePhysicalColumnForField(f)
+              // Only add alias if it doesn't already exist.
+              if (physical && physical in row && !(f.name in out)) {
+                out[f.name] = row[physical]
+              }
+              // Also alias by field id, if safe and missing.
+              if (physical && physical in row && f.id && !(f.id in out)) {
+                out[f.id] = row[physical]
+              }
+            }
+            return out
+          })(),
           created_at: row.created_at || new Date().toISOString(),
           updated_at: row.updated_at || new Date().toISOString(),
         }))
