@@ -43,6 +43,7 @@ function buildContext(fields: TableField[], opts?: GroupTreeOptions): GroupConte
     options: {
       emptyLabel: opts?.emptyLabel ?? '(Empty)',
       emptyLast: opts?.emptyLast ?? true,
+      valueLabelMaps: opts?.valueLabelMaps,
     },
   }
 }
@@ -125,7 +126,25 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
     }
 
     // Field grouping
-    const label = safeString(v).trim()
+    // Use the raw stored value for the stable group key (avoid collisions when labels repeat),
+    // but render the user-facing label via optional mapping (e.g. link_to_table UUID -> name).
+    const rawKey = safeString(v).trim()
+    if (!rawKey) {
+      keys.push(emptyKey)
+      continue
+    }
+
+    const resolvedFromMap = (() => {
+      if (!field) return null
+      const key = rawKey
+      const maps = ctx.options.valueLabelMaps
+      if (!maps) return null
+      const byName = maps[field.name]
+      const byId = maps[(field as any)?.id]
+      return (byName?.[key] ?? byId?.[key] ?? null) as string | null
+    })()
+
+    const label = String(resolvedFromMap ?? rawKey).trim()
     if (!label) {
       keys.push(emptyKey)
       continue
@@ -135,7 +154,7 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
     if (field && (field.type === 'single_select' || field.type === 'multi_select')) {
       const idx = selectSortIndex(field, label)
       keys.push({
-        key: label,
+        key: rawKey,
         label,
         sortKey: idx ?? label.toLowerCase(),
         isEmpty: false,
@@ -146,7 +165,7 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
     if (field && (field.type === 'number' || field.type === 'currency' || field.type === 'percent')) {
       const n = typeof v === 'number' ? v : Number(String(v))
       keys.push({
-        key: label,
+        key: rawKey,
         label,
         sortKey: Number.isFinite(n) ? n : label.toLowerCase(),
         isEmpty: false,
@@ -165,7 +184,7 @@ function getGroupKeysForValue(ctx: GroupContext, rule: GroupRule, field: TableFi
       continue
     }
 
-    keys.push({ key: label, label, sortKey: label.toLowerCase(), isEmpty: false })
+    keys.push({ key: rawKey, label, sortKey: label.toLowerCase(), isEmpty: false })
   }
 
   if (keys.length === 0) return [emptyKey]

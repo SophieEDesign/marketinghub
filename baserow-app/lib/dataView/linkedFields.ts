@@ -149,6 +149,124 @@ export async function resolveLinkedFieldDisplay(
 }
 
 /**
+ * Resolve many linked record IDs to a display label map in a batched way.
+ *
+ * This is useful for features like grouping, where we need stable labels for many IDs
+ * without running N individual queries.
+ */
+export async function resolveLinkedFieldDisplayMap(
+  field: LinkedField,
+  ids: string[]
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+
+  const unique = Array.isArray(ids)
+    ? Array.from(new Set(ids.map((v) => String(v ?? '').trim()).filter(Boolean)))
+    : []
+
+  if (unique.length === 0) return out
+
+  const linkedTableId = field.options?.linked_table_id
+  if (!linkedTableId) {
+    for (const id of unique) out.set(id, id)
+    return out
+  }
+
+  const supabase = createClient()
+
+  const { data: targetTable, error: tableError } = await supabase
+    .from('tables')
+    .select('supabase_table, primary_field_name')
+    .eq('id', linkedTableId)
+    .single()
+
+  if (tableError || !targetTable?.supabase_table) {
+    for (const id of unique) out.set(id, id)
+    return out
+  }
+
+  const { data: targetFields } = await supabase
+    .from('table_fields')
+    .select('id, name, type')
+    .eq('table_id', linkedTableId)
+    .order('position', { ascending: true })
+
+  const linkedFieldId = field.options?.linked_field_id
+
+  let displayFieldName: string | null = null
+
+  const configuredPrimary =
+    typeof (targetTable as any)?.primary_field_name === 'string' &&
+    String((targetTable as any).primary_field_name).trim().length > 0
+      ? String((targetTable as any).primary_field_name).trim()
+      : null
+
+  if (configuredPrimary === 'id') {
+    displayFieldName = null
+  } else if (configuredPrimary) {
+    const safe = toPostgrestColumn(configuredPrimary)
+    if (safe && targetFields?.some((f: any) => f.name === safe)) {
+      displayFieldName = safe
+    }
+  }
+
+  if (!displayFieldName) {
+    displayFieldName = getPrimaryFieldName(targetFields as any)
+  }
+
+  if (!displayFieldName && linkedFieldId && targetFields) {
+    const linkedField = (targetFields as any[]).find((f) => f.id === linkedFieldId || f.name === linkedFieldId)
+    if (linkedField) displayFieldName = String(linkedField.name)
+  }
+
+  if (!displayFieldName && targetFields) {
+    const textField = (targetFields as any[]).find((f) => ['text', 'long_text', 'email', 'url'].includes(String(f.type)))
+    if (textField) displayFieldName = String(textField.name)
+  }
+
+  if (!displayFieldName) {
+    for (const id of unique) out.set(id, id)
+    return out
+  }
+
+  const uuidIds = unique.filter(isUuid)
+  const legacyValues = unique.filter((v) => !isUuid(v))
+
+  // Always include legacy values as-is.
+  for (const v of legacyValues) out.set(v, v)
+
+  if (uuidIds.length === 0) return out
+
+  // Chunk queries to keep the `in()` list to a reasonable size.
+  const chunkSize = 200
+  for (let i = 0; i < uuidIds.length; i += chunkSize) {
+    const chunk = uuidIds.slice(i, i + chunkSize)
+    const { data: records, error: recordsError } = await supabase
+      .from(targetTable.supabase_table)
+      .select(`id, ${displayFieldName}`)
+      .in('id', chunk)
+
+    if (recordsError || !Array.isArray(records)) {
+      // Fallback: keep IDs as labels if query fails.
+      for (const id of chunk) if (!out.has(id)) out.set(id, id)
+      continue
+    }
+
+    for (const r of records as any[]) {
+      const id = String(r?.id ?? '')
+      if (!id) continue
+      const label = r?.[displayFieldName] != null ? String(r[displayFieldName]) : ''
+      out.set(id, label || id)
+    }
+
+    // Ensure any missing IDs still get a fallback label.
+    for (const id of chunk) if (!out.has(id)) out.set(id, id)
+  }
+
+  return out
+}
+
+/**
  * Resolve pasted text to linked field record IDs
  * 
  * Attempts to match pasted text (display names or IDs) to record IDs in the target table.

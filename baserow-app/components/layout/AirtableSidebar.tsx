@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
 import GroupedInterfaces from "./GroupedInterfaces"
 import { 
@@ -24,6 +24,7 @@ import RecentsFavoritesSection from "./RecentsFavoritesSection"
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/useResponsive"
 import type { Automation, Table, View } from "@/types/database"
+import { useToast } from "@/components/ui/use-toast"
 
 interface InterfacePage {
   id: string
@@ -62,6 +63,8 @@ export default function AirtableSidebar({
   onClose
 }: AirtableSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { toast } = useToast()
   const { brandName, logoUrl, primaryColor, sidebarColor, sidebarTextColor } = useBranding()
   const { mode, toggleMode } = useSidebarMode()
   const isMobile = useIsMobile()
@@ -169,10 +172,15 @@ export default function AirtableSidebar({
   return (
     <>
       {/* Overlay for mobile */}
-      {isMobile && isOpen && (
+      {isMobile && isOpen && (onClose || isOpenProp === undefined) && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 desktop:hidden"
-          onClick={onClose}
+          onClick={() => {
+            // In controlled mode (mobile), parent should provide onClose.
+            // In uncontrolled mode, fall back to collapsing internally so the overlay never "traps" clicks.
+            if (onClose) onClose()
+            else setInternalCollapsed(true)
+          }}
           aria-hidden="true"
         />
       )}
@@ -210,7 +218,18 @@ export default function AirtableSidebar({
         </Link>
         <div className="flex items-center gap-1">
           <button
-            onClick={toggleMode}
+            onClick={() => {
+              const wasEditing = isEditMode
+              toggleMode()
+              if (wasEditing) {
+                toast({
+                  title: "Finished editing",
+                  description: "Your changes have been saved.",
+                })
+                window.dispatchEvent(new CustomEvent("pages-updated"))
+                router.refresh()
+              }
+            }}
             className={cn(
               "h-8 px-2 text-xs font-medium rounded transition-colors flex items-center gap-1",
               isEditMode ? "bg-black/20 hover:bg-black/25" : "hover:bg-black/10"
@@ -257,7 +276,7 @@ export default function AirtableSidebar({
             editMode={isEditMode}
             onRefresh={() => {
               window.dispatchEvent(new CustomEvent('pages-updated'))
-              window.location.reload()
+              router.refresh()
             }}
           />
         </div>

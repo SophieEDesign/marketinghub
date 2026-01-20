@@ -42,6 +42,8 @@ import { buildGroupTree, flattenGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupRule } from "@/lib/grouping/types"
 import { isAbortError } from "@/lib/api/error-handling"
 import { normalizeUuid } from "@/lib/utils/ids"
+import type { LinkedField } from "@/types/fields"
+import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -114,6 +116,17 @@ function arrayShallowEqual(a: string[], b: string[]): boolean {
     if (a[i] !== b[i]) return false
   }
   return true
+}
+
+function collectLinkedIds(raw: any): string[] {
+  if (raw == null) return []
+  if (Array.isArray(raw)) return raw.flatMap(collectLinkedIds)
+  if (typeof raw === "object") {
+    if (raw && "id" in raw) return [String((raw as any).id)]
+    return []
+  }
+  const s = String(raw).trim()
+  return s ? [s] : []
 }
 
 function extractCurlyFieldRefs(formula: string): string[] {
@@ -869,31 +882,31 @@ export default function GridView({
     // Defensive guard: Ensure safeTableFields is an array
     const safeFields = Array.isArray(safeTableFields) ? safeTableFields : []
 
-    if (columnOrder.length > 0) {
-      // Use column order if available
-      // CRITICAL: Filter out null/undefined fieldNames and validate field existence
-      return columnOrder
-        .filter((fieldName): fieldName is string => {
-          // Filter out null, undefined, empty strings, and non-strings
-          return typeof fieldName === 'string' && fieldName.trim().length > 0
-        })
+    // Use column order if available AND valid.
+    // CRITICAL: Treat a corrupt/empty order as "no order" and fall back to order_index sorting.
+    const sanitizedOrder = asArray<string>(columnOrder).filter(
+      (fieldName): fieldName is string => typeof fieldName === 'string' && fieldName.trim().length > 0
+    )
+
+    if (sanitizedOrder.length > 0) {
+      return sanitizedOrder
         .map((fieldName) => {
           // Find view field - ensure it exists and is visible
-          const vf = safeViewFields.find((f) => 
-            f && 
-            typeof f === 'object' && 
-            f.field_name === fieldName && 
+          const vf = safeViewFields.find((f) =>
+            f &&
+            typeof f === 'object' &&
+            f.field_name === fieldName &&
             f.visible === true
           )
           if (!vf || !vf.field_name) return null
-          
+
           // Find table field for metadata
-          const tableField = safeFields.find((tf) => 
-            tf && 
-            typeof tf === 'object' && 
+          const tableField = safeFields.find((tf) =>
+            tf &&
+            typeof tf === 'object' &&
             (tf.name === fieldName || tf.id === fieldName)
           )
-          
+
           return {
             ...vf,
             order_index: tableField?.order_index ?? tableField?.position ?? vf.position ?? 0,
@@ -1024,17 +1037,32 @@ export default function GridView({
   })
 
   // Handle column reorder
+  // CRITICAL: Never allow drag to corrupt order (e.g. arrayMove([], -1, -1) -> [undefined]).
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
 
-    if (over && active.id !== over.id) {
-      setColumnOrder((items) => {
-        const oldIndex = items.indexOf(active.id as string)
-        const newIndex = items.indexOf(over.id as string)
-        return arrayMove(items, oldIndex, newIndex)
-      })
-    }
-  }, [])
+    const activeId = typeof active?.id === 'string' ? active.id : null
+    const overId = typeof over?.id === 'string' ? over.id : null
+    if (!activeId || !overId || activeId === overId) return
+
+    setColumnOrder((items) => {
+      const current = asArray<string>(items).filter(
+        (n): n is string => typeof n === 'string' && n.trim().length > 0
+      )
+      const fallback = asArray(visibleFields)
+        .map((f: any) => (typeof f?.field_name === 'string' ? f.field_name : ''))
+        .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+      const base = current.length > 0 ? current : fallback
+
+      if (base.length === 0) return current
+
+      const oldIndex = base.indexOf(activeId)
+      const newIndex = base.indexOf(overId)
+      if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return base
+
+      return arrayMove(base, oldIndex, newIndex)
+    })
+  }, [visibleFields])
 
   useEffect(() => {
     loadRows()
@@ -1778,12 +1806,67 @@ export default function GridView({
     return []
   }, [groupBy, groupByRules])
 
+  const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
+
   const groupModel = useMemo(() => {
     if (effectiveGroupRules.length === 0) return null
     return buildGroupTree(asArray<Record<string, any>>(filteredRows), safeTableFields, effectiveGroupRules, {
       emptyLabel: '(Empty)',
       emptyLast: true,
+      valueLabelMaps: groupValueLabelMaps,
     })
+  }, [effectiveGroupRules, filteredRows, safeTableFields, groupValueLabelMaps])
+
+  // Resolve grouping labels for linked record fields (link_to_table).
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
+      if (rules.length === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const safeFields = asArray<TableField>(safeTableFields as any)
+      const fieldByNameOrId = new Map<string, TableField>()
+      for (const f of safeFields) {
+        if (!f) continue
+        if (f.name) fieldByNameOrId.set(f.name, f)
+        if ((f as any).id) fieldByNameOrId.set(String((f as any).id), f)
+      }
+
+      const groupedLinkFields: LinkedField[] = []
+      for (const r of rules) {
+        if (!r || r.type !== 'field') continue
+        const f = fieldByNameOrId.get(r.field)
+        if (f && f.type === 'link_to_table') groupedLinkFields.push(f as LinkedField)
+      }
+
+      if (groupedLinkFields.length === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const next: Record<string, Record<string, string>> = {}
+      for (const f of groupedLinkFields) {
+        const ids = new Set<string>()
+        for (const row of asArray<Record<string, any>>(filteredRows)) {
+          for (const id of collectLinkedIds((row as any)?.[f.name])) ids.add(id)
+        }
+        if (ids.size === 0) continue
+        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        next[f.name] = Object.fromEntries(map.entries())
+        next[(f as any).id] = next[f.name]
+      }
+
+      if (!cancelled) setGroupValueLabelMaps(next)
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [effectiveGroupRules, filteredRows, safeTableFields])
 
   const flattenedGroups = useMemo(() => {

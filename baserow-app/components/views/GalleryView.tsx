@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { TableRow } from "@/types/database"
-import type { TableField } from "@/types/fields"
+import type { LinkedField, TableField } from "@/types/fields"
 import { Card, CardContent } from "@/components/ui/card"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
@@ -14,6 +14,7 @@ import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import { CellFactory } from "../grid/CellFactory"
 import { buildGroupTree } from "@/lib/grouping/groupTree"
 import type { GroupedNode } from "@/lib/grouping/types"
+import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 
 interface GalleryViewProps {
   tableId: string
@@ -55,6 +56,7 @@ export default function GalleryView({
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set())
+  const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
 
   // Resolve supabase table name
   useEffect(() => {
@@ -249,6 +251,64 @@ export default function GalleryView({
     return rows.filter((r) => ids.has(r.id))
   }, [rows, tableFields, searchQuery, safeFieldIds])
 
+  // Resolve grouping labels for linked record fields (link_to_table).
+  useEffect(() => {
+    let cancelled = false
+
+    const collectIds = (raw: any): string[] => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.flatMap(collectIds)
+      if (typeof raw === "object") {
+        if (raw && "id" in raw) return [String((raw as any).id)]
+        return []
+      }
+      const s = String(raw).trim()
+      return s ? [s] : []
+    }
+
+    async function load() {
+      if (!effectiveGroupByField) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const safeFields = (Array.isArray(tableFields) ? tableFields : []).filter(Boolean) as TableField[]
+      const fieldObj = safeFields.find((f: any) => f?.name === effectiveGroupByField || f?.id === effectiveGroupByField) as
+        | TableField
+        | undefined
+
+      if (!fieldObj || fieldObj.type !== "link_to_table") {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const linkField = fieldObj as LinkedField
+      const ids = new Set<string>()
+      for (const r of Array.isArray(filteredRows) ? filteredRows : []) {
+        const raw = (r as any)?.data?.[linkField.name]
+        for (const id of collectIds(raw)) ids.add(id)
+      }
+
+      if (ids.size === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const map = await resolveLinkedFieldDisplayMap(linkField, Array.from(ids))
+      const next: Record<string, Record<string, string>> = {
+        [linkField.name]: Object.fromEntries(map.entries()),
+        [(linkField as any).id]: Object.fromEntries(map.entries()),
+      }
+
+      if (!cancelled) setGroupValueLabelMaps(next)
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [effectiveGroupByField, filteredRows, tableFields])
+
   type GalleryGroupItem = Record<string, any> & { __row: TableRow; __rowId: string }
 
   const groupedRows = useMemo((): GroupedNode<GalleryGroupItem>[] | null => {
@@ -262,9 +322,10 @@ export default function GalleryView({
     const { rootGroups } = buildGroupTree(items, safeFields, [{ type: "field", field: effectiveGroupByField }], {
       emptyLabel: "(Empty)",
       emptyLast: true,
+      valueLabelMaps: groupValueLabelMaps,
     })
     return rootGroups
-  }, [effectiveGroupByField, filteredRows, tableFields])
+  }, [effectiveGroupByField, filteredRows, tableFields, groupValueLabelMaps])
 
   const toggleGroupCollapsed = useCallback((pathKey: string) => {
     setCollapsedGroups((prev) => {

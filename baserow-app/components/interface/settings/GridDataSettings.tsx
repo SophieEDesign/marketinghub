@@ -571,8 +571,8 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Filters (optional) - For Table, Calendar, Kanban, and Timeline views */}
-      {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline') && config.table_id && fields.length > 0 && (
+      {/* Filters (optional) - For Table, Calendar, Kanban, Timeline, and Gallery views */}
+      {(currentViewType === 'grid' || currentViewType === 'calendar' || currentViewType === 'kanban' || currentViewType === 'timeline' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
         <div className="space-y-2 border-t pt-4">
           <BlockFilterEditor
             filters={config.filters || []}

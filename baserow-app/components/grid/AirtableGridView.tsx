@@ -37,6 +37,8 @@ import type { FilterConfig } from '@/lib/interface/filters'
 import { buildGroupTree, flattenGroupTree } from '@/lib/grouping/groupTree'
 import type { GroupRule } from '@/lib/grouping/types'
 import { normalizeUuid } from '@/lib/utils/ids'
+import type { LinkedField } from '@/types/fields'
+import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -162,6 +164,7 @@ export default function AirtableGridView({
   const [containerHeight, setContainerHeight] = useState(600)
   const [sorts, setSorts] = useState<Array<{ field: string; direction: 'asc' | 'desc' }>>([])
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [groupValueLabelMaps, setGroupValueLabelMaps] = useState<Record<string, Record<string, string>>>({})
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set())
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null)
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null)
@@ -769,7 +772,71 @@ export default function AirtableGridView({
     return buildGroupTree(asArray<GridRow>(filteredRows), safeFields, effectiveGroupRules, {
       emptyLabel: '(Empty)',
       emptyLast: true,
+      valueLabelMaps: groupValueLabelMaps,
     })
+  }, [effectiveGroupRules, filteredRows, safeFields, groupValueLabelMaps])
+
+  // Resolve grouping labels for linked record fields (link_to_table).
+  useEffect(() => {
+    let cancelled = false
+
+    const collectIds = (raw: any): string[] => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.flatMap(collectIds)
+      if (typeof raw === 'object') {
+        if (raw && 'id' in raw) return [String((raw as any).id)]
+        return []
+      }
+      const s = String(raw).trim()
+      return s ? [s] : []
+    }
+
+    async function load() {
+      const rules = Array.isArray(effectiveGroupRules) ? effectiveGroupRules : []
+      if (rules.length === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const fieldByNameOrId = new Map<string, TableField>()
+      for (const f of safeFields) {
+        if (!f) continue
+        if (f.name) fieldByNameOrId.set(f.name, f)
+        if ((f as any).id) fieldByNameOrId.set(String((f as any).id), f)
+      }
+
+      const groupedLinkFields: LinkedField[] = []
+      for (const r of rules) {
+        if (!r || r.type !== 'field') continue
+        const f = fieldByNameOrId.get(r.field)
+        if (f && f.type === 'link_to_table') groupedLinkFields.push(f as LinkedField)
+      }
+
+      if (groupedLinkFields.length === 0) {
+        setGroupValueLabelMaps({})
+        return
+      }
+
+      const next: Record<string, Record<string, string>> = {}
+      for (const f of groupedLinkFields) {
+        const ids = new Set<string>()
+        for (const row of asArray<GridRow>(filteredRows)) {
+          for (const id of collectIds((row as any)?.[f.name])) ids.add(id)
+        }
+        if (ids.size === 0) continue
+        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        next[f.name] = Object.fromEntries(map.entries())
+        // Also key by field id for callers who group by id.
+        next[(f as any).id] = next[f.name]
+      }
+
+      if (!cancelled) setGroupValueLabelMaps(next)
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [effectiveGroupRules, filteredRows, safeFields])
 
   function toggleGroup(pathKey: string) {

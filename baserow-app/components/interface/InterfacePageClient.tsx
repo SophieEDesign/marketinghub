@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, Suspense } from "rea
 import { useSearchParams, useRouter } from "next/navigation"
 import { Edit2, Settings, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +48,7 @@ function InterfacePageClientInternal({
 }: InterfacePageClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
   const [page, setPage] = useState<InterfacePage | null>(initialPage || null)
   const [data, setData] = useState<any[]>(initialData)
   const [loading, setLoading] = useState(!initialPage)
@@ -892,7 +894,7 @@ function InterfacePageClientInternal({
   
 
   // Save page title with debouncing - MUST be before early returns (React Hooks rule)
-  const savePageTitle = useCallback(async (newTitle: string, immediate = false) => {
+  const savePageTitle = useCallback(async (newTitle: string, immediate = false): Promise<boolean | undefined> => {
     if (!page || !isAdmin) return
     
     // Clear existing timeout
@@ -901,11 +903,11 @@ function InterfacePageClientInternal({
       saveTimeoutRef.current = null
     }
 
-    const doSave = async () => {
+    const doSave = async (): Promise<boolean> => {
       // Don't save if title hasn't changed
       if (newTitle.trim() === lastSavedTitleRef.current) {
         setIsSavingTitle(false)
-        return
+        return true
       }
 
       setIsSavingTitle(true)
@@ -933,6 +935,7 @@ function InterfacePageClientInternal({
         
         // Trigger sidebar refresh to update navigation
         window.dispatchEvent(new CustomEvent('pages-updated'))
+        return true
       } catch (error: any) {
         console.error('Error saving page title:', error)
         setTitleError(true)
@@ -942,16 +945,18 @@ function InterfacePageClientInternal({
         alert(error.message || 'Failed to save page title. Please try again.')
         // Clear error state after a moment
         setTimeout(() => setTitleError(false), 3000)
+        return false
       } finally {
         setIsSavingTitle(false)
       }
     }
 
     if (immediate) {
-      await doSave()
+      return await doSave()
     } else {
       // Debounce: wait 1000ms (within 800-1200ms range) before saving
       saveTimeoutRef.current = setTimeout(doSave, 1000)
+      return undefined
     }
   }, [page, isAdmin])
 
@@ -1029,7 +1034,14 @@ function InterfacePageClientInternal({
   const handleTitleBlur = async () => {
     // Save immediately on blur - wait for save to complete
     if (titleValue.trim() !== lastSavedTitleRef.current) {
-      await savePageTitle(titleValue.trim(), true)
+      const ok = await savePageTitle(titleValue.trim(), true)
+      if (ok) {
+        toast({
+          title: "Finished editing",
+          description: "Page title saved.",
+        })
+        router.refresh()
+      }
     }
     setIsEditingTitle(false)
   }
@@ -1055,6 +1067,17 @@ function InterfacePageClientInternal({
   const handleStartEditTitle = () => {
     setIsEditingTitle(true)
     setTitleValue(page?.name || "")
+  }
+
+  const handleDoneEditingInterface = () => {
+    exitBlockEdit()
+    toast({
+      title: "Finished editing",
+      description: "Refreshing to show saved changes.",
+    })
+    // Refresh server components + re-fetch blocks to ensure view mode reflects persisted state.
+    router.refresh()
+    if (page) loadBlocks(true)
   }
 
   return (
@@ -1115,7 +1138,7 @@ function InterfacePageClientInternal({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {isBlockEditing ? (
-                  <DropdownMenuItem onClick={() => exitBlockEdit()}>
+                  <DropdownMenuItem onClick={handleDoneEditingInterface}>
                     Done editing
                   </DropdownMenuItem>
                 ) : (

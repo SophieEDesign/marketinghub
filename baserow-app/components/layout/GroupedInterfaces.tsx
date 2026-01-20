@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import PageCreationWizard from "@/components/interface/PageCreationWizard"
+import { useToast } from "@/components/ui/use-toast"
 
 interface InterfacePage {
   id: string
@@ -81,6 +82,7 @@ export default function GroupedInterfaces({
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
   const { primaryColor, sidebarTextColor } = useBranding()
+  const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)
   const [groups, setGroups] = useState<InterfaceGroup[]>(initialGroups.filter(g => g && g.id))
   const [pages, setPages] = useState<InterfacePage[]>(interfacePages)
@@ -255,7 +257,7 @@ export default function GroupedInterfaces({
     setIsRenaming(false)
   }
 
-  const handleSaveGroup = async (groupId: string) => {
+  const handleSaveGroup = async (groupId: string, opts?: { trigger?: 'blur' | 'enter' | 'unknown' }) => {
     if (!editingName.trim()) {
       setEditingGroupId(null)
       setIsRenaming(false)
@@ -275,6 +277,13 @@ export default function GroupedInterfaces({
         )
         setEditingGroupId(null)
         setIsRenaming(false)
+        window.dispatchEvent(new CustomEvent("pages-updated"))
+        if (opts?.trigger === 'blur') {
+          toast({
+            title: "Finished editing",
+            description: "Saved.",
+          })
+        }
         onRefresh?.()
       } else {
         console.warn("Failed to update group:", response.status, response.statusText)
@@ -359,7 +368,7 @@ export default function GroupedInterfaces({
     setIsRenaming(false)
   }
 
-  const handleSavePage = async (pageId: string) => {
+  const handleSavePage = async (pageId: string, opts?: { trigger?: 'blur' | 'enter' | 'unknown' }) => {
     if (!editingName.trim()) {
       setEditingPageId(null)
       setIsRenaming(false)
@@ -379,6 +388,13 @@ export default function GroupedInterfaces({
         )
         setEditingPageId(null)
         setIsRenaming(false)
+        window.dispatchEvent(new CustomEvent("pages-updated"))
+        if (opts?.trigger === 'blur') {
+          toast({
+            title: "Finished editing",
+            description: "Saved.",
+          })
+        }
         onRefresh?.()
       } else {
         // Revert on error
@@ -761,11 +777,11 @@ export default function GroupedInterfaces({
               <Input
                 value={editingName}
                 onChange={(e) => setEditingName(e.target.value)}
-                onBlur={() => handleSaveGroup(group.id)}
+                onBlur={() => handleSaveGroup(group.id, { trigger: 'blur' })}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault()
-                    handleSaveGroup(group.id)
+                    handleSaveGroup(group.id, { trigger: 'enter' })
                   } else if (e.key === "Escape") {
                     e.preventDefault()
                     handleCancelEditGroup()
@@ -903,11 +919,11 @@ export default function GroupedInterfaces({
             <Input
               value={editingName}
               onChange={(e) => setEditingName(e.target.value)}
-              onBlur={() => handleSavePage(page.id)}
+              onBlur={() => handleSavePage(page.id, { trigger: 'blur' })}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault()
-                  handleSavePage(page.id)
+                  handleSavePage(page.id, { trigger: 'enter' })
                 } else if (e.key === "Escape") {
                   e.preventDefault()
                   handleCancelEditPage()

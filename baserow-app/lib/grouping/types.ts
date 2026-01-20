@@ -55,12 +55,20 @@ export type GroupTreeOptions = {
   emptyLabel?: string
   /** Whether empty groups should sort last (Airtable-like). Default: true */
   emptyLast?: boolean
+  /**
+   * Optional mapping to resolve raw stored values (e.g. UUIDs) to human labels for grouping.
+   *
+   * Primary use-case: `link_to_table` fields store record IDs, but UI should group by the linked
+   * record's primary label. Provide a map of `fieldNameOrId -> { rawValue -> label }`.
+   */
+  valueLabelMaps?: Record<string, Record<string, string>>
 }
 
 export type GroupContext = {
   fields: TableField[]
   fieldByName: Map<string, TableField>
   fieldById: Map<string, TableField>
-  options: Required<Pick<GroupTreeOptions, 'emptyLabel' | 'emptyLast'>>
+  options: Required<Pick<GroupTreeOptions, 'emptyLabel' | 'emptyLast'>> &
+    Pick<GroupTreeOptions, 'valueLabelMaps'>
 }
 
