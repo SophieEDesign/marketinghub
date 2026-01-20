@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import type { AggregateType, PageBlock } from "@/lib/interface/types"
 import { applyFiltersToQuery, mergeFilters, type FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import type { TableField } from "@/types/fields"
 import {
@@ -35,6 +36,7 @@ interface ChartBlockProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level filters
+  filterTree?: FilterTree
 }
 
 interface ChartDataPoint {
@@ -51,7 +53,14 @@ interface CategoricalLegendItem {
   color: string
 }
 
-export default function ChartBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [] }: ChartBlockProps) {
+export default function ChartBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  filterTree = null,
+}: ChartBlockProps) {
   const router = useRouter()
   const { config } = block
   // Chart block table_id resolution:

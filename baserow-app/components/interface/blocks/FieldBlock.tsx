@@ -323,25 +323,56 @@ export default function FieldBlock({
   }
 
   const content = isAttachmentField ? (
-    <div className="flex-1">
-      {attachments.length > 0 ? (
-        <AttachmentPreview
-          attachments={attachments}
-          maxVisible={10}
-          size={(config?.appearance as any)?.attachment_size || "medium"}
-          displayStyle={
-            field.options?.attachment_display_style ||
-            (config?.appearance as any)?.attachment_display_style ||
-            "thumbnails"
+    isEditable ? (
+      <InlineFieldEditor
+        field={field}
+        value={fieldValue}
+        onChange={handleCommit}
+        isEditing={isEditingValue}
+        onEditStart={() => {
+          setIsEditingValue(true)
+        }}
+        onEditEnd={() => setIsEditingValue(false)}
+        onLinkedRecordClick={(linkedTableId, linkedRecordId) => {
+          // Never open the current record (self-link edge case)
+          if (pageTableId && recordId && linkedTableId === pageTableId && linkedRecordId === recordId) {
+            return
           }
-        />
-      ) : (
-        <div className="px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
-          <Paperclip className="h-4 w-4" />
-          No attachments
-        </div>
-      )}
-    </div>
+          window.location.href = `/tables/${linkedTableId}/records/${linkedRecordId}`
+        }}
+        onAddLinkedRecord={() => {
+          toast({
+            title: "Not implemented",
+            description: "Adding linked records is not available here yet.",
+          })
+        }}
+        isReadOnly={false}
+        showLabel={false}
+        tableId={pageTableId || undefined}
+        recordId={recordId || undefined}
+        tableName={tableName || undefined}
+      />
+    ) : (
+      <div className="flex-1">
+        {attachments.length > 0 ? (
+          <AttachmentPreview
+            attachments={attachments}
+            maxVisible={10}
+            size={(config?.appearance as any)?.attachment_size || "medium"}
+            displayStyle={
+              field.options?.attachment_display_style ||
+              (config?.appearance as any)?.attachment_display_style ||
+              "thumbnails"
+            }
+          />
+        ) : (
+          <div className="px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-md text-sm text-gray-400 italic flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            No attachments
+          </div>
+        )}
+      </div>
+    )
   ) : (
     <InlineFieldEditor
       field={field}

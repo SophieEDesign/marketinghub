@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -11,6 +11,7 @@ import {
   normalizeFilter,
   type FilterConfig,
 } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { asArray } from "@/lib/utils/asArray"
 import type { TableField } from "@/types/fields"
@@ -32,6 +33,7 @@ interface ListBlockProps {
   pageTableId?: string | null
   pageId?: string | null
   filters?: FilterConfig[]
+  filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
   pageShowAddRecord?: boolean // Page-level default for showing Add record
 }
@@ -42,6 +44,7 @@ export default function ListBlock({
   pageTableId = null,
   pageId = null,
   filters = [],
+  filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
 }: ListBlockProps) {

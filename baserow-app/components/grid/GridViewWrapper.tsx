@@ -8,6 +8,8 @@ import Toolbar from "./Toolbar"
 import FieldBuilderDrawer from "./FieldBuilderDrawer"
 import type { TableField } from "@/types/fields"
 import type { FilterConfig } from "@/lib/interface/filters"
+import { stripFilterBlockFilters } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
 
@@ -57,6 +59,7 @@ interface GridViewWrapperProps {
   isEditing?: boolean // When false, hide builder controls (add field, etc.)
   onRecordClick?: (recordId: string) => void // Emit recordId on row click
   standardizedFilters?: FilterConfig[] // Standardized filters (preferred over initialFilters)
+  filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   modalFields?: string[] // Fields to show in modal (if empty, show all)
   appearance?: {
     show_toolbar?: boolean
@@ -84,6 +87,7 @@ export default function GridViewWrapper({
   viewFields,
   initialFilters,
   standardizedFilters,
+  filterTree = null,
   initialSorts,
   initialGroupBy,
   initialTableFields = [],
@@ -487,7 +491,9 @@ export default function GridViewWrapper({
   // Merge standardizedFilters (block-level) with user-created filters
   // Exclude block-level filters that have been explicitly deleted by the user
   const gridViewFilters = useMemo<FilterConfig[]>(() => {
-    const blockLevelFilters = (standardizedFilters || []).filter(f => {
+    const standardizedForQuery = filterTree ? stripFilterBlockFilters(standardizedFilters || []) : (standardizedFilters || [])
+
+    const blockLevelFilters = standardizedForQuery.filter(f => {
       // Exclude block-level filters that the user has explicitly deleted
       return !deletedBlockLevelFilters.has(f.field)
     })
@@ -507,7 +513,7 @@ export default function GridViewWrapper({
     // Merge block-level filters with user-created filters
     // Block-level filters take precedence (they're applied first)
     return [...blockLevelFilters, ...userCreatedFilters]
-  }, [standardizedFilters, filters, deletedBlockLevelFilters])
+  }, [standardizedFilters, filters, deletedBlockLevelFilters, filterTree])
 
   // Merge block-level filters with user-created filters for display in Toolbar
   // Block-level filters are marked as non-deletable and show source information
@@ -576,6 +582,7 @@ export default function GridViewWrapper({
         viewFields={safeViewFields}
         viewFilters={safeInitialFilters}
         filters={gridViewFilters}
+        filterTree={filterTree}
         viewSorts={asArray(sorts)}
         searchTerm={searchTerm}
         groupBy={groupBy}

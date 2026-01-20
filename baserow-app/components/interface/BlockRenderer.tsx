@@ -27,6 +27,7 @@ import ListBlock from "./blocks/ListBlock"
 import NumberBlock from "./blocks/NumberBlock"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import LazyBlockWrapper from "./LazyBlockWrapper"
 
 // Module-level Set to track warned blocks across all component instances
@@ -42,6 +43,7 @@ interface BlockRendererProps {
   recordId?: string | null // Record ID for record review pages
   mode?: 'view' | 'edit' | 'review' // Record review mode: view (no editing), edit (full editing), review (content editing without layout)
   filters?: FilterConfig[] // Filters from filter blocks (for data blocks)
+  filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data for KPI blocks
   pageShowAddRecord?: boolean // Page-level default for "Add record" buttons in data blocks
@@ -61,6 +63,7 @@ export default function BlockRenderer({
   recordId = null,
   mode = 'view', // Default to view mode
   filters = [],
+  filterTree = null,
   onRecordClick,
   aggregateData,
   pageShowAddRecord = false,
@@ -157,6 +160,7 @@ export default function BlockRenderer({
               pageId={pageId}
               recordId={recordId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -207,13 +211,13 @@ export default function BlockRenderer({
       case "chart":
         // CRITICAL: Pass pageTableId to ChartBlock for table resolution fallback
         // pageTableId must flow to blocks for base_table fallback
-        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} />
+        return <ChartBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} filterTree={filterTree} />
 
       case "kpi":
         // CRITICAL: Pass pageTableId to KPIBlock for table resolution fallback
         // pageTableId must flow to blocks for base_table fallback
         // CRITICAL: Pass pre-fetched aggregate data to prevent duplicate requests
-        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} aggregateData={aggregateData} />
+        return <KPIBlock block={safeBlock} isEditing={canEdit} pageTableId={pageTableId} pageId={pageId} filters={filters} filterTree={filterTree} aggregateData={aggregateData} />
 
       case "filter":
         // Filter block emits filter state via context
@@ -278,6 +282,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -292,6 +297,7 @@ export default function BlockRenderer({
               isEditing={canEdit}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -308,6 +314,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -324,6 +331,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -338,6 +346,7 @@ export default function BlockRenderer({
               isEditing={canEdit}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -354,6 +363,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />
@@ -370,6 +380,7 @@ export default function BlockRenderer({
               pageTableId={pageTableId}
               pageId={pageId}
               filters={filters}
+              filterTree={filterTree}
               onRecordClick={onRecordClick}
               pageShowAddRecord={pageShowAddRecord}
             />

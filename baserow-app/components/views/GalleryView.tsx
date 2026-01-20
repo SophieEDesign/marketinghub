@@ -6,7 +6,8 @@ import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import { Card, CardContent } from "@/components/ui/card"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import { applyFiltersToQuery, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { ChevronRight } from "lucide-react"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -19,6 +20,7 @@ interface GalleryViewProps {
   searchQuery?: string
   tableFields?: any[]
   filters?: FilterConfig[]
+  filterTree?: FilterTree
   onRecordClick?: (recordId: string) => void
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
@@ -37,6 +39,7 @@ export default function GalleryView({
   searchQuery = "",
   tableFields = [],
   filters = [],
+  filterTree = null,
   onRecordClick,
   reloadKey,
   colorField,
@@ -103,7 +106,11 @@ export default function GalleryView({
           type: f.type || f.field_type,
           options: f.options || f.field_options,
         }))
-        query = applyFiltersToQuery(query, filters, normalizedFields)
+        const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
+        if (filterTree) {
+          query = applyFiltersToQuery(query, filterTree, normalizedFields)
+        }
+        query = applyFiltersToQuery(query, baseFilters, normalizedFields)
 
         // Default ordering
         query = query.order("created_at", { ascending: false })

@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 import type { PageBlock } from "@/lib/interface/types"
 import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import MultiCalendarView from "@/components/views/MultiCalendarView"
 
 interface MultiCalendarBlockProps {
@@ -10,6 +11,7 @@ interface MultiCalendarBlockProps {
   isEditing?: boolean
   pageId?: string | null
   filters?: FilterConfig[]
+  filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
 }
@@ -24,6 +26,7 @@ export default function MultiCalendarBlock({
   isEditing = false,
   pageId = null,
   filters = [],
+  filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
 }: MultiCalendarBlockProps) {
@@ -87,6 +90,7 @@ export default function MultiCalendarBlock({
       pageId={pageId}
       sources={sources}
       filters={filters}
+      filterTree={filterTree}
       blockConfig={block.config || {}}
       isEditing={isEditing}
       onRecordClick={onRecordClick}

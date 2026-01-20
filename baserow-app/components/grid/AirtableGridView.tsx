@@ -115,7 +115,9 @@ export default function AirtableGridView({
 
   // Load tableId from tableName if not provided
   useEffect(() => {
-    if (!tableIdState && tableName && !disableRecordPanel) {
+    // We need `tableId` for more than opening records (e.g. schema sync/self-heal in `useGridData`).
+    // So we should resolve it even when the record panel is disabled.
+    if (!tableIdState && tableName) {
       const loadTableId = async () => {
         try {
           const supabase = createClient()
@@ -133,7 +135,7 @@ export default function AirtableGridView({
       }
       loadTableId()
     }
-  }, [tableIdState, tableName, disableRecordPanel])
+  }, [tableIdState, tableName])
 
   const handleOpenRecord = useCallback((rowId: string) => {
     if (disableRecordPanel) return
@@ -222,6 +224,27 @@ export default function AirtableGridView({
   const safeRows = asArray<GridRow>(allRows)
   const safeFields = asArray<TableField>(fields)
   const safeSorts = asArray<Sort>(sorts)
+
+  // Upstream can recreate arrays each render; use a stable content key so our effects don't thrash.
+  // Keep this order-insensitive to avoid loops if the same fields arrive in different orders.
+  const fieldsContentKey = useMemo(() => {
+    const minimal = Array.isArray(safeFields)
+      ? safeFields
+          .filter((f): f is TableField => Boolean(f && typeof f === 'object'))
+          .map((f) => ({
+            id: (f as any).id ?? null,
+            name: (f as any).name ?? null,
+            order_index: (f as any).order_index ?? (f as any).position ?? null,
+            type: (f as any).type ?? null,
+          }))
+          .sort((a, b) => {
+            const ak = String(a.id ?? a.name ?? '')
+            const bk = String(b.id ?? b.name ?? '')
+            return ak.localeCompare(bk)
+          })
+      : []
+    return JSON.stringify(minimal)
+  }, [safeFields])
 
   // Get visible fields in order (needed for search filtering and rendering)
   // CRITICAL: If columnOrder is empty, fall back to all fields sorted by order_index/position
@@ -540,7 +563,7 @@ export default function AirtableGridView({
     }
 
     loadGridViewSettings()
-  }, [safeFields, tableName, viewName, viewUuid])
+  }, [fieldsContentKey, tableName, viewName, viewUuid])
 
   // Save column widths, order, and wrap text to database and localStorage
   useEffect(() => {

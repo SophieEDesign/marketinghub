@@ -15,6 +15,7 @@ import {
   normalizeFilter,
   type FilterConfig,
 } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { useViewMeta } from "@/hooks/useViewMeta"
 import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { asArray } from "@/lib/utils/asArray"
@@ -32,6 +33,7 @@ interface GridBlockProps {
   pageId?: string | null // Page ID
   recordId?: string | null // Record ID for record review pages (used to detect record context)
   filters?: FilterConfig[] // Page-level or filter block filters
+  filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string, tableId?: string) => void // Callback for record clicks (for RecordReview integration)
   pageShowAddRecord?: boolean // Page-level default for showing Add record
 }
@@ -43,6 +45,7 @@ export default function GridBlock({
   pageId = null,
   recordId = null,
   filters = [],
+  filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
 }: GridBlockProps) {
@@ -505,6 +508,7 @@ export default function GridBlock({
             fieldIds={fieldIds}
             tableFields={tableFields}
             filters={allFilters}
+            filterTree={filterTree}
             blockConfig={config} // Pass block config so CalendarView can read date_field from page settings
             onRecordClick={onRecordClick} // CRITICAL: Pass onRecordClick for RecordReview integration
             colorField={appearance.color_field}
@@ -651,6 +655,7 @@ export default function GridBlock({
             searchQuery=""
             tableFields={tableFields}
             filters={allFilters}
+            filterTree={filterTree}
             onRecordClick={onRecordClick}
             blockConfig={config}
             colorField={appearance.color_field}
@@ -704,6 +709,7 @@ export default function GridBlock({
             viewFields={visibleFields}
             initialFilters={activeFilters}
             standardizedFilters={allFilters}
+            filterTree={filterTree}
             initialSorts={activeSorts}
             initialGroupBy={effectiveGroupBy}
             initialTableFields={tableFields}

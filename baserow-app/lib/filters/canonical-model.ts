@@ -203,3 +203,22 @@ export function conditionsToFilterTree(
     children: conditions
   }
 }
+
+/**
+ * Combine multiple filter trees into a single AND group.
+ *
+ * - null/empty trees are ignored
+ * - if only one non-empty tree exists, that tree is returned (normalized)
+ */
+export function andFilterTrees(trees: FilterTree[]): FilterTree {
+  const normalizedChildren = (Array.isArray(trees) ? trees : [])
+    .map((t) => normalizeFilterTree(t))
+    .filter((t): t is FilterGroup => Boolean(t) && Array.isArray((t as any).children))
+
+  if (normalizedChildren.length === 0) return null
+  if (normalizedChildren.length === 1) return normalizedChildren[0]
+  return {
+    operator: 'AND',
+    children: normalizedChildren,
+  }
+}

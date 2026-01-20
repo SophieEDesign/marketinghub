@@ -50,7 +50,7 @@ export default function RichTextEditor({
   placeholder = 'Start typing...',
   editable = true,
   className,
-  minHeight = '120px',
+  minHeight = '180px',
   showToolbar = true,
 }: RichTextEditorProps) {
   const editor = useEditor({
@@ -129,7 +129,7 @@ export default function RichTextEditor({
     if (!showToolbar || !editable) return null
 
     return (
-      <div className="flex items-center gap-1 p-1 bg-white border border-gray-200 rounded-md shadow-sm mb-2 flex-wrap">
+      <div className="flex items-center gap-1 p-1 bg-white border border-gray-200 rounded-md shadow-sm flex-wrap">
         {/* Heading selector */}
         <Select
           value={
@@ -259,9 +259,9 @@ export default function RichTextEditor({
     <div className={cn("space-y-2", className)}>
       {showToolbar && editable && <Toolbar />}
       <div className={cn(
-        "border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent",
+        "border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent overflow-auto",
         !editable && "bg-gray-50"
-      )}>
+      )} style={{ minHeight }}>
         <EditorContent editor={editor} />
       </div>
     </div>

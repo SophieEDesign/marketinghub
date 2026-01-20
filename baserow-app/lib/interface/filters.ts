@@ -7,6 +7,7 @@
 import type { BlockFilter } from './types'
 import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 import { applyFiltersToQuery as applyFiltersToQueryUnified } from '@/lib/filters/evaluation'
+import type { FilterTree } from '@/lib/filters/canonical-model'
 import type { TableField } from '@/types/fields'
 
 export interface FilterConfig {
@@ -40,6 +41,16 @@ export interface FilterConfig {
 export interface PageFilters {
   filters: FilterConfig[]
   searchQuery?: string
+}
+
+/**
+ * Filters coming from Filter Blocks carry source metadata (sourceBlockId/sourceBlockTitle).
+ * When a canonical `FilterTree` is used (groups/OR), those block-derived filters should not be
+ * applied again from a flat list (or they will be double-applied).
+ */
+export function stripFilterBlockFilters(filters: FilterConfig[] = []): FilterConfig[] {
+  const safe = Array.isArray(filters) ? filters : []
+  return safe.filter((f: any) => !f?.sourceBlockId)
 }
 
 /**
@@ -142,13 +153,13 @@ export function serializeFiltersForComparison(filters: FilterConfig[] = []): str
  */
 export function applyFiltersToQuery(
   query: any,
-  filters: FilterConfig[],
+  filters: FilterConfig[] | FilterTree,
   tableFields: Array<{ name: string; type: string; id?: string; options?: any }> = []
 ): any {
-  if (!filters || filters.length === 0) return query
+  if (!filters) return query
+  if (Array.isArray(filters) && filters.length === 0) return query
 
-  // Convert FilterConfig[] to FilterTree and use unified evaluation
-  const filterTree = filterConfigsToFilterTree(filters, 'AND')
+  const filterTree: FilterTree = Array.isArray(filters) ? filterConfigsToFilterTree(filters, 'AND') : (filters as FilterTree)
   return applyFiltersToQueryUnified(query, filterTree, tableFields as any)
 }
 

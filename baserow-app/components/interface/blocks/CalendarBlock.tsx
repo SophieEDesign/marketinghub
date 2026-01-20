@@ -3,6 +3,7 @@
 import type { PageBlock } from "@/lib/interface/types"
 import GridBlock from "./GridBlock"
 import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 
 interface CalendarBlockProps {
   block: PageBlock
@@ -10,6 +11,7 @@ interface CalendarBlockProps {
   pageTableId?: string | null
   pageId?: string | null
   filters?: FilterConfig[]
+  filterTree?: FilterTree
   onRecordClick?: (recordId: string, tableId?: string) => void
   pageShowAddRecord?: boolean
 }
@@ -24,6 +26,7 @@ export default function CalendarBlock({
   pageTableId = null,
   pageId = null,
   filters = [],
+  filterTree = null,
   onRecordClick,
   pageShowAddRecord = false,
 }: CalendarBlockProps) {
@@ -43,6 +46,7 @@ export default function CalendarBlock({
       pageTableId={pageTableId}
       pageId={pageId}
       filters={filters}
+      filterTree={filterTree}
       onRecordClick={onRecordClick}
       pageShowAddRecord={pageShowAddRecord}
     />

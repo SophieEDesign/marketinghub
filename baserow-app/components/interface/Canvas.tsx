@@ -9,7 +9,7 @@ import BlockAppearanceWrapper from "./BlockAppearanceWrapper"
 import { ErrorBoundary } from "./ErrorBoundary"
 import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
-import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
 import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
@@ -74,7 +74,7 @@ export default function Canvas({
   editableFieldNames = [],
 }: CanvasProps) {
   // Get filters from filter blocks for this block
-  const { getFiltersForBlock } = useFilterState()
+  const { getFiltersForBlock, getFilterTreeForBlock } = useFilterState()
   
   // CRITICAL: Fetch aggregate data at page level (inside FilterStateProvider)
   // This eliminates duplicate requests - SWR handles deduplication automatically
@@ -1503,6 +1503,7 @@ export default function Canvas({
                     recordId={recordId}
                     mode={mode}
                     filters={getFiltersForBlock(block.id)}
+                    filterTree={getFilterTreeForBlock(block.id) as FilterTree}
                     onRecordClick={onRecordClick}
                     aggregateData={aggregateData[block.id]}
                     pageShowAddRecord={pageShowAddRecord}

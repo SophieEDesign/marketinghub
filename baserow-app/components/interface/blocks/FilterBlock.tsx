@@ -62,44 +62,25 @@ export default function FilterBlock({
   // Config: target blocks and allowed fields
   const targetBlocks = config?.target_blocks || 'all'
   const allowedFields = config?.allowed_fields || []
-  const defaultFilters = config?.default_filters || null // Default filter tree
+  const defaultFilterTree = (config as any)?.default_filters || null // Default filter tree (canonical)
   
-  /**
-   * Block-safe filter model:
-   * - We support a *flat* list of conditions combined by a single top-level operator (AND/OR).
-   * - We do NOT support nested groups (they are flattened).
-   */
-  const toFlatTree = useCallback((tree: FilterTree): FilterTree => {
-    const normalized = normalizeFilterTree(tree)
-    if (!normalized) return null
-    const conditions = flattenFilterTree(normalized)
-    // Preserve the incoming top-level operator (AND/OR), but flatten any nested groups away.
-    return filterConfigsToFilterTree(
-      conditions.map(c => ({ field: c.field_id, operator: c.operator, value: c.value })),
-      normalized.operator
-    )
-  }, [])
+  const legacyFiltersToTree = useCallback((): FilterTree => {
+    if (!config?.filters || !Array.isArray(config.filters) || config.filters.length === 0) return null
+    const filterConfigs = config.filters.map((f: any) => ({
+      field: f.field,
+      operator: f.operator,
+      value: f.value,
+      value2: (f as any).value2,
+    }))
+    return filterConfigsToFilterTree(filterConfigs, 'AND')
+  }, [config?.filters])
 
   // Current filter state (stored as FilterTree)
   const [filterTree, setFilterTree] = useState<FilterTree>(() => {
-    // Initialize from config.filters (legacy BlockFilter[]) or config.filter_tree (new FilterTree)
-    if (config?.filter_tree) {
-      return toFlatTree(config.filter_tree as FilterTree)
-    }
-    if (config?.filters && Array.isArray(config.filters) && config.filters.length > 0) {
-      // Convert legacy BlockFilter[] to FilterTree
-      const filterConfigs = config.filters.map((f: any) => ({
-        field: f.field,
-        operator: f.operator,
-        value: f.value,
-      }))
-      return toFlatTree(filterConfigsToFilterTree(filterConfigs, 'AND'))
-    }
-    // Use defaults if available
-    if (defaultFilters) {
-      return toFlatTree(defaultFilters as FilterTree)
-    }
-    return null
+    // Initialize from config.filter_tree (preferred) -> defaults -> legacy config.filters
+    if ((config as any)?.filter_tree) return (config as any).filter_tree as FilterTree
+    if (defaultFilterTree) return defaultFilterTree as FilterTree
+    return legacyFiltersToTree()
   })
   
   const [tableFields, setTableFields] = useState<TableField[]>([])
@@ -124,20 +105,10 @@ export default function FilterBlock({
 
   // Sync filter tree when config changes externally
   useEffect(() => {
-    const configFilterTree = config?.filter_tree
-      ? toFlatTree(config.filter_tree as FilterTree)
-      : (config?.filters && Array.isArray(config.filters) && config.filters.length > 0
-          ? toFlatTree(
-              filterConfigsToFilterTree(
-                config.filters.map((f: any) => ({
-                  field: f.field,
-                  operator: f.operator,
-                  value: f.value,
-                })),
-                'AND'
-              )
-            )
-          : (defaultFilters ? toFlatTree(defaultFilters as FilterTree) : null))
+    const configFilterTree =
+      (config as any)?.filter_tree
+        ? ((config as any).filter_tree as FilterTree)
+        : (defaultFilterTree ? (defaultFilterTree as FilterTree) : legacyFiltersToTree())
     
     const configStr = JSON.stringify(configFilterTree)
     
@@ -155,7 +126,7 @@ export default function FilterBlock({
       }
       return prev
     })
-  }, [config?.filter_tree, config?.filters, defaultFilters, toFlatTree])
+  }, [config?.filter_tree, defaultFilterTree, legacyFiltersToTree])
 
   useEffect(() => {
     if (tableId) {
@@ -280,9 +251,9 @@ export default function FilterBlock({
   useEffect(() => {
     if (block.id) {
       const blockTitle = config?.title || block.id
-      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle)
+      updateFilterBlock(block.id, emittedFilters, effectiveTargetBlocks, blockTitle, filterTree)
     }
-  }, [emitSignature, block.id, updateFilterBlock])
+  }, [emitSignature, block.id, updateFilterBlock, filterTree])
 
   // Cleanup only on unmount / blockId change.
   useEffect(() => {
@@ -305,6 +276,7 @@ export default function FilterBlock({
       const flatForLegacy = normalized ? flattenFilterTree(normalized) : []
       onUpdate(block.id, { 
         filter_tree: filterTree,
+        default_filters: filterTree,
         // Keep legacy filters for backward compatibility (AND-only semantics).
         // NOTE: OR is not representable in the legacy flat list, so consumers must prefer `filter_tree`.
         filters: flatForLegacy.map(c => ({
@@ -316,7 +288,7 @@ export default function FilterBlock({
     }, 1000)
     
     return () => clearTimeout(timeoutId)
-  }, [filterTree, block.id, onUpdate])
+  }, [filterTree, block.id, onUpdate, isEditing])
 
   async function loadTableFields() {
     if (!tableId) return
@@ -342,12 +314,10 @@ export default function FilterBlock({
 
   // Reset to defaults
   const handleReset = useCallback(() => {
-    if (defaultFilters) {
-      setFilterTree(toFlatTree(defaultFilters as FilterTree))
-    } else {
-      setFilterTree(null)
-    }
-  }, [defaultFilters, toFlatTree])
+    if (defaultFilterTree) setFilterTree(defaultFilterTree as FilterTree)
+    else if ((config as any)?.filter_tree) setFilterTree((config as any).filter_tree as FilterTree)
+    else setFilterTree(null)
+  }, [defaultFilterTree, config?.filter_tree])
 
   // Apply appearance settings
   const appearance = config.appearance || {}
@@ -426,8 +396,8 @@ export default function FilterBlock({
   }
 
   const isEmpty = isEmptyFilterTree(filterTree)
-  const hasDefaults = defaultFilters !== null && !isEmptyFilterTree(defaultFilters as FilterTree)
-  const isAtDefaults = JSON.stringify(filterTree) === JSON.stringify(defaultFilters)
+  const hasDefaults = defaultFilterTree !== null && !isEmptyFilterTree(defaultFilterTree as FilterTree)
+  const isAtDefaults = JSON.stringify(filterTree) === JSON.stringify(defaultFilterTree)
 
   return (
     <div className="h-full w-full overflow-auto flex flex-col rounded-lg border border-gray-200" style={blockStyle}>
@@ -455,7 +425,7 @@ export default function FilterBlock({
           tableFields={availableFields}
           onChange={setFilterTree}
           variant="airtable"
-          allowGroups={false}
+          allowGroups={true}
           allowOr={true}
         />
 
@@ -509,7 +479,7 @@ export default function FilterBlock({
                 filterTree={filterTree}
                 tableFields={availableFields}
                 onChange={setFilterTree}
-                allowGroups={false}
+                allowGroups={true}
                 allowOr={true}
               />
 

@@ -29,6 +29,7 @@ import type { TableField } from "@/types/fields"
 import RecordModal from "./RecordModal"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { sortRowsByFieldType, shouldUseClientSideSorting } from "@/lib/sorting/fieldTypeAwareSort"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
@@ -64,6 +65,7 @@ interface GridViewProps {
     value?: string
   }>
   filters?: FilterConfig[] // Standardized FilterConfig format (takes precedence over viewFilters)
+  filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   viewSorts?: Array<{
     field_name: string
     direction: string
@@ -280,6 +282,7 @@ export default function GridView({
   viewFields,
   viewFilters = [],
   filters = [], // Standardized filters (preferred)
+  filterTree = null,
   viewSorts = [],
   searchTerm = "",
   groupBy,
@@ -1060,6 +1063,12 @@ export default function GridView({
         : buildSelectClause(selectClause.split(','), { includeId: true, fallback: '*' })
 
       let query = supabase.from(supabaseTableName).select(safeSelectClause || '*')
+
+      // Apply filter-block tree first (supports groups/OR).
+      if (filterTree) {
+        const normalizedFields = safeTableFields.map((f) => ({ name: f.name, type: f.type }))
+        query = applyFiltersToQuery(query, filterTree, normalizedFields)
+      }
 
       // Use standardized filters if provided, otherwise fall back to viewFilters format
       if (safeFilters.length > 0) {

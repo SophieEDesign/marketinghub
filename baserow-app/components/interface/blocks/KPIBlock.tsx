@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import type { PageBlock } from "@/lib/interface/types"
 import { TrendingUp, TrendingDown, ArrowRight, Filter } from "lucide-react"
 import type { FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
 
 interface KPIBlockProps {
   block: PageBlock
@@ -11,6 +12,7 @@ interface KPIBlockProps {
   pageTableId?: string | null // Table ID from the page
   pageId?: string | null // Page ID
   filters?: FilterConfig[] // Page-level filters
+  filterTree?: FilterTree
   aggregateData?: { data: any; error: string | null; isLoading: boolean } // Pre-fetched aggregate data (page-level)
 }
 
@@ -22,7 +24,15 @@ interface ComparisonData {
   trend: 'up' | 'down' | 'neutral'
 }
 
-export default function KPIBlock({ block, isEditing = false, pageTableId = null, pageId = null, filters = [], aggregateData }: KPIBlockProps) {
+export default function KPIBlock({
+  block,
+  isEditing = false,
+  pageTableId = null,
+  pageId = null,
+  filters = [],
+  filterTree = null,
+  aggregateData,
+}: KPIBlockProps) {
   const router = useRouter()
   const { config } = block
   // KPI block MUST have table_id configured - no fallback to page table

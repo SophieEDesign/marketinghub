@@ -8,6 +8,8 @@ export interface GridViewSettings {
   column_order: string[]
   column_wrap_text: Record<string, boolean>
   row_height: 'short' | 'medium' | 'tall'
+  /** Optional per-record height overrides (record_id -> pixel height). */
+  row_heights?: Record<string, number>
   frozen_columns: number
   created_at: string
   updated_at: string

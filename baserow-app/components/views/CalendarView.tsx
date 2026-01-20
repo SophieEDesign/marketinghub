@@ -15,7 +15,9 @@ import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin from "@fullcalendar/interaction"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
-import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
+import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFilters, type FilterConfig } from "@/lib/interface/filters"
+import type { FilterTree } from "@/lib/filters/canonical-model"
+import { flattenFilterTree } from "@/lib/filters/canonical-model"
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
 import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
@@ -35,6 +37,7 @@ interface CalendarViewProps {
   searchQuery?: string
   tableFields?: any[]
   filters?: FilterConfig[] // Dynamic filters from config
+  filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string) => void // Emit recordId on click
   blockConfig?: Record<string, any> // Block/page config for reading date_field from page settings
   colorField?: string // Field name to use for event colors (single-select field)
@@ -71,6 +74,7 @@ export default function CalendarView({
   searchQuery = "",
   tableFields = [],
   filters = [],
+  filterTree = null,
   onRecordClick,
   blockConfig = {},
   colorField,
@@ -349,7 +353,8 @@ export default function CalendarView({
   
   // Build combined filters including date range
   const combinedFilters = useMemo(() => {
-    const allFilters: FilterConfig[] = [...(filters || [])]
+    const baseFilters = filterTree ? stripFilterBlockFilters(filters || []) : (filters || [])
+    const allFilters: FilterConfig[] = [...baseFilters]
     
     // Add date range filter if dates are set
     if (resolvedDateFieldId && (dateFrom || dateTo)) {
@@ -364,7 +369,38 @@ export default function CalendarView({
     }
     
     return allFilters
-  }, [filters, resolvedDateFieldId, dateFrom, dateTo])
+  }, [filters, filterTree, resolvedDateFieldId, dateFrom, dateTo])
+
+  // For "new record defaults" (Airtable-like), include flattened filter-tree conditions as best-effort.
+  const combinedFiltersForDefaults = useMemo(() => {
+    const out: FilterConfig[] = [...combinedFilters]
+    if (!filterTree) return out
+
+    for (const c of flattenFilterTree(filterTree)) {
+      if (
+        c.operator === "date_range" &&
+        c.value &&
+        typeof c.value === "object" &&
+        "start" in (c.value as any) &&
+        "end" in (c.value as any)
+      ) {
+        const v = c.value as any
+        out.push({
+          field: c.field_id,
+          operator: c.operator as any,
+          value: v.start ?? null,
+          value2: v.end ?? null,
+        })
+      } else {
+        out.push({
+          field: c.field_id,
+          operator: c.operator as any,
+          value: c.value ?? null,
+        })
+      }
+    }
+    return out
+  }, [combinedFilters, filterTree])
 
   // Memoize loadedTableFields key to prevent unnecessary re-renders
   const loadedTableFieldsKey = useMemo(() => {
@@ -558,6 +594,10 @@ export default function CalendarView({
 
       // Apply filters using shared filter system (includes date range filters)
       const normalizedFields = loadedTableFields.map(f => ({ name: f.name || f.id, type: f.type }))
+      // Apply filter block tree first (supports groups/OR), then apply remaining flat filters (AND).
+      if (filterTree) {
+        query = applyFiltersToQuery(query, filterTree, normalizedFields)
+      }
       query = applyFiltersToQuery(query, combinedFilters, normalizedFields)
 
       // Apply search query if provided
@@ -1663,7 +1703,7 @@ export default function CalendarView({
             const initial: Record<string, any> = {}
             // Also apply Airtable-style defaults from active filters (when they imply a single-value selection).
             // NOTE: combinedFilters includes date range UI filters, but deriveDefaultValuesFromFilters() intentionally ignores them.
-            const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFilters, loadedTableFields)
+            const defaultsFromFilters = deriveDefaultValuesFromFilters(combinedFiltersForDefaults, loadedTableFields)
             if (Object.keys(defaultsFromFilters).length > 0) {
               Object.assign(initial, defaultsFromFilters)
             }

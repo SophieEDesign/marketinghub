@@ -382,7 +382,9 @@ export default function InlineFieldEditor({
             onBlur={handleBlur}
             editable={true}
             showToolbar={true}
-            minHeight="120px"
+            // Give enough space so the toolbar doesn't "take over" in tight layouts.
+            // The editor will still scroll internally if the parent is constrained.
+            minHeight="240px"
           />
         </div>
       )
@@ -462,19 +464,44 @@ export default function InlineFieldEditor({
             )}
           </label>
         )}
-        {attachments.length > 0 ? (
-          <AttachmentPreview
-            attachments={attachments}
-            maxVisible={5}
-            size="medium"
-            displayStyle={field.options?.attachment_display_style || 'thumbnails'}
-          />
-        ) : (
-          <div className={`${readOnlyBoxClassName} flex items-center gap-2 ${showLabel ? "" : "text-gray-400 italic"}`}>
-            <Paperclip className="h-4 w-4" />
-            No attachments
-          </div>
-        )}
+        <div
+          onClick={(e) => {
+            if (isReadOnly) return
+            // Don't force edit mode when user is just previewing an attachment.
+            if ((e.target as HTMLElement).closest('[data-attachment-preview]')) return
+            onEditStart()
+          }}
+          className={
+            isReadOnly
+              ? `${readOnlyBoxClassName} ${attachments.length > 0 ? "not-italic" : ""}`
+              : `${displayBoxClassName} ${showLabel ? "min-h-[48px] flex items-center" : ""}`
+          }
+          role={!isReadOnly ? "button" : undefined}
+          tabIndex={!isReadOnly ? 0 : undefined}
+          onKeyDown={(e) => {
+            if (isReadOnly) return
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              onEditStart()
+            }
+          }}
+        >
+          {attachments.length > 0 ? (
+            <div data-attachment-preview>
+              <AttachmentPreview
+                attachments={attachments}
+                maxVisible={5}
+                size="medium"
+                displayStyle={field.options?.attachment_display_style || 'thumbnails'}
+              />
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 ${isReadOnly ? (showLabel ? "" : "text-gray-400 italic") : "text-gray-400"}`}>
+              <Paperclip className="h-4 w-4" />
+              {isReadOnly ? "No attachments" : "Click to add attachments..."}
+            </div>
+          )}
+        </div>
       </div>
     )
   }

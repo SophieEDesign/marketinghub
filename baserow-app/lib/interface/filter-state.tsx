@@ -8,10 +8,21 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 import type { FilterConfig } from './filters'
+import type { FilterTree } from '@/lib/filters/canonical-model'
+import { andFilterTrees } from '@/lib/filters/canonical-model'
+import { filterConfigsToFilterTree } from '@/lib/filters/converters'
 
 interface FilterBlockState {
   blockId: string
+  /**
+   * Flat filters used for backward compatibility and lightweight consumers.
+   * NOTE: This cannot represent grouped OR logic. Prefer `filterTree` when applying filters to queries.
+   */
   filters: FilterConfig[]
+  /**
+   * Canonical filter tree emitted by filter blocks (supports groups + AND/OR).
+   */
+  filterTree?: FilterTree
   targetBlocks: string[] | 'all'
   /**
    * A stable signature of the emitted filter payload.
@@ -29,10 +40,18 @@ export interface FilterConfigWithSource extends FilterConfig {
 interface FilterStateContextValue {
   // Get filters for a specific block (from all filter blocks that target it)
   getFiltersForBlock: (blockId: string) => FilterConfigWithSource[]
+  // Get canonical filter tree for a specific block (from all filter blocks that target it)
+  getFilterTreeForBlock: (blockId: string) => FilterTree
   // Get filter block info for a specific block ID
   getFilterBlockInfo: (blockId: string) => { blockId: string; title?: string } | null
   // Update filter block state
-  updateFilterBlock: (blockId: string, filters: FilterConfig[], targetBlocks: string[] | 'all', blockTitle?: string) => void
+  updateFilterBlock: (
+    blockId: string,
+    filters: FilterConfig[],
+    targetBlocks: string[] | 'all',
+    blockTitle?: string,
+    filterTree?: FilterTree
+  ) => void
   // Remove filter block state
   removeFilterBlock: (blockId: string) => void
   // Get all filter blocks
@@ -48,11 +67,12 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
   const computeSignature = useCallback((
     blockId: string,
     filters: FilterConfig[],
-    targetBlocks: string[] | 'all'
+    targetBlocks: string[] | 'all',
+    filterTree?: FilterTree
   ) => {
     // IMPORTANT: We assume caller maintains stable order; this is sufficient to detect "no-op" re-emits.
     // This is intentionally cheap and avoids deep-equality footguns.
-    return JSON.stringify({ blockId, filters, targetBlocks })
+    return JSON.stringify({ blockId, filters, targetBlocks, filterTree })
   }, [])
 
   const getFiltersForBlock = useCallback((blockId: string): FilterConfigWithSource[] => {
@@ -83,6 +103,19 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     return filters
   }, [filterBlocks, filterBlockTitles])
 
+  const getFilterTreeForBlock = useCallback((blockId: string): FilterTree => {
+    const trees: FilterTree[] = []
+
+    for (const [, state] of filterBlocks.entries()) {
+      if (state.targetBlocks === 'all' || state.targetBlocks.includes(blockId)) {
+        const tree = state.filterTree ?? filterConfigsToFilterTree(state.filters || [], 'AND')
+        if (tree) trees.push(tree)
+      }
+    }
+
+    return andFilterTrees(trees)
+  }, [filterBlocks])
+
   const getFilterBlockInfo = useCallback((blockId: string): { blockId: string; title?: string } | null => {
     const title = filterBlockTitles.get(blockId)
     if (!title && !filterBlocks.has(blockId)) return null
@@ -93,16 +126,17 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     blockId: string,
     filters: FilterConfig[],
     targetBlocks: string[] | 'all',
-    blockTitle?: string
+    blockTitle?: string,
+    filterTree?: FilterTree
   ) => {
-    const signature = computeSignature(blockId, filters, targetBlocks)
+    const signature = computeSignature(blockId, filters, targetBlocks, filterTree)
     setFilterBlocks(prev => {
       const existing = prev.get(blockId)
       if (existing?.signature === signature) {
         return prev
       }
       const next = new Map(prev)
-      next.set(blockId, { blockId, filters, targetBlocks, signature })
+      next.set(blockId, { blockId, filters, targetBlocks, signature, filterTree })
       return next
     })
     if (blockTitle !== undefined) {
@@ -138,6 +172,7 @@ export function FilterStateProvider({ children }: { children: ReactNode }) {
     <FilterStateContext.Provider
       value={{
         getFiltersForBlock,
+        getFilterTreeForBlock,
         getFilterBlockInfo,
         updateFilterBlock,
         removeFilterBlock,
