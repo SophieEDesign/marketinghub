@@ -15,6 +15,7 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
+  DragCancelEvent,
   useDroppable,
 } from "@dnd-kit/core"
 import {
@@ -506,6 +507,18 @@ export default function GroupedInterfaces({
     setActiveId(event.active.id as string)
   }
 
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    // Drag can be cancelled (escape key, pointer cancel, route change, etc).
+    // If we don't clear this state, the sidebar can become "unclickable"
+    // due to `pointer-events-none` being left on items.
+    setIsDragging(false)
+    setActiveId(null)
+
+    // Best-effort revert to original order.
+    if (originalGroups.length > 0) setGroups(originalGroups)
+    if (originalPages.length > 0) setPages(originalPages)
+  }
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
@@ -671,6 +684,14 @@ export default function GroupedInterfaces({
       }
     }
   }
+
+  // Safety: never let the sidebar remain in "dragging" mode across navigation.
+  useEffect(() => {
+    if (!isDragging && !activeId) return
+    setIsDragging(false)
+    setActiveId(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   // Sortable Group Component
   function SortableGroup({ group }: { group: InterfaceGroup }) {
@@ -1062,6 +1083,7 @@ export default function GroupedInterfaces({
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="space-y-1">
         <div className="px-2 mb-1 flex gap-1">

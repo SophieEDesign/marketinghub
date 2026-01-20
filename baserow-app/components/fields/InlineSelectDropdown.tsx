@@ -7,6 +7,7 @@ import {
   resolveChoiceColor,
   normalizeHexColor,
   getChoiceThemePalette,
+  getTextColorForBackground,
 } from '@/lib/field-colors'
 import type { FieldOptions, SelectOption } from '@/types/fields'
 import { ChoicePill } from '@/components/fields/ChoicePill'

@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Plus, ChevronLeft, ZoomIn, ZoomOut } from "lucide-react"
+import { Plus, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react"
 import { filterRowsBySearch } from "@/lib/search/filterRows"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -253,64 +253,6 @@ export default function TimelineView({
     return rows.filter((row) => filteredIds.has(row.id))
   }, [rows, tableFields, searchQuery, fieldIds])
 
-  // Resolve display labels for any link_to_table fields used in cards/grouping.
-  useEffect(() => {
-    let cancelled = false
-
-    const collectIds = (raw: any): string[] => {
-      if (raw == null) return []
-      if (Array.isArray(raw)) return raw.flatMap(collectIds)
-      if (typeof raw === "object") {
-        if (raw && "id" in raw) return [String((raw as any).id)]
-        return []
-      }
-      const s = String(raw).trim()
-      return s ? [s] : []
-    }
-
-    async function load() {
-      const fields = Array.isArray(tableFields) ? tableFields : []
-
-      const wanted = new Map<string, LinkedField>()
-      const addIfLinked = (f: TableField | null | undefined) => {
-        if (!f) return
-        if (f.type !== "link_to_table") return
-        wanted.set(f.name, f as LinkedField)
-      }
-
-      addIfLinked(resolvedCardFields?.titleField || null)
-      for (const f of (resolvedCardFields?.cardFields || [])) addIfLinked(f)
-      addIfLinked(resolvedGroupByField as any)
-
-      if (wanted.size === 0) {
-        setLinkedValueLabelMaps((prev) => (Object.keys(prev).length === 0 ? prev : {}))
-        return
-      }
-
-      const next: Record<string, Record<string, string>> = {}
-      for (const f of wanted.values()) {
-        const ids = new Set<string>()
-        for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-          for (const id of collectIds((row as any)?.data?.[f.name])) ids.add(id)
-        }
-        if (ids.size === 0) continue
-        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
-        const obj = Object.fromEntries(map.entries())
-        next[f.name] = obj
-        next[(f as any).id] = obj
-      }
-
-      if (!cancelled) {
-        setLinkedValueLabelMaps((prev) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [filteredRows, resolvedCardFields, resolvedGroupByField, tableFieldsKey, areLinkedValueMapsEqual])
-
   // Load view config for timeline settings (color field, etc.)
   const [viewConfig, setViewConfig] = useState<{
     timeline_color_field?: string | null
@@ -549,6 +491,64 @@ export default function TimelineView({
     
     return field || null
   }, [groupByFieldProp, blockConfig, tableFields])
+
+  // Resolve display labels for any link_to_table fields used in cards/grouping.
+  // NOTE: This must be defined after resolvedCardFields/resolvedGroupByField so TS doesn't
+  // treat them as used-before-declaration.
+  useEffect(() => {
+    let cancelled = false
+
+    const collectIds = (raw: any): string[] => {
+      if (raw == null) return []
+      if (Array.isArray(raw)) return raw.flatMap(collectIds)
+      if (typeof raw === "object") {
+        if (raw && "id" in raw) return [String((raw as any).id)]
+        return []
+      }
+      const s = String(raw).trim()
+      return s ? [s] : []
+    }
+
+    async function load() {
+      const wanted = new Map<string, LinkedField>()
+      const addIfLinked = (f: TableField | null | undefined) => {
+        if (!f) return
+        if (f.type !== "link_to_table") return
+        wanted.set(f.name, f as LinkedField)
+      }
+
+      addIfLinked(resolvedCardFields?.titleField || null)
+      for (const f of resolvedCardFields?.cardFields || []) addIfLinked(f)
+      addIfLinked(resolvedGroupByField as any)
+
+      if (wanted.size === 0) {
+        setLinkedValueLabelMaps((prev) => (Object.keys(prev).length === 0 ? prev : {}))
+        return
+      }
+
+      const next: Record<string, Record<string, string>> = {}
+      for (const f of wanted.values()) {
+        const ids = new Set<string>()
+        for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
+          for (const id of collectIds((row as any)?.data?.[f.name])) ids.add(id)
+        }
+        if (ids.size === 0) continue
+        const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
+        const obj = Object.fromEntries(map.entries())
+        next[f.name] = obj
+        next[(f as any).id] = obj
+      }
+
+      if (!cancelled) {
+        setLinkedValueLabelMaps((prev) => (areLinkedValueMapsEqual(prev, next) ? prev : next))
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [filteredRows, resolvedCardFields, resolvedGroupByField, tableFieldsKey, areLinkedValueMapsEqual])
 
   // Resolve wrap title setting
   const wrapTitle = useMemo(() => {
@@ -1086,11 +1086,13 @@ export default function TimelineView({
       }
       
       if (draggingEvent) {
+        const startPos = dragStartPos
+        if (!startPos) return
         // Calculate the offset from the drag start
-        const dragOffsetX = e.clientX - dragStartPos.x
+        const dragOffsetX = e.clientX - startPos.x
         const offsetMs = (dragOffsetX / timelineWidth) * rangeMs
-        const duration = dragStartPos.endDate.getTime() - dragStartPos.startDate.getTime()
-        const newStart = new Date(dragStartPos.startDate.getTime() + offsetMs)
+        const duration = startPos.endDate.getTime() - startPos.startDate.getTime()
+        const newStart = new Date(startPos.startDate.getTime() + offsetMs)
         const newEnd = new Date(newStart.getTime() + duration)
         
         // Don't clamp during dragging - allow moving outside visible range
