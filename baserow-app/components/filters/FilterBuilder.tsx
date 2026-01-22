@@ -434,8 +434,8 @@ export default function FilterBuilder({
               <span className={`text-sm font-semibold ${variant === "airtable" ? "text-gray-900" : "text-blue-900"}`}>
                 {isEmpty ? 'Empty Group' : `Group (${group.children.length} condition${group.children.length !== 1 ? 's' : ''})`}
               </span>
-              {/* Only show operator selector when there are 2+ conditions - operators only make sense when combining multiple conditions */}
-              {group.children.length >= 2 && allowOr ? (
+              {/* Always show operator selector for groups - users should explicitly choose AND/OR for each group */}
+              {allowOr ? (
                 <Select
                   value={group.operator}
                   onValueChange={(value) => updateGroupOperator(path, value as GroupOperator)}
@@ -448,11 +448,11 @@ export default function FilterBuilder({
                     <SelectItem value="OR">OR</SelectItem>
                   </SelectContent>
                 </Select>
-              ) : group.children.length >= 2 && !allowOr ? (
+              ) : (
                 <span className={`text-xs font-semibold px-2 py-1 rounded border ${variant === "airtable" ? "border-gray-300 text-gray-700 bg-white" : "border-blue-300 text-blue-800 bg-white"}`}>
                   AND
                 </span>
-              ) : null}
+              )}
             </div>
             <div className="flex items-center gap-1">
               <Button
