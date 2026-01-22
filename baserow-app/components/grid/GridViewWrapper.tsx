@@ -12,6 +12,7 @@ import { stripFilterBlockFilters } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
+import type { GroupRule } from "@/lib/grouping/types"
 
 interface Filter {
   id?: string
@@ -78,6 +79,14 @@ interface GridViewWrapperProps {
   hideEmptyState?: boolean // Hide "No columns configured" UI (for record view contexts)
   /** Bump to force GridView to refetch rows (e.g. after external record creation). */
   reloadKey?: number
+  /** Block-level settings from block config - these should be hidden from UI */
+  blockLevelSettings?: {
+    filters?: boolean // true if filters come from block config
+    sorts?: boolean // true if sorts come from block config
+    groupBy?: boolean // true if groupBy comes from block config
+  }
+  /** When grouping, should groups start collapsed? Default: true (closed). */
+  defaultGroupsCollapsed?: boolean
 }
 
 export default function GridViewWrapper({
@@ -98,6 +107,8 @@ export default function GridViewWrapper({
   permissions,
   hideEmptyState = false, // Hide "No columns configured" UI (for record view contexts)
   reloadKey,
+  blockLevelSettings = {},
+  defaultGroupsCollapsed = true,
 }: GridViewWrapperProps) {
   // CRITICAL: Normalize all inputs at wrapper entry point
   const safeInitialFilters = asArray<Filter>(initialFilters)
@@ -123,10 +134,12 @@ export default function GridViewWrapper({
   const [filters, setFilters] = useState<Filter[]>(safeInitialFilters)
   const [sorts, setSorts] = useState<Sort[]>(safeInitialSorts)
   const [groupBy, setGroupBy] = useState<string | undefined>(initialGroupBy)
+  const [groupByRules, setGroupByRules] = useState<GroupRule[] | undefined>(undefined)
   const [searchTerm, setSearchTerm] = useState("")
   const [fields, setFields] = useState<TableField[]>(safeInitialTableFields)
   const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
   const [editingField, setEditingField] = useState<TableField | null>(null)
+  const [viewRowHeight, setViewRowHeight] = useState<string | null>(null)
 
   // `viewId` can sometimes be a composite like "<uuid>:<index>".
   // Only use a strict UUID for DB writes/reads.
@@ -144,8 +157,51 @@ export default function GridViewWrapper({
     return height // Already in correct format
   }
   
-  // Use block appearance settings (block-level control)
-  const rowHeight = mapRowHeight(appearance.row_height)
+  // Load row height from grid_view_settings (view-level) as fallback when block-level is not set
+  useEffect(() => {
+    if (!viewUuid) {
+      setViewRowHeight(null)
+      return
+    }
+    
+    // If block-level setting exists, don't load from view-level
+    if (appearance.row_height) {
+      setViewRowHeight(null)
+      return
+    }
+    
+    async function loadViewRowHeight() {
+      try {
+        const { data, error } = await supabase
+          .from("grid_view_settings")
+          .select("row_height")
+          .eq("view_id", viewUuid)
+          .maybeSingle()
+
+        if (error) {
+          // Table might not exist yet, ignore
+          if (error.code === 'PGRST205' || error.code === '42P01') {
+            return
+          }
+          console.warn("Error loading view row height:", error)
+          return
+        }
+
+        if (data?.row_height) {
+          setViewRowHeight(data.row_height)
+        } else {
+          setViewRowHeight(null)
+        }
+      } catch (error) {
+        console.warn("Error loading view row height:", error)
+      }
+    }
+
+    loadViewRowHeight()
+  }, [viewUuid, appearance.row_height])
+  
+  // Use block appearance settings first, then fall back to view-level settings
+  const rowHeight = mapRowHeight(appearance.row_height || viewRowHeight || undefined)
   const wrapText = appearance.wrap_text || false
 
   // Track previous values to prevent infinite loops
@@ -213,6 +269,50 @@ export default function GridViewWrapper({
       setGroupBy(initialGroupBy)
     }
   }, [initialGroupBy])
+
+  // Load group_by_rules from grid_view_settings
+  useEffect(() => {
+    if (!viewUuid) return
+
+    async function loadGroupRules() {
+      try {
+        const { data, error } = await supabase
+          .from("grid_view_settings")
+          .select("group_by_rules, group_by_field")
+          .eq("view_id", viewUuid)
+          .maybeSingle()
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading group rules:", error)
+          return
+        }
+
+        if (data) {
+          // Prefer group_by_rules if available, otherwise convert group_by_field
+          if (data.group_by_rules && Array.isArray(data.group_by_rules) && data.group_by_rules.length > 0) {
+            setGroupByRules(data.group_by_rules as GroupRule[])
+            // Also set groupBy for backward compatibility
+            const firstRule = data.group_by_rules[0] as GroupRule
+            if (firstRule.type === 'field') {
+              setGroupBy(firstRule.field)
+            }
+          } else if (data.group_by_field) {
+            // Convert legacy group_by_field to rules
+            const rules: GroupRule[] = [{ type: 'field', field: data.group_by_field }]
+            setGroupByRules(rules)
+            setGroupBy(data.group_by_field)
+          } else {
+            setGroupByRules(undefined)
+            setGroupBy(undefined)
+          }
+        }
+      } catch (error) {
+        console.error("Error loading group rules:", error)
+      }
+    }
+
+    loadGroupRules()
+  }, [viewUuid])
 
   async function handleFilterCreate(filter: Omit<Filter, "id">) {
     try {
@@ -411,10 +511,22 @@ export default function GridViewWrapper({
   }
 
   async function handleGroupByChange(fieldName: string | null) {
+    // Legacy handler - convert to rules format
+    const rules: GroupRule[] | null = fieldName ? [{ type: 'field', field: fieldName }] : null
+    await handleGroupRulesChange(rules)
+  }
+
+  async function handleGroupRulesChange(rules: GroupRule[] | null) {
     try {
       if (!viewUuid) {
         console.warn("GridViewWrapper: viewId is not a valid UUID; cannot persist grouping.")
-        setGroupBy(fieldName || undefined)
+        setGroupByRules(rules || undefined)
+        // Also update groupBy for backward compatibility
+        if (rules && rules.length > 0 && rules[0].type === 'field') {
+          setGroupBy(rules[0].field)
+        } else {
+          setGroupBy(undefined)
+        }
         return
       }
       // Update grid view settings instead of views.config
@@ -429,24 +541,36 @@ export default function GridViewWrapper({
         // If table doesn't exist (PGRST205) or 404, skip update
         if (fetchError.code === 'PGRST205' || fetchError.code === '42P01') {
           console.warn("grid_view_settings table does not exist. Run migration to create it.")
-          // Fallback: update in views.config for backward compatibility
-          setGroupBy(fieldName || undefined)
+          // Fallback: update state only
+          setGroupByRules(rules || undefined)
+          if (rules && rules.length > 0 && rules[0].type === 'field') {
+            setGroupBy(rules[0].field)
+          } else {
+            setGroupBy(undefined)
+          }
           return
         }
         throw fetchError
       }
 
+      // For backward compatibility, also set group_by_field to the first rule's field
+      const groupByFieldValue = rules && rules.length > 0 && rules[0].type === 'field' ? rules[0].field : null
+
       if (existing) {
         // Update existing settings
         const { error } = await supabase
           .from("grid_view_settings")
-          .update({ group_by_field: fieldName })
+          .update({ 
+            group_by_rules: rules,
+            group_by_field: groupByFieldValue, // Keep for backward compatibility
+          })
           .eq("view_id", viewUuid)
 
         if (error) {
           if (error.code === 'PGRST205' || error.code === '42P01') {
             console.warn("grid_view_settings table does not exist. Run migration to create it.")
-            setGroupBy(fieldName || undefined)
+            setGroupByRules(rules || undefined)
+            setGroupBy(groupByFieldValue || undefined)
             return
           }
           throw error
@@ -458,7 +582,8 @@ export default function GridViewWrapper({
           .insert([
             {
               view_id: viewUuid,
-              group_by_field: fieldName,
+              group_by_rules: rules,
+              group_by_field: groupByFieldValue, // Keep for backward compatibility
               column_widths: {},
               column_order: [],
               column_wrap_text: {},
@@ -470,18 +595,25 @@ export default function GridViewWrapper({
         if (error) {
           if (error.code === 'PGRST205' || error.code === '42P01') {
             console.warn("grid_view_settings table does not exist. Run migration to create it.")
-            setGroupBy(fieldName || undefined)
+            setGroupByRules(rules || undefined)
+            setGroupBy(groupByFieldValue || undefined)
             return
           }
           throw error
         }
       }
 
-      setGroupBy(fieldName || undefined)
+      setGroupByRules(rules || undefined)
+      setGroupBy(groupByFieldValue || undefined)
     } catch (error) {
-      console.error("Error updating group by:", error)
+      console.error("Error updating group rules:", error)
       // Don't throw - just log and update state
-      setGroupBy(fieldName || undefined)
+      setGroupByRules(rules || undefined)
+      if (rules && rules.length > 0 && rules[0].type === 'field') {
+        setGroupBy(rules[0].field)
+      } else {
+        setGroupBy(undefined)
+      }
     }
   }
 
@@ -552,8 +684,18 @@ export default function GridViewWrapper({
   }, [standardizedFilters, filters, deletedBlockLevelFilters, filterTree])
 
   // Merge block-level filters with user-created filters for display in Toolbar
-  // Block-level filters are marked as non-deletable and show source information
+  // If blockLevelSettings.filters is true, hide block-level filters from UI
   const displayFilters = useMemo<Array<Filter & { isBlockLevel?: boolean; sourceBlockId?: string; sourceBlockTitle?: string }>>(() => {
+    // If filters are from block config, only show user-created filters
+    if (blockLevelSettings.filters) {
+      return filters.filter(f => {
+        // Only include filters with valid UUID IDs (user-created filters)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        return f.id && uuidRegex.test(f.id)
+      })
+    }
+    
+    // Otherwise, show both block-level and user-created filters
     const blockLevelFilters: Array<Filter & { isBlockLevel?: boolean; sourceBlockId?: string; sourceBlockTitle?: string }> = (standardizedFilters || []).map(f => {
       // Check if this filter has source information (from filter blocks)
       const filterWithSource = f as any
@@ -576,7 +718,30 @@ export default function GridViewWrapper({
     
     // Merge: block-level filters first, then user-created filters
     return [...blockLevelFilters, ...userCreatedFilters]
-  }, [standardizedFilters, filters])
+  }, [standardizedFilters, filters, blockLevelSettings.filters])
+  
+  // Filter sorts for display - hide block-level sorts if from block config
+  const displaySorts = useMemo<Sort[]>(() => {
+    // If sorts are from block config, only show user-created sorts
+    if (blockLevelSettings.sorts) {
+      return sorts.filter(s => {
+        // Only include sorts with valid UUID IDs (user-created sorts)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        return s.id && uuidRegex.test(s.id)
+      })
+    }
+    // Otherwise, show all sorts
+    return sorts
+  }, [sorts, blockLevelSettings.sorts])
+  
+  // Filter groupBy for display - hide if from block config
+  const displayGroupBy = useMemo<string | undefined>(() => {
+    // If groupBy is from block config, don't show it in UI
+    if (blockLevelSettings.groupBy) {
+      return undefined
+    }
+    return groupBy
+  }, [groupBy, blockLevelSettings.groupBy])
 
   // Determine toolbar visibility based on appearance settings.
   // Keep edit mode WYSIWYG (match live view).
@@ -596,14 +761,16 @@ export default function GridViewWrapper({
             fields={safeViewFields as any}
             tableFields={fields}
             filters={displayFilters}
-            sorts={sorts}
-            groupBy={groupBy}
+            sorts={displaySorts}
+            groupBy={displayGroupBy}
+            groupByRules={groupByRules}
             onSearchChange={setSearchTerm}
             onFilterCreate={handleFilterCreate}
             onFilterDelete={handleFilterDelete}
             onSortCreate={handleSortCreate}
             onSortDelete={handleSortDelete}
             onGroupByChange={handleGroupByChange}
+            onGroupRulesChange={handleGroupRulesChange}
             showSearch={showSearch}
             showFilter={showFilter}
             showSort={showSort}
@@ -622,6 +789,7 @@ export default function GridViewWrapper({
         viewSorts={asArray(sorts)}
         searchTerm={searchTerm}
         groupBy={groupBy}
+        groupByRules={groupByRules}
         tableFields={fields}
         onAddField={isEditing ? handleAddField : undefined}
         onEditField={isEditing ? handleEditField : undefined}
@@ -639,6 +807,7 @@ export default function GridViewWrapper({
           modalFields={modalFields}
           onTableFieldsRefresh={loadFields}
           reloadKey={reloadKey}
+          defaultGroupsCollapsed={defaultGroupsCollapsed}
         />
       </div>
       <FieldBuilderDrawer

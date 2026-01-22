@@ -21,6 +21,7 @@ import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
+import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
 
 interface TimelineViewProps {
   tableId: string
@@ -956,28 +957,31 @@ export default function TimelineView({
     })
 
     // Sort groups by field options order if available (single/multi select)
+    // Use selectOptions with sort_index as the source of truth
     if (
-      (resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select') &&
-      resolvedGroupByField.options?.choices
+      resolvedGroupByField.type === 'single_select' || resolvedGroupByField.type === 'multi_select'
     ) {
-      const sortedGroups: Record<string, TimelineEvent[]> = {}
-      const choices = resolvedGroupByField.options.choices
-      
-      // Add groups in choice order
-      choices.forEach(choice => {
-        if (groups[choice]) {
-          sortedGroups[choice] = groups[choice]
-        }
-      })
-      
-      // Add remaining groups (including Unassigned)
-      Object.keys(groups).forEach(key => {
-        if (!sortedGroups[key]) {
-          sortedGroups[key] = groups[key]
-        }
-      })
-      
-      return sortedGroups
+      const { selectOptions } = normalizeSelectOptionsForUi(resolvedGroupByField.type, resolvedGroupByField.options)
+      if (selectOptions.length > 0) {
+        const sortedGroups: Record<string, TimelineEvent[]> = {}
+        
+        // Add groups in selectOptions order (by sort_index)
+        const orderedOptions = [...selectOptions].sort((a, b) => a.sort_index - b.sort_index)
+        orderedOptions.forEach(option => {
+          if (groups[option.label]) {
+            sortedGroups[option.label] = groups[option.label]
+          }
+        })
+        
+        // Add remaining groups (including Unassigned)
+        Object.keys(groups).forEach(key => {
+          if (!sortedGroups[key]) {
+            sortedGroups[key] = groups[key]
+          }
+        })
+        
+        return sortedGroups
+      }
     }
 
     // Default: alphabetical group order, with Unassigned last.

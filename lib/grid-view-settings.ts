@@ -1,9 +1,11 @@
 import { createServerSupabaseClient } from './supabase'
+import type { GroupRule } from '@/lib/grouping/types'
 
 export interface GridViewSettings {
   id: string
   view_id: string
-  group_by_field: string | null
+  group_by_field: string | null // Legacy: single field grouping (for backward compatibility)
+  group_by_rules: GroupRule[] | null // New: nested grouping rules
   column_widths: Record<string, number>
   column_order: string[]
   column_wrap_text: Record<string, boolean>

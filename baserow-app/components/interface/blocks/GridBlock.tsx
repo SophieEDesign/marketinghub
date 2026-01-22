@@ -654,6 +654,12 @@ export default function GridBlock({
           )
         }
 
+        // Gallery group default collapse behavior (default: collapsed/closed)
+        const galleryDefaultGroupsCollapsed =
+          (config as any)?.gallery_groups_default_collapsed ??
+          (config as any)?.grid_groups_default_collapsed ??
+          true
+
         return (
           <GalleryView
             tableId={tableId}
@@ -665,6 +671,7 @@ export default function GridBlock({
             filterTree={filterTree}
             onRecordClick={onRecordClick}
             blockConfig={config}
+            defaultGroupsCollapsed={galleryDefaultGroupsCollapsed}
             colorField={appearance.color_field}
             imageField={appearance.image_field}
             fitImageSize={appearance.fit_image_size}
@@ -692,6 +699,12 @@ export default function GridBlock({
         })()
         const effectiveGroupBy = groupByFromConfigResolved || groupBy
 
+        // Grid group default collapse behavior (default: collapsed/closed)
+        const defaultGroupsCollapsed =
+          (config as any)?.grid_groups_default_collapsed ??
+          (config as any)?.gallery_groups_default_collapsed ??
+          true
+
         // Determine if record clicks should be enabled
         const handleRecordClick = allowOpenRecord
           ? (onRecordClick || ((recordId) => {
@@ -707,6 +720,13 @@ export default function GridBlock({
         const isRightColumnBlock = block.x !== undefined && block.x >= 4
         const isRecordContext = !!recordId
         const hideEmptyState = isRecordContext && isRightColumnBlock
+
+        // Determine which settings come from block config (should be hidden from UI)
+        const blockLevelSettings = {
+          filters: blockBaseFilters.length > 0, // Filters from block config
+          sorts: sortsConfig.length > 0, // Sorts from block config
+          groupBy: !!effectiveGroupBy && (!!config.group_by_field || !!config.group_by), // GroupBy from block config
+        }
 
         return (
           <GridViewWrapper
@@ -724,6 +744,7 @@ export default function GridBlock({
             onRecordClick={handleRecordClick}
             modalFields={(config as any).modal_fields}
             reloadKey={refreshKey}
+            defaultGroupsCollapsed={defaultGroupsCollapsed}
             appearance={{
               ...appearance,
               color_field: appearance.color_field,
@@ -739,13 +760,14 @@ export default function GridBlock({
               allowOpenRecord,
             }}
             hideEmptyState={hideEmptyState}
+            blockLevelSettings={blockLevelSettings}
           />
         )
     }
   }
 
   return (
-    <div className="h-full w-full overflow-auto" style={blockStyle}>
+    <div className="h-full w-full flex flex-col overflow-hidden" style={blockStyle}>
       {/* Legacy header (title + optional add record) - only when appearance wrapper is not active */}
       {!wrapperHasAppearanceSettings &&
         (((appearance.showTitle ?? (appearance as any).show_title) !== false && blockTitle) ||
@@ -854,7 +876,9 @@ export default function GridBlock({
         />
       )}
 
-      {renderView()}
+      <div className="flex-1 min-h-0">
+        {renderView()}
+      </div>
     </div>
   )
 }

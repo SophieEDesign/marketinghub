@@ -312,7 +312,7 @@ export default function FieldBuilderDrawer({
 
       case "link_to_table":
         return (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <label className="block text-sm font-medium">Linked Table</label>
             <select
               value={options.linked_table_id || ""}
@@ -340,6 +340,57 @@ export default function FieldBuilderDrawer({
               Select the table to link records from. Each row can contain one or
               more records from that table.
             </p>
+            </div>
+            
+            {options.linked_table_id && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    How many records can be selected
+                  </label>
+                  <select
+                    value={options.relationship_type || 'one-to-many'}
+                    onChange={(e) =>
+                      setOptions({ ...options, relationship_type: e.target.value as any })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                  >
+                    <option value="one-to-one">One to One</option>
+                    <option value="one-to-many">One to Many</option>
+                    <option value="many-to-many">Many to Many</option>
+                  </select>
+                  <p className="text-xs text-gray-500">
+                    {(options.relationship_type || 'one-to-many') === 'one-to-one' 
+                      ? 'Each row can link to a single record from the linked table.'
+                      : 'Each row can link to multiple records from the linked table.'}
+                  </p>
+                </div>
+
+                {(options.relationship_type === 'one-to-many' || options.relationship_type === 'many-to-many' || !options.relationship_type) && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium">
+                      Max Selections (optional)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={options.max_selections || ''}
+                      onChange={(e) =>
+                        setOptions({ 
+                          ...options, 
+                          max_selections: e.target.value ? parseInt(e.target.value) : undefined 
+                        })
+                      }
+                      placeholder="No limit"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Limit the maximum number of linked records that can be selected.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )
 

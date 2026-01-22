@@ -929,7 +929,19 @@ export async function DELETE(
     if (userIsAdmin) {
       // For admins, use SQL method directly (bypasses RLS and most triggers)
       console.log('[Field Delete] User is admin, using SQL method to bypass RLS...')
+      console.log('[Field Delete] Field ID:', fieldId, 'Field name:', field?.name)
+      
+      // Check if it's a system field first (triggers will block these)
+      if (field && isSystemFieldName(field.name)) {
+        return NextResponse.json(
+          { error: `System field "${field.name}" cannot be deleted.` },
+          { status: 400 }
+        )
+      }
+      
       try {
+        // Use execute_sql_safe which runs as SECURITY DEFINER and bypasses RLS
+        // Note: Triggers will still fire, but we've already checked for system fields
         const sqlResult = await supabase.rpc('execute_sql_safe', {
           sql_text: `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
         })
@@ -941,11 +953,17 @@ export async function DELETE(
           // Verify deletion using admin client (bypasses RLS)
           try {
             const adminClient = createAdminClient()
-            const { data: verifyField } = await adminClient
+            const { data: verifyField, error: verifyError } = await adminClient
               .from('table_fields')
-              .select('id')
+              .select('id, name')
               .eq('id', fieldId)
               .maybeSingle()
+            
+            console.log('[Field Delete] Verification result:', { 
+              fieldExists: !!verifyField, 
+              fieldName: verifyField?.name,
+              verifyError 
+            })
             
             if (!verifyField) {
               // Field was deleted successfully
@@ -953,11 +971,14 @@ export async function DELETE(
               deleteError = null
               console.log('[Field Delete] Successfully deleted via SQL (admin)')
             } else {
-              console.warn('[Field Delete] SQL delete executed but field still exists - may be trigger blocking')
+              // Field still exists - trigger may have blocked it
+              console.warn('[Field Delete] SQL delete executed but field still exists - trigger may be blocking')
+              console.warn('[Field Delete] Field details:', verifyField)
+              // Don't set deletedRows - will fall through to error
             }
-          } catch (verifyError) {
+          } catch (verifyError: any) {
             // If verification fails, assume deletion succeeded (SQL executed without error)
-            console.warn('[Field Delete] Could not verify deletion, but SQL executed successfully')
+            console.warn('[Field Delete] Could not verify deletion, but SQL executed successfully:', verifyError)
             deletedRows = [{ id: fieldId }]
             deleteError = null
           }
@@ -999,14 +1020,27 @@ export async function DELETE(
       
       const isSystemField = fieldCheck?.name && isSystemFieldName(fieldCheck.name)
       
+      // Build detailed error message
+      let errorMessage = 'Field was not deleted.'
+      if (isSystemField) {
+        errorMessage = `System field "${fieldCheck.name}" cannot be deleted.`
+      } else if (userIsAdmin) {
+        errorMessage = 'Field was not deleted. Admin SQL method was used but deletion failed. This may be caused by a trigger blocking the delete. Check server logs for details.'
+      } else {
+        errorMessage = 'Field was not deleted. This is usually caused by Row Level Security (RLS) blocking deletes for your current user/session. If you are an admin, the code should have used the admin fallback - check server logs to see if admin detection is working.'
+      }
+      
       return NextResponse.json(
         {
-          error: isSystemField
-            ? `System field "${fieldCheck.name}" cannot be deleted.`
-            : 'Field was not deleted. This is usually caused by Row Level Security (RLS) blocking deletes for your current user/session. If you are an admin, please run the ensure_table_fields_delete_rls.sql migration and check server logs for details.',
+          error: errorMessage,
           error_code: isSystemField ? 'SYSTEM_FIELD_DELETE_BLOCKED' : 'FIELD_DELETE_NOT_PERMITTED',
           details: !isSystemField ? {
-            suggestion: 'Run CHECK_TABLE_FIELDS_RLS.sql in Supabase SQL editor to diagnose RLS policies',
+            userIsAdmin: userIsAdmin,
+            fieldId: fieldId,
+            fieldName: field?.name || fieldCheck?.name,
+            suggestion: userIsAdmin 
+              ? 'Check server logs for [Field Delete] messages. The SQL method was used but may have been blocked by a trigger.'
+              : 'Run CHECK_TABLE_FIELDS_RLS.sql in Supabase SQL editor to diagnose RLS policies. If you are an admin, check why admin detection failed.',
             migration: 'Run ensure_table_fields_delete_rls.sql migration if DELETE policy is missing'
           } : undefined
         },

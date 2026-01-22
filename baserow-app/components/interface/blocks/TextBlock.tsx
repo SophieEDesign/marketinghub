@@ -916,7 +916,7 @@ export default function TextBlock({ block, isEditing = false, onUpdate }: TextBl
       {/* Editor Content - Same source for both edit and view mode */}
       <div 
         className={cn(
-          "flex-1 w-full min-h-0 h-full overflow-auto",
+          "flex-1 w-full min-h-0 h-full overflow-hidden",
           !hasContent && isEditing && "flex items-center justify-center min-h-[100px]",
           // Cursor cues: text cursor when editable, pointer when clickable, default when not
           isBlockEditing && "cursor-text",

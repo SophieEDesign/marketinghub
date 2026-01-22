@@ -163,12 +163,16 @@ export default function GridColumnHeader({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={(e) => {
-        // Select column on click (but not when clicking sort/resize buttons)
-        if (onSelect && !e.defaultPrevented) {
-          const target = e.target as HTMLElement
-          if (!target.closest('button') && !target.closest('.resize-handle')) {
-            onSelect(field.id)
-          }
+        // Select column when clicking anywhere on the header (except chevron button and drag handle)
+        const target = e.target as HTMLElement
+        if (onSelect && !target.closest('button') && !target.closest('[data-drag-handle]')) {
+          onSelect(field.id)
+          // Copy field name to clipboard when selected
+          navigator.clipboard.writeText(field.name).then(() => {
+            // Could show toast notification here
+          }).catch(err => {
+            console.error('Failed to copy column name:', err)
+          })
         }
       }}
     >
@@ -176,27 +180,15 @@ export default function GridColumnHeader({
       <div
         {...attributes}
         {...listeners}
+        data-drag-handle
         className="flex items-center justify-center w-4 h-full cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
       >
         <GripVertical className="h-3 w-3" />
       </div>
 
-      {/* Field icon and name - clickable to select column */}
+      {/* Field icon and name - clickable to select column (entire area) */}
       <div 
-        className={`flex items-center gap-2 px-3 flex-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''}`}
-        onClick={(e) => {
-          e.stopPropagation()
-          // Select column when clicking on the name area
-          if (onSelect) {
-            onSelect(field.id)
-            // Copy field name to clipboard when selected
-            navigator.clipboard.writeText(field.name).then(() => {
-              // Could show toast notification here
-            }).catch(err => {
-              console.error('Failed to copy column name:', err)
-            })
-          }
-        }}
+        className={`flex items-center gap-2 px-3 flex-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30' : ''}`}
         title="Click to select column"
       >
         <span className="text-gray-400 flex-shrink-0">
@@ -219,50 +211,6 @@ export default function GridColumnHeader({
           )}
         </div>
       </div>
-
-      {/* Wrap text button */}
-      {onToggleWrapText && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleWrapText(field.name)
-          }}
-          className={`p-1.5 rounded transition-colors ${
-            wrapText
-              ? 'text-blue-600 bg-blue-50/50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
-          }`}
-          title={wrapText ? 'Text wrapping enabled' : 'Enable text wrapping'}
-        >
-          <WrapText className="h-3.5 w-3.5" />
-        </button>
-      )}
-
-      {/* Sort button */}
-      {onSort && (
-        <button
-          onClick={handleSortClick}
-          className={`p-1.5 rounded transition-colors flex items-center gap-0.5 ${
-            sortDirection
-              ? 'text-blue-600 bg-blue-50/50'
-              : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
-          }`}
-          title={`Sort ${sortDirection === 'asc' ? 'ascending' : sortDirection === 'desc' ? 'descending' : 'none'}${sortOrder !== null ? ` (${sortOrder})` : ''}`}
-        >
-          {sortDirection === 'asc' ? (
-            <ArrowUp className="h-3.5 w-3.5" />
-          ) : sortDirection === 'desc' ? (
-            <ArrowDown className="h-3.5 w-3.5" />
-          ) : (
-            <ArrowUpDown className="h-3.5 w-3.5" />
-          )}
-          {sortOrder !== null && (
-            <span className="text-[10px] font-semibold leading-none">
-              {sortOrder}
-            </span>
-          )}
-        </button>
-      )}
 
       {/* Chevron dropdown trigger - separate clickable area with padding for easier clicking */}
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>

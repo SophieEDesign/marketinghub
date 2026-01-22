@@ -69,6 +69,8 @@
   position: relative;
   /* Text color will be applied via inline styles from TextBlock component */
   color: inherit;
+  /* Remove scrollbars - content should fit naturally */
+  overflow: visible;
 }
 
 /* Text block: make the editor fill the available block height so it doesn't look like a small inner box */
@@ -78,6 +80,8 @@
   min-height: 0;
   /* The block container already provides padding via appearance settings. Avoid double-padding. */
   padding: 0;
+  /* Remove scrollbars - content should fit naturally */
+  overflow: visible;
 }
 
 /* Ensure editor is visible and has proper spacing */

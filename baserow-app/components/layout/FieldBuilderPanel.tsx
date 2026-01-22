@@ -621,39 +621,95 @@ function NewFieldForm({
 
       case "link_to_table":
         return (
-          <div className="space-y-2">
-            <Label className="text-xs font-medium text-gray-700">Linked table</Label>
-            <Select
-              value={options.linked_table_id || undefined}
-              onValueChange={(v) =>
-                setOptions({
-                  ...options,
-                  linked_table_id: v || undefined,
-                })
-              }
-            >
-              <SelectTrigger className="mt-1 h-8 text-sm">
-                <SelectValue placeholder={loadingTables ? "Loading..." : "Select a table"} />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingTables ? (
-                  <SelectItem value="__loading__" disabled>
-                    Loading tables...
-                  </SelectItem>
-                ) : (
-                  tables
-                    .filter((t) => t.id !== tableId)
-                    .map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-gray-700">Linked table</Label>
+              <Select
+                value={options.linked_table_id || undefined}
+                onValueChange={(v) =>
+                  setOptions({
+                    ...options,
+                    linked_table_id: v || undefined,
+                  })
+                }
+              >
+                <SelectTrigger className="mt-1 h-8 text-sm">
+                  <SelectValue placeholder={loadingTables ? "Loading..." : "Select a table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingTables ? (
+                    <SelectItem value="__loading__" disabled>
+                      Loading tables...
+                    </SelectItem>
+                  ) : (
+                    tables
+                      .filter((t) => t.id !== tableId)
+                      .map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Required to create a link field.
+              </p>
+            </div>
+            
+            {options.linked_table_id && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-gray-700">
+                    How many records can be selected
+                  </Label>
+                  <Select
+                    value={options.relationship_type || 'one-to-many'}
+                    onValueChange={(relType) =>
+                      setOptions({ ...options, relationship_type: relType as any })
+                    }
+                  >
+                    <SelectTrigger className="mt-1 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="one-to-one">One to One</SelectItem>
+                      <SelectItem value="one-to-many">One to Many</SelectItem>
+                      <SelectItem value="many-to-many">Many to Many</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    {(options.relationship_type || 'one-to-many') === 'one-to-one' 
+                      ? 'Each row can link to a single record from the linked table.'
+                      : 'Each row can link to multiple records from the linked table.'}
+                  </p>
+                </div>
+
+                {(options.relationship_type === 'one-to-many' || options.relationship_type === 'many-to-many' || !options.relationship_type) && (
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium text-gray-700">
+                      Max Selections (optional)
+                    </Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={options.max_selections || ''}
+                      onChange={(e) =>
+                        setOptions({ 
+                          ...options, 
+                          max_selections: e.target.value ? parseInt(e.target.value) : undefined 
+                        })
+                      }
+                      placeholder="No limit"
+                      className="mt-1 h-8 text-sm"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Limit the maximum number of linked records that can be selected.
+                    </p>
+                  </div>
                 )}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              Required to create a link field.
-            </p>
+              </div>
+            )}
           </div>
         )
 

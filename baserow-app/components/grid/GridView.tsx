@@ -99,6 +99,8 @@ interface GridViewProps {
   onTableFieldsRefresh?: () => void // Refresh tableFields after option updates (select/multi-select)
   /** Bump to force a refetch (e.g. after external record creation). */
   reloadKey?: number
+  /** When grouping, should groups start collapsed? Default: true (closed). */
+  defaultGroupsCollapsed?: boolean
 }
 
 const ITEMS_PER_PAGE = 100
@@ -315,12 +317,12 @@ function DraggableColumnHeader({
           <GripVertical className="h-3 w-3" />
         </div>
         
-        {/* Column name - clickable to select column */}
+        {/* Column name - clickable to select column (entire area) */}
         <div
           className={`flex-1 text-left px-2 py-1 rounded hover:bg-gray-100/50 transition-colors flex items-center gap-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50 ring-1 ring-blue-400/30' : ''}`}
           onClick={(e) => {
             e.stopPropagation()
-            // Select column when clicking on the name area
+            // Select column when clicking anywhere on the name area
             if (onSelect) {
               onSelect(fieldName)
             }
@@ -514,6 +516,7 @@ export default function GridView({
   modalFields,
   onTableFieldsRefresh,
   reloadKey,
+  defaultGroupsCollapsed = true,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -535,6 +538,11 @@ export default function GridView({
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [selectedColumnName, setSelectedColumnName] = useState<string | null>(null)
   const [frozenColumns, setFrozenColumns] = useState<number>(0) // Number of columns to freeze (typically 1 for first column)
+
+  // Track previous groupBy to detect changes
+  const prevGroupByRef = useRef<string | undefined>(groupBy)
+  // Track whether we've initialized collapsed groups for the current groupBy
+  const didInitGroupCollapseRef = useRef(false)
 
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
@@ -1941,15 +1949,18 @@ export default function GridView({
       }
 
       if (error) {
-        console.error("Error saving cell:", {
-          tableName: supabaseTableName,
-          rowId,
-          fieldName,
-          column: safeColumn,
-          error: error,
-          code: error.code,
-          message: error.message,
-        })
+        // Don't log abort errors (expected during navigation/unmount)
+        if (!isAbortError(error)) {
+          console.error("Error saving cell:", {
+            tableName: supabaseTableName,
+            rowId,
+            fieldName,
+            column: safeColumn,
+            error: error,
+            code: error.code,
+            message: error.message,
+          })
+        }
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
           if (isMountedRef.current) {
             setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
@@ -2133,6 +2144,7 @@ export default function GridView({
     // Copy column name to clipboard when selected
     navigator.clipboard.writeText(fieldName).then(() => {
       // Could show toast notification here
+      console.log('Column selected and copied:', fieldName)
     }).catch(err => {
       console.error('Failed to copy column name:', err)
     })
@@ -2239,6 +2251,39 @@ export default function GridView({
     if (!groupModel || groupModel.rootGroups.length === 0) return null
     return flattenGroupTree(groupModel.rootGroups, collapsedGroups)
   }, [collapsedGroups, groupModel])
+
+  // When grouping, allow "start collapsed" behavior (default: collapsed).
+  // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
+  // so we don't override the user's manual expand/collapse interactions mid-session.
+  useEffect(() => {
+    const groupByChanged = prevGroupByRef.current !== groupBy
+    prevGroupByRef.current = groupBy
+
+    if (groupByChanged) {
+      didInitGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+    }
+
+    // No grouping: always open (nothing to collapse)
+    if (effectiveGroupRules.length === 0) {
+      didInitGroupCollapseRef.current = false
+      return
+    }
+
+    // If the setting is "open", force-expand (clear collapsed set).
+    if (!defaultGroupsCollapsed) {
+      didInitGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+      return
+    }
+
+    // Setting is "closed": collapse all groups once, when we have keys.
+    if (didInitGroupCollapseRef.current) return
+    const top = groupModel?.rootGroups || []
+    if (top.length === 0) return
+    setCollapsedGroups(new Set(top.map((n) => n.pathKey)))
+    didInitGroupCollapseRef.current = true
+  }, [groupBy, defaultGroupsCollapsed, effectiveGroupRules.length, groupModel?.rootGroups])
 
   function toggleGroup(groupKey: string) {
     setCollapsedGroups((prev) => {

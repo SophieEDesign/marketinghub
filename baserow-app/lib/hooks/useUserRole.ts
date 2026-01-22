@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { isAbortError } from '@/lib/api/error-handling'
 
 export type ClientUserRole = 'admin' | 'member'
 
@@ -8,6 +9,8 @@ export type ClientUserRole = 'admin' | 'member'
  * - Prefers `profiles.role` (new system)
  * - Falls back to `user_roles.role` (legacy)
  * - Defaults to 'member' for safety
+ * 
+ * Note: Abort errors during rapid navigation/unmount are expected and silently ignored.
  */
 export function useUserRole() {
   const [role, setRole] = useState<ClientUserRole>('member')
@@ -24,6 +27,8 @@ export function useUserRole() {
           data: { user },
         } = await supabase.auth.getUser()
 
+        if (cancelled) return
+
         if (!user) {
           if (!cancelled) setRole('member')
           return
@@ -35,6 +40,8 @@ export function useUserRole() {
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle()
+
+        if (cancelled) return
 
         if (!profileError && profile?.role) {
           if (!cancelled) setRole(profile.role === 'admin' ? 'admin' : 'member')
@@ -51,6 +58,8 @@ export function useUserRole() {
             .eq('user_id', user.id)
             .maybeSingle()
 
+          if (cancelled) return
+
           if (!legacyError && legacyRole?.role) {
             // Map legacy roles: admin/editor -> admin, viewer -> member
             if (!cancelled) {
@@ -62,13 +71,18 @@ export function useUserRole() {
             }
             return
           }
-        } catch {
-          // Ignore missing legacy table / other failures and default safely below
+        } catch (e) {
+          // Ignore abort errors (expected during rapid navigation/unmount)
+          if (isAbortError(e)) return
+          // Ignore other errors and default safely below
         }
 
         if (!cancelled) setRole('member')
       } catch (e) {
-        console.error('[useUserRole] Failed to load role:', e)
+        // Only log non-abort errors (abort errors are expected during rapid navigation/unmount)
+        if (!isAbortError(e)) {
+          console.error('[useUserRole] Failed to load role:', e)
+        }
         if (!cancelled) setRole('member')
       } finally {
         if (!cancelled) setLoading(false)

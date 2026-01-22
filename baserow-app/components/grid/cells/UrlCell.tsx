@@ -74,6 +74,21 @@ export default function UrlCell({
     }
   }
 
+  const getFullUrl = (url: string): string => {
+    if (!url) return ''
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url
+    }
+    return `https://${url}`
+  }
+
+  const handleExternalLinkClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (value) {
+      window.open(getFullUrl(value), '_blank', 'noopener,noreferrer')
+    }
+  }
+
   if (editing && editable) {
     return (
       <input
@@ -108,10 +123,14 @@ export default function UrlCell({
       title={value || undefined}
     >
       <span className="text-gray-900 truncate">{formatUrl(value)}</span>
-      <ExternalLink
-        className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-        aria-hidden="true"
-      />
+      <button
+        onClick={handleExternalLinkClick}
+        className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 hover:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded"
+        aria-label="Open link in new tab"
+        title="Open link in new tab"
+      >
+        <ExternalLink className="h-3 w-3" />
+      </button>
     </div>
   )
 }

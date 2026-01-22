@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import { Search, Filter, ArrowUpDown, Group, X, Plus } from "lucide-react"
 import FilterEditor from "./FilterEditor"
 import SortEditor from "./SortEditor"
-import GroupPicker from "./GroupPicker"
+import GroupDialog from "./GroupDialog"
+import type { GroupRule } from "@/lib/grouping/types"
 
 interface Filter {
   id?: string
@@ -31,12 +32,14 @@ interface ToolbarProps {
   filters: Filter[]
   sorts: Sort[]
   groupBy?: string
+  groupByRules?: GroupRule[]
   onSearchChange: (searchTerm: string) => void
   onFilterCreate: (filter: Omit<Filter, "id">) => Promise<void>
   onFilterDelete: (filterId: string) => Promise<void>
   onSortCreate: (sort: Omit<Sort, "id">) => Promise<void>
   onSortDelete: (sortId: string) => Promise<void>
   onGroupByChange: (fieldName: string | null) => Promise<void>
+  onGroupRulesChange?: (rules: GroupRule[] | null) => Promise<void>
   showSearch?: boolean
   showFilter?: boolean
   showSort?: boolean
@@ -49,12 +52,14 @@ export default function Toolbar({
   filters,
   sorts,
   groupBy,
+  groupByRules,
   onSearchChange,
   onFilterCreate,
   onFilterDelete,
   onSortCreate,
   onSortDelete,
   onGroupByChange,
+  onGroupRulesChange,
   showSearch = true,
   showFilter = true,
   showSort = true,
@@ -62,12 +67,11 @@ export default function Toolbar({
   const [searchTerm, setSearchTerm] = useState("")
   const [showFilterEditor, setShowFilterEditor] = useState(false)
   const [showSortEditor, setShowSortEditor] = useState(false)
-  const [showGroupPicker, setShowGroupPicker] = useState(false)
+  const [showGroupDialog, setShowGroupDialog] = useState(false)
   const [editingFilter, setEditingFilter] = useState<Filter | null>(null)
   const [editingSort, setEditingSort] = useState<Sort | null>(null)
   const filterEditorRef = useRef<HTMLDivElement>(null)
   const sortEditorRef = useRef<HTMLDivElement>(null)
-  const groupPickerRef = useRef<HTMLDivElement>(null)
 
   // Debounce search
   useEffect(() => {
@@ -95,19 +99,13 @@ export default function Toolbar({
         setShowSortEditor(false)
         setEditingSort(null)
       }
-      if (
-        groupPickerRef.current &&
-        !groupPickerRef.current.contains(event.target as Node)
-      ) {
-        setShowGroupPicker(false)
-      }
     }
 
-    if (showFilterEditor || showSortEditor || showGroupPicker) {
+    if (showFilterEditor || showSortEditor || showGroupDialog) {
       document.addEventListener("mousedown", handleClickOutside)
       return () => document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [showFilterEditor, showSortEditor, showGroupPicker])
+  }, [showFilterEditor, showSortEditor, showGroupDialog])
 
   async function handleFilterSave(filter: Filter) {
     if (filter.id) {
@@ -347,36 +345,35 @@ export default function Toolbar({
         {/* Group By */}
         <div className="relative">
           <button
-            onClick={() => setShowGroupPicker(true)}
+            onClick={() => setShowGroupDialog(true)}
             className={`px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
-              groupBy
+              groupBy || (groupByRules && groupByRules.length > 0)
                 ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             <Group className="h-4 w-4" />
             Group
-            {groupBy && (
+            {(groupByRules && groupByRules.length > 0) && (
+              <span className="ml-1 text-xs text-blue-600">
+                ({groupByRules.length} {groupByRules.length === 1 ? 'field' : 'fields'})
+              </span>
+            )}
+            {!groupByRules && groupBy && (
               <span className="ml-1 text-xs text-blue-600">({groupBy})</span>
             )}
           </button>
 
-          {showGroupPicker && (
-            <div
-              ref={groupPickerRef}
-              className="absolute top-full right-0 mt-2 z-50"
-            >
-              <GroupPicker
-                fields={fields}
-                currentGroupBy={groupBy}
-                onSelect={async (fieldName) => {
-                  await onGroupByChange(fieldName)
-                  setShowGroupPicker(false)
-                }}
-                onCancel={() => setShowGroupPicker(false)}
-              />
-            </div>
-          )}
+          <GroupDialog
+            isOpen={showGroupDialog}
+            onClose={() => setShowGroupDialog(false)}
+            viewId={viewId}
+            tableFields={tableFields || []}
+            groupBy={groupBy}
+            groupByRules={groupByRules}
+            onGroupChange={onGroupByChange}
+            onGroupRulesChange={onGroupRulesChange}
+          />
         </div>
       </div>
     </div>

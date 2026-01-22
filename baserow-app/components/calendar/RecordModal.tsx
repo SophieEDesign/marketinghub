@@ -25,6 +25,7 @@ export interface RecordModalProps {
   initialData?: Record<string, any> // Initial data for creating new records
   onSave?: () => void
   onDeleted?: () => void | Promise<void>
+  supabaseTableName?: string | null // Optional: if provided, skips table info fetch for faster loading
 }
 
 export default function RecordModal({
@@ -37,14 +38,18 @@ export default function RecordModal({
   initialData,
   onSave,
   onDeleted,
+  supabaseTableName: supabaseTableNameProp,
 }: RecordModalProps) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
-  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)
+  const [supabaseTableName, setSupabaseTableName] = useState<string | null>(supabaseTableNameProp || null)
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
+
+  // Use prop directly if available, otherwise use state
+  const effectiveTableName = supabaseTableNameProp || supabaseTableName
 
   const loadTableInfo = useCallback(async () => {
     if (!tableId) return
@@ -70,13 +75,13 @@ export default function RecordModal({
   }, [tableId])
 
   const loadRecord = useCallback(async () => {
-    if (!recordId || !supabaseTableName) return
+    if (!recordId || !effectiveTableName) return
 
     setLoading(true)
     try {
       const supabase = createClient()
       const { data, error } = await supabase
-        .from(supabaseTableName)
+        .from(effectiveTableName)
         .select('*')
         .eq('id', recordId)
         .single()
@@ -91,21 +96,31 @@ export default function RecordModal({
     } finally {
       setLoading(false)
     }
-  }, [recordId, supabaseTableName])
+  }, [recordId, effectiveTableName])
 
-  // Load table info when modal opens
+  // Update supabaseTableName when prop changes (for fallback when prop is removed)
   useEffect(() => {
-    if (open && tableId) {
+    if (supabaseTableNameProp) {
+      setSupabaseTableName(supabaseTableNameProp)
+    }
+  }, [supabaseTableNameProp])
+
+  // Load table info when modal opens (only if not provided as prop)
+  useEffect(() => {
+    if (open && tableId && !supabaseTableNameProp) {
       loadTableInfo()
-    } else {
-      setSupabaseTableName(null)
+    } else if (!open) {
+      // Reset state when modal closes
+      if (!supabaseTableNameProp) {
+        setSupabaseTableName(null)
+      }
       setFormData({})
     }
-  }, [open, tableId, loadTableInfo])
+  }, [open, tableId, supabaseTableNameProp, loadTableInfo])
 
   // Load record data when table name is available, or initialize with initialData for new records
   useEffect(() => {
-    if (open && supabaseTableName) {
+    if (open && effectiveTableName) {
       if (recordId) {
         loadRecord()
       } else if (initialData) {
@@ -115,10 +130,10 @@ export default function RecordModal({
         setFormData({})
       }
     }
-  }, [open, recordId, supabaseTableName, loadRecord, initialData])
+  }, [open, recordId, effectiveTableName, loadRecord, initialData])
 
   async function handleSave() {
-    if (!supabaseTableName) return
+    if (!effectiveTableName) return
 
     setSaving(true)
     try {
@@ -127,7 +142,7 @@ export default function RecordModal({
       if (recordId) {
         // Update existing record
         const { error } = await supabase
-          .from(supabaseTableName)
+          .from(effectiveTableName)
           .update(formData)
           .eq('id', recordId)
 
@@ -141,7 +156,7 @@ export default function RecordModal({
       } else {
         // Create new record
         const { error } = await supabase
-          .from(supabaseTableName)
+          .from(effectiveTableName)
           .insert(formData)
 
         if (error) {
@@ -165,7 +180,7 @@ export default function RecordModal({
 
   async function handleDelete() {
     if (!recordId) return
-    if (!supabaseTableName) return
+    if (!effectiveTableName) return
 
     if (userRole !== 'admin') {
       toast({
@@ -183,7 +198,7 @@ export default function RecordModal({
     setDeleting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.from(supabaseTableName).delete().eq('id', recordId)
+      const { error } = await supabase.from(effectiveTableName).delete().eq('id', recordId)
       if (error) throw error
 
       toast({
@@ -257,7 +272,7 @@ export default function RecordModal({
                     onChange={(newValue) => handleFieldChange(field.name, newValue)}
                     required={field.required || false}
                     recordId={recordId || undefined}
-                    tableName={supabaseTableName || undefined}
+                    tableName={effectiveTableName || undefined}
                   />
                 )
               })}

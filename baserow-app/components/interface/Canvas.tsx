@@ -703,6 +703,97 @@ export default function Canvas({
   }, [applyHorizontalSnap, applyVerticalSnap])
   
   /**
+   * Pushes blocks below a growing block down to prevent overlap
+   * This preserves block order - blocks are pushed down, not reordered
+   * 
+   * Algorithm:
+   * 1. Find the resized block and calculate its new bottom edge
+   * 2. Sort all blocks by y position (top to bottom)
+   * 3. For each block, check if it overlaps with blocks above it (including resized block)
+   * 4. Push block down to the first available position below all overlapping blocks
+   * 5. Process blocks in order to handle cascading pushes correctly
+   */
+  const pushBlocksDown = useCallback((currentLayout: Layout[], resizedBlockId: string): Layout[] => {
+    const resizedBlock = currentLayout.find(l => l.i === resizedBlockId)
+    if (!resizedBlock) return currentLayout
+    
+    const resizedX = resizedBlock.x || 0
+    const resizedW = resizedBlock.w || 4
+    const resizedY = resizedBlock.y || 0
+    const resizedH = resizedBlock.h || 4
+    const resizedBottom = resizedY + resizedH
+    
+    // Sort all blocks by y position (top to bottom), then by x (left to right)
+    // This ensures we process blocks in order and handle cascading pushes correctly
+    const sortedLayout = [...currentLayout].sort((a, b) => {
+      const aY = a.y || 0
+      const bY = b.y || 0
+      if (aY !== bY) return aY - bY
+      return (a.x || 0) - (b.x || 0)
+    })
+    
+    // Track new positions as we process blocks
+    const newPositions = new Map<string, number>()
+    
+    sortedLayout.forEach(block => {
+      const blockX = block.x || 0
+      const blockW = block.w || 4
+      const blockY = block.y || 0
+      const blockH = block.h || 4
+      
+      // Start with the block's current Y position
+      let minY = blockY
+      
+      // Check overlap with the resized block
+      if (block.i !== resizedBlockId) {
+        const xOverlap = !(resizedX + resizedW <= blockX || resizedX >= blockX + blockW)
+        if (xOverlap) {
+          // Block overlaps horizontally with resized block
+          // If block is at or below the resized block's top, ensure it's below the resized block's bottom
+          if (blockY >= resizedY) {
+            minY = Math.max(minY, resizedBottom)
+          }
+        }
+      }
+      
+      // Check overlap with all blocks that have already been processed (including pushed blocks)
+      sortedLayout.forEach(otherBlock => {
+        if (otherBlock.i === block.i) return
+        
+        const otherX = otherBlock.x || 0
+        const otherW = otherBlock.w || 4
+        // Use new position if available, otherwise use original position
+        const otherY = newPositions.get(otherBlock.i) ?? (otherBlock.y || 0)
+        const otherH = otherBlock.h || 4
+        const otherBottom = otherY + otherH
+        
+        // Check if blocks overlap horizontally
+        const xOverlap = !(blockX + blockW <= otherX || blockX >= otherX + otherW)
+        
+        // If overlapping and other block is above this block, push this block down
+        if (xOverlap && otherBottom > minY && otherY < minY + blockH) {
+          minY = otherBottom
+        }
+      })
+      
+      // Store the new position
+      newPositions.set(block.i, minY)
+    })
+    
+    // Apply new positions
+    return currentLayout.map(block => {
+      const newY = newPositions.get(block.i)
+      if (newY !== undefined && Math.abs(newY - (block.y || 0)) > 0.01) {
+        return {
+          ...block,
+          y: newY,
+        }
+      }
+      return block
+    })
+  }, [])
+  
+  /**
    * Vertically compact layout by shifting blocks upward to fill gaps
    * This ensures that when a block shrinks, moves, or is deleted, blocks below shift up
    * 
@@ -884,18 +975,28 @@ export default function Canvas({
       // Reset resize flag after resize/drag completes (no more layout changes for 300ms)
       // This allows the layout to persist and prevents useEffect from resetting it during resize
       resizeTimeoutRef.current = setTimeout(() => {
-        // CRITICAL: Use current layout state (from setLayout) to check for shrinkage
+        // CRITICAL: Use current layout state (from setLayout) to check for shrinkage/growth
         // We need to check the actual current state, not the closure value
         setLayout(currentLayout => {
-          // CRITICAL: Check if any block shrunk and compact layout vertically
+          // CRITICAL: Check if any block grew or shrunk
+          let needsPushDown = false
           let needsCompaction = false
+          let resizedBlockId: string | null = null
           const heightsBeforeResize = new Map(blockHeightsBeforeResizeRef.current)
           
           heightsBeforeResize.forEach((previousHeight, blockId) => {
             const currentBlock = currentLayout.find(l => l.i === blockId)
             if (currentBlock) {
               const currentHeight = currentBlock.h || 4
-              if (currentHeight < previousHeight) {
+              if (currentHeight > previousHeight) {
+                // Block grew - push blocks down instead of reordering
+                needsPushDown = true
+                resizedBlockId = blockId
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[Canvas] Block ${blockId} grew from ${previousHeight} to ${currentHeight} - pushing blocks down`)
+                }
+              } else if (currentHeight < previousHeight) {
+                // Block shrunk - compact layout vertically
                 needsCompaction = true
                 if (process.env.NODE_ENV === 'development') {
                   console.log(`[Canvas] Block ${blockId} shrunk from ${previousHeight} to ${currentHeight} - compacting layout`)
@@ -904,8 +1005,8 @@ export default function Canvas({
             }
           })
           
-          // Apply smart snapping to dragged blocks before compaction
-          // Priority: horizontal snap > vertical snap > vertical compaction
+          // Apply smart snapping to dragged blocks before push/compaction
+          // Priority: horizontal snap > vertical snap > push down / compaction
           let snappedLayout = [...currentLayout]
           const cols = layoutSettings?.cols || 12
           
@@ -941,12 +1042,26 @@ export default function Canvas({
             }
           }
           
-          // Apply vertical compaction to remove gaps (but preserve snapped positions)
-          // Only compact blocks that weren't just snapped horizontally
-          const compactedLayout = compactLayoutVertically(snappedLayout, blocks)
+          // Apply push down or compaction based on resize direction
+          let finalLayout = snappedLayout
+          if (needsPushDown && resizedBlockId) {
+            // Block grew - push blocks below down (preserves order)
+            finalLayout = pushBlocksDown(snappedLayout, resizedBlockId)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Canvas] Applied push down after resize grow', {
+                resizedBlockId,
+              })
+            }
+          } else if (needsCompaction) {
+            // Block shrunk - compact layout vertically (removes gaps)
+            finalLayout = compactLayoutVertically(snappedLayout, blocks)
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Canvas] Applied compaction after resize shrink')
+            }
+          }
           
-          // Check if layout changed (either from snapping or compaction)
-          const layoutChanged = compactedLayout.some((item, index) => {
+          // Check if layout changed (either from snapping, push down, or compaction)
+          const layoutChanged = finalLayout.some((item, index) => {
             const original = currentLayout.find(l => l.i === item.i)
             if (!original) return true
             return (
@@ -957,14 +1072,17 @@ export default function Canvas({
           
           if (layoutChanged) {
             if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Applied snap/compaction after drag/resize end', {
+              console.log('[Canvas] Applied snap/push/compaction after drag/resize end', {
                 hadSnap: draggedBlockId !== null,
+                hadPushDown: needsPushDown,
+                hadCompaction: needsCompaction,
                 draggedBlockId,
+                resizedBlockId,
               })
             }
             
             // Update position tracking ref
-            compactedLayout.forEach(layoutItem => {
+            finalLayout.forEach(layoutItem => {
               previousBlockPositionsRef.current.set(layoutItem.i, {
                 x: layoutItem.x || 0,
                 y: layoutItem.y || 0,
@@ -973,10 +1091,10 @@ export default function Canvas({
               })
             })
             
-            // Notify parent of snapped/compacted layout asynchronously to avoid state update conflicts
+            // Notify parent of final layout asynchronously to avoid state update conflicts
             setTimeout(() => {
               if (onLayoutChange) {
-                const layoutItems: LayoutItem[] = compactedLayout.map((item) => ({
+                const layoutItems: LayoutItem[] = finalLayout.map((item) => ({
                   i: item.i,
                   x: item.x || 0,
                   y: item.y || 0,
@@ -987,7 +1105,7 @@ export default function Canvas({
               }
             }, 0)
             
-            return compactedLayout
+            return finalLayout
           }
           
           return currentLayout
@@ -1008,7 +1126,7 @@ export default function Canvas({
         resizeTimeoutRef.current = null
       }, 300)
     },
-    [onLayoutChange, isEditing, pageId, compactLayoutVertically, blocks, applySmartSnap, layoutSettings?.cols]
+    [onLayoutChange, isEditing, pageId, compactLayoutVertically, pushBlocksDown, blocks, applySmartSnap, layoutSettings?.cols]
   )
   
   // Reset first layout change flag when entering edit mode

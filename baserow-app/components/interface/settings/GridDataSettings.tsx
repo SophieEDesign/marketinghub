@@ -242,34 +242,72 @@ export default function GridDataSettings({
         </div>
       )}
 
-      {/* Sorts (optional) - For Grid and Gallery views */}
-      {(currentViewType === 'grid' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
-        <SortSelector
-          value={Array.isArray(config.sorts) ? config.sorts : undefined}
-          onChange={(sorts) => onUpdate({ sorts: sorts as any })}
-          fields={fields}
-          allowMultiple={false}
-        />
+      {/* Sorts (optional) - For Grid view only (Gallery, Calendar, Timeline, Kanban have their own in Options sections) */}
+      {currentViewType === 'grid' && config.table_id && fields.length > 0 && (
+        <div className="space-y-2 border-t pt-4">
+          <SortSelector
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as any })}
+            fields={fields}
+            allowMultiple={false}
+          />
+        </div>
       )}
 
-      {/* Grouping (optional) - Table + Gallery */}
+      {/* Grouping (Optional) - Table + Gallery */}
       {(currentViewType === 'grid' || currentViewType === 'gallery') && config.table_id && fields.length > 0 && (
-        <GroupBySelector
-          value={(config as any).group_by_field || (config as any).group_by}
-          onChange={(value) => {
-            onUpdate({
-              group_by_field: value,
-              group_by: value,
-            } as any)
-          }}
-          fields={fields}
-          filterGroupableFields={true}
-          description={
-            currentViewType === 'gallery'
-              ? "Group cards into collapsible sections by the selected field."
-              : "Group rows into collapsible sections by the selected field."
-          }
-        />
+        <>
+          <GroupBySelector
+            value={(config as any).group_by_field || (config as any).group_by}
+            onChange={(value) => {
+              onUpdate({
+                group_by_field: value,
+                group_by: value,
+              } as any)
+            }}
+            fields={fields}
+            filterGroupableFields={true}
+            description={
+              currentViewType === 'gallery'
+                ? "Group cards into collapsible sections by the selected field."
+                : "Group rows into collapsible sections by the selected field."
+            }
+          />
+          
+          {/* Group Load Behavior */}
+          {((config as any).group_by_field || (config as any).group_by) && (config as any).group_by !== "__none__" && (
+            <div className="space-y-2">
+              <Label>Groups on load</Label>
+              <Select
+                value={
+                  ((config as any)?.grid_groups_default_collapsed ??
+                    (config as any)?.gallery_groups_default_collapsed ??
+                    true)
+                    ? "closed"
+                    : "open"
+                }
+                onValueChange={(value) => {
+                  const closed = value === "closed"
+                  onUpdate({
+                    grid_groups_default_collapsed: closed,
+                    gallery_groups_default_collapsed: closed,
+                  } as any)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="closed">Closed (collapsed)</SelectItem>
+                  <SelectItem value="open">Open (expanded)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Control whether grouped sections start expanded or collapsed when the view loads.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {/* Calendar-Specific Settings - Airtable Style */}
@@ -320,7 +358,27 @@ export default function GridDataSettings({
             fields={fields}
             mode="full"
             label="Fields"
+            showPasteList={false}
           />
+        </>
+      )}
+
+      {/* Gallery-Specific Settings - Airtable Style */}
+      {currentViewType === 'gallery' && config.table_id && fields.length > 0 && (
+        <>
+          {/* Options Section - Airtable Style */}
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <Label className="text-sm font-semibold">Options</Label>
+            
+            {/* Sort */}
+            <SortSelector
+              value={Array.isArray(config.sorts) ? config.sorts : undefined}
+              onChange={(sorts) => onUpdate({ sorts: sorts as any })}
+              fields={fields}
+              allowMultiple={false}
+              label="Sort"
+            />
+          </div>
         </>
       )}
 
@@ -352,6 +410,15 @@ export default function GridDataSettings({
               table.
             </p>
           )}
+
+          {/* Sort */}
+          <SortSelector
+            value={Array.isArray(config.sorts) ? config.sorts : undefined}
+            onChange={(sorts) => onUpdate({ sorts: sorts as any })}
+            fields={fields}
+            allowMultiple={false}
+            label="Sort"
+          />
         </div>
       )}
 
@@ -401,8 +468,17 @@ export default function GridDataSettings({
               }
               fields={fields}
               filterGroupableFields={false}
-              label="Group by (optional)"
+              label="Group by (Optional)"
               description="Group timeline events by a field value. Each group appears as a separate lane."
+            />
+
+            {/* Sort */}
+            <SortSelector
+              value={Array.isArray(config.sorts) ? config.sorts : undefined}
+              onChange={(sorts) => onUpdate({ sorts: sorts as any })}
+              fields={fields}
+              allowMultiple={false}
+              label="Sort"
             />
           </div>
 

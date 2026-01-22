@@ -1800,6 +1800,7 @@ export default function CalendarView({
           modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
           recordId={selectedRecordId}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
+          supabaseTableName={supabaseTableName}
           onSave={() => {
             // Reload rows after save
             if (resolvedTableId && supabaseTableName) {
@@ -1824,6 +1825,7 @@ export default function CalendarView({
           modalFields={Array.isArray(blockConfig?.modal_fields) ? blockConfig.modal_fields : []}
           recordId={null}
           tableFields={Array.isArray(loadedTableFields) ? loadedTableFields : []}
+          supabaseTableName={supabaseTableName}
           initialData={(() => {
             // Pre-fill the date field(s) based on the clicked date
             const initial: Record<string, any> = {}

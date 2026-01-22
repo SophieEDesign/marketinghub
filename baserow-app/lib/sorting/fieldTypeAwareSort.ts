@@ -2,13 +2,14 @@
  * Field-Type Aware Sorting
  * 
  * Implements intelligent sorting based on field types:
- * - Status/single_select: Sort by the order of choices in options.choices array
+ * - Status/single_select: Sort by the order in field.options.selectOptions (sort_index) - source of truth
  * - Dates: Sort as dates (timestamptz)
- * - Multi-select: Sort by first value in the array
+ * - Multi-select: Sort by first value's sort_index from selectOptions
  * - Other types: Standard sorting
  */
 
 import type { TableField } from '@/types/fields'
+import { normalizeSelectOptionsForUi } from '@/lib/fields/select-options'
 
 export interface ViewSort {
   field_name: string
@@ -101,23 +102,44 @@ function compareValues(
 
   switch (field.type) {
     case 'single_select': {
-      // Sort by the order in options.choices array
-      const choices = field.options?.choices || []
-      const aIndex = choices.indexOf(String(a))
-      const bIndex = choices.indexOf(String(b))
+      // Sort by the order in field.options.selectOptions (sort_index) - this is the source of truth
+      const { selectOptions } = normalizeSelectOptionsForUi('single_select', field.options)
+      const indexByLabel = new Map<string, number>()
+      for (const o of selectOptions) {
+        indexByLabel.set(o.label, o.sort_index)
+      }
       
-      // If value not found in choices, treat as -1 (sort to end)
-      const aOrder = aIndex === -1 ? Infinity : aIndex
-      const bOrder = bIndex === -1 ? Infinity : bIndex
+      const aLabel = String(a)
+      const bLabel = String(b)
+      const aOrder = indexByLabel.get(aLabel) ?? Number.POSITIVE_INFINITY
+      const bOrder = indexByLabel.get(bLabel) ?? Number.POSITIVE_INFINITY
       
       return (aOrder - bOrder) * multiplier
     }
 
     case 'multi_select': {
-      // Sort by first value in array
+      // Sort by first value's sort_index from selectOptions
+      const { selectOptions } = normalizeSelectOptionsForUi('multi_select', field.options)
+      const indexByLabel = new Map<string, number>()
+      for (const o of selectOptions) {
+        indexByLabel.set(o.label, o.sort_index)
+      }
+      
       const aFirst = Array.isArray(a) && a.length > 0 ? String(a[0]) : ''
       const bFirst = Array.isArray(b) && b.length > 0 ? String(b[0]) : ''
       
+      // If empty, sort to end
+      if (!aFirst && !bFirst) return 0
+      if (!aFirst) return 1 * multiplier
+      if (!bFirst) return -1 * multiplier
+      
+      const aOrder = indexByLabel.get(aFirst) ?? Number.POSITIVE_INFINITY
+      const bOrder = indexByLabel.get(bFirst) ?? Number.POSITIVE_INFINITY
+      
+      // If same order, fall back to label comparison for stability
+      if (aOrder !== bOrder) {
+        return (aOrder - bOrder) * multiplier
+      }
       return aFirst.localeCompare(bFirst) * multiplier
     }
 

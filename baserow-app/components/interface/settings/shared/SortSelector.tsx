@@ -125,13 +125,12 @@ export default function SortSelector({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>{label}</Label>
-        {allowMultiple && (
+        {allowMultiple && sortsArray.length > 0 && (
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleAddSort}
-            disabled={!allowMultiple && sortsArray.length > 0}
             className="h-7 text-xs"
           >
             <Plus className="h-3 w-3 mr-1" />
@@ -183,7 +182,19 @@ export default function SortSelector({
           </div>
         ))}
         {sortsArray.length === 0 && (
-          <p className="text-xs text-gray-400 italic">No sort configured</p>
+          <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
+            <p className="text-xs text-gray-400 italic">No sort configured</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddSort}
+              className="h-7 text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Sort
+            </Button>
+          </div>
         )}
       </div>
       {description ? (

@@ -25,7 +25,7 @@ export default function GroupBySelector({
   value,
   onChange,
   fields,
-  label = "Group by (optional)",
+  label = "Group by (Optional)",
   description,
   filterGroupableFields = true,
   placeholder = "Select a field",

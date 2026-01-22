@@ -55,9 +55,13 @@ export default function TextCell({
     try {
       await onSave(editValue)
       setEditing(false)
-    } catch (error) {
+    } catch (error: any) {
+      // Don't show errors for aborted requests (expected during navigation/unmount)
+      if (error?.name === 'AbortError' || error?.message?.includes('signal is aborted')) {
+        return
+      }
       console.error('Error saving text cell:', error)
-      alert((error as any)?.message || 'Failed to save. Please check your permissions and try again.')
+      alert(error?.message || 'Failed to save. Please check your permissions and try again.')
     } finally {
       setSaving(false)
     }

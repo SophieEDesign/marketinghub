@@ -26,6 +26,14 @@ export default function PermissionsSettings({
   const allowInlineDelete = permissions.allowInlineDelete ?? true
   const allowOpenRecord = permissions.allowOpenRecord ?? true
 
+  // Record action permissions (create/delete)
+  const recordActions = ((config as any).record_actions || {}) as {
+    create?: 'admin' | 'both'
+    delete?: 'admin' | 'both'
+  }
+  const recordCreatePermission: 'admin' | 'both' = recordActions.create || 'both'
+  const recordDeletePermission: 'admin' | 'both' = recordActions.delete || 'admin'
+
   // When mode is 'view', all other toggles are disabled
   const isViewOnly = mode === 'view'
 
@@ -63,68 +71,96 @@ export default function PermissionsSettings({
     })
   }
 
-  const handleOpenRecordChange = (checked: boolean) => {
+  const handleRecordCreateChange = (value: 'admin' | 'both') => {
     onUpdate({
-      permissions: {
-        ...permissions,
-        allowOpenRecord: checked,
-      },
+      record_actions: {
+        ...recordActions,
+        create: value,
+      } as any,
+    })
+  }
+
+  const handleRecordDeleteChange = (value: 'admin' | 'both') => {
+    onUpdate({
+      record_actions: {
+        ...recordActions,
+        delete: value,
+      } as any,
     })
   }
 
   return (
     <div className="space-y-6">
+      {/* Page Permissions */}
       <div>
-        <h3 className="text-sm font-semibold mb-4">Permissions</h3>
-      </div>
-
-      {/* Access Mode - Simplified toggle matching the image */}
-      <div className="flex items-center justify-between">
-        <Label htmlFor="access-mode" className="text-sm text-gray-700">Permissions</Label>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-md p-1">
-          <button
-            type="button"
-            onClick={() => handleModeChange('view')}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-              mode === 'view'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+        <h3 className="text-sm font-semibold mb-1">Page Permissions</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Page-level permissions act as a ceiling. Block permissions cannot exceed page permissions.
+        </p>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="access-mode" className="text-sm text-gray-700">Permissions</Label>
+          <Select
+            value={mode}
+            onValueChange={(value) => handleModeChange(value as 'view' | 'edit')}
           >
-            View-only
-          </button>
-          <button
-            type="button"
-            onClick={() => handleModeChange('edit')}
-            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-              mode === 'edit'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Editable
-          </button>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="view">View-only</SelectItem>
+              <SelectItem value="edit">Editable</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Inline Editing */}
+      {/* Record Actions */}
       <div className="space-y-4 border-t pt-4">
+        <div>
+          <h3 className="text-sm font-semibold mb-1">Record actions</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Control who can create and delete records from this Record View page UI.
+          </p>
+        </div>
+        
+        {/* Create Records */}
         <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <Label htmlFor="inline-editing">Inline Editing</Label>
-            <p className="text-xs text-gray-500 mt-1">
-              Allow users to add/delete records inline
-            </p>
-          </div>
-          <Switch
-            id="inline-editing"
-            checked={allowInlineCreate && allowInlineDelete && !isViewOnly}
+          <Label htmlFor="create-records" className="text-sm text-gray-700">
+            Create records (+)
+          </Label>
+          <Select
+            value={recordCreatePermission}
+            onValueChange={(value) => handleRecordCreateChange(value as 'admin' | 'both')}
             disabled={isViewOnly}
-            onCheckedChange={(checked) => {
-              handleInlineCreateChange(checked)
-              handleInlineDeleteChange(checked)
-            }}
-          />
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin only</SelectItem>
+              <SelectItem value="both">Admins + members</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Delete Records */}
+        <div className="flex items-center justify-between">
+          <Label htmlFor="delete-records" className="text-sm text-gray-700">
+            Delete records (-)
+          </Label>
+          <Select
+            value={recordDeletePermission}
+            onValueChange={(value) => handleRecordDeleteChange(value as 'admin' | 'both')}
+            disabled={isViewOnly}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin only</SelectItem>
+              <SelectItem value="both">Admins + members</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {isViewOnly && (
           <p className="text-xs text-gray-400 italic">
@@ -133,21 +169,11 @@ export default function PermissionsSettings({
         )}
       </div>
 
-      {/* Record Details Access */}
-      <div className="space-y-4 border-t pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <Label htmlFor="record-details">Record Details Access</Label>
-            <p className="text-xs text-gray-500 mt-1">
-              Allow users to open record details
-            </p>
-          </div>
-          <Switch
-            id="record-details"
-            checked={allowOpenRecord}
-            onCheckedChange={handleOpenRecordChange}
-          />
-        </div>
+      {/* Additional Info */}
+      <div className="border-t pt-4">
+        <p className="text-xs text-gray-400 italic">
+          Field-level editability settings are configured in the Data tab. Individual fields can be set to view-only even if the page is editable.
+        </p>
       </div>
     </div>
   )

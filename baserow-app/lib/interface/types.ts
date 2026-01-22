@@ -123,6 +123,11 @@ export interface BlockConfig {
     allowInlineDelete?: boolean // Allow users to delete records inline
     allowOpenRecord?: boolean // Allow users to open record details
   }
+  // Record action permissions (create/delete)
+  record_actions?: {
+    create?: 'admin' | 'both' // Who can create records: 'admin' (admin only) or 'both' (admins + members)
+    delete?: 'admin' | 'both' // Who can delete records: 'admin' (admin only) or 'both' (admins + members)
+  }
   // Appearance settings
   appearance?: {
     // Airtable-style appearance (new)

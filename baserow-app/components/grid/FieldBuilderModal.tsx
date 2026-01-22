@@ -513,37 +513,93 @@ export default function FieldBuilderModal({
 
       case "link_to_table":
         return (
-          <div className="space-y-2">
-            <Label htmlFor="linked-table">Linked Table *</Label>
-            <Select
-              value={options.linked_table_id || undefined}
-              onValueChange={(tableId) =>
-                setOptions({ 
-                  ...options, 
-                  linked_table_id: tableId || undefined,
-                })
-              }
-            >
-              <SelectTrigger id="linked-table">
-                <SelectValue placeholder="Select a table" />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingTables ? (
-                  <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
-                ) : (
-                  tables
-                    .filter(t => t.id !== tableId)
-                    .map((table) => (
-                      <SelectItem key={table.id} value={table.id}>
-                        {table.name}
-                      </SelectItem>
-                    ))
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="linked-table">Linked Table *</Label>
+              <Select
+                value={options.linked_table_id || undefined}
+                onValueChange={(tableId) =>
+                  setOptions({ 
+                    ...options, 
+                    linked_table_id: tableId || undefined,
+                  })
+                }
+              >
+                <SelectTrigger id="linked-table">
+                  <SelectValue placeholder="Select a table" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingTables ? (
+                    <SelectItem value="__loading__" disabled>Loading tables...</SelectItem>
+                  ) : (
+                    tables
+                      .filter(t => t.id !== tableId)
+                      .map((table) => (
+                        <SelectItem key={table.id} value={table.id}>
+                          {table.name}
+                        </SelectItem>
+                      ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                Select the table to link records from. Each row can contain one or more records from that table.
+              </p>
+            </div>
+            
+            {options.linked_table_id && (
+              <div className="space-y-3 border-t pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="link-relationship-type" className="text-sm font-normal">
+                    How many records can be selected
+                  </Label>
+                  <Select
+                    value={options.relationship_type || 'one-to-many'}
+                    onValueChange={(relType) =>
+                      setOptions({ ...options, relationship_type: relType as any })
+                    }
+                  >
+                    <SelectTrigger id="link-relationship-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="one-to-one">One to One</SelectItem>
+                      <SelectItem value="one-to-many">One to Many</SelectItem>
+                      <SelectItem value="many-to-many">Many to Many</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">
+                    {(options.relationship_type || 'one-to-many') === 'one-to-one' 
+                      ? 'Each row can link to a single record from the linked table.'
+                      : 'Each row can link to multiple records from the linked table.'}
+                  </p>
+                </div>
+
+                {(options.relationship_type === 'one-to-many' || options.relationship_type === 'many-to-many' || !options.relationship_type) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="link-max-selections" className="text-sm font-normal">
+                      Max Selections (optional)
+                    </Label>
+                    <Input
+                      id="link-max-selections"
+                      type="number"
+                      min="1"
+                      value={options.max_selections || ''}
+                      onChange={(e) =>
+                        setOptions({ 
+                          ...options, 
+                          max_selections: e.target.value ? parseInt(e.target.value) : undefined 
+                        })
+                      }
+                      placeholder="No limit"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Limit the maximum number of linked records that can be selected.
+                    </p>
+                  </div>
                 )}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              Select the table to link records from. Each row can contain one or more records from that table.
-            </p>
+              </div>
+            )}
           </div>
         )
 

@@ -47,6 +47,7 @@ interface FieldPickerProps {
   description?: string
   required?: boolean
   filterFields?: (field: TableField) => boolean
+  showPasteList?: boolean // Show/hide the paste list section (default: true)
 }
 
 function SortableFieldItem({
@@ -110,6 +111,7 @@ export default function FieldPicker({
   description,
   required = false,
   filterFields,
+  showPasteList = true,
 }: FieldPickerProps) {
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<"position" | "name_asc" | "name_desc" | "type_asc">("position")
@@ -478,52 +480,54 @@ export default function FieldPicker({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Paste list (field names)</Label>
-        <Textarea
-          value={pasteText}
-          onChange={(e) => setPasteText(e.target.value)}
-          placeholder={"Paste field names (one per line, or comma-separated)"}
-          className="text-xs min-h-[70px]"
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => applyPaste("add")}
-          >
-            Add
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => applyPaste("replace")}
-          >
-            Replace
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs ml-auto"
-            onClick={() => {
-              setPasteText("")
-              setPasteSummary(null)
-            }}
-          >
-            Clear
-          </Button>
-        </div>
-        {pasteSummary && (
-          <div className="text-xs text-gray-500">
-            Added: {pasteSummary.added} · Not found: {pasteSummary.missing}
+      {showPasteList && (
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">Paste list (field names)</Label>
+          <Textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={"Paste field names (one per line, or comma-separated)"}
+            className="text-xs min-h-[70px]"
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => applyPaste("add")}
+            >
+              Add
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => applyPaste("replace")}
+            >
+              Replace
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs ml-auto"
+              onClick={() => {
+                setPasteText("")
+                setPasteSummary(null)
+              }}
+            >
+              Clear
+            </Button>
           </div>
-        )}
-      </div>
+          {pasteSummary && (
+            <div className="text-xs text-gray-500">
+              Added: {pasteSummary.added} · Not found: {pasteSummary.missing}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="border rounded-md p-3 max-h-[200px] overflow-y-auto space-y-2 bg-gray-50">
         {displayFields.map((field) => {
