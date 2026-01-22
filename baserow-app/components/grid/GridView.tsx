@@ -180,6 +180,15 @@ function extractMissingColumnFromError(err: any): string | null {
   const m3 = msg.match(/Could not find the '([^']+)' column/i)
   if (m3?.[1]) return m3[1]
 
+  // Additional patterns for 400 errors:
+  // - column reference "column_name" is ambiguous
+  // - invalid input syntax for type
+  // - syntax error at or near
+  const m4 = msg.match(/column\s+["']?([a-zA-Z0-9_]+)["']?/i)
+  if (m4?.[1] && (msg.includes('does not exist') || msg.includes('not found') || msg.includes('invalid'))) {
+    return m4[1]
+  }
+
   return null
 }
 
@@ -1503,6 +1512,8 @@ export default function GridView({
             details: (error as any)?.details,
             hint: (error as any)?.hint,
             code: (error as any)?.code,
+            attemptedSelect: safeSelectClause,
+            requiredFields: Array.from(requiredNames),
             error: error,
           })
         }
@@ -1517,8 +1528,17 @@ export default function GridView({
         // IMPORTANT: missing physical table is 42P01 and must be handled separately.
         const missingColumn = extractMissingColumnFromError(error)
         const errorMsg = String((error as any)?.message || (error as any)?.details || '').trim()
+        const errorCode = (error as any)?.code || (error as any)?.status
         const isMissingColumnLike =
-          (error as any)?.code === '42703' ||
+          errorCode === '42703' ||
+          (errorCode === 400 && (
+            !!missingColumn ||
+            /(does\s+not\s+exist)/i.test(errorMsg) ||
+            /(Could not find the ')/i.test(errorMsg) ||
+            /(schema cache)/i.test(errorMsg) ||
+            /(column.*not found)/i.test(errorMsg) ||
+            /(invalid.*column)/i.test(errorMsg)
+          )) ||
           (!!missingColumn &&
             (/(does\s+not\s+exist)/i.test(errorMsg) ||
               /(Could not find the ')/i.test(errorMsg) ||
@@ -1526,9 +1546,13 @@ export default function GridView({
 
         if (isMissingColumnLike) {
           console.warn('[GridView] Column missing for view; retrying with "*" select.', {
+            tableName: supabaseTableName,
             message: (error as any)?.message,
+            details: (error as any)?.details,
             code: (error as any)?.code,
             missingColumn,
+            attemptedSelect: safeSelectClause,
+            requiredFields: Array.from(requiredNames),
           })
 
           // From this point on, avoid repeating the failing "minimal select" for this table.
@@ -1696,6 +1720,29 @@ export default function GridView({
           setLoading(false)
           return
         }
+
+        // Fallback: For 400 errors that don't match missing column patterns,
+        // but we haven't already forced star select, mark for star select and let next render retry
+        const errorCode = (error as any)?.code || (error as any)?.status
+        if (errorCode === 400 || errorCode === '400') {
+          const alreadyForcedStar = forceStarSelectRef.current.has(supabaseTableName)
+          if (!alreadyForcedStar) {
+            console.warn('[GridView] 400 error not matching column patterns; will retry with "*" select on next load.', {
+              tableName: supabaseTableName,
+              message: (error as any)?.message,
+              details: (error as any)?.details,
+            })
+            forceStarSelectRef.current.add(supabaseTableName)
+            // Clear backoff to allow immediate retry
+            loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
+            // Mark that we have a pending load to retry
+            pendingLoadRowsRef.current = true
+            setLoading(false)
+            // The effect will trigger a reload when dependencies change or on next render
+            return
+          }
+        }
+
         console.error("Error loading rows:", {
           code: (error as any)?.code,
           message: (error as any)?.message,

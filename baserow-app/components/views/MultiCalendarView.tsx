@@ -42,6 +42,7 @@ import {
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isAbortError } from "@/lib/api/error-handling"
 
 type MultiSource = {
   id: string
@@ -183,6 +184,7 @@ export default function MultiCalendarView({
   const [fieldsBySource, setFieldsBySource] = useState<Record<string, TableField[]>>({})
   const [viewDefaultFiltersBySource, setViewDefaultFiltersBySource] = useState<Record<string, FilterConfig[]>>({})
   const [rowsBySource, setRowsBySource] = useState<Record<string, TableRow[]>>({})
+  const [errorsBySource, setErrorsBySource] = useState<Record<string, string>>({})
 
   const [quickFiltersBySource, setQuickFiltersBySource] = useState<Record<string, FilterConfig[]>>({})
   const [quickFilterSourceId, setQuickFilterSourceId] = useState<string>(() => enabledSourceIdsDefault[0] || sources[0]?.id || "")
