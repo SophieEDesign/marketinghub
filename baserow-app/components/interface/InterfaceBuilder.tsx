@@ -687,10 +687,68 @@ export default function InterfaceBuilder({
     [page.id, toast]
   )
 
+  // Helper function to find next available position without overlapping
+  const findNextAvailablePosition = useCallback((newWidth: number, newHeight: number, existingBlocks: PageBlock[]): { x: number; y: number } => {
+    const GRID_COLS = 12
+    
+    // If no blocks exist, start at top-left
+    if (existingBlocks.length === 0) {
+      return { x: 0, y: 0 }
+    }
+
+    // Create a set of occupied cells for fast collision detection
+    const occupied = new Set<string>()
+    existingBlocks.forEach(block => {
+      const x = block.x ?? 0
+      const y = block.y ?? 0
+      const w = block.w ?? 4
+      const h = block.h ?? 4
+      
+      // Mark all cells occupied by this block
+      for (let cellX = x; cellX < x + w && cellX < GRID_COLS; cellX++) {
+        for (let cellY = y; cellY < y + h; cellY++) {
+          occupied.add(`${cellX},${cellY}`)
+        }
+      }
+    })
+
+    // Find the maximum Y position to know where to start searching
+    const maxY = existingBlocks.length > 0 
+      ? Math.max(...existingBlocks.map((b) => (b.y ?? 0) + (b.h ?? 4)))
+      : 0
+
+    // Try positions starting from top-left, moving right, then down
+    // Start from y=0 to fill gaps, but also check below existing blocks
+    for (let startY = 0; startY <= maxY + 1; startY++) {
+      for (let startX = 0; startX <= GRID_COLS - newWidth; startX++) {
+        // Check if this position fits without overlapping
+        let canFit = true
+        for (let cellX = startX; cellX < startX + newWidth; cellX++) {
+          for (let cellY = startY; cellY < startY + newHeight; cellY++) {
+            if (occupied.has(`${cellX},${cellY}`)) {
+              canFit = false
+              break
+            }
+          }
+          if (!canFit) break
+        }
+        
+        if (canFit) {
+          return { x: startX, y: startY }
+        }
+      }
+    }
+
+    // Fallback: place below all existing blocks
+    return { x: 0, y: maxY }
+  }, [])
+
   const handleAddBlock = useCallback(
     async (type: BlockType) => {
       const def = BLOCK_REGISTRY[type]
-      const maxY = blocks.length > 0 ? Math.max(...blocks.map((b) => b.y + b.h)) : 0
+      
+      // Find next available position that doesn't overlap
+      const position = findNextAvailablePosition(def.defaultWidth, def.defaultHeight, blocks)
 
       try {
         const response = await fetch(`/api/pages/${page.id}/blocks`, {
@@ -698,8 +756,8 @@ export default function InterfaceBuilder({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type,
-            x: 0,
-            y: maxY,
+            x: position.x,
+            y: position.y,
             w: def.defaultWidth,
             h: def.defaultHeight,
             config: def.defaultConfig,
@@ -729,7 +787,7 @@ export default function InterfaceBuilder({
         })
       }
     },
-    [page.id, blocks, toast]
+    [page.id, blocks, toast, findNextAvailablePosition]
   )
 
   const handleDeleteBlock = useCallback(

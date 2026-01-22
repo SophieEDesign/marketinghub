@@ -175,7 +175,7 @@ export default function GroupDialog({
           {rules.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <p>No grouping rules added yet.</p>
-              <p className="text-sm mt-2">Click "Add Grouping Rule" to start grouping your records.</p>
+              <p className="text-sm mt-2">Click &quot;Add Grouping Rule&quot; to start grouping your records.</p>
             </div>
           ) : (
             <div className="space-y-3">

@@ -340,7 +340,6 @@ export default function FieldBuilderDrawer({
               Select the table to link records from. Each row can contain one or
               more records from that table.
             </p>
-            </div>
             
             {options.linked_table_id && (
               <div className="space-y-3 border-t pt-4">
