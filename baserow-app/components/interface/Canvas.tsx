@@ -680,9 +680,8 @@ export default function Canvas({
       debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
         originalY: draggedBlock.y,
         snappedY: verticalSnapped.y,
-          direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
-        })
-      }
+        direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
+      })
       return verticalSnapped
     }
     
@@ -1034,7 +1033,6 @@ export default function Canvas({
             debugLog('LAYOUT', '[Canvas] Applied push down after resize grow', {
               resizedBlockId,
             })
-            }
           } else if (needsCompaction) {
             // Block shrunk - compact layout vertically (removes gaps)
             finalLayout = compactLayoutVertically(snappedLayout, blocks)
@@ -1405,10 +1403,9 @@ export default function Canvas({
             debugLog('LAYOUT', `[Canvas] Drag stopped for block ${blockId}`, {
               startX: dragStartPositionRef.current.get(blockId)?.x,
               startY: dragStartPositionRef.current.get(blockId)?.y,
-                endX: newItem.x,
-                endY: newItem.y,
-              })
-            }
+              endX: newItem.x,
+              endY: newItem.y,
+            })
             
             // Use the same timeout mechanism as resize to ensure layout is stable
             // The handleLayoutChange will be called and will apply snap/compaction after timeout
@@ -1421,8 +1418,7 @@ export default function Canvas({
             debugLog('LAYOUT', `[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
               block,
               layoutItem: layout.find(l => l.i === block.id),
-              })
-            }
+            })
             return (
               <div
                 key={block.id}

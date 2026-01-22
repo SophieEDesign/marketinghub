@@ -746,13 +746,13 @@ export default function GridView({
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     // Removed debug console.log - use React DevTools to inspect props
     // console.log('GridView input types', {
-      rows: Array.isArray(rows),
-      viewFields: Array.isArray(viewFields),
-      tableFields: Array.isArray(tableFields),
-      viewFilters: Array.isArray(viewFilters),
-      filters: Array.isArray(filters),
-      viewSorts: Array.isArray(viewSorts),
-    })
+    //   rows: Array.isArray(rows),
+    //   viewFields: Array.isArray(viewFields),
+    //   tableFields: Array.isArray(tableFields),
+    //   viewFilters: Array.isArray(viewFilters),
+    //   filters: Array.isArray(filters),
+    //   viewSorts: Array.isArray(viewSorts),
+    // })
   }
 
   // Load column order and widths from grid_view_settings

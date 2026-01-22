@@ -457,10 +457,10 @@ export default function RecordDetailsPanel({
                     </div>
                   </div>
                 ) : (
-                  {/* CRITICAL: Use stable key based on page.id only - NOT recordId
-                      This ensures blocks are page-level templates that apply to all records.
-                      When record changes, blocks re-render with new recordId context but don't remount. */}
                   <InterfaceBuilder
+                    // CRITICAL: Use stable key based on page.id only - NOT recordId
+                    // This ensures blocks are page-level templates that apply to all records.
+                    // When record changes, blocks re-render with new recordId context but don't remount.
                     key={page.id} // CRITICAL: ONLY page.id - recordId changes don't cause remounts
                     page={page as any}
                     initialBlocks={blocks.filter((b: any) => b.type !== "record" && b.type !== "field")}
