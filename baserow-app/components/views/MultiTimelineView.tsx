@@ -36,6 +36,7 @@ import {
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isAbortError } from "@/lib/api/error-handling"
 
 type MultiSource = {
   id: string
@@ -97,8 +98,49 @@ function safeDateOnly(d: Date) {
   return format(d, "yyyy-MM-dd")
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function parseDateValueToLocalDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+  const s = String(value).trim()
+  if (!s) return null
+  // IMPORTANT: treat YYYY-MM-DD as a local date (not UTC) to avoid day-shifts.
+  const d = DATE_ONLY_RE.test(s) ? new Date(`${s}T00:00:00`) : new Date(s)
+  return isNaN(d.getTime()) ? null : d
+}
+
 function isSelectField(field: TableField): field is TableField & { type: "single_select" | "multi_select" } {
   return field.type === "single_select" || field.type === "multi_select"
+}
+
+function resolveFieldNameFromFields(fields: TableField[], raw: string | undefined | null): string | null {
+  if (!raw || typeof raw !== "string") return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const match = (Array.isArray(fields) ? fields : []).find((f) => f && (f.name === trimmed || f.id === trimmed))
+  return match?.name || trimmed
+}
+
+function buildSourcesKey(list: MultiSource[]) {
+  // Avoid JSON.stringify: configs can contain non-JSON values and throw at render-time.
+  return (Array.isArray(list) ? list : [])
+    .map((s) =>
+      [
+        s?.id ?? "",
+        s?.enabled === false ? "0" : "1",
+        s?.table_id ?? "",
+        s?.view_id ?? "",
+        s?.title_field ?? "",
+        s?.start_date_field ?? "",
+        s?.end_date_field ?? "",
+        s?.color_field ?? "",
+        s?.type_field ?? "",
+      ]
+        .map((x) => String(x ?? ""))
+        .join("~")
+    )
+    .join("|")
 }
 
 export default function MultiTimelineView({
@@ -143,6 +185,7 @@ export default function MultiTimelineView({
   const [fieldsBySource, setFieldsBySource] = useState<Record<string, TableField[]>>({})
   const [viewDefaultFiltersBySource, setViewDefaultFiltersBySource] = useState<Record<string, FilterConfig[]>>({})
   const [rowsBySource, setRowsBySource] = useState<Record<string, TableRow[]>>({})
+  const [errorsBySource, setErrorsBySource] = useState<Record<string, string>>({})
 
   const loadingRef = useRef(false)
 
@@ -152,90 +195,177 @@ export default function MultiTimelineView({
     return tableFields.some((f) => f.name === fieldName || f.id === fieldName)
   }
 
+  const sourcesKey = useMemo(() => buildSourcesKey(sources), [sources])
+  const filtersKey = useMemo(() => {
+    try {
+      return JSON.stringify(filters || [])
+    } catch {
+      // Fall back to a lossy but safe signature.
+      return (Array.isArray(filters) ? filters : [])
+        .map((f: any) => [f?.field ?? "", f?.field_name ?? "", f?.operator ?? "", String(f?.value ?? ""), String(f?.value2 ?? "")]
+          .join("~"))
+        .join("|")
+    }
+  }, [filters])
+
   async function loadAll() {
     if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
+    const nextErrors: Record<string, string> = {}
     try {
       const nextTables: Record<string, { tableId: string; supabaseTable: string; name: string }> = {}
       const nextFields: Record<string, TableField[]> = {}
       const nextViewDefaults: Record<string, FilterConfig[]> = {}
       const nextRows: Record<string, TableRow[]> = {}
 
+      // Serialize all requests (connection exhaustion guard).
+      // Partial failure handling: continue loading other sources if one fails.
       for (const s of sources) {
-        const tableId = normalizeUuid((s as any)?.table_id)
-        if (!tableId) continue
-        const tableRes = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-          .eq("id", tableId)
-          .single()
-        if (!tableRes.data?.supabase_table) continue
-        nextTables[s.id] = {
-          tableId,
-          supabaseTable: tableRes.data.supabase_table,
-          name: tableRes.data.name || "Untitled table",
-        }
+        try {
+          const tableId = normalizeUuid((s as any)?.table_id)
+          if (!tableId) {
+            nextErrors[s.id] = "Missing table ID"
+            continue
+          }
 
-        const fieldsRes = await supabase
-          .from("table_fields")
-          .select("*")
-          .eq("table_id", tableId)
-          .order("position", { ascending: true })
-        nextFields[s.id] = asArray<TableField>(fieldsRes.data)
+          const tableRes = await supabase
+            .from("tables")
+            .select("id, name, supabase_table")
+            .eq("id", tableId)
+            .single()
 
-        const viewId = normalizeUuid((s as any)?.view_id)
-        if (viewId) {
-          const viewFiltersRes = await supabase
-            .from("view_filters")
+          if (tableRes.error) {
+            if (isAbortError(tableRes.error)) {
+              return // Component unmounted, exit early
+            }
+            console.error(`MultiTimeline: Error loading table for source ${s.id}:`, tableRes.error)
+            nextErrors[s.id] = tableRes.error.message || "Failed to load table"
+            continue
+          }
+
+          if (!tableRes.data?.supabase_table) {
+            nextErrors[s.id] = "Table not found"
+            continue
+          }
+
+          nextTables[s.id] = {
+            tableId,
+            supabaseTable: tableRes.data.supabase_table,
+            name: tableRes.data.name || "Untitled table",
+          }
+
+          const fieldsRes = await supabase
+            .from("table_fields")
             .select("*")
-            .eq("view_id", viewId)
-          nextViewDefaults[s.id] = asArray<any>(viewFiltersRes.data).map((f: any) =>
-            // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
-            normalizeFilter({
-              field: f.field_name,
-              operator: f.operator,
-              value: f.value,
-            } as any)
-          )
-        } else {
-          nextViewDefaults[s.id] = []
+            .eq("table_id", tableId)
+            .order("position", { ascending: true })
+
+          if (fieldsRes.error) {
+            if (isAbortError(fieldsRes.error)) {
+              return
+            }
+            console.error(`MultiTimeline: Error loading fields for source ${s.id}:`, fieldsRes.error)
+            nextErrors[s.id] = fieldsRes.error.message || "Failed to load fields"
+            continue
+          }
+
+          nextFields[s.id] = asArray<TableField>(fieldsRes.data || [])
+
+          const viewId = normalizeUuid((s as any)?.view_id)
+          if (viewId) {
+            const viewFiltersRes = await supabase
+              .from("view_filters")
+              .select("*")
+              .eq("view_id", viewId)
+
+            if (viewFiltersRes.error) {
+              if (isAbortError(viewFiltersRes.error)) {
+                return
+              }
+              // Non-critical error - log but continue
+              console.warn(`MultiTimeline: Error loading view filters for source ${s.id}:`, viewFiltersRes.error)
+            }
+
+            nextViewDefaults[s.id] = asArray<any>(viewFiltersRes.data || []).map((f: any) =>
+              // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
+              normalizeFilter({
+                field: f.field_name,
+                operator: f.operator,
+                value: f.value,
+              } as any)
+            )
+          } else {
+            nextViewDefaults[s.id] = []
+          }
+        } catch (err: any) {
+          if (isAbortError(err)) {
+            return
+          }
+          console.error(`MultiTimeline: Exception loading source ${s.id}:`, err)
+          nextErrors[s.id] = err.message || "Unexpected error"
         }
       }
 
+      // Now load rows per source (serialized).
       for (const s of sources) {
-        if (!s?.table_id) continue
-        const table = nextTables[s.id]
-        const tableFields = nextFields[s.id] || []
-        if (!table?.supabaseTable) continue
+        try {
+          if (!s?.table_id) continue
+          const table = nextTables[s.id]
+          const tableFields = nextFields[s.id] || []
+          if (!table?.supabaseTable) continue
 
-        const viewDefaults = nextViewDefaults[s.id] || []
-        const userQuick = quickFiltersBySource[s.id] || []
-        const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
-        const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
-        // Rule: quick filters apply on top; must not overwrite view defaults.
-        const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
+          const viewDefaults = nextViewDefaults[s.id] || []
+          const userQuick = quickFiltersBySource[s.id] || []
+          const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
+          const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
+          // Rule: quick filters apply on top; must not overwrite view defaults.
+          const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
 
-        let query = supabase.from(table.supabaseTable).select("*")
-        const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
-        query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
-        query = query.order("created_at", { ascending: false })
+          let query = supabase.from(table.supabaseTable).select("*")
+          const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
+          query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
+          query = query.order("created_at", { ascending: false })
 
-        const rowsRes = await query
-        const data = asArray<any>(rowsRes.data)
-        nextRows[s.id] = data.map((row) => ({
-          id: row.id,
-          table_id: table.tableId,
-          data: row,
-          created_at: row.created_at || new Date().toISOString(),
-          updated_at: row.updated_at || new Date().toISOString(),
-        })) as TableRow[]
+          const rowsRes = await query
+
+          if (rowsRes.error) {
+            if (isAbortError(rowsRes.error)) {
+              return
+            }
+            console.error(`MultiTimeline: Error loading rows for source ${s.id}:`, rowsRes.error)
+            nextErrors[s.id] = rowsRes.error.message || "Failed to load rows"
+            continue
+          }
+
+          const data = asArray<any>(rowsRes.data || [])
+          nextRows[s.id] = data.map((row) => ({
+            id: row.id,
+            table_id: table.tableId,
+            data: row,
+            created_at: row.created_at || new Date().toISOString(),
+            updated_at: row.updated_at || new Date().toISOString(),
+          })) as TableRow[]
+        } catch (err: any) {
+          if (isAbortError(err)) {
+            return
+          }
+          console.error(`MultiTimeline: Exception loading rows for source ${s.id}:`, err)
+          nextErrors[s.id] = err.message || "Unexpected error loading rows"
+        }
       }
 
       setTablesBySource(nextTables)
       setFieldsBySource(nextFields)
       setViewDefaultFiltersBySource(nextViewDefaults)
       setRowsBySource(nextRows)
+      setErrorsBySource(nextErrors)
+    } catch (err: any) {
+      if (isAbortError(err)) {
+        return
+      }
+      console.error("MultiTimeline: Fatal error in loadAll:", err)
+      setErrorsBySource({ __global__: err.message || "Failed to load timeline data" })
     } finally {
       setLoading(false)
       loadingRef.current = false
@@ -245,7 +375,7 @@ export default function MultiTimelineView({
   useEffect(() => {
     loadAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(sources), JSON.stringify(filters)])
+  }, [sourcesKey, filtersKey, quickFiltersBySource])
 
   const range = useMemo(() => {
     const start = startOfMonth(currentDate)
@@ -269,27 +399,36 @@ export default function MultiTimelineView({
       const sourceLabel = (s.label || "").trim() || table.name
       const sourceColor = pickSourceColor(idx)
 
+      // IMPORTANT: Supabase row keys are field NAMES (columns), but config can store IDs.
+      const startFieldName = resolveFieldNameFromFields(tableFields, s.start_date_field)
+      const endFieldName = resolveFieldNameFromFields(tableFields, s.end_date_field || null)
+      const titleFieldName = resolveFieldNameFromFields(tableFields, s.title_field)
+      const typeFieldName = resolveFieldNameFromFields(tableFields, s.type_field || null)
+      const colorFieldName = resolveFieldNameFromFields(tableFields, s.color_field || null)
+
       rows.forEach((r) => {
         const row = r.data || {}
-        const startRaw = row[s.start_date_field]
+        const startRaw = startFieldName ? row[startFieldName] : null
         if (!startRaw) return
-        const start = new Date(startRaw)
-        if (isNaN(start.getTime())) return
+        const start = parseDateValueToLocalDate(startRaw)
+        if (!start) return
 
-        const endRaw = s.end_date_field ? row[s.end_date_field] : null
-        const end = endRaw ? new Date(endRaw) : start
-        const finalEnd = isNaN(end.getTime()) ? start : end
+        const endRaw = endFieldName ? (row[endFieldName] || null) : null
+        const end = endRaw ? parseDateValueToLocalDate(endRaw) : start
+        const finalEnd = end || start
 
-        const title = row[s.title_field] ? String(row[s.title_field]) : "Untitled"
+        const title = titleFieldName && row[titleFieldName] ? String(row[titleFieldName]) : "Untitled"
         if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return
 
-        const typeLabel = s.type_field && row[s.type_field] ? String(row[s.type_field]) : undefined
+        const typeLabel = typeFieldName && row[typeFieldName] ? String(row[typeFieldName]) : undefined
 
         let eventColor = sourceColor
-        if (s.color_field) {
+        if (colorFieldName) {
           const colorFieldObj = tableFields.find(
             (f): f is TableField & { type: "single_select" | "multi_select" } =>
-              (f.name === s.color_field || f.id === s.color_field) && isSelectField(f)
+              Boolean(colorFieldName) &&
+              (f.name === colorFieldName || f.id === colorFieldName) &&
+              isSelectField(f)
           )
           if (colorFieldObj) {
             const rawValue = row[colorFieldObj.name]
@@ -381,18 +520,32 @@ export default function MultiTimelineView({
       if (!event || !update?.start) return
       if (!event.mapping?.start_date_field) return
 
-      const updates: Record<string, any> = {
-        [event.mapping.start_date_field]: safeDateOnly(update.start),
+      // Resolve field names from field IDs/config
+      const tableFields = fieldsBySource[event.sourceId] || []
+      const startFieldName = resolveFieldNameFromFields(tableFields, event.mapping.start_date_field)
+      const endFieldName = resolveFieldNameFromFields(tableFields, event.mapping.end_date_field || null)
+
+      if (!startFieldName) {
+        console.error("MultiTimeline: Cannot resolve start date field name", event.mapping.start_date_field)
+        return
       }
-      if (event.mapping.end_date_field && update.end) {
-        updates[event.mapping.end_date_field] = safeDateOnly(update.end)
+
+      const updates: Record<string, any> = {
+        [startFieldName]: safeDateOnly(update.start),
+      }
+      if (endFieldName && update.end) {
+        updates[endFieldName] = safeDateOnly(update.end)
       }
 
       try {
         const { error } = await supabase.from(event.supabaseTableName).update(updates).eq("id", event.rowId)
-        if (error) throw error
+        if (error) {
+          if (isAbortError(error)) return
+          throw error
+        }
         await loadAll()
       } catch (e) {
+        if (isAbortError(e)) return
         console.error("MultiTimeline: Failed to persist drag", e)
         await loadAll()
       } finally {
@@ -410,7 +563,7 @@ export default function MultiTimelineView({
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mouseup", onUp)
     }
-  }, [dragging, optimistic, pxPerMs, events, supabase])
+  }, [dragging, optimistic, pxPerMs, events, supabase, fieldsBySource, loadAll])
 
   async function handleCreate() {
     const sid = createSourceId
@@ -428,15 +581,24 @@ export default function MultiTimelineView({
 
     const defaultsFromFilters = deriveDefaultValuesFromFilters(effectiveFilters, tableFields)
     const newData: Record<string, any> = { ...defaultsFromFilters }
-    if (mapping.start_date_field) newData[mapping.start_date_field] = safeDateOnly(createDate)
-    if (mapping.end_date_field) newData[mapping.end_date_field] = newData[mapping.end_date_field] || safeDateOnly(createDate)
+    
+    // Resolve field names from field IDs/config
+    const startFieldName = resolveFieldNameFromFields(tableFields, mapping.start_date_field)
+    const endFieldName = resolveFieldNameFromFields(tableFields, mapping.end_date_field || null)
+    
+    if (startFieldName) newData[startFieldName] = safeDateOnly(createDate)
+    if (endFieldName) newData[endFieldName] = newData[endFieldName] || safeDateOnly(createDate)
 
     try {
       const { error } = await supabase.from(table.supabaseTable).insert([newData])
-      if (error) throw error
+      if (error) {
+        if (isAbortError(error)) return
+        throw error
+      }
       setCreateOpen(false)
       await loadAll()
     } catch (e) {
+      if (isAbortError(e)) return
       console.error("MultiTimeline: Failed to create record", e)
       alert("Failed to create record. Please try again.")
     }
@@ -458,10 +620,31 @@ export default function MultiTimelineView({
     return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>
   }
 
+  // Show errors if any sources failed to load
+  const hasErrors = Object.keys(errorsBySource).length > 0
+  const errorMessages = Object.entries(errorsBySource).map(([sourceId, error]) => {
+    const source = sources.find((s) => s.id === sourceId)
+    const table = tablesBySource[sourceId]
+    const label = source?.label || table?.name || sourceId
+    return { label, error }
+  })
+
   const rangeMs = range.end.getTime() - range.start.getTime()
 
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Error messages */}
+      {hasErrors && !isEditing && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+          <div className="text-sm font-medium text-red-800">Some sources failed to load:</div>
+          {errorMessages.map(({ label, error }, idx) => (
+            <div key={idx} className="text-xs text-red-700">
+              <span className="font-medium">{label}:</span> {error}
+            </div>
+          ))}
+        </div>
+      )}
+
       {!isEditing && (
         <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">

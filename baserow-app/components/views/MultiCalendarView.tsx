@@ -88,6 +88,18 @@ function safeDateOnly(d: Date) {
   return format(d, "yyyy-MM-dd")
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+function parseDateValueToLocalDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+  const s = String(value).trim()
+  if (!s) return null
+  // IMPORTANT: treat YYYY-MM-DD as a local date (not UTC) to avoid day-shifts.
+  const d = DATE_ONLY_RE.test(s) ? new Date(`${s}T00:00:00`) : new Date(s)
+  return isNaN(d.getTime()) ? null : d
+}
+
 function isSelectField(field: TableField): field is TableField & { type: "single_select" | "multi_select" } {
   return field.type === "single_select" || field.type === "multi_select"
 }
@@ -422,11 +434,11 @@ export default function MultiCalendarView({
         const endRaw = endFieldName ? row[endFieldName] : null
         if (!startRaw) return
 
-        const start = new Date(startRaw)
-        if (isNaN(start.getTime())) return
+        const start = parseDateValueToLocalDate(startRaw)
+        if (!start) return
 
-        const end = endRaw ? new Date(endRaw) : start
-        const finalEnd = isNaN(end.getTime()) ? start : end
+        const end = endRaw ? parseDateValueToLocalDate(endRaw) : start
+        const finalEnd = end || start
 
         const title = titleFieldName && row[titleFieldName] ? String(row[titleFieldName]) : "Untitled"
         if (searchQuery && !title.toLowerCase().includes(searchQuery.toLowerCase())) return
@@ -650,6 +662,18 @@ export default function MultiCalendarView({
 
   return (
     <div className="h-full w-full flex flex-col">
+      {/* Error messages */}
+      {hasErrors && !isEditing && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+          <div className="text-sm font-medium text-red-800">Some sources failed to load:</div>
+          {errorMessages.map(({ label, error }, idx) => (
+            <div key={idx} className="text-xs text-red-700">
+              <span className="font-medium">{label}:</span> {error}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Unified header: toggles + quick filters + add */}
       {!isEditing && (
         <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
