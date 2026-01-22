@@ -14,6 +14,7 @@ import type { TableField } from '@/types/fields'
 import FieldEditor from '@/components/fields/FieldEditor'
 import { useToast } from '@/components/ui/use-toast'
 import { useUserRole } from '@/lib/hooks/useUserRole'
+import { isAbortError } from '@/lib/api/error-handling'
 
 export interface RecordModalProps {
   open: boolean
@@ -65,12 +66,16 @@ export default function RecordModal({
         .single()
       
       if (error) {
-        console.error('Error loading table info:', error)
+        if (!isAbortError(error)) {
+          console.error('Error loading table info:', error)
+        }
       } else if (table) {
         setSupabaseTableName(table.supabase_table)
       }
     } catch (error) {
-      console.error('Error loading table info:', error)
+      if (!isAbortError(error)) {
+        console.error('Error loading table info:', error)
+      }
     }
   }, [tableId])
 
@@ -87,12 +92,16 @@ export default function RecordModal({
         .single()
 
       if (error) {
-        console.error('Error loading record:', error)
+        if (!isAbortError(error)) {
+          console.error('Error loading record:', error)
+        }
       } else if (data) {
         setFormData(data)
       }
     } catch (error) {
-      console.error('Error loading record:', error)
+      if (!isAbortError(error)) {
+        console.error('Error loading record:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -147,10 +156,12 @@ export default function RecordModal({
           .eq('id', recordId)
 
         if (error) {
-          console.error('Error saving record:', error)
-          const message = (error as any)?.message || 'Unknown error'
-          const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
-          alert(`Failed to save record${code}: ${message}`)
+          if (!isAbortError(error)) {
+            console.error('Error saving record:', error)
+            const message = (error as any)?.message || 'Unknown error'
+            const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
+            alert(`Failed to save record${code}: ${message}`)
+          }
           return
         }
       } else {
@@ -160,10 +171,12 @@ export default function RecordModal({
           .insert(formData)
 
         if (error) {
-          console.error('Error creating record:', error)
-          const message = (error as any)?.message || 'Unknown error'
-          const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
-          alert(`Failed to create record${code}: ${message}`)
+          if (!isAbortError(error)) {
+            console.error('Error creating record:', error)
+            const message = (error as any)?.message || 'Unknown error'
+            const code = (error as any)?.code ? ` (code: ${(error as any).code})` : ''
+            alert(`Failed to create record${code}: ${message}`)
+          }
           return
         }
       }
@@ -171,8 +184,10 @@ export default function RecordModal({
       onSave?.()
       onClose()
     } catch (error) {
-      console.error('Error saving record:', error)
-      alert('Failed to save record. Please try again.')
+      if (!isAbortError(error)) {
+        console.error('Error saving record:', error)
+        alert('Failed to save record. Please try again.')
+      }
     } finally {
       setSaving(false)
     }
@@ -208,12 +223,14 @@ export default function RecordModal({
       await onDeleted?.()
       onClose()
     } catch (error: any) {
-      console.error('Error deleting record:', error)
-      toast({
-        variant: 'destructive',
-        title: 'Failed to delete record',
-        description: error?.message || 'Please try again',
-      })
+      if (!isAbortError(error)) {
+        console.error('Error deleting record:', error)
+        toast({
+          variant: 'destructive',
+          title: 'Failed to delete record',
+          description: error?.message || 'Please try again',
+        })
+      }
     } finally {
       setDeleting(false)
     }

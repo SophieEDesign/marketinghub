@@ -57,9 +57,12 @@ export default function TextCell({
   useEffect(() => {
     if (editing && inputRef.current) {
       inputRef.current.focus()
-      inputRef.current.select()
+      // Select all text if there's existing text, otherwise just focus
+      if (editValue) {
+        inputRef.current.select()
+      }
     }
-  }, [editing])
+  }, [editing, editValue])
 
   const handleSave = async () => {
     if (saving) return
@@ -111,24 +114,41 @@ export default function TextCell({
     }
   }
 
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   const handleSingleClick = (e: React.MouseEvent) => {
-    // Single click: copy value
+    // Single click: copy value (with delay to detect double-click)
     if (e.detail === 1) {
-      const timer = setTimeout(() => {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+      }
+      clickTimerRef.current = setTimeout(() => {
         handleCopy()
       }, 200) // Small delay to detect double-click
-      
-      return () => clearTimeout(timer)
     }
   }
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    // Clear the single-click timer
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
     if (editable) {
-      // Double-click: open modal for editing
-      setModalOpen(true)
+      // Double-click: start inline editing
+      setEditing(true)
     }
   }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+      }
+    }
+  }, [])
 
   if (editing && editable) {
     // Container to properly constrain the input within the cell
@@ -185,11 +205,12 @@ export default function TextCell({
             ref={cellRef}
             onClick={handleSingleClick}
             onDoubleClick={handleDoubleClick}
-            className={`w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex overflow-hidden ${
+            className={`w-full h-full px-3 py-1 text-sm text-gray-900 cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors flex overflow-hidden relative group ${
               wrapText ? 'items-start' : 'items-center'
             }`}
             style={cellStyle}
             title={!isEmpty ? rawText : undefined}
+            tabIndex={editable ? 0 : -1}
           >
             <span 
               className={`${wrapText ? 'line-clamp-2' : 'truncate'} ${isPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'} w-full`}
@@ -200,6 +221,19 @@ export default function TextCell({
             >
               {displayValue}
             </span>
+            {/* Edit button that appears on hover */}
+            {editable && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setModalOpen(true)
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700"
+                title="Edit in larger editor"
+              >
+                <Edit className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -208,10 +242,16 @@ export default function TextCell({
             Copy
           </ContextMenuItem>
           {editable && (
-            <ContextMenuItem onClick={() => setModalOpen(true)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit in modal
-            </ContextMenuItem>
+            <>
+              <ContextMenuItem onClick={() => setEditing(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit inline
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => setModalOpen(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit in modal
+              </ContextMenuItem>
+            </>
           )}
         </ContextMenuContent>
       </ContextMenu>

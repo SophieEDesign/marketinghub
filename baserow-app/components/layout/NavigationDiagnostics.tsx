@@ -12,21 +12,55 @@ import { usePathname } from "next/navigation"
 export default function NavigationDiagnostics() {
   const pathname = usePathname()
   const [enabled, setEnabled] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Mount check - ensure we're on client side
+  useEffect(() => {
+    setMounted(true)
+    // Log that diagnostics component is loaded
+    if (typeof window !== "undefined") {
+      const isEnabled = localStorage.getItem("DEBUG_NAVIGATION") === "1"
+      console.log("🔍 NavigationDiagnostics component loaded", {
+        enabled: isEnabled,
+        instruction: isEnabled ? "Diagnostics active" : 'Run localStorage.setItem("DEBUG_NAVIGATION", "1") to enable'
+      })
+    }
+  }, [])
 
   useEffect(() => {
+    if (!mounted) return
+    
     // Check if diagnostics are enabled
     const checkEnabled = () => {
-      return typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+      try {
+        return typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+      } catch (e) {
+        return false
+      }
     }
     
-    setEnabled(checkEnabled())
+    const currentEnabled = checkEnabled()
+    if (currentEnabled !== enabled) {
+      setEnabled(currentEnabled)
+      if (currentEnabled) {
+        console.log("🔍 Navigation Diagnostics ENABLED - monitoring navigation clicks")
+      } else {
+        console.log("🔍 Navigation Diagnostics DISABLED")
+      }
+    }
     
     const interval = setInterval(() => {
-      setEnabled(checkEnabled())
-    }, 1000)
+      const newEnabled = checkEnabled()
+      if (newEnabled !== enabled) {
+        setEnabled(newEnabled)
+        if (newEnabled) {
+          console.log("🔍 Navigation Diagnostics ENABLED - monitoring navigation clicks")
+        }
+      }
+    }, 500) // Check more frequently
 
     return () => clearInterval(interval)
-  }, [])
+  }, [mounted, enabled])
 
   useEffect(() => {
     if (!enabled) return
@@ -78,16 +112,21 @@ export default function NavigationDiagnostics() {
         }))
       })
 
-      // 4. Check sidebar links
-      const sidebarLinks = document.querySelectorAll('[data-sidebar] a[href], [data-sidebar] Link')
+      // 4. Check sidebar links (Next.js Link components render as <a> tags)
+      const sidebarContainer = document.querySelector('[data-sidebar]')
+      const sidebarLinks = sidebarContainer 
+        ? Array.from(sidebarContainer.querySelectorAll('a[href]'))
+        : []
       console.log("🔗 Sidebar Links:", {
         count: sidebarLinks.length,
-        items: Array.from(sidebarLinks).map(el => ({
+        containerFound: !!sidebarContainer,
+        items: sidebarLinks.map(el => ({
           element: el,
           href: el.getAttribute("href"),
           pointerEvents: window.getComputedStyle(el).pointerEvents,
           zIndex: window.getComputedStyle(el).zIndex,
           display: window.getComputedStyle(el).display,
+          tagName: el.tagName,
         }))
       })
 
@@ -135,7 +174,10 @@ export default function NavigationDiagnostics() {
       })
 
       // 8. Test click on sidebar link
-      const testLink = document.querySelector('[data-sidebar] a[href^="/pages/"]') as HTMLAnchorElement
+      const sidebarContainer = document.querySelector('[data-sidebar]')
+      const testLink = sidebarContainer 
+        ? (sidebarContainer.querySelector('a[href^="/pages/"]') as HTMLAnchorElement)
+        : null
       if (testLink) {
         console.log("🧪 Test Link Found:", {
           href: testLink.href,
@@ -151,6 +193,8 @@ export default function NavigationDiagnostics() {
             target: e.target,
           })
         }, { once: true, capture: true })
+      } else {
+        console.log("🧪 No test link found in sidebar")
       }
 
       console.groupEnd()
@@ -169,9 +213,13 @@ export default function NavigationDiagnostics() {
 
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      const sidebarLink = target.closest('[data-sidebar] a[href]')
+      // Find sidebar container first, then find link within it
+      const sidebarContainer = target.closest('[data-sidebar]')
+      const sidebarLink = sidebarContainer 
+        ? (target.closest('a[href]') as HTMLAnchorElement)
+        : null
       
-      if (sidebarLink) {
+      if (sidebarLink && sidebarContainer) {
         console.log("🖱️ Click on sidebar link:", {
           href: sidebarLink.getAttribute("href"),
           element: sidebarLink,

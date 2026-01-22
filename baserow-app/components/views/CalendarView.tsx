@@ -106,11 +106,11 @@ export default function CalendarView({
   
   // Lifecycle logging
   useEffect(() => {
-    console.log(`[Lifecycle] CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
+    debugCalendar('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
     // Mark as mounted to prevent hydration mismatch with FullCalendar
     setMounted(true)
     return () => {
-      console.log(`[Lifecycle] CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
+      debugCalendar('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
     }
   }, [])
   
@@ -324,9 +324,7 @@ export default function CalendarView({
         (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
       )
       if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from page config:', field.name)
-        }
+        debugCalendar('CALENDAR', 'Using date field from page config:', field.name)
         return field.name
       }
     }
@@ -337,9 +335,7 @@ export default function CalendarView({
         (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
       )
       if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from view config:', field.name)
-        }
+        debugCalendar('CALENDAR', 'Using date field from view config:', field.name)
         return field.name
       }
     }
@@ -348,9 +344,7 @@ export default function CalendarView({
         (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
       )
       if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using start date field from view config:', field.name)
-        }
+        debugCalendar('CALENDAR', 'Using start date field from view config:', field.name)
         return field.name
       }
     }
@@ -361,9 +355,7 @@ export default function CalendarView({
         (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
       )
       if (field) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Calendar: Using date field from prop:', field.name)
-        }
+        debugCalendar('CALENDAR', 'Using date field from prop:', field.name)
         return field.name
       }
     }
@@ -493,7 +485,7 @@ export default function CalendarView({
     // CRITICAL: tableId prop MUST come from block config (not page fallback)
     // If tableId is provided, use it directly
     if (tableId && tableId.trim() !== '') {
-      console.log('Calendar: Using tableId from prop:', tableId)
+      debugCalendar('CALENDAR', 'Using tableId from prop:', tableId)
       setResolvedTableId(tableId)
       return
     }
@@ -516,10 +508,10 @@ export default function CalendarView({
         }
 
         if (view?.table_id) {
-          console.log('Calendar: Resolved tableId from view:', view.table_id)
+          debugCalendar('CALENDAR', 'Resolved tableId from view:', view.table_id)
           setResolvedTableId(view.table_id)
         } else {
-          console.warn('Calendar: View has no table_id')
+          debugCalendarWarn('CALENDAR', 'View has no table_id')
           setResolvedTableId("")
           setLoading(false)
         }
@@ -590,7 +582,7 @@ export default function CalendarView({
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
     if (!resolvedTableId || !supabaseTableName) {
-      console.log('Calendar: Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
+      debugCalendar('CALENDAR', 'Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
       setRows([])
       setLoading(false)
       isLoadingRef.current = false

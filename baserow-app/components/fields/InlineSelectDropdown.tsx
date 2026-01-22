@@ -26,6 +26,8 @@ interface InlineSelectDropdownProps {
   onValueChange: (value: string | string[] | null) => Promise<void>
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
   placeholder?: string
+  isCellSelected?: boolean // Whether the cell is currently selected (for two-click behavior)
+  allowOptionEditing?: boolean // Whether to show edit/delete/create option controls (default: true, false for cells)
 }
 
 export default function InlineSelectDropdown({
@@ -41,6 +43,8 @@ export default function InlineSelectDropdown({
   onValueChange,
   onFieldOptionsUpdate,
   placeholder = 'Select...',
+  isCellSelected = false,
+  allowOptionEditing = true, // Default to true for backwards compatibility (header/settings)
 }: InlineSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -63,6 +67,10 @@ export default function InlineSelectDropdown({
   }, [value, isMulti])
 
   const handleOpenChange = (open: boolean) => {
+    // Only allow opening if cell is selected (two-click behavior)
+    if (open && !isCellSelected) {
+      return
+    }
     setIsOpen(open)
     if (!open) {
       setSearchTerm('')
@@ -88,10 +96,10 @@ export default function InlineSelectDropdown({
 
   // Check if search term matches a new option to create
   const canCreateNewOption = useMemo(() => {
-    if (!canEditOptions || !searchTerm.trim()) return false
+    if (!canEditOptions || !allowOptionEditing || !searchTerm.trim()) return false
     const term = searchTerm.trim()
     return !choices.some(c => c.toLowerCase() === term.toLowerCase())
-  }, [canEditOptions, searchTerm, choices])
+  }, [canEditOptions, allowOptionEditing, searchTerm, choices])
 
   // Merge choiceColors into fieldOptions for proper resolution
   const mergedOptions: FieldOptions = useMemo(() => {
@@ -380,6 +388,26 @@ export default function InlineSelectDropdown({
     )
   }
 
+  // Handle click: only open dropdown if cell is already selected (two-click behavior)
+  const handleTriggerClick = (e: React.MouseEvent) => {
+    // If cell is not selected, allow click to propagate to parent for cell selection
+    if (!isCellSelected) {
+      // Don't stop propagation - let parent handle cell selection
+      return
+    }
+    // Cell is selected, so stop propagation and open dropdown on this click
+    e.stopPropagation()
+    setIsOpen(true)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only stop propagation if cell is already selected (to prevent row selection)
+    // If not selected, allow propagation so parent can select the cell
+    if (isCellSelected) {
+      e.stopPropagation()
+    }
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -387,15 +415,8 @@ export default function InlineSelectDropdown({
         <button
           type="button"
           className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-start flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
-          onMouseDown={(e) => {
-            // Prevent row-level mouse handlers from ever seeing this interaction.
-            // Some grids select rows on mousedown/click; we want the dropdown to be isolated.
-            e.stopPropagation()
-          }}
-          onClick={(e) => {
-            // Prevent row-level click handlers (e.g. open record) from firing
-            e.stopPropagation()
-          }}
+          onMouseDown={handleMouseDown}
+          onClick={handleTriggerClick}
         >
           {selectedValues.length > 0 ? (
             selectedValues.map((val: string) => {
@@ -436,7 +457,7 @@ export default function InlineSelectDropdown({
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={updatingOptions || !!editingChoice || !!editingColor}
             />
-            {canCreateNewOption && (
+            {canCreateNewOption && allowOptionEditing && (
               <div className="mt-1 text-xs text-gray-500 px-1">
                 This will update the field everywhere.
               </div>
@@ -564,7 +585,7 @@ export default function InlineSelectDropdown({
                         />
                         <ChoicePill label={choice} fieldType={fieldType} fieldOptions={mergedOptions} />
                       </button>
-                      {canEditOptions && (
+                      {canEditOptions && allowOptionEditing && (
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
@@ -611,7 +632,7 @@ export default function InlineSelectDropdown({
             })}
 
             {/* Create new option */}
-            {canCreateNewOption && (
+            {canCreateNewOption && allowOptionEditing && (
               <div className="px-3 py-2 border-t border-gray-200 bg-blue-50/50">
                 <button
                   type="button"

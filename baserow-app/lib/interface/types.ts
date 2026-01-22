@@ -204,6 +204,8 @@ export interface BlockConfig {
     label_position?: 'top' | 'left' | 'inline'
     field_spacing?: number
     button_alignment?: 'left' | 'center' | 'right' | 'full'
+    enable_modal_display?: boolean // Enable modal display for form/record blocks
+    modal_style?: 'side_panel' | 'modal' // Modal display style (default: 'side_panel')
     // Image specific
     image_size?: 'auto' | 'contain' | 'cover' | 'small' | 'medium' | 'large'
     image_align?: 'left' | 'center' | 'right'

@@ -744,7 +744,8 @@ export default function GridView({
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-    console.log('GridView input types', {
+    // Removed debug console.log - use React DevTools to inspect props
+    // console.log('GridView input types', {
       rows: Array.isArray(rows),
       viewFields: Array.isArray(viewFields),
       tableFields: Array.isArray(tableFields),

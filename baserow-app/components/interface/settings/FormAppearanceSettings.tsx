@@ -9,11 +9,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 
 interface FormAppearanceSettingsProps {
   config: BlockConfig
-  onUpdate: (updates: Partial<BlockConfig>) => void
+  onUpdate: (updates: Partial<BlockConfig['appearance']>) => void
 }
 
 export default function FormAppearanceSettings({
@@ -30,12 +31,7 @@ export default function FormAppearanceSettings({
         <Select
           value={appearance.form_layout || 'single'}
           onValueChange={(value) =>
-            onUpdate({
-              appearance: { 
-                ...appearance, 
-                form_layout: value as 'single' | 'two' 
-              },
-            })
+            onUpdate({ form_layout: value as 'single' | 'two' })
           }
         >
           <SelectTrigger>
@@ -54,12 +50,7 @@ export default function FormAppearanceSettings({
         <Select
           value={appearance.label_position || 'top'}
           onValueChange={(value) =>
-            onUpdate({
-              appearance: { 
-                ...appearance, 
-                label_position: value as 'top' | 'left' | 'inline' 
-              },
-            })
+            onUpdate({ label_position: value as 'top' | 'left' | 'inline' })
           }
         >
           <SelectTrigger>
@@ -82,12 +73,7 @@ export default function FormAppearanceSettings({
           max="32"
           value={appearance.field_spacing ?? 16}
           onChange={(e) =>
-            onUpdate({
-              appearance: {
-                ...appearance,
-                field_spacing: parseInt(e.target.value) || 16,
-              },
-            })
+            onUpdate({ field_spacing: parseInt(e.target.value) || 16 })
           }
         />
         <p className="text-xs text-gray-500">Spacing between fields in pixels</p>
@@ -99,12 +85,7 @@ export default function FormAppearanceSettings({
         <Select
           value={appearance.button_alignment || 'left'}
           onValueChange={(value) =>
-            onUpdate({
-              appearance: { 
-                ...appearance, 
-                button_alignment: value as 'left' | 'center' | 'right' | 'full' 
-              },
-            })
+            onUpdate({ button_alignment: value as 'left' | 'center' | 'right' | 'full' })
           }
         >
           <SelectTrigger>
@@ -118,6 +99,55 @@ export default function FormAppearanceSettings({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Display Style Section */}
+      {config.table_id && (
+        <div className="space-y-4 pt-4 border-t">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Display Style</h3>
+            <p className="text-xs text-gray-500 mb-4">Configure how the form is displayed</p>
+          </div>
+
+          {/* Enable Modal Display */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="enable-form-modal">Enable modal display</Label>
+              <p className="text-xs text-gray-500 mt-1">
+                Show form in a modal overlay instead of inline in the block.
+              </p>
+            </div>
+            <Switch
+              id="enable-form-modal"
+              checked={appearance.enable_modal_display === true}
+              onCheckedChange={(checked) => onUpdate({ enable_modal_display: checked })}
+            />
+          </div>
+
+          {/* Modal Style - Only show if enabled */}
+          {appearance.enable_modal_display === true && (
+            <div className="space-y-2">
+              <Label>Modal style</Label>
+              <Select
+                value={appearance.modal_style || "side_panel"}
+                onValueChange={(value) => onUpdate({ modal_style: value as 'side_panel' | 'modal' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="side_panel">Side panel</SelectItem>
+                  <SelectItem value="modal">Modal</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                {appearance.modal_style === 'modal'
+                  ? "Form opens in a full-screen modal overlay"
+                  : "Form opens in a side panel (desktop) or modal (mobile)"}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

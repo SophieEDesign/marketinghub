@@ -29,6 +29,8 @@ export interface UseGridDataReturn {
   updateCell: (rowId: string, fieldName: string, value: any) => Promise<void>
   insertRow: (data: Record<string, any>) => Promise<GridRow | null>
   deleteRow: (rowId: string) => Promise<void>
+  /** Physical columns that exist in the database (null if not yet loaded) */
+  physicalColumns: Set<string> | null
 }
 
 // CRITICAL: Reduced default limit from 10000 to 500 to prevent memory exhaustion and crashes
@@ -436,6 +438,18 @@ export function useGridData({
   const updateCell = useCallback(
     async (rowId: string, fieldName: string, value: any) => {
       try {
+        // CRITICAL: First check if the field exists in metadata before attempting any update
+        // This prevents errors when trying to update deleted fields
+        const safeFields = asArray<TableField>(fields)
+        const fieldExists = safeFields.some(f => f && typeof f === 'object' && f.name === fieldName)
+        
+        if (!fieldExists) {
+          throw new Error(
+            `Cannot update "${fieldName}" because this field has been deleted or renamed. ` +
+              `Please refresh the page to see the current field list.`
+          )
+        }
+
         // If the column name isn't a safe PostgREST identifier, UPDATE may fail depending on how
         // the physical table was created (quoted identifiers, etc.). Surface a clearer error.
         const safeColumn = toPostgrestColumn(fieldName)
@@ -452,42 +466,47 @@ export function useGridData({
           if (tableId) {
             try {
               const res = await fetch(`/api/tables/${tableId}/sync-schema`, { method: 'POST' })
-              if (res.ok) {
-                const syncResult = await res.json()
+              const syncResult = await res.json().catch(() => ({}))
+              
+              if (res.ok && syncResult.success) {
                 console.log('[useGridData] Schema sync result:', syncResult)
                 // Wait a moment for PostgREST cache to refresh
                 await new Promise(resolve => setTimeout(resolve, 500))
                 await refreshPhysicalColumns(true)
+                
+                // Check if the column was added or if it's still missing
+                if (syncResult.missingPhysicalColumns && syncResult.missingPhysicalColumns.includes(safeColumn)) {
+                  throw new Error(
+                    `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
+                      `The field "${fieldName}" exists in metadata but the physical column could not be created. ` +
+                      `Please refresh the page or contact support if the issue persists. ` +
+                      `(Table ID: ${tableId})`
+                  )
+                }
               } else {
-                const errorData = await res.json().catch(() => ({}))
-                console.error('[useGridData] Schema sync failed:', errorData)
+                // Log the error but continue to check if column exists
+                const status = res.status
+                const errorMsg = syncResult.message || syncResult.error || 'Unknown error'
+                console.warn('[useGridData] Schema sync failed:', { status, error: errorMsg })
+                
+                // If sync failed, we still need to check if the column exists
+                // It might have been created manually or in a previous attempt
+                await refreshPhysicalColumns(true)
               }
-            } catch (syncError) {
-              console.error('[useGridData] Schema sync error:', syncError)
-              // Continue to check if column exists after refresh
+            } catch (syncError: any) {
+              console.warn('[useGridData] Schema sync error:', syncError)
+              // Refresh columns anyway in case they were created
+              await refreshPhysicalColumns(true)
             }
           }
 
           const refreshedCols = physicalColumnsRef.current
           if (refreshedCols && !refreshedCols.has(safeColumn)) {
-            // Check if the field exists in metadata
-            const safeFields = asArray<TableField>(fields)
-            const fieldExists = safeFields.some(f => f && typeof f === 'object' && f.name === fieldName)
-            
-            if (fieldExists) {
-              throw new Error(
-                `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
-                  `The field exists in metadata but the physical column is missing. ` +
-                  `Please try refreshing the page, or contact support if the issue persists. ` +
-                  `(Table ID: ${tableId || 'unknown'})`
-              )
-            } else {
-              throw new Error(
-                `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
-                  `The field "${fieldName}" may have been deleted or renamed. ` +
-                  `Please refresh the page to see the current field list.`
-              )
-            }
+            // Field exists in metadata but column is missing - this is a schema drift issue
+            throw new Error(
+              `Cannot update "${fieldName}" on "${tableName}" because that column does not exist on the physical table. ` +
+                `The field "${fieldName}" may have been deleted or renamed. Please refresh the page to see the current field list.`
+            )
           }
         }
 
@@ -635,5 +654,6 @@ export function useGridData({
     updateCell,
     insertRow,
     deleteRow,
+    physicalColumns: physicalColumnsRef.current,
   }
 }

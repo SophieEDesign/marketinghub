@@ -11,7 +11,7 @@ import type { PageBlock, LayoutItem, BlockType } from "@/lib/interface/types"
 import { useFilterState } from "@/lib/interface/filter-state"
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { dbBlockToPageBlock } from "@/lib/interface/layout-mapping"
-import { debugLog, debugWarn } from "@/lib/interface/debug-flags"
+import { debugLog, debugWarn, isDebugEnabled } from "@/lib/interface/debug-flags"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 
 const ResponsiveGridLayout = WidthProvider(Responsive)
@@ -155,20 +155,18 @@ export default function Canvas({
       userInteractionInProgressRef.current = false
       isFirstLayoutChangeRef.current = true // Reset first layout change flag on page change
       setLayout([]) // Clear layout when page changes
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Page changed - resetting hydration state', {
-          oldPageId,
-          newPageId: pageId,
-        })
-      }
+      debugLog('LAYOUT', '[Canvas] Page changed - resetting hydration state', {
+        oldPageId,
+        newPageId: pageId,
+      })
     }
   }, [pageId])
   
   // Lifecycle logging
   useEffect(() => {
-    console.log(`[Lifecycle] Canvas MOUNT: pageId=${pageId}, blocks=${blocks.length}, recordId=${recordId}`)
+    debugLog('LAYOUT', `Canvas MOUNT: pageId=${pageId}, blocks=${blocks.length}, recordId=${recordId}`)
     return () => {
-      console.log(`[Lifecycle] Canvas UNMOUNT: pageId=${pageId}, recordId=${recordId}`)
+      debugLog('LAYOUT', `Canvas UNMOUNT: pageId=${pageId}, recordId=${recordId}`)
     }
   }, [])
 
@@ -211,9 +209,7 @@ export default function Canvas({
     // Don't sync if blocks were just updated from user interaction (drag/resize)
     // This prevents overwriting user changes when InterfaceBuilder updates blocks to match layout
     if (blocksUpdatedFromUserRef.current) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Sync skipped - blocks updated from user interaction')
-      }
+      debugLog('LAYOUT', '[Canvas] Sync skipped - blocks updated from user interaction')
       return
     }
 
@@ -224,12 +220,10 @@ export default function Canvas({
         previousBlockIdsRef.current = ""
         previousBlockPositionsRef.current.clear()
         layoutHydratedRef.current = false
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Blocks cleared - resetting hydration state', {
-            pageId,
-            previousBlockIds: previousBlockIdsRef.current,
-          })
-        }
+        debugLog('LAYOUT', '[Canvas] Blocks cleared - resetting hydration state', {
+          pageId,
+          previousBlockIds: previousBlockIdsRef.current,
+        })
       }
       setLayout([])
       return
@@ -302,10 +296,9 @@ export default function Canvas({
     // Sync layout from blocks
     if (shouldSync) {
       // PHASE 2 - Layout rehydration audit: Log before hydration
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Canvas] BEFORE HYDRATION`, {
-          pageId,
-          isFirstLoad: previousBlockIds === "",
+      debugLog('LAYOUT', `[Canvas] BEFORE HYDRATION`, {
+        pageId,
+        isFirstLoad: previousBlockIds === "",
           blockIdsChanged,
           previousBlockIds: previousBlockIdsRef.current,
           currentBlockIds,
@@ -377,10 +370,9 @@ export default function Canvas({
       })
       
       // PHASE 2 - Layout rehydration audit: Log after hydration
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Layout Rehydration] AFTER HYDRATION`, {
-          newLayout: newLayout.map(item => ({
-            id: item.i,
+      debugLog('LAYOUT', `[Layout Rehydration] AFTER HYDRATION`, {
+        newLayout: newLayout.map(item => ({
+          id: item.i,
             x: item.x,
             y: item.y,
             w: item.w,
@@ -407,10 +399,9 @@ export default function Canvas({
       layoutHydratedRef.current = true
       isInitializedRef.current = true
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Layout synced from blocks', {
-          isFirstLoad: previousBlockIds === "",
-          blockIdsChanged,
+      debugLog('LAYOUT', '[Canvas] Layout synced from blocks', {
+        isFirstLoad: previousBlockIds === "",
+        blockIdsChanged,
           blockPositionsChanged,
           blocksCount: blocks.length,
         })
@@ -674,10 +665,9 @@ export default function Canvas({
     // Try horizontal snap first (respects spatial intent)
     const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
     if (horizontalSnapped) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
-          originalX: draggedBlock.x,
-          snappedX: horizontalSnapped.x,
+      debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
+        originalX: draggedBlock.x,
+        snappedX: horizontalSnapped.x,
           direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
         })
       }
@@ -687,10 +677,9 @@ export default function Canvas({
     // Try vertical snap as second priority
     const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
     if (verticalSnapped) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
-          originalY: draggedBlock.y,
-          snappedY: verticalSnapped.y,
+      debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
+        originalY: draggedBlock.y,
+        snappedY: verticalSnapped.y,
           direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
         })
       }
@@ -886,8 +875,8 @@ export default function Canvas({
       // React-Grid-Layout may call onLayoutChange on mount even with compactType: null
       // We only want to handle user-initiated drag/resize, not grid's internal normalization
       if (!isEditing) {
-        if (process.env.NODE_ENV === 'development' && isFirstLayoutChangeRef.current) {
-          console.log('[Canvas] Ignoring layout change - not in edit mode (grid normalization)')
+        if (isFirstLayoutChangeRef.current) {
+          debugLog('LAYOUT', '[Canvas] Ignoring layout change - not in edit mode (grid normalization)')
         }
         isFirstLayoutChangeRef.current = false
         return
@@ -896,10 +885,9 @@ export default function Canvas({
       // Ignore first layout change after mount (grid normalization)
       // Even with compactType: null, RGL may call onLayoutChange once on mount
       if (isFirstLayoutChangeRef.current) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[Canvas] Ignoring first layout change (grid normalization on mount)', {
-            pageId,
-            layoutCount: newLayout.length,
+        debugLog('LAYOUT', '[Canvas] Ignoring first layout change (grid normalization on mount)', {
+          pageId,
+          layoutCount: newLayout.length,
             isEditing,
           })
         }
@@ -992,15 +980,11 @@ export default function Canvas({
                 // Block grew - push blocks down instead of reordering
                 needsPushDown = true
                 resizedBlockId = blockId
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[Canvas] Block ${blockId} grew from ${previousHeight} to ${currentHeight} - pushing blocks down`)
-                }
+                debugLog('LAYOUT', `[Canvas] Block ${blockId} grew from ${previousHeight} to ${currentHeight} - pushing blocks down`)
               } else if (currentHeight < previousHeight) {
                 // Block shrunk - compact layout vertically
                 needsCompaction = true
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`[Canvas] Block ${blockId} shrunk from ${previousHeight} to ${currentHeight} - compacting layout`)
-                }
+                debugLog('LAYOUT', `[Canvas] Block ${blockId} shrunk from ${previousHeight} to ${currentHeight} - compacting layout`)
               }
             }
           })
@@ -1047,17 +1031,14 @@ export default function Canvas({
           if (needsPushDown && resizedBlockId) {
             // Block grew - push blocks below down (preserves order)
             finalLayout = pushBlocksDown(snappedLayout, resizedBlockId)
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Applied push down after resize grow', {
-                resizedBlockId,
-              })
+            debugLog('LAYOUT', '[Canvas] Applied push down after resize grow', {
+              resizedBlockId,
+            })
             }
           } else if (needsCompaction) {
             // Block shrunk - compact layout vertically (removes gaps)
             finalLayout = compactLayoutVertically(snappedLayout, blocks)
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Applied compaction after resize shrink')
-            }
+            debugLog('LAYOUT', '[Canvas] Applied compaction after resize shrink')
           }
           
           // Check if layout changed (either from snapping, push down, or compaction)
@@ -1071,10 +1052,9 @@ export default function Canvas({
           })
           
           if (layoutChanged) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[Canvas] Applied snap/push/compaction after drag/resize end', {
-                hadSnap: draggedBlockId !== null,
-                hadPushDown: needsPushDown,
+            debugLog('LAYOUT', '[Canvas] Applied snap/push/compaction after drag/resize end', {
+              hadSnap: draggedBlockId !== null,
+              hadPushDown: needsPushDown,
                 hadCompaction: needsCompaction,
                 draggedBlockId,
                 resizedBlockId,
@@ -1166,10 +1146,9 @@ export default function Canvas({
     const wasHydrated = layoutHydratedRef.current && previousBlockCountRef.current > 0
     
     if (blockCountDecreased && wasHydrated && !isResizingRef.current && isEditing && layout.length > 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Block deleted - triggering compaction', {
-          previousCount: previousBlockCountRef.current,
-          currentCount: blocks.length,
+      debugLog('LAYOUT', '[Canvas] Block deleted - triggering compaction', {
+        previousCount: previousBlockCountRef.current,
+        currentCount: blocks.length,
         })
       }
       
@@ -1269,20 +1248,20 @@ export default function Canvas({
   // Empty state: Show template-specific guidance
   // Log blocks received by Canvas
   useEffect(() => {
-    console.log(`[Canvas] blocks prop changed: pageId=${pageId}, blocksCount=${blocks.length}`, {
+    debugLog('LAYOUT', `[Canvas] blocks prop changed: pageId=${pageId}, blocksCount=${blocks.length}`, {
       blockIds: blocks.map(b => b.id),
       blockTypes: blocks.map(b => b.type),
       isEditing,
     })
   }, [blocks.length, pageId]) // Removed isEditing - mode changes don't affect block rendering
 
-  // Log container width for debugging (temporary)
+  // Log container width for debugging
   // CRITICAL: Must be declared before any early returns (Rules of Hooks)
   const containerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (containerRef.current && process.env.NODE_ENV === 'development') {
+    if (containerRef.current) {
       const width = containerRef.current.offsetWidth
-      console.log(`[Canvas] Container width: ${width}px (pageId=${pageId}, isEditing=${isEditing})`)
+      debugLog('LAYOUT', `[Canvas] Container width: ${width}px (pageId=${pageId}, isEditing=${isEditing})`)
     }
   }, [pageId, isEditing, layout.length])
 
@@ -1293,9 +1272,8 @@ export default function Canvas({
   }
 
   // GUARDRAIL LOG: Log grid signature to verify grid config is identical in edit/public
-  // Only log in development or when explicitly enabled to reduce console noise
-  const shouldLogLayout = process.env.NODE_ENV === 'development' || 
-    (typeof window !== 'undefined' && localStorage.getItem('DEBUG_CANVAS_LAYOUT') === '1')
+  // Use debug flag system to reduce console noise
+  const shouldLogLayout = isDebugEnabled('LAYOUT')
   
   if (shouldLogLayout) {
     try {
@@ -1308,11 +1286,11 @@ export default function Canvas({
       })).sort((a, b) => a.id.localeCompare(b.id))
       
       // Sanity log: layout BEFORE grid (to verify DB positions match what we're passing to grid)
-      console.log(`[Canvas] layout BEFORE grid: pageId=${pageId}`, 
+      debugLog('LAYOUT', `[Canvas] layout BEFORE grid: pageId=${pageId}`, 
         layout.map(l => `${l.i}:${l.x},${l.y}`).join(' | ')
       )
       
-      console.log(`[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
+      debugLog('LAYOUT', `[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
         // Grid configuration (MUST be identical - if these differ, layout will diverge)
         cols: JSON.stringify(GRID_CONFIG.cols),
         rowHeight: GRID_CONFIG.rowHeight,
@@ -1333,7 +1311,7 @@ export default function Canvas({
       })
     } catch (error) {
       // If log fails, at least log that it failed
-      console.error('[Canvas] Grid Layout Signature log failed:', error)
+      debugWarn('LAYOUT', '[Canvas] Grid Layout Signature log failed:', error)
     }
   }
 
@@ -1371,9 +1349,7 @@ export default function Canvas({
             const blockId = oldItem.i
             currentlyResizingBlockIdRef.current = blockId
             blockHeightsBeforeResizeRef.current.set(blockId, oldItem.h || 4)
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Resize started for block ${blockId}, initial height: ${oldItem.h || 4}`)
-            }
+            debugLog('LAYOUT', `[Canvas] Resize started for block ${blockId}, initial height: ${oldItem.h || 4}`)
           }}
           onResizeStop={(layout, oldItem, newItem, placeholder, e, element) => {
             // CRITICAL: Immediately clear ALL resize state when resize ends
@@ -1383,9 +1359,7 @@ export default function Canvas({
             const previousHeight = blockHeightsBeforeResizeRef.current.get(blockId)
             const newHeight = newItem.h || 4
             
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Resize stopped for block ${blockId}, height: ${previousHeight} → ${newHeight}`)
-            }
+            debugLog('LAYOUT', `[Canvas] Resize stopped for block ${blockId}, height: ${previousHeight} → ${newHeight}`)
             
             // CRITICAL: Clear cached height immediately - do NOT persist after resize
             // Old heights must never be cached after collapse
@@ -1407,10 +1381,9 @@ export default function Canvas({
               x: oldItem.x || 0,
               y: oldItem.y || 0,
             })
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Drag started for block ${blockId}`, {
-                startX: oldItem.x,
-                startY: oldItem.y,
+            debugLog('LAYOUT', `[Canvas] Drag started for block ${blockId}`, {
+              startX: oldItem.x,
+              startY: oldItem.y,
               })
             }
           }}
@@ -1429,10 +1402,9 @@ export default function Canvas({
               x: newItem.x || 0,
               y: newItem.y || 0,
             })
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Drag stopped for block ${blockId}`, {
-                startX: dragStartPositionRef.current.get(blockId)?.x,
-                startY: dragStartPositionRef.current.get(blockId)?.y,
+            debugLog('LAYOUT', `[Canvas] Drag stopped for block ${blockId}`, {
+              startX: dragStartPositionRef.current.get(blockId)?.x,
+              startY: dragStartPositionRef.current.get(blockId)?.y,
                 endX: newItem.x,
                 endY: newItem.y,
               })
@@ -1446,10 +1418,9 @@ export default function Canvas({
         >
           {blocks.map((block) => {
             // Log each block being rendered
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
-                block,
-                layoutItem: layout.find(l => l.i === block.id),
+            debugLog('LAYOUT', `[Canvas] Rendering block: pageId=${pageId}, blockId=${block.id}, type=${block.type}`, {
+              block,
+              layoutItem: layout.find(l => l.i === block.id),
               })
             }
             return (

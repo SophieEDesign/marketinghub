@@ -26,6 +26,7 @@ interface CellFactoryProps {
   rowHeight?: number // Row height in pixels
   onSave: (value: any) => Promise<void>
   onFieldOptionsUpdate?: () => void // Callback when select options are updated
+  isCellSelected?: boolean // Whether the cell is currently selected
 }
 
 export function CellFactory({
@@ -38,6 +39,7 @@ export function CellFactory({
   rowHeight,
   onSave,
   onFieldOptionsUpdate,
+  isCellSelected = false,
 }: CellFactoryProps): ReactNode {
   const commonProps = {
     value,
@@ -78,6 +80,7 @@ export function CellFactory({
           fieldId={field.id}
           tableId={field.table_id}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
+          isSelected={isCellSelected}
         />
       )
 
@@ -91,6 +94,7 @@ export function CellFactory({
           fieldId={field.id}
           tableId={field.table_id}
           onFieldOptionsUpdate={onFieldOptionsUpdate}
+          isSelected={isCellSelected}
         />
       )
 

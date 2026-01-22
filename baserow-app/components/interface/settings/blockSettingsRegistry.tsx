@@ -21,6 +21,7 @@ import MultiSourceDataSettings from "./MultiSourceDataSettings"
 import FormDataSettings from "./FormDataSettings"
 import FormAppearanceSettings from "./FormAppearanceSettings"
 import RecordDataSettings from "./RecordDataSettings"
+import RecordAppearanceSettings from "./RecordAppearanceSettings"
 import ImageDataSettings from "./ImageDataSettings"
 import ImageAppearanceSettings from "./ImageAppearanceSettings"
 import DividerAppearanceSettings from "./DividerAppearanceSettings"
@@ -146,6 +147,16 @@ const APPEARANCE_SETTINGS_RENDERERS: Partial<Record<BlockType, AppearanceRendere
   form: (ctx) => (
     <>
       <FormAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} />
+      <CommonAppearanceSettings
+        config={ctx.config}
+        onUpdate={ctx.onUpdateAppearance}
+        blockType={ctx.blockType}
+      />
+    </>
+  ),
+  record: (ctx) => (
+    <>
+      <RecordAppearanceSettings config={ctx.config} onUpdate={ctx.onUpdateAppearance} />
       <CommonAppearanceSettings
         config={ctx.config}
         onUpdate={ctx.onUpdateAppearance}

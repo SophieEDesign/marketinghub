@@ -31,52 +31,77 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ tableId: string }> }
 ) {
-  const supabase = await createClient()
-
-  const { data: auth } = await supabase.auth.getUser()
-  if (!auth?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const { tableId } = await params
-  const table = await getTable(tableId)
-  if (!table) {
-    return NextResponse.json({ error: 'Table not found' }, { status: 404 })
-  }
-
-  const rawTableName = String((table as any).supabase_table || '')
-  const tableName = normalizeSupabaseTableName(rawTableName)
-  if (!tableName) {
-    return NextResponse.json({ error: 'Missing supabase_table for table' }, { status: 400 })
-  }
-
-  const addedColumns: string[] = []
-
-  // 1) Ensure the base physical table exists (id + audit fields + grants).
-  // If the RPC doesn't exist, the call will error and we surface it.
+  let tableId: string | undefined
   try {
-    const { error: createError } = await supabase.rpc('create_dynamic_table', {
-      table_name: tableName,
-    })
-    if (createError) {
-      // If the table already exists, that's fine - continue
-      const errorMsg = String(createError.message || '').toLowerCase()
-      if (!errorMsg.includes('already exists') && !errorMsg.includes('duplicate')) {
-        console.error(`[sync-schema] Failed to ensure physical table "${tableName}":`, createError)
-        return NextResponse.json(
-          {
-            error: `Failed to ensure physical table "${tableName}": ${createError.message}`,
-            code: createError.code,
-          },
-          { status: 500 }
-        )
-      }
+    const supabase = await createClient()
+
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  } catch (err: any) {
-    // If RPC doesn't exist or other unexpected error, log but don't fail completely
-    console.error(`[sync-schema] Error calling create_dynamic_table for "${tableName}":`, err)
-    // Continue - the table might already exist
-  }
+
+    // Safely await params
+    try {
+      const resolvedParams = await params
+      tableId = resolvedParams?.tableId
+      if (!tableId || typeof tableId !== 'string' || tableId.trim().length === 0) {
+        return NextResponse.json({ error: 'Invalid tableId parameter' }, { status: 400 })
+      }
+    } catch (paramsError: any) {
+      console.error('[sync-schema] Error resolving params:', paramsError)
+      return NextResponse.json(
+        { error: 'Invalid request parameters', message: paramsError?.message || 'Unknown error' },
+        { status: 400 }
+      )
+    }
+
+    // Safely get table
+    let table
+    try {
+      table = await getTable(tableId)
+    } catch (getTableError: any) {
+      console.error(`[sync-schema] Error getting table "${tableId}":`, getTableError)
+      // Check if it's a not found error
+      const errorMsg = String(getTableError?.message || '').toLowerCase()
+      if (errorMsg.includes('not found') || getTableError?.code === 'PGRST116') {
+        return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+      }
+      // Re-throw to be caught by outer catch
+      throw getTableError
+    }
+    
+    if (!table) {
+      return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+    }
+
+    const rawTableName = String((table as any).supabase_table || '')
+    const tableName = normalizeSupabaseTableName(rawTableName)
+    if (!tableName) {
+      return NextResponse.json({ error: 'Missing supabase_table for table' }, { status: 400 })
+    }
+
+    const addedColumns: string[] = []
+
+    // 1) Ensure the base physical table exists (id + audit fields + grants).
+    // If the RPC doesn't exist, the call will error and we surface it.
+    try {
+      const { error: createError } = await supabase.rpc('create_dynamic_table', {
+        table_name: tableName,
+      })
+      if (createError) {
+        // If the table already exists, that's fine - continue
+        const errorMsg = String(createError.message || '').toLowerCase()
+        if (!errorMsg.includes('already exists') && !errorMsg.includes('duplicate')) {
+          console.warn(`[sync-schema] Failed to ensure physical table "${tableName}":`, createError)
+          // Don't return 500 - this might be expected in some cases (permissions, etc.)
+          // Just log and continue
+        }
+      }
+    } catch (err: any) {
+      // If RPC doesn't exist or other unexpected error, log but don't fail completely
+      console.warn(`[sync-schema] Error calling create_dynamic_table for "${tableName}":`, err)
+      // Continue - the table might already exist
+    }
 
   // Ensure audit fields/trigger exist (best-effort; not all envs have the function).
   try {
@@ -92,9 +117,25 @@ export async function POST(
     if (!Array.isArray(fields)) {
       fields = []
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error(`[sync-schema] Error loading fields for table "${tableId}":`, err)
-    // Continue with empty fields array - we can still check physical columns
+    // If it's a critical error (not just "table not found"), we might want to fail
+    // But for now, continue with empty fields array - we can still check physical columns
+    // This allows the endpoint to work even if table_fields table has issues
+    const errorMsg = String(err?.message || '').toLowerCase()
+    if (errorMsg.includes('permission denied') || errorMsg.includes('unauthorized')) {
+      // Permission errors are critical - return 403
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Permission denied loading field metadata',
+          message: err?.message || 'Unknown error',
+          tableId 
+        },
+        { status: 403 }
+      )
+    }
+    // For other errors, continue with empty fields array
   }
 
   // 3) Load physical columns once via RPC.
@@ -106,8 +147,13 @@ export async function POST(
     })
     cols = result.data
     colsError = result.error
+    if (colsError) {
+      // Log but don't fail - we can still attempt to add columns
+      console.warn(`[sync-schema] Error calling get_table_columns for "${tableName}":`, colsError)
+    }
   } catch (err) {
-    console.error(`[sync-schema] Error calling get_table_columns for "${tableName}":`, err)
+    // Non-fatal - log and continue
+    console.warn(`[sync-schema] Exception calling get_table_columns for "${tableName}":`, err)
     colsError = err
   }
   // If this RPC fails, we can still attempt ADD COLUMN IF NOT EXISTS for every field.
@@ -129,17 +175,33 @@ export async function POST(
     }
 
     try {
-      const sql = generateAddColumnSQL(`public.${tableName}`, colName, (f as any).type, (f as any).options)
+      // Generate SQL - this can throw if field type is invalid
+      let sql: string
+      try {
+        sql = generateAddColumnSQL(`public.${tableName}`, colName, (f as any).type, (f as any).options)
+      } catch (sqlGenError: any) {
+        console.warn(
+          `[sync-schema] Failed to generate SQL for column "${colName}" (type: ${(f as any).type}) in "${tableName}":`,
+          sqlGenError
+        )
+        // Skip this field - can't generate valid SQL for it
+        continue
+      }
+
       const { error: addError } = await supabase.rpc('execute_sql_safe', { sql_text: sql })
       if (!addError) {
         addedColumns.push(colName)
         physical.add(colName)
       } else {
-        console.error(`[sync-schema] Failed to add column "${colName}" to "${tableName}":`, addError)
+        // Log but don't fail - column might already exist or there might be permissions issues
+        const errorMsg = String(addError.message || '').toLowerCase()
+        if (!errorMsg.includes('already exists') && !errorMsg.includes('duplicate')) {
+          console.warn(`[sync-schema] Failed to add column "${colName}" to "${tableName}":`, addError)
+        }
       }
-    } catch (err) {
-      console.error(`[sync-schema] Error adding column "${colName}" to "${tableName}":`, err)
-      // Continue with other columns even if one fails
+    } catch (err: any) {
+      // Non-fatal - log and continue with other columns
+      console.warn(`[sync-schema] Exception adding column "${colName}" to "${tableName}":`, err)
     }
   }
 
@@ -166,13 +228,78 @@ export async function POST(
     }
   }
 
+  // 6) Identify fields in metadata that don't have physical columns (for reporting)
+  const missingPhysicalColumns: string[] = []
+  if (!colsError && Array.isArray(cols)) {
+    for (const f of physicalFieldDefs) {
+      const colName = String((f as any).name || '').trim()
+      if (colName && !physical.has(colName)) {
+        missingPhysicalColumns.push(colName)
+      }
+    }
+  }
+
   return NextResponse.json({
     success: true,
     tableName,
     addedColumns,
+    missingPhysicalColumns: missingPhysicalColumns.length > 0 ? missingPhysicalColumns : undefined,
     message: addedColumns.length > 0 
       ? `Added ${addedColumns.length} column(s): ${addedColumns.join(', ')}. PostgREST cache refresh requested.`
+      : missingPhysicalColumns.length > 0
+      ? `Schema sync completed. ${missingPhysicalColumns.length} field(s) in metadata have no physical column: ${missingPhysicalColumns.join(', ')}. These fields cannot be updated until columns are created.`
       : 'Schema is in sync. No columns added.',
   })
+  } catch (err: any) {
+    // Catch any unexpected errors and return a proper response instead of 500
+    const errorTableId = tableId || 'unknown'
+    
+    // Log full error details for debugging
+    console.error(`[sync-schema] Unexpected error for table "${errorTableId}":`, {
+      message: err?.message,
+      code: err?.code,
+      name: err?.name,
+      stack: err?.stack,
+      details: err?.details,
+      hint: err?.hint,
+      fullError: String(err),
+    })
+    
+    // Provide more detailed error information
+    const errorDetails: any = {
+      success: false,
+      error: 'An error occurred while syncing schema',
+      message: err?.message || 'Unknown error',
+      tableId: errorTableId,
+      errorCode: err?.code || null,
+      errorName: err?.name || null,
+    }
+    
+    // Add stack trace and full error in development
+    if (process.env.NODE_ENV === 'development') {
+      errorDetails.stack = err?.stack
+      errorDetails.fullError = String(err)
+      errorDetails.details = err?.details
+      errorDetails.hint = err?.hint
+    }
+    
+    // Check if it's a known error type that should return a different status
+    const errorMsg = String(err?.message || '').toLowerCase()
+    const errorCode = String(err?.code || '')
+    const errorName = String(err?.name || '')
+    
+    if (errorMsg.includes('permission denied') || errorMsg.includes('unauthorized') || errorCode === '42501' || errorName === 'UnauthorizedError') {
+      return NextResponse.json(errorDetails, { status: 403 })
+    }
+    if (errorMsg.includes('not found') || errorMsg.includes('does not exist') || errorCode === 'PGRST116' || errorCode === '42P01') {
+      return NextResponse.json(errorDetails, { status: 404 })
+    }
+    if (errorMsg.includes('invalid') || errorCode === '22P02' || errorCode === '23505' || errorCode === '23503') {
+      return NextResponse.json(errorDetails, { status: 400 })
+    }
+    
+    // Default to 500 for unexpected errors, but include detailed info
+    return NextResponse.json(errorDetails, { status: 500 })
+  }
 }
 

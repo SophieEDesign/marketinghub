@@ -4,6 +4,7 @@ import InlineSelectDropdown from "@/components/fields/InlineSelectDropdown"
 import type { FieldOptions } from "@/types/fields"
 import { sortLabelsByManualOrder } from "@/lib/fields/select-options"
 import { ChoicePillList } from "@/components/fields/ChoicePill"
+import { ChevronDown } from "lucide-react"
 
 interface MultiSelectCellProps {
   value: string[] | null
@@ -18,6 +19,7 @@ interface MultiSelectCellProps {
   fieldId?: string // Field ID for updating options
   tableId?: string // Table ID for updating options
   onFieldOptionsUpdate?: () => void // Callback when field options are updated
+  isSelected?: boolean // Whether the cell is currently selected
 }
 
 export default function MultiSelectCell({
@@ -33,6 +35,7 @@ export default function MultiSelectCell({
   fieldId,
   tableId,
   onFieldOptionsUpdate,
+  isSelected = false,
 }: MultiSelectCellProps) {
   const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
   // If we don't have fieldId/tableId, fall back to basic display (for backwards compatibility)
@@ -56,7 +59,7 @@ export default function MultiSelectCell({
   }
 
   return (
-    <div className="w-full px-3 py-1.5 flex items-start" style={containerStyle}>
+    <div className="w-full px-3 py-1.5 flex items-start gap-1.5" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
         // Ensure the picker dropdown uses canonical manual order by default.
@@ -68,18 +71,29 @@ export default function MultiSelectCell({
         fieldId={fieldId}
         tableId={tableId}
         editable={editable}
-        canEditOptions={editable} // If they can edit the cell, they can edit options
+        canEditOptions={false} // Disable option editing in cells - only in header/settings
         onValueChange={async (newValue) => {
           try {
             await onSave((newValue as string[]) || [])
           } catch (e: any) {
             console.error("[MultiSelectCell] Error saving value:", e)
-            alert(e?.message || "Failed to save. Please check your permissions and try again.")
+            // Don't show alert for deleted field errors - they're handled by updateCell
+            const errorMsg = e?.message || ""
+            if (errorMsg.includes("deleted") || errorMsg.includes("does not exist")) {
+              // Field was deleted - error is already logged, just return
+              return
+            }
+            alert(errorMsg || "Failed to save. Please check your permissions and try again.")
           }
         }}
         onFieldOptionsUpdate={onFieldOptionsUpdate}
         placeholder={placeholder}
+        isCellSelected={isSelected}
+        allowOptionEditing={false} // Disable option editing UI in cells
       />
+      {isSelected && editable && (
+        <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+      )}
     </div>
   )
 }

@@ -27,11 +27,21 @@ npm install
 ```
 
 2. Set up environment variables:
-Create `.env.local` file:
-```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+   
+   Copy the example file and fill in your values:
+   ```bash
+   cp .env.example .env.local
+   ```
+   
+   Required environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Your Supabase anonymous key
+   - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (required for user management)
+   
+   Optional:
+   - `NEXT_PUBLIC_APP_URL` - Your application URL (for redirects, defaults to localhost:3000 in dev)
+   
+   See `.env.example` for detailed documentation.
 
 3. Set up the database schema:
    - Go to your Supabase project dashboard
@@ -113,12 +123,16 @@ Tables support four access control levels:
 
 1. Push your code to GitHub
 2. Import your repository in Vercel
-3. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Add environment variables in Vercel project settings:
+   - `NEXT_PUBLIC_SUPABASE_URL` (Required)
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Required)
+   - `SUPABASE_SERVICE_ROLE_KEY` (Required for user invitations and admin operations)
+   - `NEXT_PUBLIC_APP_URL` (Optional - Vercel automatically sets `VERCEL_URL`)
 4. Deploy!
 
 The project is configured for Vercel with `vercel.json`.
+
+**Note:** The `VERCEL_URL` environment variable is automatically set by Vercel and can be used as a fallback for `NEXT_PUBLIC_APP_URL`.
 
 ## Database Schema
 

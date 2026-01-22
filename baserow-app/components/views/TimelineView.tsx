@@ -22,6 +22,7 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import { sanitizeFieldName } from "@/lib/fields/validation"
 import { resolveSystemFieldAlias } from "@/lib/fields/systemFieldAliases"
 import { normalizeSelectOptionsForUi } from "@/lib/fields/select-options"
+import { getPrimaryField } from "@/lib/fields/primary"
 
 interface TimelineViewProps {
   tableId: string
@@ -591,7 +592,7 @@ export default function TimelineView({
     }
   }, [titleFieldProp, cardField1, cardField2, cardField3, blockConfig, tableFields, resolvedDateFields, startDateFieldId, endDateFieldId, dateFieldId, fieldIds])
 
-  // Resolve group by field
+  // Resolve group by field - fall back to primary field if not configured
   const resolvedGroupByField = useMemo(() => {
     const groupFieldName = groupByFieldProp || 
       blockConfig?.timeline_group_by || 
@@ -599,13 +600,17 @@ export default function TimelineView({
       blockConfig?.group_by ||
       null
     
-    if (!groupFieldName) return null
+    if (groupFieldName) {
+      // Timeline grouping is supported for many field types (not just select fields).
+      // For select fields, we preserve choice-order sorting when choices are available.
+      const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
+      if (field) return field
+    }
     
-    // Timeline grouping is supported for many field types (not just select fields).
-    // For select fields, we preserve choice-order sorting when choices are available.
-    const field = tableFields.find(f => (f.name === groupFieldName || f.id === groupFieldName))
-    
-    return field || null
+    // Fall back to primary field if no group field is configured
+    // This ensures we always group by a meaningful field instead of showing record IDs
+    const primaryField = getPrimaryField(tableFields)
+    return primaryField
   }, [groupByFieldProp, blockConfig, tableFields])
 
   // Resolve display labels for any link_to_table fields used in cards/grouping.
@@ -830,11 +835,13 @@ export default function TimelineView({
         }
 
         // Get group value for grouping
+        // CRITICAL: Always use a field value, never fall back to record ID
         let groupValue: string | null = null
         if (resolvedGroupByField) {
           const groupFieldName = resolvedGroupByField.name
           const groupFieldId = (resolvedGroupByField as any).id
           // Try both field name and field id when reading the value
+          // IMPORTANT: Never use row.id as a fallback - always use the field value or 'Unassigned'
           const groupFieldValue = row.data[groupFieldName] ?? (groupFieldId ? row.data[groupFieldId] : null)
           
           // Helper to resolve linked table field value to display label
@@ -846,24 +853,26 @@ export default function TimelineView({
             return labelMap[trimmedId] || labelMap[id] || id
           }
           
-          if (groupFieldValue) {
+          if (groupFieldValue !== null && groupFieldValue !== undefined && groupFieldValue !== '') {
             // Normalize common value shapes to a stable string label.
             // - arrays: take first value (e.g. multi_select, link_to_table)
             // - Dates: stringify (ISO or existing string)
             // - objects: JSON stringify fallback (rare)
             if (Array.isArray(groupFieldValue)) {
               const first = groupFieldValue.length > 0 ? groupFieldValue[0] : null
-              const id = first && typeof first === "object" && "id" in (first as any) ? String((first as any).id) : String(first ?? "")
-              groupValue =
-                resolvedGroupByField.type === "link_to_table" && id.trim()
-                  ? resolveLinkedValue(id)
-                  : id
+              if (first !== null && first !== undefined && first !== '') {
+                const id = first && typeof first === "object" && "id" in (first as any) ? String((first as any).id) : String(first)
+                groupValue =
+                  resolvedGroupByField.type === "link_to_table" && id.trim()
+                    ? resolveLinkedValue(id)
+                    : id
+              }
             } else if (groupFieldValue instanceof Date) {
-              groupValue = isNaN(groupFieldValue.getTime()) ? '' : groupFieldValue.toISOString()
+              groupValue = isNaN(groupFieldValue.getTime()) ? 'Unassigned' : groupFieldValue.toISOString()
             } else if (typeof groupFieldValue === 'object') {
               if (resolvedGroupByField.type === "link_to_table" && groupFieldValue && "id" in (groupFieldValue as any)) {
                 const id = String((groupFieldValue as any).id ?? "").trim()
-                groupValue = id ? resolveLinkedValue(id) : ""
+                groupValue = id ? resolveLinkedValue(id) : "Unassigned"
               } else {
                 try {
                   groupValue = JSON.stringify(groupFieldValue)
@@ -878,8 +887,22 @@ export default function TimelineView({
                   ? resolveLinkedValue(id)
                   : id
             }
-            if (groupValue !== null) groupValue = groupValue.trim()
+            if (groupValue !== null && groupValue !== undefined) {
+              groupValue = groupValue.trim()
+              // Ensure we never use empty string or record ID as group value
+              if (groupValue === '' || groupValue === row.id) {
+                groupValue = 'Unassigned'
+              }
+            } else {
+              groupValue = 'Unassigned'
+            }
+          } else {
+            // Field value is null/undefined/empty - use 'Unassigned' instead of record ID
+            groupValue = 'Unassigned'
           }
+        } else {
+          // No group field resolved (shouldn't happen with primary field fallback, but be safe)
+          groupValue = 'Unassigned'
         }
 
         // Get image from image field
@@ -960,21 +983,27 @@ export default function TimelineView({
     })
   }, [events, timelineRange])
 
-  // Group events by group field if configured
+  // Group events by group field (always use resolvedGroupByField which falls back to primary field)
   const groupedEvents = useMemo(() => {
     if (!resolvedGroupByField) {
-      // No grouping - return single group
-      return { '': visibleEvents }
+      // Shouldn't happen with primary field fallback, but handle gracefully
+      return { 'Unassigned': visibleEvents }
     }
 
     const groups: Record<string, TimelineEvent[]> = {}
     
     visibleEvents.forEach(event => {
+      // groupValue should always be set (either a field value or 'Unassigned')
+      // Never use record ID as group key
       const groupKey = event.groupValue || 'Unassigned'
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
+      // Safety check: if groupKey looks like a UUID (record ID), use 'Unassigned' instead
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const safeGroupKey = uuidPattern.test(groupKey) ? 'Unassigned' : groupKey
+      
+      if (!groups[safeGroupKey]) {
+        groups[safeGroupKey] = []
       }
-      groups[groupKey].push(event)
+      groups[safeGroupKey].push(event)
     })
 
     // Sort groups by field options order if available (single/multi select)

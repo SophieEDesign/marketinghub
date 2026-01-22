@@ -248,6 +248,15 @@ export async function POST(
           const errorResponse = createErrorResponse(sqlError, 'Failed to create column', 500)
           return NextResponse.json(errorResponse, { status: 500 })
         }
+
+        // Trigger PostgREST schema cache refresh so the new column is immediately queryable
+        try {
+          await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
+          // Small delay to allow PostgREST to process the notification
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch {
+          // Non-fatal: PostgREST will eventually pick up the new column
+        }
       } catch (sqlErr: any) {
         // Rollback: Delete metadata
         await supabase.from('table_fields').delete().eq('id', fieldData.id)
@@ -422,6 +431,14 @@ export async function POST(
 
           const errorResponse = createErrorResponse(reciprocalSqlError, 'Failed to create reciprocal column', 500)
           return NextResponse.json(errorResponse, { status: 500 })
+        }
+
+        // Trigger PostgREST schema cache refresh for the target table
+        try {
+          await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
+          await new Promise(resolve => setTimeout(resolve, 200))
+        } catch {
+          // Non-fatal: PostgREST will eventually pick up the new column
         }
       } catch (e: any) {
         // Rollback both sides best-effort.

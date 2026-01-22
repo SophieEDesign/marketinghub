@@ -96,22 +96,41 @@ export default function LongTextCell({
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (editable) {
-      // Double-click: open modal for editing
+      // Double-click: start inline editing
+      setEditing(true)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && e.shiftKey) {
+      // Shift+Enter opens modal for rich text editing
+      e.preventDefault()
       setModalOpen(true)
+      setEditing(false)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setEditing(false)
+      setEditValue(value || '')
     }
   }
 
   if (editing && editable) {
+    // Inline editing with textarea for long text
     return (
-      <div className="w-full">
-        <RichTextEditor
+      <div className="w-full h-full px-3 py-1">
+        <textarea
           value={editValue}
-          onChange={handleChange}
+          onChange={(e) => setEditValue(e.target.value)}
           onBlur={handleBlur}
-          editable={true}
-          showToolbar={true}
-          minHeight="120px"
-          className="w-full"
+          onKeyDown={handleKeyDown}
+          className="w-full px-2 py-1 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md resize-none"
+          style={{ 
+            height: rowHeight ? `${Math.max(rowHeight - 16, 60)}px` : '120px',
+            minHeight: '60px',
+          }}
+          disabled={saving}
+          placeholder="Enter text... (Shift+Enter for rich text editor)"
+          autoFocus
         />
       </div>
     )
@@ -138,15 +157,16 @@ export default function LongTextCell({
           <div
             onClick={handleSingleClick}
             onDoubleClick={handleDoubleClick}
-            className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex ${
+            className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex relative group ${
               wrapText ? 'items-start' : 'items-center'
             }`}
             style={cellStyle}
             title={plainText || undefined}
+            tabIndex={editable ? 0 : -1}
           >
             {value && value.trim() && value !== '<p></p>' ? (
               <div 
-                className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
+                className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden flex-1`}
                 style={{ 
                   lineHeight: '1.25',
                   maxHeight: wrapText ? contentMaxHeight : 'none',
@@ -158,6 +178,19 @@ export default function LongTextCell({
                 {isPlaceholder ? placeholder : ''}
               </span>
             )}
+            {/* Edit button that appears on hover - more prominent for long text */}
+            {editable && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setModalOpen(true)
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-700 bg-white shadow-sm border border-gray-200"
+                title="Edit in rich text editor"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
@@ -166,10 +199,16 @@ export default function LongTextCell({
             Copy
           </ContextMenuItem>
           {editable && (
-            <ContextMenuItem onClick={() => setModalOpen(true)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit in modal
-            </ContextMenuItem>
+            <>
+              <ContextMenuItem onClick={() => setEditing(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit inline
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => setModalOpen(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit in rich text editor
+              </ContextMenuItem>
+            </>
           )}
         </ContextMenuContent>
       </ContextMenu>

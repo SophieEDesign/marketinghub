@@ -35,6 +35,8 @@ interface GridColumnHeaderProps {
   sortOrder?: number | null // Sort order number (1, 2, 3) for multi-sort
   onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
   tableId?: string // Table ID for copy URL functionality
+  onInsertLeft?: (fieldName: string) => void
+  onInsertRight?: (fieldName: string) => void
 }
 
 export default function GridColumnHeader({
@@ -53,6 +55,8 @@ export default function GridColumnHeader({
   sortOrder = null,
   onSort,
   tableId,
+  onInsertLeft,
+  onInsertRight,
 }: GridColumnHeaderProps) {
   const isMobile = useIsMobile()
 
@@ -246,22 +250,24 @@ export default function GridColumnHeader({
               Duplicate field
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={() => { 
-            // TODO: Implement insert left
-            console.log('Insert left:', field.name)
-            setDropdownOpen(false)
-          }}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Insert left
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { 
-            // TODO: Implement insert right
-            console.log('Insert right:', field.name)
-            setDropdownOpen(false)
-          }}>
-            <ArrowRight className="h-4 w-4 mr-2" />
-            Insert right
-          </DropdownMenuItem>
+          {onInsertLeft && (
+            <DropdownMenuItem onClick={() => { 
+              onInsertLeft(field.name)
+              setDropdownOpen(false)
+            }}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Insert left
+            </DropdownMenuItem>
+          )}
+          {onInsertRight && (
+            <DropdownMenuItem onClick={() => { 
+              onInsertRight(field.name)
+              setDropdownOpen(false)
+            }}>
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Insert right
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={() => { 
             // Copy field URL
             const tableIdForUrl = tableId || field.table_id

@@ -14,6 +14,7 @@ import type { TableField } from "@/types/fields"
 import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { Trash2 } from "lucide-react"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -105,12 +106,16 @@ export default function RecordModal({
         .single()
 
       if (error) {
-        console.error("Error loading record:", error)
+        if (!isAbortError(error)) {
+          console.error("Error loading record:", error)
+        }
       } else {
         setRecord(data)
       }
     } catch (error) {
-      console.error("Error loading record:", error)
+      if (!isAbortError(error)) {
+        console.error("Error loading record:", error)
+      }
     } finally {
       setLoading(false)
     }
@@ -131,7 +136,9 @@ export default function RecordModal({
         setFields(filteredFields)
       }
     } catch (error) {
-      console.error("Error loading fields:", error)
+      if (!isAbortError(error)) {
+        console.error("Error loading fields:", error)
+      }
     }
   }
 
@@ -162,14 +169,19 @@ export default function RecordModal({
       }
 
       if (error) {
-        console.error("Error updating field:", error)
-        throw error
+        if (!isAbortError(error)) {
+          console.error("Error updating field:", error)
+          throw error
+        }
+        return
       }
 
       // Update local state
       setRecord((prev) => (prev ? { ...prev, [fieldName]: finalSavedValue } : null))
     } catch (error) {
-      console.error("Error updating field:", error)
+      if (!isAbortError(error)) {
+        console.error("Error updating field:", error)
+      }
     }
   }
 
@@ -200,12 +212,14 @@ export default function RecordModal({
       await onDeleted?.()
       onClose()
     } catch (error: any) {
-      console.error("Error deleting record:", error)
-      toast({
-        variant: "destructive",
-        title: "Failed to delete record",
-        description: error.message || "Please try again",
-      })
+      if (!isAbortError(error)) {
+        console.error("Error deleting record:", error)
+        toast({
+          variant: "destructive",
+          title: "Failed to delete record",
+          description: error.message || "Please try again",
+        })
+      }
     } finally {
       setDeleting(false)
     }

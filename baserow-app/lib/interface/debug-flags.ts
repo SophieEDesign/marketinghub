@@ -6,11 +6,12 @@
  * - localStorage.setItem('DEBUG_CALENDAR', '1')
  * - localStorage.setItem('DEBUG_LIST', '1')
  * - localStorage.setItem('DEBUG_RECORD', '1')
+ * - localStorage.setItem('DEBUG_CANVAS', '1')
  * 
  * Or enable all: localStorage.setItem('DEBUG_ALL', '1')
  */
 
-export type DebugFlag = 'LAYOUT' | 'TEXT' | 'CALENDAR' | 'LIST' | 'RECORD'
+export type DebugFlag = 'LAYOUT' | 'TEXT' | 'CALENDAR' | 'LIST' | 'RECORD' | 'CANVAS'
 
 export function isDebugEnabled(flag: DebugFlag): boolean {
   if (typeof window === 'undefined') return false

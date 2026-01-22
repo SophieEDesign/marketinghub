@@ -41,6 +41,7 @@ import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
 import FillHandle from './FillHandle'
 import CellContextMenu from './CellContextMenu'
 import { formatCellValue } from '@/lib/dataView/clipboard'
+import FieldBuilderModal from './FieldBuilderModal'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -173,6 +174,7 @@ export default function AirtableGridView({
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
   const MIN_ROW_HEIGHT_PX = ROW_HEIGHT_SHORT
   const rowHeightsRef = useRef<Record<string, number>>({})
+  const settingsLoadedRef = useRef<string | null>(null) // Track which fieldsContentKey we've loaded settings for
   
   // Drag-to-fill state
   const [fillSource, setFillSource] = useState<{ rowId: string; fieldName: string; value: any } | null>(null)
@@ -180,6 +182,10 @@ export default function AirtableGridView({
   
   // Track wrap text settings per column (from grid_view_settings)
   const [columnWrapTextSettings, setColumnWrapTextSettings] = useState<Record<string, boolean>>({})
+
+  // Field builder modal state for insert left/right
+  const [fieldBuilderOpen, setFieldBuilderOpen] = useState(false)
+  const [insertTargetField, setInsertTargetField] = useState<{ fieldName: string; position: 'left' | 'right' } | null>(null)
 
   // Refs
   const gridRef = useRef<HTMLDivElement>(null)
@@ -219,7 +225,7 @@ export default function AirtableGridView({
       }))
   }, [viewFilters])
 
-  const { rows: allRows, loading, error, updateCell, refresh, insertRow } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, insertRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
@@ -229,9 +235,10 @@ export default function AirtableGridView({
 
   // CRITICAL: Normalize all inputs at grid entry point
   // Never trust upstream to pass correct types - always normalize
-  const safeRows = asArray<GridRow>(allRows)
-  const safeFields = asArray<TableField>(fields)
-  const safeSorts = asArray<Sort>(sorts)
+  // CRITICAL: Memoize to prevent new array references on every render (causes infinite loops)
+  const safeRows = useMemo(() => asArray<GridRow>(allRows), [allRows])
+  const safeFields = useMemo(() => asArray<TableField>(fields), [fields])
+  const safeSorts = useMemo(() => asArray<Sort>(sorts), [sorts])
 
   // Upstream can recreate arrays each render; use a stable content key so our effects don't thrash.
   // Keep this order-insensitive to avoid loops if the same fields arrive in different orders.
@@ -256,22 +263,48 @@ export default function AirtableGridView({
 
   // Get visible fields in order (needed for search filtering and rendering)
   // CRITICAL: If columnOrder is empty, fall back to all fields sorted by order_index/position
+  // CRITICAL: Filter out any fields that don't have valid names (defensive check)
+  // CRITICAL: Filter out fields that don't exist in the physical table (if we know the physical columns)
   const visibleFields = useMemo(() => {
     // CRITICAL: Defensive guard - ensure safeFields is an array
     if (!Array.isArray(safeFields) || safeFields.length === 0) {
       return []
     }
 
+    // Filter out any invalid fields first (defensive check)
+    let validFields = safeFields.filter((f): f is TableField => 
+      f !== null && 
+      f !== undefined && 
+      typeof f === 'object' && 
+      !!f.name && 
+      typeof f.name === 'string' &&
+      f.name.trim().length > 0
+    )
+
+    // If we know the physical columns, filter out fields that don't exist physically
+    // (except for virtual fields like formula/lookup which don't need physical columns)
+    if (physicalColumns !== null) {
+      validFields = validFields.filter((f) => {
+        const isVirtual = f.type === 'formula' || f.type === 'lookup'
+        if (isVirtual) return true // Virtual fields are OK
+        if (!physicalColumns.has(f.name)) {
+          console.warn(`[AirtableGridView] Filtering out field "${f.name}" - exists in metadata but not in physical table`)
+          return false
+        }
+        return true
+      })
+    }
+
     // If columnOrder is empty or invalid, use all fields sorted by order_index/position
     if (!Array.isArray(columnOrder) || columnOrder.length === 0) {
       // Sort fields by order_index, then by position, then by name
-      const sortedFields = [...safeFields].sort((a, b) => {
+      const sortedFields = [...validFields].sort((a, b) => {
         const aOrder = a.order_index ?? a.position ?? 0
         const bOrder = b.order_index ?? b.position ?? 0
         if (aOrder !== bOrder) return aOrder - bOrder
         return (a.name || '').localeCompare(b.name || '')
       })
-      return sortedFields.filter((f): f is TableField => f !== null && f !== undefined && !!f.name)
+      return sortedFields
     }
 
     // Use columnOrder if available
@@ -279,13 +312,14 @@ export default function AirtableGridView({
       typeof name === 'string' && name.length > 0
     )
     
+    // Map column order to fields, filtering out any that don't exist
     return safeColumnOrder
       .map((fieldName) => {
-        const field = safeFields.find((f) => f && typeof f === 'object' && f.name === fieldName)
+        const field = validFields.find((f) => f.name === fieldName)
         return field
       })
       .filter((f): f is TableField => f !== null && f !== undefined && !!f.name)
-  }, [columnOrder, safeFields])
+  }, [columnOrder, safeFields, physicalColumns])
 
   // Filter rows by search query (only visible fields)
   const visibleFieldNames = useMemo(() => {
@@ -362,8 +396,24 @@ export default function AirtableGridView({
         
         const fullMessage = summary + errorMsg + (errorCount > 5 ? `\n... and ${errorCount - 5} more error${errorCount - 5 !== 1 ? 's' : ''}` : '')
         
-        // Use console.error for better debugging, but also show user-friendly alert
-        console.error('Paste errors:', result.errors)
+        // Log structured error details for debugging (only in development or when explicitly enabled)
+        const isDevelopment = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development'
+        const errorLoggingEnabled = typeof window !== 'undefined' && (window as any).__enablePasteErrorLogging
+        
+        if (isDevelopment || errorLoggingEnabled) {
+          console.group('Paste Errors')
+          console.error(`Total errors: ${errorCount}, Applied: ${appliedCount}`)
+          result.errors.forEach((error, index) => {
+            console.error(`[${index + 1}] ${error.fieldName || 'Unknown field'}:`, {
+              rowId: error.rowId,
+              columnId: error.columnId,
+              value: error.value,
+              error: error.error,
+            })
+          })
+          console.groupEnd()
+        }
+        
         alert(fullMessage)
       } else if (result.appliedCount > 0) {
         // Success feedback (optional - can be removed if too noisy)
@@ -378,14 +428,48 @@ export default function AirtableGridView({
   })
 
   // Update data view context when data changes
+  // CRITICAL: Don't include dataView in dependencies - updateContext is stable via useCallback
+  // Including dataView causes infinite loops because the object reference changes on every render
+  const { updateContext } = dataView
+  
+  // Memoize rowOrder to prevent creating new array reference on every render
+  const rowOrder = useMemo(() => {
+    return filteredRows.map((r: any) => r.id)
+  }, [filteredRows])
+  
+  // Use refs to track previous values and only update when content actually changes
+  // This prevents infinite loops from reference changes
+  const prevContextRef = useRef<string>('')
+  const contextKey = useMemo(() => {
+    return JSON.stringify({
+      rowsLength: safeRows.length,
+      rowsIds: safeRows.slice(0, 10).map(r => r?.id).filter(Boolean), // Sample of IDs
+      fieldsLength: safeFields.length,
+      fieldsNames: safeFields.map(f => f?.name).filter(Boolean).sort(),
+      visibleFieldsLength: visibleFields.length,
+      visibleFieldsNames: visibleFields.map(f => f?.name).filter(Boolean).sort(),
+      rowOrderLength: rowOrder.length,
+      rowOrderSample: rowOrder.slice(0, 10), // Sample of IDs
+    })
+  }, [safeRows, safeFields, visibleFields, rowOrder])
+  
   useEffect(() => {
-    dataView.updateContext({
+    // Only update if content actually changed (not just reference)
+    if (prevContextRef.current === contextKey) {
+      return
+    }
+    prevContextRef.current = contextKey
+    
+    updateContext({
       rows: safeRows,
       fields: safeFields,
       visibleFields: visibleFields,
-      rowOrder: filteredRows.map((r: any) => r.id),
+      rowOrder: rowOrder,
     })
-  }, [safeRows, safeFields, visibleFields, filteredRows, dataView])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // updateContext is stable via useCallback, but including it causes React to re-run unnecessarily
+    // contextKey tracks actual content changes, preventing infinite loops from reference changes
+  }, [contextKey])
 
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -399,6 +483,13 @@ export default function AirtableGridView({
   // Load grid view settings from database (column widths, order, wrap text)
   useEffect(() => {
     if (!viewUuid || safeFields.length === 0) return
+    
+    // CRITICAL: Prevent loading settings multiple times for the same fieldsContentKey
+    // This prevents infinite loops when state updates trigger re-renders
+    if (settingsLoadedRef.current === fieldsContentKey) {
+      return
+    }
+    settingsLoadedRef.current = fieldsContentKey
 
     async function loadGridViewSettings() {
       try {
@@ -477,14 +568,18 @@ export default function AirtableGridView({
         }
 
         // Set default widths for fields without saved widths
+        // CRITICAL: Only update if there are actually new widths to add to prevent infinite loops
         setColumnWidths((prev) => {
+          let hasChanges = false
           const newWidths = { ...prev }
           safeFields.forEach((field) => {
             if (!newWidths[field.name]) {
               newWidths[field.name] = COLUMN_DEFAULT_WIDTH
+              hasChanges = true
             }
           })
-          return newWidths
+          // Only return new object if there were actual changes
+          return hasChanges ? newWidths : prev
         })
       } catch (error) {
         console.error('Error loading grid view settings:', error)
@@ -1043,9 +1138,15 @@ export default function AirtableGridView({
   const handleCellSave = useCallback(
     async (rowId: string, fieldName: string, value: any) => {
       try {
+        // Let useGridData's updateCell handle schema sync automatically
+        // It will attempt to sync the schema if the column is missing
         await updateCell(rowId, fieldName, value)
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error saving cell:', error)
+        // Show user-friendly error message
+        if (error?.message) {
+          alert(error.message)
+        }
         throw error
       }
     },
@@ -1109,6 +1210,144 @@ export default function AirtableGridView({
     
     return null
   }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, safeRows])
+
+  // Handle insert left/right
+  const handleInsertLeft = useCallback((fieldName: string) => {
+    if (!tableId) {
+      console.warn('Cannot insert field: tableId is required')
+      return
+    }
+    setInsertTargetField({ fieldName, position: 'left' })
+    setFieldBuilderOpen(true)
+  }, [tableId])
+
+  const handleInsertRight = useCallback((fieldName: string) => {
+    if (!tableId) {
+      console.warn('Cannot insert field: tableId is required')
+      return
+    }
+    setInsertTargetField({ fieldName, position: 'right' })
+    setFieldBuilderOpen(true)
+  }, [tableId])
+
+  // Handle field save with position reordering
+  const handleFieldSave = useCallback(async () => {
+    if (!insertTargetField || !tableId) {
+      // Regular field save (not from insert)
+      if (onTableFieldsRefresh) {
+        onTableFieldsRefresh()
+      }
+      setFieldBuilderOpen(false)
+      setInsertTargetField(null)
+      return
+    }
+
+    // Wait a bit for the field to be created and committed to the database
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    try {
+      // Get all fields to find the newly created one and calculate position
+      const supabase = createClient()
+      const { data: allFields, error: fieldsError } = await supabase
+        .from('table_fields')
+        .select('*')
+        .eq('table_id', tableId)
+        .order('order_index', { ascending: true })
+
+      if (fieldsError) {
+        console.error('Error loading fields for reordering:', fieldsError)
+        if (onTableFieldsRefresh) {
+          onTableFieldsRefresh()
+        }
+        setFieldBuilderOpen(false)
+        setInsertTargetField(null)
+        return
+      }
+
+      // Find the target field
+      const targetField = allFields?.find(f => f.name === insertTargetField.fieldName)
+      if (!targetField) {
+        console.warn('Target field not found for reordering')
+        if (onTableFieldsRefresh) {
+          onTableFieldsRefresh()
+        }
+        setFieldBuilderOpen(false)
+        setInsertTargetField(null)
+        return
+      }
+
+      // Find the newly created field (should be the one with the highest order_index)
+      // The API always creates fields with maxOrderIndex + 1, so the new field will have the highest order_index
+      const sortedFields = (allFields || []).sort((a, b) => {
+        const aOrder = a.order_index ?? a.position ?? 0
+        const bOrder = b.order_index ?? b.position ?? 0
+        return bOrder - aOrder
+      })
+      // The new field should be the first one (highest order_index) that's not the target
+      // If target is the first, then new field is the second
+      const newField = sortedFields[0]?.id === targetField.id 
+        ? sortedFields[1]  // Target is first, new field is second
+        : sortedFields[0]   // New field is first (has highest order_index)
+
+      if (!newField) {
+        // Couldn't find new field - might have been created with a different name
+        console.warn('Could not find newly created field for reordering')
+        if (onTableFieldsRefresh) {
+          onTableFieldsRefresh()
+        }
+        setFieldBuilderOpen(false)
+        setInsertTargetField(null)
+        return
+      }
+
+      // Calculate target order_index
+      const targetOrderIndex = targetField.order_index ?? targetField.position ?? 0
+      const newOrderIndex = insertTargetField.position === 'left' 
+        ? targetOrderIndex  // Insert before: use target's order_index
+        : targetOrderIndex + 1  // Insert after: use target's order_index + 1
+
+      // Shift all fields with order_index >= newOrderIndex by 1 (except the new field)
+      const fieldsToUpdate: Array<{ id: string; order_index: number }> = []
+      
+      // First, set the new field's order_index
+      fieldsToUpdate.push({ id: newField.id, order_index: newOrderIndex })
+      
+      // Then, shift all other fields that need to move
+      for (const field of allFields || []) {
+        if (field.id === newField.id) continue // Already handled
+        
+        const fieldOrder = field.order_index ?? field.position ?? 0
+        if (fieldOrder >= newOrderIndex) {
+          // Shift this field to the right
+          fieldsToUpdate.push({ id: field.id, order_index: fieldOrder + 1 })
+        }
+      }
+
+      // Update all affected fields
+      if (fieldsToUpdate.length > 0) {
+        const response = await fetch(`/api/tables/${tableId}/fields/reorder`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates: fieldsToUpdate }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          console.error('Error reordering fields:', error)
+        }
+      }
+
+      // Refresh fields
+      if (onTableFieldsRefresh) {
+        onTableFieldsRefresh()
+      }
+    } catch (error) {
+      console.error('Error handling field save with reordering:', error)
+    } finally {
+      setFieldBuilderOpen(false)
+      setInsertTargetField(null)
+    }
+  }, [insertTargetField, tableId, onTableFieldsRefresh])
 
   // Keyboard shortcuts for copy/paste
   useEffect(() => {
@@ -1400,6 +1639,8 @@ export default function AirtableGridView({
                     sortOrder={sortIndex >= 0 ? sortIndex + 1 : null}
                     onSort={handleSort}
                     tableId={tableId}
+                    onInsertLeft={tableId ? handleInsertLeft : undefined}
+                    onInsertRight={tableId ? handleInsertRight : undefined}
                   />
                 )
               })}
@@ -1706,6 +1947,7 @@ export default function AirtableGridView({
                               rowHeight={effectiveRowHeight}
                               onSave={(value) => handleCellSave(row.id, field.name, value)}
                               onFieldOptionsUpdate={onTableFieldsRefresh}
+                              isCellSelected={isCellSelected}
                             />
                             {isCellSelected && editable && !field.options?.read_only && (
                               <FillHandle
@@ -1796,6 +2038,21 @@ export default function AirtableGridView({
           window.location.reload()
         }}
       />
+
+      {/* Field Builder Modal for Insert Left/Right */}
+      {tableId && (
+        <FieldBuilderModal
+          isOpen={fieldBuilderOpen}
+          onClose={() => {
+            setFieldBuilderOpen(false)
+            setInsertTargetField(null)
+          }}
+          tableId={tableId}
+          field={null}
+          onSave={handleFieldSave}
+          tableFields={safeFields}
+        />
+      )}
     </div>
   )
 }
