@@ -173,37 +173,6 @@ export default function GalleryView({
   // Track whether we've initialized collapsed groups for the current groupBy
   const didInitGroupCollapseRef = useRef(false)
 
-  // When grouping, allow "start collapsed" behavior (default: collapsed).
-  // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
-  // so we don't override the user's manual expand/collapse interactions mid-session.
-  useEffect(() => {
-    const groupByChanged = prevGroupByRef.current !== effectiveGroupByField
-    prevGroupByRef.current = effectiveGroupByField
-
-    if (groupByChanged) {
-      didInitGroupCollapseRef.current = false
-      setCollapsedGroups(new Set())
-    }
-
-    // No grouping: always open (nothing to collapse)
-    if (!effectiveGroupByField || !groupedRows || groupedRows.length === 0) {
-      didInitGroupCollapseRef.current = false
-      return
-    }
-
-    // If the setting is "open", force-expand (clear collapsed set).
-    if (!defaultGroupsCollapsed) {
-      didInitGroupCollapseRef.current = false
-      setCollapsedGroups(new Set())
-      return
-    }
-
-    // Setting is "closed": collapse all groups once, when we have keys.
-    if (didInitGroupCollapseRef.current) return
-    setCollapsedGroups(new Set(groupedRows.map((n) => n.pathKey)))
-    didInitGroupCollapseRef.current = true
-  }, [effectiveGroupByField, defaultGroupsCollapsed, groupedRows])
-
   // Pick a title field for cards (simple heuristic, configurable later)
   const titleField = useMemo(() => {
     const configured =
@@ -360,6 +329,37 @@ export default function GalleryView({
     })
     return rootGroups
   }, [effectiveGroupByField, filteredRows, tableFields, groupValueLabelMaps])
+
+  // When grouping, allow "start collapsed" behavior (default: collapsed).
+  // This is intentionally applied only on initial load / when the groupBy field changes / when the setting flips,
+  // so we don't override the user's manual expand/collapse interactions mid-session.
+  useEffect(() => {
+    const groupByChanged = prevGroupByRef.current !== effectiveGroupByField
+    prevGroupByRef.current = effectiveGroupByField
+
+    if (groupByChanged) {
+      didInitGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+    }
+
+    // No grouping: always open (nothing to collapse)
+    if (!effectiveGroupByField || !groupedRows || groupedRows.length === 0) {
+      didInitGroupCollapseRef.current = false
+      return
+    }
+
+    // If the setting is "open", force-expand (clear collapsed set).
+    if (!defaultGroupsCollapsed) {
+      didInitGroupCollapseRef.current = false
+      setCollapsedGroups(new Set())
+      return
+    }
+
+    // Setting is "closed": collapse all groups once, when we have keys.
+    if (didInitGroupCollapseRef.current) return
+    setCollapsedGroups(new Set(groupedRows.map((n) => n.pathKey)))
+    didInitGroupCollapseRef.current = true
+  }, [effectiveGroupByField, defaultGroupsCollapsed, groupedRows])
 
   const toggleGroupCollapsed = useCallback((pathKey: string) => {
     setCollapsedGroups((prev) => {

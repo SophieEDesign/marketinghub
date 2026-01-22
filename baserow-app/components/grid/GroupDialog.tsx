@@ -75,7 +75,7 @@ export default function GroupDialog({
 
   // Get date fields for date grouping
   const dateFields = tableFields.filter(
-    (f) => f.type === "date" || f.type === "datetime"
+    (f) => f.type === "date"
   )
 
   function addRule() {
