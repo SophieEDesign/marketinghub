@@ -1296,6 +1296,10 @@ export default function GridView({
     nextAllowedAt: 0,
     delayMs: 0,
   })
+  // Track retry attempts per table to prevent infinite retry loops
+  const retryAttemptsRef = useRef<Map<string, number>>(new Map())
+  // Maximum number of retry attempts before giving up
+  const MAX_RETRY_ATTEMPTS = 3
 
   // Handle column reorder
   // CRITICAL: Never allow drag to corrupt order (e.g. arrayMove([], -1, -1) -> [undefined]).
