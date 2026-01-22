@@ -223,6 +223,7 @@ export default function MultiCalendarView({
     if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
+    const nextErrors: Record<string, string> = {}
     try {
       const nextTables: Record<string, { tableId: string; supabaseTable: string; name: string }> = {}
       const nextFields: Record<string, TableField[]> = {}
@@ -230,87 +231,156 @@ export default function MultiCalendarView({
       const nextRows: Record<string, TableRow[]> = {}
 
       // Serialize all requests (connection exhaustion guard).
+      // Partial failure handling: continue loading other sources if one fails.
       for (const s of sources) {
-        const tableId = normalizeUuid((s as any)?.table_id)
-        if (!tableId) continue
+        try {
+          const tableId = normalizeUuid((s as any)?.table_id)
+          if (!tableId) {
+            nextErrors[s.id] = "Missing table ID"
+            continue
+          }
 
-        const tableRes = await supabase
-          .from("tables")
-          .select("id, name, supabase_table")
-          .eq("id", tableId)
-          .single()
+          const tableRes = await supabase
+            .from("tables")
+            .select("id, name, supabase_table")
+            .eq("id", tableId)
+            .single()
 
-        if (!tableRes.data?.supabase_table) continue
-        nextTables[s.id] = {
-          tableId,
-          supabaseTable: tableRes.data.supabase_table,
-          name: tableRes.data.name || "Untitled table",
-        }
+          if (tableRes.error) {
+            if (isAbortError(tableRes.error)) {
+              return // Component unmounted, exit early
+            }
+            console.error(`MultiCalendar: Error loading table for source ${s.id}:`, tableRes.error)
+            nextErrors[s.id] = tableRes.error.message || "Failed to load table"
+            continue
+          }
 
-        const fieldsRes = await supabase
-          .from("table_fields")
-          .select("*")
-          .eq("table_id", tableId)
-          .order("position", { ascending: true })
-        nextFields[s.id] = asArray<TableField>(fieldsRes.data)
+          if (!tableRes.data?.supabase_table) {
+            nextErrors[s.id] = "Table not found"
+            continue
+          }
 
-        // View default filters (optional per source)
-        const viewId = normalizeUuid((s as any)?.view_id)
-        if (viewId) {
-          const viewFiltersRes = await supabase
-            .from("view_filters")
+          nextTables[s.id] = {
+            tableId,
+            supabaseTable: tableRes.data.supabase_table,
+            name: tableRes.data.name || "Untitled table",
+          }
+
+          const fieldsRes = await supabase
+            .from("table_fields")
             .select("*")
-            .eq("view_id", viewId)
-          const vf = asArray<any>(viewFiltersRes.data).map((f: any) =>
-            // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
-            normalizeFilter({
-              field: f.field_name,
-              operator: f.operator,
-              value: f.value,
-            } as any)
-          )
-          nextViewDefaults[s.id] = vf
-        } else {
-          nextViewDefaults[s.id] = []
+            .eq("table_id", tableId)
+            .order("position", { ascending: true })
+
+          if (fieldsRes.error) {
+            if (isAbortError(fieldsRes.error)) {
+              return
+            }
+            console.error(`MultiCalendar: Error loading fields for source ${s.id}:`, fieldsRes.error)
+            nextErrors[s.id] = fieldsRes.error.message || "Failed to load fields"
+            continue
+          }
+
+          nextFields[s.id] = asArray<TableField>(fieldsRes.data)
+
+          // View default filters (optional per source)
+          const viewId = normalizeUuid((s as any)?.view_id)
+          if (viewId) {
+            const viewFiltersRes = await supabase
+              .from("view_filters")
+              .select("*")
+              .eq("view_id", viewId)
+
+            if (viewFiltersRes.error) {
+              if (isAbortError(viewFiltersRes.error)) {
+                return
+              }
+              // Non-critical error - log but continue
+              console.warn(`MultiCalendar: Error loading view filters for source ${s.id}:`, viewFiltersRes.error)
+            }
+
+            const vf = asArray<any>(viewFiltersRes.data || []).map((f: any) =>
+              // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
+              normalizeFilter({
+                field: f.field_name,
+                operator: f.operator,
+                value: f.value,
+              } as any)
+            )
+            nextViewDefaults[s.id] = vf
+          } else {
+            nextViewDefaults[s.id] = []
+          }
+        } catch (err: any) {
+          if (isAbortError(err)) {
+            return
+          }
+          console.error(`MultiCalendar: Exception loading source ${s.id}:`, err)
+          nextErrors[s.id] = err.message || "Unexpected error"
         }
       }
 
       // Now load rows per source (serialized).
       for (const s of sources) {
-        if (!s?.table_id) continue
-        const table = nextTables[s.id]
-        const tableFields = nextFields[s.id] || []
-        if (!table?.supabaseTable) continue
+        try {
+          if (!s?.table_id) continue
+          const table = nextTables[s.id]
+          const tableFields = nextFields[s.id] || []
+          if (!table?.supabaseTable) continue
 
-        const viewDefaults = nextViewDefaults[s.id] || []
-        const userQuick = quickFiltersBySource[s.id] || []
+          const viewDefaults = nextViewDefaults[s.id] || []
+          const userQuick = quickFiltersBySource[s.id] || []
 
-        const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
-        const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
+          const compatibleFilterBlocks = (filters || []).filter((f) => isFilterCompatible(f, tableFields))
+          const compatibleQuick = userQuick.filter((f) => isFilterCompatible(f, tableFields))
 
-        // Rule: quick filters apply on top; they must not overwrite view defaults.
-        const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
+          // Rule: quick filters apply on top; they must not overwrite view defaults.
+          const effectiveFilters = [...viewDefaults, ...compatibleFilterBlocks, ...compatibleQuick]
 
-        let query = supabase.from(table.supabaseTable).select("*")
-        const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
-        query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
-        query = query.order("created_at", { ascending: false })
+          let query = supabase.from(table.supabaseTable).select("*")
+          const normalizedFields = tableFields.map((f) => ({ name: f.name || f.id, type: f.type }))
+          query = applyFiltersToQuery(query, effectiveFilters, normalizedFields)
+          query = query.order("created_at", { ascending: false })
 
-        const rowsRes = await query
-        const data = asArray<any>(rowsRes.data)
-        nextRows[s.id] = data.map((row) => ({
-          id: row.id,
-          table_id: table.tableId,
-          data: row,
-          created_at: row.created_at || new Date().toISOString(),
-          updated_at: row.updated_at || new Date().toISOString(),
-        })) as TableRow[]
+          const rowsRes = await query
+
+          if (rowsRes.error) {
+            if (isAbortError(rowsRes.error)) {
+              return
+            }
+            console.error(`MultiCalendar: Error loading rows for source ${s.id}:`, rowsRes.error)
+            nextErrors[s.id] = rowsRes.error.message || "Failed to load rows"
+            continue
+          }
+
+          const data = asArray<any>(rowsRes.data || [])
+          nextRows[s.id] = data.map((row) => ({
+            id: row.id,
+            table_id: table.tableId,
+            data: row,
+            created_at: row.created_at || new Date().toISOString(),
+            updated_at: row.updated_at || new Date().toISOString(),
+          })) as TableRow[]
+        } catch (err: any) {
+          if (isAbortError(err)) {
+            return
+          }
+          console.error(`MultiCalendar: Exception loading rows for source ${s.id}:`, err)
+          nextErrors[s.id] = err.message || "Unexpected error loading rows"
+        }
       }
 
       setTablesBySource(nextTables)
       setFieldsBySource(nextFields)
       setViewDefaultFiltersBySource(nextViewDefaults)
       setRowsBySource(nextRows)
+      setErrorsBySource(nextErrors)
+    } catch (err: any) {
+      if (isAbortError(err)) {
+        return
+      }
+      console.error("MultiCalendar: Fatal error in loadAll:", err)
+      setErrorsBySource({ __global__: err.message || "Failed to load calendar data" })
     } finally {
       setLoading(false)
       loadingRef.current = false
@@ -568,6 +638,15 @@ export default function MultiCalendarView({
   if (loading) {
     return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Loading…</div>
   }
+
+  // Show errors if any sources failed to load
+  const hasErrors = Object.keys(errorsBySource).length > 0
+  const errorMessages = Object.entries(errorsBySource).map(([sourceId, error]) => {
+    const source = sources.find((s) => s.id === sourceId)
+    const table = tablesBySource[sourceId]
+    const label = source?.label || table?.name || sourceId
+    return { label, error }
+  })
 
   return (
     <div className="h-full w-full flex flex-col">
