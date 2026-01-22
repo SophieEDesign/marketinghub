@@ -1104,6 +1104,7 @@ export default function GridView({
 
   // Get visible fields ordered by column order (if set) or by order_index
   // CRITICAL: Always return an array, filter out null/undefined, ensure field_name exists
+  // IMPORTANT: Only include fields that exist in tableFields to prevent querying non-existent columns
   const visibleFields = useMemo(() => {
     // Defensive guard: Ensure safeViewFields is an array
     if (!Array.isArray(safeViewFields) || safeViewFields.length === 0) {
@@ -1112,6 +1113,25 @@ export default function GridView({
 
     // Defensive guard: Ensure safeTableFields is an array
     const safeFields = Array.isArray(safeTableFields) ? safeTableFields : []
+    
+    // Build a set of valid field names from tableFields for fast lookup
+    const validFieldNames = new Set<string>()
+    const validFieldIds = new Set<string>()
+    for (const tf of safeFields) {
+      if (tf && typeof tf === 'object') {
+        if (tf.name && typeof tf.name === 'string') {
+          validFieldNames.add(tf.name)
+        }
+        if (tf.id && typeof tf.id === 'string') {
+          validFieldIds.add(tf.id)
+        }
+      }
+    }
+    
+    // Helper to check if a field exists in tableFields
+    const fieldExists = (fieldName: string): boolean => {
+      return validFieldNames.has(fieldName) || validFieldIds.has(fieldName)
+    }
 
     // Use column order if available AND valid.
     // CRITICAL: Treat a corrupt/empty order as "no order" and fall back to order_index sorting.
@@ -1130,6 +1150,12 @@ export default function GridView({
             f.visible === true
           )
           if (!vf || !vf.field_name) return null
+          
+          // CRITICAL: Only include fields that exist in tableFields
+          if (!fieldExists(vf.field_name)) {
+            console.warn('[GridView] Filtering out view field that does not exist in tableFields:', vf.field_name)
+            return null
+          }
 
           // Find table field for metadata
           const tableField = safeFields.find((tf) =>
@@ -1151,11 +1177,15 @@ export default function GridView({
     return safeViewFields
       .filter((f) => {
         // Filter out null, undefined, and ensure field has required properties
-        return f && 
-               typeof f === 'object' && 
-               f.visible === true && 
-               f.field_name && 
-               typeof f.field_name === 'string'
+        if (!f || typeof f !== 'object' || f.visible !== true || !f.field_name || typeof f.field_name !== 'string') {
+          return false
+        }
+        // CRITICAL: Only include fields that exist in tableFields
+        if (!fieldExists(f.field_name)) {
+          console.warn('[GridView] Filtering out view field that does not exist in tableFields:', f.field_name)
+          return false
+        }
+        return true
       })
       .map((vf) => {
         // Find table field for metadata
@@ -1296,6 +1326,14 @@ export default function GridView({
   }, [visibleFields])
 
   useEffect(() => {
+    // Reset retry counter when table changes
+    if (supabaseTableName) {
+      const currentRetries = retryAttemptsRef.current.get(supabaseTableName)
+      if (currentRetries === undefined) {
+        // New table - reset retry counter
+        retryAttemptsRef.current.delete(supabaseTableName)
+      }
+    }
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabaseTableName, filtersKey, viewFiltersKey, viewSortsKey, tableFieldsKey, reloadKey])
@@ -1678,8 +1716,9 @@ export default function GridView({
             setTableWarning(
               'This view references one or more fields that no longer exist in the underlying table. Showing records with a fallback query.'
             )
-            // Successful recovery: clear backoff.
+            // Successful recovery: clear backoff and reset retry counter.
             loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
+            retryAttemptsRef.current.delete(supabaseTableName)
             if (retryNeedsClientSideSort && filteredRetrySorts.length > 0) {
               dataArray = sortRowsByFieldType(
                 dataArray,
@@ -1726,19 +1765,41 @@ export default function GridView({
         const fallbackErrorCode = (error as any)?.code || (error as any)?.status
         if (fallbackErrorCode === 400 || fallbackErrorCode === '400') {
           const alreadyForcedStar = forceStarSelectRef.current.has(supabaseTableName)
-          if (!alreadyForcedStar) {
+          const currentRetries = retryAttemptsRef.current.get(supabaseTableName) || 0
+          
+          if (!alreadyForcedStar && currentRetries < MAX_RETRY_ATTEMPTS) {
             console.warn('[GridView] 400 error not matching column patterns; will retry with "*" select on next load.', {
               tableName: supabaseTableName,
               message: (error as any)?.message,
               details: (error as any)?.details,
+              retryAttempt: currentRetries + 1,
+              maxRetries: MAX_RETRY_ATTEMPTS,
             })
             forceStarSelectRef.current.add(supabaseTableName)
-            // Clear backoff to allow immediate retry
-            loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
+            retryAttemptsRef.current.set(supabaseTableName, currentRetries + 1)
+            // Apply exponential backoff even for star select retries to prevent resource exhaustion
+            const backoffDelay = Math.min(500 * Math.pow(2, currentRetries), 5000)
+            loadBackoffRef.current = {
+              nextAllowedAt: Date.now() + backoffDelay,
+              delayMs: backoffDelay,
+            }
             // Mark that we have a pending load to retry
             pendingLoadRowsRef.current = true
             setLoading(false)
             // The effect will trigger a reload when dependencies change or on next render
+            return
+          } else if (currentRetries >= MAX_RETRY_ATTEMPTS) {
+            // Max retries reached - stop retrying and show error
+            console.error('[GridView] Max retry attempts reached for table. Stopping retries.', {
+              tableName: supabaseTableName,
+              retryAttempts: currentRetries,
+            })
+            setIsMissingPhysicalTable(false)
+            setTableError(
+              `Failed to load data after ${MAX_RETRY_ATTEMPTS} attempts. The table may have schema issues. Please check the table structure.`
+            )
+            setRows([])
+            setLoading(false)
             return
           }
         }
@@ -1814,8 +1875,9 @@ export default function GridView({
         }
         setRows([])
       } else {
-        // Success: clear backoff.
+        // Success: clear backoff and reset retry counter.
         loadBackoffRef.current = { nextAllowedAt: 0, delayMs: 0 }
+        retryAttemptsRef.current.delete(supabaseTableName)
 
         // CRITICAL: Normalize data to array - API might return single record or null
         let dataArray = normalizeRowsWithId(asArray<Record<string, any>>(data))

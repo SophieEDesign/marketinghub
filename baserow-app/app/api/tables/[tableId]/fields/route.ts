@@ -32,6 +32,21 @@ export async function GET(
 ) {
   try {
     const { tableId } = await params
+    
+    // Validate tableId
+    if (!tableId || typeof tableId !== 'string' || tableId.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Invalid tableId', fields: [] },
+        { status: 400 }
+      )
+    }
+    
+    // Validate UUID format if it looks like a UUID
+    if (tableId.includes('-') && !isUuid(tableId)) {
+      console.warn(`[fields] Invalid UUID format for tableId: ${tableId}`)
+      // Continue anyway - might be a different ID format
+    }
+    
     const fields = await getTableFields(tableId)
     
     // Do not cache: field metadata changes frequently (settings edits, reorder, etc.)
@@ -49,6 +64,16 @@ export async function GET(
       return response
     }
     
+    // Handle validation errors as 400
+    if (error?.code === '22P02' || error?.message?.includes('invalid input') || error?.message?.includes('invalid uuid')) {
+      console.error(`[fields] Invalid tableId format:`, error)
+      return NextResponse.json(
+        { error: 'Invalid tableId format', fields: [] },
+        { status: 400 }
+      )
+    }
+    
+    console.error(`[fields] Error fetching fields:`, error)
     const errorResponse = createErrorResponse(error, 'Failed to fetch fields', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }

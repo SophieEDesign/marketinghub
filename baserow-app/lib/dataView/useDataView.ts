@@ -16,6 +16,7 @@ export interface UseDataViewOptions {
 export interface UseDataViewReturn {
   // Copy/paste
   copy: (selection: Selection) => string
+  copyWithDisplayResolution: (selection: Selection) => Promise<string>
   paste: (selection: Selection, clipboardText: string) => Promise<BatchMutationResult>
   
   // Column operations
@@ -76,6 +77,15 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
     (selection: Selection): string => {
       if (!serviceRef.current) return ''
       return serviceRef.current.copy(selection)
+    },
+    []
+  )
+
+  // Copy operation with display resolution (for linked fields)
+  const copyWithDisplayResolution = useCallback(
+    async (selection: Selection): Promise<string> => {
+      if (!serviceRef.current) return ''
+      return await serviceRef.current.copyWithDisplayResolution(selection)
     },
     []
   )
@@ -343,6 +353,7 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
 
   return {
     copy,
+    copyWithDisplayResolution,
     paste,
     duplicateColumn,
     validateValue,

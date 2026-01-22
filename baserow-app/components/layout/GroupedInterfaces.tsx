@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
 import {
   DndContext,
@@ -82,6 +82,7 @@ export default function GroupedInterfaces({
   onRefresh,
 }: GroupedInterfacesProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { primaryColor, sidebarTextColor } = useBranding()
   const { toast } = useToast()
   // Filter out any null/undefined groups (safety check)
@@ -867,10 +868,11 @@ export default function GroupedInterfaces({
   // Navigation Page Component (view mode)
   function NavigationPage({ page, level = 0 }: { page: InterfacePage; level?: number }) {
     const isActive = pathname.includes(`/pages/${page.id}`)
+    const targetPath = `/pages/${page.id}`
 
     return (
       <Link
-        href={`/pages/${page.id}`}
+        href={targetPath}
         className={cn(
           "flex items-center rounded-md px-3 py-1.5 text-sm transition-colors",
           level > 0 && "pl-10",
@@ -882,10 +884,26 @@ export default function GroupedInterfaces({
           
           if (debugEnabled) {
             console.log("[NavigationPage] Click detected:", {
-              href: `/pages/${page.id}`,
+              href: targetPath,
+              currentPath: pathname,
+              isActive,
               defaultPrevented: e.defaultPrevented,
               target: e.target,
             })
+          }
+          
+          // CRITICAL: If clicking the same page, force a refresh/reload
+          // Next.js Link won't navigate if already on the page, but user might want to refresh
+          if (isActive && pathname === targetPath) {
+            if (debugEnabled) {
+              console.log("[NavigationPage] Already on this page - forcing refresh")
+            }
+            // Force a router refresh to reload the page data
+            e.preventDefault()
+            router.refresh()
+            // Also try a push to ensure navigation happens
+            router.push(targetPath)
+            return
           }
           
           // Only navigate, don't toggle edit mode
@@ -988,10 +1006,14 @@ export default function GroupedInterfaces({
               } : { color: sidebarTextColor }}
               onClick={(e) => {
                 const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+                const targetPath = `/pages/${page.id}`
+                const isCurrentlyActive = pathname === targetPath
                 
                 if (debugEnabled) {
                   console.log("[Sidebar Link] Click detected:", {
-                    href: `/pages/${page.id}`,
+                    href: targetPath,
+                    currentPath: pathname,
+                    isActive: isCurrentlyActive,
                     editMode,
                     isDragging: isDraggingRef.current,
                     activeId,
@@ -1008,7 +1030,21 @@ export default function GroupedInterfaces({
                     console.warn("[Sidebar Link] Navigation prevented - dragging in edit mode")
                   }
                   e.preventDefault()
-                } else if (debugEnabled) {
+                  return
+                }
+                
+                // If clicking the same page, force a refresh
+                if (isCurrentlyActive) {
+                  if (debugEnabled) {
+                    console.log("[Sidebar Link] Already on this page - forcing refresh")
+                  }
+                  e.preventDefault()
+                  router.refresh()
+                  router.push(targetPath)
+                  return
+                }
+                
+                if (debugEnabled) {
                   console.log("[Sidebar Link] Navigation allowed")
                 }
               }}

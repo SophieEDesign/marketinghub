@@ -328,13 +328,40 @@ export default function AirtableGridView({
       // Refresh data after changes
       await refresh()
       
-      // Show errors if any
+      // Show warnings if any (non-blocking)
+      if (result.warnings && result.warnings.length > 0) {
+        const warningMsg = result.warnings.slice(0, 3).join('\n')
+        console.warn('Paste warnings:', warningMsg)
+      }
+      
+      // Show errors if any (only if there are errors)
       if (result.errors.length > 0) {
+        const errorCount = result.errors.length
+        const appliedCount = result.appliedCount || 0
+        
+        // Build error message
         const errorMsg = result.errors
           .slice(0, 5)
-          .map(e => `${e.fieldName}: ${e.error}`)
+          .map(e => {
+            const fieldName = e.fieldName || 'Unknown field'
+            const error = e.error || 'Validation failed'
+            return `${fieldName}: ${error}`
+          })
           .join('\n')
-        alert(`Some values could not be pasted:\n\n${errorMsg}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`)
+        
+        const summary = appliedCount > 0
+          ? `Successfully pasted ${appliedCount} value${appliedCount !== 1 ? 's' : ''}, but ${errorCount} error${errorCount !== 1 ? 's' : ''} occurred:\n\n`
+          : `Failed to paste ${errorCount} value${errorCount !== 1 ? 's' : ''}:\n\n`
+        
+        const fullMessage = summary + errorMsg + (errorCount > 5 ? `\n... and ${errorCount - 5} more error${errorCount - 5 !== 1 ? 's' : ''}` : '')
+        
+        // Use console.error for better debugging, but also show user-friendly alert
+        console.error('Paste errors:', result.errors)
+        alert(fullMessage)
+      } else if (result.appliedCount > 0) {
+        // Success feedback (optional - can be removed if too noisy)
+        // Only log to console to avoid interrupting workflow
+        console.log(`Successfully pasted ${result.appliedCount} value${result.appliedCount !== 1 ? 's' : ''}`)
       }
     },
     onError: (error) => {
@@ -1029,6 +1056,53 @@ export default function AirtableGridView({
     })
   }, [])
 
+  // Helper function to determine current selection
+  const getCurrentSelection = useCallback((): Selection | null => {
+    // Priority: column > row > cell
+    if (selectedColumnId) {
+      const field = safeFields.find(f => f.id === selectedColumnId)
+      if (field && field.name) {
+        return {
+          type: 'column',
+          columnId: field.id,
+          fieldName: field.name,
+        }
+      }
+    }
+    
+    if (selectedRowIds.size > 0) {
+      // Filter out invalid row IDs
+      const validRowIds = Array.from(selectedRowIds).filter((id): id is string => {
+        return typeof id === 'string' && id.trim().length > 0 && safeRows.some(r => r.id === id)
+      })
+      
+      if (validRowIds.length > 0) {
+        return {
+          type: 'row',
+          rowIds: validRowIds,
+        }
+      }
+    }
+    
+    if (selectedCell) {
+      const field = safeFields.find(f => f.name === selectedCell.fieldName)
+      if (field && field.id && selectedCell.rowId) {
+        // Verify row exists
+        const rowExists = safeRows.some(r => r.id === selectedCell.rowId)
+        if (rowExists) {
+          return {
+            type: 'cell',
+            rowId: selectedCell.rowId,
+            columnId: field.id,
+            fieldName: selectedCell.fieldName,
+          }
+        }
+      }
+    }
+    
+    return null
+  }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, safeRows])
+
   // Keyboard shortcuts for copy/paste
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent) => {
@@ -1040,41 +1114,29 @@ export default function AirtableGridView({
       if ((e.ctrlKey || e.metaKey) && e.key === 'c' && !e.shiftKey && !isInputFocused) {
         e.preventDefault()
         
-        // Determine selection type (priority: column > row > cell)
-        let selection: Selection | null = null
+        const selection = getCurrentSelection()
+        if (!selection) return
         
-        if (selectedColumnId) {
-          // Column selection
-          const field = safeFields.find(f => f.id === selectedColumnId)
-          if (field) {
-            selection = {
-              type: 'column',
-              columnId: field.id,
-              fieldName: field.name,
-            }
+        try {
+          // Use display resolution for better UX (human-readable labels for linked fields)
+          // Check if we need async resolution (linked fields)
+          const hasLinkedFields = selection.type === 'row' || selection.type === 'column'
+            ? safeFields.some(f => f.type === 'link_to_table')
+            : safeFields.some(f => f.name === selection.fieldName && f.type === 'link_to_table')
+          
+          let clipboardText: string
+          if (hasLinkedFields && dataView.copyWithDisplayResolution) {
+            // Use async display resolution for linked fields
+            clipboardText = await dataView.copyWithDisplayResolution(selection)
+          } else {
+            // No linked fields, use synchronous copy
+            clipboardText = dataView.copy(selection)
           }
-        } else if (selectedRowIds.size > 0) {
-          // Row selection
-          selection = {
-            type: 'row',
-            rowIds: Array.from(selectedRowIds),
-          }
-        } else if (selectedCell) {
-          // Cell selection
-          const field = safeFields.find(f => f.name === selectedCell.fieldName)
-          if (field) {
-            selection = {
-              type: 'cell',
-              rowId: selectedCell.rowId,
-              columnId: field.id,
-              fieldName: selectedCell.fieldName,
-            }
-          }
-        }
-        
-        if (selection) {
-          const clipboardText = dataView.copy(selection)
+          
           await navigator.clipboard.writeText(clipboardText)
+        } catch (error) {
+          console.error('Error copying to clipboard:', error)
+          // Silently fail - clipboard access may be denied
         }
       }
       
@@ -1082,46 +1144,92 @@ export default function AirtableGridView({
       if ((e.ctrlKey || e.metaKey) && e.key === 'v' && !e.shiftKey && !isInputFocused) {
         e.preventDefault()
         
+        const selection = getCurrentSelection()
+        if (!selection) {
+          // No selection - try to paste into currently selected cell if available
+          if (selectedCell) {
+            const field = safeFields.find(f => f.name === selectedCell.fieldName)
+            if (field) {
+              try {
+                const clipboardText = await navigator.clipboard.readText()
+                if (clipboardText.trim()) {
+                  const cellSelection: Selection = {
+                    type: 'cell',
+                    rowId: selectedCell.rowId,
+                    columnId: field.id,
+                    fieldName: selectedCell.fieldName,
+                  }
+                  await dataView.paste(cellSelection, clipboardText)
+                }
+              } catch (error) {
+                console.error('Error pasting:', error)
+              }
+            }
+          }
+          return
+        }
+        
         try {
           const clipboardText = await navigator.clipboard.readText()
           
-          // Determine selection type (priority: column > row > cell)
-          let selection: Selection | null = null
+          // Validate clipboard content
+          if (!clipboardText) {
+            return // Empty clipboard, do nothing
+          }
           
-          if (selectedColumnId) {
-            // Column selection
-            const field = safeFields.find(f => f.id === selectedColumnId)
-            if (field) {
-              selection = {
-                type: 'column',
-                columnId: field.id,
-                fieldName: field.name,
-              }
-            }
-          } else if (selectedRowIds.size > 0) {
-            // Row selection
-            selection = {
-              type: 'row',
-              rowIds: Array.from(selectedRowIds),
-            }
-          } else if (selectedCell) {
-            // Cell selection
-            const field = safeFields.find(f => f.name === selectedCell.fieldName)
-            if (field) {
-              selection = {
-                type: 'cell',
-                rowId: selectedCell.rowId,
-                columnId: field.id,
-                fieldName: selectedCell.fieldName,
-              }
+          // Check if clipboard contains only whitespace
+          const trimmed = clipboardText.trim()
+          if (trimmed.length === 0) {
+            return // Only whitespace, do nothing
+          }
+          
+          // Validate selection is still valid
+          const currentSelection = getCurrentSelection()
+          if (!currentSelection) {
+            console.warn('No valid selection for paste operation')
+            return
+          }
+          
+          // Additional validation: check if paste would affect too many cells
+          // This is handled by DataViewService, but we can add pre-validation here
+          const lines = trimmed.split(/\r?\n/)
+          const estimatedCells = lines.reduce((sum, line) => {
+            return sum + line.split('\t').filter(cell => cell.trim().length > 0).length
+          }, 0)
+          
+          if (estimatedCells > 10000) {
+            const proceed = confirm(
+              `This paste operation will affect approximately ${estimatedCells.toLocaleString()} cells. ` +
+              `This may take a while. Do you want to continue?`
+            )
+            if (!proceed) {
+              return
             }
           }
           
-          if (selection) {
-            await dataView.paste(selection, clipboardText)
+          const result = await dataView.paste(currentSelection, clipboardText)
+          
+          // Result handling is done in onChangesApplied callback
+          // Additional validation can be done here if needed
+          if (result.appliedCount === 0 && result.errors.length === 0) {
+            // No changes applied and no errors - likely empty or invalid clipboard
+            console.warn('No data was pasted. Clipboard may be empty or contain only whitespace.')
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error pasting:', error)
+          
+          // Provide user-friendly error message
+          const errorMessage = error?.message || 'Failed to paste data'
+          if (errorMessage.includes('clipboard') || errorMessage.includes('permission')) {
+            // Clipboard permission denied - don't show alert, just log
+            console.warn('Clipboard access denied. Please ensure clipboard permissions are granted.')
+          } else if (errorMessage.includes('Too many changes')) {
+            // Large paste operation - show user-friendly message
+            alert(`Paste operation too large. Please paste smaller amounts of data at a time.`)
+          } else {
+            // Other errors - show user-friendly alert
+            alert(`Failed to paste data: ${errorMessage}`)
+          }
         }
       }
       
@@ -1129,7 +1237,11 @@ export default function AirtableGridView({
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey && !isInputFocused) {
         e.preventDefault()
         if (dataView.canUndo) {
-          await dataView.undo()
+          try {
+            await dataView.undo()
+          } catch (error) {
+            console.error('Error undoing:', error)
+          }
         }
       }
       
@@ -1137,14 +1249,18 @@ export default function AirtableGridView({
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey && !isInputFocused) {
         e.preventDefault()
         if (dataView.canRedo) {
-          await dataView.redo()
+          try {
+            await dataView.redo()
+          } catch (error) {
+            console.error('Error redoing:', error)
+          }
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, dataView, refresh])
+  }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, dataView, getCurrentSelection])
 
   if (loading) {
     return (

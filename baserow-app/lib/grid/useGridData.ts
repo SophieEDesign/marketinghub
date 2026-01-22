@@ -453,19 +453,41 @@ export function useGridData({
             try {
               const res = await fetch(`/api/tables/${tableId}/sync-schema`, { method: 'POST' })
               if (res.ok) {
+                const syncResult = await res.json()
+                console.log('[useGridData] Schema sync result:', syncResult)
+                // Wait a moment for PostgREST cache to refresh
+                await new Promise(resolve => setTimeout(resolve, 500))
                 await refreshPhysicalColumns(true)
+              } else {
+                const errorData = await res.json().catch(() => ({}))
+                console.error('[useGridData] Schema sync failed:', errorData)
               }
-            } catch {
-              // ignore
+            } catch (syncError) {
+              console.error('[useGridData] Schema sync error:', syncError)
+              // Continue to check if column exists after refresh
             }
           }
 
           const refreshedCols = physicalColumnsRef.current
           if (refreshedCols && !refreshedCols.has(safeColumn)) {
-            throw new Error(
-              `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
-                `This usually means your table schema is out of sync with field metadata, or PostgREST schema cache hasn't refreshed yet.`
-            )
+            // Check if the field exists in metadata
+            const safeFields = asArray<TableField>(fields)
+            const fieldExists = safeFields.some(f => f && typeof f === 'object' && f.name === fieldName)
+            
+            if (fieldExists) {
+              throw new Error(
+                `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
+                  `The field exists in metadata but the physical column is missing. ` +
+                  `Please try refreshing the page, or contact support if the issue persists. ` +
+                  `(Table ID: ${tableId || 'unknown'})`
+              )
+            } else {
+              throw new Error(
+                `Cannot update "${safeColumn}" on "${tableName}" because that column does not exist on the physical table. ` +
+                  `The field "${fieldName}" may have been deleted or renamed. ` +
+                  `Please refresh the page to see the current field list.`
+              )
+            }
           }
         }
 

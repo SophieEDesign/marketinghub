@@ -13,15 +13,34 @@ import { resolveLinkedFieldDisplay } from './linkedFields'
  * @returns 2D array of values [row][column]
  */
 export function parseClipboardText(text: string): string[][] {
-  if (!text || text.trim().length === 0) {
+  if (!text || typeof text !== 'string') {
+    return []
+  }
+
+  // Trim the entire text first
+  const trimmed = text.trim()
+  if (trimmed.length === 0) {
     return []
   }
 
   // Split by newlines (handle both \n and \r\n)
-  const lines = text.split(/\r?\n/)
+  // Preserve empty lines that might be intentional (e.g., empty rows in spreadsheet)
+  const lines = trimmed.split(/\r?\n/)
+  
+  // Filter out completely empty lines at the end (trailing newlines)
+  let lastNonEmptyIndex = lines.length - 1
+  while (lastNonEmptyIndex >= 0 && lines[lastNonEmptyIndex].trim().length === 0) {
+    lastNonEmptyIndex--
+  }
+  const trimmedLines = lines.slice(0, lastNonEmptyIndex + 1)
   
   // Split each line by tabs
-  return lines.map(line => line.split('\t'))
+  // Preserve empty cells (they represent empty values in the grid)
+  return trimmedLines.map(line => {
+    const cells = line.split('\t')
+    // Return cells as-is (including empty strings for empty cells)
+    return cells
+  })
 }
 
 /**

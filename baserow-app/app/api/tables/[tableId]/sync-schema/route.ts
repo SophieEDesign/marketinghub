@@ -54,17 +54,28 @@ export async function POST(
 
   // 1) Ensure the base physical table exists (id + audit fields + grants).
   // If the RPC doesn't exist, the call will error and we surface it.
-  const { error: createError } = await supabase.rpc('create_dynamic_table', {
-    table_name: tableName,
-  })
-  if (createError) {
-    return NextResponse.json(
-      {
-        error: `Failed to ensure physical table "${tableName}": ${createError.message}`,
-        code: createError.code,
-      },
-      { status: 500 }
-    )
+  try {
+    const { error: createError } = await supabase.rpc('create_dynamic_table', {
+      table_name: tableName,
+    })
+    if (createError) {
+      // If the table already exists, that's fine - continue
+      const errorMsg = String(createError.message || '').toLowerCase()
+      if (!errorMsg.includes('already exists') && !errorMsg.includes('duplicate')) {
+        console.error(`[sync-schema] Failed to ensure physical table "${tableName}":`, createError)
+        return NextResponse.json(
+          {
+            error: `Failed to ensure physical table "${tableName}": ${createError.message}`,
+            code: createError.code,
+          },
+          { status: 500 }
+        )
+      }
+    }
+  } catch (err: any) {
+    // If RPC doesn't exist or other unexpected error, log but don't fail completely
+    console.error(`[sync-schema] Error calling create_dynamic_table for "${tableName}":`, err)
+    // Continue - the table might already exist
   }
 
   // Ensure audit fields/trigger exist (best-effort; not all envs have the function).
@@ -75,12 +86,30 @@ export async function POST(
   }
 
   // 2) Load field metadata.
-  const fields = await getTableFields(tableId)
+  let fields: TableField[] = []
+  try {
+    fields = await getTableFields(tableId)
+    if (!Array.isArray(fields)) {
+      fields = []
+    }
+  } catch (err) {
+    console.error(`[sync-schema] Error loading fields for table "${tableId}":`, err)
+    // Continue with empty fields array - we can still check physical columns
+  }
 
   // 3) Load physical columns once via RPC.
-  const { data: cols, error: colsError } = await supabase.rpc('get_table_columns', {
-    table_name: tableName,
-  })
+  let cols: any[] | null = null
+  let colsError: any = null
+  try {
+    const result = await supabase.rpc('get_table_columns', {
+      table_name: tableName,
+    })
+    cols = result.data
+    colsError = result.error
+  } catch (err) {
+    console.error(`[sync-schema] Error calling get_table_columns for "${tableName}":`, err)
+    colsError = err
+  }
   // If this RPC fails, we can still attempt ADD COLUMN IF NOT EXISTS for every field.
   const physical = new Set<string>(
     Array.isArray(cols) ? cols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean) : []
@@ -99,25 +128,51 @@ export async function POST(
       continue
     }
 
-    const sql = generateAddColumnSQL(`public.${tableName}`, colName, (f as any).type, (f as any).options)
-    const { error: addError } = await supabase.rpc('execute_sql_safe', { sql_text: sql })
-    if (!addError) {
-      addedColumns.push(colName)
-      physical.add(colName)
+    try {
+      const sql = generateAddColumnSQL(`public.${tableName}`, colName, (f as any).type, (f as any).options)
+      const { error: addError } = await supabase.rpc('execute_sql_safe', { sql_text: sql })
+      if (!addError) {
+        addedColumns.push(colName)
+        physical.add(colName)
+      } else {
+        console.error(`[sync-schema] Failed to add column "${colName}" to "${tableName}":`, addError)
+      }
+    } catch (err) {
+      console.error(`[sync-schema] Error adding column "${colName}" to "${tableName}":`, err)
+      // Continue with other columns even if one fails
     }
   }
 
   // 5) Best-effort: ask PostgREST to reload schema cache so new tables/columns are queryable immediately.
-  try {
-    await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
-  } catch {
-    // best-effort only
+  if (addedColumns.length > 0) {
+    // If we added columns, try multiple times to ensure PostgREST picks them up
+    for (let i = 0; i < 3; i++) {
+      try {
+        await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
+        // Small delay between notifications
+        if (i < 2) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      } catch {
+        // best-effort only
+      }
+    }
+  } else {
+    // Still try once even if no columns were added
+    try {
+      await supabase.rpc('execute_sql_safe', { sql_text: "NOTIFY pgrst, 'reload schema';" })
+    } catch {
+      // best-effort only
+    }
   }
 
   return NextResponse.json({
     success: true,
     tableName,
     addedColumns,
+    message: addedColumns.length > 0 
+      ? `Added ${addedColumns.length} column(s): ${addedColumns.join(', ')}. PostgREST cache refresh requested.`
+      : 'Schema is in sync. No columns added.',
   })
 }
 
