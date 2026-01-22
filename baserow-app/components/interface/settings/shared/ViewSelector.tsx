@@ -61,7 +61,7 @@ export default function ViewSelector({
         <p className="text-xs text-gray-500">{description}</p>
       ) : (
         <p className="text-xs text-gray-500">
-          Optionally filter data to a specific view. Select "**all**" to use all records from the table.
+          Optionally filter data to a specific view. Select &quot;**all**&quot; to use all records from the table.
         </p>
       )}
     </div>
