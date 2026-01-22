@@ -468,7 +468,7 @@ export class DataViewService {
       }
 
       // Special handling for linked fields: resolve pasted text to IDs
-      let parsedValue = parseCellValue(change.value, field.type)
+      let parsedValue = parseCellValue(change.value, field.type, field)
       
       if (isLinkedField(field) && typeof parsedValue === 'string' && parsedValue.trim()) {
         // Check if it's already a UUID
@@ -576,7 +576,7 @@ export class DataViewService {
       }
     }
 
-    const parsedValue = parseCellValue(value, field.type)
+    const parsedValue = parseCellValue(value, field.type, field)
     const result = validateFieldValue(field, parsedValue)
 
     return {

@@ -172,12 +172,7 @@ export default function GridColumnHeader({
           const newSelection = isSelected ? null : field.id
           if (newSelection) {
             onSelect(newSelection)
-            // Copy field name to clipboard when selected
-            navigator.clipboard.writeText(field.name).then(() => {
-              console.log('Column selected and copied:', field.name)
-            }).catch(err => {
-              console.error('Failed to copy column name:', err)
-            })
+            // Don't copy on click - wait for Ctrl+C to copy all column values
           } else {
             // Deselect
             onSelect('')

@@ -61,6 +61,7 @@ export function formatClipboardText(grid: string[][]): string {
  * Format cell value for clipboard (plain text representation)
  * 
  * For linked fields, this returns display labels (comma-separated for multi-link).
+ * For select fields, returns the choice label(s) as stored (already human-readable).
  * For other fields, returns standard string representation.
  * 
  * Note: For linked fields, this is synchronous and returns IDs if display resolution
@@ -84,7 +85,20 @@ export function formatCellValue(value: any, field?: TableField): string {
     return String(value)
   }
 
-  // Handle arrays (e.g., multi-select)
+  // Single select: value is already the choice label, return as-is
+  if (field && field.type === 'single_select') {
+    return String(value)
+  }
+
+  // Multi-select: array of choice labels, join with comma
+  if (field && field.type === 'multi_select') {
+    if (Array.isArray(value)) {
+      return value.join(', ')
+    }
+    return String(value)
+  }
+
+  // Handle arrays (e.g., multi-select without field context, or other array types)
   if (Array.isArray(value)) {
     return value.join(', ')
   }
@@ -106,9 +120,10 @@ export function formatCellValue(value: any, field?: TableField): string {
  * 
  * @param text - Clipboard text value
  * @param fieldType - Field type for type-specific parsing
+ * @param field - Optional field definition (for single_select validation against options)
  * @returns Parsed value (raw text for linked fields, parsed for others)
  */
-export function parseCellValue(text: string, fieldType?: string): any {
+export function parseCellValue(text: string, fieldType?: string, field?: TableField): any {
   if (!text || text.trim().length === 0) {
     return null
   }
@@ -149,9 +164,62 @@ export function parseCellValue(text: string, fieldType?: string): any {
         return trimmed
       }
 
+    case 'single_select':
+      // For single select, return the trimmed value as-is
+      // Validation against field options will happen in validation.ts
+      // But we can use field options if available to normalize the value
+      if (field && field.options) {
+        // Check if using new selectOptions format
+        const selectOptions = (field.options as any)?.selectOptions
+        if (Array.isArray(selectOptions) && selectOptions.length > 0) {
+          // Try to match by label (case-insensitive)
+          const match = selectOptions.find(
+            (opt: any) => String(opt?.label || '').trim().toLowerCase() === trimmed.toLowerCase()
+          )
+          if (match) {
+            return String(match.label || match.id || trimmed).trim()
+          }
+        }
+        // Fall back to legacy choices format
+        const choices = (field.options as any)?.choices || []
+        if (choices.length > 0) {
+          // Try case-insensitive match
+          const match = choices.find((c: string) => String(c).trim().toLowerCase() === trimmed.toLowerCase())
+          if (match) {
+            return String(match).trim()
+          }
+        }
+      }
+      // Return as-is if no field or no match found (validation will catch invalid values)
+      return trimmed
+
     case 'multi_select':
       // Split by comma for multi-select
-      return trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0)
+      const values = trimmed.split(',').map(s => s.trim()).filter(s => s.length > 0)
+      // If field options available, try to normalize values
+      if (field && field.options && values.length > 0) {
+        const selectOptions = (field.options as any)?.selectOptions
+        if (Array.isArray(selectOptions) && selectOptions.length > 0) {
+          // Match each value against selectOptions (case-insensitive)
+          const normalized = values.map(val => {
+            const match = selectOptions.find(
+              (opt: any) => String(opt?.label || '').trim().toLowerCase() === val.toLowerCase()
+            )
+            return match ? String(match.label || match.id || val).trim() : val
+          })
+          return normalized
+        }
+        // Fall back to legacy choices format
+        const choices = (field.options as any)?.choices || []
+        if (choices.length > 0) {
+          const normalized = values.map(val => {
+            const match = choices.find((c: string) => String(c).trim().toLowerCase() === val.toLowerCase())
+            return match ? String(match).trim() : val
+          })
+          return normalized
+        }
+      }
+      return values
 
     default:
       return trimmed

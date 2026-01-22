@@ -38,6 +38,9 @@ import type { GroupRule } from '@/lib/grouping/types'
 import { normalizeUuid } from '@/lib/utils/ids'
 import type { LinkedField } from '@/types/fields'
 import { resolveLinkedFieldDisplayMap } from '@/lib/dataView/linkedFields'
+import FillHandle from './FillHandle'
+import CellContextMenu from './CellContextMenu'
+import { formatCellValue } from '@/lib/dataView/clipboard'
 
 type Sort = { field: string; direction: 'asc' | 'desc' }
 
@@ -170,6 +173,10 @@ export default function AirtableGridView({
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
   const MIN_ROW_HEIGHT_PX = ROW_HEIGHT_SHORT
   const rowHeightsRef = useRef<Record<string, number>>({})
+  
+  // Drag-to-fill state
+  const [fillSource, setFillSource] = useState<{ rowId: string; fieldName: string; value: any } | null>(null)
+  const [fillTargetRowIds, setFillTargetRowIds] = useState<Set<string>>(new Set())
   
   // Track wrap text settings per column (from grid_view_settings)
   const [columnWrapTextSettings, setColumnWrapTextSettings] = useState<Record<string, boolean>>({})
@@ -1384,17 +1391,7 @@ export default function AirtableGridView({
                       } else {
                         const newSelection = selectedColumnId === fieldId ? null : fieldId
                         setSelectedColumnId(newSelection)
-                        
-                        if (newSelection) {
-                          const field = fields.find(f => f.id === fieldId)
-                          if (field) {
-                            navigator.clipboard.writeText(field.name).then(() => {
-                              console.log('Column selected and copied:', field.name)
-                            }).catch(err => {
-                              console.error('Failed to copy column name:', err)
-                            })
-                          }
-                        }
+                        // Don't copy on click - wait for Ctrl+C to copy all column values
                       }
                       setSelectedCell(null)
                       setSelectedRowIds(new Set())
@@ -1624,40 +1621,119 @@ export default function AirtableGridView({
                   {/* Cells */}
                   {visibleFields.map((field) => {
                     const width = columnWidths[field.name] || COLUMN_DEFAULT_WIDTH
-                    const isSelected =
+                    const isCellSelected =
                       selectedCell?.rowId === row.id && selectedCell?.fieldName === field.name
+                    const isColumnSelected = selectedColumnId === field.id
                     const wrapText = columnWrapText[field.name] || false
 
                     return (
                       <div
                         key={field.name}
                         data-grid-cell="true"
+                        data-row-id={row.id}
+                        data-field-name={field.name}
                         className={`border-r border-gray-100/50 relative flex items-center overflow-hidden ${
-                          isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
+                          isColumnSelected 
+                            ? 'bg-blue-100/50 ring-1 ring-blue-400/30 ring-inset' 
+                            : isCellSelected 
+                              ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' 
+                              : fillTargetRowIds.has(row.id) && fillSource?.fieldName === field.name
+                                ? 'bg-green-50 ring-1 ring-green-400/30 ring-inset'
+                                : ''
                         }`}
                         style={{ width, height: effectiveRowHeight, maxHeight: effectiveRowHeight }}
-                        onClick={() => {
+                        onClick={(e) => {
+                          // Single click: select cell and copy value
                           setSelectedCell({ rowId: row.id, fieldName: field.name })
                           setSelectedColumnId(null)
+                          
+                          // Copy cell value to clipboard
+                          const fieldObj = fields.find(f => f.name === field.name)
+                          const textToCopy = formatCellValue(row[field.name], fieldObj)
+                          if (textToCopy) {
+                            navigator.clipboard.writeText(textToCopy).catch(err => {
+                              console.error('Failed to copy:', err)
+                            })
+                          }
+                          
+                          // Store for drag-to-fill
+                          setFillSource({ rowId: row.id, fieldName: field.name, value: row[field.name] })
                         }}
                         onDoubleClick={(e) => {
                           // Prevent row double-click from opening record when interacting with a cell.
                           e.stopPropagation()
+                          // Double-click: start editing (handled by CellFactory)
                         }}
                       >
-                        <div className="w-full h-full flex items-center overflow-hidden">
-                          <CellFactory
-                            field={field}
-                            value={row[field.name]}
-                            rowId={row.id}
-                            tableName={tableName}
-                            editable={editable && !field.options?.read_only}
-                            wrapText={wrapText}
-                            rowHeight={effectiveRowHeight}
-                            onSave={(value) => handleCellSave(row.id, field.name, value)}
-                            onFieldOptionsUpdate={onTableFieldsRefresh}
-                          />
-                        </div>
+                        <CellContextMenu
+                          value={row[field.name]}
+                          fieldName={field.name}
+                          editable={editable && !field.options?.read_only}
+                          onCopy={() => {
+                            const fieldObj = fields.find(f => f.name === field.name)
+                            const textToCopy = formatCellValue(row[field.name], fieldObj)
+                            if (textToCopy) {
+                              navigator.clipboard.writeText(textToCopy)
+                            }
+                          }}
+                          onPaste={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText()
+                              if (text) {
+                                const fieldObj = fields.find(f => f.name === field.name)
+                                const cellSelection: Selection = {
+                                  type: 'cell',
+                                  rowId: row.id,
+                                  columnId: fieldObj?.id || '',
+                                  fieldName: field.name,
+                                }
+                                await dataView.paste(cellSelection, text)
+                              }
+                            } catch (err) {
+                              console.error('Failed to paste:', err)
+                            }
+                          }}
+                          formatValue={(val) => formatCellValue(val, fields.find(f => f.name === field.name))}
+                        >
+                          <div className="w-full h-full flex items-center overflow-hidden relative group">
+                            <CellFactory
+                              field={field}
+                              value={row[field.name]}
+                              rowId={row.id}
+                              tableName={tableName}
+                              editable={editable && !field.options?.read_only}
+                              wrapText={wrapText}
+                              rowHeight={effectiveRowHeight}
+                              onSave={(value) => handleCellSave(row.id, field.name, value)}
+                              onFieldOptionsUpdate={onTableFieldsRefresh}
+                            />
+                            {isCellSelected && editable && !field.options?.read_only && (
+                              <FillHandle
+                                sourceRowId={row.id}
+                                fieldName={field.name}
+                                isVisible={true}
+                                onDragTargetsChange={setFillTargetRowIds}
+                                onFill={async (targetRowIds) => {
+                                  const sourceValue = row[field.name]
+                                  const updates = targetRowIds.map(targetRowId => ({
+                                    rowId: targetRowId,
+                                    fieldName: field.name,
+                                    value: sourceValue,
+                                  }))
+                                  
+                                  try {
+                                    await Promise.all(
+                                      updates.map(update => handleCellSave(update.rowId, update.fieldName, update.value))
+                                    )
+                                    setFillTargetRowIds(new Set())
+                                  } catch (err) {
+                                    console.error('Error filling cells:', err)
+                                  }
+                                }}
+                              />
+                            )}
+                          </div>
+                        </CellContextMenu>
                       </div>
                     )
                   })}

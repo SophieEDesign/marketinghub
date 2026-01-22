@@ -998,37 +998,62 @@ export async function DELETE(
           // Admin client returned 0 rows - try SQL as fallback
           console.warn('[Field Delete] Admin client returned 0 rows, trying SQL fallback...')
           try {
+            // Use simple SQL delete - execute_sql_safe will handle errors
             const sqlResult = await supabase.rpc('execute_sql_safe', {
               sql_text: `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
             })
             
             if (sqlResult.error) {
               console.error('[Field Delete] SQL fallback error:', sqlResult.error)
-              deleteError = sqlResult.error
-            } else {
-              // SQL executed - verify deletion
-              const verifyResult = await adminClient
-                .from('table_fields')
-                .select('id')
-                .eq('id', fieldId)
-                .maybeSingle()
+              const errorMsg = sqlResult.error.message || String(sqlResult.error) || ''
               
-              if (!verifyResult.data) {
-                deletedRows = [{ id: fieldId }]
-                deleteError = null
-                console.log('[Field Delete] Successfully deleted via SQL fallback')
+              // Check if it's a trigger exception
+              if (errorMsg.includes('cannot be deleted') || 
+                  errorMsg.includes('System field') ||
+                  errorMsg.includes('trigger') ||
+                  errorMsg.includes('prevent_system_field')) {
+                deleteError = new Error(`Trigger blocked deletion: ${errorMsg}`)
               } else {
-                console.error('[Field Delete] Both admin client and SQL failed to delete field')
-                deleteError = new Error('Field deletion failed: Both admin client and SQL methods returned 0 rows. This may indicate a trigger or constraint is blocking the deletion.')
+                deleteError = sqlResult.error
+              }
+            } else {
+              // SQL executed without error - verify deletion
+              try {
+                await new Promise(resolve => setTimeout(resolve, 100)) // Small delay for transaction commit
+                
+                const verifyResult = await adminClient
+                  .from('table_fields')
+                  .select('id, name')
+                  .eq('id', fieldId)
+                  .maybeSingle()
+                
+                console.log('[Field Delete] SQL verification:', {
+                  fieldExists: !!verifyResult.data,
+                  fieldName: verifyResult.data?.name,
+                  error: verifyResult.error
+                })
+                
+                if (!verifyResult.data) {
+                  deletedRows = [{ id: fieldId }]
+                  deleteError = null
+                  console.log('[Field Delete] Successfully deleted via SQL fallback')
+                } else {
+                  console.error('[Field Delete] SQL executed but field still exists:', verifyResult.data)
+                  deleteError = new Error(`Field deletion failed: SQL executed but field still exists (${verifyResult.data.name}). This indicates a trigger or constraint is blocking the deletion.`)
+                }
+              } catch (verifyError: any) {
+                console.error('[Field Delete] Verification error:', verifyError)
+                // If verification fails, we can't be sure - don't assume success
+                deleteError = new Error(`Field deletion verification failed: ${verifyError.message || verifyError}`)
               }
             }
           } catch (sqlError: any) {
             console.error('[Field Delete] SQL fallback exception:', sqlError)
-            deleteError = sqlError
+            deleteError = sqlError instanceof Error ? sqlError : new Error(String(sqlError))
           }
         }
       } catch (adminError: any) {
-        console.error('[Field Delete] Failed to create admin client:', adminError)
+        console.error('[Field Delete] Admin client operation failed:', adminError)
         deleteError = adminError
       }
     } else {
@@ -1050,8 +1075,18 @@ export async function DELETE(
     }
 
     if (deleteError) {
-      const errorResponse = createErrorResponse(deleteError, 'Failed to delete field', 500)
-      return NextResponse.json(errorResponse, { status: 500 })
+      // Check if it's a trigger/constraint error - return 403 instead of 500
+      const errorMsg = deleteError.message || String(deleteError) || ''
+      const isBlockedError = errorMsg.includes('cannot be deleted') || 
+                            errorMsg.includes('System field') ||
+                            errorMsg.includes('trigger') ||
+                            errorMsg.includes('prevent_system_field') ||
+                            errorMsg.includes('constraint') ||
+                            errorMsg.includes('blocking')
+      
+      const statusCode = isBlockedError ? 403 : 500
+      const errorResponse = createErrorResponse(deleteError, 'Failed to delete field', statusCode)
+      return NextResponse.json(errorResponse, { status: statusCode })
     }
 
     if (!deletedRows || deletedRows.length === 0) {

@@ -2,6 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/fields/RichTextEditor'
+import TextCellModal from '../TextCellModal'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/context-menu/ContextMenu'
+import { Copy, Edit } from 'lucide-react'
 
 interface LongTextCellProps {
   value: string | null
@@ -11,6 +19,7 @@ interface LongTextCellProps {
   rowHeight?: number // Row height in pixels
   onSave: (value: string) => Promise<void>
   placeholder?: string
+  onCopy?: () => void // Optional callback for copy action
 }
 
 export default function LongTextCell({
@@ -21,8 +30,10 @@ export default function LongTextCell({
   rowHeight,
   onSave,
   placeholder = '—',
+  onCopy,
 }: LongTextCellProps) {
   const [editing, setEditing] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const [editValue, setEditValue] = useState(value || '')
   const [saving, setSaving] = useState(false)
 
@@ -59,6 +70,37 @@ export default function LongTextCell({
     return tmp.textContent || tmp.innerText || ''
   }
 
+  const handleCopy = async () => {
+    const text = stripHtml(value)
+    if (text) {
+      try {
+        await navigator.clipboard.writeText(text)
+        if (onCopy) onCopy()
+      } catch (err) {
+        console.error('Failed to copy:', err)
+      }
+    }
+  }
+
+  const handleSingleClick = (e: React.MouseEvent) => {
+    // Single click: copy value
+    if (e.detail === 1) {
+      const timer = setTimeout(() => {
+        handleCopy()
+      }, 200) // Small delay to detect double-click
+      
+      return () => clearTimeout(timer)
+    }
+  }
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (editable) {
+      // Double-click: open modal for editing
+      setModalOpen(true)
+    }
+  }
+
   if (editing && editable) {
     return (
       <div className="w-full">
@@ -90,28 +132,61 @@ export default function LongTextCell({
   const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 
   return (
-    <div
-      onClick={() => editable && setEditing(true)}
-      className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex ${
-        wrapText ? 'items-start' : 'items-center'
-      }`}
-      style={cellStyle}
-      title={plainText || undefined}
-    >
-      {value && value.trim() && value !== '<p></p>' ? (
-        <div 
-          className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
-          style={{ 
-            lineHeight: '1.25',
-            maxHeight: wrapText ? contentMaxHeight : 'none',
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            onClick={handleSingleClick}
+            onDoubleClick={handleDoubleClick}
+            className={`w-full h-full px-3 py-1 text-sm cursor-pointer hover:bg-gray-50/50 rounded-md transition-colors overflow-hidden flex ${
+              wrapText ? 'items-start' : 'items-center'
+            }`}
+            style={cellStyle}
+            title={plainText || undefined}
+          >
+            {value && value.trim() && value !== '<p></p>' ? (
+              <div 
+                className={`prose prose-sm max-w-none text-gray-900 ${wrapText ? 'line-clamp-2' : 'line-clamp-1'} overflow-hidden`}
+                style={{ 
+                  lineHeight: '1.25',
+                  maxHeight: wrapText ? contentMaxHeight : 'none',
+                }}
+                dangerouslySetInnerHTML={{ __html: value }}
+              />
+            ) : (
+              <span className={`text-gray-400 italic truncate w-full`}>
+                {isPlaceholder ? placeholder : ''}
+              </span>
+            )}
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onClick={handleCopy}>
+            <Copy className="h-4 w-4 mr-2" />
+            Copy
+          </ContextMenuItem>
+          {editable && (
+            <ContextMenuItem onClick={() => setModalOpen(true)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit in modal
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+      
+      {modalOpen && (
+        <TextCellModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          value={value}
+          fieldName={fieldName}
+          onSave={async (newValue) => {
+            await onSave(newValue)
+            setModalOpen(false)
           }}
-          dangerouslySetInnerHTML={{ __html: value }}
+          isLongText={true}
         />
-      ) : (
-        <span className={`text-gray-400 italic truncate w-full`}>
-          {isPlaceholder ? placeholder : ''}
-        </span>
       )}
-    </div>
+    </>
   )
 }
