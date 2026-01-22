@@ -878,6 +878,16 @@ export default function GroupedInterfaces({
           isActive && "bg-black/20 font-semibold"
         )}
         onClick={(e) => {
+          const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+          
+          if (debugEnabled) {
+            console.log("[NavigationPage] Click detected:", {
+              href: `/pages/${page.id}`,
+              defaultPrevented: e.defaultPrevented,
+              target: e.target,
+            })
+          }
+          
           // Only navigate, don't toggle edit mode
           e.stopPropagation()
         }}
@@ -977,11 +987,29 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
+                const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+                
+                if (debugEnabled) {
+                  console.log("[Sidebar Link] Click detected:", {
+                    href: `/pages/${page.id}`,
+                    editMode,
+                    isDragging: isDraggingRef.current,
+                    activeId,
+                    willPrevent: editMode && isDraggingRef.current && activeId,
+                    defaultPrevented: e.defaultPrevented,
+                  })
+                }
+                
                 // CRITICAL: Use ref for synchronous check - state might be stale
                 // Only prevent navigation if we're ACTUALLY dragging (both conditions)
                 // AND we're in edit mode (browse mode should never block navigation)
                 if (editMode && isDraggingRef.current && activeId) {
+                  if (debugEnabled) {
+                    console.warn("[Sidebar Link] Navigation prevented - dragging in edit mode")
+                  }
                   e.preventDefault()
+                } else if (debugEnabled) {
+                  console.log("[Sidebar Link] Navigation allowed")
                 }
               }}
             >

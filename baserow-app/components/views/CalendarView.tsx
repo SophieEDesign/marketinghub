@@ -101,10 +101,14 @@ export default function CalendarView({
   const router = useRouter()
   const [rows, setRows] = useState<TableRow[]>([])
   const [loading, setLoading] = useState(true)
+  // CRITICAL: Prevent hydration mismatch - FullCalendar generates dynamic IDs that differ between server/client
+  const [mounted, setMounted] = useState(false)
   
   // Lifecycle logging
   useEffect(() => {
     console.log(`[Lifecycle] CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
+    // Mark as mounted to prevent hydration mismatch with FullCalendar
+    setMounted(true)
     return () => {
       console.log(`[Lifecycle] CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
     }
@@ -1764,31 +1768,39 @@ export default function CalendarView({
       {renderFilters()}
       
       <div className="p-6 bg-white">
-        <FullCalendar
-          plugins={calendarPlugins}
-          events={calendarEvents}
-          editable={!isViewOnly}
-          eventDrop={handleEventDrop}
-          headerToolbar={calendarHeaderToolbar}
-          // Uncontrolled: changing `initialView` after mount can trigger repeated remount/update cycles.
-          initialView="dayGridMonth"
-          height="auto"
-          aspectRatio={1.35}
-          dayMaxEvents={3}
-          moreLinkClick="popover"
-          eventDisplay="block"
-          eventClassNames={calendarEventClassNames}
-          dayCellClassNames="hover:bg-gray-50 transition-colors"
-          dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
-          eventTextColor="#1f2937"
-          eventBorderColor="transparent"
-          eventBackgroundColor="#f3f4f6"
-          dayHeaderFormat={calendarDayHeaderFormat}
-          firstDay={1}
-          eventContent={calendarEventContent}
-          eventClick={onCalendarEventClick}
-          dateClick={onCalendarDateClick}
-        />
+        {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
+        {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
+        {mounted ? (
+          <FullCalendar
+            plugins={calendarPlugins}
+            events={calendarEvents}
+            editable={!isViewOnly}
+            eventDrop={handleEventDrop}
+            headerToolbar={calendarHeaderToolbar}
+            // Uncontrolled: changing `initialView` after mount can trigger repeated remount/update cycles.
+            initialView="dayGridMonth"
+            height="auto"
+            aspectRatio={1.35}
+            dayMaxEvents={3}
+            moreLinkClick="popover"
+            eventDisplay="block"
+            eventClassNames={calendarEventClassNames}
+            dayCellClassNames="hover:bg-gray-50 transition-colors"
+            dayHeaderClassNames="text-sm font-medium text-gray-700 py-2"
+            eventTextColor="#1f2937"
+            eventBorderColor="transparent"
+            eventBackgroundColor="#f3f4f6"
+            dayHeaderFormat={calendarDayHeaderFormat}
+            firstDay={1}
+            eventContent={calendarEventContent}
+            eventClick={onCalendarEventClick}
+            dateClick={onCalendarDateClick}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-64 text-gray-500">
+            Loading calendar...
+          </div>
+        )}
       </div>
 
       {/* Record Modal for Editing */}

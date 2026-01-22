@@ -1262,7 +1262,24 @@ export default function AirtableGridView({
                     onEdit={onEditField}
                     onToggleWrapText={handleToggleWrapText}
                     onSelect={(fieldId) => {
-                      setSelectedColumnId(fieldId)
+                      // Toggle selection - if already selected, deselect; otherwise select
+                      if (fieldId === '') {
+                        setSelectedColumnId(null)
+                      } else {
+                        const newSelection = selectedColumnId === fieldId ? null : fieldId
+                        setSelectedColumnId(newSelection)
+                        
+                        if (newSelection) {
+                          const field = fields.find(f => f.id === fieldId)
+                          if (field) {
+                            navigator.clipboard.writeText(field.name).then(() => {
+                              console.log('Column selected and copied:', field.name)
+                            }).catch(err => {
+                              console.error('Failed to copy column name:', err)
+                            })
+                          }
+                        }
+                      }
                       setSelectedCell(null)
                       setSelectedRowIds(new Set())
                     }}

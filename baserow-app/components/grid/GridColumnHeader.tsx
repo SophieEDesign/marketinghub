@@ -157,8 +157,10 @@ export default function GridColumnHeader({
     <div
       ref={setNodeRef}
       style={{ ...style, width, minWidth: width, maxWidth: width }}
-      className={`relative flex items-center border-r border-gray-100 bg-white hover:bg-gray-50/50 transition-colors group ${
-        isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30 ring-inset' : ''
+      className={`relative flex items-center border-r border-gray-100 transition-colors group ${
+        isSelected 
+          ? 'bg-blue-100 ring-2 ring-blue-500 ring-inset' 
+          : 'bg-white hover:bg-gray-50/50'
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -166,13 +168,20 @@ export default function GridColumnHeader({
         // Select column when clicking anywhere on the header (except chevron button and drag handle)
         const target = e.target as HTMLElement
         if (onSelect && !target.closest('button') && !target.closest('[data-drag-handle]')) {
-          onSelect(field.id)
-          // Copy field name to clipboard when selected
-          navigator.clipboard.writeText(field.name).then(() => {
-            // Could show toast notification here
-          }).catch(err => {
-            console.error('Failed to copy column name:', err)
-          })
+          // Toggle selection - if already selected, deselect; otherwise select
+          const newSelection = isSelected ? null : field.id
+          if (newSelection) {
+            onSelect(newSelection)
+            // Copy field name to clipboard when selected
+            navigator.clipboard.writeText(field.name).then(() => {
+              console.log('Column selected and copied:', field.name)
+            }).catch(err => {
+              console.error('Failed to copy column name:', err)
+            })
+          } else {
+            // Deselect
+            onSelect('')
+          }
         }
       }}
     >
@@ -188,7 +197,7 @@ export default function GridColumnHeader({
 
       {/* Field icon and name - clickable to select column (entire area) */}
       <div 
-        className={`flex items-center gap-2 px-3 flex-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50/50 ring-1 ring-blue-400/30' : ''}`}
+        className={`flex items-center gap-2 px-3 flex-1 min-w-0 cursor-pointer ${isSelected ? 'font-semibold' : ''}`}
         title="Click to select column"
       >
         <span className="text-gray-400 flex-shrink-0">

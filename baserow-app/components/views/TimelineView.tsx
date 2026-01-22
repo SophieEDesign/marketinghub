@@ -542,12 +542,16 @@ export default function TimelineView({
       }
       
       // Card fields are all visible fields except title and date fields
+      // Only include fields that render as pills (select, linked fields)
       const titleFieldNameToExclude = resolvedTitleField?.name
       const titleFieldIdToExclude = resolvedTitleField?.id
+      const pillFieldTypes = ['single_select', 'multi_select', 'link_to_table']
       cardFields = allVisibleFields.filter(f => 
         f.name !== titleFieldNameToExclude && 
         (titleFieldIdToExclude ? f.id !== titleFieldIdToExclude : true) &&
         !dateFieldNames.has(f.name) &&
+        // Only include pill-rendering field types
+        pillFieldTypes.includes(f.type) &&
         // Skip non-card-friendly types
         f.type !== 'attachment'
       )
@@ -568,13 +572,17 @@ export default function TimelineView({
         ? tableFields.find(f => f.name === titleFieldName || f.id === titleFieldName) || primaryField
         : primaryField
       
+      // Only include fields that render as pills (select, linked fields)
+      const pillFieldTypes = ['single_select', 'multi_select', 'link_to_table']
       cardFields = [
         cardField1 || blockConfig?.timeline_field_1 || blockConfig?.card_field_1,
         cardField2 || blockConfig?.timeline_field_2 || blockConfig?.card_field_2,
         cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
       ].filter(Boolean).map(fieldName => 
         tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      ).filter(Boolean) as TableField[]
+      ).filter(Boolean).filter(f => 
+        pillFieldTypes.includes(f.type)
+      ) as TableField[]
     }
 
     return {
@@ -638,7 +646,9 @@ export default function TimelineView({
       for (const f of wanted.values()) {
         const ids = new Set<string>()
         for (const row of Array.isArray(filteredRows) ? filteredRows : []) {
-          for (const id of collectIds((row as any)?.data?.[f.name])) ids.add(id)
+          // Try both field name and field id when collecting IDs
+          const fieldValue = (row as any)?.data?.[f.name] ?? ((f as any).id ? (row as any)?.data?.[(f as any).id] : null)
+          for (const id of collectIds(fieldValue)) ids.add(id)
         }
         if (ids.size === 0) continue
         const map = await resolveLinkedFieldDisplayMap(f, Array.from(ids))
@@ -823,7 +833,18 @@ export default function TimelineView({
         let groupValue: string | null = null
         if (resolvedGroupByField) {
           const groupFieldName = resolvedGroupByField.name
-          const groupFieldValue = row.data[groupFieldName]
+          const groupFieldId = (resolvedGroupByField as any).id
+          // Try both field name and field id when reading the value
+          const groupFieldValue = row.data[groupFieldName] ?? (groupFieldId ? row.data[groupFieldId] : null)
+          
+          // Helper to resolve linked table field value to display label
+          const resolveLinkedValue = (id: string): string => {
+            if (!id || !id.trim()) return id
+            const trimmedId = id.trim()
+            // Try both field name and field id as keys
+            const labelMap = linkedValueLabelMaps[groupFieldName] || linkedValueLabelMaps[groupFieldId] || {}
+            return labelMap[trimmedId] || labelMap[id] || id
+          }
           
           if (groupFieldValue) {
             // Normalize common value shapes to a stable string label.
@@ -835,14 +856,14 @@ export default function TimelineView({
               const id = first && typeof first === "object" && "id" in (first as any) ? String((first as any).id) : String(first ?? "")
               groupValue =
                 resolvedGroupByField.type === "link_to_table" && id.trim()
-                  ? linkedValueLabelMaps[groupFieldName]?.[id.trim()] ?? id
+                  ? resolveLinkedValue(id)
                   : id
             } else if (groupFieldValue instanceof Date) {
               groupValue = isNaN(groupFieldValue.getTime()) ? '' : groupFieldValue.toISOString()
             } else if (typeof groupFieldValue === 'object') {
               if (resolvedGroupByField.type === "link_to_table" && groupFieldValue && "id" in (groupFieldValue as any)) {
                 const id = String((groupFieldValue as any).id ?? "").trim()
-                groupValue = id ? (linkedValueLabelMaps[groupFieldName]?.[id] ?? id) : ""
+                groupValue = id ? resolveLinkedValue(id) : ""
               } else {
                 try {
                   groupValue = JSON.stringify(groupFieldValue)
@@ -854,7 +875,7 @@ export default function TimelineView({
               const id = String(groupFieldValue)
               groupValue =
                 resolvedGroupByField.type === "link_to_table" && id.trim()
-                  ? linkedValueLabelMaps[groupFieldName]?.[id.trim()] ?? id
+                  ? resolveLinkedValue(id)
                   : id
             }
             if (groupValue !== null) groupValue = groupValue.trim()

@@ -927,8 +927,8 @@ export async function DELETE(
     let deleteError: any = null
 
     if (userIsAdmin) {
-      // For admins, use SQL method directly (bypasses RLS and most triggers)
-      console.log('[Field Delete] User is admin, using SQL method to bypass RLS...')
+      // For admins, use admin client directly (bypasses RLS)
+      console.log('[Field Delete] User is admin, using admin client to bypass RLS...')
       console.log('[Field Delete] Field ID:', fieldId, 'Field name:', field?.name)
       
       // Check if it's a system field first (triggers will block these)
@@ -940,52 +940,71 @@ export async function DELETE(
       }
       
       try {
-        // Use execute_sql_safe which runs as SECURITY DEFINER and bypasses RLS
-        // Note: Triggers will still fire, but we've already checked for system fields
-        const sqlResult = await supabase.rpc('execute_sql_safe', {
-          sql_text: `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
+        // Use admin client directly - it bypasses RLS
+        const adminClient = createAdminClient()
+        const adminResult = await adminClient
+          .from('table_fields')
+          .delete()
+          .eq('id', fieldId)
+          .select('id')
+        
+        console.log('[Field Delete] Admin client result:', {
+          data: adminResult.data,
+          error: adminResult.error,
+          dataLength: adminResult.data?.length || 0
         })
         
-        if (sqlResult.error) {
-          console.error('[Field Delete] SQL delete error:', sqlResult.error)
-          deleteError = sqlResult.error
+        if (adminResult.error) {
+          console.error('[Field Delete] Admin client delete error:', adminResult.error)
+          
+          // Check if it's a trigger exception (system field protection)
+          if (adminResult.error.message?.includes('cannot be deleted') || 
+              adminResult.error.message?.includes('System field')) {
+            deleteError = new Error(`Trigger blocked deletion: ${adminResult.error.message}. This field may be a system field.`)
+          } else {
+            deleteError = adminResult.error
+          }
+        } else if (adminResult.data && adminResult.data.length > 0) {
+          // Successfully deleted
+          deletedRows = adminResult.data
+          deleteError = null
+          console.log('[Field Delete] Successfully deleted via admin client')
         } else {
-          // Verify deletion using admin client (bypasses RLS)
+          // Admin client returned 0 rows - try SQL as fallback
+          console.warn('[Field Delete] Admin client returned 0 rows, trying SQL fallback...')
           try {
-            const adminClient = createAdminClient()
-            const { data: verifyField, error: verifyError } = await adminClient
-              .from('table_fields')
-              .select('id, name')
-              .eq('id', fieldId)
-              .maybeSingle()
-            
-            console.log('[Field Delete] Verification result:', { 
-              fieldExists: !!verifyField, 
-              fieldName: verifyField?.name,
-              verifyError 
+            const sqlResult = await supabase.rpc('execute_sql_safe', {
+              sql_text: `DELETE FROM public.table_fields WHERE id = '${fieldId}'::uuid;`
             })
             
-            if (!verifyField) {
-              // Field was deleted successfully
-              deletedRows = [{ id: fieldId }]
-              deleteError = null
-              console.log('[Field Delete] Successfully deleted via SQL (admin)')
+            if (sqlResult.error) {
+              console.error('[Field Delete] SQL fallback error:', sqlResult.error)
+              deleteError = sqlResult.error
             } else {
-              // Field still exists - trigger may have blocked it
-              console.warn('[Field Delete] SQL delete executed but field still exists - trigger may be blocking')
-              console.warn('[Field Delete] Field details:', verifyField)
-              // Don't set deletedRows - will fall through to error
+              // SQL executed - verify deletion
+              const verifyResult = await adminClient
+                .from('table_fields')
+                .select('id')
+                .eq('id', fieldId)
+                .maybeSingle()
+              
+              if (!verifyResult.data) {
+                deletedRows = [{ id: fieldId }]
+                deleteError = null
+                console.log('[Field Delete] Successfully deleted via SQL fallback')
+              } else {
+                console.error('[Field Delete] Both admin client and SQL failed to delete field')
+                deleteError = new Error('Field deletion failed: Both admin client and SQL methods returned 0 rows. This may indicate a trigger or constraint is blocking the deletion.')
+              }
             }
-          } catch (verifyError: any) {
-            // If verification fails, assume deletion succeeded (SQL executed without error)
-            console.warn('[Field Delete] Could not verify deletion, but SQL executed successfully:', verifyError)
-            deletedRows = [{ id: fieldId }]
-            deleteError = null
+          } catch (sqlError: any) {
+            console.error('[Field Delete] SQL fallback exception:', sqlError)
+            deleteError = sqlError
           }
         }
-      } catch (sqlError: any) {
-        console.error('[Field Delete] SQL delete exception:', sqlError)
-        deleteError = sqlError
+      } catch (adminError: any) {
+        console.error('[Field Delete] Failed to create admin client:', adminError)
+        deleteError = adminError
       }
     } else {
       // For non-admins, try regular client (respects RLS)

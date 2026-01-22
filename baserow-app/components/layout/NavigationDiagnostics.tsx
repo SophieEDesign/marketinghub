@@ -1,0 +1,204 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
+
+/**
+ * NavigationDiagnostics - Helps identify what's blocking navigation clicks
+ * 
+ * Enable via: localStorage.setItem("DEBUG_NAVIGATION", "1")
+ * Then open browser console to see diagnostic info
+ */
+export default function NavigationDiagnostics() {
+  const pathname = usePathname()
+  const [enabled, setEnabled] = useState(false)
+
+  useEffect(() => {
+    // Check if diagnostics are enabled
+    const checkEnabled = () => {
+      return typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+    }
+    
+    setEnabled(checkEnabled())
+    
+    const interval = setInterval(() => {
+      setEnabled(checkEnabled())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    // Run diagnostics on pathname change
+    const runDiagnostics = () => {
+      console.group("🔍 Navigation Diagnostics")
+      
+      // 1. Check for blocking overlays
+      const overlays = document.querySelectorAll('[class*="fixed"][class*="inset"]')
+      console.log("📋 Overlays:", {
+        count: overlays.length,
+        items: Array.from(overlays).map(el => ({
+          element: el,
+          classes: el.className,
+          zIndex: window.getComputedStyle(el).zIndex,
+          pointerEvents: window.getComputedStyle(el).pointerEvents,
+          display: window.getComputedStyle(el).display,
+        }))
+      })
+
+      // 2. Check body/html styles
+      const body = document.body
+      const html = document.documentElement
+      console.log("🎨 Body/HTML Styles:", {
+        body: {
+          pointerEvents: body.style.pointerEvents || window.getComputedStyle(body).pointerEvents,
+          userSelect: body.style.userSelect || window.getComputedStyle(body).userSelect,
+          cursor: body.style.cursor || window.getComputedStyle(body).cursor,
+          overflow: body.style.overflow || window.getComputedStyle(body).overflow,
+          dataScrollLocked: body.getAttribute("data-scroll-locked"),
+        },
+        html: {
+          pointerEvents: html.style.pointerEvents || window.getComputedStyle(html).pointerEvents,
+          userSelect: html.style.userSelect || window.getComputedStyle(html).userSelect,
+          overflow: html.style.overflow || window.getComputedStyle(html).overflow,
+        }
+      })
+
+      // 3. Check for open modals/dialogs
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      console.log("🚪 Dialogs:", {
+        count: dialogs.length,
+        items: Array.from(dialogs).map(el => ({
+          element: el,
+          dataState: el.getAttribute("data-state"),
+          ariaModal: el.getAttribute("aria-modal"),
+          display: window.getComputedStyle(el).display,
+        }))
+      })
+
+      // 4. Check sidebar links
+      const sidebarLinks = document.querySelectorAll('[data-sidebar] a[href], [data-sidebar] Link')
+      console.log("🔗 Sidebar Links:", {
+        count: sidebarLinks.length,
+        items: Array.from(sidebarLinks).map(el => ({
+          element: el,
+          href: el.getAttribute("href"),
+          pointerEvents: window.getComputedStyle(el).pointerEvents,
+          zIndex: window.getComputedStyle(el).zIndex,
+          display: window.getComputedStyle(el).display,
+        }))
+      })
+
+      // 5. Check for elements with pointer-events: none
+      const noPointerEvents = Array.from(document.querySelectorAll("*")).filter(el => {
+        const style = window.getComputedStyle(el)
+        return style.pointerEvents === "none"
+      })
+      console.log("🚫 Elements with pointer-events: none:", {
+        count: noPointerEvents.length,
+        top10: noPointerEvents.slice(0, 10).map(el => ({
+          tag: el.tagName,
+          classes: el.className,
+          id: el.id,
+        }))
+      })
+
+      // 6. Check z-index stacking
+      const highZIndex = Array.from(document.querySelectorAll("*")).filter(el => {
+        const zIndex = parseInt(window.getComputedStyle(el).zIndex)
+        return !isNaN(zIndex) && zIndex >= 40
+      }).sort((a, b) => {
+        const za = parseInt(window.getComputedStyle(a).zIndex)
+        const zb = parseInt(window.getComputedStyle(b).zIndex)
+        return zb - za
+      })
+      console.log("📚 High Z-Index Elements (≥40):", {
+        count: highZIndex.length,
+        top10: highZIndex.slice(0, 10).map(el => ({
+          tag: el.tagName,
+          classes: el.className,
+          zIndex: window.getComputedStyle(el).zIndex,
+          pointerEvents: window.getComputedStyle(el).pointerEvents,
+        }))
+      })
+
+      // 7. Check for drag state
+      const dragElements = document.querySelectorAll('[class*="dragging"], [class*="drag"]')
+      console.log("🖱️ Drag Elements:", {
+        count: dragElements.length,
+        items: Array.from(dragElements).map(el => ({
+          element: el,
+          classes: el.className,
+        }))
+      })
+
+      // 8. Test click on sidebar link
+      const testLink = document.querySelector('[data-sidebar] a[href^="/pages/"]') as HTMLAnchorElement
+      if (testLink) {
+        console.log("🧪 Test Link Found:", {
+          href: testLink.href,
+          element: testLink,
+          canClick: window.getComputedStyle(testLink).pointerEvents !== "none",
+        })
+        
+        // Try to simulate click and see what happens
+        testLink.addEventListener("click", (e) => {
+          console.log("✅ Sidebar link clicked!", {
+            href: testLink.href,
+            defaultPrevented: e.defaultPrevented,
+            target: e.target,
+          })
+        }, { once: true, capture: true })
+      }
+
+      console.groupEnd()
+    }
+
+    // Run immediately and after a delay
+    runDiagnostics()
+    const timeout = setTimeout(runDiagnostics, 1000)
+
+    return () => clearTimeout(timeout)
+  }, [pathname, enabled])
+
+  // Add click listener to document to catch blocked clicks
+  useEffect(() => {
+    if (!enabled) return
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const sidebarLink = target.closest('[data-sidebar] a[href]')
+      
+      if (sidebarLink) {
+        console.log("🖱️ Click on sidebar link:", {
+          href: sidebarLink.getAttribute("href"),
+          element: sidebarLink,
+          defaultPrevented: e.defaultPrevented,
+          pointerEvents: window.getComputedStyle(sidebarLink).pointerEvents,
+          zIndex: window.getComputedStyle(sidebarLink).zIndex,
+          pathname: pathname,
+        })
+
+        // Check if something is blocking
+        const rect = sidebarLink.getBoundingClientRect()
+        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
+        
+        if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
+          console.warn("⚠️ Click blocked! Element at point:", {
+            blockingElement: elementAtPoint,
+            blockingClasses: elementAtPoint?.className,
+            blockingZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : null,
+            expectedElement: sidebarLink,
+          })
+        }
+      }
+    }
+
+    document.addEventListener("click", handleClick, true) // Use capture phase
+    return () => document.removeEventListener("click", handleClick, true)
+  }, [enabled, pathname])
+
+  return null
+}

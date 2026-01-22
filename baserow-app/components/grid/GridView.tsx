@@ -305,7 +305,13 @@ function DraggableColumnHeader({
     <th
       ref={setNodeRef}
       style={style}
-      className={`px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 ${isFrozen ? 'z-20' : 'z-10'} group hover:bg-gray-100 transition-colors relative`}
+      className={`px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 transition-colors relative ${
+        isFrozen ? 'z-20' : 'z-10'
+      } group ${
+        isSelected 
+          ? 'bg-blue-100 ring-2 ring-blue-500' 
+          : 'bg-gray-50 hover:bg-gray-100'
+      }`}
     >
       <div className="flex items-center justify-between gap-1 w-full">
         {/* Drag handle */}
@@ -319,7 +325,11 @@ function DraggableColumnHeader({
         
         {/* Column name - clickable to select column (entire area) */}
         <div
-          className={`flex-1 text-left px-2 py-1 rounded hover:bg-gray-100/50 transition-colors flex items-center gap-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50 ring-1 ring-blue-400/30' : ''}`}
+          className={`flex-1 text-left px-2 py-1 rounded transition-colors flex items-center gap-1 min-w-0 cursor-pointer ${
+            isSelected 
+              ? 'bg-blue-100 ring-2 ring-blue-500 font-semibold' 
+              : 'hover:bg-gray-100/50'
+          }`}
           onClick={(e) => {
             e.stopPropagation()
             // Select column when clicking anywhere on the name area
@@ -2140,14 +2150,18 @@ export default function GridView({
   }
 
   function handleColumnSelect(fieldName: string) {
-    setSelectedColumnName(fieldName)
-    // Copy column name to clipboard when selected
-    navigator.clipboard.writeText(fieldName).then(() => {
-      // Could show toast notification here
-      console.log('Column selected and copied:', fieldName)
-    }).catch(err => {
-      console.error('Failed to copy column name:', err)
-    })
+    // Toggle selection - if already selected, deselect; otherwise select
+    const newSelection = selectedColumnName === fieldName ? null : fieldName
+    setSelectedColumnName(newSelection)
+    
+    if (newSelection) {
+      // Copy column name to clipboard when selected
+      navigator.clipboard.writeText(fieldName).then(() => {
+        console.log('Column selected and copied:', fieldName)
+      }).catch(err => {
+        console.error('Failed to copy column name:', err)
+      })
+    }
   }
 
   // Apply client-side search

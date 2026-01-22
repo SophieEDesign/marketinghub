@@ -91,18 +91,20 @@ function compareValues(
 ): number {
   const multiplier = ascending ? 1 : -1
 
-  // Handle null/undefined values (always sort to end)
+  // Handle null/undefined values (always sort to end, regardless of direction)
   if (a === null || a === undefined) {
     if (b === null || b === undefined) return 0
-    return 1 * multiplier // a is null, b is not - a goes after
+    return 1 // a is null, b is not - a always goes after (end)
   }
   if (b === null || b === undefined) {
-    return -1 * multiplier // b is null, a is not - b goes after
+    return -1 // b is null, a is not - b always goes after (end)
   }
 
   switch (field.type) {
     case 'single_select': {
       // Sort by the order in field.options.selectOptions (sort_index) - this is the source of truth
+      // ASC: lower sort_index values come first (multiplier = 1)
+      // DESC: higher sort_index values come first (multiplier = -1)
       const { selectOptions } = normalizeSelectOptionsForUi('single_select', field.options)
       const indexByLabel = new Map<string, number>()
       for (const o of selectOptions) {
@@ -114,11 +116,14 @@ function compareValues(
       const aOrder = indexByLabel.get(aLabel) ?? Number.POSITIVE_INFINITY
       const bOrder = indexByLabel.get(bLabel) ?? Number.POSITIVE_INFINITY
       
+      // Apply direction: ASC (multiplier=1) means lower sort_index first, DESC (multiplier=-1) means higher sort_index first
       return (aOrder - bOrder) * multiplier
     }
 
     case 'multi_select': {
       // Sort by first value's sort_index from selectOptions
+      // ASC: lower sort_index values come first (multiplier = 1)
+      // DESC: higher sort_index values come first (multiplier = -1)
       const { selectOptions } = normalizeSelectOptionsForUi('multi_select', field.options)
       const indexByLabel = new Map<string, number>()
       for (const o of selectOptions) {
@@ -128,18 +133,19 @@ function compareValues(
       const aFirst = Array.isArray(a) && a.length > 0 ? String(a[0]) : ''
       const bFirst = Array.isArray(b) && b.length > 0 ? String(b[0]) : ''
       
-      // If empty, sort to end
+      // If empty, sort to end (regardless of direction)
       if (!aFirst && !bFirst) return 0
-      if (!aFirst) return 1 * multiplier
-      if (!bFirst) return -1 * multiplier
+      if (!aFirst) return 1 // a is empty, b is not - a always goes after (end)
+      if (!bFirst) return -1 // b is empty, a is not - b always goes after (end)
       
       const aOrder = indexByLabel.get(aFirst) ?? Number.POSITIVE_INFINITY
       const bOrder = indexByLabel.get(bFirst) ?? Number.POSITIVE_INFINITY
       
-      // If same order, fall back to label comparison for stability
+      // Apply direction: ASC (multiplier=1) means lower sort_index first, DESC (multiplier=-1) means higher sort_index first
       if (aOrder !== bOrder) {
         return (aOrder - bOrder) * multiplier
       }
+      // If same order, fall back to label comparison for stability (also respects direction)
       return aFirst.localeCompare(bFirst) * multiplier
     }
 
