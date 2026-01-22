@@ -186,6 +186,8 @@ function DraggableColumnHeader({
   onResizeStart,
   onResize,
   onResizeEnd,
+  isFrozen = false,
+  frozenLeft,
 }: {
   fieldName: string
   tableField?: TableField
@@ -196,6 +198,8 @@ function DraggableColumnHeader({
   onResizeStart: (fieldName: string) => void
   onResize: (fieldName: string, width: number) => void
   onResizeEnd: () => void
+  isFrozen?: boolean
+  frozenLeft?: number
 }) {
   const {
     attributes,
@@ -210,13 +214,20 @@ function DraggableColumnHeader({
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(0)
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     width: `${width}px`,
     minWidth: `${width}px`,
     maxWidth: `${width}px`,
+  }
+  
+  // Apply frozen column sticky positioning
+  if (isFrozen && frozenLeft !== undefined) {
+    style.position = 'sticky'
+    style.left = `${frozenLeft}px`
+    style.zIndex = 20
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -246,7 +257,7 @@ function DraggableColumnHeader({
     <th
       ref={setNodeRef}
       style={style}
-      className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 z-10 group hover:bg-gray-100 transition-colors relative"
+      className={`px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 ${isFrozen ? 'z-20' : 'z-10'} group hover:bg-gray-100 transition-colors relative`}
     >
       <div className="flex items-center justify-between gap-2">
         {/* Drag handle */}
@@ -347,6 +358,7 @@ export default function GridView({
   const [hoverResizeRowId, setHoverResizeRowId] = useState<string | null>(null)
   const [resizeLineTop, setResizeLineTop] = useState<number | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const [frozenColumns, setFrozenColumns] = useState<number>(0) // Number of columns to freeze (typically 1 for first column)
 
   // Prevent runaway "create table" loops on repeated errors.
   // (E.g. when the error is actually a missing column, not a missing table.)
@@ -599,12 +611,12 @@ export default function GridView({
         const supabase = createClient()
         let { data, error } = await supabase
           .from('grid_view_settings')
-          .select('column_order, column_widths, row_heights')
+          .select('column_order, column_widths, row_heights, frozen_columns')
           .eq('view_id', viewUuid)
           .maybeSingle()
 
-        // Backward compatibility: older schemas won't have row_heights yet.
-        if (error && ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('row_heights'))) {
+        // Backward compatibility: older schemas won't have row_heights or frozen_columns yet.
+        if (error && ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('row_heights') || String((error as any)?.message || '').includes('frozen_columns'))) {
           const retry = await supabase
             .from('grid_view_settings')
             .select('column_order, column_widths')
@@ -646,6 +658,11 @@ export default function GridView({
           } catch {
             // ignore
           }
+        }
+
+        // Load frozen columns
+        if (typeof data?.frozen_columns === 'number' && data.frozen_columns >= 0) {
+          setFrozenColumns(data.frozen_columns)
         }
 
         // Load column order - CRITICAL: Validate against current fields
@@ -751,6 +768,7 @@ export default function GridView({
           column_order: columnOrder,
           column_widths: columnWidths,
           row_heights: rowHeights,
+          frozen_columns: frozenColumns,
         }
 
         const tryUpdateOrInsert = async (payload: any) => {
@@ -762,7 +780,7 @@ export default function GridView({
             ...payload,
             column_wrap_text: {},
             row_height: 'medium',
-            frozen_columns: 0,
+            frozen_columns: frozenColumns,
           }])
         }
 
@@ -780,7 +798,7 @@ export default function GridView({
     // Debounce saves to avoid too many database calls
     const timeoutId = setTimeout(saveColumnSettings, 500)
     return () => clearTimeout(timeoutId)
-  }, [columnOrder, columnWidths, rowHeights, viewUuid])
+  }, [columnOrder, columnWidths, rowHeights, frozenColumns, viewUuid])
 
   const startRowResize = useCallback((rowId: string, startHeight: number, startClientY: number) => {
     if (isMobile) return
@@ -2134,19 +2152,11 @@ export default function GridView({
   return (
     <div className="w-full h-full flex flex-col relative" style={{ paddingBottom: isEditing ? '60px' : '0' }}>
       {/* Toolbar - Only show builder controls in edit mode */}
-      {isEditing && (
+      {/* NOTE: "Add Row" button removed from top toolbar per Airtable-style refinement rules */}
+      {/* Records are added via bottom-of-table button or inline creation */}
+      {isEditing && onAddField && (
         <div className="flex-shrink-0 mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Only show Add Row button if inline create is allowed */}
-            {allowInlineCreate && (
-              <button
-                onClick={handleAddRow}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Row
-              </button>
-            )}
             {onAddField && (
               <button
                 onClick={onAddField}
@@ -2254,7 +2264,7 @@ export default function GridView({
                                    !!field.field_name && 
                                    typeof field.field_name === 'string'
                           })
-                          .map((field) => {
+                          .map((field, fieldIndex) => {
                             // CRITICAL: Defensive access to tableField and columnWidth
                             const tableField = Array.isArray(safeTableFields) 
                               ? safeTableFields.find(f => 
@@ -2269,6 +2279,24 @@ export default function GridView({
                               ? (columnWidths[field.field_name] || COLUMN_DEFAULT_WIDTH)
                               : COLUMN_DEFAULT_WIDTH
                             
+                            // Calculate left offset for frozen columns
+                            // Account for record open column (32px) and image column (48px if present)
+                            const recordOpenWidth = (enableRecordOpen && allowOpenRecord) ? 32 : 0
+                            const imageColumnWidth = imageField ? 48 : 0
+                            const leftOffset = recordOpenWidth + imageColumnWidth + 
+                              (fieldIndex < frozenColumns 
+                                ? Array.from({ length: fieldIndex }, (_, i) => {
+                                    const prevField = safeVisibleFields[i]
+                                    if (!prevField) return 0
+                                    const prevWidth = typeof columnWidths === 'object' && columnWidths !== null
+                                      ? (columnWidths[prevField.field_name] || COLUMN_DEFAULT_WIDTH)
+                                      : COLUMN_DEFAULT_WIDTH
+                                    return prevWidth
+                                  }).reduce((sum, w) => sum + w, 0)
+                                : 0)
+                            
+                            const isFrozen = fieldIndex < frozenColumns
+                            
                             return (
                               <DraggableColumnHeader
                                 key={field.field_name}
@@ -2281,6 +2309,8 @@ export default function GridView({
                                 onResizeStart={handleResizeStart}
                                 onResize={handleResize}
                                 onResizeEnd={handleResizeEnd}
+                                isFrozen={isFrozen}
+                                frozenLeft={isFrozen ? leftOffset : undefined}
                               />
                             )
                           })
@@ -2360,7 +2390,7 @@ export default function GridView({
                       className={`border-b border-gray-100 transition-colors ${
                         thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                       } cursor-default`}
-                      style={{ ...borderColor, height: `${thisRowHeight}px` }}
+                      style={{ ...borderColor, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
                       data-rowid="true"
                       data-row-key={thisRowId || ''}
                       onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
@@ -2410,7 +2440,7 @@ export default function GridView({
                                 typeof field.field_name === 'string'
                               )
                             })
-                            .map((field) => {
+                            .map((field, fieldIndex) => {
                               const tableField = Array.isArray(safeTableFields)
                                 ? safeTableFields.find(
                                     (f) =>
@@ -2428,12 +2458,46 @@ export default function GridView({
 
                               const rowId = row && typeof row === 'object' && row.id ? row.id : null
                               const canUseCellFactory = !!tableField && rowId !== null
+                              
+                              // Calculate left offset for frozen columns (same as header)
+                              const recordOpenWidth = (enableRecordOpen && allowOpenRecord) ? 32 : 0
+                              const imageColumnWidth = imageField ? 48 : 0
+                              const leftOffset = recordOpenWidth + imageColumnWidth + 
+                                (fieldIndex < frozenColumns 
+                                  ? Array.from({ length: fieldIndex }, (_, i) => {
+                                      const prevField = safeVisibleFields[i]
+                                      if (!prevField) return 0
+                                      const prevWidth = typeof columnWidths === 'object' && columnWidths !== null
+                                        ? (columnWidths[prevField.field_name] || COLUMN_DEFAULT_WIDTH)
+                                        : COLUMN_DEFAULT_WIDTH
+                                      return prevWidth
+                                    }).reduce((sum, w) => sum + w, 0)
+                                  : 0)
+                              
+                              const isFrozen = fieldIndex < frozenColumns
+                              
+                              const cellStyle: React.CSSProperties = { 
+                                width: `${columnWidth}px`, 
+                                minWidth: `${columnWidth}px`, 
+                                maxWidth: `${columnWidth}px`,
+                                height: `${thisRowHeight}px`,
+                                minHeight: `${thisRowHeight}px`,
+                                maxHeight: `${thisRowHeight}px`,
+                                overflow: 'hidden'
+                              }
+                              
+                              if (isFrozen && frozenColumns > 0) {
+                                cellStyle.position = 'sticky'
+                                cellStyle.left = `${leftOffset}px`
+                                cellStyle.zIndex = 10
+                                cellStyle.backgroundColor = 'white'
+                              }
 
                               return (
                                 <td
                                   key={field.field_name}
                                   className="px-0 py-0"
-                                  style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                  style={cellStyle}
                                   onClick={(e) => e.stopPropagation()}
                                   onDoubleClick={(e) => e.stopPropagation()}
                                 >
@@ -2494,7 +2558,7 @@ export default function GridView({
                     className={`border-b border-gray-100 transition-colors ${
                       thisRowId && selectedRowId === thisRowId ? 'bg-blue-50' : 'hover:bg-gray-50/50'
                     } cursor-default`}
-                    style={{ ...borderColor, height: `${thisRowHeight}px` }}
+                    style={{ ...borderColor, height: `${thisRowHeight}px`, minHeight: `${thisRowHeight}px`, maxHeight: `${thisRowHeight}px` }}
                     data-rowid="true"
                     data-row-key={thisRowId || ''}
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
@@ -2545,7 +2609,7 @@ export default function GridView({
                                    !!field.field_name && 
                                    typeof field.field_name === 'string'
                           })
-                          .map((field) => {
+                          .map((field, fieldIndex) => {
                             // CRITICAL: Defensive access to tableField, columnWidth, and row.id
                             const tableField = Array.isArray(safeTableFields) 
                               ? safeTableFields.find(f => 
@@ -2564,12 +2628,46 @@ export default function GridView({
                             const rowId = row && typeof row === 'object' && row.id ? row.id : null
                             
                             const canUseCellFactory = !!tableField && rowId !== null
+                            
+                            // Calculate left offset for frozen columns (same as header)
+                            const recordOpenWidth = (enableRecordOpen && allowOpenRecord) ? 32 : 0
+                            const imageColumnWidth = imageField ? 48 : 0
+                            const leftOffset = recordOpenWidth + imageColumnWidth + 
+                              (fieldIndex < frozenColumns 
+                                ? Array.from({ length: fieldIndex }, (_, i) => {
+                                    const prevField = safeVisibleFields[i]
+                                    if (!prevField) return 0
+                                    const prevWidth = typeof columnWidths === 'object' && columnWidths !== null
+                                      ? (columnWidths[prevField.field_name] || COLUMN_DEFAULT_WIDTH)
+                                      : COLUMN_DEFAULT_WIDTH
+                                    return prevWidth
+                                  }).reduce((sum, w) => sum + w, 0)
+                                : 0)
+                            
+                            const isFrozen = fieldIndex < frozenColumns
+                            
+                            const cellStyle: React.CSSProperties = { 
+                              width: `${columnWidth}px`, 
+                              minWidth: `${columnWidth}px`, 
+                              maxWidth: `${columnWidth}px`,
+                              height: `${thisRowHeight}px`,
+                              minHeight: `${thisRowHeight}px`,
+                              maxHeight: `${thisRowHeight}px`,
+                              overflow: 'hidden'
+                            }
+                            
+                            if (isFrozen && frozenColumns > 0) {
+                              cellStyle.position = 'sticky'
+                              cellStyle.left = `${leftOffset}px`
+                              cellStyle.zIndex = 10
+                              cellStyle.backgroundColor = 'white'
+                            }
 
                             return (
                               <td
                                 key={field.field_name}
                                 className="px-0 py-0"
-                                style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                style={cellStyle}
                                 onClick={(e) => e.stopPropagation()}
                                 onDoubleClick={(e) => e.stopPropagation()}
                               >
@@ -2619,36 +2717,16 @@ export default function GridView({
         </div>
       </div>
 
-      {/* Fixed bottom toolbar - Always visible */}
-      {isEditing && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40 px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Only show Add Row button if inline create is allowed */}
-            {allowInlineCreate && (
-              <button
-                onClick={handleAddRow}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Row
-              </button>
-            )}
-            {onAddField && (
-              <button
-                onClick={onAddField}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Add Field
-              </button>
-            )}
-          </div>
-          <div className="text-sm text-gray-500">
-            {Array.isArray(filteredRows) ? filteredRows.length : 0} {Array.isArray(filteredRows) && filteredRows.length === 1 ? "row" : "rows"}
-            {searchTerm && Array.isArray(filteredRows) && Array.isArray(safeRows) && filteredRows.length !== safeRows.length && (
-              <span className="ml-1">(filtered from {safeRows.length})</span>
-            )}
-          </div>
+      {/* Add record button at bottom of table (Airtable-style) */}
+      {allowInlineCreate && (
+        <div className="flex-shrink-0 border-t border-gray-200 bg-white px-4 py-2">
+          <button
+            onClick={handleAddRow}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add record
+          </button>
         </div>
       )}
     </div>

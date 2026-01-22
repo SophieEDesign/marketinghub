@@ -79,18 +79,33 @@ export default function TextCell({
   }
 
   if (editing && editable) {
+    // Container to properly constrain the input within the cell
+    const containerStyle: React.CSSProperties = {
+      height: rowHeight ? `${rowHeight}px` : '100%',
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      overflow: 'hidden',
+    }
+
     return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        className="w-full h-full px-3 py-1 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
-        style={{ height: rowHeight ? `${rowHeight}px` : 'auto' }}
-        disabled={saving}
-      />
+      <div style={containerStyle}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="w-full px-3 py-1 text-sm border border-blue-400 outline-none bg-white focus:ring-2 focus:ring-blue-400/20 focus:ring-offset-1 rounded-md"
+          style={{ 
+            height: rowHeight ? `${rowHeight - 2}px` : 'calc(100% - 2px)',
+            minHeight: rowHeight ? `${rowHeight - 2}px` : 'auto',
+            maxHeight: rowHeight ? `${rowHeight - 2}px` : 'none',
+          }}
+          disabled={saving}
+        />
+      </div>
     )
   }
 
@@ -101,9 +116,12 @@ export default function TextCell({
   const isPlaceholder = isEmpty
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
+  // CRITICAL: Row height must be fixed - cells must not resize rows
   const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
     minHeight: rowHeight ? `${rowHeight}px` : 'auto',
     maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+    overflow: 'hidden',
   }
   const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 

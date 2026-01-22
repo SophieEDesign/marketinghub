@@ -80,9 +80,12 @@ export default function LongTextCell({
   const plainText = stripHtml(value)
 
   // Controlled wrapping: single line with ellipsis by default, max 2 lines if wrapText enabled
+  // CRITICAL: Row height must be fixed - cells must not resize rows
   const cellStyle: React.CSSProperties = {
+    height: rowHeight ? `${rowHeight}px` : 'auto',
     minHeight: rowHeight ? `${rowHeight}px` : 'auto',
     maxHeight: rowHeight ? `${rowHeight}px` : 'none',
+    overflow: 'hidden',
   }
   const contentMaxHeight = rowHeight ? `${Math.max(16, rowHeight - 8)}px` : 'none'
 

@@ -75,7 +75,13 @@ export default function NumberCell({
     return val.toString()
   }
 
-  const containerStyle: React.CSSProperties = rowHeight ? { height: `${rowHeight}px` } : {}
+  // CRITICAL: Row height must be fixed - cells must not resize rows
+  const containerStyle: React.CSSProperties = rowHeight ? { 
+    height: `${rowHeight}px`,
+    minHeight: `${rowHeight}px`,
+    maxHeight: `${rowHeight}px`,
+    overflow: 'hidden'
+  } : {}
 
   if (editing && editable) {
     return (

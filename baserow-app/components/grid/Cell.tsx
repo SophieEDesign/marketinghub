@@ -262,36 +262,65 @@ export default function Cell({ value, fieldName, fieldType, fieldOptions, isVirt
     }
 
     if (isLongText) {
+      const textareaContainerStyle: React.CSSProperties = {
+        height: rowHeight ? `${rowHeight}px` : '100%',
+        width: '100%',
+        display: 'flex',
+        overflow: 'hidden',
+      }
+
       return (
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          className="w-full h-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
-          placeholder="Enter text..."
-        />
+        <div style={textareaContainerStyle}>
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="w-full px-2 py-1 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+            style={{
+              height: rowHeight ? `${rowHeight - 2}px` : 'calc(100% - 2px)',
+              minHeight: rowHeight ? `${rowHeight - 2}px` : 'auto',
+              maxHeight: rowHeight ? `${rowHeight - 2}px` : 'none',
+            }}
+            placeholder="Enter text..."
+          />
+        </div>
       )
     }
 
+    const inputContainerStyle: React.CSSProperties = {
+      height: rowHeight ? `${rowHeight}px` : '100%',
+      width: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      overflow: 'hidden',
+    }
+
     return (
-      <input
-        ref={inputRef as React.RefObject<HTMLInputElement>}
-        type={inputType}
-        value={editValue}
-        onChange={(e) => {
-          const newValue = inputType === "number" 
-            ? (e.target.value === "" ? null : Number(e.target.value))
-            : e.target.value
-          setEditValue(newValue)
-        }}
-        onBlur={handleSave}
-        onKeyDown={handleKeyDown}
-        className="w-full h-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-        placeholder="Enter value..."
-        disabled={saving}
-      />
+      <div style={inputContainerStyle}>
+        <input
+          ref={inputRef as React.RefObject<HTMLInputElement>}
+          type={inputType}
+          value={editValue}
+          onChange={(e) => {
+            const newValue = inputType === "number" 
+              ? (e.target.value === "" ? null : Number(e.target.value))
+              : e.target.value
+            setEditValue(newValue)
+          }}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="w-full px-2 text-sm border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          style={{
+            height: rowHeight ? `${rowHeight - 2}px` : 'calc(100% - 2px)',
+            minHeight: rowHeight ? `${rowHeight - 2}px` : 'auto',
+            maxHeight: rowHeight ? `${rowHeight - 2}px` : 'none',
+          }}
+          placeholder="Enter value..."
+          disabled={saving}
+        />
+      </div>
     )
   }
 
