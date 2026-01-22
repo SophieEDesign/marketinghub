@@ -14,6 +14,8 @@ import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import BlockFilterEditor from "./BlockFilterEditor"
+import TableSelector from "./shared/TableSelector"
+import ViewSelector from "./shared/ViewSelector"
 
 interface KPIDataSettingsProps {
   config: BlockConfig
@@ -43,46 +45,21 @@ export default function KPIDataSettings({
   return (
     <div className="space-y-4">
       {/* Table */}
-      <div className="space-y-2">
-        <Label>Table *</Label>
-        <Select
-          value={config.table_id || ""}
-          onValueChange={onTableChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a table" />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((table) => (
-              <SelectItem key={table.id} value={table.id}>
-                {table.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TableSelector
+        value={config.table_id || ""}
+        onChange={onTableChange}
+        tables={tables}
+        required={true}
+      />
 
-      {/* View (optional) */}
-      {config.table_id && views.length > 0 && (
-        <div className="space-y-2">
-          <Label>View (optional)</Label>
-          <Select
-            value={config.view_id || "__all__"}
-            onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All records" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All records</SelectItem>
-              {views.map((view) => (
-                <SelectItem key={view.id} value={view.id}>
-                  {view.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* View Selection (optional) */}
+      {config.table_id && (
+        <ViewSelector
+          value={config.view_id}
+          onChange={(viewId) => onUpdate({ view_id: viewId })}
+          views={views}
+          tableId={config.table_id}
+        />
       )}
 
       {/* Metric */}

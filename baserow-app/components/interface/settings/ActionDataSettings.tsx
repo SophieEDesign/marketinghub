@@ -13,6 +13,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table } from "@/types/database"
+import TableSelector from "./shared/TableSelector"
 
 interface ActionDataSettingsProps {
   config: BlockConfig
@@ -71,24 +72,12 @@ export default function ActionDataSettings({
       )}
 
       {config.action_type === "create_record" && (
-        <div className="space-y-2">
-          <Label>Table *</Label>
-          <Select
-            value={config.table_id || ""}
-            onValueChange={(value) => onUpdate({ table_id: value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a table" />
-            </SelectTrigger>
-            <SelectContent>
-              {tables.map((table) => (
-                <SelectItem key={table.id} value={table.id}>
-                  {table.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <TableSelector
+          value={config.table_id || ""}
+          onChange={(tableId) => onUpdate({ table_id: tableId })}
+          tables={tables}
+          required={true}
+        />
       )}
 
       {config.action_type === "redirect" && (

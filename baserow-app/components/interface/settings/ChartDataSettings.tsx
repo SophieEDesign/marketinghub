@@ -12,6 +12,10 @@ import { Input } from "@/components/ui/input"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import BlockFilterEditor from "./BlockFilterEditor"
+import TableSelector from "./shared/TableSelector"
+import ViewSelector from "./shared/ViewSelector"
+import GroupBySelector from "./shared/GroupBySelector"
+import SortSelector from "./shared/SortSelector"
 
 interface ChartDataSettingsProps {
   config: BlockConfig
@@ -33,11 +37,6 @@ export default function ChartDataSettings({
   // Numeric fields for metric aggregation
   const numericFields = fields.filter(f => 
     ['number', 'currency', 'percent', 'rating'].includes(f.type)
-  )
-  
-  // Fields suitable for grouping (select, multi-select, date, linked)
-  const groupByFields = fields.filter(f => 
-    ['single_select', 'multi_select', 'date', 'link_row'].includes(f.type)
   )
 
   const metricType = config.chart_aggregate || "count"
@@ -64,46 +63,21 @@ export default function ChartDataSettings({
   return (
     <div className="space-y-4">
       {/* Table */}
-      <div className="space-y-2">
-        <Label>Table *</Label>
-        <Select
-          value={config.table_id || ""}
-          onValueChange={onTableChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a table" />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((table) => (
-              <SelectItem key={table.id} value={table.id}>
-                {table.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TableSelector
+        value={config.table_id || ""}
+        onChange={onTableChange}
+        tables={tables}
+        required={true}
+      />
 
-      {/* View (optional) */}
-      {config.table_id && views.length > 0 && (
-        <div className="space-y-2">
-          <Label>View (optional)</Label>
-          <Select
-            value={config.view_id || "__all__"}
-            onValueChange={(value) => onUpdate({ view_id: value === "__all__" ? undefined : value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="All records" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">All records</SelectItem>
-              {views.map((view) => (
-                <SelectItem key={view.id} value={view.id}>
-                  {view.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* View Selection (optional) */}
+      {config.table_id && (
+        <ViewSelector
+          value={config.view_id}
+          onChange={(viewId) => onUpdate({ view_id: viewId })}
+          views={views}
+          tableId={config.table_id}
+        />
       )}
 
       {/* Metric Type */}
@@ -162,37 +136,24 @@ export default function ChartDataSettings({
       )}
 
       {/* Group By */}
-      <div className="space-y-2">
-        <Label>Group By (optional)</Label>
-        <Select
-          value={groupBy || "__none__"}
-          onValueChange={(value) => {
+      {config.table_id && fields.length > 0 && (
+        <GroupBySelector
+          value={groupBy}
+          onChange={(value) => {
             const updates: Partial<BlockConfig> = { 
-              group_by_field: value === "__none__" ? undefined : value 
+              group_by_field: value
             }
             // Clear X-axis when Group By is selected (X-axis is inferred from Group By)
-            if (value !== "__none__") {
+            if (value) {
               updates.chart_x_axis = undefined
             }
             onUpdate(updates)
           }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="No grouping" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">No grouping</SelectItem>
-            {groupByFields.map((field) => (
-              <SelectItem key={field.id} value={field.name}>
-                {field.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Group data by category (e.g., count by status, count by month)
-        </p>
-      </div>
+          fields={fields}
+          filterGroupableFields={false}
+          description="Group data by category (e.g., count by status, count by month)"
+        />
+      )}
 
       {/* Chart Type */}
       <div className="space-y-2">
@@ -236,25 +197,13 @@ export default function ChartDataSettings({
       )}
 
       {/* Sort */}
-      <div className="space-y-2">
-        <Label>Sort By (optional)</Label>
-        <Select
-          value={config.sort_field || "__none__"}
-          onValueChange={(value) => onUpdate({ sort_field: value === "__none__" ? undefined : value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="No sorting" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">No sorting</SelectItem>
-            {fields.map((field) => (
-              <SelectItem key={field.id} value={field.name}>
-                {field.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <SortSelector
+        value={config.sort_field}
+        onChange={(value) => onUpdate({ sort_field: value as string | undefined })}
+        fields={fields}
+        mode="string"
+        label="Sort By (optional)"
+      />
 
       {/* Limit */}
       <div className="space-y-2">

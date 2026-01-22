@@ -16,6 +16,9 @@ import { Plus, Trash2 } from "lucide-react"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, View, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
+import TableSelector from "./shared/TableSelector"
+import ViewSelector from "./shared/ViewSelector"
+import DateFieldSelector from "./shared/DateFieldSelector"
 
 type MultiSource = {
   id: string
@@ -182,14 +185,12 @@ export default function MultiSourceDataSettings({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-700">Table *</Label>
-                  <Select
-                    value={s.table_id || "__none__"}
-                    onValueChange={(value) => {
-                      const table_id = value === "__none__" ? "" : value
+                  <TableSelector
+                    value={s.table_id || ""}
+                    onChange={(tableId) => {
                       // Reset field mappings when table changes (avoid ambiguous state).
                       updateSource(s.id, {
-                        table_id,
+                        table_id: tableId,
                         view_id: undefined,
                         title_field: "",
                         start_date_field: "",
@@ -198,47 +199,22 @@ export default function MultiSourceDataSettings({
                         type_field: undefined,
                       })
                     }}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select a table" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Select a table…</SelectItem>
-                      {tables.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    tables={tables}
+                    required={true}
+                    label="Table"
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-700">Default view (filters/sorts)</Label>
-                  <Select
-                    value={s.view_id || "__none__"}
-                    onValueChange={(value) =>
-                      updateSource(s.id, { view_id: value === "__none__" ? undefined : value })
-                    }
-                    disabled={!s.table_id}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Optional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {viewsForSource.map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          {v.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div />
-              </div>
+              {/* View Selection (optional) */}
+              {s.table_id && (
+                <ViewSelector
+                  value={s.view_id}
+                  onChange={(viewId) => updateSource(s.id, { view_id: viewId })}
+                  views={viewsForSource}
+                  tableId={s.table_id}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -262,50 +238,19 @@ export default function MultiSourceDataSettings({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-700">Start date field *</Label>
-                  <Select
-                    value={s.start_date_field || "__none__"}
-                    onValueChange={(value) =>
-                      updateSource(s.id, { start_date_field: value === "__none__" ? "" : value })
+                <div className="col-span-2">
+                  <DateFieldSelector
+                    startDateField={s.start_date_field}
+                    endDateField={s.end_date_field}
+                    onStartDateChange={(value) =>
+                      updateSource(s.id, { start_date_field: value || "" })
                     }
-                    disabled={!s.table_id || dateFields.length === 0}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select date field" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Select…</SelectItem>
-                      {dateFields.map((f) => (
-                        <SelectItem key={f.id} value={f.name}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-gray-700">End date field (optional)</Label>
-                  <Select
-                    value={s.end_date_field || "__none__"}
-                    onValueChange={(value) =>
-                      updateSource(s.id, { end_date_field: value === "__none__" ? undefined : value })
+                    onEndDateChange={(value) =>
+                      updateSource(s.id, { end_date_field: value })
                     }
-                    disabled={!s.table_id || dateFields.length === 0}
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="None" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None</SelectItem>
-                      {dateFields.map((f) => (
-                        <SelectItem key={f.id} value={f.name}>
-                          {f.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    fields={fieldsForSource}
+                    label="Date settings"
+                  />
                 </div>
 
                 <div className="space-y-2">

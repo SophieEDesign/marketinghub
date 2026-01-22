@@ -36,6 +36,8 @@ import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
 import { createClient } from "@/lib/supabase/client"
+import TableSelector from "./shared/TableSelector"
+import FieldPicker from "./shared/FieldPicker"
 
 interface RecordDataSettingsProps {
   config: BlockConfig
@@ -111,28 +113,14 @@ export default function RecordDataSettings({
   return (
     <div className="space-y-4">
       {/* Table Selection - Block-specific table (can be different from page's source table) */}
-      <div className="space-y-2">
-        <Label>Source Table *</Label>
-        <Select
-          value={config.table_id || ""}
-          onValueChange={onTableChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a table" />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((table) => (
-              <SelectItem key={table.id} value={table.id}>
-                {table.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          The table containing the record to display in this block. This is independent from the
-          page&apos;s source table (configured in Page Settings).
-        </p>
-      </div>
+      <TableSelector
+        value={config.table_id || ""}
+        onChange={onTableChange}
+        tables={tables}
+        required={true}
+        label="Source Table"
+        description="The table containing the record to display in this block. This is independent from the page's source table (configured in Page Settings)."
+      />
 
       {/* Record Selection */}
       {config.table_id && (
@@ -188,79 +176,14 @@ export default function RecordDataSettings({
 
       {/* Field Visibility - Block-specific field selection (for this block instance) */}
       {config.table_id && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Fields to Display</Label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  // Select all fields
-                  const allFieldNames = fields.map(f => f.name)
-                  onUpdate({ detail_fields: allFieldNames })
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Select All
-              </button>
-              <span className="text-xs text-gray-300">|</span>
-              <button
-                type="button"
-                onClick={() => {
-                  // Select none
-                  onUpdate({ detail_fields: [] })
-                }}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Select None
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500">
-            Which fields to display in this record block. This is block-specific and independent
-            from the page&apos;s visible fields (configured in Page Settings).
-          </p>
-          <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
-            {fields.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center py-2">
-                No fields available
-              </div>
-            ) : (
-              fields.map((field) => {
-                const isVisible = detailFields.includes(field.name)
-                return (
-                  <label
-                    key={field.id}
-                    className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isVisible}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          onUpdate({
-                            detail_fields: [...detailFields, field.name],
-                          })
-                        } else {
-                          onUpdate({
-                            detail_fields: detailFields.filter(
-                              f => f !== field.name
-                            ),
-                          })
-                        }
-                      }}
-                      className="cursor-pointer"
-                    />
-                    <span>{field.name}</span>
-                  </label>
-                )
-              })
-            )}
-          </div>
-          <p className="text-xs text-gray-500">
-            {detailFields.length} of {fields.length} fields visible
-          </p>
-        </div>
+        <FieldPicker
+          selectedFields={detailFields}
+          onChange={(fieldNames) => onUpdate({ detail_fields: fieldNames })}
+          fields={fields}
+          mode="checkbox"
+          label="Fields to Display"
+          description="Which fields to display in this record block. This is block-specific and independent from the page's visible fields (configured in Page Settings)."
+        />
       )}
 
       {/* Block Permissions - Block-level permissions (cannot exceed page-level permissions) */}

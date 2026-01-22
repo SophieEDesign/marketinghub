@@ -26,8 +26,20 @@ export default function AdvancedSettings({
 }: AdvancedSettingsProps) {
   const isLocked = config.locked || false
 
-  // Only show permissions for blocks that can have records (grid, form, record)
-  const showPermissions = ['grid', 'form', 'record'].includes(block.type)
+  // Show permissions for all data blocks that support records
+  const dataBlockTypes = [
+    'grid',
+    'list',
+    'gallery',
+    'timeline',
+    'calendar',
+    'kanban',
+    'chart',
+    'kpi',
+    'form',
+    'record',
+  ]
+  const showPermissions = dataBlockTypes.includes(block.type)
 
   return (
     <div className="space-y-6">

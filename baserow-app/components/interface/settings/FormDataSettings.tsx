@@ -14,6 +14,7 @@ import { GripVertical, Trash2, Plus } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import type { BlockConfig } from "@/lib/interface/types"
 import type { Table, TableField } from "@/types/database"
+import TableSelector from "./shared/TableSelector"
 
 interface FormFieldConfig {
   field_id: string
@@ -114,24 +115,12 @@ export default function FormDataSettings({
   return (
     <div className="space-y-4">
       {/* Table Selection */}
-      <div className="space-y-2">
-        <Label>Table *</Label>
-        <Select
-          value={config.table_id || ""}
-          onValueChange={onTableChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select a table" />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((table) => (
-              <SelectItem key={table.id} value={table.id}>
-                {table.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TableSelector
+        value={config.table_id || ""}
+        onChange={onTableChange}
+        tables={tables}
+        required={true}
+      />
 
       {/* Form Fields Configuration */}
       {config.table_id && (
