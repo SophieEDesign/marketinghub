@@ -391,19 +391,19 @@ export default function AirtableGridView({
           }
           if (data.column_order && Array.isArray(data.column_order)) {
             // CRITICAL: Sanitize persisted column order - filter out null/undefined/empty strings
-            const sanitizedOrder = data.column_order
-              .filter((name): name is string => typeof name === 'string' && name.trim().length > 0)
+            const sanitizedOrder = (data.column_order as unknown[])
+              .filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
             
             // Get current field names
             const allFieldNames = Array.isArray(safeFields)
               ? safeFields
                   .filter((f) => f && typeof f === 'object' && f.name)
                   .map((f) => f.name)
-                  .filter((name): name is string => typeof name === 'string' && name.length > 0)
+                  .filter((name: unknown): name is string => typeof name === 'string' && name.length > 0)
               : []
             
             // Validate that all fields in persisted order still exist
-            const validOrder = sanitizedOrder.filter(name => allFieldNames.includes(name))
+            const validOrder = sanitizedOrder.filter((name: string) => allFieldNames.includes(name))
             
             if (validOrder.length > 0 && validOrder.length === sanitizedOrder.length) {
               // All fields in order are valid - use it
