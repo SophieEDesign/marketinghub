@@ -580,9 +580,9 @@ export default function TimelineView({
         cardField3 || blockConfig?.timeline_field_3 || blockConfig?.card_field_3,
       ].filter(Boolean).map(fieldName => 
         tableFields.find(f => f.name === fieldName || f.id === fieldName)
-      ).filter(Boolean).filter(f => 
-        pillFieldTypes.includes(f.type)
-      ) as TableField[]
+      ).filter((f): f is TableField => 
+        f !== undefined && pillFieldTypes.includes(f.type)
+      )
     }
 
     return {

@@ -1723,8 +1723,8 @@ export default function GridView({
 
         // Fallback: For 400 errors that don't match missing column patterns,
         // but we haven't already forced star select, mark for star select and let next render retry
-        const errorCode = (error as any)?.code || (error as any)?.status
-        if (errorCode === 400 || errorCode === '400') {
+        const fallbackErrorCode = (error as any)?.code || (error as any)?.status
+        if (fallbackErrorCode === 400 || fallbackErrorCode === '400') {
           const alreadyForcedStar = forceStarSelectRef.current.has(supabaseTableName)
           if (!alreadyForcedStar) {
             console.warn('[GridView] 400 error not matching column patterns; will retry with "*" select on next load.', {
