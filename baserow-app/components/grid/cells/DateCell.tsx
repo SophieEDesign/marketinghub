@@ -35,13 +35,22 @@ export default function DateCell({
   const [editValue, setEditValue] = useState(getInitialEditValue())
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const isMountedRef = useRef(true)
 
   useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isMountedRef.current) return
     if (value) {
       try {
         setEditValue(format(parseISO(value), 'yyyy-MM-dd'))
       } catch {
-        setEditValue('')
+        if (isMountedRef.current) setEditValue('')
       }
     } else {
       setEditValue('')
@@ -56,18 +65,24 @@ export default function DateCell({
   }, [editing])
 
   const handleSave = async () => {
-    if (saving) return
+    if (saving || !isMountedRef.current) return
     setSaving(true)
     try {
       // editValue is in YYYY-MM-DD format (from HTML5 date input)
       // Convert to ISO string for storage (ensures proper format)
       const dateValue = editValue ? toISODateString(editValue) : null
       await onSave(dateValue)
-      setEditing(false)
+      if (isMountedRef.current) {
+        setEditing(false)
+      }
     } catch (error) {
       console.error('Error saving date cell:', error)
+      // Don't update state if component is unmounted
+      if (!isMountedRef.current) return
     } finally {
-      setSaving(false)
+      if (isMountedRef.current) {
+        setSaving(false)
+      }
     }
   }
 

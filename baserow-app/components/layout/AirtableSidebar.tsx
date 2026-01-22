@@ -106,6 +106,7 @@ export default function AirtableSidebar({
   
   // Close sidebar on mobile when navigating.
   // Note: `popstate` only fires for back/forward, not Next.js Link navigations.
+  // CRITICAL: Always close on navigation to prevent overlay from blocking clicks
   useEffect(() => {
     // Skip first render so we don't immediately close on initial load.
     if (previousPathnameRef.current === null) {
@@ -115,8 +116,14 @@ export default function AirtableSidebar({
 
     if (previousPathnameRef.current !== pathname) {
       previousPathnameRef.current = pathname
-      if (isMobile && isOpen && onClose) {
-        onClose()
+      // CRITICAL: Always close sidebar on navigation (mobile) to prevent overlay blocking
+      if (isMobile && isOpen) {
+        if (onClose) {
+          onClose()
+        } else {
+          // Fallback: close internally if no onClose provided
+          setInternalCollapsed(true)
+        }
       }
     }
   }, [pathname, isMobile, isOpen, onClose])

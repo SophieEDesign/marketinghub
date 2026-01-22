@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useBranding } from "@/contexts/BrandingContext"
@@ -130,6 +130,10 @@ export default function GroupedInterfaces({
   // Track interaction states - these are mutually exclusive
   const [isDragging, setIsDragging] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
+  
+  // CRITICAL: Use ref for synchronous dragging check to prevent navigation blocking
+  // State updates are async, but refs are synchronous - prevents stuck navigation
+  const isDraggingRef = useRef(false)
   
   // Store original order for revert on error
   const [originalGroups, setOriginalGroups] = useState<InterfaceGroup[]>([])
@@ -503,6 +507,8 @@ export default function GroupedInterfaces({
     setOriginalGroups([...sortedGroups])
     setOriginalPages([...pages])
     
+    // CRITICAL: Update both state and ref synchronously
+    isDraggingRef.current = true
     setIsDragging(true)
     setActiveId(event.active.id as string)
   }
@@ -511,6 +517,8 @@ export default function GroupedInterfaces({
     // Drag can be cancelled (escape key, pointer cancel, route change, etc).
     // If we don't clear this state, the sidebar can become "unclickable"
     // due to `pointer-events-none` being left on items.
+    // CRITICAL: Clear ref FIRST (synchronous) before state update (async)
+    isDraggingRef.current = false
     setIsDragging(false)
     setActiveId(null)
 
@@ -522,7 +530,8 @@ export default function GroupedInterfaces({
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     
-    // Always clear dragging state
+    // Always clear dragging state - CRITICAL: Clear ref FIRST (synchronous)
+    isDraggingRef.current = false
     setIsDragging(false)
     setActiveId(null)
 
@@ -686,8 +695,10 @@ export default function GroupedInterfaces({
   }
 
   // Safety: never let the sidebar remain in "dragging" mode across navigation.
+  // CRITICAL: Clear ref FIRST (synchronous) so navigation isn't blocked
   useEffect(() => {
-    if (!isDragging && !activeId) return
+    // Always clear on navigation - don't check current state (might be stale)
+    isDraggingRef.current = false
     setIsDragging(false)
     setActiveId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -966,8 +977,10 @@ export default function GroupedInterfaces({
                 color: primaryColor 
               } : { color: sidebarTextColor }}
               onClick={(e) => {
-                // Prevent navigation if we're in drag state
-                if (isDragging) {
+                // CRITICAL: Use ref for synchronous check - state might be stale
+                // Only prevent navigation if we're ACTUALLY dragging (both conditions)
+                // AND we're in edit mode (browse mode should never block navigation)
+                if (editMode && isDraggingRef.current && activeId) {
                   e.preventDefault()
                 }
               }}

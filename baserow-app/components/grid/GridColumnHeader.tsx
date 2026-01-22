@@ -3,12 +3,19 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText } from 'lucide-react'
+import { GripVertical, MoreVertical, ArrowUpDown, ArrowUp, ArrowDown, WrapText, ChevronDown, Edit, Copy, ArrowLeft, ArrowRight, Link, Info, Lock, Filter, Group, Eye, EyeOff, Trash2 } from 'lucide-react'
 import type { TableField } from '@/types/fields'
 import { getFieldIcon } from '@/lib/icons'
 import { useIsMobile } from '@/hooks/useResponsive'
 import { createClient } from '@/lib/supabase/client'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const COLUMN_MIN_WIDTH = 100
 
@@ -27,6 +34,7 @@ interface GridColumnHeaderProps {
   sortDirection?: 'asc' | 'desc' | null
   sortOrder?: number | null // Sort order number (1, 2, 3) for multi-sort
   onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
+  tableId?: string // Table ID for copy URL functionality
 }
 
 export default function GridColumnHeader({
@@ -44,6 +52,7 @@ export default function GridColumnHeader({
   sortDirection,
   sortOrder = null,
   onSort,
+  tableId,
 }: GridColumnHeaderProps) {
   const isMobile = useIsMobile()
 
@@ -94,6 +103,7 @@ export default function GridColumnHeader({
   } = useSortable({ id: field.name })
 
   const [isHovered, setIsHovered] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const resizeRef = useRef<HTMLDivElement>(null)
   const resizeStartXRef = useRef(0)
   const resizeStartWidthRef = useRef(0)
@@ -171,8 +181,24 @@ export default function GridColumnHeader({
         <GripVertical className="h-3 w-3" />
       </div>
 
-      {/* Field icon and name */}
-      <div className="flex items-center gap-2 px-3 flex-1 min-w-0">
+      {/* Field icon and name - clickable to select column */}
+      <div 
+        className={`flex items-center gap-2 px-3 flex-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          // Select column when clicking on the name area
+          if (onSelect) {
+            onSelect(field.id)
+            // Copy field name to clipboard when selected
+            navigator.clipboard.writeText(field.name).then(() => {
+              // Could show toast notification here
+            }).catch(err => {
+              console.error('Failed to copy column name:', err)
+            })
+          }
+        }}
+        title="Click to select column"
+      >
         <span className="text-gray-400 flex-shrink-0">
           {getFieldIcon(field.type)}
         </span>
@@ -232,16 +258,140 @@ export default function GridColumnHeader({
         </button>
       )}
 
-      {/* Edit menu button */}
-      {onEdit && (
-        <button
-          onClick={() => onEdit(field.name)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-100/50 rounded transition-opacity mr-1"
-          title="Edit column"
-        >
-          <MoreVertical className="h-4 w-4 text-gray-400" />
-        </button>
-      )}
+      {/* Chevron dropdown trigger - separate clickable area with padding for easier clicking */}
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="px-1.5 py-1 rounded hover:bg-gray-100/50 transition-colors flex items-center justify-center flex-shrink-0 mr-1"
+            onClick={(e) => {
+              e.stopPropagation()
+            }}
+            title="Click to open column menu"
+          >
+            <ChevronDown className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 transition-colors" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          {onEdit && (
+            <DropdownMenuItem onClick={() => { onEdit(field.name); setDropdownOpen(false); }}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit field
+            </DropdownMenuItem>
+          )}
+          {field.type !== 'formula' && field.type !== 'lookup' && (
+            <DropdownMenuItem onClick={() => { 
+              // TODO: Implement duplicate
+              console.log('Duplicate field:', field.name)
+              setDropdownOpen(false)
+            }}>
+              <Copy className="h-4 w-4 mr-2" />
+              Duplicate field
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Implement insert left
+            console.log('Insert left:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Insert left
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Implement insert right
+            console.log('Insert right:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <ArrowRight className="h-4 w-4 mr-2" />
+            Insert right
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // Copy field URL
+            const tableIdForUrl = tableId || field.table_id
+            if (tableIdForUrl) {
+              const url = `${window.location.origin}/data/${tableIdForUrl}?field=${encodeURIComponent(field.name)}`
+              navigator.clipboard.writeText(url).then(() => {
+                setDropdownOpen(false)
+              }).catch(err => {
+                console.error('Failed to copy URL:', err)
+              })
+            } else {
+              setDropdownOpen(false)
+            }
+          }}>
+            <Link className="h-4 w-4 mr-2" />
+            Copy field URL
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Edit field description
+            onEdit?.(field.name)
+            setDropdownOpen(false)
+          }}>
+            <Info className="h-4 w-4 mr-2" />
+            Edit field description
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Edit field permissions
+            console.log('Edit permissions:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <Lock className="h-4 w-4 mr-2" />
+            Edit field permissions
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {onSort && (
+            <>
+              <DropdownMenuItem onClick={() => { onSort(field.name, 'asc'); setDropdownOpen(false); }}>
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                Sort First → Last
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { onSort(field.name, 'desc'); setDropdownOpen(false); }}>
+                <ArrowUpDown className="h-4 w-4 mr-2" />
+                Sort Last → First
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Filter by this field
+            console.log('Filter by:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <Filter className="h-4 w-4 mr-2" />
+            Filter by this field
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Group by this field
+            console.log('Group by:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <Group className="h-4 w-4 mr-2" />
+            Group by this field
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { 
+            // TODO: Hide field
+            console.log('Hide field:', field.name)
+            setDropdownOpen(false)
+          }}>
+            <EyeOff className="h-4 w-4 mr-2" />
+            Hide field
+          </DropdownMenuItem>
+          {field.type !== 'formula' && field.type !== 'lookup' && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={() => { 
+                  // TODO: Delete field
+                  console.log('Delete field:', field.name)
+                  setDropdownOpen(false)
+                }}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete field
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Resize handle - hidden on mobile */}
       {!isMobile && (

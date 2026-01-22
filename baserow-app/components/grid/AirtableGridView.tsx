@@ -1269,6 +1269,7 @@ export default function AirtableGridView({
                     sortDirection={sort?.direction || null}
                     sortOrder={sortIndex >= 0 ? sortIndex + 1 : null}
                     onSort={handleSort}
+                    tableId={tableId}
                   />
                 )
               })}

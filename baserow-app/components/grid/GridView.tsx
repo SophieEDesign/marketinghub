@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import React from "react"
 import { supabase } from "@/lib/supabase/client"
-import { Plus, ChevronDown, ChevronRight } from "lucide-react"
+import { Plus, ChevronDown, ChevronRight, Edit, Copy, ArrowLeft, ArrowRight, Link, Info, Lock, Filter, Group, Eye, EyeOff, Trash2, ArrowUpDown, GripVertical } from "lucide-react"
 import {
   DndContext,
   closestCenter,
@@ -21,7 +21,6 @@ import {
 } from '@dnd-kit/sortable'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
 import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
@@ -43,6 +42,13 @@ import { isAbortError } from "@/lib/api/error-handling"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface BlockPermissions {
   mode?: 'view' | 'edit'
@@ -188,6 +194,25 @@ function DraggableColumnHeader({
   onResizeEnd,
   isFrozen = false,
   frozenLeft,
+  isFirstColumn = false,
+  onSort,
+  onFilter,
+  onGroup,
+  onHide,
+  onDuplicate,
+  onInsertLeft,
+  onInsertRight,
+  onDelete,
+  onCopyUrl,
+  onEditDescription,
+  onEditPermissions,
+  onChangePrimary,
+  currentSortDirection,
+  isGroupedBy,
+  isFilteredBy,
+  isHidden,
+  onSelect,
+  isSelected = false,
 }: {
   fieldName: string
   tableField?: TableField
@@ -200,6 +225,25 @@ function DraggableColumnHeader({
   onResizeEnd: () => void
   isFrozen?: boolean
   frozenLeft?: number
+  isFirstColumn?: boolean
+  onSort?: (fieldName: string, direction: 'asc' | 'desc' | null) => void
+  onFilter?: (fieldName: string) => void
+  onGroup?: (fieldName: string) => void
+  onHide?: (fieldName: string) => void
+  onDuplicate?: (fieldName: string) => void
+  onInsertLeft?: (fieldName: string) => void
+  onInsertRight?: (fieldName: string) => void
+  onDelete?: (fieldName: string) => void
+  onCopyUrl?: (fieldName: string) => void
+  onEditDescription?: (fieldName: string) => void
+  onEditPermissions?: (fieldName: string) => void
+  onChangePrimary?: (fieldName: string) => void
+  currentSortDirection?: 'asc' | 'desc' | null
+  isGroupedBy?: boolean
+  isFilteredBy?: boolean
+  isHidden?: boolean
+  onSelect?: (fieldName: string) => void
+  isSelected?: boolean
 }) {
   const {
     attributes,
@@ -253,24 +297,34 @@ function DraggableColumnHeader({
     document.addEventListener('mouseup', handleMouseUp)
   }
 
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
   return (
     <th
       ref={setNodeRef}
       style={style}
-      className={`px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 ${isFrozen ? 'z-20' : 'z-10'} group hover:bg-gray-100 transition-colors relative`}
+      className={`px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider sticky top-0 bg-gray-50 ${isFrozen ? 'z-20' : 'z-10'} group hover:bg-gray-100 transition-colors relative`}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-1 w-full">
         {/* Drag handle */}
         <div
           {...attributes}
           {...listeners}
-          className="flex items-center justify-center w-4 h-full cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+          className="flex items-center justify-center w-4 h-full cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 flex-shrink-0"
         >
           <GripVertical className="h-3 w-3" />
         </div>
-        <span
-          onClick={() => onEdit?.(fieldName)}
-          className={`flex-1 ${onEdit ? 'cursor-pointer hover:text-blue-600' : ''}`}
+        
+        {/* Column name - clickable to select column */}
+        <div
+          className={`flex-1 text-left px-2 py-1 rounded hover:bg-gray-100/50 transition-colors flex items-center gap-1 min-w-0 cursor-pointer ${isSelected ? 'bg-blue-50 ring-1 ring-blue-400/30' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            // Select column when clicking on the name area
+            if (onSelect) {
+              onSelect(fieldName)
+            }
+          }}
           title={
             tableField && 
             typeof tableField === 'object' &&
@@ -280,19 +334,140 @@ function DraggableColumnHeader({
             tableField.options.formula &&
             typeof tableField.options.formula === 'string'
               ? `Formula: ${tableField.options.formula}` 
-              : undefined
+              : 'Click to select column'
           }
         >
-          {fieldName || 'Unknown Field'}
+          <span className="truncate font-medium">
+            {fieldName || 'Unknown Field'}
+          </span>
           {isVirtual && (
-            <span className="ml-1 text-xs text-gray-400" title="Formula field">(fx)</span>
+            <span className="ml-1 text-xs text-gray-400 flex-shrink-0" title="Formula field">(fx)</span>
           )}
-        </span>
-        {tableField && 
-         typeof tableField === 'object' &&
-         tableField.required === true && (
-          <span className="text-red-500 text-xs ml-1">*</span>
-        )}
+          {tableField && 
+           typeof tableField === 'object' &&
+           tableField.required === true && (
+            <span className="text-red-500 text-xs ml-1 flex-shrink-0">*</span>
+          )}
+        </div>
+
+        {/* Chevron dropdown trigger - separate clickable area with padding for easier clicking */}
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="px-1.5 py-1 rounded hover:bg-gray-100/50 transition-colors flex items-center justify-center flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation()
+              }}
+              title="Click to open column menu"
+            >
+              <ChevronDown className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600 transition-colors" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            {onEdit && (
+              <DropdownMenuItem onClick={() => { onEdit(fieldName); setDropdownOpen(false); }}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit field
+              </DropdownMenuItem>
+            )}
+            {onDuplicate && !isVirtual && (
+              <DropdownMenuItem onClick={() => { onDuplicate(fieldName); setDropdownOpen(false); }}>
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicate field
+              </DropdownMenuItem>
+            )}
+            {onInsertLeft && (
+              <DropdownMenuItem onClick={() => { onInsertLeft(fieldName); setDropdownOpen(false); }}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Insert left
+              </DropdownMenuItem>
+            )}
+            {onInsertRight && (
+              <DropdownMenuItem onClick={() => { onInsertRight(fieldName); setDropdownOpen(false); }}>
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Insert right
+              </DropdownMenuItem>
+            )}
+            {onCopyUrl && (
+              <DropdownMenuItem onClick={() => { onCopyUrl(fieldName); setDropdownOpen(false); }}>
+                <Link className="h-4 w-4 mr-2" />
+                Copy field URL
+              </DropdownMenuItem>
+            )}
+            {onEditDescription && (
+              <DropdownMenuItem onClick={() => { onEditDescription(fieldName); setDropdownOpen(false); }}>
+                <Info className="h-4 w-4 mr-2" />
+                Edit field description
+              </DropdownMenuItem>
+            )}
+            {onEditPermissions && (
+              <DropdownMenuItem onClick={() => { onEditPermissions(fieldName); setDropdownOpen(false); }}>
+                <Lock className="h-4 w-4 mr-2" />
+                Edit field permissions
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            {onSort && (
+              <>
+                <DropdownMenuItem onClick={() => { onSort(fieldName, 'asc'); setDropdownOpen(false); }}>
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Sort First → Last
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { onSort(fieldName, 'desc'); setDropdownOpen(false); }}>
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  Sort Last → First
+                </DropdownMenuItem>
+              </>
+            )}
+            {onFilter && (
+              <DropdownMenuItem onClick={() => { onFilter(fieldName); setDropdownOpen(false); }}>
+                <Filter className="h-4 w-4 mr-2" />
+                Filter by this field
+              </DropdownMenuItem>
+            )}
+            {onGroup && (
+              <DropdownMenuItem onClick={() => { onGroup(fieldName); setDropdownOpen(false); }}>
+                <Group className="h-4 w-4 mr-2" />
+                Group by this field
+              </DropdownMenuItem>
+            )}
+            {onHide && (
+              <DropdownMenuItem onClick={() => { onHide(fieldName); setDropdownOpen(false); }}>
+                {isHidden ? (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Show field
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Hide field
+                  </>
+                )}
+              </DropdownMenuItem>
+            )}
+            {onDelete && !isVirtual && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => { onDelete(fieldName); setDropdownOpen(false); }}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete field
+                </DropdownMenuItem>
+              </>
+            )}
+            {onChangePrimary && isFirstColumn && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { onChangePrimary(fieldName); setDropdownOpen(false); }}>
+                  Change primary field
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       {/* Resize handle */}
       <div
@@ -358,6 +533,7 @@ export default function GridView({
   const [hoverResizeRowId, setHoverResizeRowId] = useState<string | null>(null)
   const [resizeLineTop, setResizeLineTop] = useState<number | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
+  const [selectedColumnName, setSelectedColumnName] = useState<string | null>(null)
   const [frozenColumns, setFrozenColumns] = useState<number>(0) // Number of columns to freeze (typically 1 for first column)
 
   // Prevent runaway "create table" loops on repeated errors.
@@ -1300,6 +1476,19 @@ export default function GridView({
         if (isAbortError(error)) {
           return
         }
+        
+        // Log detailed error information for debugging 400 errors
+        if ((error as any)?.code === '400' || (error as any)?.status === 400) {
+          console.error('[GridView] 400 Bad Request error:', {
+            tableName: supabaseTableName,
+            message: (error as any)?.message,
+            details: (error as any)?.details,
+            hint: (error as any)?.hint,
+            code: (error as any)?.code,
+            error: error,
+          })
+        }
+        
         bumpLoadBackoff()
 
         // If a view references a column that no longer exists in the physical table,
@@ -1621,10 +1810,20 @@ export default function GridView({
     }
   }
 
+  // Track if component is mounted to prevent state updates after unmount
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   async function handleCellSave(rowId: string, fieldName: string, value: any) {
     // Don't allow saving if view-only
     if (isViewOnly) return
     if (!rowId || !supabaseTableName) return
+    if (!isMountedRef.current) return // Prevent updates after unmount
 
     try {
       // Prevent 400 spam when the view references a field that no longer exists physically.
@@ -1637,13 +1836,17 @@ export default function GridView({
             (typeof f.name === 'string' && f.name.toLowerCase() === String(fieldName).toLowerCase()))
       )
       if (!fieldMeta) {
-        throw new Error(
+        const error = new Error(
           `Cannot update "${fieldName}" because it does not exist in the underlying table schema. ` +
             `Refresh the view fields or re-add/rename the column in Supabase.`
         )
+        console.error("Error saving cell:", error)
+        throw error
       }
       if (fieldMeta.type === 'formula' || fieldMeta.type === 'lookup') {
-        throw new Error(`Cannot update "${fieldName}" because it is a ${fieldMeta.type} field.`)
+        const error = new Error(`Cannot update "${fieldName}" because it is a ${fieldMeta.type} field.`)
+        console.error("Error saving cell:", error)
+        throw error
       }
 
       // Normalize values to match the physical column type expectations.
@@ -1707,10 +1910,12 @@ export default function GridView({
 
       const safeColumn = toPostgrestColumn(fieldName)
       if (!safeColumn) {
-        throw new Error(
+        const error = new Error(
           `This field cannot be updated because its column name is not a safe identifier: "${fieldName}". ` +
             `Rename the field to a simple snake_case name (letters/numbers/_), or ensure your backend supports quoted column updates.`
         )
+        console.error("Error saving cell:", error)
+        throw error
       }
 
       let finalSavedValue: any = normalizeUpdateValue(fieldMeta, value)
@@ -1736,20 +1941,33 @@ export default function GridView({
       }
 
       if (error) {
-        console.error("Error saving cell:", error)
+        console.error("Error saving cell:", {
+          tableName: supabaseTableName,
+          rowId,
+          fieldName,
+          column: safeColumn,
+          error: error,
+          code: error.code,
+          message: error.message,
+        })
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
-          setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+          if (isMountedRef.current) {
+            setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+          }
         }
         throw error
       }
 
-      // Update local state immediately for better UX
-      setRows((prevRows) =>
-        prevRows.map((row) =>
-          row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
+      // Update local state immediately for better UX (only if still mounted)
+      if (isMountedRef.current) {
+        setRows((prevRows) =>
+          prevRows.map((row) =>
+            row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
+          )
         )
-      )
+      }
     } catch (error) {
+      // Re-throw error so calling code can handle it (e.g., show toast)
       throw error
     }
   }
@@ -1842,6 +2060,82 @@ export default function GridView({
     // Cell contents should stopPropagation on double click to prevent accidental opens.
     if (!allowOpenRecord || !enableRecordOpen) return
     openRecordUI(rowId)
+  }
+
+  // Column header dropdown handlers
+  function handleColumnSort(fieldName: string, direction: 'asc' | 'desc' | null) {
+    // TODO: Implement column-level sort (currently handled by toolbar)
+    console.log('Column sort:', fieldName, direction)
+  }
+
+  function handleColumnFilter(fieldName: string) {
+    // TODO: Implement column-level filter (currently handled by toolbar)
+    console.log('Column filter:', fieldName)
+  }
+
+  function handleColumnGroup(fieldName: string) {
+    // TODO: Implement column-level group (currently handled by toolbar)
+    console.log('Column group:', fieldName)
+  }
+
+  function handleColumnHide(fieldName: string) {
+    // TODO: Implement column hide/show
+    console.log('Column hide:', fieldName)
+  }
+
+  function handleColumnDuplicate(fieldName: string) {
+    // TODO: Implement column duplicate
+    console.log('Column duplicate:', fieldName)
+  }
+
+  function handleColumnInsertLeft(fieldName: string) {
+    // TODO: Implement insert column left
+    console.log('Insert left:', fieldName)
+  }
+
+  function handleColumnInsertRight(fieldName: string) {
+    // TODO: Implement insert column right
+    console.log('Insert right:', fieldName)
+  }
+
+  function handleColumnDelete(fieldName: string) {
+    // TODO: Implement column delete
+    console.log('Column delete:', fieldName)
+  }
+
+  function handleColumnCopyUrl(fieldName: string) {
+    // Copy field URL to clipboard
+    const url = `${window.location.origin}/data/${tableId}?field=${encodeURIComponent(fieldName)}`
+    navigator.clipboard.writeText(url).then(() => {
+      // Could show toast notification here
+    }).catch(err => {
+      console.error('Failed to copy URL:', err)
+    })
+  }
+
+  function handleColumnEditDescription(fieldName: string) {
+    // TODO: Open field description editor
+    onEditField?.(fieldName)
+  }
+
+  function handleColumnEditPermissions(fieldName: string) {
+    // TODO: Open field permissions editor
+    console.log('Edit permissions:', fieldName)
+  }
+
+  function handleChangePrimaryField(fieldName: string) {
+    // TODO: Change primary field
+    console.log('Change primary field:', fieldName)
+  }
+
+  function handleColumnSelect(fieldName: string) {
+    setSelectedColumnName(fieldName)
+    // Copy column name to clipboard when selected
+    navigator.clipboard.writeText(fieldName).then(() => {
+      // Could show toast notification here
+    }).catch(err => {
+      console.error('Failed to copy column name:', err)
+    })
   }
 
   // Apply client-side search
@@ -2234,6 +2528,18 @@ export default function GridView({
           <table className="min-w-full w-max border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
+                {/* Checkbox column header (for row selection) - Airtable-style */}
+                <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-8 sticky top-0 bg-gray-50 z-10">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
+                    title="Select all rows"
+                    onChange={(e) => {
+                      // TODO: Implement select all functionality
+                      console.log('Select all:', e.target.checked)
+                    }}
+                  />
+                </th>
                 {/* Row action column header (for record opening) */}
                 {enableRecordOpen && allowOpenRecord && (
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-8 sticky top-0 bg-gray-50 z-10"></th>
@@ -2280,10 +2586,11 @@ export default function GridView({
                               : COLUMN_DEFAULT_WIDTH
                             
                             // Calculate left offset for frozen columns
-                            // Account for record open column (32px) and image column (48px if present)
+                            // Account for checkbox column (32px), record open column (32px), and image column (48px if present)
+                            const checkboxColumnWidth = 32
                             const recordOpenWidth = (enableRecordOpen && allowOpenRecord) ? 32 : 0
                             const imageColumnWidth = imageField ? 48 : 0
-                            const leftOffset = recordOpenWidth + imageColumnWidth + 
+                            const leftOffset = checkboxColumnWidth + recordOpenWidth + imageColumnWidth + 
                               (fieldIndex < frozenColumns 
                                 ? Array.from({ length: fieldIndex }, (_, i) => {
                                     const prevField = safeVisibleFields[i]
@@ -2297,6 +2604,14 @@ export default function GridView({
                             
                             const isFrozen = fieldIndex < frozenColumns
                             
+                            // Check if this field is currently sorted, grouped, or filtered
+                            const currentSort = safeViewSorts.find(s => s.field_name === field.field_name)
+                            const currentSortDirection = currentSort ? (currentSort.direction === 'asc' ? 'asc' : 'desc') : null
+                            const isGroupedBy = groupBy === field.field_name
+                            const isFilteredBy = safeFilters.some(f => f.field === field.field_name) || safeViewFilters.some(f => f.field_name === field.field_name)
+                            const isHidden = !field.visible
+                            const isFirstColumn = fieldIndex === 0
+
                             return (
                               <DraggableColumnHeader
                                 key={field.field_name}
@@ -2311,6 +2626,25 @@ export default function GridView({
                                 onResizeEnd={handleResizeEnd}
                                 isFrozen={isFrozen}
                                 frozenLeft={isFrozen ? leftOffset : undefined}
+                                isFirstColumn={isFirstColumn}
+                                onSort={handleColumnSort}
+                                onFilter={handleColumnFilter}
+                                onGroup={handleColumnGroup}
+                                onHide={handleColumnHide}
+                                onDuplicate={handleColumnDuplicate}
+                                onInsertLeft={handleColumnInsertLeft}
+                                onInsertRight={handleColumnInsertRight}
+                                onDelete={handleColumnDelete}
+                                onCopyUrl={handleColumnCopyUrl}
+                                onEditDescription={handleColumnEditDescription}
+                                onEditPermissions={handleColumnEditPermissions}
+                                onChangePrimary={handleChangePrimaryField}
+                                currentSortDirection={currentSortDirection}
+                                isGroupedBy={isGroupedBy}
+                                isFilteredBy={isFilteredBy}
+                                isHidden={isHidden}
+                                onSelect={handleColumnSelect}
+                                isSelected={selectedColumnName === field.field_name}
                               />
                             )
                           })
@@ -2324,6 +2658,7 @@ export default function GridView({
                 <tr>
                   <td
                     colSpan={
+                      1 + // Checkbox column
                       safeVisibleFields.length +
                       (enableRecordOpen && allowOpenRecord ? 1 : 0) +
                       (imageField ? 1 : 0)
@@ -2348,6 +2683,7 @@ export default function GridView({
                       <tr key={`group-${node.pathKey}`} className="bg-gray-50 border-b border-gray-200">
                         <td
                           colSpan={
+                            1 + // Checkbox column
                             safeVisibleFields.length +
                             (enableRecordOpen && allowOpenRecord ? 1 : 0) +
                             (imageField ? 1 : 0)
@@ -2396,6 +2732,17 @@ export default function GridView({
                       onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
                       onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                     >
+                      {/* Checkbox column (row selection) - Airtable-style */}
+                      <td className="px-2 py-1 w-8">
+                        <input
+                          type="checkbox"
+                          checked={thisRowId && selectedRowId === thisRowId}
+                          onChange={() => thisRowId && handleRowSelect(thisRowId)}
+                          className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Select row"
+                        />
+                      </td>
                       {/* Row open control */}
                       {canOpenRecord && (
                         <td className="px-2 py-1 w-8">
@@ -2564,6 +2911,17 @@ export default function GridView({
                     onClick={thisRowId ? () => handleRowSelect(thisRowId) : undefined}
                     onDoubleClick={thisRowId ? () => handleRowDoubleClick(thisRowId) : undefined}
                   >
+                    {/* Checkbox column (row selection) - Airtable-style */}
+                    <td className="px-2 py-1 w-8">
+                      <input
+                        type="checkbox"
+                        checked={thisRowId && selectedRowId === thisRowId}
+                        onChange={() => thisRowId && handleRowSelect(thisRowId)}
+                        className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Select row"
+                      />
+                    </td>
                     {/* Row open control */}
                     {canOpenRecord && (
                       <td
@@ -2630,9 +2988,10 @@ export default function GridView({
                             const canUseCellFactory = !!tableField && rowId !== null
                             
                             // Calculate left offset for frozen columns (same as header)
+                            const checkboxColumnWidth = 32
                             const recordOpenWidth = (enableRecordOpen && allowOpenRecord) ? 32 : 0
                             const imageColumnWidth = imageField ? 48 : 0
-                            const leftOffset = recordOpenWidth + imageColumnWidth + 
+                            const leftOffset = checkboxColumnWidth + recordOpenWidth + imageColumnWidth + 
                               (fieldIndex < frozenColumns 
                                 ? Array.from({ length: fieldIndex }, (_, i) => {
                                     const prevField = safeVisibleFields[i]
