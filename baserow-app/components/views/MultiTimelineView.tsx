@@ -35,6 +35,7 @@ import {
 } from "@/lib/interface/filters"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 type MultiSource = {
   id: string
@@ -162,15 +163,16 @@ export default function MultiTimelineView({
       const nextRows: Record<string, TableRow[]> = {}
 
       for (const s of sources) {
-        if (!s?.table_id) continue
+        const tableId = normalizeUuid((s as any)?.table_id)
+        if (!tableId) continue
         const tableRes = await supabase
           .from("tables")
           .select("id, name, supabase_table")
-          .eq("id", s.table_id)
+          .eq("id", tableId)
           .single()
         if (!tableRes.data?.supabase_table) continue
         nextTables[s.id] = {
-          tableId: s.table_id,
+          tableId,
           supabaseTable: tableRes.data.supabase_table,
           name: tableRes.data.name || "Untitled table",
         }
@@ -178,15 +180,16 @@ export default function MultiTimelineView({
         const fieldsRes = await supabase
           .from("table_fields")
           .select("*")
-          .eq("table_id", s.table_id)
+          .eq("table_id", tableId)
           .order("position", { ascending: true })
         nextFields[s.id] = asArray<TableField>(fieldsRes.data)
 
-        if (s.view_id) {
+        const viewId = normalizeUuid((s as any)?.view_id)
+        if (viewId) {
           const viewFiltersRes = await supabase
             .from("view_filters")
             .select("*")
-            .eq("view_id", s.view_id)
+            .eq("view_id", viewId)
           nextViewDefaults[s.id] = asArray<any>(viewFiltersRes.data).map((f: any) =>
             // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
             normalizeFilter({
@@ -621,8 +624,10 @@ export default function MultiTimelineView({
                           left: `${leftPct}%`,
                           width: `${widthPct}%`,
                           borderColor: "#e5e7eb",
-                          borderLeftColor: ev.color,
-                          borderLeftWidth: 4,
+                          // Merged multi-table view: keep the card styling identical across sources.
+                          // (Legend/toggles still show per-source colour.)
+                          borderLeftColor: "#e5e7eb",
+                          borderLeftWidth: 1,
                         }}
                         onClick={() => {
                           // Avoid opening the record when the user just dragged.

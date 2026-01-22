@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   DndContext,
   closestCenter,
@@ -31,7 +31,6 @@ import { useDataView } from '@/lib/dataView/useDataView'
 import type { Selection } from '@/lib/dataView/types'
 import { useIsMobile, useIsTablet } from '@/hooks/useResponsive'
 import { cn } from '@/lib/utils'
-import RecordModal from './RecordModal'
 import type { FilterType } from '@/types/database'
 import type { FilterConfig } from '@/lib/interface/filters'
 import { buildGroupTree, flattenGroupTree } from '@/lib/grouping/groupTree'
@@ -105,11 +104,10 @@ export default function AirtableGridView({
   onTableFieldsRefresh,
   onActionsReady,
 }: AirtableGridViewProps) {
-  const { openRecord } = useRecordPanel()
+  const router = useRouter()
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
-  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
 
   // `viewId` can be a composite like "<uuid>:<index>" in some contexts.
   // Only use a strict UUID when querying `grid_view_settings`.
@@ -142,9 +140,9 @@ export default function AirtableGridView({
   const handleOpenRecord = useCallback((rowId: string) => {
     if (disableRecordPanel) return
     if (!tableIdState || !tableName) return
-    // Open in modal instead of side panel
-    setModalRecord({ tableId: tableIdState, recordId: rowId, tableName })
-  }, [tableIdState, tableName, disableRecordPanel])
+    // Core Data (Airtable grid): open record as a full page view.
+    router.push(`/tables/${tableIdState}/records/${rowId}`)
+  }, [disableRecordPanel, router, tableIdState, tableName])
   
   // Map row height from props to internal format
   // On mobile, cap row height to medium for better usability
@@ -371,22 +369,13 @@ export default function AirtableGridView({
     async function loadGridViewSettings() {
       try {
         const supabase = createClient()
-        let { data, error } = await supabase
+        // IMPORTANT: Use `select('*')` so environments missing optional columns
+        // (e.g. `column_wrap_text`, `row_heights`) don't fail with a 400.
+        const { data, error } = await supabase
           .from('grid_view_settings')
-          .select('column_widths, column_order, column_wrap_text, row_heights')
+          .select('*')
           .eq('view_id', viewUuid)
           .maybeSingle()
-
-        // Backward compatibility: older schemas won't have row_heights yet.
-        if (error && ((error as any)?.code === '42703' || String((error as any)?.message || '').includes('row_heights'))) {
-          const retry = await supabase
-            .from('grid_view_settings')
-            .select('column_widths, column_order, column_wrap_text')
-            .eq('view_id', viewUuid)
-            .maybeSingle()
-          data = retry.data as any
-          error = retry.error as any
-        }
 
         if (error && error.code !== 'PGRST116') {
           console.error('Error loading grid view settings:', error)
@@ -1597,21 +1586,6 @@ export default function AirtableGridView({
           window.location.reload()
         }}
       />
-      
-      {/* Record modal */}
-      {modalRecord && (
-        <RecordModal
-          isOpen={!!modalRecord}
-          onClose={() => setModalRecord(null)}
-          onDeleted={async () => {
-            // Refresh data so the deleted record disappears.
-            await refresh()
-          }}
-          tableId={modalRecord.tableId}
-          recordId={modalRecord.recordId}
-          tableName={modalRecord.tableName}
-        />
-      )}
     </div>
   )
 }

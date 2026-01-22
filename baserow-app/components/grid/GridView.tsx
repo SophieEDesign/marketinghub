@@ -26,7 +26,6 @@ import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
-import RecordModal from "./RecordModal"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -347,7 +346,6 @@ export default function GridView({
   const [rowHeights, setRowHeights] = useState<Record<string, number>>({})
   const [hoverResizeRowId, setHoverResizeRowId] = useState<string | null>(null)
   const [resizeLineTop, setResizeLineTop] = useState<number | null>(null)
-  const [modalRecord, setModalRecord] = useState<{ tableId: string; recordId: string; tableName: string } | null>(null)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
 
   // Prevent runaway "create table" loops on repeated errors.
@@ -1801,14 +1799,6 @@ export default function GridView({
     if (!allowOpenRecord || !enableRecordOpen) return
     if (!rowId) return
 
-    // CRITICAL: If this grid is configured to open records in a modal,
-    // the dedicated chevron (and optional double-click) must open the modal
-    // even when `onRecordClick` is provided (e.g. by GridBlock).
-    if (recordOpenStyle === 'modal') {
-      setModalRecord({ tableId, recordId: rowId, tableName: supabaseTableName })
-      return
-    }
-
     // Otherwise, if an integration callback is provided, use it.
     if (onRecordClick) {
       onRecordClick(rowId)
@@ -2660,22 +2650,6 @@ export default function GridView({
             )}
           </div>
         </div>
-      )}
-
-      {/* Record modal */}
-      {modalRecord && (
-        <RecordModal
-          isOpen={!!modalRecord}
-          onClose={() => setModalRecord(null)}
-          onDeleted={() => {
-            // Refresh the grid after deletion so the removed row disappears.
-            void loadRows()
-          }}
-          tableId={modalRecord.tableId}
-          recordId={modalRecord.recordId}
-          tableName={modalRecord.tableName}
-          modalFields={modalFields}
-        />
       )}
     </div>
   )

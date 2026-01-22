@@ -41,6 +41,7 @@ import {
 } from "@/lib/interface/filters"
 import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 type MultiSource = {
   id: string
@@ -228,17 +229,18 @@ export default function MultiCalendarView({
 
       // Serialize all requests (connection exhaustion guard).
       for (const s of sources) {
-        if (!s?.table_id) continue
+        const tableId = normalizeUuid((s as any)?.table_id)
+        if (!tableId) continue
 
         const tableRes = await supabase
           .from("tables")
           .select("id, name, supabase_table")
-          .eq("id", s.table_id)
+          .eq("id", tableId)
           .single()
 
         if (!tableRes.data?.supabase_table) continue
         nextTables[s.id] = {
-          tableId: s.table_id,
+          tableId,
           supabaseTable: tableRes.data.supabase_table,
           name: tableRes.data.name || "Untitled table",
         }
@@ -246,16 +248,17 @@ export default function MultiCalendarView({
         const fieldsRes = await supabase
           .from("table_fields")
           .select("*")
-          .eq("table_id", s.table_id)
+          .eq("table_id", tableId)
           .order("position", { ascending: true })
         nextFields[s.id] = asArray<TableField>(fieldsRes.data)
 
         // View default filters (optional per source)
-        if (s.view_id) {
+        const viewId = normalizeUuid((s as any)?.view_id)
+        if (viewId) {
           const viewFiltersRes = await supabase
             .from("view_filters")
             .select("*")
-            .eq("view_id", s.view_id)
+            .eq("view_id", viewId)
           const vf = asArray<any>(viewFiltersRes.data).map((f: any) =>
             // normalizeFilter expects BlockFilter/FilterConfig (no `id` field)
             normalizeFilter({
@@ -391,9 +394,10 @@ export default function MultiCalendarView({
           title,
           start,
           end: finalEnd || undefined,
-          // Unified "card" styling: neutral background + subtle coloured border for source/type.
+          // Unified "card" styling: neutral background + subtle neutral border.
+          // This is a merged multi-table view, so cards should look the same regardless of source.
           backgroundColor: "#ffffff",
-          borderColor: eventColor,
+          borderColor: "#e5e7eb",
           textColor: "#111827",
           editable: isStartEditable && !isViewOnly && !isEditing,
           startEditable: isStartEditable && !isViewOnly && !isEditing,
@@ -696,6 +700,27 @@ export default function MultiCalendarView({
           eventDrop={handleEventDrop}
           eventClick={onCalendarEventClick}
           dateClick={onCalendarDateClick}
+          // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
+          eventDidMount={(arg: any) => {
+            const el = arg?.el as HTMLElement | undefined
+            if (!el) return
+            el.style.setProperty("background-color", "#ffffff", "important")
+            el.style.setProperty("border-color", "#e5e7eb", "important")
+            el.style.setProperty("color", "#111827", "important")
+            el.style.setProperty("border-width", "1px", "important")
+            el.style.setProperty("border-style", "solid", "important")
+            el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
+            el.style.setProperty("border-radius", "6px", "important")
+
+            // FullCalendar often renders the title inside an <a>; force link text color too.
+            try {
+              el.querySelectorAll("a").forEach((a) => {
+                ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
+              })
+            } catch {
+              // ignore
+            }
+          }}
         />
       </div>
 

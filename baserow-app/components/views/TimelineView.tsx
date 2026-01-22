@@ -519,7 +519,16 @@ export default function TimelineView({
       
       // If no explicit title field, use first non-date field from visible_fields
       if (!resolvedTitleField) {
-        resolvedTitleField = allVisibleFields.find(f => !dateFieldNames.has(f.name)) || null
+        // Prefer a text/long_text field for the title (e.g. "Content Name") so cards are readable.
+        // If none exist in visible_fields, fall back to first non-date field.
+        resolvedTitleField =
+          allVisibleFields.find(
+            (f) =>
+              !dateFieldNames.has(f.name) &&
+              (f.type === "text" || f.type === "long_text")
+          ) ||
+          allVisibleFields.find((f) => !dateFieldNames.has(f.name)) ||
+          null
       }
       
       // Fallback to auto-detect if still no title field
@@ -1525,7 +1534,8 @@ export default function TimelineView({
                                 />
                                 
                                 {/* Title */}
-                                <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                                {/* NOTE: Don't use flex-1 here; it can consume all height and hide field values below. */}
+                                <div className={`text-xs font-medium leading-tight ${wrapTitle ? 'break-words' : 'truncate'}`}>
                                   {event.title}
                                 </div>
 
@@ -1618,7 +1628,8 @@ export default function TimelineView({
                         />
                         
                         {/* Title */}
-                        <div className={`text-xs font-medium flex-1 ${wrapTitle ? 'break-words' : 'truncate'}`}>
+                        {/* NOTE: Don't use flex-1 here; it can consume all height and hide field values below. */}
+                        <div className={`text-xs font-medium leading-tight ${wrapTitle ? 'break-words' : 'truncate'}`}>
                           {event.title}
                         </div>
 

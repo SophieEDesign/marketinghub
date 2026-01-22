@@ -9,10 +9,10 @@
 import { createClient } from '@/lib/supabase/client'
 import type { InterfacePage } from './page-types-only'
 import { VIEWS_ENABLED } from '@/lib/featureFlags'
+import { normalizeUuid } from '@/lib/utils/ids'
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-function isUuidLike(value: string | null | undefined): value is string {
-  return typeof value === 'string' && UUID_RE.test(value)
+function isUuidLike(value: unknown): value is string {
+  return normalizeUuid(value) != null
 }
 
 /**
@@ -29,7 +29,7 @@ export async function getPageTableId(page: InterfacePage): Promise<string | null
   if (page.base_table) {
     // Check if it looks like a UUID (36 chars with dashes)
     if (isUuidLike(page.base_table)) {
-      return page.base_table
+      return normalizeUuid(page.base_table)
     }
     // Otherwise it might be a table name (or supabase_table) - resolve to ID.
     try {
@@ -59,7 +59,7 @@ export async function getPageTableId(page: InterfacePage): Promise<string | null
   // Check form_config_id - if it's a UUID, it's a table ID
   if (page.form_config_id) {
     if (isUuidLike(page.form_config_id)) {
-      return page.form_config_id
+      return normalizeUuid(page.form_config_id)
     }
   }
 
@@ -70,11 +70,13 @@ export async function getPageTableId(page: InterfacePage): Promise<string | null
       return null
     }
     try {
+      const viewId = normalizeUuid(page.saved_view_id)
+      if (!viewId) return null
       const supabase = createClient()
       const { data: view, error } = await supabase
         .from('views')
         .select('table_id')
-        .eq('id', page.saved_view_id)
+        .eq('id', viewId)
         .maybeSingle()
 
       if (!error && view?.table_id) {
@@ -99,14 +101,14 @@ export function getPageTableIdSync(
   // Check base_table
   if (page.base_table) {
     if (isUuidLike(page.base_table)) {
-      return page.base_table
+      return normalizeUuid(page.base_table)
     }
   }
 
   // Check form_config_id
   if (page.form_config_id) {
     if (isUuidLike(page.form_config_id)) {
-      return page.form_config_id
+      return normalizeUuid(page.form_config_id)
     }
   }
 

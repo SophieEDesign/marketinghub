@@ -906,20 +906,41 @@ export async function DELETE(
     }
 
     // Delete from view_fields
-    await supabase
+    const { error: viewFieldsDeleteError } = await supabase
       .from('view_fields')
       .delete()
       .eq('field_name', field.name)
+    if (viewFieldsDeleteError) {
+      // Non-fatal: this can fail under some RLS policies; field metadata deletion is the primary action.
+      console.warn('Failed to delete view_fields rows for field:', {
+        field_name: field.name,
+        error: viewFieldsDeleteError,
+      })
+    }
 
     // Delete metadata
-    const { error: deleteError } = await supabase
+    // IMPORTANT: RLS can cause a "silent no-op" delete (0 rows affected, no error).
+    // Always request the deleted rows back and verify we actually deleted something.
+    const { data: deletedRows, error: deleteError } = await supabase
       .from('table_fields')
       .delete()
       .eq('id', fieldId)
+      .select('id')
 
     if (deleteError) {
       const errorResponse = createErrorResponse(deleteError, 'Failed to delete field', 500)
       return NextResponse.json(errorResponse, { status: 500 })
+    }
+
+    if (!deletedRows || deletedRows.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Field was not deleted. This is usually caused by Row Level Security (RLS) blocking deletes for your current user/session.',
+          error_code: 'FIELD_DELETE_NOT_PERMITTED',
+        },
+        { status: 403 }
+      )
     }
 
     // TODO (Future Enhancement): Invalidate view metadata cache when fields change

@@ -24,6 +24,7 @@ import { getRequiredAnchorType } from "@/lib/interface/page-types"
 import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
+import { normalizeUuid } from "@/lib/utils/ids"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -271,10 +272,12 @@ function InterfacePageClientInternal({
       
       try {
         const supabase = createClient()
+        const savedViewId = normalizeUuid((page as any)?.saved_view_id)
+        if (!savedViewId) return
         const { data: view, error } = await supabase
           .from('views')
           .select('updated_at')
-          .eq('id', page.saved_view_id)
+          .eq('id', savedViewId)
           .single()
         
         if (!error && view?.updated_at) {
@@ -434,11 +437,12 @@ function InterfacePageClientInternal({
       let supabaseTableName: string | null = null
 
       // First, try to get table ID from saved_view_id
-      if (page.saved_view_id) {
+      const savedViewId = normalizeUuid((page as any)?.saved_view_id)
+      if (savedViewId) {
         const { data: view, error: viewError } = await supabase
           .from('views')
           .select('table_id')
-          .eq('id', page.saved_view_id)
+          .eq('id', savedViewId)
           .single()
 
         if (!viewError && view?.table_id) {
@@ -541,12 +545,19 @@ function InterfacePageClientInternal({
 
     try {
       const supabase = createClient()
+      const savedViewId = normalizeUuid((page as any)?.saved_view_id)
+      if (!savedViewId) {
+        setData([])
+        dataLoadingRef.current = false
+        setDataLoading(false)
+        return
+      }
       
       // Get view with table_id and updated_at to track view changes
       const { data: view, error: viewError } = await supabase
         .from('views')
         .select('table_id, updated_at')
-        .eq('id', page.saved_view_id)
+        .eq('id', savedViewId)
         .single()
 
       if (viewError || !view?.table_id) {
@@ -580,11 +591,11 @@ function InterfacePageClientInternal({
         supabase
           .from('view_filters')
           .select('*')
-          .eq('view_id', page.saved_view_id),
+          .eq('view_id', savedViewId),
         supabase
           .from('view_sorts')
           .select('*')
-          .eq('view_id', page.saved_view_id)
+          .eq('view_id', savedViewId)
           .order('order_index', { ascending: true }),
       ])
 
