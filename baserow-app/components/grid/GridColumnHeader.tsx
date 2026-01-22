@@ -203,11 +203,17 @@ export default function GridColumnHeader({
           {getFieldIcon(field.type)}
         </span>
         <div className="min-w-0">
-          <div className="text-sm font-medium text-gray-700 truncate">
+          <div 
+            className="text-sm font-medium text-gray-700 truncate"
+            title={getFieldDisplayName(field)}
+          >
             {getFieldDisplayName(field)}
           </div>
           {isMirroredLinkedField && (
-            <div className="text-[11px] text-gray-400 truncate">
+            <div 
+              className="text-[11px] text-gray-400 truncate"
+              title={`Linked from ${linkedFromTableName || 'linked table'}`}
+            >
               Linked from {linkedFromTableName || 'linked table'}
             </div>
           )}

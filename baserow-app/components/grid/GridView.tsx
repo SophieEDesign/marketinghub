@@ -2736,7 +2736,7 @@ export default function GridView({
                       <td className="px-2 py-1 w-8">
                         <input
                           type="checkbox"
-                          checked={thisRowId && selectedRowId === thisRowId}
+                          checked={thisRowId ? selectedRowId === thisRowId : false}
                           onChange={() => thisRowId && handleRowSelect(thisRowId)}
                           className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
                           onClick={(e) => e.stopPropagation()}
@@ -2915,7 +2915,7 @@ export default function GridView({
                     <td className="px-2 py-1 w-8">
                       <input
                         type="checkbox"
-                        checked={thisRowId && selectedRowId === thisRowId}
+                        checked={thisRowId ? selectedRowId === thisRowId : false}
                         onChange={() => thisRowId && handleRowSelect(thisRowId)}
                         className="w-4 h-4 text-blue-600 bg-white border-gray-300 rounded focus:ring-blue-400/20 cursor-pointer"
                         onClick={(e) => e.stopPropagation()}

@@ -48,12 +48,20 @@ export function ChoicePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center rounded-md text-xs font-medium",
         density === "compact" ? "px-2 py-0.5" : "px-2 py-0.5",
         textColorClass,
         className
       )}
-      style={{ backgroundColor: bgColor, ...style }}
+      style={{ 
+        backgroundColor: bgColor, 
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        ...style 
+      }}
+      title={normalized}
       {...props}
     >
       {normalized}
@@ -84,7 +92,7 @@ export function ChoicePillList({
   const remaining = typeof max === "number" ? Math.max(0, safe.length - shown.length) : 0
 
   return (
-    <div className={cn("flex flex-wrap gap-1", className)} {...props}>
+    <div className={cn("flex flex-wrap gap-1 items-start", className)} {...props}>
       {shown.map((val) => (
         <ChoicePill
           key={val}

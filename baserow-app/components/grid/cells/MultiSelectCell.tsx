@@ -40,7 +40,7 @@ export default function MultiSelectCell({
     // Basic fallback - just show the values as pills
     const displayValues = sortLabelsByManualOrder(value || [], "multi_select", fieldOptions)
     return (
-      <div className="w-full h-full px-3 flex items-center flex-wrap gap-1.5 text-sm overflow-hidden" style={containerStyle}>
+      <div className="w-full px-3 py-1.5 flex items-start flex-wrap gap-1.5 text-sm overflow-y-auto" style={containerStyle}>
         {displayValues.length > 0 ? (
           <ChoicePillList
             labels={displayValues}
@@ -56,7 +56,7 @@ export default function MultiSelectCell({
   }
 
   return (
-    <div className="w-full h-full px-3 flex items-center overflow-hidden" style={containerStyle}>
+    <div className="w-full px-3 py-1.5 flex items-start" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
         // Ensure the picker dropdown uses canonical manual order by default.

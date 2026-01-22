@@ -386,7 +386,7 @@ export default function InlineSelectDropdown({
         {/* Dropdown trigger */}
         <button
           type="button"
-          className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-center flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
+          className="cell-editor w-full min-h-[32px] px-2.5 py-1.5 flex items-start flex-wrap gap-1.5 text-sm border border-gray-300 rounded-md hover:border-blue-400 hover:bg-blue-50/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40 focus-visible:ring-offset-2"
           onMouseDown={(e) => {
             // Prevent row-level mouse handlers from ever seeing this interaction.
             // Some grids select rows on mousedown/click; we want the dropdown to be isolated.

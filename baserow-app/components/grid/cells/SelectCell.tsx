@@ -39,7 +39,7 @@ export default function SelectCell({
   if (!fieldId || !tableId) {
     // Basic fallback - just show the value as a pill
     return (
-      <div className="w-full h-full px-3 flex items-center gap-2 text-sm overflow-hidden" style={containerStyle}>
+      <div className="w-full px-3 py-1.5 flex items-center gap-2 text-sm" style={containerStyle}>
         {value ? (
           <ChoicePill
             label={value}
@@ -55,7 +55,7 @@ export default function SelectCell({
   }
 
   return (
-    <div className="w-full h-full px-3 flex items-center overflow-hidden" style={containerStyle}>
+    <div className="w-full px-3 py-1.5 flex items-center" style={containerStyle}>
       <InlineSelectDropdown
         value={value}
         // Ensure the picker dropdown uses canonical manual order by default.
