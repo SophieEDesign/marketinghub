@@ -7,7 +7,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/context-menu/ContextMenu'
-import { Copy, Paste } from 'lucide-react'
+import { Copy, ClipboardPaste } from 'lucide-react'
 
 interface CellContextMenuProps {
   children: ReactNode
@@ -77,7 +77,7 @@ export default function CellContextMenu({
         </ContextMenuItem>
         {editable && (
           <ContextMenuItem onClick={handlePaste}>
-            <Paste className="h-4 w-4 mr-2" />
+            <ClipboardPaste className="h-4 w-4 mr-2" />
             Paste
           </ContextMenuItem>
         )}
