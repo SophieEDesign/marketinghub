@@ -193,7 +193,7 @@ export async function ensureSidebarItemsForTables() {
         item_type: 'table',
         item_id: table.id,
         label: table.name,
-        href: `/data/${table.id}`,
+        href: `/tables/${table.id}`,
         icon: 'database',
         position: nextPosition,
         category_id: null,

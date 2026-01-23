@@ -91,7 +91,7 @@ export default function ViewTopBar({
 
       setDeleteOpen(false)
       onViewDeleted?.()
-      router.push(`/data/${tableId}`)
+      router.push(`/tables/${tableId}`)
     } catch (error) {
       console.error('Error deleting view:', error)
       alert('Failed to delete view')

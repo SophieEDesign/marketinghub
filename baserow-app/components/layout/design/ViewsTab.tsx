@@ -129,7 +129,7 @@ const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
                 <div className="flex-1 min-w-0">
                   <div
                     className="text-sm font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600"
-                    onClick={() => router.push(`/data/${tableId}/views/${view.id}`)}
+                    onClick={() => router.push(`/tables/${tableId}/views/${view.id}`)}
                   >
                     {view.name}
                   </div>
@@ -141,7 +141,7 @@ const ViewsTab = memo(function ViewsTab({ tableId, tableName }: ViewsTabProps) {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => router.push(`/data/${tableId}/views/${view.id}`)}
+                    onClick={() => router.push(`/tables/${tableId}/views/${view.id}`)}
                     className="h-7 w-7 p-0"
                   >
                     <Edit className="h-3.5 w-3.5 text-gray-500" />

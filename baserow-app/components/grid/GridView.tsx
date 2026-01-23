@@ -2239,7 +2239,7 @@ export default function GridView({
 
   function handleColumnCopyUrl(fieldName: string) {
     // Copy field URL to clipboard
-    const url = `${window.location.origin}/data/${tableId}?field=${encodeURIComponent(fieldName)}`
+    const url = `${window.location.origin}/tables/${tableId}?field=${encodeURIComponent(fieldName)}`
     navigator.clipboard.writeText(url).then(() => {
       // Could show toast notification here
     }).catch(err => {

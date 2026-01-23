@@ -273,7 +273,7 @@ export default function GridColumnHeader({
             // Copy field URL
             const tableIdForUrl = tableId || field.table_id
             if (tableIdForUrl) {
-              const url = `${window.location.origin}/data/${tableIdForUrl}?field=${encodeURIComponent(field.name)}`
+              const url = `${window.location.origin}/tables/${tableIdForUrl}?field=${encodeURIComponent(field.name)}`
               navigator.clipboard.writeText(url).then(() => {
                 setDropdownOpen(false)
               }).catch(err => {
