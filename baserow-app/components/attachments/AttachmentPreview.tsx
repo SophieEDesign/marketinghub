@@ -26,7 +26,7 @@ interface AttachmentPreviewProps {
   attachments: Attachment[]
   maxVisible?: number // Max previews to show (for grid view)
   size?: 'small' | 'medium' | 'large' // Preview size
-  displayStyle?: 'thumbnails' | 'list' // Display style
+  displayStyle?: 'thumbnails' | 'list' | 'hero' | 'cover' | 'gallery' // Display style
   onPreviewClick?: (index: number) => void // Optional: custom click handler
   className?: string
   compact?: boolean // For grid cells - show minimal previews
@@ -150,7 +150,200 @@ export default function AttachmentPreview({
     )
   }
 
-  // Full preview mode
+  // Hero mode - large featured image with others as thumbnails below
+  if (displayStyle === 'hero') {
+    const firstAttachment = attachments[0]
+    const isFirstImage = isImage(firstAttachment?.type) && !failedImages.has(0)
+    const otherAttachments = attachments.slice(1, maxVisible)
+
+    return (
+      <>
+        <div className={cn("space-y-3", className)}>
+          {/* Hero image */}
+          {firstAttachment && (
+            <div
+              className="relative w-full rounded-lg overflow-hidden bg-gray-100 cursor-pointer group"
+              style={{ aspectRatio: '16/9' }}
+              onClick={() => handleAttachmentClick(0)}
+            >
+              {isFirstImage ? (
+                <img
+                  src={firstAttachment.url}
+                  alt={firstAttachment.name}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                  onError={() => {
+                    setFailedImages(prev => new Set(prev).add(0))
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8">
+                  {getFileTypeIcon(firstAttachment)}
+                  <p className="mt-2 text-sm text-gray-600">{firstAttachment.name}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Thumbnail grid below */}
+          {otherAttachments.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {otherAttachments.map((attachment, index) => {
+                const actualIndex = index + 1
+                const isImg = isImage(attachment.type) && !failedImages.has(actualIndex)
+                return (
+                  <div
+                    key={actualIndex}
+                    className="relative aspect-square rounded overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => handleAttachmentClick(actualIndex)}
+                  >
+                    {isImg ? (
+                      <img
+                        src={attachment.url}
+                        alt={attachment.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={() => {
+                          setFailedImages(prev => new Set(prev).add(actualIndex))
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        {getFileTypeIcon(attachment)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {remainingCount > 0 && (
+                <div
+                  className="aspect-square flex items-center justify-center rounded bg-gray-100 text-gray-600 font-medium cursor-pointer hover:bg-gray-200 transition-colors"
+                  onClick={() => handleAttachmentClick(visibleAttachments.length)}
+                >
+                  +{remainingCount}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {previewIndex !== null && (
+          <AttachmentModal
+            attachments={attachments}
+            index={previewIndex}
+            onClose={() => setPreviewIndex(null)}
+            onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Cover mode - full-width banner image
+  if (displayStyle === 'cover') {
+    const firstAttachment = attachments[0]
+    const isFirstImage = isImage(firstAttachment?.type) && !failedImages.has(0)
+
+    return (
+      <>
+        <div className={cn("relative w-full rounded-lg overflow-hidden bg-gray-100", className)}>
+          {firstAttachment && (
+            <div
+              className="relative w-full cursor-pointer group"
+              style={{ aspectRatio: '21/9', minHeight: '200px' }}
+              onClick={() => handleAttachmentClick(0)}
+            >
+              {isFirstImage ? (
+                <img
+                  src={firstAttachment.url}
+                  alt={firstAttachment.name}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  loading="lazy"
+                  onError={() => {
+                    setFailedImages(prev => new Set(prev).add(0))
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8">
+                  {getFileTypeIcon(firstAttachment)}
+                  <p className="mt-2 text-sm text-gray-600">{firstAttachment.name}</p>
+                </div>
+              )}
+              {attachments.length > 1 && (
+                <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                  +{attachments.length - 1} more
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {previewIndex !== null && (
+          <AttachmentModal
+            attachments={attachments}
+            index={previewIndex}
+            onClose={() => setPreviewIndex(null)}
+            onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Gallery mode - responsive grid of images
+  if (displayStyle === 'gallery') {
+    return (
+      <>
+        <div className={cn("grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2", className)}>
+          {visibleAttachments.map((attachment, index) => {
+            const isImg = isImage(attachment.type) && !failedImages.has(index)
+            return (
+              <div
+                key={index}
+                className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer group"
+                onClick={() => handleAttachmentClick(index)}
+              >
+                {isImg ? (
+                  <img
+                    src={attachment.url}
+                    alt={attachment.name}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                    loading="lazy"
+                    onError={() => {
+                      setFailedImages(prev => new Set(prev).add(index))
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                    {getFileTypeIcon(attachment)}
+                    <span className="text-xs text-gray-600 truncate w-full text-center mt-1">
+                      {(attachment.name || '').split('.').pop()?.toUpperCase() || 'FILE'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {remainingCount > 0 && (
+            <div
+              className="aspect-square flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 font-medium cursor-pointer hover:bg-gray-200 transition-colors"
+              onClick={() => handleAttachmentClick(visibleAttachments.length)}
+            >
+              +{remainingCount}
+            </div>
+          )}
+        </div>
+        {previewIndex !== null && (
+          <AttachmentModal
+            attachments={attachments}
+            index={previewIndex}
+            onClose={() => setPreviewIndex(null)}
+            onNavigate={(newIndex) => setPreviewIndex(newIndex)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // List mode
   if (displayStyle === 'list') {
     return (
       <>

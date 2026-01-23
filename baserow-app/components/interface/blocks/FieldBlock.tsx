@@ -357,11 +357,19 @@ export default function FieldBlock({
         {attachments.length > 0 ? (
           <AttachmentPreview
             attachments={attachments}
-            maxVisible={10}
-            size={(config?.appearance as any)?.attachment_size || "medium"}
+            maxVisible={
+              (config?.appearance as any)?.attachment_max_visible ||
+              field.options?.attachment_max_visible ||
+              10
+            }
+            size={
+              (config?.appearance as any)?.attachment_size ||
+              field.options?.attachment_preview_size ||
+              "medium"
+            }
             displayStyle={
-              field.options?.attachment_display_style ||
               (config?.appearance as any)?.attachment_display_style ||
+              field.options?.attachment_display_style ||
               "thumbnails"
             }
           />

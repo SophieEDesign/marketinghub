@@ -100,7 +100,7 @@ export interface FieldOptions {
   lookup_filters?: LookupFieldFilter[]
   
   // For attachment fields
-  attachment_display_style?: 'thumbnails' | 'list' // Display style for attachments
+  attachment_display_style?: 'thumbnails' | 'list' | 'hero' | 'cover' | 'gallery' // Display style for attachments
   attachment_preview_size?: 'small' | 'medium' | 'large' // Preview size for attachments
   attachment_max_visible?: number // Max number of previews to show (default: 3 for grid, 10 for record view)
   
