@@ -23,7 +23,7 @@ import type { EventDropArg, EventInput } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
-import { isDebugEnabled, debugLog as debugCalendar, debugWarn as debugCalendarWarn } from '@/lib/interface/debug-flags'
+import { isDebugEnabled, debugLog, debugWarn, debugError } from '@/lib/interface/debug-flags'
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import TimelineFieldValue from "@/components/views/TimelineFieldValue"
@@ -274,7 +274,7 @@ export default function CalendarView({
         setResolvedTableId(view.table_id)
       }
     } catch (error) {
-      console.error('Calendar: Error loading view config:', error)
+      debugError('CALENDAR', 'Calendar: Error loading view config:', error)
     }
   }
 
@@ -360,9 +360,7 @@ export default function CalendarView({
       }
     }
     
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Calendar: No valid date field found. Block config:', blockConfig, 'View config:', viewConfig, 'Prop:', dateFieldId)
-    }
+    debugWarn('CALENDAR', 'Calendar: No valid date field found.', { blockConfig, viewConfig, dateFieldId })
     return ''
   }, [blockConfig, viewConfig, dateFieldId, loadedTableFields])
 
@@ -440,13 +438,11 @@ export default function CalendarView({
     // Early return if critical prerequisites aren't met
     // Note: loadedTableFields are only needed for filtering, not for loading rows
     if (!resolvedTableId || !supabaseTableName) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Calendar: Skipping loadRows - prerequisites not met', {
-          resolvedTableId: !!resolvedTableId,
-          supabaseTableName: !!supabaseTableName,
-          loadedTableFieldsCount: loadedTableFields.length
-        })
-      }
+      debugLog('CALENDAR', 'Calendar: Skipping loadRows - prerequisites not met', {
+        resolvedTableId: !!resolvedTableId,
+        supabaseTableName: !!supabaseTableName,
+        loadedTableFieldsCount: loadedTableFields.length
+      })
       return
     }
     
@@ -467,13 +463,11 @@ export default function CalendarView({
     const shouldLoad = prevFiltersRef.current !== combinedKey || (isFirstLoadForThisView && rows.length === 0)
     
     if (shouldLoad) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Calendar: Triggering loadRows', {
-          keyChanged: prevFiltersRef.current !== combinedKey,
-          noRowsYet: rows.length === 0,
-          combinedKey: combinedKey.substring(0, 50) + '...'
-        })
-      }
+      debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
+        keyChanged: prevFiltersRef.current !== combinedKey,
+        noRowsYet: rows.length === 0,
+        combinedKey: combinedKey.substring(0, 50) + '...'
+      })
       prevFiltersRef.current = combinedKey
       loadRows()
     }
@@ -501,27 +495,27 @@ export default function CalendarView({
           .single()
 
         if (error) {
-          console.warn('Calendar: Could not resolve tableId from view:', error)
+          debugWarn('CALENDAR', 'Calendar: Could not resolve tableId from view:', error)
           setResolvedTableId("")
           setLoading(false)
           return
         }
 
         if (view?.table_id) {
-          debugCalendar('CALENDAR', 'Resolved tableId from view:', view.table_id)
+          debugLog('CALENDAR', 'Resolved tableId from view:', view.table_id)
           setResolvedTableId(view.table_id)
         } else {
-          debugCalendarWarn('CALENDAR', 'View has no table_id')
+          debugWarn('CALENDAR', 'View has no table_id')
           setResolvedTableId("")
           setLoading(false)
         }
       } catch (error) {
-        console.error('Calendar: Error resolving tableId:', error)
+        debugError('CALENDAR', 'Calendar: Error resolving tableId:', error)
         setResolvedTableId("")
         setLoading(false)
       }
     } else {
-      console.warn('Calendar: No tableId provided and no viewId fallback')
+      debugWarn('CALENDAR', 'Calendar: No tableId provided and no viewId fallback')
       setResolvedTableId("")
       setLoading(false)
     }
@@ -575,14 +569,14 @@ export default function CalendarView({
         })))
       }
     } catch (error) {
-      console.error('Calendar: Error loading table fields:', error)
+      debugError('CALENDAR', 'Calendar: Error loading table fields:', error)
     }
   }
 
   async function loadRows() {
     // Gracefully handle missing tableId for SQL-view backed pages
     if (!resolvedTableId || !supabaseTableName) {
-      debugCalendar('CALENDAR', 'Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
+      debugLog('CALENDAR', 'Cannot load rows - missing tableId or supabaseTableName', { resolvedTableId, supabaseTableName })
       setRows([])
       setLoading(false)
       isLoadingRef.current = false
@@ -600,8 +594,7 @@ export default function CalendarView({
       const supabase = createClient()
       
       // DEBUG logging - always log if debug flag is set
-      if (calendarDebugEnabled || process.env.NODE_ENV === 'development') {
-        console.log(`[Calendar] Loading rows from table`, {
+      debugLog('CALENDAR', `[Calendar] Loading rows from table`, {
           tableId: resolvedTableId,
           supabaseTableName,
           filtersCount: filters.length,
@@ -634,7 +627,8 @@ export default function CalendarView({
 
       if (error) {
         if (isAbortError(error)) return
-        console.error('Calendar: Error loading rows:', error, {
+        debugError('CALENDAR', 'Calendar: Error loading rows:', {
+          error,
           tableId: resolvedTableId,
           supabaseTableName,
           errorCode: (error as any).code,
@@ -653,7 +647,7 @@ export default function CalendarView({
         setRows(tableRows)
         
         // DEBUG_CALENDAR: Log loaded rows
-        debugCalendar('CALENDAR', `Loaded ${data?.length || 0} rows from ${supabaseTableName}`, {
+        debugLog('CALENDAR', `Loaded ${data?.length || 0} rows from ${supabaseTableName}`, {
           rowCount: data?.length || 0,
           supabaseTableName,
           resolvedDateFieldId,
@@ -662,7 +656,7 @@ export default function CalendarView({
       }
     } catch (error) {
       if (isAbortError(error)) return
-      console.error('Calendar: Exception loading rows:', error)
+      debugError('CALENDAR', 'Calendar: Exception loading rows:', error)
       setRows([])
     } finally {
       setLoading(false)
@@ -858,14 +852,14 @@ export default function CalendarView({
     }
 
     if (!supabaseTableName) {
-      console.warn("Calendar: Cannot persist drop - missing supabaseTableName")
+      debugWarn('CALENDAR', "Calendar: Cannot persist drop - missing supabaseTableName")
       info.revert()
       return
     }
 
     const { fromFieldName, toFieldName } = resolveCalendarDateFieldNames()
     if (!fromFieldName) {
-      console.warn("Calendar: Cannot persist drop - missing fromFieldName", {
+      debugWarn('CALENDAR', "Calendar: Cannot persist drop - missing fromFieldName", {
         rowId,
         resolvedDateFieldId,
         viewConfig,
@@ -922,7 +916,8 @@ export default function CalendarView({
       // Ensure the UI is in sync with any DB-side transforms.
       await loadRows()
     } catch (error) {
-      console.error("Calendar: Failed to persist event drop", error, {
+      debugError('CALENDAR', "Calendar: Failed to persist event drop", {
+        error,
         rowId,
         supabaseTableName,
         updates,
@@ -943,8 +938,7 @@ export default function CalendarView({
     
     // Defensive check: ensure we have a valid date field
     if (!effectiveDateFieldId || !isValidDateField) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('Calendar: Cannot generate events - missing or invalid date field', {
+      debugWarn('CALENDAR', 'Calendar: Cannot generate events - missing or invalid date field', {
           resolvedDateFieldId,
           isValidDateField,
           dateField,
@@ -957,8 +951,7 @@ export default function CalendarView({
     
     // Defensive check: ensure we have rows
     if (!filteredRows || filteredRows.length === 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Calendar: No rows to generate events from', {
+      debugLog('CALENDAR', 'Calendar: No rows to generate events from', {
           totalRows: rows.length,
           filteredRows: filteredRows?.length || 0,
           searchQuery,
@@ -969,8 +962,8 @@ export default function CalendarView({
     }
     
     // Defensive check: log if rows exist but events will be empty
-    if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
-      console.log('Calendar: Processing events', {
+    debugLog('CALENDAR', 'Calendar: Processing events', {
+      enabled: filteredRows.length > 0,
         rowCount: filteredRows.length,
         dateField: effectiveDateFieldId,
         sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
@@ -984,7 +977,7 @@ export default function CalendarView({
       const actualFieldName = effectiveDateField?.name || effectiveDateFieldId
       
       // DEBUG_CALENDAR: Log date field resolution
-      debugCalendar('CALENDAR', 'Date field resolution for events', {
+      debugLog('CALENDAR', 'Date field resolution for events', {
         effectiveDateFieldId,
         effectiveDateFieldName: effectiveDateField?.name,
         actualFieldName,
@@ -1038,7 +1031,7 @@ export default function CalendarView({
       const actualToFieldName = resolvedToField?.name || endField?.name || viewConfig?.calendar_end_field || autoDetectedToField?.name || null
       
       if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
-        console.log('Calendar: Date field resolution', {
+        debugLog('CALENDAR', 'Calendar: Date field resolution', {
           actualFieldName,
           actualFromFieldName,
           actualToFieldName,
@@ -1050,7 +1043,7 @@ export default function CalendarView({
       // CRITICAL: Log sample row data to debug date field extraction
       if (process.env.NODE_ENV === 'development' && filteredRows.length > 0) {
         const sampleRow = filteredRows[0]
-        console.log('Calendar: Sample row data for event mapping', {
+        debugLog('CALENDAR', 'Calendar: Sample row data for event mapping', {
           rowId: sampleRow.id,
           dateFromFieldName: actualFromFieldName,
           dateToFieldName: actualToFieldName,
@@ -1066,9 +1059,7 @@ export default function CalendarView({
       const events = filteredRows
         .filter((row) => {
           if (!row || !row.data) {
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('Calendar: Row missing or has no data', { rowId: row?.id })
-            }
+            debugWarn('CALENDAR', 'Calendar: Row missing or has no data', { rowId: row?.id })
             return false
           }
           
@@ -1111,8 +1102,8 @@ export default function CalendarView({
           
           // Skip if no date value at all
           if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
-            if (process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
-              console.log('Calendar: Row filtered out - no date value', {
+            debugLog('CALENDAR', 'Calendar: Row filtered out - no date value', {
+              enabled: filteredRows.length <= 5,
                 rowId: row.id,
                 dateFromField: actualFromFieldName,
                 dateToField: actualToFieldName,
@@ -1127,8 +1118,8 @@ export default function CalendarView({
             const parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
             // Check if date is valid
             const isValid = !isNaN(parsedDate.getTime())
-            if (!isValid && process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
-              console.warn('Calendar: Row filtered out - invalid date', {
+            if (!isValid) {
+              debugWarn('CALENDAR', 'Calendar: Row filtered out - invalid date', {
                 rowId: row.id,
                 dateValue,
                 parsedDate
@@ -1136,8 +1127,7 @@ export default function CalendarView({
             }
             return isValid
           } catch (error) {
-            if (process.env.NODE_ENV === 'development' && filteredRows.length <= 5) {
-              console.warn('Calendar: Row filtered out - date parse error', {
+            debugWarn('CALENDAR', 'Calendar: Row filtered out - date parse error', {
                 rowId: row.id,
                 dateValue,
                 error
@@ -1402,7 +1392,7 @@ export default function CalendarView({
       }
       return events
     } catch (error) {
-      console.error('Calendar: Error generating events:', error)
+      debugError('CALENDAR', 'Calendar: Error generating events:', error)
       return []
     }
   }
@@ -1582,7 +1572,7 @@ export default function CalendarView({
       // Standardise on localStorage.getItem("DEBUG_CALENDAR") === "1"
       const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_CALENDAR") === "1"
       if (debugEnabled || process.env.NODE_ENV === "development") {
-        console.log("[Calendar] Event clicked", {
+        debugLog('CALENDAR', "[Calendar] Event clicked", {
           recordId,
           eventId: info.event.id,
           eventTitle: info.event.title,
@@ -1594,7 +1584,7 @@ export default function CalendarView({
         })
       }
 
-      debugCalendar("CALENDAR", "Event clicked", {
+      debugLog("CALENDAR", "Event clicked", {
         recordId,
         event: info.event,
         hasOnRecordClick: !!onRecordClick,
@@ -1603,7 +1593,7 @@ export default function CalendarView({
       })
 
       if (!recordId) {
-        console.warn("[Calendar] Event clicked but no recordId found", { event: info.event })
+        debugWarn('CALENDAR', "[Calendar] Event clicked but no recordId found", { event: info.event })
         return
       }
 
@@ -1708,7 +1698,7 @@ export default function CalendarView({
     // Log diagnostic info in development
     if (process.env.NODE_ENV === 'development') {
       const sampleRow = rows[0]
-      console.warn('Calendar: Rows exist but no events generated', {
+      debugWarn('CALENDAR', 'Calendar: Rows exist but no events generated', {
         rowCount: rows.length,
         dateField: resolvedDateFieldId,
         sampleRowData: sampleRow?.data ? {

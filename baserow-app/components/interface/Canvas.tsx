@@ -195,9 +195,7 @@ export default function Canvas({
     // This prevents Canvas from committing empty layout state before blocks arrive
     // InterfaceBuilder should prevent Canvas from rendering until hydrated, but this is a safety net
     if (!layoutHydratedRef.current && blocks.length === 0) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[Canvas] Sync skipped - not hydrated yet, blocks.length=0')
-      }
+      debugLog('LAYOUT', '[Canvas] Sync skipped - not hydrated yet, blocks.length=0')
       return
     }
     
@@ -278,8 +276,7 @@ export default function Canvas({
     // 4. Block positions changed (blocks reloaded with updated positions from DB)
     const shouldSync = blockIdsChanged || layoutIsEmpty || blockPositionsChanged
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Canvas] Layout sync check', {
+    debugLog('LAYOUT', '[Canvas] Layout sync check', {
         pageId,
         blocksCount: blocks.length,
         currentBlockIds,
@@ -883,9 +880,8 @@ export default function Canvas({
         debugLog('LAYOUT', '[Canvas] Ignoring first layout change (grid normalization on mount)', {
           pageId,
           layoutCount: newLayout.length,
-            isEditing,
-          })
-        }
+          isEditing,
+        })
         isFirstLayoutChangeRef.current = false
         return
       }

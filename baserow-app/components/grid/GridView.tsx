@@ -42,6 +42,7 @@ import { isAbortError } from "@/lib/api/error-handling"
 import { normalizeUuid } from "@/lib/utils/ids"
 import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
+import { debugLog, debugWarn, debugError } from "@/lib/interface/debug-flags"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -745,7 +746,6 @@ export default function GridView({
   // Defensive logging (temporary - remove after fixing all upstream issues)
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     // Removed debug console.log - use React DevTools to inspect props
-    // console.log('GridView input types', {
     //   rows: Array.isArray(rows),
     //   viewFields: Array.isArray(viewFields),
     //   tableFields: Array.isArray(tableFields),
@@ -831,7 +831,7 @@ export default function GridView({
         }
 
         if (error && error.code !== 'PGRST116') {
-          console.error('Error loading column settings:', error)
+          debugError('LAYOUT', 'Error loading column settings:', error)
           return
         }
 
@@ -900,7 +900,7 @@ export default function GridView({
           initializeColumnOrder()
         }
       } catch (error) {
-        console.error('Error loading column settings:', error)
+        debugError('LAYOUT', 'Error loading column settings:', error)
         initializeColumnOrder()
       }
     }
@@ -995,7 +995,7 @@ export default function GridView({
           await tryUpdateOrInsert(withoutRowHeights)
         }
       } catch (error) {
-        console.error('Error saving column settings:', error)
+        debugError('LAYOUT', 'Error saving column settings:', error)
       }
     }
 
@@ -1154,7 +1154,7 @@ export default function GridView({
           
           // CRITICAL: Only include fields that exist in tableFields
           if (!fieldExists(vf.field_name)) {
-            console.warn('[GridView] Filtering out view field that does not exist in tableFields:', vf.field_name)
+            debugWarn('LAYOUT', '[GridView] Filtering out view field that does not exist in tableFields:', vf.field_name)
             return null
           }
 
@@ -1183,7 +1183,7 @@ export default function GridView({
         }
         // CRITICAL: Only include fields that exist in tableFields
         if (!fieldExists(f.field_name)) {
-          console.warn('[GridView] Filtering out view field that does not exist in tableFields:', f.field_name)
+          debugWarn('LAYOUT', '[GridView] Filtering out view field that does not exist in tableFields:', f.field_name)
           return false
         }
         return true
@@ -1549,7 +1549,7 @@ export default function GridView({
         
         // Log detailed error information for debugging 400 errors
         if ((error as any)?.code === '400' || (error as any)?.status === 400) {
-          console.error('[GridView] 400 Bad Request error:', {
+          debugError('LAYOUT', '[GridView] 400 Bad Request error:', {
             tableName: supabaseTableName,
             message: (error as any)?.message,
             details: (error as any)?.details,
@@ -1588,7 +1588,7 @@ export default function GridView({
               /(schema cache)/i.test(errorMsg)))
 
         if (isMissingColumnLike) {
-          console.warn('[GridView] Column missing for view; retrying with "*" select.', {
+          debugWarn('LAYOUT', '[GridView] Column missing for view; retrying with "*" select.', {
             tableName: supabaseTableName,
             message: (error as any)?.message,
             details: (error as any)?.details,
@@ -1773,7 +1773,7 @@ export default function GridView({
           const currentRetries = retryAttemptsRef.current.get(supabaseTableName) || 0
           
           if (!alreadyForcedStar && currentRetries < MAX_RETRY_ATTEMPTS) {
-            console.warn('[GridView] 400 error not matching column patterns; will retry with "*" select on next load.', {
+            debugWarn('LAYOUT', '[GridView] 400 error not matching column patterns; will retry with "*" select on next load.', {
               tableName: supabaseTableName,
               message: (error as any)?.message,
               details: (error as any)?.details,
@@ -1795,7 +1795,7 @@ export default function GridView({
             return
           } else if (currentRetries >= MAX_RETRY_ATTEMPTS) {
             // Max retries reached - stop retrying and show error
-            console.error('[GridView] Max retry attempts reached for table. Stopping retries.', {
+            debugError('LAYOUT', '[GridView] Max retry attempts reached for table. Stopping retries.', {
               tableName: supabaseTableName,
               retryAttempts: currentRetries,
             })
@@ -1809,7 +1809,7 @@ export default function GridView({
           }
         }
 
-        console.error("Error loading rows:", {
+        debugError('LAYOUT', "Error loading rows:", {
           code: (error as any)?.code,
           message: (error as any)?.message,
           details: (error as any)?.details,
@@ -1870,7 +1870,7 @@ export default function GridView({
               setTableError(errorMsg + sqlMsg)
             }
           } catch (createError) {
-            console.error('Failed to create table:', createError)
+            debugError('LAYOUT', 'Failed to create table:', createError)
             setTableError(`The table "${supabaseTableName}" does not exist and could not be created automatically. Please create it manually in Supabase.`)
           }
         } else {
@@ -1918,7 +1918,7 @@ export default function GridView({
     } catch (error) {
       if (isAbortError(error)) return
       bumpLoadBackoff()
-      console.error("Error loading rows:", error)
+      debugError('LAYOUT', "Error loading rows:", error)
       const msg =
         (error as any)?.message ||
         (typeof error === 'string' ? error : '') ||
@@ -1972,7 +1972,7 @@ export default function GridView({
           `Cannot update "${fieldName}" because it does not exist in the underlying table schema. ` +
             `Refresh the view fields or re-add/rename the column in Supabase.`
         )
-        console.error("Error saving cell:", error)
+        debugError('LAYOUT', "Error saving cell:", error)
         throw error
       }
       if (fieldMeta.type === 'formula' || fieldMeta.type === 'lookup') {
@@ -2075,7 +2075,7 @@ export default function GridView({
       if (error) {
         // Don't log abort errors (expected during navigation/unmount)
         if (!isAbortError(error)) {
-          console.error("Error saving cell:", {
+          debugError('LAYOUT', "Error saving cell:", {
             tableName: supabaseTableName,
             rowId,
             fieldName,
@@ -2140,7 +2140,7 @@ export default function GridView({
         .single()
 
       if (error) {
-        console.error("Error adding row:", error)
+        debugError('LAYOUT', "Error adding row:", error)
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
           setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
         }
@@ -2150,7 +2150,7 @@ export default function GridView({
         // User can open via the dedicated chevron (or optional row double-click).
       }
     } catch (error: any) {
-      console.error("Error adding row:", error)
+      debugError('LAYOUT', "Error adding row:", error)
       if (error?.code === "42P01" || error?.message?.includes("does not exist")) {
         setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
       }
@@ -2200,42 +2200,42 @@ export default function GridView({
   // Column header dropdown handlers
   function handleColumnSort(fieldName: string, direction: 'asc' | 'desc' | null) {
     // TODO: Implement column-level sort (currently handled by toolbar)
-    console.log('Column sort:', fieldName, direction)
+    debugLog('LAYOUT', 'Column sort:', { fieldName, direction })
   }
 
   function handleColumnFilter(fieldName: string) {
     // TODO: Implement column-level filter (currently handled by toolbar)
-    console.log('Column filter:', fieldName)
+    debugLog('LAYOUT', 'Column filter:', { fieldName })
   }
 
   function handleColumnGroup(fieldName: string) {
     // TODO: Implement column-level group (currently handled by toolbar)
-    console.log('Column group:', fieldName)
+    debugLog('LAYOUT', 'Column group:', { fieldName })
   }
 
   function handleColumnHide(fieldName: string) {
     // TODO: Implement column hide/show
-    console.log('Column hide:', fieldName)
+    debugLog('LAYOUT', 'Column hide:', { fieldName })
   }
 
   function handleColumnDuplicate(fieldName: string) {
     // TODO: Implement column duplicate
-    console.log('Column duplicate:', fieldName)
+    debugLog('LAYOUT', 'Column duplicate:', { fieldName })
   }
 
   function handleColumnInsertLeft(fieldName: string) {
     // TODO: Implement insert column left
-    console.log('Insert left:', fieldName)
+    debugLog('LAYOUT', 'Insert left:', { fieldName })
   }
 
   function handleColumnInsertRight(fieldName: string) {
     // TODO: Implement insert column right
-    console.log('Insert right:', fieldName)
+    debugLog('LAYOUT', 'Insert right:', { fieldName })
   }
 
   function handleColumnDelete(fieldName: string) {
     // TODO: Implement column delete
-    console.log('Column delete:', fieldName)
+    debugLog('LAYOUT', 'Column delete:', { fieldName })
   }
 
   function handleColumnCopyUrl(fieldName: string) {
@@ -2244,7 +2244,7 @@ export default function GridView({
     navigator.clipboard.writeText(url).then(() => {
       // Could show toast notification here
     }).catch(err => {
-      console.error('Failed to copy URL:', err)
+      debugError('LAYOUT', 'Failed to copy URL:', err)
     })
   }
 
@@ -2271,9 +2271,9 @@ export default function GridView({
     if (newSelection) {
       // Copy column name to clipboard when selected
       navigator.clipboard.writeText(fieldName).then(() => {
-        console.log('Column selected and copied:', fieldName)
+        debugLog('LAYOUT', 'Column selected and copied:', { fieldName })
       }).catch(err => {
-        console.error('Failed to copy column name:', err)
+        debugError('LAYOUT', 'Failed to copy column name:', err)
       })
     }
   }
@@ -2502,7 +2502,7 @@ export default function GridView({
         
         if (isExpectedError) {
           // These are expected - just log and return
-          console.log('Fields initialization skipped (expected):', data.message || data.error)
+          debugLog('LAYOUT', 'Fields initialization skipped (expected):', data.message || data.error)
           return
         }
         
@@ -2512,7 +2512,7 @@ export default function GridView({
           : data.error || 'Failed to initialize fields'
         
         // Log full error details for debugging
-        console.error('Error initializing fields:', {
+        debugError('LAYOUT', 'Error initializing fields:', {
           status: response.status,
           error: data.error,
           error_code: data.error_code,
@@ -2526,7 +2526,7 @@ export default function GridView({
       
       // Show success message if partial success or warning
       if (data.warning) {
-        console.log('Fields initialization warning:', data.warning)
+        debugWarn('LAYOUT', 'Fields initialization warning:', data.warning)
       }
       
       // Only reload if fields were actually added
@@ -2535,10 +2535,10 @@ export default function GridView({
         window.location.reload()
       } else if (data.message) {
         // Just log if no fields were added (already configured)
-        console.log('Fields initialization:', data.message)
+        debugLog('LAYOUT', 'Fields initialization:', data.message)
       }
     } catch (error: any) {
-      console.error('Error initializing fields:', error)
+      debugError('LAYOUT', 'Error initializing fields:', error)
       // Only show alert for unexpected errors
       const errorMessage = error.message || 'Failed to initialize fields. Please try again.'
       alert(`Error: ${errorMessage}\n\nIf this problem persists, please check:\n1. You have permission to modify this view\n2. The view is properly connected to a table\n3. The table has fields configured`)
@@ -2709,7 +2709,7 @@ export default function GridView({
                     title="Select all rows"
                     onChange={(e) => {
                       // TODO: Implement select all functionality
-                      console.log('Select all:', e.target.checked)
+                      debugLog('LAYOUT', 'Select all:', { checked: e.target.checked })
                     }}
                   />
                 </th>
