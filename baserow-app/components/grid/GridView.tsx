@@ -577,6 +577,8 @@ export default function GridView({
   // If we detect a schema mismatch (e.g. view references a missing column), force future loads to use `select('*')`
   // to avoid repeated failing "minimal select" attempts on every re-render.
   const forceStarSelectRef = useRef<Set<string>>(new Set())
+  // Track schema sync attempts to avoid repeated calls
+  const schemaSyncAttemptedRef = useRef<Set<string>>(new Set())
   // Some environments created tables with `record_id` instead of `id`.
   // Track the actual row identifier column per physical table to avoid hard-coding `id` everywhere.
   const rowIdColumnByTableRef = useRef<Map<string, string>>(new Map())
@@ -1606,6 +1608,39 @@ export default function GridView({
             requiredFields: Array.from(requiredNames),
           })
 
+          // Attempt schema sync once per table to create missing columns
+          if (tableId && !schemaSyncAttemptedRef.current.has(supabaseTableName)) {
+            schemaSyncAttemptedRef.current.add(supabaseTableName)
+            try {
+              debugWarn('LAYOUT', '[GridView] Attempting schema sync to fix missing columns...', {
+                tableName: supabaseTableName,
+                tableId,
+                missingColumn,
+              })
+              const syncRes = await fetch(`/api/tables/${tableId}/sync-schema`, { method: 'POST' })
+              const syncResult = await syncRes.json().catch(() => ({}))
+              if (syncRes.ok && syncResult.success) {
+                debugWarn('LAYOUT', '[GridView] Schema sync completed, columns may have been added.', {
+                  tableName: supabaseTableName,
+                  addedColumns: syncResult.addedColumns,
+                  missingColumns: syncResult.missingPhysicalColumns,
+                })
+                // Wait longer for PostgREST cache to refresh (schema cache reload can take 1-2 seconds)
+                await new Promise(resolve => setTimeout(resolve, 2000))
+                // Clear the force star select flag so we can retry with proper column selection
+                forceStarSelectRef.current.delete(supabaseTableName)
+              } else {
+                debugWarn('LAYOUT', '[GridView] Schema sync failed or no columns added.', {
+                  tableName: supabaseTableName,
+                  status: syncRes.status,
+                  result: syncResult,
+                })
+              }
+            } catch (syncError) {
+              debugWarn('LAYOUT', '[GridView] Schema sync error:', syncError)
+            }
+          }
+
           // From this point on, avoid repeating the failing "minimal select" for this table.
           // This prevents endless 400s in live mode when parent props cause re-renders.
           forceStarSelectRef.current.add(supabaseTableName)
@@ -1747,6 +1782,7 @@ export default function GridView({
           // Retry also failed: treat as schema mismatch (do NOT try to create the table).
           bumpLoadBackoff()
           let sqlHint = ''
+          let syncHint = ''
           if (missingColumn) {
             const field = safeTableFields.find(
               (f) => f && typeof f === 'object' && typeof f.name === 'string' && f.name === missingColumn
@@ -1760,12 +1796,17 @@ export default function GridView({
                 // ignore (we'll show generic message)
               }
             }
+            // Suggest schema sync if tableId is available
+            if (tableId) {
+              syncHint = `\n\nAlternatively, the schema sync API can automatically add missing columns. Refresh the page to trigger automatic sync, or call: POST /api/tables/${tableId}/sync-schema`
+            }
           }
           setIsMissingPhysicalTable(false)
           setTableWarning(null)
           setTableError(
             `This table is missing a column required by the view${missingColumn ? `: "${missingColumn}"` : ''}.` +
               `\n\nThis is a schema mismatch (error code 42703), not a missing table.` +
+              syncHint +
               sqlHint
           )
           setRows([])

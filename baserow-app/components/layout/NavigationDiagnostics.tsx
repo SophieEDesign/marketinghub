@@ -19,11 +19,16 @@ export default function NavigationDiagnostics() {
     setMounted(true)
     // Log that diagnostics component is loaded
     if (typeof window !== "undefined") {
-      const isEnabled = localStorage.getItem("DEBUG_NAVIGATION") === "1"
-      console.log("🔍 NavigationDiagnostics component loaded", {
-        enabled: isEnabled,
-        instruction: isEnabled ? "Diagnostics active" : 'Run localStorage.setItem("DEBUG_NAVIGATION", "1") to enable'
-      })
+      try {
+        const isEnabled = localStorage.getItem("DEBUG_NAVIGATION") === "1"
+        console.log("🔍 NavigationDiagnostics component loaded", {
+          enabled: isEnabled,
+          instruction: isEnabled ? "Diagnostics active" : 'Run localStorage.setItem("DEBUG_NAVIGATION", "1") to enable',
+          localStorageAvailable: true,
+        })
+      } catch (e) {
+        console.error("🔍 NavigationDiagnostics: localStorage error", e)
+      }
     }
   }, [])
 
@@ -197,6 +202,29 @@ export default function NavigationDiagnostics() {
         console.log("🧪 No test link found in sidebar")
       }
 
+      // 9. Performance check - detect if UI is blocked
+      const perfStart = performance.now()
+      requestAnimationFrame(() => {
+        const perfElapsed = performance.now() - perfStart
+        console.log("⚡ Performance:", {
+          rafLatency: perfElapsed,
+          status: perfElapsed > 16 ? "SLOW" : "OK",
+          warning: perfElapsed > 100 ? "UI thread may be blocked!" : null,
+        })
+      })
+
+      // 10. Check for long-running operations
+      const longTasks = (performance as any).getEntriesByType?.('long-task') || []
+      if (longTasks.length > 0) {
+        console.warn("⚠️ Long tasks detected (blocking operations):", {
+          count: longTasks.length,
+          recent: longTasks.slice(-5).map((task: any) => ({
+            duration: task.duration,
+            startTime: task.startTime,
+          })),
+        })
+      }
+
       console.groupEnd()
     }
 
@@ -247,6 +275,116 @@ export default function NavigationDiagnostics() {
     document.addEventListener("click", handleClick, true) // Use capture phase
     return () => document.removeEventListener("click", handleClick, true)
   }, [enabled, pathname])
+
+  // Performance monitoring - detect if UI is frozen/blocked
+  useEffect(() => {
+    if (!enabled || !mounted) return
+
+    let lastCheck = performance.now()
+    let frameCount = 0
+    let blockedFrames = 0
+
+    const checkPerformance = () => {
+      const now = performance.now()
+      const elapsed = now - lastCheck
+      
+      // If frame took > 100ms, UI is likely blocked
+      if (elapsed > 100) {
+        blockedFrames++
+        if (blockedFrames > 3) {
+          console.warn("⚠️ UI BLOCKED - Performance issue detected!", {
+            blockedFrames,
+            averageFrameTime: elapsed,
+            message: "UI thread is blocked, clicks may not register",
+          })
+        }
+      } else {
+        blockedFrames = 0
+      }
+      
+      frameCount++
+      lastCheck = now
+      
+      // Log performance every 60 frames (~1 second at 60fps)
+      if (frameCount % 60 === 0) {
+        console.log("⚡ Performance check:", {
+          frameTime: elapsed,
+          blockedFrames,
+          status: blockedFrames > 0 ? "BLOCKED" : "OK",
+        })
+      }
+    }
+
+    let rafId: number
+    const monitor = () => {
+      checkPerformance()
+      rafId = requestAnimationFrame(monitor)
+    }
+    rafId = requestAnimationFrame(monitor)
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [enabled, mounted])
+
+  // Expose a global test function for manual testing
+  useEffect(() => {
+    if (!mounted) return
+    
+    // Add a global function to test navigation and diagnostics
+    if (typeof window !== "undefined") {
+      (window as any).testNavigation = (pageId?: string) => {
+        const testPageId = pageId || "test-page-id"
+        console.log("🧪 Testing navigation to:", `/pages/${testPageId}`)
+        
+        const link = document.querySelector(`[data-sidebar] a[href="/pages/${testPageId}"]`) as HTMLAnchorElement
+        if (link) {
+          console.log("✅ Found link, clicking...")
+          link.click()
+        } else {
+          console.warn("❌ Link not found. Available links:", 
+            Array.from(document.querySelectorAll('[data-sidebar] a[href^="/pages/"]')).map(a => a.getAttribute("href"))
+          )
+        }
+      }
+      
+      (window as any).checkNavigationDiagnostics = () => {
+        console.log("🔍 Navigation Diagnostics Status:", {
+          localStorage: typeof Storage !== "undefined",
+          debugEnabled: localStorage.getItem("DEBUG_NAVIGATION") === "1",
+          sidebarFound: !!document.querySelector('[data-sidebar]'),
+          sidebarLinks: document.querySelectorAll('[data-sidebar] a[href]').length,
+          componentMounted: mounted,
+          enabled: enabled,
+        })
+      }
+
+      (window as any).checkPerformance = () => {
+        const start = performance.now()
+        // Test if UI thread is responsive
+        requestAnimationFrame(() => {
+          const elapsed = performance.now() - start
+          console.log("⚡ Performance Test:", {
+            rafLatency: elapsed,
+            status: elapsed > 16 ? "SLOW" : "OK",
+            message: elapsed > 100 ? "UI thread is blocked!" : "UI thread is responsive",
+          })
+        })
+      }
+      
+      console.log("💡 Test functions available:")
+      console.log("   - window.testNavigation(pageId) - Test clicking a link")
+      console.log("   - window.checkNavigationDiagnostics() - Check diagnostics status")
+      console.log("   - window.checkPerformance() - Check if UI thread is blocked")
+    }
+    
+    return () => {
+      if (typeof window !== "undefined") {
+        delete (window as any).testNavigation
+        delete (window as any).checkPerformance
+      }
+    }
+  }, [mounted, enabled])
 
   return null
 }

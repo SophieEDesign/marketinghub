@@ -881,12 +881,14 @@ export default function GroupedInterfaces({
         )}
         onClick={(e) => {
           const debugEnabled = typeof window !== "undefined" && localStorage.getItem("DEBUG_NAVIGATION") === "1"
+          const isCurrentlyActive = pathname === targetPath
           
           if (debugEnabled) {
             console.log("[NavigationPage] Click detected:", {
               href: targetPath,
               currentPath: pathname,
               isActive,
+              isCurrentlyActive,
               defaultPrevented: e.defaultPrevented,
               target: e.target,
             })
@@ -894,20 +896,25 @@ export default function GroupedInterfaces({
           
           // CRITICAL: If clicking the same page, force a refresh/reload
           // Next.js Link won't navigate if already on the page, but user might want to refresh
-          if (isActive && pathname === targetPath) {
+          if (isCurrentlyActive) {
             if (debugEnabled) {
               console.log("[NavigationPage] Already on this page - forcing refresh")
             }
-            // Force a router refresh to reload the page data
+            // Prevent default Link behavior and manually refresh
             e.preventDefault()
+            e.stopPropagation()
+            // Use router.refresh() to reload server components
             router.refresh()
-            // Also try a push to ensure navigation happens
-            router.push(targetPath)
             return
           }
           
-          // Only navigate, don't toggle edit mode
+          // For different pages, let Next.js Link handle navigation normally
+          // Only stop propagation to prevent parent handlers from interfering
           e.stopPropagation()
+          
+          if (debugEnabled) {
+            console.log("[NavigationPage] Navigation allowed - letting Next.js Link handle it")
+          }
         }}
         style={{ color: sidebarTextColor }}
       >
@@ -1019,6 +1026,7 @@ export default function GroupedInterfaces({
                     activeId,
                     willPrevent: editMode && isDraggingRef.current && activeId,
                     defaultPrevented: e.defaultPrevented,
+                    timestamp: performance.now(),
                   })
                 }
                 
@@ -1030,22 +1038,23 @@ export default function GroupedInterfaces({
                     console.warn("[Sidebar Link] Navigation prevented - dragging in edit mode")
                   }
                   e.preventDefault()
+                  e.stopPropagation()
                   return
                 }
                 
-                // If clicking the same page, force a refresh
+                // If clicking the same page, force a refresh (but don't block navigation)
                 if (isCurrentlyActive) {
                   if (debugEnabled) {
-                    console.log("[Sidebar Link] Already on this page - forcing refresh")
+                    console.log("[Sidebar Link] Already on this page - refreshing data")
                   }
-                  e.preventDefault()
+                  // Don't prevent default - let Link handle it, but also refresh
+                  // Next.js Link won't navigate if already on page, so refresh is safe
                   router.refresh()
-                  router.push(targetPath)
-                  return
+                  // Continue - don't return, let Link handle the click
                 }
                 
                 if (debugEnabled) {
-                  console.log("[Sidebar Link] Navigation allowed")
+                  console.log("[Sidebar Link] Navigation allowed - letting Next.js Link handle it")
                 }
               }}
             >

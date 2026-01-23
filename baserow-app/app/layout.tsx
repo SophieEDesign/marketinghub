@@ -7,6 +7,7 @@ import DynamicTitle from "@/components/layout/DynamicTitle"
 import DiagnosticsInitializer from "@/components/layout/DiagnosticsInitializer"
 import InteractionFailsafe from "@/components/layout/InteractionFailsafe"
 import NavigationDiagnostics from "@/components/layout/NavigationDiagnostics"
+import PerformanceMonitor from "@/components/layout/PerformanceMonitor"
 import SWRProvider from "@/components/providers/SWRProvider"
 import { getWorkspaceSettings } from "@/lib/branding"
 
@@ -77,6 +78,7 @@ export default function RootLayout({
         <SWRProvider>
           <DiagnosticsInitializer />
           <InteractionFailsafe />
+          <PerformanceMonitor />
           <NavigationDiagnostics />
           <DynamicTitle />
           {children}
