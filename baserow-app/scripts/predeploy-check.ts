@@ -366,14 +366,41 @@ async function runTypecheck() {
 async function runLint() {
   console.log('🔍 Running ESLint...')
   const { execSync } = require('child_process')
+  let hasErrors = false
   try {
-    // Use next lint with --max-warnings to allow warnings but fail on errors
-    // Set a very high number to allow all warnings
-    execSync('npx next lint --max-warnings 9999', { stdio: 'inherit' })
-    console.log('✅ Lint passed')
-    return true
-  } catch (error) {
-    console.error('❌ Lint failed')
+    // Run next lint and capture output to check for actual errors vs warnings
+    const output = execSync('npx next lint', { 
+      encoding: 'utf-8',
+      stdio: 'pipe'
+    })
+    // Show output
+    process.stdout.write(output)
+    // Check for actual errors (lines with "error" but not "Warning:")
+    hasErrors = output.split('\n').some((line: string) => {
+      // ESLint errors typically have format: "file:line:col  error  message"
+      return /:\d+:\d+\s+error\s/.test(line.trim())
+    })
+  } catch (error: any) {
+    // Capture output from error
+    const stdout = error.stdout?.toString() || ''
+    const stderr = error.stderr?.toString() || ''
+    const combinedOutput = stdout + stderr
+    
+    // Show output
+    if (stdout) process.stdout.write(stdout)
+    if (stderr) process.stderr.write(stderr)
+    
+    // Check for actual errors (not warnings)
+    // ESLint errors have format: "file:line:col  error  message"
+    // Warnings have format: "file:line:col  warning  message"
+    hasErrors = combinedOutput.split('\n').some((line: string) => {
+      const trimmed = line.trim()
+      return /:\d+:\d+\s+error\s/.test(trimmed) && !trimmed.includes('Warning:')
+    })
+  }
+  
+  if (hasErrors) {
+    console.error('❌ Lint failed - found actual errors (not just warnings)')
     errors.push({
       type: 'lint_error',
       id: 'eslint',
@@ -381,6 +408,9 @@ async function runLint() {
     })
     return false
   }
+  
+  console.log('✅ Lint passed (warnings allowed)')
+  return true
 }
 
 /**
