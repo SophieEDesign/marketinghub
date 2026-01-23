@@ -5,7 +5,8 @@
  * All views (grid, form, bulk editor) should use this service for consistency.
  */
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient, type SupabaseClient } from '@/lib/supabase/client'
+import type { ReturnType } from '@/lib/supabase/client'
 import type { TableField, FieldType } from '@/types/fields'
 import { isLinkedField, isLookupField } from '@/types/fields'
 import type {
@@ -531,7 +532,7 @@ export class DataViewService {
    * Apply batch updates to database
    */
   private async applyBatchUpdates(
-    supabase: any,
+    supabase: ReturnType<typeof createClient>,
     tableName: string,
     changes: CellChange[]
   ): Promise<number> {
@@ -567,7 +568,7 @@ export class DataViewService {
   /**
    * Validate a single value against a field
    */
-  validateValue(columnId: string, value: any): { valid: boolean; error?: string; normalizedValue?: any } {
+  validateValue(columnId: string, value: unknown): { valid: boolean; error?: string; normalizedValue?: unknown } {
     const field = this.context.fields.find(f => f.id === columnId)
     if (!field) {
       return {
@@ -726,10 +727,11 @@ export class DataViewService {
         success: true,
         newColumnId: newField.id,
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = (error as { message?: string })?.message || 'Failed to duplicate column'
       return {
         success: false,
-        error: error.message || 'Failed to duplicate column',
+        error: errorMessage,
       }
     }
   }

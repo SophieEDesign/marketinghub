@@ -277,18 +277,17 @@ export default function Canvas({
     const shouldSync = blockIdsChanged || layoutIsEmpty || blockPositionsChanged
     
     debugLog('LAYOUT', '[Canvas] Layout sync check', {
-        pageId,
-        blocksCount: blocks.length,
-        currentBlockIds,
-        previousBlockIds,
-        blockIdsChanged,
-        layoutIsEmpty,
-        blockPositionsChanged,
-        shouldSync,
-        layoutLength: layout.length,
-        layoutHydrated: layoutHydratedRef.current,
-      })
-    }
+      pageId,
+      blocksCount: blocks.length,
+      currentBlockIds,
+      previousBlockIds,
+      blockIdsChanged,
+      layoutIsEmpty,
+      blockPositionsChanged,
+      shouldSync,
+      layoutLength: layout.length,
+      layoutHydrated: layoutHydratedRef.current,
+    })
     
     // Sync layout from blocks
     if (shouldSync) {

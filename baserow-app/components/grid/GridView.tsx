@@ -126,11 +126,11 @@ function arrayShallowEqual(a: string[], b: string[]): boolean {
   return true
 }
 
-function collectLinkedIds(raw: any): string[] {
+function collectLinkedIds(raw: unknown): string[] {
   if (raw == null) return []
   if (Array.isArray(raw)) return raw.flatMap(collectLinkedIds)
   if (typeof raw === "object") {
-    if (raw && "id" in raw) return [String((raw as any).id)]
+    if (raw && "id" in raw) return [String((raw as { id: unknown }).id)]
     return []
   }
   const s = String(raw).trim()
@@ -151,14 +151,15 @@ function extractCurlyFieldRefs(formula: string): string[] {
   return refs
 }
 
-function extractMissingColumnFromError(err: any): string | null {
+function extractMissingColumnFromError(err: unknown): string | null {
+  const errorObj = err as { message?: string; details?: string; hint?: string; error?: { message?: string }; error_description?: string; cause?: { message?: string } } | null
   const candidates = [
-    err?.message,
-    err?.details,
-    err?.hint,
-    err?.error?.message,
-    err?.error_description,
-    err?.cause?.message,
+    errorObj?.message,
+    errorObj?.details,
+    errorObj?.hint,
+    errorObj?.error?.message,
+    errorObj?.error_description,
+    errorObj?.cause?.message,
   ]
     .filter(Boolean)
     .map((x) => String(x).trim())
@@ -772,7 +773,7 @@ export default function GridView({
 
     const fieldsMinimal = Array.isArray(safeTableFields)
       ? safeTableFields
-          .map((f: any) => ({
+          .map((f: TableField) => ({
             id: f?.id ?? null,
             name: f?.name ?? null,
             order_index: f?.order_index ?? f?.position ?? null,
@@ -975,7 +976,7 @@ export default function GridView({
           frozen_columns: frozenColumns,
         }
 
-        const tryUpdateOrInsert = async (payload: any) => {
+        const tryUpdateOrInsert = async (payload: Record<string, unknown>) => {
           if (existing) {
             return await supabase.from('grid_view_settings').update(payload).eq('view_id', viewUuid)
           }
@@ -990,8 +991,9 @@ export default function GridView({
 
         const res = await tryUpdateOrInsert(settingsData)
         // Backward compatibility: older schemas won't have row_heights yet.
-        if (res?.error && ((res.error as any)?.code === '42703' || String((res.error as any)?.message || '').includes('row_heights'))) {
-          const { row_heights, ...withoutRowHeights } = settingsData as any
+        const errorObj = res?.error as { code?: string; message?: string } | null
+        if (res?.error && (errorObj?.code === '42703' || String(errorObj?.message || '').includes('row_heights'))) {
+          const { row_heights, ...withoutRowHeights } = settingsData as Record<string, unknown>
           await tryUpdateOrInsert(withoutRowHeights)
         }
       } catch (error) {
@@ -1212,10 +1214,10 @@ export default function GridView({
   // If we bake order into the key, we can create a fetch → setState → rerender → key changes → fetch loop (React #185).
   const filtersKey = useMemo(() => {
     const canonical = (safeFilters ?? [])
-      .map((f: any) => {
+      .map((f: FilterConfig) => {
         const field = typeof f?.field === "string" ? f.field : ""
         const operator = typeof f?.operator === "string" ? f.operator : ""
-        const valueRaw = (f as any)?.value
+        const valueRaw = f?.value
         const value =
           valueRaw == null
             ? ""
@@ -1235,10 +1237,10 @@ export default function GridView({
 
   const viewFiltersKey = useMemo(() => {
     const canonical = (safeViewFilters ?? [])
-      .map((f: any) => {
+      .map((f: { field_name?: string; operator?: string; value?: unknown }) => {
         const field_name = typeof f?.field_name === "string" ? f.field_name : ""
         const operator = typeof f?.operator === "string" ? f.operator : ""
-        const valueRaw = (f as any)?.value
+        const valueRaw = f?.value
         const value =
           valueRaw == null
             ? ""
@@ -1258,7 +1260,7 @@ export default function GridView({
 
   const viewSortsKey = useMemo(() => {
     const canonical = (safeViewSorts ?? [])
-      .map((s: any) => {
+      .map((s: { field_name?: string; direction?: string }) => {
         const field_name = typeof s?.field_name === "string" ? s.field_name : ""
         const direction = typeof s?.direction === "string" ? s.direction : ""
         return { field_name, direction }
@@ -1316,7 +1318,7 @@ export default function GridView({
         (n): n is string => typeof n === 'string' && n.trim().length > 0
       )
       const fallback = asArray(visibleFields)
-        .map((f: any) => (typeof f?.field_name === 'string' ? f.field_name : ''))
+        .map((f: { field_name?: string }) => (typeof f?.field_name === 'string' ? f.field_name : ''))
         .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
       const base = current.length > 0 ? current : fallback
 
@@ -1951,7 +1953,7 @@ export default function GridView({
     }
   }, [])
 
-  async function handleCellSave(rowId: string, fieldName: string, value: any) {
+  async function handleCellSave(rowId: string, fieldName: string, value: unknown) {
     // Don't allow saving if view-only
     if (isViewOnly) return
     if (!rowId || !supabaseTableName) return
@@ -1983,14 +1985,14 @@ export default function GridView({
 
       // Normalize values to match the physical column type expectations.
       // This prevents common inline-edit crashes (especially for linked record fields).
-      const normalizeUpdateValue = (field: TableField, raw: any): any => {
+      const normalizeUpdateValue = (field: TableField, raw: unknown): unknown => {
         // Avoid sending `undefined` (PostgREST can treat it as an empty body).
-        let v: any = raw === undefined ? null : raw
+        let v: unknown = raw === undefined ? null : raw
         if (typeof v === 'number' && (!Number.isFinite(v) || Number.isNaN(v))) v = null
 
         if (field.type !== 'link_to_table') return v
 
-        const maybeParseJsonArrayString = (s: string): any[] | null => {
+        const maybeParseJsonArrayString = (s: string): unknown[] | null => {
           const trimmed = s.trim()
           if (!(trimmed.startsWith('[') && trimmed.endsWith(']'))) return null
           try {
@@ -2001,28 +2003,24 @@ export default function GridView({
           }
         }
 
-        const toId = (x: any): string | null => {
+        const toId = (x: unknown): string | null => {
           if (x == null || x === '') return null
           if (typeof x === 'string') {
             // Some UI paths accidentally stringify arrays for link fields, e.g. `["uuid"]`.
             const parsedArr = maybeParseJsonArrayString(x)
-            if (parsedArr) {
+            if (parsedArr && parsedArr.length > 0) {
               const first = parsedArr[0]
               if (first == null || first === '') return null
               return String(first)
             }
             return x
           }
-          if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
+            if (typeof x === 'object' && x && 'id' in x) return String((x as { id: unknown }).id)
           return String(x)
         }
 
-        const relationshipType = (field.options as any)?.relationship_type as
-          | 'one-to-one'
-          | 'one-to-many'
-          | 'many-to-many'
-          | undefined
-        const maxSelections = (field.options as any)?.max_selections as number | undefined
+        const relationshipType = (field.options as { relationship_type?: 'one-to-one' | 'one-to-many' | 'many-to-many' })?.relationship_type
+        const maxSelections = (field.options as { max_selections?: number })?.max_selections
         const isMulti =
           relationshipType === 'one-to-many' ||
           relationshipType === 'many-to-many' ||
@@ -2050,9 +2048,9 @@ export default function GridView({
         throw error
       }
 
-      let finalSavedValue: any = normalizeUpdateValue(fieldMeta, value)
+      let finalSavedValue: unknown = normalizeUpdateValue(fieldMeta, value)
 
-      const doUpdate = async (val: any) => {
+      const doUpdate = async (val: unknown) => {
         const rowIdColumn = getRowIdColumn()
         return await supabase.from(supabaseTableName).update({ [safeColumn]: val }).eq(rowIdColumn, rowId)
       }
@@ -2063,7 +2061,7 @@ export default function GridView({
       if (
         error?.code === '22P02' &&
         Array.isArray(finalSavedValue) &&
-        String((error as any)?.message || '').toLowerCase().includes('invalid input syntax for type uuid')
+        String((error as { message?: string })?.message || '').toLowerCase().includes('invalid input syntax for type uuid')
       ) {
         if (finalSavedValue.length <= 1) {
           finalSavedValue = finalSavedValue[0] ?? null
@@ -2149,9 +2147,10 @@ export default function GridView({
         // Contract: creating a row must NOT auto-open the record.
         // User can open via the dedicated chevron (or optional row double-click).
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       debugError('LAYOUT', "Error adding row:", error)
-      if (error?.code === "42P01" || error?.message?.includes("does not exist")) {
+      const errorObj = error as { code?: string; message?: string } | null
+      if (errorObj?.code === "42P01" || errorObj?.message?.includes("does not exist")) {
         setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
       }
     }
@@ -2537,10 +2536,10 @@ export default function GridView({
         // Just log if no fields were added (already configured)
         debugLog('LAYOUT', 'Fields initialization:', data.message)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       debugError('LAYOUT', 'Error initializing fields:', error)
       // Only show alert for unexpected errors
-      const errorMessage = error.message || 'Failed to initialize fields. Please try again.'
+      const errorMessage = (error as { message?: string })?.message || 'Failed to initialize fields. Please try again.'
       alert(`Error: ${errorMessage}\n\nIf this problem persists, please check:\n1. You have permission to modify this view\n2. The view is properly connected to a table\n3. The table has fields configured`)
     } finally {
       setInitializingFields(false)

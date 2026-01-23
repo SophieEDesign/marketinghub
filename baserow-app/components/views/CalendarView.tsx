@@ -37,7 +37,7 @@ interface CalendarViewProps {
   dateFieldId: string
   fieldIds: string[]
   searchQuery?: string
-  tableFields?: any[]
+  tableFields?: TableField[]
   filters?: FilterConfig[] // Dynamic filters from config
   filterTree?: FilterTree // Canonical filter tree from filter blocks (supports groups/OR)
   onRecordClick?: (recordId: string) => void // Emit recordId on click
@@ -288,7 +288,7 @@ export default function CalendarView({
       // If tableFields prop is provided and not empty, use it
       if (tableFields && tableFields.length > 0) {
         // Ensure fields are in correct format (TableField[])
-        const formattedFields = tableFields.map((f: any) => ({
+        const formattedFields = tableFields.map((f: TableField | { id?: string; field_id?: string; table_id?: string; name?: string; field_name?: string; type?: string; field_type?: string; position?: number; created_at?: string; options?: unknown; field_options?: unknown }) => ({
           id: f.id || f.field_id,
           table_id: f.table_id,
           name: f.name || f.field_name,
@@ -595,14 +595,13 @@ export default function CalendarView({
       
       // DEBUG logging - always log if debug flag is set
       debugLog('CALENDAR', `[Calendar] Loading rows from table`, {
-          tableId: resolvedTableId,
-          supabaseTableName,
-          filtersCount: filters.length,
-          fieldIdsCount: fieldIds.length,
-          resolvedDateFieldId,
-          viewId
-        })
-      }
+        tableId: resolvedTableId,
+        supabaseTableName,
+        filtersCount: filters.length,
+        fieldIdsCount: fieldIds.length,
+        resolvedDateFieldId,
+        viewId
+      })
       
       // Build query with filters
       let query = supabase
@@ -637,7 +636,7 @@ export default function CalendarView({
         setRows([])
       } else {
         // Convert flat rows to TableRow format
-        const tableRows: TableRow[] = (data || []).map((row: any) => ({
+        const tableRows: TableRow[] = (data || []).map((row: Record<string, unknown> & { id: string; created_at?: string; updated_at?: string }) => ({
           id: row.id,
           table_id: resolvedTableId,
           data: row,
@@ -691,7 +690,7 @@ export default function CalendarView({
   useEffect(() => {
     let cancelled = false
 
-    const collectIds = (raw: any): string[] => {
+    const collectIds = (raw: unknown): string[] => {
       if (raw == null) return []
       if (Array.isArray(raw)) return raw.flatMap(collectIds)
       if (typeof raw === "object") {
@@ -1064,8 +1063,8 @@ export default function CalendarView({
           }
           
           // Check for date values - prefer date_from (default), fallback to date_to if only that exists
-          let fromDateValue: any = null
-          let toDateValue: any = null
+          let fromDateValue: unknown = null
+          let toDateValue: unknown = null
           
           // Try to get date_from value
           if (actualFromFieldName) {
@@ -1104,18 +1103,17 @@ export default function CalendarView({
           if (!dateValue || dateValue === null || dateValue === undefined || dateValue === '') {
             debugLog('CALENDAR', 'Calendar: Row filtered out - no date value', {
               enabled: filteredRows.length <= 5,
-                rowId: row.id,
-                dateFromField: actualFromFieldName,
-                dateToField: actualToFieldName,
-                availableKeys: Object.keys(row.data)
-              })
-            }
+              rowId: row.id,
+              dateFromField: actualFromFieldName,
+              dateToField: actualToFieldName,
+              availableKeys: Object.keys(row.data)
+            })
             return false
           }
           
           // Try to parse the date value
           try {
-            const parsedDate = dateValue instanceof Date ? dateValue : new Date(dateValue)
+            const parsedDate = dateValue instanceof Date ? dateValue : new Date(String(dateValue))
             // Check if date is valid
             const isValid = !isNaN(parsedDate.getTime())
             if (!isValid) {
@@ -1128,11 +1126,10 @@ export default function CalendarView({
             return isValid
           } catch (error) {
             debugWarn('CALENDAR', 'Calendar: Row filtered out - date parse error', {
-                rowId: row.id,
-                dateValue,
-                error
-              })
-            }
+              rowId: row.id,
+              dateValue,
+              error
+            })
             return false
           }
         })
@@ -1140,8 +1137,8 @@ export default function CalendarView({
         .filter((row): row is TableRow => row !== null && row !== undefined)
         .map((row) => {
           // Get date values - use date_from (default) and date_to (if available for range)
-          let fromDateValue: any = null
-          let toDateValue: any = null
+          let fromDateValue: unknown = null
+          let toDateValue: unknown = null
           
           // Try to get date_from value
           if (actualFromFieldName) {
@@ -1224,7 +1221,7 @@ export default function CalendarView({
           
           // Extract title from row data
           let title = "Untitled"
-          let titleValue: any = null
+          let titleValue: unknown = null
           if (titleFieldName && row.data[titleFieldName]) {
             titleValue = row.data[titleFieldName]
             title = String(row.data[titleFieldName])
@@ -1401,7 +1398,7 @@ export default function CalendarView({
   // unrelated parent re-renders (especially when event objects contain new Date instances).
   // Memoize to only regenerate when the underlying data/config that affects events changes.
   const blockConfigEventKey = useMemo(() => {
-    const bc: any = blockConfig || {}
+    const bc: Record<string, unknown> = blockConfig || {}
     return JSON.stringify({
       date_from: bc?.date_from ?? null,
       date_to: bc?.date_to ?? null,
@@ -1452,7 +1449,7 @@ export default function CalendarView({
   // We intentionally derive a lightweight signature from stable primitives.
   const calendarEvents = useMemo(() => {
     const signature = (Array.isArray(computedCalendarEvents) ? computedCalendarEvents : [])
-      .map((e: any) => {
+      .map((e: EventInput) => {
         const startMs =
           e?.start instanceof Date ? e.start.getTime() : typeof e?.start === "number" ? e.start : String(e?.start || "")
         const endMs =
@@ -1463,7 +1460,7 @@ export default function CalendarView({
         const image = String(e?.extendedProps?.image || "")
         const cards = Array.isArray(e?.extendedProps?.cardFields)
           ? e.extendedProps.cardFields
-              .map((cf: any) => `${String(cf?.field?.id || cf?.field?.name || "")}=${String(cf?.value ?? "")}`)
+              .map((cf: { field?: { id?: string; name?: string }; value?: unknown }) => `${String(cf?.field?.id || cf?.field?.name || "")}=${String(cf?.value ?? "")}`)
               .join(",")
           : ""
         return `${id}|${title}|${startMs}|${endMs}|${bg}|${image}|${cards}`
@@ -1492,7 +1489,7 @@ export default function CalendarView({
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
   const calendarEventClassNames = useCallback(
-    (arg: any) => [
+    (arg: EventDropArg) => [
       "hover:opacity-80 transition-opacity rounded-md",
       allowOpenRecord ? "cursor-pointer" : "",
       selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",
@@ -1500,7 +1497,7 @@ export default function CalendarView({
     [allowOpenRecord, selectedEventId]
   )
 
-  const calendarEventContent = useCallback((eventInfo: any) => {
+  const calendarEventContent = useCallback((eventInfo: { event: EventInput; timeText?: string }) => {
     const image = eventInfo.event.extendedProps?.image
     const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
     const cardFieldsRaw = eventInfo.event.extendedProps?.cardFields
@@ -1541,7 +1538,7 @@ export default function CalendarView({
                 String(eventInfo.event.title || "Untitled")
               )}
             </div>
-            {cardFields.slice(0, 2).map((f: any, idx: number) => (
+            {cardFields.slice(0, 2).map((f: { field: TableField; value: unknown }, idx: number) => (
               <div key={`${eventInfo.event.id}-cf-${idx}`} className="truncate text-[10px] opacity-90">
                 {f?.field ? (
                   <TimelineFieldValue
@@ -1562,7 +1559,7 @@ export default function CalendarView({
   }, [linkedValueLabelMaps])
 
   const onCalendarEventClick = useCallback(
-    (info: any) => {
+    (info: { event: EventInput }) => {
       // Contract: single click opens the record (if permitted) and selects event.
       const recordId = info.event.id
       const recordIdString = recordId ? String(recordId) : ""
@@ -1609,7 +1606,7 @@ export default function CalendarView({
   )
 
   const onCalendarDateClick = useCallback(
-    (info: any) => {
+    (info: { dateStr: string }) => {
       if (!canCreateRecord) return
       // Date clicked - open modal to create new record with pre-filled date
       // info.dateStr is already in YYYY-MM-DD format
