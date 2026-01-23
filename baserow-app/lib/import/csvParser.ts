@@ -2,8 +2,8 @@ import Papa from 'papaparse'
 
 // Ensure Papa is available
 if (typeof window !== 'undefined' && !window.Papa) {
-  // @ts-expect-error - Papa needs to be attached to window for some legacy code
-  window.Papa = Papa
+  // Attach Papa to window for legacy code compatibility
+  ;(window as any).Papa = Papa
 }
 
 export interface ParsedColumn {
