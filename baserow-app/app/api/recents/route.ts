@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { recordRecentItem, getRecentItems } from '@/lib/recents/recents'
+import { recordRecentItem, getRecentItems, type EntityType } from '@/lib/recents/recents'
 import { createErrorResponse } from '@/lib/api/error-handling'
 import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 
@@ -34,9 +34,10 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10
-    const entity_type = searchParams.get('entity_type')
+    const entity_type = searchParams.get('entity_type') as EntityType | null
+    const entityType: EntityType | undefined = entity_type || undefined
 
-    const items = await getRecentItems(limit, entity_type)
+    const items = await getRecentItems(limit, entityType)
     // Cache recents for 30 seconds (they change frequently)
     return cachedJsonResponse(
       { items },

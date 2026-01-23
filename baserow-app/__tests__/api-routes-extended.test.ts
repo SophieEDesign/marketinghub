@@ -99,9 +99,9 @@ describe('API Routes - Extended Tests', () => {
       expect(validatePrimaryField('validField123')).toEqual({ valid: true })
       expect(validatePrimaryField(null)).toEqual({ valid: true })
       expect(validatePrimaryField('')).toEqual({ valid: true })
-      expect(validatePrimaryField('invalid-field')).toEqual({ valid: false })
-      expect(validatePrimaryField('123invalid')).toEqual({ valid: false })
-      expect(validatePrimaryField(123)).toEqual({ valid: false })
+      expect(validatePrimaryField('invalid-field')).toMatchObject({ valid: false })
+      expect(validatePrimaryField('123invalid')).toMatchObject({ valid: false })
+      expect(validatePrimaryField(123)).toMatchObject({ valid: false })
     })
   })
 

@@ -111,6 +111,12 @@ export function parseUKDateToISO(ukDateString: string): string | null {
     const date = new Date(year, month - 1, day)
     if (!isValid(date)) return null
     
+    // Validate that the date matches the input (catches invalid dates like Feb 29 in non-leap years)
+    // JavaScript Date constructor will adjust invalid dates (e.g., Feb 29, 2023 becomes Mar 1, 2023)
+    if (date.getDate() !== day || date.getMonth() !== month - 1 || date.getFullYear() !== year) {
+      return null
+    }
+    
     // Return ISO format (YYYY-MM-DD)
     return format(date, "yyyy-MM-dd")
   } catch {

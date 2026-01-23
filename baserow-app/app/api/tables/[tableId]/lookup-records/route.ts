@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { applyLookupFilters } from '@/lib/lookups/applyLookupFilters'
-import type { LookupFieldFilter } from '@/types/fields'
+import type { LookupFieldFilter, TableField } from '@/types/fields'
 import { getPrimaryFieldName } from '@/lib/fields/primary'
 import { toPostgrestColumn } from '@/lib/supabase/postgrest'
 
@@ -81,7 +81,7 @@ export async function POST(
     // Get lookup table fields
     const { data: lookupTableFields, error: fieldsError } = await supabase
       .from('table_fields')
-      .select('name, type')
+      .select('id, name, type, position, order_index, options, table_id, created_at')
       .eq('table_id', lookupTableId)
     
     if (fieldsError || !lookupTableFields) {
@@ -123,7 +123,7 @@ export async function POST(
         ? String((lookupTable as any).primary_field_name).trim()
         : null
 
-    const computedPrimary = getPrimaryFieldName(lookupTableFields) || 'id'
+    const computedPrimary = getPrimaryFieldName(lookupTableFields as TableField[]) || 'id'
     const candidate = configuredPrimary || computedPrimary
     const safeCandidate = candidate === 'id' ? 'id' : toPostgrestColumn(candidate)
     const primaryLabelField =

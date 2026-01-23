@@ -115,8 +115,12 @@ export class DataViewService {
         
         // Resolve linked field display if needed
         if (field && isLinkedField(field) && value) {
-          const display = await resolveLinkedFieldDisplay(field, value)
-          return display
+          // Ensure value is a valid string or string array
+          const linkedValue = typeof value === 'string' || Array.isArray(value) ? value : null
+          if (linkedValue) {
+            const display = await resolveLinkedFieldDisplay(field, linkedValue)
+            return display
+          }
         }
         
         return formatCellValue(value, field)
@@ -134,8 +138,14 @@ export class DataViewService {
             
             // Resolve linked field display if needed
             if (field && isLinkedField(field) && value) {
-              const display = await resolveLinkedFieldDisplay(field, value)
-              rowValues.push(display)
+              // Ensure value is a valid string or string array
+              const linkedValue = typeof value === 'string' || Array.isArray(value) ? value : null
+              if (linkedValue) {
+                const display = await resolveLinkedFieldDisplay(field, linkedValue)
+                rowValues.push(display)
+              } else {
+                rowValues.push(formatCellValue(value, field))
+              }
             } else {
               rowValues.push(formatCellValue(value, field))
             }
@@ -161,8 +171,14 @@ export class DataViewService {
           
           // Resolve linked field display if needed
           if (field && isLinkedField(field) && value) {
-            const display = await resolveLinkedFieldDisplay(field, value)
-            values.push(display)
+            // Ensure value is a valid string or string array
+            const linkedValue = typeof value === 'string' || Array.isArray(value) ? value : null
+            if (linkedValue) {
+              const display = await resolveLinkedFieldDisplay(field, linkedValue)
+              values.push(display)
+            } else {
+              values.push(formatCellValue(value, field))
+            }
           } else {
             values.push(formatCellValue(value, field))
           }
@@ -472,7 +488,7 @@ export class DataViewService {
       }
 
       // Special handling for linked fields: resolve pasted text to IDs
-      let parsedValue = parseCellValue(change.value, field.type, field)
+      let parsedValue = parseCellValue(String(change.value ?? ''), field.type, field)
       
       if (isLinkedField(field) && typeof parsedValue === 'string' && parsedValue.trim()) {
         // Check if it's already a UUID

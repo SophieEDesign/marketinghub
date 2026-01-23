@@ -5,6 +5,7 @@
 
 import { useCallback, useRef, useState, useMemo } from 'react'
 import { DataViewService } from './DataViewService'
+import { parseClipboardText } from './clipboard'
 import type { DataViewContext, Selection, CellChange, BatchMutationResult, DuplicateColumnOptions } from './types'
 
 export interface UseDataViewOptions {
@@ -99,7 +100,6 @@ export function useDataView(options: UseDataViewOptions): UseDataViewReturn {
 
       try {
         // Parse clipboard text
-        const { parseClipboardText } = require('./clipboard')
         const clipboardGrid = parseClipboardText(clipboardText)
 
         if (clipboardGrid.length === 0) {

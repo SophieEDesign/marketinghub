@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { addFavorite, removeFavorite, getFavorites } from '@/lib/recents/recents'
+import { addFavorite, removeFavorite, getFavorites, type EntityType } from '@/lib/recents/recents'
 import { createErrorResponse } from '@/lib/api/error-handling'
 import { cachedJsonResponse, CACHE_DURATIONS } from '@/lib/api/cache-headers'
 
@@ -57,9 +57,10 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50
-    const entity_type = searchParams.get('entity_type')
+    const entity_type = searchParams.get('entity_type') as EntityType | null
+    const entityType: EntityType | undefined = entity_type || undefined
 
-    const items = await getFavorites(limit, entity_type)
+    const items = await getFavorites(limit, entityType)
     // Cache favorites for 1 minute (they change infrequently)
     return cachedJsonResponse(
       { items },

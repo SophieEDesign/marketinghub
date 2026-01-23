@@ -124,14 +124,15 @@ export async function POST(
     // If it's a critical error (not just "table not found"), we might want to fail
     // But for now, continue with empty fields array - we can still check physical columns
     // This allows the endpoint to work even if table_fields table has issues
-    const errorMsg = String(err?.message || '').toLowerCase()
+    const errorObj = err && typeof err === 'object' && 'message' in err ? err as { message?: string } : null
+    const errorMsg = String(errorObj?.message || '').toLowerCase()
     if (errorMsg.includes('permission denied') || errorMsg.includes('unauthorized')) {
       // Permission errors are critical - return 403
       return NextResponse.json(
         { 
           success: false,
           error: 'Permission denied loading field metadata',
-          message: err?.message || 'Unknown error',
+          message: errorObj?.message || 'Unknown error',
           tableId 
         },
         { status: 403 }
@@ -278,6 +279,9 @@ export async function POST(
       errorName: string | null
       code?: string | number
       details?: string
+      stack?: string
+      fullError?: string
+      hint?: string
     } = {
       success: false,
       error: 'An error occurred while syncing schema',
@@ -293,7 +297,9 @@ export async function POST(
     if (process.env.NODE_ENV === 'development') {
       errorDetails.stack = errorObj?.stack
       errorDetails.fullError = String(err)
-      errorDetails.details = errorObj?.details
+      if (errorObj?.details) {
+        errorDetails.details = errorObj.details
+      }
       errorDetails.hint = errorObj?.hint
     }
     
