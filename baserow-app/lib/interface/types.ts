@@ -227,6 +227,10 @@ export interface BlockConfig {
     list_image_field?: string // Optional: field name for image/attachment
     list_pill_fields?: string[] // Optional: select/multi-select fields to show as pills
     list_meta_fields?: string[] // Optional: date, number, etc. for metadata
+    // Attachment/Image field display settings (for field blocks)
+    attachment_display_style?: 'thumbnails' | 'list' | 'hero' | 'cover' | 'gallery' // Display style for attachments
+    attachment_size?: 'small' | 'medium' | 'large' // Preview size for attachments (for thumbnails/list)
+    attachment_max_visible?: number // Max number of previews to show before "+X more"
   }
   // List block specific config (at root level for backward compatibility)
   list_title_field?: string

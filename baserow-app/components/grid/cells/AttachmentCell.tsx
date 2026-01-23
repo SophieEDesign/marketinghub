@@ -21,6 +21,8 @@ function generateUUID(): string {
 // Re-export Attachment type for backwards compatibility
 export type { Attachment } from '@/components/attachments/AttachmentPreview'
 
+import type { FieldOptions } from '@/types/fields'
+
 interface AttachmentCellProps {
   value: Attachment[] | null
   fieldName: string
@@ -29,11 +31,7 @@ interface AttachmentCellProps {
   editable?: boolean
   onSave: (value: Attachment[]) => Promise<void>
   placeholder?: string
-  fieldOptions?: {
-    attachment_display_style?: 'thumbnails' | 'list'
-    attachment_preview_size?: 'small' | 'medium' | 'large'
-    attachment_max_visible?: number
-  }
+  fieldOptions?: FieldOptions
 }
 
 export default function AttachmentCell({

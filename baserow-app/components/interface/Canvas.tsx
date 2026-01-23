@@ -497,6 +497,17 @@ export default function Canvas({
       }
     })
     
+    // Check if block is near the top of the canvas (y=0)
+    // This allows snapping to the top even when there are no other blocks above
+    const distanceToCanvasTop = draggedY
+    if (distanceToCanvasTop <= snapThreshold && (!snapTargets.top || distanceToCanvasTop < snapTargets.top.distance)) {
+      snapTargets.top = {
+        block: draggedBlock, // Use dragged block as placeholder (not used for actual block reference)
+        distance: distanceToCanvasTop,
+        targetY: 0, // Snap to top of canvas
+      }
+    }
+    
     return snapTargets
   }, [])
   

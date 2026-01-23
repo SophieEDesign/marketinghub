@@ -205,7 +205,7 @@ export default function FieldAppearanceSettings({
               className="text-sm"
             />
             <p className="text-xs text-gray-500">
-              Maximum number of attachments to show before showing "+X more"
+              Maximum number of attachments to show before showing &quot;+X more&quot;
             </p>
           </div>
         </div>
