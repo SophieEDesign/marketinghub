@@ -299,64 +299,63 @@ export default function Canvas({
       debugLog('LAYOUT', `[Canvas] BEFORE HYDRATION`, {
         pageId,
         isFirstLoad: previousBlockIds === "",
-          blockIdsChanged,
-          previousBlockIds: previousBlockIdsRef.current,
-          currentBlockIds,
-          blocksCount: blocks.length,
-          blocks: blocks.map(b => ({
-            id: b.id,
-            x: b.x,
-            y: b.y,
-            w: b.w,
-            h: b.h,
-          })),
-        })
-      }
+        blockIdsChanged,
+        previousBlockIds: previousBlockIdsRef.current,
+        currentBlockIds,
+        blocksCount: blocks.length,
+        blocks: blocks.map(b => ({
+          id: b.id,
+          x: b.x,
+          y: b.y,
+          w: b.w,
+          h: b.h,
+        })),
+      })
 
       // Convert blocks to layout format - use saved positions from Supabase
       // CRITICAL: Database values (position_x, position_y, width, height) are single source of truth
       // Only apply defaults when ALL position values are NULL (newly created block)
       const newLayout: Layout[] = blocks.map((block) => {
-      // CRITICAL: Use unified mapping function - enforces single source of truth
-      // Map DB values using unified function (throws if corrupted, returns null if new)
-      // Note: API already maps position_x/position_y/width/height to x/y/w/h
-      const layout = dbBlockToPageBlock({
-        id: block.id,
-        position_x: block.x, // API already maps position_x → x
-        position_y: block.y,
-        width: block.w,
-        height: block.h,
-      })
-      
-      let x: number, y: number, w: number, h: number
-      
-      if (!layout) {
-        // New block (all null) - apply defaults
-        x = 0
-        y = 0
-        w = 4
-        h = 4
-        
-        // DEBUG_LAYOUT: Log default application
-        debugLog('LAYOUT', `Block ${block.id}: DEFAULTS APPLIED (new block)`, {
-          blockId: block.id,
-          fromDB: { x: null, y: null, w: null, h: null },
-          applied: { x, y, w, h },
+        // CRITICAL: Use unified mapping function - enforces single source of truth
+        // Map DB values using unified function (throws if corrupted, returns null if new)
+        // Note: API already maps position_x/position_y/width/height to x/y/w/h
+        const layout = dbBlockToPageBlock({
+          id: block.id,
+          position_x: block.x, // API already maps position_x → x
+          position_y: block.y,
+          width: block.w,
+          height: block.h,
         })
-      } else {
-        // Existing block - use mapped values (no defaults)
-        x = layout.x
-        y = layout.y
-        w = layout.w
-        h = layout.h
         
-        // DEBUG_LAYOUT: Log DB values used
-        debugLog('LAYOUT', `Block ${block.id}: FROM DB`, {
-          blockId: block.id,
-          fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
-          applied: { x, y, w, h },
-        })
-      }
+        let x: number, y: number, w: number, h: number
+        
+        if (!layout) {
+          // New block (all null) - apply defaults
+          x = 0
+          y = 0
+          w = 4
+          h = 4
+          
+          // DEBUG_LAYOUT: Log default application
+          debugLog('LAYOUT', `Block ${block.id}: DEFAULTS APPLIED (new block)`, {
+            blockId: block.id,
+            fromDB: { x: null, y: null, w: null, h: null },
+            applied: { x, y, w, h },
+          })
+        } else {
+          // Existing block - use mapped values (no defaults)
+          x = layout.x
+          y = layout.y
+          w = layout.w
+          h = layout.h
+          
+          // DEBUG_LAYOUT: Log DB values used
+          debugLog('LAYOUT', `Block ${block.id}: FROM DB`, {
+            blockId: block.id,
+            fromDB: { x: block.x, y: block.y, w: block.w, h: block.h },
+            applied: { x, y, w, h },
+          })
+        }
         
         return {
           i: block.id,
@@ -373,13 +372,12 @@ export default function Canvas({
       debugLog('LAYOUT', `[Layout Rehydration] AFTER HYDRATION`, {
         newLayout: newLayout.map(item => ({
           id: item.i,
-            x: item.x,
-            y: item.y,
-            w: item.w,
-            h: item.h,
-          })),
-        })
-      }
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+        })),
+      })
       
       setLayout(newLayout)
       previousBlockIdsRef.current = currentBlockIds
@@ -402,10 +400,9 @@ export default function Canvas({
       debugLog('LAYOUT', '[Canvas] Layout synced from blocks', {
         isFirstLoad: previousBlockIds === "",
         blockIdsChanged,
-          blockPositionsChanged,
-          blocksCount: blocks.length,
-        })
-      }
+        blockPositionsChanged,
+        blocksCount: blocks.length,
+      })
     }
     // CRITICAL: Mode changes must NEVER trigger layout syncs
     // isEditing is only used to control drag/resize capabilities, not state
@@ -668,9 +665,8 @@ export default function Canvas({
       debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
         originalX: draggedBlock.x,
         snappedX: horizontalSnapped.x,
-          direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
-        })
-      }
+        direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
+      })
       return horizontalSnapped
     }
     
@@ -1053,11 +1049,10 @@ export default function Canvas({
             debugLog('LAYOUT', '[Canvas] Applied snap/push/compaction after drag/resize end', {
               hadSnap: draggedBlockId !== null,
               hadPushDown: needsPushDown,
-                hadCompaction: needsCompaction,
-                draggedBlockId,
-                resizedBlockId,
-              })
-            }
+              hadCompaction: needsCompaction,
+              draggedBlockId,
+              resizedBlockId,
+            })
             
             // Update position tracking ref
             finalLayout.forEach(layoutItem => {
@@ -1147,8 +1142,7 @@ export default function Canvas({
       debugLog('LAYOUT', '[Canvas] Block deleted - triggering compaction', {
         previousCount: previousBlockCountRef.current,
         currentCount: blocks.length,
-        })
-      }
+      })
       
       // Wait a brief moment for the layout to update, then compact
       setTimeout(() => {
@@ -1382,8 +1376,7 @@ export default function Canvas({
             debugLog('LAYOUT', `[Canvas] Drag started for block ${blockId}`, {
               startX: oldItem.x,
               startY: oldItem.y,
-              })
-            }
+            })
           }}
           onDrag={(layout, oldItem, newItem, placeholder, e, element) => {
             // Update last position during drag (for drag vector calculation)
