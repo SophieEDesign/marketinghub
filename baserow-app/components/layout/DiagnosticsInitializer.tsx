@@ -12,7 +12,7 @@ import { useEffect } from 'react'
 export default function DiagnosticsInitializer() {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      // @ts-ignore - window.__DEV_DIAGNOSTICS__ is set at runtime
+      // @ts-expect-error - window.__DEV_DIAGNOSTICS__ is set at runtime
       window.__DEV_DIAGNOSTICS__ = true
       console.log('[Diagnostics] Runtime diagnostics enabled. Set window.__DEV_DIAGNOSTICS__ = false to disable.')
     }
