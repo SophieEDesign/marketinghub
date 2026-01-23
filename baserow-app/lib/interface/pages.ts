@@ -129,7 +129,7 @@ export async function createInterfacePage(
   let saved_view_id: string | null = null
   let dashboard_layout_id: string | null = null
   let form_config_id: string | null = null
-  let record_config_id: string | null = null
+  const record_config_id: string | null = null
 
   switch (requiredAnchor) {
     case 'saved_view':

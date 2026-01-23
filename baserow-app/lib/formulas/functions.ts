@@ -47,7 +47,7 @@ export const FORMULA_FUNCTIONS: Record<string, FormulaFunction> = {
 
   SUBSTITUTE: (text, oldText, newText, instanceNum?) => {
     if (text === null || oldText === null || newText === null) return '#VALUE!'
-    let s = String(text)
+    const s = String(text)
     const old = String(oldText)
     const newStr = String(newText)
 

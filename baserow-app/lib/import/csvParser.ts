@@ -2,7 +2,7 @@ import Papa from 'papaparse'
 
 // Ensure Papa is available
 if (typeof window !== 'undefined' && !window.Papa) {
-  // @ts-ignore
+  // @ts-expect-error - Papa needs to be attached to window for some legacy code
   window.Papa = Papa
 }
 
