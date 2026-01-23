@@ -10,19 +10,19 @@ export interface ParsedColumn {
   name: string
   sanitizedName: string
   type: 'text' | 'number' | 'boolean' | 'date'
-  sampleValues: any[]
+  sampleValues: unknown[]
 }
 
 export interface ParsedCSV {
   columns: ParsedColumn[]
-  rows: Record<string, any>[]
-  previewRows: Record<string, any>[]
+  rows: Record<string, unknown>[]
+  previewRows: Record<string, unknown>[]
 }
 
 /**
  * Infer field type from a value
  */
-function inferType(value: any): 'text' | 'number' | 'boolean' | 'date' {
+function inferType(value: unknown): 'text' | 'number' | 'boolean' | 'date' {
   if (value === null || value === undefined || value === '') {
     return 'text' // Default to text for empty values
   }
@@ -90,7 +90,7 @@ function inferType(value: any): 'text' | 'number' | 'boolean' | 'date' {
 /**
  * Infer column type from multiple sample values
  */
-function inferColumnType(values: any[]): 'text' | 'number' | 'boolean' | 'date' {
+function inferColumnType(values: unknown[]): 'text' | 'number' | 'boolean' | 'date' {
   // Ensure values is always an array
   if (!Array.isArray(values)) {
     return 'text'
@@ -209,10 +209,10 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
           }
 
           // Ensure data is always an array and properly typed
-          let dataArray: Record<string, any>[] = []
+          let dataArray: Record<string, unknown>[] = []
           if (Array.isArray(data)) {
             // Filter out any non-object entries and ensure all items are objects
-            dataArray = (data as any[]).filter((item): item is Record<string, any> => 
+            dataArray = (data as unknown[]).filter((item): item is Record<string, unknown> => 
               item !== null && 
               item !== undefined && 
               typeof item === 'object' &&
@@ -233,7 +233,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             const sampleRows = Array.isArray(dataArray) ? dataArray.slice(0, 100) : []
             const sampleValues = Array.isArray(sampleRows) 
               ? sampleRows
-                  .map((row: any) => {
+                  .map((row: Record<string, unknown>) => {
                     if (!row || typeof row !== 'object') return null
                     const value = row[name]
                     // Handle arrays (from CSV parsing) - convert to string
@@ -248,7 +248,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             // Ensure safe array operations for type inference
             const typeInferenceRows = Array.isArray(dataArray) ? dataArray.slice(0, 100) : []
             const typeInferenceValues = Array.isArray(typeInferenceRows)
-              ? typeInferenceRows.map((row: any) => {
+              ? typeInferenceRows.map((row: Record<string, unknown>) => {
                   if (!row || typeof row !== 'object') return null
                   const value = row[name]
                   // Handle arrays - convert to string for type inference
@@ -256,7 +256,7 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
                     return value.join(', ')
                   }
                   return value
-                }).filter((v: any) => v !== null && v !== undefined)
+                }).filter((v: unknown) => v !== null && v !== undefined)
               : []
             
             const type = inferColumnType(typeInferenceValues)
@@ -295,8 +295,9 @@ export async function parseCSV(file: File): Promise<ParsedCSV> {
             rows: dataArray,
             previewRows,
           })
-        } catch (error: any) {
-          reject(new Error(`Failed to parse CSV: ${error.message}`))
+        } catch (error: unknown) {
+          const errorMessage = (error as { message?: string })?.message || 'Unknown error'
+          reject(new Error(`Failed to parse CSV: ${errorMessage}`))
         }
       },
       error: (error) => {

@@ -8,7 +8,7 @@ import { isAbortError } from '@/lib/api/error-handling'
 
 export interface GridRow {
   id: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export interface UseGridDataOptions {
@@ -26,7 +26,7 @@ export interface UseGridDataReturn {
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
-  updateCell: (rowId: string, fieldName: string, value: any) => Promise<void>
+  updateCell: (rowId: string, fieldName: string, value: unknown) => Promise<void>
   insertRow: (data: Record<string, any>) => Promise<GridRow | null>
   deleteRow: (rowId: string) => Promise<void>
   /** Physical columns that exist in the database (null if not yet loaded) */
@@ -76,7 +76,7 @@ export function useGridData({
         })
         if (!colsError && Array.isArray(cols)) {
           physicalColumnsRef.current = new Set(
-            cols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean)
+            cols.map((c: { column_name?: string }) => String(c?.column_name ?? '')).filter(Boolean)
           )
         }
       } catch {
@@ -87,8 +87,9 @@ export function useGridData({
     [tableName]
   )
 
-  function noteMissingColumnFromError(err: any): string | null {
-    const msg = String(err?.message || err?.details || '').toLowerCase()
+  function noteMissingColumnFromError(err: unknown): string | null {
+    const errorObj = err as { message?: string; details?: string } | null
+    const msg = String(errorObj?.message || errorObj?.details || '').toLowerCase()
 
     // Common PostgREST patterns:
     // - Could not find the 'name' column of 'table_x' in the schema cache
@@ -100,26 +101,27 @@ export function useGridData({
     return null
   }
 
-  function formatPostgrestError(err: any): string {
+  function formatPostgrestError(err: unknown): string {
     if (!err) return 'Unknown error'
+    const errorObj = err as { code?: string | number; message?: string; details?: string; hint?: string } | null
     const parts = [
-      err?.code ? `code=${err.code}` : null,
-      err?.message ? `message=${err.message}` : null,
-      err?.details ? `details=${err.details}` : null,
-      err?.hint ? `hint=${err.hint}` : null,
+      errorObj?.code ? `code=${errorObj.code}` : null,
+      errorObj?.message ? `message=${errorObj.message}` : null,
+      errorObj?.details ? `details=${errorObj.details}` : null,
+      errorObj?.hint ? `hint=${errorObj.hint}` : null,
     ].filter(Boolean)
     return parts.length > 0 ? parts.join(' | ') : String(err)
   }
 
-  function normalizeUpdateValue(fieldName: string, value: any): any {
+  function normalizeUpdateValue(fieldName: string, value: unknown): unknown {
     // Avoid sending `undefined` (it becomes `{}` and can cause PostgREST 400s).
-    let v: any = value === undefined ? null : value
+    let v: unknown = value === undefined ? null : value
     // JSON.stringify turns NaN/Infinity into null; do it explicitly for clarity.
     if (typeof v === 'number' && (!Number.isFinite(v) || Number.isNaN(v))) v = null
 
     const safeFields = asArray<TableField>(fields)
-    const field = safeFields.find((f) => f && typeof f === 'object' && (f as any).name === fieldName)
-    const type = (field as any)?.type as TableField['type'] | undefined
+    const field = safeFields.find((f) => f && typeof f === 'object' && (f as TableField).name === fieldName)
+    const type = (field as TableField | undefined)?.type
 
     if (!type) return v
 
@@ -171,7 +173,7 @@ export function useGridData({
       }
 
       case 'link_to_table': {
-        const maybeParseJsonArrayString = (s: string): any[] | null => {
+        const maybeParseJsonArrayString = (s: string): unknown[] | null => {
           const trimmed = s.trim()
           if (!(trimmed.startsWith('[') && trimmed.endsWith(']'))) return null
           try {
@@ -182,20 +184,20 @@ export function useGridData({
           }
         }
 
-        const toId = (x: any): string | null => {
+        const toId = (x: unknown): string | null => {
           if (x == null || x === '') return null
           if (typeof x === 'string') {
             // Some UI paths accidentally stringify arrays for link fields, e.g. `["uuid"]`.
             // Coerce that back into a single uuid to avoid Postgres 22P02.
             const parsedArr = maybeParseJsonArrayString(x)
-            if (parsedArr) {
+            if (parsedArr && parsedArr.length > 0) {
               const first = parsedArr[0]
               if (first == null || first === '') return null
               return String(first)
             }
             return x
           }
-          if (typeof x === 'object' && x && 'id' in x) return String((x as any).id)
+          if (typeof x === 'object' && x && 'id' in x) return String((x as { id: unknown }).id)
           return String(x)
         }
         // IMPORTANT:
@@ -289,11 +291,12 @@ export function useGridData({
         }
       }
 
-      const isTableMissingError = (err: any): boolean => {
+      const isTableMissingError = (err: unknown): boolean => {
         // Supabase/PostgREST often uses 404 or codes like 42P01 for missing relations.
-        const status = (err as any)?.status
-        const code = String((err as any)?.code || '')
-        const msg = String((err as any)?.message || '').toLowerCase()
+        const errorObj = err as { status?: number; code?: string; message?: string } | null
+        const status = errorObj?.status
+        const code = String(errorObj?.code || '')
+        const msg = String(errorObj?.message || '').toLowerCase()
         return (
           status === 404 ||
           code === '42P01' ||
@@ -303,7 +306,7 @@ export function useGridData({
         )
       }
 
-      const runQuery = async (attempt: number): Promise<any> => {
+      const runQuery = async (attempt: number): Promise<null> => {
         // Use refs to get current filters/sorts without causing dependency issues
         const currentFilters = filtersRef.current
         const currentSorts = sortsRef.current
@@ -335,11 +338,11 @@ export function useGridData({
 
         const selectClause = buildSelectClause(existingPhysicalFieldNames, { includeId: true, fallback: '*' })
 
-        let query: any = supabase.from(tableName).select(selectClause)
+        let query = supabase.from(tableName).select(selectClause)
 
       // Apply filters using shared unified filter engine (supports date operators, selects, etc.)
-        const safeFilterConfigs = asArray<FilterConfig>(currentFilters as any).filter(
-        (f) => !!f && typeof (f as any).field === 'string' && typeof (f as any).operator === 'string'
+        const safeFilterConfigs = asArray<FilterConfig>(currentFilters as FilterConfig[]).filter(
+        (f) => !!f && typeof (f as FilterConfig).field === 'string' && typeof (f as FilterConfig).operator === 'string'
       )
       if (safeFilterConfigs.length > 0) {
         // If we know the physical columns, skip filters on missing columns.
@@ -418,10 +421,11 @@ export function useGridData({
       }
 
       await runQuery(0)
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isAbortError(err)) return
       console.error('Error loading grid data:', err)
-      setError(err.message || 'Failed to load data')
+      const errorMessage = (err as { message?: string })?.message || 'Failed to load data'
+      setError(errorMessage)
       setRows([])
     } finally {
       setLoading(false)
@@ -436,7 +440,7 @@ export function useGridData({
   }, [loadData])
 
   const updateCell = useCallback(
-    async (rowId: string, fieldName: string, value: any) => {
+    async (rowId: string, fieldName: string, value: unknown) => {
       try {
         // CRITICAL: First check if the field exists in metadata before attempting any update
         // This prevents errors when trying to update deleted fields
@@ -493,7 +497,7 @@ export function useGridData({
                 // It might have been created manually or in a previous attempt
                 await refreshPhysicalColumns(true)
               }
-            } catch (syncError: any) {
+            } catch (syncError: unknown) {
               console.warn('[useGridData] Schema sync error:', syncError)
               // Refresh columns anyway in case they were created
               await refreshPhysicalColumns(true)
@@ -512,9 +516,9 @@ export function useGridData({
 
         const normalizedValue = normalizeUpdateValue(fieldName, value)
 
-        let finalSavedValue: any = normalizedValue
+        let finalSavedValue: unknown = normalizedValue
 
-        const doUpdate = async (val: any) => {
+        const doUpdate = async (val: unknown) => {
           return await supabase.from(tableName).update({ [safeColumn]: val }).eq('id', rowId)
         }
 
@@ -574,7 +578,7 @@ export function useGridData({
             row.id === rowId ? { ...row, [fieldName]: finalSavedValue } : row
           )
         )
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error updating cell:', {
           tableName,
           rowId,
@@ -613,7 +617,7 @@ export function useGridData({
 
         setRows((prevRows) => [...prevRows, newRow])
         return newRow
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error inserting row:', err)
         throw err
       }
@@ -634,7 +638,7 @@ export function useGridData({
         }
 
         setRows((prevRows) => prevRows.filter((row) => row.id !== rowId))
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error deleting row:', err)
         throw err
       }

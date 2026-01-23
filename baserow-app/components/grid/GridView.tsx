@@ -1510,7 +1510,7 @@ export default function GridView({
           const sort = safeViewSorts[i]
           const orderColumn = toPostgrestColumn(sort.field_name)
           if (!orderColumn) {
-            console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
+            debugWarn('LAYOUT', 'Skipping sort on invalid column:', sort.field_name)
             continue
           }
           if (i === 0) {
@@ -1701,7 +1701,7 @@ export default function GridView({
               const sort = filteredRetrySorts[i]
               const orderColumn = toPostgrestColumn(sort.field_name)
               if (!orderColumn) {
-                console.warn('[GridView] Skipping sort on invalid column:', sort.field_name)
+                debugWarn('LAYOUT', 'Skipping sort on invalid column:', sort.field_name)
                 continue
               }
               retryQuery = retryQuery.order(orderColumn, {
@@ -1979,7 +1979,7 @@ export default function GridView({
       }
       if (fieldMeta.type === 'formula' || fieldMeta.type === 'lookup') {
         const error = new Error(`Cannot update "${fieldName}" because it is a ${fieldMeta.type} field.`)
-        console.error("Error saving cell:", error)
+        debugError('LAYOUT', "Error saving cell:", error)
         throw error
       }
 
@@ -2044,7 +2044,7 @@ export default function GridView({
           `This field cannot be updated because its column name is not a safe identifier: "${fieldName}". ` +
             `Rename the field to a simple snake_case name (letters/numbers/_), or ensure your backend supports quoted column updates.`
         )
-        console.error("Error saving cell:", error)
+        debugError('LAYOUT', "Error saving cell:", error)
         throw error
       }
 
@@ -2254,12 +2254,12 @@ export default function GridView({
 
   function handleColumnEditPermissions(fieldName: string) {
     // TODO: Open field permissions editor
-    console.log('Edit permissions:', fieldName)
+    debugLog('LAYOUT', 'Edit permissions:', fieldName)
   }
 
   function handleChangePrimaryField(fieldName: string) {
     // TODO: Change primary field
-    console.log('Change primary field:', fieldName)
+    debugLog('LAYOUT', 'Change primary field:', fieldName)
   }
 
   function handleColumnSelect(fieldName: string) {

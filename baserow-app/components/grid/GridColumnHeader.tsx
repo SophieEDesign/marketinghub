@@ -9,6 +9,7 @@ import { getFieldIcon } from '@/lib/icons'
 import { useIsMobile } from '@/hooks/useResponsive'
 import { createClient } from '@/lib/supabase/client'
 import { getFieldDisplayName } from '@/lib/fields/display'
+import { debugLog, debugError } from '@/lib/interface/debug-flags'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -243,7 +244,7 @@ export default function GridColumnHeader({
           {field.type !== 'formula' && field.type !== 'lookup' && (
             <DropdownMenuItem onClick={() => { 
               // TODO: Implement duplicate
-              console.log('Duplicate field:', field.name)
+              debugLog('LAYOUT', 'Duplicate field:', field.name)
               setDropdownOpen(false)
             }}>
               <Copy className="h-4 w-4 mr-2" />
@@ -276,7 +277,7 @@ export default function GridColumnHeader({
               navigator.clipboard.writeText(url).then(() => {
                 setDropdownOpen(false)
               }).catch(err => {
-                console.error('Failed to copy URL:', err)
+                debugError('LAYOUT', 'Failed to copy URL:', err)
               })
             } else {
               setDropdownOpen(false)
@@ -295,7 +296,7 @@ export default function GridColumnHeader({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => { 
             // TODO: Edit field permissions
-            console.log('Edit permissions:', field.name)
+            debugLog('LAYOUT', 'Edit permissions:', field.name)
             setDropdownOpen(false)
           }}>
             <Lock className="h-4 w-4 mr-2" />
@@ -316,7 +317,7 @@ export default function GridColumnHeader({
           )}
           <DropdownMenuItem onClick={() => { 
             // TODO: Filter by this field
-            console.log('Filter by:', field.name)
+            debugLog('LAYOUT', 'Filter by:', field.name)
             setDropdownOpen(false)
           }}>
             <Filter className="h-4 w-4 mr-2" />
@@ -324,7 +325,7 @@ export default function GridColumnHeader({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => { 
             // TODO: Group by this field
-            console.log('Group by:', field.name)
+            debugLog('LAYOUT', 'Group by:', field.name)
             setDropdownOpen(false)
           }}>
             <Group className="h-4 w-4 mr-2" />
@@ -332,7 +333,7 @@ export default function GridColumnHeader({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => { 
             // TODO: Hide field
-            console.log('Hide field:', field.name)
+            debugLog('LAYOUT', 'Hide field:', field.name)
             setDropdownOpen(false)
           }}>
             <EyeOff className="h-4 w-4 mr-2" />
@@ -344,7 +345,7 @@ export default function GridColumnHeader({
               <DropdownMenuItem 
                 onClick={() => { 
                   // TODO: Delete field
-                  console.log('Delete field:', field.name)
+                  debugLog('LAYOUT', 'Delete field:', field.name)
                   setDropdownOpen(false)
                 }}
                 className="text-red-600 focus:text-red-600"

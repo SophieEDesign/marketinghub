@@ -54,7 +54,7 @@ export async function GET(
     const response = NextResponse.json({ fields: fields || [] })
     response.headers.set('Cache-Control', 'no-store')
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If table doesn't exist, return empty array (graceful degradation)
     if (isTableNotFoundError(error)) {
       const { tableId } = await params
@@ -65,7 +65,8 @@ export async function GET(
     }
     
     // Handle validation errors as 400
-    if (error?.code === '22P02' || error?.message?.includes('invalid input') || error?.message?.includes('invalid uuid')) {
+    const errorObj = error as { code?: string; message?: string } | null
+    if (errorObj?.code === '22P02' || errorObj?.message?.includes('invalid input') || errorObj?.message?.includes('invalid uuid')) {
       console.error(`[fields] Invalid tableId format:`, error)
       return NextResponse.json(
         { error: 'Invalid tableId format', fields: [] },
@@ -440,7 +441,7 @@ export async function POST(
         } catch {
           // Non-fatal: PostgREST will eventually pick up the new column
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Rollback both sides best-effort.
         await supabase.from('table_fields').delete().eq('id', reciprocalFieldData.id)
         try {
@@ -532,7 +533,7 @@ export async function POST(
       field: fieldData,
       reciprocal_field: reciprocalField,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to create field', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }
@@ -798,7 +799,7 @@ export async function PATCH(
       field: updatedField,
       warning: isDestructive ? 'Type change may result in data loss' : undefined,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to update field', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }
@@ -861,7 +862,7 @@ export async function DELETE(
       .select('id, name, options')
       .or('type.eq.link_to_table,type.eq.lookup')
 
-    const isReferenced = linkedFields?.some((f: any) => {
+    const isReferenced = linkedFields?.some((f: { linked_table_id?: string; relationship_type?: string }) => {
       const opts = f.options || {}
       return opts.linked_field_id === fieldId || opts.lookup_field_id === fieldId
     })
@@ -965,8 +966,8 @@ export async function DELETE(
     // Delete metadata
     // Check if user is admin first - if so, use SQL method directly to bypass RLS/triggers
     const userIsAdmin = await isAdmin()
-    let deletedRows: any[] | null = null
-    let deleteError: any = null
+    let deletedRows: unknown[] | null = null
+    let deleteError: unknown = null
 
     if (userIsAdmin) {
       // For admins, use admin client directly (bypasses RLS)
@@ -1061,10 +1062,11 @@ export async function DELETE(
               } catch (verifyError: any) {
                 console.error('[Field Delete] Verification error:', verifyError)
                 // If verification fails, we can't be sure - don't assume success
-                deleteError = new Error(`Field deletion verification failed: ${verifyError.message || verifyError}`)
+                const verifyErrorMessage = (verifyError as { message?: string })?.message || String(verifyError)
+                deleteError = new Error(`Field deletion verification failed: ${verifyErrorMessage}`)
               }
             }
-          } catch (sqlError: any) {
+          } catch (sqlError: unknown) {
             console.error('[Field Delete] SQL fallback exception:', sqlError)
             deleteError = sqlError instanceof Error ? sqlError : new Error(String(sqlError))
           }
@@ -1149,7 +1151,7 @@ export async function DELETE(
     // clearViewMetaCache(undefined, params.tableId) // Clear all views for this table
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to delete field', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }

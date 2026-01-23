@@ -47,10 +47,11 @@ export async function POST(
       if (!tableId || typeof tableId !== 'string' || tableId.trim().length === 0) {
         return NextResponse.json({ error: 'Invalid tableId parameter' }, { status: 400 })
       }
-    } catch (paramsError: any) {
+    } catch (paramsError: unknown) {
       console.error('[sync-schema] Error resolving params:', paramsError)
+      const errorMessage = (paramsError as { message?: string })?.message || 'Unknown error'
       return NextResponse.json(
-        { error: 'Invalid request parameters', message: paramsError?.message || 'Unknown error' },
+        { error: 'Invalid request parameters', message: errorMessage },
         { status: 400 }
       )
     }
@@ -59,11 +60,12 @@ export async function POST(
     let table
     try {
       table = await getTable(tableId)
-    } catch (getTableError: any) {
+    } catch (getTableError: unknown) {
       console.error(`[sync-schema] Error getting table "${tableId}":`, getTableError)
+      const errorObj = getTableError as { message?: string; code?: string } | null
       // Check if it's a not found error
-      const errorMsg = String(getTableError?.message || '').toLowerCase()
-      if (errorMsg.includes('not found') || getTableError?.code === 'PGRST116') {
+      const errorMsg = String(errorObj?.message || '').toLowerCase()
+      if (errorMsg.includes('not found') || errorObj?.code === 'PGRST116') {
         return NextResponse.json({ error: 'Table not found' }, { status: 404 })
       }
       // Re-throw to be caught by outer catch
@@ -74,7 +76,7 @@ export async function POST(
       return NextResponse.json({ error: 'Table not found' }, { status: 404 })
     }
 
-    const rawTableName = String((table as any).supabase_table || '')
+    const rawTableName = String((table as { supabase_table?: string }).supabase_table || '')
     const tableName = normalizeSupabaseTableName(rawTableName)
     if (!tableName) {
       return NextResponse.json({ error: 'Missing supabase_table for table' }, { status: 400 })

@@ -12,12 +12,13 @@ export interface ApiError {
  * Check if an error is caused by a request being aborted (navigation/unmount).
  * This is not a real failure and should generally be ignored.
  */
-export function isAbortError(error: any): boolean {
+export function isAbortError(error: unknown): boolean {
   if (!error) return false
-  const name = (error as any)?.name
+  const errorObj = error as { name?: string; message?: string; details?: string } | null
+  const name = errorObj?.name
   if (name === 'AbortError') return true
 
-  const message = String((error as any)?.message || (error as any)?.details || '')
+  const message = String(errorObj?.message || errorObj?.details || '')
   return message.includes('AbortError') || message.includes('signal is aborted')
 }
 
@@ -47,17 +48,18 @@ export function isTableNotFoundError(error: ApiError): boolean {
  * Create a standardized error response
  */
 export function createErrorResponse(
-  error: any,
+  error: unknown,
   defaultMessage: string,
   statusCode: number = 500
 ) {
-  const errorMessage = error?.message || error?.error || defaultMessage
+  const errorObj = error as { message?: string; error?: string; code?: string | number; details?: string } | null
+  const errorMessage = errorObj?.message || errorObj?.error || defaultMessage
   console.error(defaultMessage, error)
   
   return {
     error: errorMessage,
-    ...(error?.code && { code: error.code }),
-    ...(error?.details && { details: error.details }),
+    ...(errorObj?.code && { code: errorObj.code }),
+    ...(errorObj?.details && { details: errorObj.details }),
   }
 }
 

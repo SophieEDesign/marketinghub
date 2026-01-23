@@ -174,8 +174,8 @@ export default function NavigationDiagnostics() {
       })
 
       // 8. Test click on sidebar link
-      const sidebarContainer = document.querySelector('[data-sidebar]')
-      const testLink = sidebarContainer 
+      const sidebarContainerForTest = document.querySelector('[data-sidebar]')
+      const testLink = sidebarContainerForTest 
         ? (sidebarContainer.querySelector('a[href^="/pages/"]') as HTMLAnchorElement)
         : null
       if (testLink) {
@@ -214,12 +214,12 @@ export default function NavigationDiagnostics() {
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       // Find sidebar container first, then find link within it
-      const sidebarContainer = target.closest('[data-sidebar]')
-      const sidebarLink = sidebarContainer 
+      const sidebarContainerForClick = target.closest('[data-sidebar]')
+      const sidebarLink = sidebarContainerForClick 
         ? (target.closest('a[href]') as HTMLAnchorElement)
         : null
       
-      if (sidebarLink && sidebarContainer) {
+      if (sidebarLink && sidebarContainerForClick) {
         console.log("🖱️ Click on sidebar link:", {
           href: sidebarLink.getAttribute("href"),
           element: sidebarLink,

@@ -39,7 +39,7 @@ export default function FormPageSettingsPanel({
   const [tables, setTables] = useState<Table[]>([])
   const [tableFields, setTableFields] = useState<TableField[]>([])
   const [selectedTableId, setSelectedTableId] = useState<string>("")
-  const [config, setConfig] = useState<any>({})
+  const [config, setConfig] = useState<BlockConfig>({} as BlockConfig)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -124,13 +124,17 @@ export default function FormPageSettingsPanel({
     await saveConfig(newConfig, tableId)
   }
 
-  async function handleConfigUpdate(updates: Partial<any>) {
+  async function handleConfigUpdate(updates: Partial<any>): Promise<void> {
     const newConfig = {
       ...config,
       ...updates,
     }
     setConfig(newConfig)
     await saveConfig(newConfig, selectedTableId)
+  }
+
+  const handleAppearanceUpdate = (updates: Partial<BlockConfig['appearance']>): void => {
+    handleConfigUpdate(updates as Partial<any>).catch(console.error)
   }
 
   async function saveConfig(newConfig: any, tableId?: string) {
@@ -204,8 +208,8 @@ export default function FormPageSettingsPanel({
 
             <TabsContent value="appearance" className="mt-6">
               <FormAppearanceSettings
-                config={config}
-                onUpdate={handleConfigUpdate}
+                config={config as BlockConfig}
+                onUpdate={handleAppearanceUpdate}
               />
             </TabsContent>
           </Tabs>

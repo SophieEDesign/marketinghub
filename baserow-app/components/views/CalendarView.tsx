@@ -19,7 +19,7 @@ import { applyFiltersToQuery, deriveDefaultValuesFromFilters, stripFilterBlockFi
 import type { FilterTree } from "@/lib/filters/canonical-model"
 import { flattenFilterTree } from "@/lib/filters/canonical-model"
 import { addDays, differenceInCalendarDays, format, startOfDay } from "date-fns"
-import type { EventDropArg, EventInput } from "@fullcalendar/core"
+import type { EventDropArg, EventInput, EventClickArg, EventContentArg } from "@fullcalendar/core"
 import type { TableRow } from "@/types/database"
 import type { LinkedField, TableField } from "@/types/fields"
 import RecordModal from "@/components/calendar/RecordModal"
@@ -95,7 +95,7 @@ export default function CalendarView({
     if (!fieldIdsProp) return []
     if (Array.isArray(fieldIdsProp)) return fieldIdsProp
     // Fallback: if somehow not an array, return empty array
-    console.warn('CalendarView: fieldIdsProp is not an array:', typeof fieldIdsProp, fieldIdsProp)
+    debugWarn('CALENDAR', 'CalendarView: fieldIdsProp is not an array:', { type: typeof fieldIdsProp, value: fieldIdsProp })
     return []
   }, [fieldIdsProp])
   const router = useRouter()
@@ -106,11 +106,11 @@ export default function CalendarView({
   
   // Lifecycle logging
   useEffect(() => {
-    debugCalendar('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
+    debugLog('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
     // Mark as mounted to prevent hydration mismatch with FullCalendar
     setMounted(true)
     return () => {
-      debugCalendar('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
+      debugLog('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
     }
   }, [])
   
@@ -288,15 +288,22 @@ export default function CalendarView({
       // If tableFields prop is provided and not empty, use it
       if (tableFields && tableFields.length > 0) {
         // Ensure fields are in correct format (TableField[])
-        const formattedFields = tableFields.map((f: TableField | { id?: string; field_id?: string; table_id?: string; name?: string; field_name?: string; type?: string; field_type?: string; position?: number; created_at?: string; options?: unknown; field_options?: unknown }) => ({
-          id: f.id || f.field_id,
-          table_id: f.table_id,
-          name: f.name || f.field_name,
-          type: f.type || f.field_type,
-          position: f.position || 0,
-          created_at: f.created_at,
-          options: f.options || f.field_options || {}
-        }))
+        const formattedFields: TableField[] = tableFields.map((f) => {
+          // Handle both TableField and legacy format with field_id/field_name
+          const fieldId = 'id' in f ? f.id : ('field_id' in f ? (f as any).field_id : '')
+          const fieldName = 'name' in f ? f.name : ('field_name' in f ? (f as any).field_name : '')
+          const fieldType = 'type' in f ? f.type : ('field_type' in f ? (f as any).field_type : 'text')
+          const tableId = 'table_id' in f ? f.table_id : ''
+          
+          return {
+            id: fieldId || '',
+            table_id: tableId || resolvedTableId || '',
+            name: fieldName || '',
+            type: fieldType as any,
+            position: 'position' in f ? f.position : 0,
+            options: ('options' in f ? f.options : ('field_options' in f ? (f as any).field_options : {})) || {}
+          }
+        })
         // Only update if fields actually changed
         if (prevTableFieldsRef.current !== tableFieldsKey) {
           setLoadedTableFields(formattedFields)
@@ -324,7 +331,7 @@ export default function CalendarView({
         (f.name === pageDateField || f.id === pageDateField) && f.type === 'date'
       )
       if (field) {
-        debugCalendar('CALENDAR', 'Using date field from page config:', field.name)
+        debugLog('CALENDAR', 'Using date field from page config:', field.name)
         return field.name
       }
     }
@@ -335,7 +342,7 @@ export default function CalendarView({
         (f.name === viewConfig.calendar_date_field || f.id === viewConfig.calendar_date_field) && f.type === 'date'
       )
       if (field) {
-        debugCalendar('CALENDAR', 'Using date field from view config:', field.name)
+        debugLog('CALENDAR', 'Using date field from view config:', field.name)
         return field.name
       }
     }
@@ -344,7 +351,7 @@ export default function CalendarView({
         (f.name === viewConfig.calendar_start_field || f.id === viewConfig.calendar_start_field) && f.type === 'date'
       )
       if (field) {
-        debugCalendar('CALENDAR', 'Using start date field from view config:', field.name)
+        debugLog('CALENDAR', 'Using start date field from view config:', field.name)
         return field.name
       }
     }
@@ -355,7 +362,7 @@ export default function CalendarView({
         (f.name === dateFieldId || f.id === dateFieldId) && f.type === 'date'
       )
       if (field) {
-        debugCalendar('CALENDAR', 'Using date field from prop:', field.name)
+        debugLog('CALENDAR', 'Using date field from prop:', field.name)
         return field.name
       }
     }
@@ -479,7 +486,7 @@ export default function CalendarView({
     // CRITICAL: tableId prop MUST come from block config (not page fallback)
     // If tableId is provided, use it directly
     if (tableId && tableId.trim() !== '') {
-      debugCalendar('CALENDAR', 'Using tableId from prop:', tableId)
+      debugLog('CALENDAR', 'Using tableId from prop:', tableId)
       setResolvedTableId(tableId)
       return
     }
@@ -539,7 +546,7 @@ export default function CalendarView({
         setSupabaseTableName(table.supabase_table)
       }
     } catch (error) {
-      console.error('Calendar: Error loading table info:', error)
+      debugError('CALENDAR', 'Error loading table info:', error)
     }
   }
 
@@ -640,8 +647,8 @@ export default function CalendarView({
           id: row.id,
           table_id: resolvedTableId,
           data: row,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
+          created_at: row.created_at || new Date().toISOString(),
+          updated_at: row.updated_at || new Date().toISOString(),
         }))
         setRows(tableRows)
         
@@ -1362,7 +1369,7 @@ export default function CalendarView({
       
       // DEBUG_CALENDAR: Log event generation
       if (events.length === 0 && filteredRows.length > 0) {
-        debugCalendarWarn('CALENDAR', `No events generated from ${filteredRows.length} rows`, {
+        debugWarn('CALENDAR', `No events generated from ${filteredRows.length} rows`, {
           dateField: effectiveDateFieldId,
           resolvedDateFieldId,
           sampleRowData: filteredRows[0]?.data ? {
@@ -1373,7 +1380,7 @@ export default function CalendarView({
           check: 'Ensure date field is correctly configured and rows have valid date values'
         })
       } else if (events.length > 0) {
-        debugCalendar('CALENDAR', `Generated ${events.length} events successfully`, {
+        debugLog('CALENDAR', `Generated ${events.length} events successfully`, {
           eventCount: events.length,
           rowCount: filteredRows.length,
           dateField: effectiveDateFieldId,
@@ -1556,7 +1563,7 @@ export default function CalendarView({
   }, [linkedValueLabelMaps])
 
   const onCalendarEventClick = useCallback(
-    (info: { event: EventInput }) => {
+    (info: EventClickArg) => {
       // Contract: single click opens the record (if permitted) and selects event.
       const recordId = info.event.id
       const recordIdString = recordId ? String(recordId) : ""

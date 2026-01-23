@@ -5,8 +5,8 @@
  * All views (grid, form, bulk editor) should use this service for consistency.
  */
 
-import { createClient, type SupabaseClient } from '@/lib/supabase/client'
-import type { ReturnType } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TableField, FieldType } from '@/types/fields'
 import { isLinkedField, isLookupField } from '@/types/fields'
 import type {
@@ -202,6 +202,7 @@ export class DataViewService {
     
     if (rowCount > maxRows) {
       const warning = `[DataViewService] Paste size exceeds max rows: ${rowCount} > ${maxRows}. Truncating.`
+      // Keep console.warn for user-facing warnings about paste operations
       console.warn(warning)
       warnings.push(warning)
       // Truncate to max rows
@@ -210,6 +211,7 @@ export class DataViewService {
     
     if (colCount > maxCols) {
       const warning = `[DataViewService] Paste size exceeds max columns: ${colCount} > ${maxCols}. Truncating.`
+      // Keep console.warn for user-facing warnings about paste operations
       console.warn(warning)
       warnings.push(warning)
       // Truncate each row to max columns
@@ -223,6 +225,7 @@ export class DataViewService {
     // Soft warning for large pastes
     if (rowCount * colCount > 1000) {
       const warning = `[DataViewService] Large paste detected: ${rowCount} rows × ${colCount} columns = ${rowCount * colCount} cells`
+      // Keep console.warn for user-facing warnings about paste operations
       console.warn(warning)
       warnings.push(warning)
     }
@@ -532,7 +535,7 @@ export class DataViewService {
    * Apply batch updates to database
    */
   private async applyBatchUpdates(
-    supabase: ReturnType<typeof createClient>,
+    supabase: SupabaseClient,
     tableName: string,
     changes: CellChange[]
   ): Promise<number> {
@@ -623,6 +626,7 @@ export class DataViewService {
       if (options.withData) {
         // Warn but allow - only copy definition
         // This matches Airtable behavior where you can duplicate lookup field definition
+        // Keep console.warn for user-facing warnings about field operations
         console.warn(
           `[duplicateColumn] Lookup field "${sourceField.name}" values are computed. Only duplicating field definition.`
         )

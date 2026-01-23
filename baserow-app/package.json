@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "predeploy-check": "tsx scripts/predeploy-check.ts",
     "repair-linked-fields": "tsx scripts/repair-linked-fields.ts",
     "prebuild": "npm run predeploy-check"
