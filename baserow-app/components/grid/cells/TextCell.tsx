@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
-import TextCellModal from '../TextCellModal'
+import TextCellModal from '@/components/grid/TextCellModal'
 import {
   ContextMenu,
   ContextMenuContent,

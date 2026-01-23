@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage } from '@/lib/interface/pages'
 import { getUserRole } from '@/lib/roles'
+import type { PageConfig } from '@/lib/interface/page-config'
 
-function canCreate(role: 'admin' | 'member' | null, pageConfig: any): boolean {
+function canCreate(role: 'admin' | 'member' | null, pageConfig: PageConfig): boolean {
   if (!role) return false
   if (role === 'admin') return true
   const createPerm = pageConfig?.record_actions?.create ?? 'both'
@@ -16,7 +17,7 @@ function canCreate(role: 'admin' | 'member' | null, pageConfig: any): boolean {
  *
  * Body:
  * - fieldName?: string (optional, if you want to prefill a primary field)
- * - fieldValue?: any
+ * - fieldValue?: unknown
  */
 export async function POST(
   request: NextRequest,
@@ -35,12 +36,12 @@ export async function POST(
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })
     }
 
-    const pageConfig = page.config || {}
+    const pageConfig: PageConfig = page.config || {}
     const tableId =
       page.base_table ||
-      (pageConfig as any).table_id ||
-      (pageConfig as any).tableId ||
-      (pageConfig as any).primary_table_id ||
+      pageConfig.table_id ||
+      (pageConfig as { tableId?: string }).tableId ||
+      (pageConfig as { primary_table_id?: string }).primary_table_id ||
       null
 
     if (!tableId) {
@@ -61,7 +62,7 @@ export async function POST(
       return NextResponse.json({ error: 'Table not found or not configured' }, { status: 400 })
     }
 
-    const newData: Record<string, any> = {}
+    const newData: Record<string, unknown> = {}
     if (fieldName && typeof fieldName === 'string') {
       newData[fieldName] = fieldValue ?? null
     }
@@ -76,11 +77,11 @@ export async function POST(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    const createdId = (data as any)?.id || (data as any)?.record_id
+    const createdId = (data as { id?: string; record_id?: string })?.id || (data as { id?: string; record_id?: string })?.record_id
     return NextResponse.json({ record: data, recordId: createdId }, { status: 200 })
-  } catch (error: any) {
-    const message = error?.message || 'Failed to create record'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch (error: unknown) {
+    const errorMessage = (error as { message?: string })?.message || 'Failed to create record'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const favorite = await addFavorite(entity_type, entity_id)
     return NextResponse.json(favorite)
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to add favorite', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }
@@ -43,7 +43,7 @@ export async function DELETE(request: NextRequest) {
 
     await removeFavorite(entity_type, entity_id)
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to remove favorite', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50
-    const entity_type = searchParams.get('entity_type') as any
+    const entity_type = searchParams.get('entity_type')
 
     const items = await getFavorites(limit, entity_type)
     // Cache favorites for 1 minute (they change infrequently)
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       CACHE_DURATIONS.SHORT,
       CACHE_DURATIONS.SHORT
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to get favorites', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }

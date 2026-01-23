@@ -38,6 +38,11 @@ interface GridColumnHeaderProps {
   tableId?: string // Table ID for copy URL functionality
   onInsertLeft?: (fieldName: string) => void
   onInsertRight?: (fieldName: string) => void
+  onHide?: (fieldName: string) => void
+  onDelete?: (fieldName: string) => void
+  onFilter?: (fieldName: string) => void
+  onGroup?: (fieldName: string) => void
+  onDuplicate?: (fieldName: string) => void
 }
 
 export default function GridColumnHeader({
@@ -58,6 +63,11 @@ export default function GridColumnHeader({
   tableId,
   onInsertLeft,
   onInsertRight,
+  onHide,
+  onDelete,
+  onFilter,
+  onGroup,
+  onDuplicate,
 }: GridColumnHeaderProps) {
   const isMobile = useIsMobile()
 
@@ -241,10 +251,9 @@ export default function GridColumnHeader({
               Edit field
             </DropdownMenuItem>
           )}
-          {field.type !== 'formula' && field.type !== 'lookup' && (
+          {field.type !== 'formula' && field.type !== 'lookup' && onDuplicate && (
             <DropdownMenuItem onClick={() => { 
-              // TODO: Implement duplicate
-              debugLog('LAYOUT', 'Duplicate field:', field.name)
+              onDuplicate(field.name)
               setDropdownOpen(false)
             }}>
               <Copy className="h-4 w-4 mr-2" />
@@ -315,37 +324,39 @@ export default function GridColumnHeader({
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuItem onClick={() => { 
-            // TODO: Filter by this field
-            debugLog('LAYOUT', 'Filter by:', field.name)
-            setDropdownOpen(false)
-          }}>
-            <Filter className="h-4 w-4 mr-2" />
-            Filter by this field
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { 
-            // TODO: Group by this field
-            debugLog('LAYOUT', 'Group by:', field.name)
-            setDropdownOpen(false)
-          }}>
-            <Group className="h-4 w-4 mr-2" />
-            Group by this field
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { 
-            // TODO: Hide field
-            debugLog('LAYOUT', 'Hide field:', field.name)
-            setDropdownOpen(false)
-          }}>
-            <EyeOff className="h-4 w-4 mr-2" />
-            Hide field
-          </DropdownMenuItem>
-          {field.type !== 'formula' && field.type !== 'lookup' && (
+          {onFilter && (
+            <DropdownMenuItem onClick={() => { 
+              onFilter(field.name)
+              setDropdownOpen(false)
+            }}>
+              <Filter className="h-4 w-4 mr-2" />
+              Filter by this field
+            </DropdownMenuItem>
+          )}
+          {onGroup && (
+            <DropdownMenuItem onClick={() => { 
+              onGroup(field.name)
+              setDropdownOpen(false)
+            }}>
+              <Group className="h-4 w-4 mr-2" />
+              Group by this field
+            </DropdownMenuItem>
+          )}
+          {onHide && (
+            <DropdownMenuItem onClick={() => { 
+              onHide(field.name)
+              setDropdownOpen(false)
+            }}>
+              <EyeOff className="h-4 w-4 mr-2" />
+              Hide field
+            </DropdownMenuItem>
+          )}
+          {field.type !== 'formula' && field.type !== 'lookup' && onDelete && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={() => { 
-                  // TODO: Delete field
-                  debugLog('LAYOUT', 'Delete field:', field.name)
+                  onDelete(field.name)
                   setDropdownOpen(false)
                 }}
                 className="text-red-600 focus:text-red-600"

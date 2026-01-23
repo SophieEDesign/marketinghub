@@ -11,7 +11,7 @@ import {
   blockToLayoutItem, 
   layoutItemToDbUpdate, 
   dbBlockToPageBlock 
-} from '../lib/interface/layout-mapping'
+} from '@/lib/interface/layout-mapping'
 
 describe('Interface Invariants - Pre-Deploy Safety Checks', () => {
   describe('1. Single Source of Truth - Layout Persistence', () => {

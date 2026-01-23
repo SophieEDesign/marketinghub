@@ -566,7 +566,7 @@ export default function CalendarView({
         .order("position", { ascending: true })
 
       if (fields) {
-        setLoadedTableFields(fields.map((f: any) => ({ 
+        setLoadedTableFields(fields.map((f) => ({ 
           id: f.id,
           table_id: f.table_id,
           name: f.name, 
@@ -1360,7 +1360,7 @@ export default function CalendarView({
                     if (isEmpty) return null
                     return { field, value: raw }
                   })
-                  .filter((x): x is { field: TableField; value: any } => Boolean(x))
+                  .filter((x): x is { field: TableField; value: unknown } => Boolean(x))
 
                 return items.slice(0, 3)
               })(),

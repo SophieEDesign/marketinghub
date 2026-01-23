@@ -544,7 +544,7 @@ export class DataViewService {
     }
 
     // Group changes by row for efficient updates
-    const changesByRow = new Map<string, Record<string, any>>()
+    const changesByRow = new Map<string, Record<string, unknown>>()
 
     for (const change of changes) {
       if (!changesByRow.has(change.rowId)) {

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getInterfacePage } from '@/lib/interface/pages'
 import { getUserRole } from '@/lib/roles'
+import type { PageConfig } from '@/lib/interface/page-config'
 
-function canDelete(role: 'admin' | 'member' | null, pageConfig: any): boolean {
+function canDelete(role: 'admin' | 'member' | null, pageConfig: PageConfig): boolean {
   if (!role) return false
   if (role === 'admin') return true
   const deletePerm = pageConfig?.record_actions?.delete ?? 'admin'
@@ -65,9 +66,9 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true }, { status: 200 })
-  } catch (error: any) {
-    const message = error?.message || 'Failed to delete record'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch (error: unknown) {
+    const errorMessage = (error as { message?: string })?.message || 'Failed to delete record'
+    return NextResponse.json({ error: errorMessage }, { status: 500 })
   }
 }
 

@@ -33,10 +33,11 @@ export async function PATCH(
     const body = await request.json()
     const page = await updateInterfacePage(pageId, body)
     return NextResponse.json(page)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating interface page:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to update page'
     return NextResponse.json(
-      { error: error.message || 'Failed to update page' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
@@ -62,18 +63,20 @@ export async function DELETE(
     
     await deleteInterfacePage(pageId)
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting interface page:', error)
+    const errorObj = error as { message?: string } | null
+    const errorMessage = errorObj?.message || ''
     
     // Return appropriate status codes
-    const status = error.message?.includes('permission') || error.message?.includes('not found') 
+    const status = errorMessage.includes('permission') || errorMessage.includes('not found') 
       ? 403 
-      : error.message?.includes('Authentication') 
+      : errorMessage.includes('Authentication') 
       ? 401 
       : 500
     
     return NextResponse.json(
-      { error: error.message || 'Failed to delete page' },
+      { error: errorMessage },
       { status }
     )
   }

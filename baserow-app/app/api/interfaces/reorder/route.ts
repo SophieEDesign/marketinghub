@@ -93,10 +93,11 @@ export async function POST(request: NextRequest) {
     await Promise.all(updatePromises)
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in reorder API:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to reorder interfaces'
     return NextResponse.json(
-      { error: error.message || 'Failed to reorder interfaces' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

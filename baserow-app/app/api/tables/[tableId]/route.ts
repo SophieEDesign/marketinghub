@@ -17,10 +17,11 @@ export async function GET(
     const response = NextResponse.json({ table })
     response.headers.set('Cache-Control', 'no-store')
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching table:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to fetch table'
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch table' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
@@ -62,7 +63,7 @@ export async function PATCH(
       )
     }
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, string | null> = {
       updated_at: new Date().toISOString(),
     }
 
@@ -137,10 +138,11 @@ export async function PATCH(
     }
 
     return NextResponse.json({ table: updatedTable })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating table:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to update table'
     return NextResponse.json(
-      { error: error.message || 'Failed to update table' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
@@ -294,7 +296,7 @@ export async function DELETE(
           console.error('Error dropping Supabase table:', dropError)
           // Continue anyway - metadata cleanup is important
         }
-      } catch (sqlErr: any) {
+      } catch (sqlErr: unknown) {
         console.error('Error executing DROP TABLE:', sqlErr)
         // Continue with metadata cleanup
       }
@@ -317,10 +319,11 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting table:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to delete table'
     return NextResponse.json(
-      { error: error.message || 'Failed to delete table' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

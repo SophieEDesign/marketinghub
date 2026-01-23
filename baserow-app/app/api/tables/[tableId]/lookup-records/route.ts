@@ -123,12 +123,12 @@ export async function POST(
         ? String((lookupTable as any).primary_field_name).trim()
         : null
 
-    const computedPrimary = getPrimaryFieldName(lookupTableFields as any) || 'id'
+    const computedPrimary = getPrimaryFieldName(lookupTableFields) || 'id'
     const candidate = configuredPrimary || computedPrimary
     const safeCandidate = candidate === 'id' ? 'id' : toPostgrestColumn(candidate)
     const primaryLabelField =
       safeCandidate &&
-      (safeCandidate === 'id' || lookupTableFields.some((f: any) => f.name === safeCandidate))
+      (safeCandidate === 'id' || lookupTableFields.some((f) => f.name === safeCandidate))
         ? safeCandidate
         : 'id'
     const secondaryLabelFields: string[] = [] // table-level secondary labels can be added later
@@ -190,10 +190,11 @@ export async function POST(
         reason: 'value_resolution_failed_or_field_not_found',
       })),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching lookup records:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to fetch lookup records'
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch lookup records' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

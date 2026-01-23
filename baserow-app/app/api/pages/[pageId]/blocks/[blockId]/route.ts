@@ -12,9 +12,10 @@ export async function DELETE(
     const { blockId } = await params
     await deleteBlock(blockId)
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = (error as { message?: string })?.message || 'Failed to delete block'
     return NextResponse.json(
-      { error: error.message || 'Failed to delete block' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

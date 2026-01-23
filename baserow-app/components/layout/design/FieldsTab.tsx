@@ -1,7 +1,7 @@
 "use client"
 
 import { memo } from "react"
-import FieldBuilderPanel from "../FieldBuilderPanel"
+import FieldBuilderPanel from "@/components/layout/FieldBuilderPanel"
 
 interface FieldsTabProps {
   tableId: string

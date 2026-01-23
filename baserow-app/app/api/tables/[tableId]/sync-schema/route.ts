@@ -99,7 +99,7 @@ export async function POST(
           // Just log and continue
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If RPC doesn't exist or other unexpected error, log but don't fail completely
       console.warn(`[sync-schema] Error calling create_dynamic_table for "${tableName}":`, err)
       // Continue - the table might already exist
@@ -119,7 +119,7 @@ export async function POST(
     if (!Array.isArray(fields)) {
       fields = []
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error(`[sync-schema] Error loading fields for table "${tableId}":`, err)
     // If it's a critical error (not just "table not found"), we might want to fail
     // But for now, continue with empty fields array - we can still check physical columns
@@ -141,8 +141,8 @@ export async function POST(
   }
 
   // 3) Load physical columns once via RPC.
-  let cols: any[] | null = null
-  let colsError: any = null
+  let cols: Array<{ column_name?: string }> | null = null
+  let colsError: unknown = null
   try {
     const result = await supabase.rpc('get_table_columns', {
       table_name: tableName,
@@ -160,12 +160,12 @@ export async function POST(
   }
   // If this RPC fails, we can still attempt ADD COLUMN IF NOT EXISTS for every field.
   const physical = new Set<string>(
-    Array.isArray(cols) ? cols.map((c: any) => String(c?.column_name ?? '')).filter(Boolean) : []
+    Array.isArray(cols) ? cols.map((c) => String(c?.column_name ?? '')).filter(Boolean) : []
   )
 
   // 4) Add any missing physical columns for non-virtual, non-system fields.
   const physicalFieldDefs = (fields || []).filter(
-    (f: TableField) => f && !isVirtualType(String((f as any).type)) && !isSystemFieldName(String((f as any).name))
+    (f: TableField) => f && !isVirtualType(String(f.type)) && !isSystemFieldName(String(f.name))
   )
 
   for (const f of physicalFieldDefs) {
@@ -180,10 +180,10 @@ export async function POST(
       // Generate SQL - this can throw if field type is invalid
       let sql: string
       try {
-        sql = generateAddColumnSQL(`public.${tableName}`, colName, (f as any).type, (f as any).options)
-      } catch (sqlGenError: any) {
+        sql = generateAddColumnSQL(`public.${tableName}`, colName, f.type, f.options)
+      } catch (sqlGenError: unknown) {
         console.warn(
-          `[sync-schema] Failed to generate SQL for column "${colName}" (type: ${(f as any).type}) in "${tableName}":`,
+          `[sync-schema] Failed to generate SQL for column "${colName}" (type: ${f.type}) in "${tableName}":`,
           sqlGenError
         )
         // Skip this field - can't generate valid SQL for it
@@ -201,7 +201,7 @@ export async function POST(
           console.warn(`[sync-schema] Failed to add column "${colName}" to "${tableName}":`, addError)
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Non-fatal - log and continue with other columns
       console.warn(`[sync-schema] Exception adding column "${colName}" to "${tableName}":`, err)
     }
@@ -252,43 +252,55 @@ export async function POST(
       ? `Schema sync completed. ${missingPhysicalColumns.length} field(s) in metadata have no physical column: ${missingPhysicalColumns.join(', ')}. These fields cannot be updated until columns are created.`
       : 'Schema is in sync. No columns added.',
   })
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Catch any unexpected errors and return a proper response instead of 500
     const errorTableId = tableId || 'unknown'
+    const errorObj = err as { message?: string; code?: string | number; name?: string; stack?: string; details?: string; hint?: string } | null
     
     // Log full error details for debugging
     console.error(`[sync-schema] Unexpected error for table "${errorTableId}":`, {
-      message: err?.message,
-      code: err?.code,
-      name: err?.name,
-      stack: err?.stack,
-      details: err?.details,
-      hint: err?.hint,
+      message: errorObj?.message,
+      code: errorObj?.code,
+      name: errorObj?.name,
+      stack: errorObj?.stack,
+      details: errorObj?.details,
+      hint: errorObj?.hint,
       fullError: String(err),
     })
     
     // Provide more detailed error information
-    const errorDetails: any = {
+    const errorDetails: {
+      success: boolean
+      error: string
+      message: string
+      tableId: string
+      errorCode: string | number | null
+      errorName: string | null
+      code?: string | number
+      details?: string
+    } = {
       success: false,
       error: 'An error occurred while syncing schema',
-      message: err?.message || 'Unknown error',
+      message: errorObj?.message || 'Unknown error',
       tableId: errorTableId,
-      errorCode: err?.code || null,
-      errorName: err?.name || null,
+      errorCode: errorObj?.code || null,
+      errorName: errorObj?.name || null,
+      ...(errorObj?.code && { code: errorObj.code }),
+      ...(errorObj?.details && { details: errorObj.details }),
     }
     
     // Add stack trace and full error in development
     if (process.env.NODE_ENV === 'development') {
-      errorDetails.stack = err?.stack
+      errorDetails.stack = errorObj?.stack
       errorDetails.fullError = String(err)
-      errorDetails.details = err?.details
-      errorDetails.hint = err?.hint
+      errorDetails.details = errorObj?.details
+      errorDetails.hint = errorObj?.hint
     }
     
     // Check if it's a known error type that should return a different status
-    const errorMsg = String(err?.message || '').toLowerCase()
-    const errorCode = String(err?.code || '')
-    const errorName = String(err?.name || '')
+    const errorMsg = String(errorObj?.message || '').toLowerCase()
+    const errorCode = String(errorObj?.code || '')
+    const errorName = String(errorObj?.name || '')
     
     if (errorMsg.includes('permission denied') || errorMsg.includes('unauthorized') || errorCode === '42501' || errorName === 'UnauthorizedError') {
       return NextResponse.json(errorDetails, { status: 403 })

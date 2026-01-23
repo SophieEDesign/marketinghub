@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     await recordRecentItem(entity_type, entity_id)
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to record recent item', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 10
-    const entity_type = searchParams.get('entity_type') as any
+    const entity_type = searchParams.get('entity_type')
 
     const items = await getRecentItems(limit, entity_type)
     // Cache recents for 30 seconds (they change frequently)
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       CACHE_DURATIONS.SHORT,
       CACHE_DURATIONS.SHORT
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     const errorResponse = createErrorResponse(error, 'Failed to get recent items', 500)
     return NextResponse.json(errorResponse, { status: 500 })
   }

@@ -258,7 +258,7 @@ export async function POST(
         } catch {
           // Non-fatal: PostgREST will eventually pick up the new column
         }
-      } catch (sqlErr: any) {
+      } catch (sqlErr: unknown) {
         // Rollback: Delete metadata
         await supabase.from('table_fields').delete().eq('id', fieldData.id)
         
@@ -862,7 +862,7 @@ export async function DELETE(
       .select('id, name, options')
       .or('type.eq.link_to_table,type.eq.lookup')
 
-    const isReferenced = linkedFields?.some((f: { id: any; name: any; options: any }) => {
+    const isReferenced = linkedFields?.some((f) => {
       const opts = f.options || {}
       return opts.linked_field_id === fieldId || opts.lookup_field_id === fieldId
     })
@@ -1071,9 +1071,9 @@ export async function DELETE(
             deleteError = sqlError instanceof Error ? sqlError : new Error(String(sqlError))
           }
         }
-      } catch (adminError: any) {
+      } catch (adminError: unknown) {
         console.error('[Field Delete] Admin client operation failed:', adminError)
-        deleteError = adminError
+        deleteError = adminError instanceof Error ? adminError : new Error(String(adminError))
       }
     } else {
       // For non-admins, try regular client (respects RLS)

@@ -10,7 +10,7 @@ import type { TableRow } from "@/types/database"
 import type { TableField } from "@/types/fields"
 import { resolveChoiceColor, normalizeHexColor } from '@/lib/field-colors'
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
-import { CellFactory } from "../grid/CellFactory"
+import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
 

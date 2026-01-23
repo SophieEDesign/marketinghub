@@ -110,10 +110,11 @@ END $$;`.trim()
     }
     
     return NextResponse.json({ success: true, tableName: safeTableName, method: 'create_dynamic_table' })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in create-table API:', error)
+    const errorMessage = (error as { message?: string })?.message || 'Failed to create table'
     return NextResponse.json(
-      { error: error.message || 'Failed to create table' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

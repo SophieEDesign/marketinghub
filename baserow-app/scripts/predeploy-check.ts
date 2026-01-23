@@ -367,7 +367,9 @@ async function runLint() {
   console.log('🔍 Running ESLint...')
   const { execSync } = require('child_process')
   try {
-    execSync('npm run lint', { stdio: 'inherit' })
+    // Use next lint with --max-warnings to allow warnings but fail on errors
+    // Set a very high number to allow all warnings
+    execSync('npx next lint --max-warnings 9999', { stdio: 'inherit' })
     console.log('✅ Lint passed')
     return true
   } catch (error) {

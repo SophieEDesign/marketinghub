@@ -1,4 +1,4 @@
-import { createClient } from '../supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import type { ViewBlock } from '@/types/database'
 import { normalizeUuid } from '@/lib/utils/ids'
 

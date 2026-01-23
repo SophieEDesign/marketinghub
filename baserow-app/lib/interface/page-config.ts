@@ -3,7 +3,7 @@
  * All page behavior comes from config - no hardcoding
  */
 
-import type { FilterTree } from '../filters/canonical-model'
+import type { FilterTree } from '@/lib/filters/canonical-model'
 
 export interface PageConfig {
   // Visualization settings

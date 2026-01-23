@@ -102,6 +102,10 @@ interface GridViewProps {
   reloadKey?: number
   /** When grouping, should groups start collapsed? Default: true (closed). */
   defaultGroupsCollapsed?: boolean
+  /** Optional callback to create a filter (for "Filter by this field" action) */
+  onFilterCreate?: (filter: { field_name: string; operator: string; value?: string }) => Promise<void>
+  /** Optional callback to change groupBy (for "Group by this field" action) */
+  onGroupByChange?: (fieldName: string | null) => Promise<void>
 }
 
 const ITEMS_PER_PAGE = 100
@@ -538,6 +542,8 @@ export default function GridView({
   onTableFieldsRefresh,
   reloadKey,
   defaultGroupsCollapsed = true,
+  onFilterCreate,
+  onGroupByChange,
 }: GridViewProps) {
   const { openRecord } = useRecordPanel()
   const isMobile = useIsMobile()
@@ -1276,7 +1282,7 @@ export default function GridView({
 
   const tableFieldsKey = useMemo(() => {
     const canonical = (safeTableFields ?? [])
-      .map((f: any) => ({
+      .map((f: TableField) => ({
         id: f?.id ?? null,
         name: f?.name ?? null,
         type: f?.type ?? null,
@@ -2202,14 +2208,41 @@ export default function GridView({
     debugLog('LAYOUT', 'Column sort:', { fieldName, direction })
   }
 
-  function handleColumnFilter(fieldName: string) {
-    // TODO: Implement column-level filter (currently handled by toolbar)
-    debugLog('LAYOUT', 'Column filter:', { fieldName })
+  async function handleColumnFilter(fieldName: string) {
+    if (onFilterCreate) {
+      try {
+        // Create a basic "is not empty" filter for the field
+        // User can modify it in the filter editor
+        await onFilterCreate({
+          field_name: fieldName,
+          operator: 'is_not_empty',
+        })
+        debugLog('LAYOUT', 'Filter created for field:', fieldName)
+      } catch (error) {
+        debugError('LAYOUT', 'Failed to create filter:', error)
+        alert('Failed to create filter')
+      }
+    } else {
+      debugLog('LAYOUT', 'Column filter (no callback):', { fieldName })
+      // Future: Could open filter dialog or navigate to filter settings
+    }
   }
 
-  function handleColumnGroup(fieldName: string) {
-    // TODO: Implement column-level group (currently handled by toolbar)
-    debugLog('LAYOUT', 'Column group:', { fieldName })
+  async function handleColumnGroup(fieldName: string) {
+    if (onGroupByChange) {
+      try {
+        // Toggle: if already grouped by this field, ungroup; otherwise group by it
+        const newGroupBy = groupBy === fieldName ? null : fieldName
+        await onGroupByChange(newGroupBy)
+        debugLog('LAYOUT', 'GroupBy changed:', { fieldName, newGroupBy })
+      } catch (error) {
+        debugError('LAYOUT', 'Failed to change groupBy:', error)
+        alert('Failed to change grouping')
+      }
+    } else {
+      debugLog('LAYOUT', 'Column group (no callback):', { fieldName })
+      // Future: Could navigate to group settings
+    }
   }
 
   function handleColumnHide(fieldName: string) {
@@ -2217,24 +2250,113 @@ export default function GridView({
     debugLog('LAYOUT', 'Column hide:', { fieldName })
   }
 
-  function handleColumnDuplicate(fieldName: string) {
-    // TODO: Implement column duplicate
-    debugLog('LAYOUT', 'Column duplicate:', { fieldName })
+  async function handleColumnDuplicate(fieldName: string) {
+    try {
+      const field = tableFields.find((f) => f.name === fieldName)
+      if (!field) {
+        debugWarn('LAYOUT', 'Field not found for duplication:', fieldName)
+        return
+      }
+
+      // Skip formula fields (read-only, computed)
+      if (field.type === 'formula') {
+        alert(`Cannot duplicate formula field "${fieldName}" (read-only, computed)`)
+        return
+      }
+
+      // Generate duplicate field name
+      const existingNames = tableFields.map(f => f.name.toLowerCase())
+      let duplicateName = `${fieldName}_copy`
+      let counter = 1
+      while (existingNames.includes(duplicateName.toLowerCase())) {
+        duplicateName = `${fieldName}_copy_${counter}`
+        counter++
+      }
+
+      // Create duplicate field via API
+      const response = await fetch(`/api/tables/${tableId}/fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: duplicateName,
+          label: duplicateName, // Use name as label for duplicate
+          type: field.type,
+          required: field.required || false,
+          default_value: field.default_value || null,
+          options: field.options || {},
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || 'Failed to duplicate field')
+        return
+      }
+
+      debugLog('LAYOUT', 'Field duplicated successfully:', { fieldName, duplicateName })
+      // Refresh table fields and reload page
+      onTableFieldsRefresh?.()
+      window.location.reload()
+    } catch (error) {
+      debugError('LAYOUT', 'Error duplicating field:', error)
+      alert('Failed to duplicate field')
+    }
   }
 
   function handleColumnInsertLeft(fieldName: string) {
-    // TODO: Implement insert column left
+    // Open field builder - user can create field, then we'll position it
+    // Note: Full positioning automation would require field builder coordination
+    // For now, this opens the builder and user positions manually after creation
     debugLog('LAYOUT', 'Insert left:', { fieldName })
+    if (onAddField) {
+      onAddField()
+      // Future enhancement: Store target position and reorder after field creation
+      // This would require coordination with field builder to know which field was created
+    }
   }
 
   function handleColumnInsertRight(fieldName: string) {
-    // TODO: Implement insert column right
+    // Open field builder - user can create field, then we'll position it
+    // Note: Full positioning automation would require field builder coordination
+    // For now, this opens the builder and user positions manually after creation
     debugLog('LAYOUT', 'Insert right:', { fieldName })
+    if (onAddField) {
+      onAddField()
+      // Future enhancement: Store target position and reorder after field creation
+      // This would require coordination with field builder to know which field was created
+    }
   }
 
-  function handleColumnDelete(fieldName: string) {
-    // TODO: Implement column delete
-    debugLog('LAYOUT', 'Column delete:', { fieldName })
+  async function handleColumnDelete(fieldName: string) {
+    if (!confirm(`Are you sure you want to delete the field "${fieldName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const field = tableFields.find((f) => f.name === fieldName)
+      if (!field) {
+        debugWarn('LAYOUT', 'Field not found for deletion:', fieldName)
+        return
+      }
+
+      const response = await fetch(`/api/tables/${tableId}/fields?fieldId=${field.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || 'Failed to delete field')
+        return
+      }
+
+      debugLog('LAYOUT', 'Field deleted successfully:', fieldName)
+      // Refresh table fields and reload page
+      onTableFieldsRefresh?.()
+      window.location.reload()
+    } catch (error) {
+      debugError('LAYOUT', 'Error deleting field:', error)
+      alert('Failed to delete field')
+    }
   }
 
   function handleColumnCopyUrl(fieldName: string) {

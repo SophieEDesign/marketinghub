@@ -78,7 +78,7 @@ export async function POST(
     }
 
     const existingFieldNames = new Set(
-      (existingViewFields || []).map((vf: any) => vf.field_name)
+      (existingViewFields || []).map((vf) => vf.field_name)
     )
 
     // 4. Create view_fields for fields that don't exist yet
@@ -215,17 +215,18 @@ export async function POST(
       total: tableFields.length,
       fields: insertedFields,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorObj = error as { message?: string; code?: string; stack?: string } | null
     console.error('🔥 initialize-fields ERROR:', {
       viewId,
       viewUuid,
-      error: error.message,
-      errorCode: error.code,
-      errorStack: error.stack,
+      error: errorObj?.message,
+      errorCode: errorObj?.code,
+      errorStack: errorObj?.stack,
       errorDetails: error,
     })
     return NextResponse.json(
-      { error: 'Internal server error', error_code: 'INTERNAL_ERROR', details: error.message },
+      { error: 'Internal server error', error_code: 'INTERNAL_ERROR', details: errorObj?.message },
       { status: 500 }
     )
   }

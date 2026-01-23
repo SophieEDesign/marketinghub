@@ -808,6 +808,8 @@ export default function GridViewWrapper({
           onTableFieldsRefresh={loadFields}
           reloadKey={reloadKey}
           defaultGroupsCollapsed={defaultGroupsCollapsed}
+          onFilterCreate={handleFilterCreate}
+          onGroupByChange={handleGroupByChange}
         />
       </div>
       <FieldBuilderDrawer

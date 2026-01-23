@@ -45,8 +45,8 @@ export interface CellChange {
   rowId: string
   columnId: string
   fieldName: string
-  value: any
-  previousValue?: any
+  value: unknown
+  previousValue?: unknown
 }
 
 /**
@@ -56,7 +56,7 @@ export interface ValidationError {
   rowId: string
   columnId: string
   fieldName: string
-  value: any
+  value: unknown
   error: string
 }
 
@@ -96,7 +96,7 @@ export interface DuplicateColumnOptions {
 export interface DataViewContext {
   tableId: string
   supabaseTableName: string
-  rows: Array<{ id: string; [key: string]: any }>
+  rows: Array<{ id: string; [key: string]: unknown }>
   fields: TableField[]
   visibleFields?: TableField[] // Fields visible in current view (for copy)
   rowOrder?: string[] // Explicit row order (if available)

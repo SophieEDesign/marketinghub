@@ -1,4 +1,4 @@
-import { createClient } from '../supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import type { Table } from '@/types/database'
 
 export async function getTables() {

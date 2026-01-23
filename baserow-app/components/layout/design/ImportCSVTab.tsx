@@ -1,7 +1,7 @@
 "use client"
 
 import { memo, useState } from "react"
-import CSVImportModal from "../CSVImportModal"
+import CSVImportModal from "@/components/layout/CSVImportModal"
 import { FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 

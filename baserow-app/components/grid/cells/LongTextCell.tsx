@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import RichTextEditor from '@/components/fields/RichTextEditor'
-import TextCellModal from '../TextCellModal'
+import TextCellModal from '@/components/grid/TextCellModal'
 import {
   ContextMenu,
   ContextMenuContent,
