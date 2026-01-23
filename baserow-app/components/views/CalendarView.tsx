@@ -938,36 +938,33 @@ export default function CalendarView({
     // Defensive check: ensure we have a valid date field
     if (!effectiveDateFieldId || !isValidDateField) {
       debugWarn('CALENDAR', 'Calendar: Cannot generate events - missing or invalid date field', {
-          resolvedDateFieldId,
-          isValidDateField,
-          dateField,
-          blockConfig,
-          viewConfig
-        })
-      }
+        resolvedDateFieldId,
+        isValidDateField,
+        dateField,
+        blockConfig,
+        viewConfig
+      })
       return []
     }
     
     // Defensive check: ensure we have rows
     if (!filteredRows || filteredRows.length === 0) {
       debugLog('CALENDAR', 'Calendar: No rows to generate events from', {
-          totalRows: rows.length,
-          filteredRows: filteredRows?.length || 0,
-          searchQuery,
-          filtersCount: filters.length
-        })
-      }
+        totalRows: rows.length,
+        filteredRows: filteredRows?.length || 0,
+        searchQuery,
+        filtersCount: filters.length
+      })
       return []
     }
     
     // Defensive check: log if rows exist but events will be empty
     debugLog('CALENDAR', 'Calendar: Processing events', {
       enabled: filteredRows.length > 0,
-        rowCount: filteredRows.length,
-        dateField: effectiveDateFieldId,
-        sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
-      })
-    }
+      rowCount: filteredRows.length,
+      dateField: effectiveDateFieldId,
+      sampleRowKeys: filteredRows[0]?.data ? Object.keys(filteredRows[0].data).slice(0, 10) : []
+    })
     
     try {
       // CRITICAL: Use field NAME (not ID) when reading row data
