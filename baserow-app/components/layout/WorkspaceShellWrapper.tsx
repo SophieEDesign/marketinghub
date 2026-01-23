@@ -74,7 +74,7 @@ export default async function WorkspaceShellWrapper({
   let interfaceGroups: any[] = []
   try {
     // Start with minimal query (columns that definitely exist)
-    let groupsQuery = supabase
+    const groupsQuery = supabase
       .from('interface_groups')
       .select('id, name, order_index')
       .order('order_index', { ascending: true })

@@ -222,7 +222,7 @@ export default function RecordReviewView({ page, data, config, blocks = [], page
     }
     
     // Try to find the field - be more flexible with matching
-    let configuredField = tableFields.find(f => 
+    const configuredField = tableFields.find(f => 
       f.name === groupByFieldName || 
       f.id === groupByFieldName ||
       f.name.toLowerCase() === groupByFieldName.toLowerCase()

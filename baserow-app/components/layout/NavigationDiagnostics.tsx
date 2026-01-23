@@ -176,7 +176,7 @@ export default function NavigationDiagnostics() {
       // 8. Test click on sidebar link
       const sidebarContainerForTest = document.querySelector('[data-sidebar]')
       const testLink = sidebarContainerForTest 
-        ? (sidebarContainer.querySelector('a[href^="/pages/"]') as HTMLAnchorElement)
+        ? (sidebarContainerForTest.querySelector('a[href^="/pages/"]') as HTMLAnchorElement)
         : null
       if (testLink) {
         console.log("🧪 Test Link Found:", {

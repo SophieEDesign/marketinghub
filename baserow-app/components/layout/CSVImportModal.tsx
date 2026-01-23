@@ -677,7 +677,7 @@ export default function CSVImportModal({
           
           // Double-check field doesn't already exist before creating
           // Check multiple ways: exact match, sanitized match, case-insensitive
-          let existingField = preCreateFields.find((f: TableField) => 
+          const existingField = preCreateFields.find((f: TableField) => 
             f.name.toLowerCase() === sanitizedName.toLowerCase() ||
             sanitizeFieldNameSafe(f.name).toLowerCase() === sanitizedName.toLowerCase() ||
             f.name.toLowerCase() === fieldInfo.name.toLowerCase()

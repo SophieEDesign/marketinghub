@@ -580,7 +580,7 @@ export class DataViewService {
       }
     }
 
-    const parsedValue = parseCellValue(value, field.type, field)
+    const parsedValue = parseCellValue(String(value ?? ''), field.type, field)
     const result = validateFieldValue(field, parsedValue)
 
     return {

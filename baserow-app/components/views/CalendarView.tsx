@@ -301,7 +301,8 @@ export default function CalendarView({
             name: fieldName || '',
             type: fieldType as any,
             position: 'position' in f ? f.position : 0,
-            options: ('options' in f ? f.options : ('field_options' in f ? (f as any).field_options : {})) || {}
+            options: ('options' in f ? f.options : ('field_options' in f ? (f as any).field_options : {})) || {},
+            created_at: 'created_at' in f ? f.created_at : new Date().toISOString()
           }
         })
         // Only update if fields actually changed
@@ -1493,7 +1494,7 @@ export default function CalendarView({
   const calendarDayHeaderFormat = useMemo(() => ({ weekday: "short" as const }), [])
 
   const calendarEventClassNames = useCallback(
-    (arg: EventDropArg) => [
+    (arg: EventContentArg) => [
       "hover:opacity-80 transition-opacity rounded-md",
       allowOpenRecord ? "cursor-pointer" : "",
       selectedEventId === String(arg.event.id) ? "ring-1 ring-blue-400/40" : "",

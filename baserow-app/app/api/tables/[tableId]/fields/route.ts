@@ -12,7 +12,7 @@ import {
   isDestructiveTypeChange,
 } from '@/lib/fields/sqlGenerator'
 import { getTableFields } from '@/lib/fields/schema'
-import { isTableNotFoundError, createErrorResponse } from '@/lib/api/error-handling'
+import { isTableNotFoundError, createErrorResponse, type ApiError } from '@/lib/api/error-handling'
 import type { TableField, FieldType, FieldOptions } from '@/types/fields'
 
 const SYSTEM_FIELD_NAMES = new Set(['created_at', 'created_by', 'updated_at', 'updated_by'])
@@ -56,7 +56,7 @@ export async function GET(
     return response
   } catch (error: unknown) {
     // If table doesn't exist, return empty array (graceful degradation)
-    if (isTableNotFoundError(error)) {
+    if (isTableNotFoundError(error as ApiError)) {
       const { tableId } = await params
       console.warn(`table_fields table may not exist for table ${tableId}, returning empty fields array`)
       const response = NextResponse.json({ fields: [] })
@@ -589,7 +589,7 @@ export async function PATCH(
     }
 
     const updates: Partial<TableField> = {}
-    let sqlOperations: string[] = []
+    const sqlOperations: string[] = []
     let isDestructive = false
 
     // Handle label change (preferred).
@@ -862,7 +862,7 @@ export async function DELETE(
       .select('id, name, options')
       .or('type.eq.link_to_table,type.eq.lookup')
 
-    const isReferenced = linkedFields?.some((f: { linked_table_id?: string; relationship_type?: string }) => {
+    const isReferenced = linkedFields?.some((f: { id: any; name: any; options: any }) => {
       const opts = f.options || {}
       return opts.linked_field_id === fieldId || opts.lookup_field_id === fieldId
     })
@@ -1095,7 +1095,8 @@ export async function DELETE(
 
     if (deleteError) {
       // Check if it's a trigger/constraint error - return 403 instead of 500
-      const errorMsg = deleteError.message || String(deleteError) || ''
+      const errorObj = deleteError as { message?: string } | null
+      const errorMsg = errorObj?.message || String(deleteError) || ''
       const isBlockedError = errorMsg.includes('cannot be deleted') || 
                             errorMsg.includes('System field') ||
                             errorMsg.includes('trigger') ||

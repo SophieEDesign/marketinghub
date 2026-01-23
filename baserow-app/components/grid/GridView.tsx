@@ -1887,7 +1887,7 @@ export default function GridView({
         retryAttemptsRef.current.delete(supabaseTableName)
 
         // CRITICAL: Normalize data to array - API might return single record or null
-        let dataArray = normalizeRowsWithId(asArray<Record<string, any>>(data))
+        const dataArray = normalizeRowsWithId(asArray<Record<string, any>>(data))
         
         // Compute only formula fields that are actually needed by the view (visible/sort/filter/grouping/appearance),
         // plus any formula-to-formula dependencies (computed via the closure above).

@@ -396,7 +396,7 @@ export default function ChartBlock({
       const params = new URLSearchParams()
       
       // Start with block filters
-      let filtersToApply = [...blockBaseFilters]
+      const filtersToApply = [...blockBaseFilters]
       
       // Apply group by filter if we have group by and clicked data point
       if (groupBy && data?.name) {

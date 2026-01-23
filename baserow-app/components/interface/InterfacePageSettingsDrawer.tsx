@@ -342,7 +342,7 @@ export default function InterfacePageSettingsDrawer({
         ? Math.max(...existingBlocks.map((b: any) => (b.y || 0) + (b.h || 4)))
         : 0
       
-      let startY = maxY + marginY
+      const startY = maxY + marginY
       
       // Create blocks in grid layout via API
       for (let i = 0; i < fieldsToCreate.length; i++) {

@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import type { InterfacePage } from "@/lib/interface/page-types-only"
 import type { Table, TableField } from "@/types/database"
+import type { BlockConfig } from "@/lib/interface/types"
 import FormDataSettings from "./settings/FormDataSettings"
 import FormAppearanceSettings from "./settings/FormAppearanceSettings"
 

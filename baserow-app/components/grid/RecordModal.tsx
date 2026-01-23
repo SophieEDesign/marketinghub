@@ -45,7 +45,7 @@ export default function RecordModal({
 
   function normalizeUpdateValue(fieldName: string, value: any): any {
     // Avoid sending `undefined` to PostgREST.
-    let v: any = value === undefined ? null : value
+    const v: any = value === undefined ? null : value
 
     const field = fields.find((f) => f?.name === fieldName)
     if (!field) return v

@@ -331,8 +331,8 @@ export default function PageCreationWizard({
       // Users select tables, not views - views are created automatically
       let saved_view_id: string | null = null
       let dashboard_layout_id: string | null = null
-      let form_config_id: string | null = null
-      let record_config_id: string | null = null
+      const form_config_id: string | null = null
+      const record_config_id: string | null = null
       let base_table: string | null = null
 
       // Unified architecture: Pages don't require anchors

@@ -53,7 +53,7 @@ export default function RecordFieldPanel({
 
   function normalizeUpdateValue(fieldName: string, value: any): any {
     // Avoid sending `undefined` to PostgREST.
-    let v: any = value === undefined ? null : value
+    const v: any = value === undefined ? null : value
 
     const field = allFields.find((f) => f?.name === fieldName)
     if (!field) return v
