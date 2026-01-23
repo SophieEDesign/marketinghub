@@ -68,7 +68,7 @@ export default function PerformanceMonitor() {
       requestAnimationFrame(checkFrameRate)
     }
 
-    let rafId = requestAnimationFrame(checkFrameRate)
+    const rafId = requestAnimationFrame(checkFrameRate)
 
     // Monitor long tasks (blocking operations >50ms)
     let longTaskCount = 0
