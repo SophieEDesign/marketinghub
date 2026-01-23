@@ -29,6 +29,7 @@ import { canCreateRecord } from "@/lib/interface/record-actions"
 import { evaluateFilterTree } from "@/lib/filters/evaluation"
 import { filterConfigsToFilterTree } from "@/lib/filters/converters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface RecordReviewLeftColumnProps {
   pageId?: string
@@ -328,6 +329,20 @@ export default function RecordReviewLeftColumn({
       toast({
         title: "Record created",
         description: "Your new record has been created.",
+      })
+    } catch (error) {
+      // Ignore abort errors (expected during navigation/unmount)
+      if (isAbortError(error)) {
+        return
+      }
+      
+      // Only log and show errors for real failures
+      console.error('Failed to create record:', error)
+      const errorMessage = (error as any)?.message || 'Failed to create record'
+      toast({
+        title: "Failed to create record",
+        description: errorMessage,
+        variant: "destructive",
       })
     } finally {
       setCreating(false)
