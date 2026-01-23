@@ -1319,8 +1319,8 @@ export default function Canvas({
       {/* This ensures the grid gets the full available width, not constrained by parent flex containers */}
       {/* CRITICAL: Parent stack uses normal document flow - reflows immediately when child heights change */}
       {/* No cached heights, no min-height persistence, no delayed updates */}
-      {/* Add padding-bottom to ensure resize handles aren't cut off */}
-      <div ref={containerRef} className="w-full h-full min-w-0" style={{ paddingBottom: isEditing ? '40px' : '0' }}>
+      {/* Add padding-bottom to ensure bottom blocks aren't cut off by taskbar */}
+      <div ref={containerRef} className="w-full h-full min-w-0" style={{ paddingBottom: isEditing ? '80px' : '80px' }}>
         <ResponsiveGridLayout
           className="layout" // CRITICAL: No conditional classes - identical in edit and public
           layouts={{ lg: layout }}
@@ -1537,9 +1537,7 @@ export default function Canvas({
                         onClick={(e) => {
                           e.stopPropagation()
                           e.preventDefault()
-                          if (confirm("Are you sure you want to delete this block?")) {
-                            onBlockDelete(block.id)
-                          }
+                          onBlockDelete(block.id)
                         }}
                         className="p-1.5 rounded-md shadow-sm bg-white text-red-600 border border-red-300 hover:bg-red-50 transition-all"
                         title="Delete block (Del)"

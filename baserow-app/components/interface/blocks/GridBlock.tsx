@@ -26,6 +26,7 @@ import QuickFilterBar from "@/components/filters/QuickFilterBar"
 import CalendarDateRangeControls from "@/components/views/calendar/CalendarDateRangeControls"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface GridBlockProps {
   block: PageBlock
@@ -419,8 +420,24 @@ export default function GridBlock({
         // Contract: creating a record must NOT auto-open it.
         // User can open via the dedicated chevron (or optional double-click) in the grid.
       } catch (error) {
+        // Ignore abort errors (expected during navigation/unmount)
+        if (isAbortError(error)) {
+          return
+        }
+        
+        // Also check if error has a nested error object (e.g., from Supabase)
+        const errorObj = error as any
+        if (errorObj?.error && isAbortError(errorObj.error)) {
+          return
+        }
+        if (errorObj?.details && isAbortError({ message: errorObj.details })) {
+          return
+        }
+        
+        // Only log and show errors for real failures
         console.error('Failed to create record:', error)
-        alert('Failed to create record. Please try again.')
+        const errorMessage = (error as any)?.message || (error as any)?.error?.message || 'Failed to create record. Please try again.'
+        alert(errorMessage)
       }
     }
 

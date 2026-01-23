@@ -1244,8 +1244,8 @@ export default function InterfaceBuilder({
             />
             )}
           </FilterStateProvider>
-          {/* Footer spacer to ensure bottom content is visible */}
-          <div className="h-32 w-full" />
+          {/* Footer spacer to ensure bottom content is visible (accounts for taskbar) */}
+          <div className="h-48 w-full" />
         </div>
       </div>
 

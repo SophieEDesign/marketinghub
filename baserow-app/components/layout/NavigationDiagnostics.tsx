@@ -74,6 +74,22 @@ export default function NavigationDiagnostics() {
     const runDiagnostics = () => {
       console.group("🔍 Navigation Diagnostics")
       
+      // 0. Verify sidebar exists and has data attribute
+      const sidebarCheck = document.querySelector('[data-sidebar]')
+      if (!sidebarCheck) {
+        console.error("❌ CRITICAL: Sidebar not found! Looking for [data-sidebar] attribute")
+        // Try to find sidebar by other means
+        const possibleSidebars = document.querySelectorAll('[class*="sidebar"], [class*="Sidebar"], aside')
+        console.log("🔍 Possible sidebar elements found:", Array.from(possibleSidebars).map(el => ({
+          tag: el.tagName,
+          classes: el.className,
+          id: el.id,
+          hasDataSidebar: el.hasAttribute('data-sidebar'),
+        })))
+      } else {
+        console.log("✅ Sidebar found with [data-sidebar] attribute")
+      }
+      
       // 1. Check for blocking overlays
       const overlays = document.querySelectorAll('[class*="fixed"][class*="inset"]')
       console.log("📋 Overlays:", {
@@ -235,45 +251,124 @@ export default function NavigationDiagnostics() {
     return () => clearTimeout(timeout)
   }, [pathname, enabled])
 
-  // Add click listener to document to catch blocked clicks
+  // Add click listener to document to catch ALL clicks (even blocked ones)
   useEffect(() => {
     if (!enabled) return
 
+    // First, verify sidebar exists
+    const sidebarExists = document.querySelector('[data-sidebar]')
+    if (!sidebarExists) {
+      console.error("❌ Sidebar not found! Click detection may not work.")
+    }
+
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      // Find sidebar container first, then find link within it
-      const sidebarContainerForClick = target.closest('[data-sidebar]')
-      const sidebarLink = sidebarContainerForClick 
-        ? (target.closest('a[href]') as HTMLAnchorElement)
-        : null
       
-      if (sidebarLink && sidebarContainerForClick) {
-        console.log("🖱️ Click on sidebar link:", {
-          href: sidebarLink.getAttribute("href"),
-          element: sidebarLink,
+      // Log ALL clicks in sidebar area, not just on links
+      const sidebarContainerForClick = target.closest('[data-sidebar]')
+      
+      if (sidebarContainerForClick) {
+        console.log("🖱️ CLICK DETECTED in sidebar area:", {
+          target: target,
+          targetTag: target.tagName,
+          targetClasses: target.className,
+          targetId: target.id,
+          href: target.getAttribute("href") || (target.closest("a")?.getAttribute("href")),
+          clientX: e.clientX,
+          clientY: e.clientY,
           defaultPrevented: e.defaultPrevented,
-          pointerEvents: window.getComputedStyle(sidebarLink).pointerEvents,
-          zIndex: window.getComputedStyle(sidebarLink).zIndex,
-          pathname: pathname,
+          stopPropagation: e.cancelBubble,
+          timestamp: performance.now(),
         })
 
-        // Check if something is blocking
-        const rect = sidebarLink.getBoundingClientRect()
-        const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
-        
-        if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
-          console.warn("⚠️ Click blocked! Element at point:", {
-            blockingElement: elementAtPoint,
-            blockingClasses: elementAtPoint?.className,
+        // Find link if clicked element is inside one
+        const sidebarLink = sidebarContainerForClick 
+          ? (target.closest('a[href]') as HTMLAnchorElement)
+          : null
+      
+        if (sidebarLink) {
+          console.log("🔗 Click is on a link:", {
+            href: sidebarLink.getAttribute("href"),
+            element: sidebarLink,
+            pointerEvents: window.getComputedStyle(sidebarLink).pointerEvents,
+            zIndex: window.getComputedStyle(sidebarLink).zIndex,
+            display: window.getComputedStyle(sidebarLink).display,
+            visibility: window.getComputedStyle(sidebarLink).visibility,
+            opacity: window.getComputedStyle(sidebarLink).opacity,
+            pathname: pathname,
+          })
+
+          // Check if something is blocking
+          const rect = sidebarLink.getBoundingClientRect()
+          const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY)
+          
+          console.log("📍 Element at click point:", {
+            element: elementAtPoint,
+            elementTag: elementAtPoint?.tagName,
+            elementClasses: elementAtPoint?.className,
+            isLink: elementAtPoint === sidebarLink,
+            isLinkChild: sidebarLink.contains(elementAtPoint),
             blockingZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : null,
-            expectedElement: sidebarLink,
+            linkZIndex: window.getComputedStyle(sidebarLink).zIndex,
+          })
+          
+          if (elementAtPoint !== sidebarLink && !sidebarLink.contains(elementAtPoint)) {
+            console.warn("⚠️ CLICK BLOCKED! Something is on top of the link:", {
+              blockingElement: elementAtPoint,
+              blockingTag: elementAtPoint?.tagName,
+              blockingClasses: elementAtPoint?.className,
+              blockingZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : null,
+              blockingPointerEvents: elementAtPoint ? window.getComputedStyle(elementAtPoint).pointerEvents : null,
+              expectedElement: sidebarLink,
+              linkRect: rect,
+            })
+          }
+        } else {
+          console.warn("⚠️ Click in sidebar but NOT on a link:", {
+            clickedElement: target,
+            clickedTag: target.tagName,
+            clickedClasses: target.className,
+            parentLink: target.closest("a"),
           })
         }
       }
     }
 
-    document.addEventListener("click", handleClick, true) // Use capture phase
-    return () => document.removeEventListener("click", handleClick, true)
+    // Use capture phase to catch clicks BEFORE they can be prevented
+    // This should catch ALL clicks, even if they're prevented later
+    document.addEventListener("click", handleClick, true)
+    
+    // Also listen in bubble phase to see if it gets through
+    const handleBubble = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-sidebar]')) {
+        console.log("🖱️ Click reached bubble phase:", {
+          defaultPrevented: e.defaultPrevented,
+          target: target,
+          href: target.getAttribute("href") || target.closest("a")?.getAttribute("href"),
+        })
+      }
+    }
+    document.addEventListener("click", handleBubble, false)
+    
+    // Also listen for mousedown to catch even earlier
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-sidebar]')) {
+        console.log("🖱️ MOUSEDOWN in sidebar:", {
+          target: target.tagName,
+          targetClasses: target.className,
+          href: target.getAttribute("href") || target.closest("a")?.getAttribute("href"),
+        })
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown, true)
+    
+    return () => {
+      document.removeEventListener("click", handleClick, true)
+      document.removeEventListener("click", handleBubble, false)
+      document.removeEventListener("mousedown", handleMouseDown, true)
+    }
   }, [enabled, pathname])
 
   // Performance monitoring - detect if UI is frozen/blocked
@@ -371,11 +466,70 @@ export default function NavigationDiagnostics() {
           })
         })
       }
+
+      (window as any).testSidebarClick = () => {
+        console.log("🧪 Testing sidebar click detection...")
+        const sidebar = document.querySelector('[data-sidebar]')
+        if (!sidebar) {
+          console.error("❌ Sidebar not found!")
+          return
+        }
+        const link = sidebar.querySelector('a[href^="/pages/"]') as HTMLAnchorElement
+        if (!link) {
+          console.error("❌ No page links found in sidebar!")
+          console.log("Available links:", Array.from(sidebar.querySelectorAll('a')).map(a => ({
+            href: a.getAttribute("href"),
+            text: a.textContent?.trim(),
+          })))
+          return
+        }
+        console.log("✅ Found link, simulating click:", link.getAttribute("href"))
+        // Simulate a real click event
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+        })
+        link.dispatchEvent(clickEvent)
+        console.log("✅ Click event dispatched")
+      }
+
+      (window as any).verifyClickListeners = () => {
+        console.log("🔍 Verifying click listeners...")
+        // Check if we can find event listeners (this is tricky in JS, but we can test)
+        const sidebar = document.querySelector('[data-sidebar]')
+        if (!sidebar) {
+          console.error("❌ Sidebar not found!")
+          return
+        }
+        const link = sidebar.querySelector('a[href^="/pages/"]') as HTMLAnchorElement
+        if (!link) {
+          console.error("❌ No page links found!")
+          return
+        }
+        console.log("✅ Sidebar and link found")
+        console.log("📋 Link details:", {
+          href: link.getAttribute("href"),
+          pointerEvents: window.getComputedStyle(link).pointerEvents,
+          display: window.getComputedStyle(link).display,
+          visibility: window.getComputedStyle(link).visibility,
+          zIndex: window.getComputedStyle(link).zIndex,
+          rect: link.getBoundingClientRect(),
+        })
+        // Test if link is actually clickable
+        const testClick = () => {
+          console.log("✅ Click listener is working - this message proves it!")
+        }
+        link.addEventListener("click", testClick, { once: true })
+        console.log("💡 Test listener added. Click the link to verify.")
+      }
       
       console.log("💡 Test functions available:")
       console.log("   - window.testNavigation(pageId) - Test clicking a link")
       console.log("   - window.checkNavigationDiagnostics() - Check diagnostics status")
       console.log("   - window.checkPerformance() - Check if UI thread is blocked")
+      console.log("   - window.testSidebarClick() - Simulate a sidebar click")
+      console.log("   - window.verifyClickListeners() - Verify click detection is working")
     }
     
     return () => {

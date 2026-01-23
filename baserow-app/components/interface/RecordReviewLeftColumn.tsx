@@ -244,12 +244,18 @@ export default function RecordReviewLeftColumn({
       const { data, error } = await query
 
       if (error) {
-        console.error("Error loading records:", error)
+        // Ignore abort errors (expected during navigation/unmount)
+        if (!isAbortError(error)) {
+          console.error("Error loading records:", error)
+        }
       } else {
         setRecords(data || [])
       }
     } catch (error) {
-      console.error("Error loading records:", error)
+      // Ignore abort errors (expected during navigation/unmount)
+      if (!isAbortError(error)) {
+        console.error("Error loading records:", error)
+      }
     } finally {
       setLoading(false)
     }
@@ -304,18 +310,45 @@ export default function RecordReviewLeftColumn({
         canPrefillPrimaryCreateField && primaryCreateField?.name ? primaryCreateField.name : null
       const fieldValue = fieldName ? primaryValue?.trim() : null
 
-      const res = await fetch(`/api/interface-pages/${pageId}/records`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fieldName: fieldName || undefined,
-          fieldValue: fieldValue || undefined,
-        }),
-      })
+      let res: Response
+      try {
+        res = await fetch(`/api/interface-pages/${pageId}/records`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fieldName: fieldName || undefined,
+            fieldValue: fieldValue || undefined,
+          }),
+        })
+      } catch (fetchError) {
+        // Check if fetch itself was aborted
+        if (isAbortError(fetchError)) {
+          return
+        }
+        throw fetchError
+      }
 
-      const payload = await res.json().catch(() => ({}))
+      let payload: any = {}
+      try {
+        payload = await res.json()
+      } catch (jsonError) {
+        // If JSON parsing fails, check if it's an abort error
+        if (isAbortError(jsonError)) {
+          return
+        }
+        // If response is not ok, use the status text
+        if (!res.ok) {
+          throw new Error(res.statusText || 'Failed to create record')
+        }
+      }
+
       if (!res.ok) {
-        throw new Error(payload?.error || 'Failed to create record')
+        const errorMsg = payload?.error || res.statusText || 'Failed to create record'
+        // Check if the error message indicates an abort
+        if (isAbortError({ message: errorMsg, details: payload?.details })) {
+          return
+        }
+        throw new Error(errorMsg)
       }
 
       const createdId = payload?.recordId || payload?.record?.id
@@ -332,13 +365,23 @@ export default function RecordReviewLeftColumn({
       })
     } catch (error) {
       // Ignore abort errors (expected during navigation/unmount)
+      // Check both the error itself and any nested error properties
       if (isAbortError(error)) {
+        return
+      }
+      
+      // Also check if error has a nested error object (e.g., from Supabase)
+      const errorObj = error as any
+      if (errorObj?.error && isAbortError(errorObj.error)) {
+        return
+      }
+      if (errorObj?.details && isAbortError({ message: errorObj.details })) {
         return
       }
       
       // Only log and show errors for real failures
       console.error('Failed to create record:', error)
-      const errorMessage = (error as any)?.message || 'Failed to create record'
+      const errorMessage = (error as any)?.message || (error as any)?.error?.message || 'Failed to create record'
       toast({
         title: "Failed to create record",
         description: errorMessage,

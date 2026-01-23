@@ -14,12 +14,33 @@ export interface ApiError {
  */
 export function isAbortError(error: unknown): boolean {
   if (!error) return false
+  
+  // Handle DOMException (browser abort errors)
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true
+  }
+  
+  // Handle Error objects with AbortError name
+  if (error instanceof Error && error.name === 'AbortError') {
+    return true
+  }
+  
   const errorObj = error as { name?: string; message?: string; details?: string } | null
   const name = errorObj?.name
   if (name === 'AbortError') return true
 
-  const message = String(errorObj?.message || errorObj?.details || '')
-  return message.includes('AbortError') || message.includes('signal is aborted')
+  // Check message and details for abort-related strings
+  const message = String(errorObj?.message || '')
+  const details = String(errorObj?.details || '')
+  const combined = `${message} ${details}`.toLowerCase()
+  
+  return (
+    message.includes('AbortError') || 
+    message.includes('signal is aborted') ||
+    details.includes('AbortError') ||
+    details.includes('signal is aborted') ||
+    combined.includes('abort') && combined.includes('signal')
+  )
 }
 
 /**
