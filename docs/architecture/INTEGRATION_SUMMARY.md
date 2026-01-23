@@ -6,7 +6,7 @@ A complete Baserow-style view layer has been integrated into the Marketing Hub. 
 
 ## Structure
 
-### Routing (`app/data/[tableId]/`)
+### Routing (`app/tables/[tableId]/`)
 - `page.tsx` - Table overview with list of views
 - `views/new/page.tsx` - Create new view modal
 - `views/[viewId]/page.tsx` - View renderer (detects type and renders appropriate component)
@@ -105,12 +105,12 @@ Uses existing Supabase schema:
 
 ### Accessing Views
 
-Navigate to `/data/[tableId]` to see all views for a table.
-Click on a view to open it at `/data/[tableId]/views/[viewId]`.
+Navigate to `/tables/[tableId]` to see all views for a table.
+Click on a view to open it at `/tables/[tableId]/views/[viewId]`.
 
 ### Creating Views
 
-1. Go to `/data/[tableId]/views/new`
+1. Go to `/tables/[tableId]/views/new`
 2. Enter view name
 3. Select view type
 4. View is created and opened

@@ -115,6 +115,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Redirect /data/* routes to /tables/* for backward compatibility
+  // This handles external bookmarks and shared links
+  if (pathname.startsWith('/data/')) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = pathname.replace('/data/', '/tables/');
+    // Preserve query parameters
+    return NextResponse.redirect(redirectUrl);
+  }
+
   // Development bypass (ONLY in development, NEVER in production)
   const isDevelopment = process.env.NODE_ENV === 'development';
   const authBypass = process.env.AUTH_BYPASS === 'true';

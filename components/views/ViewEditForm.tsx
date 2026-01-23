@@ -27,7 +27,7 @@ export default function ViewEditForm({ view, tableId }: ViewEditFormProps) {
       .eq('id', view.id)
 
     if (!error) {
-      router.push(`/data/${tableId}/views/${view.id}`)
+      router.push(`/tables/${tableId}/views/${view.id}`)
       router.refresh()
     } else {
       setSaving(false)
@@ -38,7 +38,7 @@ export default function ViewEditForm({ view, tableId }: ViewEditFormProps) {
     const { duplicateView } = await import('@/lib/views')
     const newView = await duplicateView(view.id)
     if (newView) {
-      router.push(`/data/${tableId}/views/${newView.id}`)
+      router.push(`/tables/${tableId}/views/${newView.id}`)
       router.refresh()
     }
   }
@@ -58,7 +58,7 @@ export default function ViewEditForm({ view, tableId }: ViewEditFormProps) {
           Duplicate View
         </Button>
         <Button variant="outline" asChild>
-          <Link href={`/data/${tableId}/views/${view.id}`}>Cancel</Link>
+          <Link href={`/tables/${tableId}/views/${view.id}`}>Cancel</Link>
         </Button>
       </div>
     </div>

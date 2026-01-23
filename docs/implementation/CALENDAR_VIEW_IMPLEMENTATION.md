@@ -95,7 +95,7 @@ A complete, production-ready hybrid calendar view system for the Marketing Hub.
 - `components/ui/switch.tsx` - Toggle switch component
 
 ### Integration
-- `app/data/[tableId]/views/[viewId]/page.tsx` - Updated to use new CalendarView
+- `baserow-app/app/tables/[tableId]/views/[viewId]/page.tsx` - Updated to use new CalendarView
 
 ## 🔧 Configuration
 

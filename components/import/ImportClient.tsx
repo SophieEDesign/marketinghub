@@ -148,8 +148,8 @@ export default function ImportClient() {
       setTimeout(() => {
         const href =
           metadataResult.tableId && metadataResult.viewId
-            ? `/data/${metadataResult.tableId}/views/${metadataResult.viewId}`
-            : '/data'
+            ? `/tables/${metadataResult.tableId}/views/${metadataResult.viewId}`
+            : '/tables'
 
         router.push(href)
         // Force a route refresh so the destination page fetches fresh rows/fields immediately.
