@@ -230,15 +230,25 @@ export default function NavigationDiagnostics() {
       })
 
       // 10. Check for long-running operations
-      const longTasks = (performance as any).getEntriesByType?.('long-task') || []
-      if (longTasks.length > 0) {
-        console.warn("⚠️ Long tasks detected (blocking operations):", {
-          count: longTasks.length,
-          recent: longTasks.slice(-5).map((task: any) => ({
-            duration: task.duration,
-            startTime: task.startTime,
-          })),
-        })
+      // Only check if long-task API is supported
+      try {
+        const supportedEntryTypes = (PerformanceObserver as any).supportedEntryTypes
+        const isLongTaskSupported = supportedEntryTypes && supportedEntryTypes.includes('long-task')
+        
+        if (isLongTaskSupported) {
+          const longTasks = (performance as any).getEntriesByType?.('long-task') || []
+          if (longTasks.length > 0) {
+            console.warn("⚠️ Long tasks detected (blocking operations):", {
+              count: longTasks.length,
+              recent: longTasks.slice(-5).map((task: any) => ({
+                duration: task.duration,
+                startTime: task.startTime,
+              })),
+            })
+          }
+        }
+      } catch (e) {
+        // Long task API not supported - silently skip
       }
 
       console.groupEnd()

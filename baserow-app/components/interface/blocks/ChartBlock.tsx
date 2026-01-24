@@ -127,17 +127,64 @@ export default function ChartBlock({
     
     try {
       const supabase = createClient()
-      const { data: fields } = await supabase
+      
+      // Ensure we have a valid session before making requests
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        console.warn("No active session, attempting to refresh...")
+        // Try to refresh the session
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError || !refreshedSession) {
+          console.error("Session refresh failed, redirecting to login:", refreshError)
+          router.push('/login?next=' + encodeURIComponent(window.location.pathname))
+          return
+        }
+      }
+      
+      const { data: fields, error } = await supabase
         .from("table_fields")
         .select("*")
         .eq("table_id", tableId)
         .order("position")
+      
+      if (error) {
+        // Handle authentication errors
+        // PGRST301 is the PostgREST error code for 401 Unauthorized
+        if (error.code === 'PGRST301' || error.message?.includes('JWT') || error.message?.includes('expired') || error.message?.includes('unauthorized')) {
+          console.error("Authentication error loading table fields:", error)
+          // Try refreshing session one more time
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError || !refreshedSession) {
+            // Session expired, redirect to login
+            router.push('/login?next=' + encodeURIComponent(window.location.pathname))
+            return
+          }
+          // Retry the request after refresh
+          const { data: retryFields, error: retryError } = await supabase
+            .from("table_fields")
+            .select("*")
+            .eq("table_id", tableId)
+            .order("position")
+          
+          if (retryError) {
+            throw retryError
+          }
+          
+          if (retryFields) {
+            setTableFields(retryFields as TableField[])
+          }
+          return
+        }
+        throw error
+      }
       
       if (fields) {
         setTableFields(fields as TableField[])
       }
     } catch (err) {
       console.error("Error loading table fields:", err)
+      // Don't set error state here - let loadData handle the error display
+      // This prevents showing errors when tableFields is just missing metadata
     }
   }
 
@@ -154,12 +201,56 @@ export default function ChartBlock({
     try {
       const supabase = createClient()
 
+      // Ensure we have a valid session before making requests
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        console.warn("No active session in loadData, attempting to refresh...")
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError || !refreshedSession) {
+          console.error("Session refresh failed, redirecting to login:", refreshError)
+          router.push('/login?next=' + encodeURIComponent(window.location.pathname))
+          return
+        }
+      }
+
       // Get table name
-      const { data: table } = await supabase
+      let table: { supabase_table: string; name?: string } | null = null
+      const { data: tableData, error: tableError } = await supabase
         .from("tables")
         .select("supabase_table, name")
         .eq("id", tableId)
         .single()
+
+      if (tableError) {
+        // Handle authentication errors
+        // PGRST301 is the PostgREST error code for 401 Unauthorized
+        if (tableError.code === 'PGRST301' || tableError.message?.includes('JWT') || tableError.message?.includes('expired') || tableError.message?.includes('unauthorized')) {
+          console.error("Authentication error loading table:", tableError)
+          // Try refreshing session one more time
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+          if (refreshError || !refreshedSession) {
+            // Session expired, redirect to login
+            router.push('/login?next=' + encodeURIComponent(window.location.pathname))
+            return
+          }
+          // Retry the request after refresh
+          const { data: retryTable, error: retryError } = await supabase
+            .from("tables")
+            .select("supabase_table, name")
+            .eq("id", tableId)
+            .single()
+          
+          if (retryError) {
+            throw retryError
+          }
+          
+          table = retryTable
+        } else {
+          throw tableError
+        }
+      } else {
+        table = tableData
+      }
 
       if (!table?.supabase_table) {
         throw new Error("Table not found")

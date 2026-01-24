@@ -2178,6 +2178,51 @@ export default function GridView({
         Object.assign(newRow, defaultsFromFilters)
       }
 
+      // Validate required fields before inserting
+      const requiredFields = safeTableFields.filter(f => 
+        f && 
+        typeof f === 'object' && 
+        f.required === true &&
+        f.name // Ensure field has a name
+      )
+
+      if (requiredFields.length > 0) {
+        const missingRequired: string[] = []
+        
+        for (const field of requiredFields) {
+          const fieldName = field.name
+          const fieldValue = newRow[fieldName]
+          
+          // Check if field is missing or empty (null, undefined, empty string, empty array)
+          const isEmpty = 
+            fieldValue == null || 
+            fieldValue === '' || 
+            (Array.isArray(fieldValue) && fieldValue.length === 0)
+          
+          if (isEmpty) {
+            // Check if field has a default value
+            const hasDefault = field.default_value != null && field.default_value !== ''
+            
+            if (!hasDefault) {
+              missingRequired.push(field.label || field.name)
+            }
+          }
+        }
+
+        if (missingRequired.length > 0) {
+          // Warn user about missing required fields, but allow creation for spreadsheet-style UX
+          // Database NOT NULL constraints will prevent the insert if they're configured
+          const proceed = confirm(
+            `Warning: The following required fields are empty:\n\n${missingRequired.join('\n')}\n\n` +
+            `Do you want to create the record anyway? You can fill these fields after creation.\n\n` +
+            `Note: If the database enforces NOT NULL constraints, the creation will fail.`
+          )
+          if (!proceed) {
+            return // User chose to cancel
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from(supabaseTableName)
         .insert([newRow])
@@ -2188,6 +2233,11 @@ export default function GridView({
         debugError('LAYOUT', "Error adding row:", error)
         if (error.code === "42P01" || error.message?.includes("does not exist")) {
           setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+        } else if (error.code === "23502" || error.message?.includes("null value") || error.message?.includes("violates not-null constraint")) {
+          // PostgreSQL NOT NULL constraint violation
+          alert(`Cannot create record: Required fields must have values. Please fill in all required fields.`)
+        } else {
+          alert(`Failed to create record: ${error.message || 'Unknown error'}`)
         }
       } else {
         await loadRows()
@@ -2199,6 +2249,10 @@ export default function GridView({
       const errorObj = error as { code?: string; message?: string } | null
       if (errorObj?.code === "42P01" || errorObj?.message?.includes("does not exist")) {
         setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+      } else if (errorObj?.code === "23502" || errorObj?.message?.includes("null value") || errorObj?.message?.includes("violates not-null constraint")) {
+        alert(`Cannot create record: Required fields must have values. Please fill in all required fields.`)
+      } else if (errorObj?.message) {
+        alert(`Failed to create record: ${errorObj.message}`)
       }
     }
   }

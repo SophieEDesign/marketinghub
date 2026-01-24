@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import RichTextEditor from "@/components/fields/RichTextEditor"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 interface BulkEditModalProps {
   isOpen: boolean
@@ -53,6 +54,7 @@ export default function BulkEditModal({
   const [value, setValue] = useState<any>("")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Filter editable fields based on permissions
   const editableFields = useMemo(() => {
@@ -144,13 +146,11 @@ export default function BulkEditModal({
 
   const handleDelete = async () => {
     if (!onDelete) return
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedCount} record${selectedCount !== 1 ? "s" : ""}? This action cannot be undone.`
-      )
-    ) {
-      return
-    }
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!onDelete) return
 
     setDeleting(true)
     try {
@@ -386,6 +386,17 @@ export default function BulkEditModal({
           </Button>
         </div>
       </DialogContent>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={confirmDelete}
+        title="Delete Records"
+        description={`Are you sure you want to delete ${selectedCount} record${selectedCount !== 1 ? "s" : ""}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={deleting}
+      />
     </Dialog>
   )
 }

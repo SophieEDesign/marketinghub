@@ -43,10 +43,13 @@ interface RecordReviewViewProps {
 }
 
 export default function RecordReviewView({ page, data, config, blocks = [], pageTableId, isLoading = false }: RecordReviewViewProps) {
-  const recordDebugEnabled = isDebugEnabled('RECORD')
+  // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
+  const [recordDebugEnabled, setRecordDebugEnabled] = useState(false)
   
   // DEBUG_RECORD: Log component mount
   useEffect(() => {
+    // Set debug flag after mount to prevent hydration mismatch
+    setRecordDebugEnabled(isDebugEnabled('RECORD'))
     debugLog('RECORD', 'RecordReviewView MOUNT', {
       pageId: page.id,
       pageName: page.name,

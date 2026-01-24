@@ -63,18 +63,23 @@ export default function GridBlock({
   const viewType: ViewType = config?.view_type || 'grid'
   
   // DEBUG_LIST: Log tableId resolution
-  const listDebugEnabled = isDebugEnabled('LIST')
-  if (listDebugEnabled) {
-    debugLog('LIST', 'GridBlock tableId resolution', {
-      blockId: block.id,
-      configTableId: config?.table_id,
-      pageTableId,
-      configBaseTable: config?.base_table,
-      resolvedTableId: tableId,
-      viewId,
-      viewType,
-    })
-  }
+  // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
+  const [listDebugEnabled, setListDebugEnabled] = useState(false)
+  
+  useEffect(() => {
+    setListDebugEnabled(isDebugEnabled('LIST'))
+    if (isDebugEnabled('LIST')) {
+      debugLog('LIST', 'GridBlock tableId resolution', {
+        blockId: block.id,
+        configTableId: config?.table_id,
+        pageTableId,
+        configBaseTable: config?.base_table,
+        resolvedTableId: tableId,
+        viewId,
+        viewType,
+      })
+    }
+  }, [])
   // Visible fields from config (required) - ensure it's always an array
   const visibleFieldsConfig = Array.isArray(config?.visible_fields) 
     ? config.visible_fields 
@@ -348,7 +353,14 @@ export default function GridBlock({
     }
 
     const handler = async () => {
-      if (disabled || !table || !tableId) return
+      if (disabled || !table || !tableId) {
+        console.warn('GridBlock: Add record handler called but disabled or missing table/tableId', {
+          disabled,
+          hasTable: !!table,
+          tableId,
+        })
+        return
+      }
       try {
         const supabase = createClient()
         const today = new Date()
@@ -409,10 +421,27 @@ export default function GridBlock({
           .select()
           .single()
 
-        if (error) throw error
+        if (error) {
+          // Check if it's an abort error before throwing
+          if (isAbortError(error)) {
+            return
+          }
+          // Check nested error structure
+          const errorObj = error as any
+          if (errorObj?.error && isAbortError(errorObj.error)) {
+            return
+          }
+          if (errorObj?.details && isAbortError({ message: errorObj.details })) {
+            return
+          }
+          throw error
+        }
 
         const createdId = (data as any)?.id || (data as any)?.record_id
-        if (!createdId) return
+        if (!createdId) {
+          console.warn('GridBlock: Record created but no ID returned', { data })
+          return
+        }
 
         // Force the currently rendered view to refetch so the new record appears immediately.
         setRefreshKey((k) => k + 1)

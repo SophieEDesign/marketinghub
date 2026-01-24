@@ -18,6 +18,7 @@ import dynamic from 'next/dynamic'
 import { getPageTableId } from '@/lib/interface/page-table-utils'
 import { assertPageIsValid } from '@/lib/interface/assertPageIsValid'
 import PageSetupState from './PageSetupState'
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
 // Lazy load InterfaceBuilder (which wraps Canvas)
 const InterfaceBuilder = dynamic(() => import('@/components/interface/InterfaceBuilder'), { ssr: false })

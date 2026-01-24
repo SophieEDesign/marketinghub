@@ -37,6 +37,7 @@ import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
+import { useOperationFeedback } from "@/hooks/useOperationFeedback"
 
 type MultiSource = {
   id: string
@@ -155,6 +156,10 @@ export default function MultiTimelineView({
 }: MultiTimelineViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const { openRecord } = useRecordPanel()
+  const { handleError } = useOperationFeedback({
+    errorTitle: "Timeline Error",
+    showSuccess: false,
+  })
 
   const appearance = (blockConfig as any)?.appearance || {}
   const permissions = (blockConfig as any)?.permissions || {}
@@ -239,8 +244,9 @@ export default function MultiTimelineView({
             if (isAbortError(tableRes.error)) {
               return // Component unmounted, exit early
             }
-            console.error(`MultiTimeline: Error loading table for source ${s.id}:`, tableRes.error)
-            nextErrors[s.id] = tableRes.error.message || "Failed to load table"
+            const errorMsg = tableRes.error.message || "Failed to load table"
+            nextErrors[s.id] = errorMsg
+            handleError(tableRes.error, "Timeline Error", `Failed to load table for source "${s.label || s.id}": ${errorMsg}`)
             continue
           }
 
@@ -333,8 +339,9 @@ export default function MultiTimelineView({
             if (isAbortError(rowsRes.error)) {
               return
             }
-            console.error(`MultiTimeline: Error loading rows for source ${s.id}:`, rowsRes.error)
-            nextErrors[s.id] = rowsRes.error.message || "Failed to load rows"
+            const errorMsg = rowsRes.error.message || "Failed to load rows"
+            nextErrors[s.id] = errorMsg
+            handleError(rowsRes.error, "Timeline Error", `Failed to load rows for source "${s.label || s.id}": ${errorMsg}`)
             continue
           }
 
@@ -364,8 +371,9 @@ export default function MultiTimelineView({
       if (isAbortError(err)) {
         return
       }
-      console.error("MultiTimeline: Fatal error in loadAll:", err)
-      setErrorsBySource({ __global__: err.message || "Failed to load timeline data" })
+      const errorMsg = err.message || "Failed to load timeline data"
+      setErrorsBySource({ __global__: errorMsg })
+      handleError(err, "Timeline Error", `Failed to load timeline: ${errorMsg}`)
     } finally {
       setLoading(false)
       loadingRef.current = false

@@ -1270,48 +1270,54 @@ export default function Canvas({
   }
 
   // GUARDRAIL LOG: Log grid signature to verify grid config is identical in edit/public
-  // Use debug flag system to reduce console noise
-  const shouldLogLayout = isDebugEnabled('LAYOUT')
+  // CRITICAL: Use useState + useEffect to prevent hydration mismatch - localStorage access must happen after mount
+  const [shouldLogLayout, setShouldLogLayout] = useState(false)
   
-  if (shouldLogLayout) {
-    try {
-      const layoutSignature = (layout || []).map(item => ({
-        id: item.i,
-        x: item.x,
-        y: item.y,
-        w: item.w,
-        h: item.h,
-      })).sort((a, b) => a.id.localeCompare(b.id))
-      
-      // Sanity log: layout BEFORE grid (to verify DB positions match what we're passing to grid)
-      debugLog('LAYOUT', `[Canvas] layout BEFORE grid: pageId=${pageId}`, 
-        layout.map(l => `${l.i}:${l.x},${l.y}`).join(' | ')
-      )
-      
-      debugLog('LAYOUT', `[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
-        // Grid configuration (MUST be identical - if these differ, layout will diverge)
-        cols: JSON.stringify(GRID_CONFIG.cols),
-        rowHeight: GRID_CONFIG.rowHeight,
-        margin: JSON.stringify(GRID_CONFIG.margin),
-        compactType: GRID_CONFIG.compactType, // CRITICAL: Should be null (disabled)
-        isBounded: GRID_CONFIG.isBounded, // CRITICAL: Should be false (disabled)
-        preventCollision: GRID_CONFIG.preventCollision, // CRITICAL: Set to false to allow blocks to adjust into grid
-        allowOverlap: GRID_CONFIG.allowOverlap,
-        containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
-        useCSSTransforms: GRID_CONFIG.useCSSTransforms,
-        // Layout state (must be identical)
-        layoutLength: layout.length,
-        blocksCount: blocks.length,
-        layoutSignature: JSON.stringify(layoutSignature),
-        // Interactivity (can differ - this is OK, only affects drag/resize)
-        isDraggable: isEditing,
-        isResizable: isEditing,
-      })
-    } catch (error) {
-      // If log fails, at least log that it failed
-      debugWarn('LAYOUT', '[Canvas] Grid Layout Signature log failed:', error)
+  useEffect(() => {
+    setShouldLogLayout(isDebugEnabled('LAYOUT'))
+  }, [])
+  
+  useEffect(() => {
+    if (shouldLogLayout) {
+      try {
+        const layoutSignature = (layout || []).map(item => ({
+          id: item.i,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+        })).sort((a, b) => a.id.localeCompare(b.id))
+        
+        // Sanity log: layout BEFORE grid (to verify DB positions match what we're passing to grid)
+        debugLog('LAYOUT', `[Canvas] layout BEFORE grid: pageId=${pageId}`, 
+          layout.map(l => `${l.i}:${l.x},${l.y}`).join(' | ')
+        )
+        
+        debugLog('LAYOUT', `[Canvas] Grid Layout Signature: pageId=${pageId}, isEditing=${isEditing}`, {
+          // Grid configuration (MUST be identical - if these differ, layout will diverge)
+          cols: JSON.stringify(GRID_CONFIG.cols),
+          rowHeight: GRID_CONFIG.rowHeight,
+          margin: JSON.stringify(GRID_CONFIG.margin),
+          compactType: GRID_CONFIG.compactType, // CRITICAL: Should be null (disabled)
+          isBounded: GRID_CONFIG.isBounded, // CRITICAL: Should be false (disabled)
+          preventCollision: GRID_CONFIG.preventCollision, // CRITICAL: Set to false to allow blocks to adjust into grid
+          allowOverlap: GRID_CONFIG.allowOverlap,
+          containerPadding: JSON.stringify(GRID_CONFIG.containerPadding),
+          useCSSTransforms: GRID_CONFIG.useCSSTransforms,
+          // Layout state (must be identical)
+          layoutLength: layout.length,
+          blocksCount: blocks.length,
+          layoutSignature: JSON.stringify(layoutSignature),
+          // Interactivity (can differ - this is OK, only affects drag/resize)
+          isDraggable: isEditing,
+          isResizable: isEditing,
+        })
+      } catch (error) {
+        // If log fails, at least log that it failed
+        debugWarn('LAYOUT', '[Canvas] Grid Layout Signature log failed:', error)
+      }
     }
-  }
+  }, [shouldLogLayout, layout, blocks.length, pageId, isEditing])
 
   return (
     <ErrorBoundary>

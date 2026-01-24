@@ -104,8 +104,14 @@ export default function CalendarView({
   // CRITICAL: Prevent hydration mismatch - FullCalendar generates dynamic IDs that differ between server/client
   const [mounted, setMounted] = useState(false)
   
+  // DEBUG_CALENDAR: Enable via localStorage.DEBUG_CALENDAR=1
+  // CRITICAL: Use useState to prevent hydration mismatch - localStorage access must happen after mount
+  const [calendarDebugEnabled, setCalendarDebugEnabled] = useState(false)
+  
   // Lifecycle logging
   useEffect(() => {
+    // Set debug flag after mount to prevent hydration mismatch
+    setCalendarDebugEnabled(isDebugEnabled('CALENDAR'))
     debugLog('CALENDAR', `CalendarView MOUNT: tableId=${tableId}, viewId=${viewId}`)
     // Mark as mounted to prevent hydration mismatch with FullCalendar
     setMounted(true)
@@ -113,9 +119,6 @@ export default function CalendarView({
       debugLog('CALENDAR', `CalendarView UNMOUNT: tableId=${tableId}, viewId=${viewId}`)
     }
   }, [])
-  
-  // DEBUG_CALENDAR: Enable via localStorage.DEBUG_CALENDAR=1
-  const calendarDebugEnabled = isDebugEnabled('CALENDAR')
   // CRITICAL: Initialize resolvedTableId from prop immediately (don't wait for useEffect)
   const [resolvedTableId, setResolvedTableId] = useState<string>(tableId || '')
   const [supabaseTableName, setSupabaseTableName] = useState<string | null>(null)

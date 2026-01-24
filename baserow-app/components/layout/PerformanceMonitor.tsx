@@ -29,6 +29,7 @@ export default function PerformanceMonitor() {
     let totalFrameTime = 0
     let lastFrameTime = performance.now()
     let slowFrameCount = 0
+    let longTaskCount = 0
 
     // Monitor frame rate
     const checkFrameRate = () => {
@@ -55,11 +56,11 @@ export default function PerformanceMonitor() {
 
       if (frameCount % 60 === 0) {
         const avgFrameTime = totalFrameTime / frameCount
-        setStats({
-          longTasks: stats.longTasks,
+        setStats(prev => ({
+          longTasks: prev.longTasks, // Preserve longTasks from observer updates
           slowFrames: slowFrameCount,
           avgFrameTime,
-        })
+        }))
         totalFrameTime = 0
         frameCount = 0
       }
@@ -71,34 +72,48 @@ export default function PerformanceMonitor() {
     const rafId = requestAnimationFrame(checkFrameRate)
 
     // Monitor long tasks (blocking operations >50ms)
-    let longTaskCount = 0
+    // Check if long-task entry type is supported before trying to observe it
+    let observer: PerformanceObserver | null = null
+    
     try {
-      const observer = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const duration = (entry as any).duration
-          if (duration > 50) {
-            longTaskCount++
-            setStats(prev => ({ ...prev, longTasks: longTaskCount }))
-            console.warn("⚠️ Long task detected (blocking operation):", {
-              duration: `${duration.toFixed(2)}ms`,
-              startTime: (entry as any).startTime,
-              message: "This operation blocked the UI thread",
-            })
+      // Check if PerformanceObserver.supportedEntryTypes includes 'long-task'
+      // This is the proper way to check if an entry type is supported
+      const supportedEntryTypes = (PerformanceObserver as any).supportedEntryTypes
+      const isLongTaskSupported = supportedEntryTypes && supportedEntryTypes.includes('long-task')
+      
+      if (isLongTaskSupported) {
+        observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            const duration = (entry as any).duration
+            if (duration > 50) {
+              longTaskCount++
+              setStats(prev => ({ ...prev, longTasks: longTaskCount }))
+              console.warn("⚠️ Long task detected (blocking operation):", {
+                duration: `${duration.toFixed(2)}ms`,
+                startTime: (entry as any).startTime,
+                message: "This operation blocked the UI thread",
+              })
+            }
           }
-        }
-      })
+        })
 
-      observer.observe({ entryTypes: ["long-task"] })
-
-      return () => {
-        observer.disconnect()
-        cancelAnimationFrame(rafId)
+        observer.observe({ entryTypes: ["long-task"] })
+      } else {
+        // Long task API not supported - silently skip
+        // This prevents the console error
       }
     } catch (e) {
-      // Long task API not supported
-      return () => cancelAnimationFrame(rafId)
+      // Long task API not supported or error occurred
+      // Silently handle - this is expected in some browsers
     }
-  }, [stats.longTasks])
+
+    return () => {
+      if (observer) {
+        observer.disconnect()
+      }
+      cancelAnimationFrame(rafId)
+    }
+  }, []) // Empty dependency array - effect should only run once on mount
 
   // Log performance warnings
   useEffect(() => {

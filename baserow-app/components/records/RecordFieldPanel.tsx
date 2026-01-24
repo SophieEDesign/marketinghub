@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast"
 import InlineFieldEditor from "./InlineFieldEditor"
 import type { TableField } from "@/types/fields"
 import { getFieldDisplayName } from "@/lib/fields/display"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface FieldConfig {
   field: string // Field name or ID
@@ -140,10 +141,21 @@ export default function RecordFieldPanel({
           .eq("id", recordId)
           .single()
 
-        if (error) throw error
+        if (error) {
+          // Ignore abort errors (expected during navigation/unmount)
+          if (!isAbortError(error)) {
+            throw error
+          }
+          return
+        }
 
         setRecordData(data || {})
       } catch (error: any) {
+        // Ignore abort errors (expected during navigation/unmount)
+        if (isAbortError(error)) {
+          return
+        }
+        
         console.error("Error loading record:", error)
         toast({
           title: "Failed to load record",

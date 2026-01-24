@@ -43,6 +43,7 @@ import { resolveChoiceColor, normalizeHexColor } from "@/lib/field-colors"
 import { asArray } from "@/lib/utils/asArray"
 import { normalizeUuid } from "@/lib/utils/ids"
 import { isAbortError } from "@/lib/api/error-handling"
+import { useOperationFeedback } from "@/hooks/useOperationFeedback"
 
 type MultiSource = {
   id: string
@@ -262,8 +263,9 @@ export default function MultiCalendarView({
             if (isAbortError(tableRes.error)) {
               return // Component unmounted, exit early
             }
-            console.error(`MultiCalendar: Error loading table for source ${s.id}:`, tableRes.error)
-            nextErrors[s.id] = tableRes.error.message || "Failed to load table"
+            const errorMsg = tableRes.error.message || "Failed to load table"
+            nextErrors[s.id] = errorMsg
+            handleError(tableRes.error, "Calendar Error", `Failed to load table for source "${s.label || s.id}": ${errorMsg}`)
             continue
           }
 
@@ -360,8 +362,9 @@ export default function MultiCalendarView({
             if (isAbortError(rowsRes.error)) {
               return
             }
-            console.error(`MultiCalendar: Error loading rows for source ${s.id}:`, rowsRes.error)
-            nextErrors[s.id] = rowsRes.error.message || "Failed to load rows"
+            const errorMsg = rowsRes.error.message || "Failed to load rows"
+            nextErrors[s.id] = errorMsg
+            handleError(rowsRes.error, "Calendar Error", `Failed to load rows for source "${s.label || s.id}": ${errorMsg}`)
             continue
           }
 
@@ -377,8 +380,9 @@ export default function MultiCalendarView({
           if (isAbortError(err)) {
             return
           }
-          console.error(`MultiCalendar: Exception loading rows for source ${s.id}:`, err)
-          nextErrors[s.id] = err.message || "Unexpected error loading rows"
+          const errorMsg = err.message || "Unexpected error loading rows"
+          nextErrors[s.id] = errorMsg
+          handleError(err, "Calendar Error", `Unexpected error loading source "${s.label || s.id}": ${errorMsg}`)
         }
       }
 
@@ -391,8 +395,9 @@ export default function MultiCalendarView({
       if (isAbortError(err)) {
         return
       }
-      console.error("MultiCalendar: Fatal error in loadAll:", err)
-      setErrorsBySource({ __global__: err.message || "Failed to load calendar data" })
+      const errorMsg = err.message || "Failed to load calendar data"
+      setErrorsBySource({ __global__: errorMsg })
+      handleError(err, "Calendar Error", `Failed to load calendar: ${errorMsg}`)
     } finally {
       setLoading(false)
       loadingRef.current = false

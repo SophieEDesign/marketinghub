@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useUserRole } from "@/lib/hooks/useUserRole"
 import { Trash2 } from "lucide-react"
 import { isAbortError } from "@/lib/api/error-handling"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 interface RecordModalProps {
   isOpen: boolean
@@ -39,6 +40,7 @@ export default function RecordModal({
   const [fields, setFields] = useState<TableField[]>([])
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
   const { role: userRole } = useUserRole()
@@ -185,6 +187,8 @@ export default function RecordModal({
     }
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   async function handleDeleteRecord() {
     if (!tableName || !recordId) return
     if (userRole !== 'admin') {
@@ -196,9 +200,11 @@ export default function RecordModal({
       return
     }
 
-    if (!confirm("Are you sure you want to delete this record? This action cannot be undone.")) {
-      return
-    }
+    setShowDeleteConfirm(true)
+  }
+
+  async function confirmDelete() {
+    if (!tableName || !recordId) return
 
     setDeleting(true)
     try {
@@ -291,6 +297,17 @@ export default function RecordModal({
           )}
         </div>
       </DialogContent>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={confirmDelete}
+        title="Delete Record"
+        description="Are you sure you want to delete this record? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={deleting}
+      />
     </Dialog>
   )
 }

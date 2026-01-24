@@ -19,6 +19,8 @@ export interface UseGridDataOptions {
   filters?: FilterConfig[]
   sorts?: Array<{ field: string; direction: 'asc' | 'desc' }>
   limit?: number
+  /** Optional: callback for error notifications (e.g., toast) */
+  onError?: (error: unknown, message: string) => void
 }
 
 export interface UseGridDataReturn {
@@ -423,10 +425,14 @@ export function useGridData({
       await runQuery(0)
     } catch (err: unknown) {
       if (isAbortError(err)) return
-      console.error('Error loading grid data:', err)
       const errorMessage = (err as { message?: string })?.message || 'Failed to load data'
+      console.error('Error loading grid data:', err)
       setError(errorMessage)
       setRows([])
+      // Notify parent component of error for toast display
+      if (onError) {
+        onError(err, errorMessage)
+      }
     } finally {
       setLoading(false)
       isLoadingRef.current = false

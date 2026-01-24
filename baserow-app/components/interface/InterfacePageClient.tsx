@@ -25,6 +25,7 @@ import { usePageEditMode, useBlockEditMode } from "@/contexts/EditModeContext"
 import { VIEWS_ENABLED } from "@/lib/featureFlags"
 import { toPostgrestColumn } from "@/lib/supabase/postgrest"
 import { normalizeUuid } from "@/lib/utils/ids"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
 
 // Lazy load InterfaceBuilder for dashboard/overview pages
 const InterfaceBuilder = dynamic(() => import("./InterfaceBuilder"), { ssr: false })
@@ -1273,7 +1274,7 @@ function InterfacePageClientInternal({
 // Export wrapper with Suspense boundary for useSearchParams
 export default function InterfacePageClient(props: InterfacePageClientProps) {
   return (
-    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={<div className="h-screen flex items-center justify-center"><LoadingSpinner size="lg" text="Loading page..." /></div>}>
       <InterfacePageClientInternal {...props} />
     </Suspense>
   )

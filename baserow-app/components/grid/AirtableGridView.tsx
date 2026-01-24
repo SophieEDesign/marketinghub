@@ -19,6 +19,8 @@ import {
 } from '@dnd-kit/sortable'
 import { Plus, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import { useGridData, type GridRow } from '@/lib/grid/useGridData'
+import { useOperationFeedback } from '@/hooks/useOperationFeedback'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
 import BulkActionBar from './BulkActionBar'
@@ -112,6 +114,14 @@ export default function AirtableGridView({
   const isMobile = useIsMobile()
   const isTablet = useIsTablet()
   const [tableIdState, setTableIdState] = useState<string | null>(tableId || null)
+  const [showPasteConfirm, setShowPasteConfirm] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [pendingPasteAction, setPendingPasteAction] = useState<(() => void) | null>(null)
+  const [selectedCount, setSelectedCount] = useState(0)
+  const { handleError } = useOperationFeedback({
+    errorTitle: "Grid Error",
+    showSuccess: false,
+  })
 
   // `viewId` can be a composite like "<uuid>:<index>" in some contexts.
   // Only use a strict UUID when querying `grid_view_settings`.
@@ -231,6 +241,7 @@ export default function AirtableGridView({
     fields,
     filters: standardizedFilters,
     sorts,
+    onError: (err, message) => handleError(err, "Grid Error", message),
   })
 
   // CRITICAL: Normalize all inputs at grid entry point
@@ -1145,7 +1156,9 @@ export default function AirtableGridView({
         console.error('Error saving cell:', error)
         // Show user-friendly error message
         if (error?.message) {
-          alert(error.message)
+          handleError(error, "Failed to save cell", error.message)
+        } else {
+          handleError(error, "Failed to save cell", "An error occurred while saving the cell")
         }
         throw error
       }
@@ -1444,13 +1457,15 @@ export default function AirtableGridView({
           }, 0)
           
           if (estimatedCells > 10000) {
-            const proceed = confirm(
-              `This paste operation will affect approximately ${estimatedCells.toLocaleString()} cells. ` +
-              `This may take a while. Do you want to continue?`
-            )
-            if (!proceed) {
-              return
-            }
+            setPendingPasteAction(() => async () => {
+              const result = await dataView.paste(currentSelection, clipboardText)
+              // Result handling is done in onChangesApplied callback
+              if (result.appliedCount === 0 && result.errors.length === 0) {
+                return
+              }
+            })
+            setShowPasteConfirm(true)
+            return
           }
           
           const result = await dataView.paste(currentSelection, clipboardText)
@@ -2015,27 +2030,8 @@ export default function AirtableGridView({
           window.location.reload()
         }}
         onBulkDelete={async () => {
-          if (!confirm(`Are you sure you want to delete ${selectedRowIds.size} record${selectedRowIds.size !== 1 ? 's' : ''}? This action cannot be undone.`)) {
-            return
-          }
-          
-          const recordIds = Array.from(selectedRowIds)
-          const response = await fetch('/api/records/bulk-delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              table: tableName,
-              recordIds,
-            }),
-          })
-          
-          if (!response.ok) {
-            const data = await response.json()
-            throw new Error(data.error || 'Failed to delete records')
-          }
-          
-          handleClearSelection()
-          window.location.reload()
+          setSelectedCount(selectedRowIds.size)
+          setShowBulkDeleteConfirm(true)
         }}
       />
 
@@ -2053,6 +2049,56 @@ export default function AirtableGridView({
           tableFields={safeFields}
         />
       )}
+
+      {/* Paste Confirmation Dialog */}
+      <ConfirmDialog
+        open={showPasteConfirm}
+        onOpenChange={setShowPasteConfirm}
+        onConfirm={async () => {
+          if (pendingPasteAction) {
+            await pendingPasteAction()
+            setPendingPasteAction(null)
+          }
+        }}
+        title="Large Paste Operation"
+        description="This paste operation will affect approximately 10,000+ cells. This may take a while. Do you want to continue?"
+        confirmLabel="Continue"
+        cancelLabel="Cancel"
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={showBulkDeleteConfirm}
+        onOpenChange={setShowBulkDeleteConfirm}
+        onConfirm={async () => {
+          const recordIds = Array.from(selectedRowIds)
+          try {
+            const response = await fetch('/api/records/bulk-delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                table: tableName,
+                recordIds,
+              }),
+            })
+            
+            if (!response.ok) {
+              const data = await response.json()
+              throw new Error(data.error || 'Failed to delete records')
+            }
+            
+            handleClearSelection()
+            window.location.reload()
+          } catch (error: any) {
+            handleError(error, "Failed to delete records", error.message || "An error occurred while deleting records")
+          }
+        }}
+        title="Delete Records"
+        description={`Are you sure you want to delete ${selectedCount} record${selectedCount !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </div>
   )
 }
