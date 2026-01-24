@@ -21,6 +21,7 @@ import { Plus, ChevronDown, ChevronRight, Check } from 'lucide-react'
 import { useGridData, type GridRow } from '@/lib/grid/useGridData'
 import { useOperationFeedback } from '@/hooks/useOperationFeedback'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ErrorState } from '@/components/ui/ErrorState'
 import { CellFactory } from './CellFactory'
 import GridColumnHeader from './GridColumnHeader'
 import BulkActionBar from './BulkActionBar'
@@ -235,7 +236,7 @@ export default function AirtableGridView({
       }))
   }, [viewFilters])
 
-  const { rows: allRows, loading, error, updateCell, refresh, insertRow, physicalColumns } = useGridData({
+  const { rows: allRows, loading, error, updateCell, refresh, retry, insertRow, physicalColumns } = useGridData({
     tableName,
     tableId: tableIdState || tableId,
     fields,
@@ -1533,9 +1534,13 @@ export default function AirtableGridView({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-red-500">Error: {error}</div>
-      </div>
+      <ErrorState
+        title="Failed to load grid data"
+        message={error}
+        onRetry={retry}
+        retryLabel="Try again"
+        className="h-64"
+      />
     )
   }
 

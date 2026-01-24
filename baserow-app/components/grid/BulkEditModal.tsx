@@ -25,6 +25,7 @@ import type { TableField } from "@/types/fields"
 import { FIELD_TYPES } from "@/types/fields"
 import RichTextEditor from "@/components/fields/RichTextEditor"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+import { useOperationFeedback } from "@/hooks/useOperationFeedback"
 
 interface BulkEditModalProps {
   isOpen: boolean
@@ -49,6 +50,10 @@ export default function BulkEditModal({
   onSave,
   onDelete,
 }: BulkEditModalProps) {
+  const { handleError, handleSuccess } = useOperationFeedback({
+    errorTitle: "Bulk Edit Failed",
+    successTitle: "Bulk Edit Successful",
+  })
   const [selectedFieldName, setSelectedFieldName] = useState<string>("")
   const [operation, setOperation] = useState<Operation>("set")
   const [value, setValue] = useState<any>("")
@@ -110,12 +115,12 @@ export default function BulkEditModal({
 
   const handleSave = async () => {
     if (!selectedFieldName) {
-      alert("Please select a field")
+      handleError(new Error("Please select a field"), "Validation Error", "Please select a field to edit")
       return
     }
 
     if (operation === "set" && value === "" && selectedField?.type !== "checkbox") {
-      alert("Please enter a value")
+      handleError(new Error("Please enter a value"), "Validation Error", "Please enter a value")
       return
     }
 
@@ -136,9 +141,11 @@ export default function BulkEditModal({
       }
 
       await onSave(updates)
+      handleSuccess("Bulk Edit Complete", `Successfully updated ${selectedCount} record${selectedCount !== 1 ? "s" : ""}`)
+      onClose()
     } catch (error: any) {
       console.error("Error saving bulk edit:", error)
-      alert(error.message || "Failed to save changes")
+      handleError(error, "Bulk Edit Failed", error.message || "Failed to save changes")
     } finally {
       setSaving(false)
     }
@@ -155,10 +162,11 @@ export default function BulkEditModal({
     setDeleting(true)
     try {
       await onDelete()
+      handleSuccess("Records Deleted", `Successfully deleted ${selectedCount} record${selectedCount !== 1 ? "s" : ""}`)
       onClose()
     } catch (error: any) {
       console.error("Error deleting records:", error)
-      alert(error.message || "Failed to delete records")
+      handleError(error, "Delete Failed", error.message || "Failed to delete records")
     } finally {
       setDeleting(false)
     }

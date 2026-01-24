@@ -160,6 +160,7 @@ export default function MultiCalendarView({
 }: MultiCalendarViewProps) {
   const supabase = useMemo(() => createClient(), [])
   const { openRecord } = useRecordPanel()
+  const { handleError } = useOperationFeedback()
 
   // Respect block permissions + per-block add-record toggle (same contract as GridBlock).
   const appearance = (blockConfig as any)?.appearance || {}

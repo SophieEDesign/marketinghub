@@ -1263,14 +1263,9 @@ export default function Canvas({
     }
   }, [pageId, isEditing, layout.length])
 
-  if (blocks.length === 0) {
-    return (
-      <div className="w-full h-full" />
-    )
-  }
-
   // GUARDRAIL LOG: Log grid signature to verify grid config is identical in edit/public
   // CRITICAL: Use useState + useEffect to prevent hydration mismatch - localStorage access must happen after mount
+  // CRITICAL: Hooks must be called before any early returns (React rules of hooks)
   const [shouldLogLayout, setShouldLogLayout] = useState(false)
   
   useEffect(() => {

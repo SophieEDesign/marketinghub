@@ -29,6 +29,7 @@ import {
 } from "@/lib/interface/editor-safety"
 import { usePageAggregates } from "@/lib/dashboard/usePageAggregates"
 import { useFilterState } from "@/lib/interface/filter-state"
+import SaveStatusIndicator from "@/components/save-status/SaveStatusIndicator"
 
 interface InterfaceBuilderProps {
   page: Page
@@ -1129,15 +1130,7 @@ export default function InterfaceBuilder({
                   </button>
                 )}
                 <div className="flex items-center gap-2">
-                  {saveStatus === "saving" && (
-                    <span className="text-xs text-gray-500">Saving...</span>
-                  )}
-                  {saveStatus === "saved" && (
-                    <span className="text-xs text-green-600">All changes saved</span>
-                  )}
-                  {saveStatus === "error" && (
-                    <span className="text-xs text-red-600">Save failed</span>
-                  )}
+                  <SaveStatusIndicator status={saveStatus} />
                   <button
                     onClick={() => handleSave()}
                     disabled={isSaving}

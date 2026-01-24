@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { ErrorState } from "@/components/ui/ErrorState"
 import { parseCSV, sanitizeTableName, type ParsedCSV } from "@/lib/import/csvParser"
 import { createSupabaseTable } from "@/lib/import/createSupabaseTable"
 import { insertRows } from "@/lib/import/insertRows"
@@ -12,12 +13,17 @@ type ImportStatus = 'idle' | 'parsing' | 'preview' | 'importing' | 'success' | '
 
 export default function ImportClient() {
   const router = useRouter()
+  const { handleError, handleSuccess } = useOperationFeedback({
+    errorTitle: "Import Failed",
+    successTitle: "Import Successful",
+  })
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null)
   const [tableName, setTableName] = useState("")
   const [status, setStatus] = useState<ImportStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState("")
+  const [progressPercent, setProgressPercent] = useState(0)
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     if (!selectedFile.name.endsWith('.csv')) {
@@ -40,11 +46,15 @@ export default function ImportClient() {
       
       setStatus('preview')
       setProgress('')
+      setProgressPercent(0)
     } catch (err: any) {
-      setError(err.message || 'Failed to parse CSV file')
+      const errorMessage = err.message || 'Failed to parse CSV file'
+      setError(errorMessage)
       setStatus('error')
       setFile(null)
       setProgress('')
+      setProgressPercent(0)
+      handleError(err, "Parse Error", errorMessage)
     }
   }, [])
 
@@ -301,7 +311,15 @@ export default function ImportClient() {
         <div className="border rounded-lg p-8 text-center">
           <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin text-blue-600" />
           <p className="text-lg font-medium mb-2">Importing table...</p>
-          <p className="text-sm text-gray-600">{progress}</p>
+          <p className="text-sm text-gray-600 mb-4">{progress}</p>
+          {progressPercent > 0 && (
+            <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-md mx-auto">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -319,16 +337,19 @@ export default function ImportClient() {
       )}
 
       {/* Error */}
-      {error && (
-        <div className="border border-red-200 bg-red-50 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-red-800">Error</p>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-        </div>
+      {error && status === 'error' && (
+        <ErrorState
+          title="Import Failed"
+          message={error}
+          onRetry={() => {
+            setFile(null)
+            setParsedData(null)
+            setTableName("")
+            setStatus('idle')
+            setError(null)
+          }}
+          retryLabel="Try Again"
+        />
       )}
     </div>
   )

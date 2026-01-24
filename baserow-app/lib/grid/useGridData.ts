@@ -5,6 +5,7 @@ import { asArray } from '@/lib/utils/asArray'
 import { applyFiltersToQuery, type FilterConfig } from '@/lib/interface/filters'
 import { buildSelectClause, toPostgrestColumn } from '@/lib/supabase/postgrest'
 import { isAbortError } from '@/lib/api/error-handling'
+import { useToast } from '@/components/ui/use-toast'
 
 export interface GridRow {
   id: string
@@ -28,6 +29,7 @@ export interface UseGridDataReturn {
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
+  retry: () => Promise<void> // Retry loading data after an error
   updateCell: (rowId: string, fieldName: string, value: unknown) => Promise<void>
   insertRow: (data: Record<string, any>) => Promise<GridRow | null>
   deleteRow: (rowId: string) => Promise<void>
@@ -49,7 +51,9 @@ export function useGridData({
   filters = [],
   sorts = [],
   limit = DEFAULT_LIMIT,
+  onError,
 }: UseGridDataOptions): UseGridDataReturn {
+  const { toast } = useToast()
   const [rows, setRows] = useState<GridRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -439,7 +443,7 @@ export function useGridData({
     }
     // CRITICAL: Only depend on stringified versions to prevent infinite loops
     // Refs ensure we always use latest values without causing re-renders
-  }, [tableName, tableId, filtersString, refreshPhysicalColumns, safeLimit, sortsString])
+  }, [tableName, tableId, filtersString, refreshPhysicalColumns, safeLimit, sortsString, onError, toast])
 
   useEffect(() => {
     loadData()
@@ -594,10 +598,21 @@ export function useGridData({
         })
         // Reload on error to sync with server
         await loadData()
+        // Show error toast
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        if (onError) {
+          onError(err, errorMessage)
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Failed to update cell",
+            description: errorMessage,
+          })
+        }
         throw err
       }
     },
-    [tableName, tableId, loadData]
+    [tableName, tableId, loadData, onError, toast]
   )
 
   const insertRow = useCallback(
@@ -646,13 +661,28 @@ export function useGridData({
         setRows((prevRows) => prevRows.filter((row) => row.id !== rowId))
       } catch (err: unknown) {
         console.error('Error deleting row:', err)
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        if (onError) {
+          onError(err, errorMessage)
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Failed to delete row",
+            description: errorMessage,
+          })
+        }
         throw err
       }
     },
-    [tableName]
+    [tableName, onError, toast]
   )
 
   const refresh = useCallback(async () => {
+    await loadData()
+  }, [loadData])
+
+  const retry = useCallback(async () => {
+    setError(null)
     await loadData()
   }, [loadData])
 
@@ -661,6 +691,7 @@ export function useGridData({
     loading,
     error,
     refresh,
+    retry,
     updateCell,
     insertRow,
     deleteRow,

@@ -187,8 +187,6 @@ export default function RecordModal({
     }
   }
 
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
   async function handleDeleteRecord() {
     if (!tableName || !recordId) return
     if (userRole !== 'admin') {

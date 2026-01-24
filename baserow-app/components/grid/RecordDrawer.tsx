@@ -33,6 +33,7 @@ export default function RecordDrawer({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [formData, setFormData] = useState<Record<string, any>>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   useEffect(() => {
     if (isOpen && rowId && tableName) {
@@ -108,12 +109,15 @@ export default function RecordDrawer({
     }
   }
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   async function handleDelete() {
     if (!rowId || !tableName || deleting) return
+    setShowDeleteConfirm(true)
+  }
 
-    if (!confirm("Are you sure you want to delete this record?")) {
-      return
-    }
+  async function confirmDelete() {
+    if (!rowId || !tableName || deleting) return
 
     setDeleting(true)
     try {
@@ -294,6 +298,17 @@ export default function RecordDrawer({
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={confirmDelete}
+        title="Delete Record"
+        description="Are you sure you want to delete this record? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={deleting}
+      />
     </>
   )
 }

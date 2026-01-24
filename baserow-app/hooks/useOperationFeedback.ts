@@ -2,7 +2,7 @@
 
 import { useCallback } from "react"
 import { useToast } from "@/components/ui/use-toast"
-import { isAbortError } from "@/lib/supabase/errors"
+import { isAbortError } from "@/lib/api/error-handling"
 
 interface OperationFeedbackOptions {
   successTitle?: string

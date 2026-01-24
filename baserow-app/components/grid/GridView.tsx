@@ -25,6 +25,9 @@ import Cell from "./Cell"
 import { CellFactory } from "./CellFactory"
 import { useRecordPanel } from "@/contexts/RecordPanelContext"
 import type { TableField } from "@/types/fields"
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import { SkeletonLoader } from "@/components/ui/SkeletonLoader"
+import EmptyTableState from "@/components/empty-states/EmptyTableState"
 import { computeFormulaFields } from "@/lib/formulas/computeFormulaFields"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import type { FilterTree } from "@/lib/filters/canonical-model"
@@ -43,6 +46,7 @@ import { normalizeUuid } from "@/lib/utils/ids"
 import type { LinkedField } from "@/types/fields"
 import { resolveLinkedFieldDisplayMap } from "@/lib/dataView/linkedFields"
 import { debugLog, debugWarn, debugError } from "@/lib/interface/debug-flags"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -565,6 +569,11 @@ export default function GridView({
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null)
   const [selectedColumnName, setSelectedColumnName] = useState<string | null>(null)
   const [frozenColumns, setFrozenColumns] = useState<number>(0) // Number of columns to freeze (typically 1 for first column)
+  const [showRequiredFieldsConfirm, setShowRequiredFieldsConfirm] = useState(false)
+  const [showDeleteFieldConfirm, setShowDeleteFieldConfirm] = useState(false)
+  const [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(null)
+  const [fieldToDelete, setFieldToDelete] = useState<string | null>(null)
+  const [missingRequiredFields, setMissingRequiredFields] = useState<string[]>([])
 
   // Track previous groupBy to detect changes
   const prevGroupByRef = useRef<string | undefined>(groupBy)
@@ -2212,14 +2221,31 @@ export default function GridView({
         if (missingRequired.length > 0) {
           // Warn user about missing required fields, but allow creation for spreadsheet-style UX
           // Database NOT NULL constraints will prevent the insert if they're configured
-          const proceed = confirm(
-            `Warning: The following required fields are empty:\n\n${missingRequired.join('\n')}\n\n` +
-            `Do you want to create the record anyway? You can fill these fields after creation.\n\n` +
-            `Note: If the database enforces NOT NULL constraints, the creation will fail.`
-          )
-          if (!proceed) {
-            return // User chose to cancel
-          }
+          setMissingRequiredFields(missingRequired)
+          setPendingAction(async () => {
+            // Action will proceed after confirmation - insert the row
+            const { data, error } = await supabase
+              .from(supabaseTableName)
+              .insert([newRow])
+              .select()
+              .single()
+
+            if (error) {
+              debugError('LAYOUT', "Error adding row:", error)
+              if (error.code === "42P01" || error.message?.includes("does not exist")) {
+                setTableError(`The table "${supabaseTableName}" does not exist in Supabase.`)
+              } else if (error.code === "23502" || error.message?.includes("null value") || error.message?.includes("violates not-null constraint")) {
+                // PostgreSQL NOT NULL constraint violation
+                alert(`Cannot create record: Required fields must have values. Please fill in all required fields.`)
+              } else {
+                alert(`Failed to create record: ${error.message || 'Unknown error'}`)
+              }
+            } else {
+              await loadRows()
+            }
+          })
+          setShowRequiredFieldsConfirm(true)
+          return // Wait for user confirmation
         }
       }
 
@@ -2423,14 +2449,22 @@ export default function GridView({
   }
 
   async function handleColumnDelete(fieldName: string) {
-    if (!confirm(`Are you sure you want to delete the field "${fieldName}"? This action cannot be undone.`)) {
+    setFieldToDelete(fieldName)
+    setShowDeleteFieldConfirm(true)
+  }
+
+  async function confirmDeleteField() {
+    if (!fieldToDelete) {
+      setShowDeleteFieldConfirm(false)
       return
     }
 
     try {
-      const field = tableFields.find((f) => f.name === fieldName)
+      const field = tableFields.find((f) => f.name === fieldToDelete)
       if (!field) {
-        debugWarn('LAYOUT', 'Field not found for deletion:', fieldName)
+        debugWarn('LAYOUT', 'Field not found for deletion:', fieldToDelete)
+        setShowDeleteFieldConfirm(false)
+        setFieldToDelete(null)
         return
       }
 
@@ -2646,8 +2680,12 @@ export default function GridView({
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading...</div>
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <LoadingSpinner size="lg" text="Loading grid data..." />
+        <div className="w-full max-w-4xl px-4 space-y-2">
+          <SkeletonLoader count={3} height="h-10" className="w-full" />
+          <SkeletonLoader count={5} height="h-8" className="w-full" />
+        </div>
       </div>
     )
   }
@@ -3052,9 +3090,19 @@ export default function GridView({
                       (enableRecordOpen && allowOpenRecord ? 1 : 0) +
                       (imageField ? 1 : 0)
                     }
-                    className="px-4 py-12 text-center text-gray-500"
+                    className="px-4 py-12"
                   >
-                    {searchTerm ? "No rows match your search" : "No rows found"}
+                    {searchTerm ? (
+                      <div className="text-center text-gray-500">
+                        No rows match your search. Try adjusting your search terms.
+                      </div>
+                    ) : (
+                      <div className="flex justify-center">
+                        <EmptyTableState
+                          onCreateRecord={editable && !isEditing && handleAddRow ? handleAddRow : undefined}
+                        />
+                      </div>
+                    )}
                   </td>
                 </tr>
               ) : flattenedGroups ? (
@@ -3477,6 +3525,28 @@ export default function GridView({
           </button>
         </div>
       )}
+
+      {/* Confirmation Dialogs */}
+      <ConfirmDialog
+        open={showRequiredFieldsConfirm}
+        onOpenChange={setShowRequiredFieldsConfirm}
+        onConfirm={handleCreateRowWithConfirmation}
+        title="Missing Required Fields"
+        description={`Warning: The following required fields are empty:\n\n${missingRequiredFields.join('\n')}\n\nDo you want to create the record anyway? You can fill these fields after creation.\n\nNote: If the database enforces NOT NULL constraints, the creation will fail.`}
+        confirmLabel="Create Anyway"
+        cancelLabel="Cancel"
+        variant="default"
+      />
+      <ConfirmDialog
+        open={showDeleteFieldConfirm}
+        onOpenChange={setShowDeleteFieldConfirm}
+        onConfirm={confirmDeleteField}
+        title="Delete Field"
+        description={fieldToDelete ? `Are you sure you want to delete the field "${fieldToDelete}"? This action cannot be undone.` : ""}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+      />
     </div>
   )
 }
