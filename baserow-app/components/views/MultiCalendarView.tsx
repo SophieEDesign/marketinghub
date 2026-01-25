@@ -245,9 +245,17 @@ export default function MultiCalendarView({
   }, [filters])
 
   const loadAll = useCallback(async () => {
-    if (loadingRef.current) return
+    if (loadingRef.current) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MultiCalendar] loadAll: Already loading, skipping')
+      }
+      return
+    }
     loadingRef.current = true
     setLoading(true)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MultiCalendar] loadAll: Starting load', { sourcesCount: sources.length, sourcesKey })
+    }
     const nextErrors: Record<string, string> = {}
     try {
       const nextTables: Record<string, { tableId: string; supabaseTable: string; name: string }> = {}
@@ -421,6 +429,13 @@ export default function MultiCalendarView({
       setViewDefaultFiltersBySource(nextViewDefaults)
       setRowsBySource(nextRows)
       setErrorsBySource(nextErrors)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MultiCalendar] loadAll: Completed successfully', {
+          tablesCount: Object.keys(nextTables).length,
+          rowsCount: Object.values(nextRows).reduce((sum, rows) => sum + rows.length, 0),
+          errorsCount: Object.keys(nextErrors).length
+        })
+      }
     } catch (err: any) {
       if (isAbortError(err)) {
         // Component unmounted, exit early but clear loading state
@@ -435,19 +450,39 @@ export default function MultiCalendarView({
       setLoading(false)
       loadingRef.current = false
     }
-  }, [filtersKey, quickFiltersBySource, sourcesKey, supabase])
+  }, [filtersKey, quickFiltersBySource, sourcesKey, supabase, handleError, sources])
 
   // Reload whenever sources change (and on first mount). Quick filters are applied via dedicated reload button (keeps it predictable).
   useEffect(() => {
     // Only load if we have valid sources
     if (!sources || sources.length === 0) {
       // No sources configured - clear loading state immediately
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[MultiCalendar] useEffect: No sources, clearing loading state')
+      }
       setLoading(false)
       loadingRef.current = false
+      setTablesBySource({})
+      setFieldsBySource({})
+      setRowsBySource({})
+      setErrorsBySource({})
       return
     }
-    loadAll()
-  }, [loadAll, sourcesKey, filtersKey, sources])
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MultiCalendar] useEffect: Triggering loadAll', { sourcesKey, filtersKey, sourcesCount: sources.length })
+    }
+    // Call loadAll - it's stable based on sourcesKey and filtersKey
+    loadAll().catch((err) => {
+      // Handle any unhandled promise rejections
+      if (!isAbortError(err)) {
+        console.error('[MultiCalendar] loadAll promise rejection:', err)
+        setLoading(false)
+        loadingRef.current = false
+        setErrorsBySource({ __global__: err.message || 'Failed to load calendar' })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourcesKey, filtersKey]) // Only depend on stable keys, not the callback or sources array
 
   const events = useMemo<EventInput[]>(() => {
     const enabledSet = new Set(enabledSourceIds)

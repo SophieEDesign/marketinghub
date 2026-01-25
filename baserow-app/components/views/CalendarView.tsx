@@ -457,28 +457,30 @@ export default function CalendarView({
       return
     }
     
-    // Update the ref with current key before checking
-    const currentFieldsKey = loadedTableFieldsKey
-    if (prevLoadedFieldsKeyRef.current !== currentFieldsKey) {
-      prevLoadedFieldsKeyRef.current = currentFieldsKey
-    }
-    
     // Only reload if filters (including date range), searchQuery, or loadedTableFields actually changed
     const currentFiltersKey = filtersKey
+    const currentFieldsKey = loadedTableFieldsKey
     const combinedKey = `${currentFiltersKey}|${searchQuery}|${currentFieldsKey}|${reloadKey ?? 0}`
     
     // CRITICAL: Only reload if the combined key actually changed.
     // DO NOT check rows.length === 0 as it causes infinite loops (React error #185).
     // If a table has 0 rows, that's a valid state and we should not keep reloading.
     // The first load is triggered when prevFiltersRef.current === "" (initial state).
-    const shouldLoad = prevFiltersRef.current !== combinedKey
+    // CRITICAL: Set ref BEFORE checking to prevent race conditions
+    const previousKey = prevFiltersRef.current
+    const shouldLoad = previousKey !== combinedKey
     
     if (shouldLoad) {
-      debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
-        keyChanged: prevFiltersRef.current !== combinedKey,
-        combinedKey: combinedKey.substring(0, 50) + '...'
-      })
+      // CRITICAL: Set ref IMMEDIATELY before calling loadRows to prevent infinite loops
+      // This ensures that if the effect runs again before loadRows completes, it won't trigger another load
       prevFiltersRef.current = combinedKey
+      
+      debugLog('CALENDAR', 'Calendar: Triggering loadRows', {
+        previousKey: previousKey.substring(0, 50) + '...',
+        newKey: combinedKey.substring(0, 50) + '...',
+        keyChanged: true
+      })
+      
       loadRows()
     }
     // Use loadedTableFieldsKey to track actual content changes, not just length

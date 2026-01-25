@@ -99,6 +99,13 @@ export default function ListView({
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createInitialData, setCreateInitialData] = useState<Record<string, any> | null>(null)
 
+  // CRITICAL: Prevent infinite retry loops
+  const loadingRowsRef = useRef(false)
+  const consecutiveFailuresRef = useRef(0)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const MAX_CONSECUTIVE_FAILURES = 3
+  const RETRY_DELAY_MS = 2000 // 2 seconds
+
   // Load table name for record panel
   useEffect(() => {
     if (tableId && !tableName) {
@@ -134,24 +141,80 @@ export default function ListView({
   }, [groupBy])
 
   // Update currentFilters when filters prop changes
+  // CRITICAL: Memoize filters to prevent unnecessary re-renders
+  const filtersKey = useMemo(() => {
+    return JSON.stringify(filters.map(f => ({
+      field: f.field,
+      operator: f.operator,
+      value: f.value,
+      value2: f.value2,
+    })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))
+  }, [filters])
+
+  // CRITICAL: Memoize sorts to prevent unnecessary re-renders
+  const sortsKey = useMemo(() => {
+    return JSON.stringify(sorts.map(s => ({
+      field_name: s.field_name,
+      direction: s.direction,
+    })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))
+  }, [sorts])
+
   useEffect(() => {
     setCurrentFilters(filters)
-  }, [filters])
+  }, [filtersKey, filters])
 
   // Load rows
   useEffect(() => {
+    // CRITICAL: Prevent concurrent loads and infinite retry loops
+    if (loadingRowsRef.current) {
+      return
+    }
+
+    // Reset failure count when dependencies change (new query)
+    consecutiveFailuresRef.current = 0
+
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
     loadRows()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableId, supabaseTableName, currentFilters, sorts, reloadKey])
+  }, [tableId, supabaseTableName, filtersKey, sortsKey, reloadKey])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   async function loadRows() {
+    // CRITICAL: Prevent concurrent loads
+    if (loadingRowsRef.current) {
+      return
+    }
+
+    // CRITICAL: Stop retrying after too many failures
+    if (consecutiveFailuresRef.current >= MAX_CONSECUTIVE_FAILURES) {
+      console.warn(`[ListView] Stopping retries after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`)
+      return
+    }
+
     if (!supabaseTableName) {
       setRows([])
       setLoading(false)
       return
     }
 
+    loadingRowsRef.current = true
     setLoading(true)
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController()
+
     try {
       const supabase = createClient()
       let query = supabase.from(supabaseTableName).select("*")
@@ -189,18 +252,36 @@ export default function ListView({
       const { data, error } = await query
 
       if (error) {
-        if (isAbortError(error)) return
+        if (isAbortError(error)) {
+          loadingRowsRef.current = false
+          return
+        }
         console.error("Error loading rows:", error)
-        setRows([])
+        consecutiveFailuresRef.current += 1
+        
+        // Only clear rows if we haven't loaded any yet (preserve existing data on error)
+        // Don't clear rows - preserve existing data to prevent flashing
+
+        // Don't retry automatically - let the user refresh or fix the issue
+        // The effect will retry when dependencies change
       } else {
+        // Success - reset failure count
+        consecutiveFailuresRef.current = 0
         setRows(data || [])
       }
     } catch (error) {
-      if (isAbortError(error)) return
+      if (isAbortError(error)) {
+        loadingRowsRef.current = false
+        return
+      }
       console.error("Error loading rows:", error)
-      setRows([])
+      consecutiveFailuresRef.current += 1
+      
+      // Don't clear rows - preserve existing data to prevent flashing
     } finally {
       setLoading(false)
+      loadingRowsRef.current = false
+      abortControllerRef.current = null
     }
   }
 
