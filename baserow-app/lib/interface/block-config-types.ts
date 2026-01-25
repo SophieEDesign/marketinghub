@@ -50,9 +50,8 @@ export interface KPIBlockConfig extends BaseBlockConfig {
 
 // Text Block Config
 // CRITICAL: This is the contract for TextBlock
-export interface TextBlockConfig extends BaseBlockConfig {
-  // Note: content, text_content, markdown are already in BlockConfig
-}
+// Note: content, text_content, markdown are already in BlockConfig
+export type TextBlockConfig = BaseBlockConfig
 
 // Image Block Config
 export interface ImageBlockConfig extends BaseBlockConfig {
@@ -66,9 +65,8 @@ export interface GalleryBlockConfig extends GridBlockConfig {
 }
 
 // Divider Block Config
-export interface DividerBlockConfig extends BaseBlockConfig {
-  // Note: divider appearance settings are already in BlockConfig.appearance
-}
+// Note: divider appearance settings are already in BlockConfig.appearance
+export type DividerBlockConfig = BaseBlockConfig
 
 // Button Block Config
 export interface ButtonBlockConfig extends BaseBlockConfig {
@@ -90,9 +88,8 @@ export interface LinkPreviewBlockConfig extends BaseBlockConfig {
 }
 
 // Filter Block Config
-export interface FilterBlockConfig extends BaseBlockConfig {
-  // Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
-}
+// Note: table_id, target_blocks, allowed_fields, allowed_operators, filters are already in BlockConfig
+export type FilterBlockConfig = BaseBlockConfig
 
 /**
  * Discriminated Union of all block configs
