@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { notFound } from 'next/navigation'
 
 /**
  * Catch-all route for /settings/* subroutes

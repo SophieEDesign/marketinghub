@@ -391,7 +391,7 @@ export default function CalendarView({
       return prevDateFromKeyRef.current
     }
     prevDateFromTimeRef.current = currentTime
-    const key = currentTime ? format(dateFrom, 'yyyy-MM-dd') : ''
+    const key = currentTime && dateFrom ? format(dateFrom, 'yyyy-MM-dd') : ''
     prevDateFromKeyRef.current = key
     return key
   }, [dateFrom ? dateFrom.getTime() : null])
@@ -403,7 +403,7 @@ export default function CalendarView({
       return prevDateToKeyRef.current
     }
     prevDateToTimeRef.current = currentTime
-    const key = currentTime ? format(dateTo, 'yyyy-MM-dd') : ''
+    const key = currentTime && dateTo ? format(dateTo, 'yyyy-MM-dd') : ''
     prevDateToKeyRef.current = key
     return key
   }, [dateTo ? dateTo.getTime() : null])
