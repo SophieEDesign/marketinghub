@@ -37,6 +37,8 @@ interface GalleryViewProps {
   blockConfig?: Record<string, any>
   /** When grouping, should groups start collapsed? Default: true (closed). */
   defaultGroupsCollapsed?: boolean
+  /** Callback to open block settings (for configuration) */
+  onOpenSettings?: () => void
 }
 
 export default function GalleryView({

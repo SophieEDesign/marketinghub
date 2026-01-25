@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase/client"
 import type { TableField } from "@/types/fields"
 import FieldEditor from "@/components/fields/FieldEditor"
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
 
 interface RecordDrawerProps {
   isOpen: boolean
@@ -110,8 +109,6 @@ export default function RecordDrawer({
       setSaving(false)
     }
   }
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   async function handleDelete() {
     if (!rowId || !tableName || deleting) return

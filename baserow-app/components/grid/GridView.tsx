@@ -3099,7 +3099,7 @@ export default function GridView({
                     ) : (
                       <div className="flex justify-center">
                         <EmptyTableState
-                          onCreateRecord={allowInlineCreate && !isEditing && handleAddRow ? handleAddRow : undefined}
+                          onCreateRecord={allowInlineCreate && !isEditing ? handleAddRow : undefined}
                           onConfigureView={isEditing && onEditField ? () => {
                             // Open view settings or field configuration
                             // This could open a settings panel or navigate to view settings

@@ -14,7 +14,6 @@ import { CellFactory } from "@/components/grid/CellFactory"
 import { applyFiltersToQuery, deriveDefaultValuesFromFilters, type FilterConfig } from "@/lib/interface/filters"
 import { isAbortError } from "@/lib/api/error-handling"
 import EmptyState from "@/components/empty-states/EmptyState"
-import { Button } from "@/components/ui/button"
 
 interface KanbanViewProps {
   tableId: string
