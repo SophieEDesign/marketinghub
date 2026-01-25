@@ -532,7 +532,7 @@ export default function CalendarView({
       return
     }
     
-    // CRITICAL: Set ref IMMEDIATELY and SYNCHRONOUSLY before calling loadRows to prevent infinite loops
+    // CRITICAL: Set refs IMMEDIATELY and SYNCHRONOUSLY before calling loadRows to prevent infinite loops
     // This ensures that if the effect runs again before loadRows completes, it won't trigger another load
     prevCombinedKeyRef.current = combinedKey
     prevFiltersRef.current = combinedKey // Keep this for backward compatibility
@@ -546,6 +546,7 @@ export default function CalendarView({
       hasBothDates: !!(dateFromKey && dateToKey)
     })
     
+    // Call loadRows - the isLoadingRef will prevent concurrent calls
     loadRows()
     // Use loadedTableFieldsKey to track actual content changes, not just length
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1570,6 +1571,18 @@ export default function CalendarView({
     [allowOpenRecord, selectedEventId]
   )
 
+  // CRITICAL: Stabilize linkedValueLabelMaps reference to prevent FullCalendar infinite loops
+  // Use a ref to cache the previous value and only update when content actually changes
+  const prevLinkedValueLabelMapsRef = useRef<Record<string, Record<string, string>>>({})
+  const stableLinkedValueLabelMaps = useMemo(() => {
+    // Only update if content actually changed (deep comparison)
+    if (areLinkedValueMapsEqual(linkedValueLabelMaps, prevLinkedValueLabelMapsRef.current)) {
+      return prevLinkedValueLabelMapsRef.current
+    }
+    prevLinkedValueLabelMapsRef.current = linkedValueLabelMaps
+    return linkedValueLabelMaps
+  }, [linkedValueLabelMaps, areLinkedValueMapsEqual])
+
   const calendarEventContent = useCallback((eventInfo: { event: EventInput; timeText?: string }) => {
     const image = eventInfo.event.extendedProps?.image
     const fitImageSize = eventInfo.event.extendedProps?.fitImageSize || false
@@ -1604,7 +1617,7 @@ export default function CalendarView({
                 <TimelineFieldValue
                   field={titleField}
                   value={titleValue ?? eventInfo.event.title}
-                  valueLabelMap={linkedValueLabelMaps[titleField.name] || linkedValueLabelMaps[titleField.id]}
+                  valueLabelMap={stableLinkedValueLabelMaps[titleField.name] || stableLinkedValueLabelMaps[titleField.id]}
                   compact={true}
                 />
               ) : (
@@ -1617,7 +1630,7 @@ export default function CalendarView({
                   <TimelineFieldValue
                     field={f.field as TableField}
                     value={f.value}
-                    valueLabelMap={linkedValueLabelMaps[f.field.name] || linkedValueLabelMaps[f.field.id]}
+                    valueLabelMap={stableLinkedValueLabelMaps[f.field.name] || stableLinkedValueLabelMaps[f.field.id]}
                     compact={true}
                   />
                 ) : (
@@ -1629,7 +1642,7 @@ export default function CalendarView({
         </div>
       </div>
     )
-  }, [linkedValueLabelMaps])
+  }, [stableLinkedValueLabelMaps])
 
   const onCalendarEventClick = useCallback(
     (info: EventClickArg) => {

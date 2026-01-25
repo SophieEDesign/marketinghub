@@ -128,6 +128,20 @@ export default function AirtableGridView({
   // Only use a strict UUID when querying `grid_view_settings`.
   const viewUuid = useMemo(() => normalizeUuid(viewId), [viewId])
 
+  // Diagnostic logging on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
+      console.log('[AirtableGridView] Component mounted:', {
+        tableName,
+        tableId: tableId || tableIdState,
+        viewId,
+        fieldsCount: fields?.length || 0,
+        hasTableName: !!tableName,
+        hasFields: Array.isArray(fields) && fields.length > 0,
+      })
+    }
+  }, []) // Only log on mount
+
   // Load tableId from tableName if not provided
   useEffect(() => {
     // We need `tableId` for more than opening records (e.g. schema sync/self-heal in `useGridData`).
@@ -143,6 +157,9 @@ export default function AirtableGridView({
             .single()
           if (data) {
             setTableIdState(data.id)
+            if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
+              console.log('[AirtableGridView] Loaded tableId:', data.id)
+            }
           }
         } catch (error) {
           console.warn("Could not load table ID:", error)
@@ -1524,6 +1541,17 @@ export default function AirtableGridView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedCell, selectedRowIds, selectedColumnId, safeFields, dataView, getCurrentSelection])
 
+  // Check for missing tableName - this is a critical error
+  if (!tableName) {
+    return (
+      <ErrorState
+        title="Table not configured"
+        message="The grid cannot load because no table name is provided. Please check the table configuration."
+        className="h-64"
+      />
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1561,6 +1589,28 @@ export default function AirtableGridView({
           Clear search
         </button>
       </div>
+    )
+  }
+
+  // Check for empty fields - this would cause the grid to render with no columns
+  if (visibleFields.length === 0) {
+    // Log diagnostic info in development
+    if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || localStorage.getItem('DEBUG_GRID') === '1')) {
+      console.warn('[AirtableGridView] No visible fields found:', {
+        tableName,
+        tableId: tableIdState || tableId,
+        fieldsCount: safeFields.length,
+        fields: safeFields.map(f => ({ name: f?.name, type: f?.type })),
+        physicalColumns: physicalColumns ? Array.from(physicalColumns) : null,
+        columnOrder: columnOrder.length,
+      })
+    }
+    return (
+      <ErrorState
+        title="No fields configured"
+        message="The grid cannot display because there are no fields configured for this table. Please add fields using the field builder."
+        className="h-64"
+      />
     )
   }
 

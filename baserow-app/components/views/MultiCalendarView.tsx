@@ -740,7 +740,9 @@ export default function MultiCalendarView({
       })
   }, [sources, tablesBySource])
 
-  if (loading) {
+  // CRITICAL: Don't render content during SSR - wait for mount to prevent hydration mismatches
+  // This prevents issues with legendItems, errorMessages, and other mapped content that depends on client-side data
+  if (!mounted || loading) {
     return (
       <div className="h-full flex items-center justify-center">
         <LoadingSpinner size="lg" text="Loading calendar data..." />
@@ -896,45 +898,39 @@ export default function MultiCalendarView({
       )}
 
       <div className="flex-1 min-h-0">
-        {/* CRITICAL: Only render FullCalendar after mount to prevent hydration mismatch (React error #185) */}
+        {/* CRITICAL: FullCalendar only renders after mount (guarded by outer mounted check) */}
         {/* FullCalendar generates dynamic DOM IDs that differ between server and client */}
-        {mounted ? (
-          <FullCalendar
-            plugins={calendarPlugins}
-            initialView="dayGridMonth"
-            height="100%"
-            events={events}
-            editable={!isViewOnly && !isEditing}
-            eventDrop={handleEventDrop}
-            eventClick={onCalendarEventClick}
-            dateClick={onCalendarDateClick}
-            // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
-            eventDidMount={(arg: any) => {
-              const el = arg?.el as HTMLElement | undefined
-              if (!el) return
-              el.style.setProperty("background-color", "#ffffff", "important")
-              el.style.setProperty("border-color", "#e5e7eb", "important")
-              el.style.setProperty("color", "#111827", "important")
-              el.style.setProperty("border-width", "1px", "important")
-              el.style.setProperty("border-style", "solid", "important")
-              el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
-              el.style.setProperty("border-radius", "6px", "important")
+        <FullCalendar
+          plugins={calendarPlugins}
+          initialView="dayGridMonth"
+          height="100%"
+          events={events}
+          editable={!isViewOnly && !isEditing}
+          eventDrop={handleEventDrop}
+          eventClick={onCalendarEventClick}
+          dateClick={onCalendarDateClick}
+          // Enforce unified styling even if FullCalendar/theme CSS overrides event colors.
+          eventDidMount={(arg: any) => {
+            const el = arg?.el as HTMLElement | undefined
+            if (!el) return
+            el.style.setProperty("background-color", "#ffffff", "important")
+            el.style.setProperty("border-color", "#e5e7eb", "important")
+            el.style.setProperty("color", "#111827", "important")
+            el.style.setProperty("border-width", "1px", "important")
+            el.style.setProperty("border-style", "solid", "important")
+            el.style.setProperty("box-shadow", "0 1px 2px rgba(0,0,0,0.05)", "important")
+            el.style.setProperty("border-radius", "6px", "important")
 
-              // FullCalendar often renders the title inside an <a>; force link text color too.
-              try {
-                el.querySelectorAll("a").forEach((a) => {
-                  ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
-                })
-              } catch {
-                // ignore
-              }
-            }}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            Loading calendar...
-          </div>
-        )}
+            // FullCalendar often renders the title inside an <a>; force link text color too.
+            try {
+              el.querySelectorAll("a").forEach((a) => {
+                ;(a as HTMLElement).style.setProperty("color", "#111827", "important")
+              })
+            } catch {
+              // ignore
+            }
+          }}
+        />
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

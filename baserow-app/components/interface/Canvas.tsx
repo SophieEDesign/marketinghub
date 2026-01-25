@@ -413,7 +413,7 @@ export default function Canvas({
   const detectSnapTargets = useCallback((
     draggedBlock: Layout,
     allLayout: Layout[],
-    snapThreshold: number = 1 // Grid units (approximately 30px for default rowHeight, scales with grid)
+    snapThreshold: number = 2 // Grid units (approximately 60px for default rowHeight, scales with grid)
   ): {
     left?: { block: Layout; distance: number; targetX: number }
     right?: { block: Layout; distance: number; targetX: number }
@@ -576,8 +576,10 @@ export default function Canvas({
       const otherH = otherBlock.h || 4
       
       // Check if blocks would overlap
-      const xOverlap = !(clampedX + draggedW <= otherX || clampedX >= otherX + otherW)
-      const yOverlap = !(draggedY + draggedH <= otherY || draggedY >= otherY + otherH)
+      // Two blocks overlap if their ranges intersect (not just touch)
+      // Range [a1, a2] and [b1, b2] overlap if: a2 > b1 && a1 < b2
+      const xOverlap = (clampedX + draggedW > otherX) && (clampedX < otherX + otherW)
+      const yOverlap = (draggedY + draggedH > otherY) && (draggedY < otherY + otherH)
       
       if (xOverlap && yOverlap) {
         wouldOverlap = true
@@ -639,8 +641,10 @@ export default function Canvas({
       const otherH = otherBlock.h || 4
       
       // Check if blocks would overlap
-      const xOverlap = !(draggedX + draggedW <= otherX || draggedX >= otherX + otherW)
-      const yOverlap = !(clampedY + draggedH <= otherY || clampedY >= otherY + otherH)
+      // Two blocks overlap if their ranges intersect (not just touch)
+      // Range [a1, a2] and [b1, b2] overlap if: a2 > b1 && a1 < b2
+      const xOverlap = (draggedX + draggedW > otherX) && (draggedX < otherX + otherW)
+      const yOverlap = (clampedY + draggedH > otherY) && (clampedY < otherY + otherH)
       
       if (xOverlap && yOverlap) {
         wouldOverlap = true
@@ -657,8 +661,10 @@ export default function Canvas({
   }, [detectSnapTargets])
   
   /**
-   * Applies smart snapping with priority: horizontal > vertical > compaction
-   * This respects user intent by preferring horizontal adjacency when valid
+   * Applies smart snapping with priority based on drag direction
+   * If dragging primarily vertically, prioritize vertical snap
+   * If dragging primarily horizontally, prioritize horizontal snap
+   * This respects user intent by matching snap direction to drag direction
    */
   const applySmartSnap = useCallback((
     draggedBlock: Layout,
@@ -666,26 +672,54 @@ export default function Canvas({
     dragVector: { dx: number; dy: number } | null,
     cols: number
   ): Layout => {
-    // Try horizontal snap first (respects spatial intent)
-    const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
-    if (horizontalSnapped) {
-      debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
-        originalX: draggedBlock.x,
-        snappedX: horizontalSnapped.x,
-        direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
-      })
-      return horizontalSnapped
-    }
+    // Determine primary drag direction
+    const isVerticalDrag = dragVector && Math.abs(dragVector.dy) > Math.abs(dragVector.dx)
+    const isHorizontalDrag = dragVector && Math.abs(dragVector.dx) > Math.abs(dragVector.dy)
     
-    // Try vertical snap as second priority
-    const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
-    if (verticalSnapped) {
-      debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
-        originalY: draggedBlock.y,
-        snappedY: verticalSnapped.y,
-        direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
-      })
-      return verticalSnapped
+    // If dragging primarily vertically, try vertical snap first
+    if (isVerticalDrag) {
+      const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
+      if (verticalSnapped) {
+        debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
+          originalY: draggedBlock.y,
+          snappedY: verticalSnapped.y,
+          direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
+        })
+        return verticalSnapped
+      }
+      
+      // If vertical snap didn't work, try horizontal as fallback
+      const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
+      if (horizontalSnapped) {
+        debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i} (fallback)`, {
+          originalX: draggedBlock.x,
+          snappedX: horizontalSnapped.x,
+          direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
+        })
+        return horizontalSnapped
+      }
+    } else {
+      // Default: try horizontal snap first (for horizontal drags or no clear direction)
+      const horizontalSnapped = applyHorizontalSnap(draggedBlock, allLayout, dragVector, cols)
+      if (horizontalSnapped) {
+        debugLog('LAYOUT', `[Canvas] Applied horizontal snap to block ${draggedBlock.i}`, {
+          originalX: draggedBlock.x,
+          snappedX: horizontalSnapped.x,
+          direction: draggedBlock.x! > horizontalSnapped.x ? 'left' : 'right',
+        })
+        return horizontalSnapped
+      }
+      
+      // Try vertical snap as second priority
+      const verticalSnapped = applyVerticalSnap(draggedBlock, allLayout)
+      if (verticalSnapped) {
+        debugLog('LAYOUT', `[Canvas] Applied vertical snap to block ${draggedBlock.i}`, {
+          originalY: draggedBlock.y,
+          snappedY: verticalSnapped.y,
+          direction: draggedBlock.y! > verticalSnapped.y ? 'top' : 'bottom',
+        })
+        return verticalSnapped
+      }
     }
     
     // No snap available - return original position
